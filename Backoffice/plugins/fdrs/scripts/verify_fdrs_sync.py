@@ -19,8 +19,9 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 _scripts = Path(__file__).resolve().parents[3] / "scripts"
 if str(_scripts) not in sys.path:
@@ -38,6 +39,7 @@ from fdrs_data_fetcher import (  # noqa: E402
     DEFAULT_FDRS_YEARS_START,
     build_fdrs_table,
 )
+from fdrs_sync_constants import FdrsSyncCancelled  # noqa: E402
 from fdrs_sync_verify import (  # noqa: E402
     DATA_POINT_COLUMNS,
     KPI_COVERAGE_COLUMNS,
@@ -59,6 +61,10 @@ from fdrs_sync_verify import (  # noqa: E402
 logger = logging.getLogger(__name__)
 
 FDRS_TEMPLATE_ID = 21
+
+
+class FdrsVerifyCancelled(FdrsSyncCancelled):
+    """User cancelled FDRS sync verification."""
 
 
 def _parse_years(raw: Optional[str], *, test: bool = False) -> List[int]:
@@ -93,23 +99,31 @@ def _parse_states(raw: Optional[str]) -> Optional[List[int]]:
     return out or None
 
 
-def _load_api_key(explicit: Optional[str]) -> str:
+def _resolve_api_key(explicit: Optional[str] = None) -> str:
     if explicit and explicit.strip():
         return explicit.strip()
     key = (os.environ.get("FDRS_DATA_API_KEY") or "").strip()
     if key:
         return key
     try:
-        from flask import current_app
+        from flask import current_app, has_app_context
 
-        cfg = (current_app.config.get("FDRS_DATA_API_KEY") or "").strip()
-        if cfg:
-            return cfg
+        if has_app_context():
+            cfg = (current_app.config.get("FDRS_DATA_API_KEY") or "").strip()
+            if cfg:
+                return cfg
     except Exception:
         pass
-    raise SystemExit(
+    raise RuntimeError(
         "FDRS_DATA_API_KEY is required (--api-key, env, or Backoffice/.env)."
     )
+
+
+def _load_api_key(explicit: Optional[str]) -> str:
+    try:
+        return _resolve_api_key(explicit)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def _load_databank_lookups(template_id: int = FDRS_TEMPLATE_ID) -> Tuple[
@@ -225,99 +239,200 @@ def _print_summary(points, output_path: str) -> None:
         logger.info("  ... and %d more problem rows", len(problems) - 25)
 
 
+def execute_verification(
+    *,
+    years: List[int],
+    output_path: str,
+    skip_imputed: bool = False,
+    fresh_imputed: bool = False,
+    problems_only: bool = False,
+    reported_states: Optional[List[int]] = None,
+    iso3: Optional[str] = None,
+    kpi: Optional[str] = None,
+    api_key: Optional[str] = None,
+    data_api_base: Optional[str] = None,
+    template_id: int = FDRS_TEMPLATE_ID,
+    progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> Dict[str, Any]:
+    """Compare FDRS API values to Backoffice form_data. Requires a Flask app context."""
+    from flask import current_app, has_app_context
+    from import_fdrs_form_data import write_rows_to_excel
+
+    if not has_app_context():
+        raise RuntimeError("execute_verification requires a Flask app context")
+
+    def _raise_if_cancelled() -> None:
+        if cancel_check and cancel_check():
+            raise FdrsVerifyCancelled()
+
+    def _emit(
+        message: str,
+        percent: Optional[float] = None,
+        *,
+        stage: str = "verify",
+        current: Optional[int] = None,
+        total: Optional[int] = None,
+        stats: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        _raise_if_cancelled()
+        if not progress_cb:
+            return
+        payload: Dict[str, Any] = {
+            "stage": stage,
+            "message": message,
+            "percent": percent,
+            "current": current,
+            "total": total,
+        }
+        if stats is not None:
+            payload["stats"] = stats
+        progress_cb(payload)
+
+    def _on_fetch(payload: Dict[str, Any]) -> None:
+        _raise_if_cancelled()
+        if progress_cb:
+            progress_cb(payload)
+
+    resolved_key = _resolve_api_key(api_key)
+    base_url = (
+        (data_api_base or "").strip().rstrip("/")
+        or (current_app.config.get("FDRS_DATA_API_BASE") or "").strip().rstrip("/")
+        or DEFAULT_DATA_API_BASE
+    )
+    cache_dir = os.path.join(current_app.instance_path, "fdrs_imputed_cache")
+    year_list = list(years)
+    if not year_list:
+        year_list = list(range(DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END + 1))
+
+    iso_filter = {s.strip().upper() for s in (iso3 or "").split(",") if s.strip()}
+    kpi_filter = {s.strip() for s in (kpi or "").split(",") if s.strip()}
+
+    logger.info("Fetching FDRS data-api (%s, years %s–%s)...", base_url, min(year_list), max(year_list))
+    _emit(
+        f"Fetching FDRS data-api ({min(year_list)}–{max(year_list)})...",
+        2.0,
+        stage="fetch_fdrs",
+    )
+    _fdrs_data, _disagg, _excl, snapshot_rows, _disability = build_fdrs_table(
+        base_url=base_url,
+        api_key=resolved_key,
+        years=year_list,
+        imputed_url=None,
+        imputed_api_key=resolved_key,
+        use_imputed_cache=not fresh_imputed,
+        cache_dir=cache_dir,
+        reported_import_states=reported_states,
+        include_imputed=not skip_imputed,
+        progress_cb=_on_fetch,
+    )
+    logger.info("FDRS snapshot rows: %d", len(snapshot_rows))
+    _raise_if_cancelled()
+    time.sleep(0.02)
+
+    logger.info("Loading template %s form_data from Backoffice DB...", template_id)
+    _emit("Loading Backoffice form_data...", 60.0, stage="load_databank")
+    (
+        assignment_by_key,
+        base_to_item_id,
+        bank_kpi_codes,
+        country_names,
+        kpi_names,
+        by_iso_year_item,
+    ) = _load_databank_lookups(template_id)
+    logger.info(
+        "Databank: assignments=%d mapped_kpis=%d form_data_rows=%d",
+        len(assignment_by_key),
+        len(base_to_item_id),
+        len(by_iso_year_item),
+    )
+    _raise_if_cancelled()
+    time.sleep(0.02)
+
+    _emit("Comparing FDRS values to form_data...", 72.0, stage="classify")
+    points = group_snapshot_to_points(snapshot_rows)
+    if iso_filter:
+        points = [p for p in points if (p.iso3 or "").upper() in iso_filter]
+    if kpi_filter:
+        points = [p for p in points if p.base_kpi in kpi_filter]
+    apply_mapping_skips(
+        points,
+        assignment_by_key=assignment_by_key,
+        base_to_item_id=base_to_item_id,
+        bank_kpi_codes=bank_kpi_codes,
+    )
+    _raise_if_cancelled()
+    attach_databank_values(
+        points,
+        by_iso_year_item=by_iso_year_item,
+        country_names=country_names,
+        kpi_names=kpi_names,
+    )
+    attach_classification(points)
+    _raise_if_cancelled()
+    time.sleep(0.02)
+
+    export_points = points
+    if problems_only:
+        export_points = [p for p in points if p.status in (STATUS_MISSING, STATUS_MISMATCH)]
+
+    counts = counts_by_status(points)
+    stats = {
+        "total": sum(counts.values()),
+        "matched": counts[STATUS_MATCHED],
+        "skipped_intentionally": counts[STATUS_SKIPPED],
+        "missing": counts[STATUS_MISSING],
+        "mismatch": counts[STATUS_MISMATCH],
+        "exported": len(export_points),
+        "problems_only": bool(problems_only),
+        "years": year_list,
+    }
+
+    _emit("Writing Excel workbook...", 90.0, stage="write_excel", stats=stats)
+    rows = [point_to_row(p) for p in export_points]
+    summary_rows, coverage_rows = summarize_points(points)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    write_rows_to_excel(
+        rows,
+        output_path,
+        columns=DATA_POINT_COLUMNS,
+        extra_sheets=[
+            ("summary", summary_rows, SUMMARY_COLUMNS),
+            ("kpi_coverage", coverage_rows, KPI_COVERAGE_COLUMNS),
+        ],
+        sheet_title="data_points",
+    )
+    _print_summary(points, output_path)
+    _emit("Completed", 100.0, stage="complete", stats=stats)
+    stats["output_path"] = output_path
+    stats["problem_count"] = counts[STATUS_MISSING] + counts[STATUS_MISMATCH]
+    return stats
+
+
 def run_verification(args: argparse.Namespace) -> int:
     from app import create_app
-    from flask import current_app
-    from import_fdrs_form_data import write_rows_to_excel
+    from flask import current_app, has_app_context
 
     years = _parse_years(args.years, test=args.test)
     states = _parse_states(args.fdrs_reported_states)
-    iso_filter = {s.strip().upper() for s in (args.iso3 or "").split(",") if s.strip()}
-    kpi_filter = {s.strip() for s in (args.kpi or "").split(",") if s.strip()}
-
-    app = create_app()
+    app = current_app._get_current_object() if has_app_context() else create_app()
     with app.app_context():
-        api_key = _load_api_key(args.api_key)
-        base_url = (
-            (args.data_api_base or "").strip().rstrip("/")
-            or (current_app.config.get("FDRS_DATA_API_BASE") or "").strip().rstrip("/")
-            or DEFAULT_DATA_API_BASE
-        )
-        cache_dir = os.path.join(current_app.instance_path, "fdrs_imputed_cache")
         output_path = args.output or os.path.join(
             current_app.instance_path, "fdrs_sync_verification.xlsx"
         )
-
-        logger.info("Fetching FDRS data-api (%s, years %s–%s)...", base_url, min(years), max(years))
-        _fdrs_data, _disagg, _excl, snapshot_rows, _disability = build_fdrs_table(
-            base_url=base_url,
-            api_key=api_key,
+        result = execute_verification(
             years=years,
-            imputed_url=None,
-            imputed_api_key=api_key,
-            use_imputed_cache=not args.fresh_imputed,
-            cache_dir=cache_dir,
-            reported_import_states=states,
-            include_imputed=not args.skip_imputed,
+            output_path=output_path,
+            skip_imputed=bool(args.skip_imputed),
+            fresh_imputed=bool(args.fresh_imputed),
+            problems_only=bool(args.problems_only),
+            reported_states=states,
+            iso3=args.iso3,
+            kpi=args.kpi,
+            api_key=args.api_key,
+            data_api_base=args.data_api_base,
         )
-        logger.info("FDRS snapshot rows: %d", len(snapshot_rows))
-
-        logger.info("Loading template %s form_data from Backoffice DB...", FDRS_TEMPLATE_ID)
-        (
-            assignment_by_key,
-            base_to_item_id,
-            bank_kpi_codes,
-            country_names,
-            kpi_names,
-            by_iso_year_item,
-        ) = _load_databank_lookups(FDRS_TEMPLATE_ID)
-        logger.info(
-            "Databank: assignments=%d mapped_kpis=%d form_data_rows=%d",
-            len(assignment_by_key),
-            len(base_to_item_id),
-            len(by_iso_year_item),
-        )
-
-        points = group_snapshot_to_points(snapshot_rows)
-        if iso_filter:
-            points = [p for p in points if (p.iso3 or "").upper() in iso_filter]
-        if kpi_filter:
-            points = [p for p in points if p.base_kpi in kpi_filter]
-        apply_mapping_skips(
-            points,
-            assignment_by_key=assignment_by_key,
-            base_to_item_id=base_to_item_id,
-            bank_kpi_codes=bank_kpi_codes,
-        )
-        attach_databank_values(
-            points,
-            by_iso_year_item=by_iso_year_item,
-            country_names=country_names,
-            kpi_names=kpi_names,
-        )
-        attach_classification(points)
-
-        export_points = points
-        if args.problems_only:
-            export_points = [p for p in points if p.status in (STATUS_MISSING, STATUS_MISMATCH)]
-
-        rows = [point_to_row(p) for p in export_points]
-        summary_rows, coverage_rows = summarize_points(points)
-        os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
-        write_rows_to_excel(
-            rows,
-            output_path,
-            columns=DATA_POINT_COLUMNS,
-            extra_sheets=[
-                ("summary", summary_rows, SUMMARY_COLUMNS),
-                ("kpi_coverage", coverage_rows, KPI_COVERAGE_COLUMNS),
-            ],
-            sheet_title="data_points",
-        )
-        _print_summary(points, output_path)
-
-        counts = counts_by_status(points)
-        if counts[STATUS_MISSING] or counts[STATUS_MISMATCH]:
+        if result.get("problem_count"):
             return 1
         return 0
 

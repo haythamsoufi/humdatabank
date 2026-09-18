@@ -46,6 +46,22 @@ MANUAL_ACTIVITY_OVERRIDES: dict[tuple[str, str], ActivityEndpointSpec] = {
         description="Rotated an API key",
         activity_type="admin_settings",
     ),
+    ("POST", "fdrs.run_data_sync"): ActivityEndpointSpec(
+        description="Ran FDRS data sync",
+        activity_type="admin_system",
+    ),
+    ("POST", "fdrs.data_sync_cancel"): ActivityEndpointSpec(
+        description="Cancelled FDRS data sync",
+        activity_type="admin_system",
+    ),
+    ("POST", "fdrs.run_sync_verify"): ActivityEndpointSpec(
+        description="Ran FDRS sync verification",
+        activity_type="admin_system",
+    ),
+    ("POST", "fdrs.sync_verify_cancel"): ActivityEndpointSpec(
+        description="Cancelled FDRS sync verification",
+        activity_type="admin_system",
+    ),
     ("POST", "upr_excel_import.run_import"): ActivityEndpointSpec(
         description="Imported UPR country reporting data",
         activity_type="admin_assignments",

@@ -52,6 +52,7 @@ import urllib.error
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from fdrs_sync_constants import (
+    FdrsSyncCancelled,
     fdrs_kpi_has_data_availability_suffix,
     fdrs_kpi_strip_data_availability_suffix,
 )
@@ -1170,6 +1171,8 @@ def build_fdrs_table(
         }
         try:
             progress_cb(payload)
+        except FdrsSyncCancelled:
+            raise
         except Exception as e:
             logger.debug("progress_cb failed: %s", e)
 

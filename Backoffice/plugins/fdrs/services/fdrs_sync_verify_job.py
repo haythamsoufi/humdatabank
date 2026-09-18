@@ -1,4 +1,4 @@
-"""FDRS data sync background job (Track A — single-item batch via ai_job_runner)."""
+"""FDRS sync verification background job (AIJob + single item, same pattern as data sync)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 from app.extensions import db
 from app.models import AIJob, AIJobItem
 from app.services.imports.async_import_job_store import (
-    FDRS_DATA_SYNC_JOB_TYPE,
+    FDRS_SYNC_VERIFY_JOB_TYPE,
     clear_import_job_logging_state,
     get_import_job,
     get_import_job_logging_state,
@@ -27,23 +27,8 @@ from app.services.ai.ai_job_runner import (
     start_ai_job_thread,
 )
 from app.utils.datetime_helpers import utcnow
-from app.services.imports.import_change_log import (
-    ImportChangeLogWriter,
-    attach_import_change_log_to_activity,
-)
 
 logger = logging.getLogger(__name__)
-
-# Throttle for _touch_sync_item_heartbeat: each touch opens a fresh DB session
-# (checkout + SELECT + UPDATE + COMMIT + release) on the shared connection
-# pool. progress_cb fires every ~250 rows during the upsert phase, which on a
-# large sync (tens of thousands of rows) can mean a heartbeat touch every
-# fraction of a second — competing for pool connections and GIL time with the
-# request threads serving the browser's status polls. The stale-job threshold
-# is minutes (FDRS_DATA_SYNC_JOB_STALE_SECONDS, default 900s, min 60s), so a
-# few seconds of slack here is safe.
-_HEARTBEAT_MIN_INTERVAL_SECONDS = 5.0
-_last_heartbeat_ts: Dict[int, float] = {}
 
 
 def _fdrs_imports_dir() -> str:
@@ -52,27 +37,14 @@ def _fdrs_imports_dir() -> str:
     return ensure_fdrs_scripts_in_path()
 
 
-def _touch_sync_item_heartbeat(item_id: int, *, force: bool = False) -> None:
-    """Keep AIJobItem.updated_at fresh so stale recovery works during long syncs.
-
-    Rate-limited (see ``_HEARTBEAT_MIN_INTERVAL_SECONDS``) unless ``force=True``.
-    """
-    item_id = int(item_id)
-    now = time.time()
-    if not force and (now - _last_heartbeat_ts.get(item_id, 0.0)) < _HEARTBEAT_MIN_INTERVAL_SECONDS:
-        return
-    _last_heartbeat_ts[item_id] = now
+def _touch_verify_item_heartbeat(item_id: int) -> None:
     try:
         with _isolated_job_session() as session:
-            item = session.get(AIJobItem, item_id)
+            item = session.get(AIJobItem, int(item_id))
             if item:
                 item.updated_at = utcnow()
     except Exception as exc:
-        logger.debug("FDRS sync item heartbeat failed: item=%s err=%s", item_id, exc)
-
-
-def _clear_sync_item_heartbeat(item_id: int) -> None:
-    _last_heartbeat_ts.pop(int(item_id), None)
+        logger.debug("FDRS verify item heartbeat failed: item=%s err=%s", item_id, exc)
 
 
 def _summarize_error(exc: BaseException) -> str:
@@ -82,21 +54,18 @@ def _summarize_error(exc: BaseException) -> str:
     return err_msg
 
 
-def create_fdrs_data_sync_job(
+def create_fdrs_sync_verify_job(
     *,
     user_id: int,
     template_id: int,
-    dry_run: bool,
-    batch_size: int,
     fdrs_years: Optional[List[int]],
-    test_limit: Optional[int],
-    imputed_use_cache: bool,
-    sync_documents: bool,
+    skip_imputed: bool,
+    fresh_imputed: bool,
+    problems_only: bool,
     fdrs_reported_import_states: Optional[List[int]],
-    preview_path: Optional[str],
-    sync_user_id: Optional[int],
+    output_path: str,
 ) -> str:
-    """Create AIJob + single AIJobItem for an async FDRS data sync."""
+    """Create AIJob + single AIJobItem for async FDRS sync verification."""
     job_id = uuid.uuid4().hex
     now_ts = time.time()
     meta = {
@@ -108,7 +77,7 @@ def create_fdrs_data_sync_job(
         "percent": 0.0,
         "stats": None,
         "error": None,
-        "preview_path": preview_path,
+        "preview_path": output_path,
         "download_ready": False,
         "last_logged_pct": None,
         "started_ts": now_ts,
@@ -116,19 +85,16 @@ def create_fdrs_data_sync_job(
     }
     payload = {
         "template_id": int(template_id),
-        "dry_run": bool(dry_run),
-        "batch_size": int(batch_size),
         "fdrs_years": fdrs_years,
-        "test_limit": test_limit,
-        "imputed_use_cache": bool(imputed_use_cache),
-        "sync_documents": bool(sync_documents),
+        "skip_imputed": bool(skip_imputed),
+        "fresh_imputed": bool(fresh_imputed),
+        "problems_only": bool(problems_only),
         "fdrs_reported_import_states": fdrs_reported_import_states,
-        "preview_path": preview_path,
-        "sync_user_id": sync_user_id,
+        "output_path": output_path,
     }
     job = AIJob(
         id=job_id,
-        job_type=FDRS_DATA_SYNC_JOB_TYPE,
+        job_type=FDRS_SYNC_VERIFY_JOB_TYPE,
         user_id=int(user_id or 0),
         status="queued",
         total_items=1,
@@ -148,21 +114,19 @@ def create_fdrs_data_sync_job(
     return job_id
 
 
-def get_active_fdrs_data_sync_jobs_for_user(
+def get_active_fdrs_sync_verify_jobs_for_user(
     user_id: int,
     *,
     template_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
-    """Return non-terminal FDRS sync jobs for resume UI."""
     if not user_id:
         return []
 
     query = AIJob.query.filter(
         AIJob.user_id == int(user_id),
-        AIJob.job_type == FDRS_DATA_SYNC_JOB_TYPE,
+        AIJob.job_type == FDRS_SYNC_VERIFY_JOB_TYPE,
         AIJob.status.in_(("queued", "running", "cancel_requested")),
     )
-
     jobs = query.order_by(AIJob.created_at.desc()).all()
     out: List[Dict[str, Any]] = []
     for job in jobs:
@@ -184,18 +148,15 @@ def get_active_fdrs_data_sync_jobs_for_user(
     return out
 
 
-def start_fdrs_data_sync_job(app, job_id: str) -> None:
-    """Kick off (or noop if already running) the FDRS sync runner thread."""
-    start_ai_job_thread(app, job_id, _run_fdrs_data_sync_job)
+def start_fdrs_sync_verify_job(app, job_id: str) -> None:
+    start_ai_job_thread(app, job_id, _run_fdrs_sync_verify_job)
 
 
-def ensure_fdrs_data_sync_job_running(app, job_id: str) -> None:
-    """Reconcile stale state and resume orphaned FDRS sync jobs."""
-    ensure_ai_job_running(app, job_id, _run_fdrs_data_sync_job)
+def ensure_fdrs_sync_verify_job_running(app, job_id: str) -> None:
+    ensure_ai_job_running(app, job_id, _run_fdrs_sync_verify_job)
 
 
-def request_fdrs_data_sync_cancel(job_id: str) -> str:
-    """Request cooperative cancellation; returns current/previous terminal status if any."""
+def request_fdrs_sync_verify_cancel(job_id: str) -> str:
     job = AIJob.query.get(str(job_id))
     if not job:
         return "missing"
@@ -213,15 +174,14 @@ def request_fdrs_data_sync_cancel(job_id: str) -> str:
             .update({"status": "cancelled", "error": None}, synchronize_session=False)
         )
     except Exception as exc:
-        logger.debug("FDRS sync cancel item update failed: job=%s err=%s", job_id, exc)
+        logger.debug("FDRS verify cancel item update failed: job=%s err=%s", job_id, exc)
         db.session.rollback()
     db.session.commit()
     signal_job_cancel(str(job_id))
     return "cancel_requested"
 
 
-def build_fdrs_data_sync_status_payload(job_id: str, template_id: int) -> Optional[Dict[str, Any]]:
-    """Build the job dict for the status poll endpoint."""
+def build_fdrs_sync_verify_status_payload(job_id: str, template_id: int) -> Optional[Dict[str, Any]]:
     job = get_import_job(job_id)
     if not job or int(job.get("template_id") or 0) != int(template_id):
         return None
@@ -241,8 +201,7 @@ def build_fdrs_data_sync_status_payload(job_id: str, template_id: int) -> Option
     }
 
 
-def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None:
-    """Run the FDRS import pipeline for a single claimed job item."""
+def _process_fdrs_sync_verify_item(app, *, job_id: str, item_id: int) -> None:
     with app.app_context():
         item = AIJobItem.query.get(int(item_id))
         if not item or str(item.job_id) != str(job_id):
@@ -257,16 +216,14 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 status="cancelled",
                 stage="cancelled",
                 message="Cancelled",
-                error="Sync cancelled by user.",
+                error="Verification cancelled by user.",
             )
             db.session.commit()
             return
 
         payload = dict(item.payload or {})
         template_id = int(payload.get("template_id") or 0)
-        dry_run = bool(payload.get("dry_run"))
-        preview_path = payload.get("preview_path")
-        sync_user_id = payload.get("sync_user_id")
+        output_path = payload.get("output_path")
         last_cancel_db_check = 0.0
 
         def _progress_cb(progress_payload: Dict[str, Any]) -> None:
@@ -274,20 +231,16 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             pct = progress_payload.get("percent")
             msg = progress_payload.get("message") or ""
             existing = get_import_job(job_id) or {}
-            if stage.startswith(("documents", "assignment_status")):
-                current = progress_payload.get("current")
-                total = progress_payload.get("total")
-            else:
-                current = (
-                    progress_payload.get("current")
-                    if progress_payload.get("current") is not None
-                    else existing.get("current")
-                )
-                total = (
-                    progress_payload.get("total")
-                    if progress_payload.get("total") is not None
-                    else existing.get("total")
-                )
+            current = (
+                progress_payload.get("current")
+                if progress_payload.get("current") is not None
+                else existing.get("current")
+            )
+            total = (
+                progress_payload.get("total")
+                if progress_payload.get("total") is not None
+                else existing.get("total")
+            )
             update_import_job(
                 job_id,
                 status="running",
@@ -302,7 +255,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                     else existing.get("stats")
                 ),
             )
-            _touch_sync_item_heartbeat(item_id)
+            _touch_verify_item_heartbeat(item_id)
 
             try:
                 pct_f = float(pct) if pct is not None else None
@@ -311,17 +264,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             log_state = get_import_job_logging_state(job_id)
             last_logged = log_state.get("last_logged_pct")
             should_log = (
-                stage
-                in (
-                    "documents_plan",
-                    "documents_done",
-                    "assignment_status_plan",
-                    "assignment_status_done",
-                    "complete",
-                    "failed",
-                    "cancelled",
-                )
-                or (stage and stage != "upsert" and not stage.endswith("_upsert"))
+                stage in ("complete", "failed", "cancelled", "load_databank", "write_excel")
                 or (
                     pct_f is not None
                     and (last_logged is None or abs(pct_f - float(last_logged)) >= 5.0)
@@ -332,7 +275,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 update_import_job(job_id, last_logged_pct=pct_f)
             if should_log:
                 app.logger.info(
-                    "Data sync %s: %s %s%% %s",
+                    "FDRS verify %s: %s %s%% %s",
                     job_id,
                     stage or "-",
                     f"{pct_f:.1f}" if pct_f is not None else "-",
@@ -358,73 +301,33 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             message="Starting...",
             worker_pid=os.getpid(),
         )
-        _touch_sync_item_heartbeat(item_id, force=True)
+        _touch_verify_item_heartbeat(item_id)
         app.logger.info(
-            "Data sync %s: starting (template_id=%s, dry_run=%s, test=%s, sync_documents=%s)",
+            "FDRS verify %s: starting (template_id=%s, years=%s, skip_imputed=%s)",
             job_id,
             template_id,
-            dry_run,
-            payload.get("test_limit") is not None,
-            payload.get("sync_documents"),
+            payload.get("fdrs_years"),
+            payload.get("skip_imputed"),
         )
 
         terminal_item_status = "failed"
-        FdrsSyncCancelled = None
-        writer = None
+        FdrsVerifyCancelled = None
         try:
             imports_dir = _fdrs_imports_dir()
             if imports_dir not in sys.path:
                 sys.path.insert(0, imports_dir)
-            from import_fdrs_form_data import FdrsSyncCancelled, run_import
+            from verify_fdrs_sync import FdrsVerifyCancelled, execute_verification
 
-            writer = ImportChangeLogWriter(
-                job_id,
-                kind="fdrs_data_sync",
-                meta={
-                    "template_id": template_id,
-                    "dry_run": dry_run,
-                    "fdrs_years": payload.get("fdrs_years"),
-                },
-            )
-            stats = run_import(
-                input_path=None,
-                fdrs_api_url=None,
-                fdrs_from_data_api=True,
-                fdrs_data_api_base=None,
-                fdrs_data_api_key=None,
-                fdrs_imputed_url=None,
-                fdrs_imputed_from_api=False,
-                fdrs_imputed_kpi_codes_path=None,
-                fdrs_imputed_use_cache=bool(payload.get("imputed_use_cache", True)),
-                fdrs_years=payload.get("fdrs_years"),
-                fdrs_reported_import_states=payload.get("fdrs_reported_import_states"),
-                indicator_mapping_path=None,
-                indicator_bank_api_base=None,
-                indicator_bank_api_key=None,
-                databank_base_url=None,
-                databank_api_key=None,
-                preview_excel_path=preview_path if dry_run else None,
-                test_limit=payload.get("test_limit"),
-                dry_run=dry_run,
-                batch_size=int(payload.get("batch_size") or 1000),
+            stats = execute_verification(
+                years=payload.get("fdrs_years") or [],
+                output_path=str(output_path),
+                skip_imputed=bool(payload.get("skip_imputed")),
+                fresh_imputed=bool(payload.get("fresh_imputed")),
+                problems_only=bool(payload.get("problems_only")),
+                reported_states=payload.get("fdrs_reported_import_states"),
                 template_id=template_id,
                 progress_cb=_progress_cb,
                 cancel_check=_cancel_check,
-                sync_user_id=sync_user_id,
-                sync_documents=bool(payload.get("sync_documents", True)),
-                change_recorder=writer.record,
-            )
-            writer.finalize(dict(stats or {}))
-            attach_import_change_log_to_activity(
-                log_id=job_id,
-                user_id=sync_user_id,
-                extra={
-                    "rows_inserted": (stats or {}).get("inserted"),
-                    "rows_updated": (stats or {}).get("updated"),
-                    "rows_unchanged": (stats or {}).get("unchanged"),
-                    "rows_skipped": (stats or {}).get("skipped"),
-                    "rows_errors": (stats or {}).get("errors"),
-                },
             )
             update_import_job(
                 job_id,
@@ -434,36 +337,35 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 message="Completed",
                 percent=100.0,
                 stats=dict(stats or {}),
-                download_ready=bool(dry_run and preview_path and os.path.isfile(preview_path)),
+                download_ready=bool(output_path and os.path.isfile(output_path)),
             )
             item.status = "completed"
             item.error = None
             terminal_item_status = "completed"
             app.logger.info(
-                "Data sync %s: completed loaded=%s skipped=%s inserted=%s updated=%s unchanged=%s errors=%s",
+                "FDRS verify %s: completed total=%s matched=%s skipped=%s missing=%s mismatch=%s",
                 job_id,
-                (stats or {}).get("loaded"),
-                (stats or {}).get("skipped"),
-                (stats or {}).get("inserted"),
-                (stats or {}).get("updated"),
-                (stats or {}).get("unchanged"),
-                (stats or {}).get("errors"),
+                (stats or {}).get("total"),
+                (stats or {}).get("matched"),
+                (stats or {}).get("skipped_intentionally"),
+                (stats or {}).get("missing"),
+                (stats or {}).get("mismatch"),
             )
-        except FdrsSyncCancelled:
+        except FdrsVerifyCancelled:
             update_import_job(
                 job_id,
                 force=True,
                 status="cancelled",
                 stage="cancelled",
                 message="Cancelled",
-                error="Sync cancelled by user.",
+                error="Verification cancelled by user.",
             )
             item.status = "cancelled"
             item.error = None
             terminal_item_status = "cancelled"
-            app.logger.info("Data sync %s: cancelled", job_id)
+            app.logger.info("FDRS verify %s: cancelled", job_id)
         except Exception as exc:
-            logger.exception("Async data sync job failed: %s", exc)
+            logger.exception("Async FDRS verify job failed: %s", exc)
             err_msg = _summarize_error(exc)
             update_import_job(
                 job_id,
@@ -475,26 +377,20 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             )
             item.status = "failed"
             item.error = err_msg
-            app.logger.error("Data sync %s: failed: %s", job_id, exc, exc_info=True)
+            app.logger.error("FDRS verify %s: failed: %s", job_id, exc, exc_info=True)
         finally:
-            if writer is not None and not writer._finalized:
-                try:
-                    writer.finalize({"success": False})
-                except Exception:
-                    logger.debug("import change log finalize failed", exc_info=True)
             if item.status not in ("completed", "failed", "cancelled"):
                 item.status = terminal_item_status
             db.session.commit()
             clear_import_job_logging_state(job_id)
-            _clear_sync_item_heartbeat(item_id)
             db.session.remove()
 
 
-def _run_fdrs_data_sync_job(app, job_id: str) -> None:
+def _run_fdrs_sync_verify_job(app, job_id: str) -> None:
     run_ai_job(
         app,
         str(job_id),
-        _process_fdrs_data_sync_item_sync,
+        _process_fdrs_sync_verify_item,
         concurrency_config_keys=("FDRS_DATA_SYNC_CONCURRENCY",),
         default_concurrency=1,
     )

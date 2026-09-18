@@ -137,6 +137,7 @@ class TestFdrsSyncImputationRoute:
              patch("app.routes.admin.data_sync_imputation._fdrs_sync_script_available", return_value=True), \
              patch("app.routes.admin.data_sync_imputation._fdrs_default_years_bounds", return_value=(2012, 2024)), \
              patch("app.routes.admin.data_sync_imputation.get_active_fdrs_data_sync_jobs_for_user", return_value=[]), \
+             patch("app.routes.admin.data_sync_imputation.get_active_fdrs_sync_verify_jobs_for_user", return_value=[]), \
              _mock_render() as mock_rt:
             resp = logged_in_client.get("/admin/fdrs-sync-imputation")
         assert resp.status_code == 200
@@ -1160,3 +1161,148 @@ class TestInternalHelpers:
         assert {r["id"] for r in fdrs_rows} == {21}
         assert {r["id"] for r in upr_rows} == {24}
         assert {r["id"] for r in generic_rows} == {99}
+
+
+def _create_sync_verify_test_job(
+    template_id,
+    user_id,
+    *,
+    status="running",
+    download_ready=False,
+    preview_path=None,
+):
+    from app.services.imports.async_import_job_store import (
+        FDRS_SYNC_VERIFY_JOB_TYPE,
+        create_import_job,
+        update_import_job,
+    )
+
+    job_id = uuid.uuid4().hex
+    create_import_job(
+        job_id=job_id,
+        job_type=FDRS_SYNC_VERIFY_JOB_TYPE,
+        user_id=user_id,
+        initial={
+            "template_id": template_id,
+            "stage": "running",
+            "message": "Running...",
+            "current": 10,
+            "total": 100,
+            "percent": 10.0,
+            "preview_path": preview_path,
+            "download_ready": download_ready,
+        },
+    )
+    update_import_job(
+        job_id,
+        force=True,
+        status=status,
+        download_ready=download_ready,
+        preview_path=preview_path,
+    )
+    return job_id
+
+
+class TestRunSyncVerify:
+    def _post(self, logged_in_client, template_id, data=None):
+        payload = {"fdrs_years": "2024", "test": True}
+        if data:
+            payload.update(data)
+        return logged_in_client.post(
+            f"/admin/templates/data-sync/{template_id}/run-sync-verify",
+            json=payload,
+            headers=_json_headers(),
+        )
+
+    def test_nonexistent_template_returns_404(self, logged_in_client, db_session):
+        with _auth():
+            resp = self._post(logged_in_client, 99999)
+        assert resp.status_code == 404
+
+    def test_access_denied_returns_403(self, logged_in_client, db_session):
+        template = create_test_template(db_session, name="FDRS Verify Deny Template")
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
+             patch("plugins.fdrs.routes.check_template_access", return_value=False):
+            resp = self._post(logged_in_client, template.id)
+        assert resp.status_code == 403
+
+    def test_missing_years_returns_400(self, logged_in_client, db_session):
+        template = create_test_template(db_session, name="FDRS Verify Years Template")
+        with _auth(), patch("plugins.fdrs.routes._run_fdrs_sync_verify_job"):
+            resp = self._post(logged_in_client, template.id, {"fdrs_years": "", "test": False})
+        assert resp.status_code == 400
+
+    def test_invalid_years_returns_400(self, logged_in_client, db_session):
+        template = create_test_template(db_session, name="FDRS Verify Bad Years Template")
+        with _auth(), patch("plugins.fdrs.routes._run_fdrs_sync_verify_job"):
+            resp = self._post(
+                logged_in_client, template.id, {"fdrs_years": "not,a,year", "test": False}
+            )
+        assert resp.status_code == 400
+
+    def test_queues_job(self, logged_in_client, db_session, admin_user):
+        template = create_test_template(db_session, name="FDRS Verify Queue Template")
+        with _auth(), patch("plugins.fdrs.routes._run_fdrs_sync_verify_job") as mock_run:
+            resp = self._post(logged_in_client, template.id)
+        assert resp.status_code == 202
+        data = resp.get_json()
+        assert data.get("success") is True
+        assert data.get("job_id")
+        mock_run.assert_called_once()
+
+    def test_unauthenticated_redirects(self, client):
+        resp = client.post(
+            "/admin/templates/data-sync/1/run-sync-verify",
+            json={"test": True},
+            follow_redirects=False,
+        )
+        assert resp.status_code in (302, 401)
+
+
+class TestSyncVerifyStatus:
+    def test_nonexistent_job_returns_404(self, logged_in_client, db_session):
+        template = create_test_template(db_session, name="FDRS Verify Status No Job")
+        with _auth():
+            resp = logged_in_client.get(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-status/nonexistent_job"
+            )
+        assert resp.status_code == 404
+
+    def test_wrong_user_returns_403(self, logged_in_client, db_session, test_user):
+        template = create_test_template(db_session, name="FDRS Verify Status Denied")
+        job_id = _create_sync_verify_test_job(template.id, user_id=test_user.id)
+        with _auth():
+            resp = logged_in_client.get(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-status/{job_id}"
+            )
+        assert resp.status_code == 403
+
+    def test_owned_job_returns_status(self, logged_in_client, db_session, admin_user):
+        template = create_test_template(db_session, name="FDRS Verify Status Own")
+        job_id = _create_sync_verify_test_job(template.id, user_id=admin_user.id)
+        with _auth():
+            resp = logged_in_client.get(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-status/{job_id}"
+            )
+        assert resp.status_code == 200
+        assert "job" in (resp.get_json() or {})
+
+
+class TestSyncVerifyCancel:
+    def test_cancel_running_job(self, logged_in_client, db_session, admin_user):
+        template = create_test_template(db_session, name="FDRS Verify Cancel Running")
+        job_id = _create_sync_verify_test_job(template.id, user_id=admin_user.id, status="running")
+        with _auth(), patch("plugins.fdrs.routes.request_fdrs_sync_verify_cancel", return_value="cancel_requested"):
+            resp = logged_in_client.post(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-cancel/{job_id}"
+            )
+        assert resp.status_code == 200
+        assert (resp.get_json() or {}).get("status") == "cancel_requested"
+
+    def test_unauthenticated_redirects(self, client):
+        resp = client.post(
+            "/admin/templates/data-sync/1/sync-verify-cancel/fakejob",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302

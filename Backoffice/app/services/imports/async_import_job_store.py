@@ -25,8 +25,11 @@ from app.utils.datetime_helpers import utcnow
 logger = logging.getLogger(__name__)
 
 FDRS_DATA_SYNC_JOB_TYPE = "fdrs.data_sync"
+FDRS_SYNC_VERIFY_JOB_TYPE = "fdrs.sync_verify"
 UPR_EXCEL_IMPORT_JOB_TYPE = "upr.excel_import"
-IMPORT_JOB_TYPES = frozenset({FDRS_DATA_SYNC_JOB_TYPE, UPR_EXCEL_IMPORT_JOB_TYPE})
+IMPORT_JOB_TYPES = frozenset(
+    {FDRS_DATA_SYNC_JOB_TYPE, FDRS_SYNC_VERIFY_JOB_TYPE, UPR_EXCEL_IMPORT_JOB_TYPE}
+)
 IMPORT_JOB_TTL_SECONDS = 6 * 60 * 60
 _PERSIST_MIN_INTERVAL = 0.5
 _TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})

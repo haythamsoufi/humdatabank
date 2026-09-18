@@ -45,6 +45,7 @@
       <div><dt class="text-gray-500">{{ _('Finished') }}</dt><dd class="text-gray-900">{{ summary.finished_at or '—' }}</dd></div>
       <div><dt class="text-gray-500">{{ _('Inserted') }}</dt><dd class="text-gray-900">{{ stats.inserted if stats.inserted is not none else '—' }}</dd></div>
       <div><dt class="text-gray-500">{{ _('Updated') }}</dt><dd class="text-gray-900">{{ stats.updated if stats.updated is not none else stats.updated_count or '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Unchanged') }}</dt><dd class="text-gray-900">{{ stats.unchanged if stats.unchanged is not none else '—' }}</dd></div>
       <div><dt class="text-gray-500">{{ _('Skipped') }}</dt><dd class="text-gray-900">{{ stats.skipped if stats.skipped is not none else '—' }}</dd></div>
       <div><dt class="text-gray-500">{{ _('Errors') }}</dt><dd class="text-gray-900">{{ stats.errors if stats.errors is not none else '—' }}</dd></div>
       <div><dt class="text-gray-500">{{ _('Change rows') }}</dt><dd class="text-gray-900">{{ change_total }}</dd></div>

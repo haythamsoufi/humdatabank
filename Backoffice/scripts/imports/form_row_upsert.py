@@ -360,6 +360,34 @@ def _commit_upsert_and_yield() -> None:
     time.sleep(0.05)
 
 
+def _commit_and_expunge_chunk() -> None:
+    """Flush the current prefetch chunk and fully detach it from the session.
+
+    Called once per outer prefetch chunk (see ``prefetch_size`` below), never
+    mid-chunk. ``expire_all()`` (used by ``_commit_upsert_and_yield`` for the
+    periodic in-chunk commits) keeps every object in the session's identity
+    map forever, which is required mid-chunk so a duplicate (aes_id, item_id)
+    pair later in the *same* chunk still resolves to the live object instead
+    of re-inserting it. Once a whole chunk is done, nothing later needs those
+    objects, so we can fully ``expunge_all()`` them and keep the identity map
+    bounded to ~``prefetch_size`` objects instead of growing for the entire
+    run (tens of thousands of rows for a full FDRS/UPR sync).
+    """
+    from app.extensions import db
+
+    if db.session.dirty or db.session.new:
+        db.session.commit()
+    db.session.expunge_all()
+
+
+# Above this many distinct form_item_ids in one prefetch chunk, the two-column
+# IN() fastpath below (aes_ids × item_ids) could pull back a much larger result
+# set than the exact pairs we need, so we fall back to the exact tuple_ IN().
+# FDRS has ~28 form_items; keep this generous so UPR (more indicators) still
+# uses the fastpath while never risking an unbounded fetch.
+_PREFETCH_ITEM_FASTPATH_MAX = 300
+
+
 def upsert_form_data_rows(
     rows: List[Dict[str, str]],
     *,
@@ -383,6 +411,7 @@ def upsert_form_data_rows(
 
     if stats is None:
         stats = {"loaded": 0, "skipped": 0, "inserted": 0, "updated": 0, "errors": 0}
+    stats.setdefault("unchanged", 0)
     stats["loaded"] = len(rows)
 
     def _check_cancel() -> None:
@@ -459,20 +488,47 @@ def upsert_form_data_rows(
 
         existing_by_aes: Dict[Tuple[int, int], FormData] = {}
         existing_by_pub: Dict[Tuple[int, int], FormData] = {}
+
+        # A composite tuple_(...).in_([...2000 tuples...]) forces Postgres to plan
+        # a large literal IN-list of row-value comparisons every chunk. When the
+        # chunk only touches a small, bounded set of form_item_ids (true for FDRS:
+        # ~28 items total), filtering on the two plain columns separately lets the
+        # planner use a much cheaper index scan; we still get exactly the same
+        # rows because results are only ever consulted via the exact-pair dicts
+        # built below (an oversized fetch here is filtered out, never wrong).
+        distinct_item_ids = {item_id for (_, item_id) in aes_pairs_set} | {item_id for (_, item_id) in pub_pairs_set}
+        use_item_fastpath = 0 < len(distinct_item_ids) <= _PREFETCH_ITEM_FASTPATH_MAX
+
         if aes_pairs_set:
-            q = FormData.query.filter(
-                tuple_(FormData.assignment_entity_status_id, FormData.form_item_id).in_(list(aes_pairs_set))
-            )
+            if use_item_fastpath:
+                aes_ids_only = {aid for (aid, _) in aes_pairs_set}
+                q = FormData.query.filter(
+                    FormData.assignment_entity_status_id.in_(aes_ids_only),
+                    FormData.form_item_id.in_(distinct_item_ids),
+                )
+            else:
+                q = FormData.query.filter(
+                    tuple_(FormData.assignment_entity_status_id, FormData.form_item_id).in_(list(aes_pairs_set))
+                )
             for fd in q.all():
                 key = (int(fd.assignment_entity_status_id), int(fd.form_item_id))
-                existing_by_aes.setdefault(key, fd)
+                if key in aes_pairs_set:
+                    existing_by_aes.setdefault(key, fd)
         if pub_pairs_set:
-            q = FormData.query.filter(
-                tuple_(FormData.public_submission_id, FormData.form_item_id).in_(list(pub_pairs_set))
-            )
+            if use_item_fastpath:
+                pub_ids_only = {pid for (pid, _) in pub_pairs_set}
+                q = FormData.query.filter(
+                    FormData.public_submission_id.in_(pub_ids_only),
+                    FormData.form_item_id.in_(distinct_item_ids),
+                )
+            else:
+                q = FormData.query.filter(
+                    tuple_(FormData.public_submission_id, FormData.form_item_id).in_(list(pub_pairs_set))
+                )
             for fd in q.all():
                 key = (int(fd.public_submission_id), int(fd.form_item_id))
-                existing_by_pub.setdefault(key, fd)
+                if key in pub_pairs_set:
+                    existing_by_pub.setdefault(key, fd)
 
         for j_rel, (row, (assignment_entity_status_id, public_submission_id, form_item_id, payload)) in enumerate(
             zip(batch, parsed_batch)
@@ -513,18 +569,8 @@ def upsert_form_data_rows(
                 except Exception:
                     logger.debug("import change recorder failed", exc_info=True)
 
-            if dry_run:
-                if existing:
-                    stats["updated"] += 1
-                else:
-                    stats["inserted"] += 1
-                _maybe_report(j, row)
-                continue
-
             try:
-                disagg_for_db = _disagg_data_for_db(payload["disagg_data"])
-                if disagg_for_db is None:
-                    disagg_for_db = db.null()
+                disagg_new = _disagg_data_for_db(payload["disagg_data"])
                 prefilled_for_db = FormData._coerce_scalar_text_value(payload["prefilled_value"])
                 imputed_for_db = FormData._coerce_scalar_text_value(payload["imputed_value"])
                 disagg_type = payload.get("disagg_type")
@@ -535,6 +581,46 @@ def upsert_form_data_rows(
                         disagg_type = "simple"
                     elif isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"]:
                         disagg_type = "matrix"
+                new_submitted_at = payload["submitted_at"]
+            except Exception as e:
+                stats["errors"] += 1
+                if j < 5 or stats["errors"] <= 3:
+                    logger.error("Row %d error: %s", j, e)
+                _maybe_report(j, row)
+                continue
+
+            # Re-syncing the same period twice (the common case for FDRS/UPR,
+            # which re-pull recent years every run) mostly rewrites rows whose
+            # values haven't actually changed. Detecting that here skips both
+            # the DB write and the ORM attribute-history bookkeeping that would
+            # otherwise mark every touched row "dirty" regardless of whether
+            # SQLAlchemy ends up emitting a no-op UPDATE for it.
+            unchanged = bool(existing) and (
+                existing.value == payload["value"]
+                and existing.disagg_data == disagg_new
+                and existing.disagg_type == disagg_type
+                and bool(existing.data_not_available) == bool(payload["data_not_available"])
+                and bool(existing.not_applicable) == bool(payload["not_applicable"])
+                and existing.prefilled_value == prefilled_for_db
+                and existing.imputed_value == imputed_for_db
+                and (new_submitted_at is None or existing.submitted_at == new_submitted_at)
+            )
+
+            if dry_run:
+                if existing:
+                    stats["unchanged" if unchanged else "updated"] += 1
+                else:
+                    stats["inserted"] += 1
+                _maybe_report(j, row)
+                continue
+
+            if unchanged:
+                stats["unchanged"] += 1
+                _maybe_report(j, row)
+                continue
+
+            try:
+                disagg_for_db = disagg_new if disagg_new is not None else db.null()
                 if existing:
                     existing.value = payload["value"]
                     existing._sync_numeric_value_from_string()
@@ -544,8 +630,8 @@ def upsert_form_data_rows(
                     existing.not_applicable = payload["not_applicable"]
                     existing.prefilled_value = prefilled_for_db
                     FormData.sync_imputed_numeric_value(existing, imputed_for_db)
-                    if payload["submitted_at"] is not None:
-                        existing.submitted_at = payload["submitted_at"]
+                    if new_submitted_at is not None:
+                        existing.submitted_at = new_submitted_at
                     db.session.add(existing)
                     stats["updated"] += 1
                 else:
@@ -559,7 +645,7 @@ def upsert_form_data_rows(
                         data_not_available=payload["data_not_available"],
                         not_applicable=payload["not_applicable"],
                         prefilled_value=prefilled_for_db,
-                        submitted_at=payload["submitted_at"],
+                        submitted_at=new_submitted_at,
                     )
                     entry._sync_numeric_value_from_string()
                     FormData.sync_imputed_numeric_value(entry, imputed_for_db)
@@ -577,6 +663,9 @@ def upsert_form_data_rows(
             if batch_size and ((stats["inserted"] + stats["updated"]) % batch_size == 0) and (stats["inserted"] + stats["updated"]) > 0:
                 _commit_upsert_and_yield()
             _maybe_report(j, row)
+
+        if not dry_run:
+            _commit_and_expunge_chunk()
 
     if not dry_run and (stats["inserted"] + stats["updated"]) > 0:
         _commit_upsert_and_yield()

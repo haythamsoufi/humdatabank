@@ -71,10 +71,10 @@ from app.services.ai.runtime.runtime_utils import (
     estimate_openai_cost as _estimate_openai_cost,
     synthesize_partial_answer as _synthesize_partial_answer,
 )
-from app.services.upr.focus_area_analysis import run_unified_plans_focus_fastpath
+from plugins.upr.ai.focus_area_analysis import run_unified_plans_focus_fastpath
 from app.services.ai.agent._tool_circuit_helpers import make_tool_breaker_factory
 from app.services.ai.providers.openai_chat import OpenAIChatCompletionProvider
-from app.services.upr.tool_specs import UPR_BULK_TOOL_NAMES
+from plugins.upr.ai.tool_specs import UPR_BULK_TOOL_NAMES
 from app.services.ai.data.form_retrieval import resolve_indicator_to_primary_id
 from app.utils.ai_utils import openai_model_supports_sampling_params
 from app.utils.datetime_helpers import utcnow
@@ -2267,7 +2267,7 @@ class AIAgentExecutor:
                     has_upr = "get_upr_kpi_values_for_all_countries" in actions_so_far
                     reminder = "Use the observations above to answer. Do not call the same tool again with the same parameters."
                     if has_fdrs and not has_upr:
-                        from app.services.upr import is_upr_active
+                        from plugins.upr.ai import is_upr_active
                         if is_upr_active():
                             reminder += " For volunteers/staff/branches/local units you already have FDRS (Indicator Bank) data; only call get_upr_kpi_values_for_all_countries to fill gaps for countries missing from that result, or skip UPR if the user did not ask for it."
                     messages.append({"role": "user", "content": reminder})

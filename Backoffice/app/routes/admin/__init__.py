@@ -30,7 +30,7 @@ from app.routes.admin.analytics import bp as analytics_bp
 from app.routes.admin.analytics_api import bp as analytics_api_bp
 from app.routes.admin.utilities import bp as utilities_bp
 from app.routes.admin.data_sync_imputation import bp as data_sync_imputation_bp
-from app.routes.admin.upr_excel_import import bp as upr_excel_import_bp, legacy_bp as upr_excel_import_legacy_bp
+from plugins.upr.excel.import_routes import bp as upr_excel_import_bp, legacy_bp as upr_excel_import_legacy_bp
 from app.routes.admin.import_change_log import bp as import_change_log_bp
 from app.routes.admin.settings import bp as settings_bp
 from app.routes.admin.organization import bp as organization_bp
@@ -156,7 +156,7 @@ def _kobo_data_import_url_for_dashboard():
 
 def _data_sync_url_for_dashboard():
     """URL for FDRS data sync & imputation, or None if the route is not registered."""
-    ep = "admin.fdrs_sync_imputation"
+    ep = "fdrs.fdrs_sync_imputation"
     if ep not in current_app.view_functions:
         return None
     try:
@@ -167,7 +167,7 @@ def _data_sync_url_for_dashboard():
 
 def _upr_sync_url_for_dashboard():
     """URL for UPR data sync & Excel import, or None if the route is not registered."""
-    ep = "admin.upr_sync_imputation"
+    ep = "upr.upr_sync_imputation"
     if ep not in current_app.view_functions:
         return None
     try:
@@ -176,26 +176,7 @@ def _upr_sync_url_for_dashboard():
         return None
 
 
-@bp.route("/fdrs-sync-imputation", methods=["GET"])
-@admin_required
-@system_manager_required
-def fdrs_sync_imputation():
-    """FDRS data sync and imputation (Data Integration)."""
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
-    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-
-    return render_data_sync_imputation_page(FDRS_TEMPLATE_ID, sync_family="fdrs")
-
-
-@bp.route("/upr-sync-imputation", methods=["GET"])
-@admin_required
-@system_manager_required
-def upr_sync_imputation():
-    """UPR Excel sync and imputation (Data Integration)."""
-    from app.utils.data_quality_constants import UPR_PLANNING_TEMPLATE_ID
-    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-
-    return render_data_sync_imputation_page(UPR_PLANNING_TEMPLATE_ID, sync_family="upr")
+# GET /admin/upr-sync-imputation is registered by plugins.upr.routes.upr_sync_imputation
 
 
 # Legacy URL: API key admin UI now lives under /admin/api-management/api-keys

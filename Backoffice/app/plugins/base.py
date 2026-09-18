@@ -248,6 +248,14 @@ class BasePlugin(ABC):
         """Optional Data Explorer tab for org-specific admin features."""
         return None
 
+    def is_admin_feature(self) -> bool:
+        """True when plugin routes register regardless of activate/deactivate.
+
+        Default: plugins that contribute a Data Explorer tab. Backend-only admin
+        tools (for example FDRS data sync) can override this without adding a tab.
+        """
+        return self.get_data_explorer_tab() is not None
+
     def get_seed_permissions(self) -> List[SeedPermission]:
         """RBAC permissions to seed on startup."""
         return []
@@ -263,6 +271,14 @@ class BasePlugin(ABC):
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
         """Extra template context when rendering a Data Explorer panel."""
         return {}
+
+    def get_settings(self) -> Dict[str, Any]:
+        """Return plugin settings for the Plugin Management API and settings page."""
+        return {}
+
+    def update_settings(self, settings: Dict[str, Any]) -> bool:
+        """Persist plugin settings. Default is a no-op success for plugins without writable config."""
+        return True
 
     def install(self) -> bool:
         """Called when plugin is installed"""

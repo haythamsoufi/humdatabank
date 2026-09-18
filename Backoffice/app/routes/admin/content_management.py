@@ -1345,7 +1345,7 @@ def download_document(doc_id):
             and storage.submitted_source_exists(document.storage_path)
         )
         if not has_local_file:
-            from app.services.imports.fdrs_document_fetch_service import (
+            from plugins.fdrs.services.fdrs_document_fetch_service import (
                 try_materialize_public_fdrs_document,
             )
 

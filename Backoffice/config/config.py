@@ -674,7 +674,7 @@ class Config:
         'UPR_COUNTRY_REPORTING_TEMPLATE_PATH',
         os.environ.get(
             'MYR_REPORTING_TEMPLATE_PATH',
-            os.path.join(basedir, 'app', 'static', 'templates', 'unified_country_report.xlsx'),
+            os.path.join(basedir, 'plugins', 'upr', 'static', 'templates', 'unified_country_report.xlsx'),
         ),
     )
     # Deprecated alias — use UPR_COUNTRY_REPORTING_TEMPLATE_PATH

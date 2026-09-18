@@ -31,7 +31,7 @@ from app.plugins.data_explorer import (
     tab_flag_key,
 )
 from app.plugins.manager import PluginManager
-from app.services.data_quality.catalogs.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
+from plugins.fdrs.data_quality.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
 from app.services.data_quality.helpers import (
     active_country_map_query,
     build_compliance_document_lookups,

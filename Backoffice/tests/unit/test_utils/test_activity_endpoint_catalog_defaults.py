@@ -274,8 +274,8 @@ class TestActivityCategoryForEndpoint:
     def test_pb_progress(self):
         assert activity_category_for_endpoint("pb_progress.generate") == "admin_plugin"
 
-    def test_upr_visuals(self):
-        assert activity_category_for_endpoint("upr_visuals.generate") == "admin_plugin"
+    def test_upr(self):
+        assert activity_category_for_endpoint("upr.generate") == "admin_plugin"
 
     def test_unknown_blueprint(self):
         assert activity_category_for_endpoint("unknown_bp.action") == "admin_other"

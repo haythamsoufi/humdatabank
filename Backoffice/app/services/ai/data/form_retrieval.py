@@ -2610,7 +2610,7 @@ def get_fdrs_income_sources_for_all_countries(
     Kept for programmatic/API use; the AI agent uses get_form_field_values_for_all_countries
     with matrix share parameters instead.
     """
-    from app.services.data_quality.catalogs.fdrs_v1_catalog import FINANCE_TOTAL_INCOME
+    from plugins.fdrs.data_quality.fdrs_v1_catalog import FINANCE_TOTAL_INCOME
 
     source_norm = (source_type or "any").strip().lower().replace(" ", "_")
     if source_norm not in {"any", "home_government", "foreign_government"}:

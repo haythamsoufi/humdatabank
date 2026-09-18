@@ -1,0 +1,430 @@
+"""HTTP helpers for live assignment PDF export."""
+
+from __future__ import annotations
+
+import pytest
+
+
+@pytest.mark.unit
+def test_pdf_response_is_inline_by_default():
+    from plugins.upr.routes import _pdf_response
+
+    response = _pdf_response(b"%PDF-1.4", "AFG_P25_combined.pdf", download=False)
+    assert response.mimetype == "application/pdf"
+    assert response.get_data() == b"%PDF-1.4"
+    assert response.headers["Content-Disposition"] == 'inline; filename="AFG_P25_combined.pdf"'
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+@pytest.mark.unit
+def test_pdf_response_encodes_unicode_filename():
+    from plugins.upr.routes import _pdf_response
+
+    response = _pdf_response(
+        b"%PDF-1.4",
+        "Bangladesh — Unified Plan – 2026.pdf",
+        download=True,
+    )
+    header = response.headers["Content-Disposition"]
+    header.encode("latin-1")
+    assert 'filename="Bangladesh - Unified Plan - 2026.pdf"' in header
+    assert "filename*=UTF-8''" in header
+    assert "%E2%80%94" in header
+
+
+@pytest.mark.unit
+def test_pdf_response_arabic_filename_keeps_utf8_country():
+    from plugins.upr.routes import _pdf_response
+
+    response = _pdf_response(
+        b"%PDF-1.4",
+        "أفغانستان - Unified Country Report.pdf",
+        download=True,
+    )
+    header = response.headers["Content-Disposition"]
+    header.encode("latin-1")
+    assert "filename*=UTF-8''" in header
+    assert "%D8%A3" in header
+    assert "Unified Country Report.pdf" in header
+
+
+@pytest.mark.unit
+def test_pdf_response_download_uses_attachment():
+    from plugins.upr.routes import _pdf_response
+
+    response = _pdf_response(b"%PDF-1.4", "AFG_P25_combined.pdf", download=True)
+    assert response.headers["Content-Disposition"] == 'attachment; filename="AFG_P25_combined.pdf"'
+
+
+@pytest.mark.unit
+def test_assignment_pdf_response_queues_background_job(monkeypatch):
+    from flask import Response
+
+    from plugins.upr import routes
+
+    queued = []
+    monkeypatch.setattr(routes, "_aes_or_404", lambda aes_id: object())
+    monkeypatch.setattr(
+        routes,
+        "_queue_visual_export",
+        lambda aes_id, fmt, dashboard_id="combined": queued.append((aes_id, fmt, dashboard_id)) or "job-pdf",
+    )
+    monkeypatch.setattr(
+        routes,
+        "_export_wait_response",
+        lambda aes_id, job_id, download=True: Response(
+            f"wait:{job_id}:{download}", mimetype="text/html"
+        ),
+    )
+    response = routes._assignment_pdf_response(9, "combined", download=False)
+    assert response.get_data(as_text=True) == "wait:job-pdf:False"
+    assert queued == [(9, "pdf", "combined")]
+
+
+@pytest.mark.unit
+def test_queue_visual_export_reuses_matching_job(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr import routes
+
+    started = []
+    monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "ar")
+    monkeypatch.setattr(
+        routes,
+        "find_reusable_assignment_export_job",
+        lambda **_k: "job-reuse",
+    )
+    monkeypatch.setattr(
+        routes,
+        "ensure_assignment_export_job_running",
+        lambda _app, job_id: started.append(job_id),
+    )
+    monkeypatch.setattr(
+        routes,
+        "create_assignment_export_job",
+        lambda **_k: (_ for _ in ()).throw(AssertionError("should reuse")),
+    )
+    logged = []
+    monkeypatch.setattr(
+        routes,
+        "_log_upr_generation",
+        lambda **kwargs: logged.append(kwargs),
+    )
+    app = Flask(__name__)
+    with app.app_context():
+        assert routes._queue_visual_export(1641, "pdf") == "job-reuse"
+    assert started == ["job-reuse"]
+    assert logged == []
+
+
+@pytest.mark.unit
+def test_queue_visual_export_logs_new_job(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr import routes
+
+    logged = []
+    monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "en")
+    monkeypatch.setattr(routes, "find_reusable_assignment_export_job", lambda **_k: None)
+    monkeypatch.setattr(routes, "create_assignment_export_job", lambda **_k: "job-new")
+    monkeypatch.setattr(routes, "start_assignment_export_job", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        routes,
+        "_log_upr_generation",
+        lambda **kwargs: logged.append(kwargs),
+    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        assert routes._queue_visual_export(12, "png", dashboard_id="reach") == "job-new"
+    assert logged == [{"export_format": "png", "aes_id": 12, "dashboard_id": "reach"}]
+
+
+@pytest.mark.unit
+def test_upr_generation_description():
+    from plugins.upr.routes import _upr_generation_description
+
+    assert _upr_generation_description("pdf") == "Generated UPR (PDF)"
+    assert _upr_generation_description("png", narrative=True) == (
+        "Generated UPR (PNG with narrative)"
+    )
+    assert _upr_generation_description("idml") == "Generated UPR (InDesign)"
+
+
+@pytest.mark.unit
+def test_log_upr_generation_writes_audit_row(monkeypatch):
+    from flask import Flask
+    from types import SimpleNamespace
+
+    from plugins.upr import routes
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.platform.user_analytics_service.log_user_activity",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    class DummyAES:
+        query = SimpleNamespace(get=lambda _id: None)
+
+    monkeypatch.setattr(routes, "AssignmentEntityStatus", DummyAES)
+    app = Flask(__name__)
+    with app.app_context():
+        routes._log_upr_generation(
+            export_format="pdf",
+            aes_id=5,
+            narrative=True,
+        )
+        routes._log_upr_generation(export_format="idml", aes_id=5)
+    assert [c["description"] for c in calls] == [
+        "Generated UPR (PDF with narrative)",
+        "Generated UPR (InDesign)",
+    ]
+    assert calls[0]["activity_type"] == "admin_plugin"
+    assert calls[0]["context_data"]["aes_id"] == 5
+    assert calls[0]["context_data"]["export_format"] == "pdf"
+
+
+@pytest.mark.unit
+def test_log_upr_generation_includes_entity(monkeypatch):
+    from flask import Flask
+    from types import SimpleNamespace
+
+    from plugins.upr import routes
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.platform.user_analytics_service.log_user_activity",
+        lambda **kwargs: calls.append(kwargs),
+    )
+    aes = SimpleNamespace(entity_type="country", entity_id=12)
+
+    class DummyAES:
+        query = SimpleNamespace(get=lambda _id: aes)
+
+    monkeypatch.setattr(routes, "AssignmentEntityStatus", DummyAES)
+    monkeypatch.setattr(
+        "app.services.organization.entity_service.EntityService.get_entity_display_name",
+        staticmethod(lambda _type, _id: "Kenya"),
+    )
+    app = Flask(__name__)
+    with app.app_context():
+        routes._log_upr_generation(export_format="png", aes_id=7, dashboard_id="reach")
+    assert calls[0]["description"] == "Generated UPR (PNG)"
+    assert calls[0]["context_data"]["entity_name"] == "Kenya"
+    assert calls[0]["context_data"]["dashboard_id"] == "reach"
+
+
+@pytest.mark.unit
+def test_export_wait_copy_matches_format():
+    from plugins.upr.routes import _export_wait_copy
+
+    assert _export_wait_copy("pdf")[0] == "Preparing your PDF"
+    assert _export_wait_copy("png")[0] == "Preparing your image"
+    assert _export_wait_copy("idml")[0] == "Preparing InDesign files"
+
+
+@pytest.mark.unit
+def test_wants_json_export_for_xhr():
+    from flask import Flask
+
+    from plugins.upr.routes import _wants_json_export
+
+    app = Flask(__name__)
+    with app.test_request_context("/", headers={"X-Requested-With": "XMLHttpRequest"}):
+        assert _wants_json_export() is True
+    with app.test_request_context("/", headers={"Accept": "application/json"}):
+        assert _wants_json_export() is True
+    with app.test_request_context("/", headers={"Accept": "text/html"}):
+        assert _wants_json_export() is False
+
+
+@pytest.mark.unit
+def test_assignment_png_returns_json_job(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr import routes
+
+    monkeypatch.setattr(routes, "_aes_or_404", lambda aes_id: object())
+    monkeypatch.setattr(routes, "_queue_visual_export", lambda *_a, **_k: "job-png")
+    monkeypatch.setattr(
+        routes,
+        "build_assignment_export_status",
+        lambda job_id: {"job_id": job_id, "status": "queued", "export_format": "png"},
+    )
+    app = Flask(__name__)
+    with app.test_request_context(
+        "/assignment/9/png/combined",
+        headers={"X-Requested-With": "XMLHttpRequest", "Accept": "application/json"},
+    ):
+        response = routes._assignment_png_response(9, "combined")
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["job_id"] == "job-png"
+    assert data["status"]["status"] == "queued"
+
+
+@pytest.mark.unit
+def test_export_wait_page_has_live_status(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr import routes
+
+    monkeypatch.setattr(
+        routes, "build_assignment_export_status", lambda _job_id: {"status": "running"}
+    )
+    monkeypatch.setattr(
+        routes,
+        "url_for",
+        lambda endpoint, **_k: (
+            "/static/js/upr-export-wait.js"
+            if endpoint == "upr.static_file"
+            else "/status"
+        ),
+    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        response = routes._export_wait_response(
+            9, "job-1", download=False, file_url="/assignment/9/pdf?raw=1&job_id=job-1"
+        )
+    html = response.get_data(as_text=True)
+    assert response.mimetype.startswith("text/html")
+    assert "<title>Preparing your PDF</title>" in html
+    assert "id='upr-export-wait-status'" in html
+    assert "upr-export-wait__sweep" in html
+    assert "Usually ready in about 15 seconds." not in html
+    assert "upr-export-wait.js" in html
+
+
+@pytest.mark.unit
+def test_export_wait_serves_completed_file(monkeypatch):
+    from flask import Flask, Response
+
+    from plugins.upr import routes
+
+    served = []
+    monkeypatch.setattr(
+        routes, "build_assignment_export_status", lambda _job_id: {"status": "completed"}
+    )
+    monkeypatch.setattr(
+        routes,
+        "serve_assignment_export",
+        lambda job_id, aes_id, as_attachment=True: served.append((job_id, aes_id, as_attachment))
+        or Response(b"%PDF-1.4", mimetype="application/pdf"),
+    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        response = routes._export_wait_response(9, "job-ready", download=False)
+    assert response.mimetype == "application/pdf"
+    assert served == [("job-ready", 9, False)]
+
+
+@pytest.mark.unit
+def test_pdf_viewer_sets_document_title():
+    from plugins.upr.routes import _pdf_viewer_response
+
+    response = _pdf_viewer_response(
+        title="Bangladesh — Unified Plan – 2026",
+        pdf_url="/assignment/9/pdf?raw=1",
+        download_url="/assignment/9/pdf?download=1",
+        script_url="/upr/static/js/upr-pdf-viewer.js",
+        lang="ar",
+    )
+    html = response.get_data(as_text=True)
+    assert response.mimetype.startswith("text/html")
+    assert "<title>Bangladesh — Unified Plan – 2026</title>" in html
+    assert "raw=1" in html
+    assert "download=1" in html
+    assert "name='viewport'" in html
+    assert "upr-pdf-fallback" in html
+    assert "upr-pdf-viewer.js" in html
+    assert "lang='ar'" in html
+    assert "dir='rtl'" in html
+
+
+@pytest.mark.unit
+def test_prefers_native_pdf_viewer_for_phones():
+    from flask import Flask
+
+    from plugins.upr.routes import _prefers_native_pdf_viewer
+
+    app = Flask(__name__)
+    iphone = (
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    )
+    android = (
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+    )
+    desktop = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    )
+    with app.test_request_context("/", headers={"User-Agent": iphone}):
+        assert _prefers_native_pdf_viewer() is True
+    with app.test_request_context("/", headers={"User-Agent": android}):
+        assert _prefers_native_pdf_viewer() is True
+    with app.test_request_context("/", headers={"Sec-CH-UA-Mobile": "?1"}):
+        assert _prefers_native_pdf_viewer() is True
+    with app.test_request_context("/", headers={"User-Agent": desktop}):
+        assert _prefers_native_pdf_viewer() is False
+
+
+@pytest.mark.unit
+def test_file_response_zip_is_attachment():
+    from plugins.upr.routes import _file_response
+
+    response = _file_response(b"PK", "NS - InDesign.zip", mimetype="application/zip", download=True)
+    assert response.mimetype == "application/zip"
+    assert response.headers["Content-Disposition"].startswith("attachment;")
+    assert "NS - InDesign.zip" in response.headers["Content-Disposition"]
+
+
+@pytest.mark.unit
+def test_fonts_css_is_shared_typography():
+    from flask import Flask
+
+    from plugins.upr.routes import fonts_css
+    from plugins.upr.typography import ARABIC_FAMILY, export_style_token
+
+    app = Flask(__name__)
+    with app.test_request_context("/upr/fonts.css"):
+        response = fonts_css.__wrapped__()
+    body = response.get_data(as_text=True)
+    assert response.mimetype.startswith("text/css")
+    assert ARABIC_FAMILY in body
+    assert ".upr-arabic-font *" in body
+    assert response.headers["ETag"].strip('"') == export_style_token()
+
+
+@pytest.mark.unit
+def test_plugin_asset_version_tracks_css_mtime():
+    from plugins.upr.routes import _plugin_asset_version
+
+    version = _plugin_asset_version("css/upr.css")
+    assert version.isdigit()
+    assert int(version) > 0
+
+
+@pytest.mark.unit
+def test_plugin_static_cache_disabled_in_debug():
+    from flask import Flask, Response
+
+    from plugins.upr.routes import _apply_plugin_static_cache
+
+    app = Flask(__name__)
+    app.config["DEBUG"] = True
+    with app.test_request_context("/upr/static/css/upr.css"):
+        response = _apply_plugin_static_cache(Response("body", mimetype="text/css"))
+    assert "no-store" in response.headers["Cache-Control"]
+
+
+@pytest.mark.unit
+def test_pdf_viewer_csp_allows_same_origin_frame():
+    from plugins.upr.plugin import UprPlugin, _UPR_PDF_VIEWER_CSP
+
+    overrides = UprPlugin().get_csp_overrides()
+    endpoints = {item.endpoint for item in overrides}
+    assert endpoints == {"upr.assignment_pdf", "upr.assignment_narrative_file"}
+    assert all(item.policy == _UPR_PDF_VIEWER_CSP for item in overrides)
+    assert "frame-ancestors 'self'" in _UPR_PDF_VIEWER_CSP

@@ -384,7 +384,7 @@ def _retry_one_log_in_background_thread(app, log_id: int) -> tuple:
 
     Flask's ``current_app``/``db.session`` are context-local, so each thread needs
     its own app context (same pattern as the UPR Excel import background worker in
-    ``app/routes/admin/upr_excel_import.py``) — reusing the request thread's context
+    ``plugins/upr/excel/import_routes.py``) — reusing the request thread's context
     across threads would not work, and could cross-contaminate sessions.
     """
     with app.app_context():

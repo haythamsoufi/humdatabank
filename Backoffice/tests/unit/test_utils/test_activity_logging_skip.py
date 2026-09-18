@@ -111,7 +111,7 @@ class TestShouldSkipActivityEndpoint:
         assert should_skip_activity_endpoint("analytics.end_session") is True
         assert should_skip_activity_endpoint("data_exploration.get_ai_opinions_for_rows") is True
         assert should_skip_activity_endpoint("excel.import_upr_country_reporting_template") is False
-        assert should_skip_activity_endpoint("upr_visuals.assignment_narrative") is True
+        assert should_skip_activity_endpoint("upr.assignment_narrative") is True
         assert should_skip_activity_endpoint("auth.complete_profile") is True
         assert "auth.complete_profile" in SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
         assert should_skip_activity_endpoint("assignment_management.new_assignment") is False

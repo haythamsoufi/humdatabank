@@ -42,7 +42,7 @@ from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
 # Curated FDRS headline bundle for country one-pagers — the same governance,
 # finance, and reach KPI codes already used for FDRS data-quality scoring
-# (see app/services/data_quality/catalogs/fdrs_v1_catalog.py:
+# (see plugins/fdrs/data_quality/fdrs_v1_catalog.py:
 # GOVERNANCE_KPI_CODES, REACH_KPI_CODES, FINANCE_TOTAL_INCOME/EXPENDITURE).
 # Resolved to indicator_bank_id via fdrs_kpi_code, not hardcoded ids, so this
 # stays correct even if the indicator bank differs across environments.

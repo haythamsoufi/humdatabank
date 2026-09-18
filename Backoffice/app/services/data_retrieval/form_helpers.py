@@ -334,7 +334,7 @@ def infer_matrix_share_denominator_kpi_code(
     if "income" not in field:
         return None
     try:
-        from app.services.data_quality.catalogs.fdrs_v1_catalog import FINANCE_TOTAL_INCOME
+        from plugins.fdrs.data_quality.fdrs_v1_catalog import FINANCE_TOTAL_INCOME
         return FINANCE_TOTAL_INCOME
     except Exception:
         return None

@@ -1375,8 +1375,8 @@ msgid ""
 "Words. Existing glossary terms are left unchanged."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:4
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:8
+#: plugins/upr/templates/upr/_narrative_modal.html:4
+#: plugins/upr/templates/upr/_narrative_modal.html:8
 msgid "Add narrative document"
 msgstr ""
 
@@ -1997,7 +1997,7 @@ msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:517
 #: plugins/pb_progress/templates/pb_progress/manage.html:141
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:21
+#: plugins/upr/templates/upr/_language_select.html:21
 msgid "All languages"
 msgstr "所有语言"
 
@@ -2938,7 +2938,7 @@ msgstr ""
 #: app/templates/forms/entry_form/validation_summary_pdf.html:9
 #: app/templates/forms/entry_form/validation_summary_progress.html:9
 #: app/templates/notifications/center.html:107
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:29
+#: plugins/upr/templates/upr/_manage_tools.html:29
 msgid "Assignment"
 msgstr "分配"
 
@@ -3137,7 +3137,7 @@ msgstr ""
 msgid "Assignment submitted: %(template)s"
 msgstr "任务已提交"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:276
+#: plugins/upr/templates/upr/tab_panel.html:276
 #, python-brace-format
 msgid "Assignment {id}"
 msgstr ""
@@ -3797,7 +3797,7 @@ msgstr "未知部分"
 msgid "Bulk User Selection"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:243
+#: plugins/upr/templates/upr/tab_panel.html:243
 msgid "Bulk export is available to system managers."
 msgstr ""
 
@@ -4038,8 +4038,8 @@ msgstr ""
 #: app/templates/tours/tours.html:16
 #: plugins/pb_progress/templates/pb_progress/manage.html:83
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:83
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:131
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:52
+#: plugins/upr/templates/upr/_manage_tools.html:131
+#: plugins/upr/templates/upr/_narrative_modal.html:52
 msgid "Cancel"
 msgstr "取消"
 
@@ -4462,8 +4462,8 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:19
 #: app/templates/core/chat_immersive.html:48
 #: app/templates/notifications/center.html:152
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:96
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:118
+#: plugins/upr/templates/upr/_manage_tools.html:96
+#: plugins/upr/templates/upr/_manage_tools.html:118
 msgid "Clear"
 msgstr "清除"
 
@@ -4682,7 +4682,7 @@ msgid "Click to change country or scope"
 msgstr ""
 
 #: app/templates/macros/excel_import_dropzone.html:46
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:30
+#: plugins/upr/templates/upr/_narrative_modal.html:30
 msgid "Click to change file"
 msgstr ""
 
@@ -5646,7 +5646,7 @@ msgstr ""
 msgid "Could not fetch sync status."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:259
+#: plugins/upr/templates/upr/tab_panel.html:259
 msgid "Could not load data. Refresh the page and try again."
 msgstr ""
 
@@ -5689,11 +5689,11 @@ msgstr ""
 msgid "Could not load the form. Try again or refresh the page."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:283
+#: plugins/upr/templates/upr/tab_panel.html:283
 msgid "Could not load this preview."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:7
+#: plugins/upr/templates/upr/assignment_panel.html:7
 msgid "Could not load visuals."
 msgstr ""
 
@@ -5743,7 +5743,7 @@ msgstr ""
 msgid "Could not save unit."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:264
+#: plugins/upr/templates/upr/tab_panel.html:264
 msgid "Could not start export."
 msgstr ""
 
@@ -5803,7 +5803,7 @@ msgstr ""
 #: app/templates/admin/user_management/user_form.html:892
 #: app/templates/admin/validation_dashboard.html:97
 #: app/templates/admin/validation_dashboard.html:245
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:104
+#: plugins/upr/templates/upr/_manage_tools.html:104
 msgid "Countries"
 msgstr "国家"
 
@@ -5877,7 +5877,7 @@ msgstr ""
 #: app/templates/components/entity_dropdown.html:27
 #: app/templates/components/entity_dropdown.html:157
 #: app/templates/public_submission_export_pdf.html:17
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:37
+#: plugins/upr/templates/upr/_manage_tools.html:37
 msgid "Country"
 msgstr "国家"
 
@@ -6396,8 +6396,8 @@ msgstr "仪表板"
 msgid "Dashboard URL"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:89
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:151
+#: plugins/upr/templates/upr/_manage_tools.html:89
+#: plugins/upr/templates/upr/_manage_tools.html:151
 msgid "Dashboards"
 msgstr ""
 
@@ -7924,10 +7924,10 @@ msgstr ""
 #: app/templates/admin/templates/data_sync_imputation.html:1692
 #: app/templates/macros/unified_country_plan_excel_instructions.html:12
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:22
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:156
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:157
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:14
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:15
+#: plugins/upr/templates/upr/_manage_tools.html:156
+#: plugins/upr/templates/upr/_manage_tools.html:157
+#: plugins/upr/templates/upr/assignment_panel.html:14
+#: plugins/upr/templates/upr/assignment_panel.html:15
 msgid "Download"
 msgstr "下载"
 
@@ -7947,7 +7947,7 @@ msgstr ""
 msgid "Download Starter Plugin"
 msgstr "Download Starter Plugin"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:134
+#: plugins/upr/templates/upr/_manage_tools.html:134
 msgid "Download ZIP"
 msgstr ""
 
@@ -8071,7 +8071,7 @@ msgstr ""
 msgid "Drop UPR Master.xlsx here or click to browse"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:28
+#: plugins/upr/templates/upr/_narrative_modal.html:28
 msgid "Drop your Word document here"
 msgstr ""
 
@@ -9629,7 +9629,7 @@ msgid ""
 "Export all languages in a single Excel file. Easy to edit and reimport."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:275
+#: plugins/upr/templates/upr/tab_panel.html:275
 msgid "Export cancelled."
 msgstr ""
 
@@ -9637,7 +9637,7 @@ msgstr ""
 msgid "Export failed"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:274
+#: plugins/upr/templates/upr/tab_panel.html:274
 msgid "Export failed."
 msgstr ""
 
@@ -9653,7 +9653,7 @@ msgstr ""
 msgid "Export or import template structure to/from Excel"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:273
+#: plugins/upr/templates/upr/tab_panel.html:273
 msgid "Export ready. Download the ZIP below."
 msgstr ""
 
@@ -9680,7 +9680,7 @@ msgstr ""
 msgid "Export to Excel"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:49
+#: plugins/upr/templates/upr/_manage_tools.html:49
 msgid "Export type"
 msgstr ""
 
@@ -10852,18 +10852,18 @@ msgstr "常规"
 msgid "General announcement"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:21
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:59
+#: plugins/upr/templates/upr/_manage_tools.html:21
+#: plugins/upr/templates/upr/_narrative_modal.html:59
 msgid "Generate"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:127
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:58
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:269
+#: plugins/upr/templates/upr/_manage_tools.html:127
+#: plugins/upr/templates/upr/_narrative_modal.html:58
+#: plugins/upr/templates/upr/tab_panel.html:269
 msgid "Generate InDesign"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:57
+#: plugins/upr/templates/upr/_narrative_modal.html:57
 msgid "Generate PDF"
 msgstr ""
 
@@ -10877,14 +10877,14 @@ msgstr ""
 msgid "Generate PDF Thumbnail"
 msgstr "生成的URL"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:127
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:268
+#: plugins/upr/templates/upr/_manage_tools.html:127
+#: plugins/upr/templates/upr/tab_panel.html:268
 msgid "Generate PDFs"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:127
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:128
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:267
+#: plugins/upr/templates/upr/_manage_tools.html:127
+#: plugins/upr/templates/upr/_manage_tools.html:128
+#: plugins/upr/templates/upr/tab_panel.html:267
 msgid "Generate PNGs"
 msgstr ""
 
@@ -10960,8 +10960,8 @@ msgstr ""
 msgid "Generating..."
 msgstr "加载中..."
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:47
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:266
+#: plugins/upr/templates/upr/_narrative_modal.html:47
+#: plugins/upr/templates/upr/tab_panel.html:266
 msgid "Generating…"
 msgstr ""
 
@@ -11989,12 +11989,12 @@ msgstr ""
 msgid "In-app summary"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:3
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:62
+#: plugins/upr/templates/upr/_download_menu.html:3
+#: plugins/upr/templates/upr/_manage_tools.html:62
 msgid "InDesign"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:6
+#: plugins/upr/templates/upr/_download_menu.html:6
 msgid "InDesign with narrative"
 msgstr ""
 
@@ -12047,7 +12047,7 @@ msgstr ""
 msgid "Include disaggregation data (default: excluded)"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:68
+#: plugins/upr/templates/upr/_manage_tools.html:68
 msgid "Include narrative (Word)"
 msgstr ""
 
@@ -12837,9 +12837,9 @@ msgstr ""
 #: app/templates/core/layout.html:264
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:53
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:104
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:6
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:12
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:13
+#: plugins/upr/templates/upr/_language_select.html:6
+#: plugins/upr/templates/upr/_language_select.html:12
+#: plugins/upr/templates/upr/_language_select.html:13
 msgid "Language"
 msgstr "语言"
 
@@ -13259,7 +13259,7 @@ msgstr ""
 msgid "Loading assignments data..."
 msgstr "正在加载用户数据..."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:254
+#: plugins/upr/templates/upr/tab_panel.html:254
 msgid "Loading assignments…"
 msgstr ""
 
@@ -13303,7 +13303,7 @@ msgid "Loading countries..."
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:159
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:255
+#: plugins/upr/templates/upr/tab_panel.html:255
 msgid "Loading countries…"
 msgstr ""
 
@@ -13429,7 +13429,7 @@ msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:943
 #: app/templates/admin/communication/registry.html:135
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:280
+#: plugins/upr/templates/upr/tab_panel.html:280
 msgid "Loading preview…"
 msgstr ""
 
@@ -13519,7 +13519,7 @@ msgstr "正在加载用户数据..."
 msgid "Loading validation questions…"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:4
+#: plugins/upr/templates/upr/assignment_panel.html:4
 msgid "Loading visuals…"
 msgstr ""
 
@@ -14157,7 +14157,7 @@ msgstr "文档已上传"
 msgid "Maximum file size: 10MB"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:36
+#: plugins/upr/templates/upr/_narrative_modal.html:36
 msgid "Maximum file size: 20 MB"
 msgstr ""
 
@@ -14664,7 +14664,7 @@ msgstr "姓名"
 msgid "Name (optional)"
 msgstr "姓名（印地语）"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:77
+#: plugins/upr/templates/upr/_manage_tools.html:77
 msgid ""
 "Name each .docx by ISO3 (AFG.docx), or upload a zip of those files. "
 "Countries without a match still export visuals only."
@@ -14682,7 +14682,7 @@ msgstr ""
 msgid "Names"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:71
+#: plugins/upr/templates/upr/_manage_tools.html:71
 msgid "Narrative files"
 msgstr ""
 
@@ -15115,7 +15115,7 @@ msgstr ""
 msgid "No URL!"
 msgstr "没有URL！"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:256
+#: plugins/upr/templates/upr/tab_panel.html:256
 msgid "No Unified Plan or Report assignments found."
 msgstr ""
 
@@ -15265,7 +15265,7 @@ msgstr ""
 msgid "No country information found."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:258
+#: plugins/upr/templates/upr/tab_panel.html:258
 msgid "No dashboards available for this assignment."
 msgstr ""
 
@@ -16425,7 +16425,7 @@ msgstr ""
 msgid "Only /api/mobile/v1 routes (Flutter app and admin mobile APIs)."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:32
+#: plugins/upr/templates/upr/_manage_tools.html:32
 msgid "Only Unified Plan (24) and Report (33) assignments are listed."
 msgstr ""
 
@@ -16920,8 +16920,8 @@ msgid ""
 "similar indicators closer together."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:2
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:58
+#: plugins/upr/templates/upr/_download_menu.html:2
+#: plugins/upr/templates/upr/_manage_tools.html:58
 msgid "PDF"
 msgstr ""
 
@@ -16933,7 +16933,7 @@ msgstr "上传文档"
 msgid "PDF generation is not available on this deployment."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:5
+#: plugins/upr/templates/upr/_download_menu.html:5
 msgid "PDF with narrative"
 msgstr ""
 
@@ -16941,8 +16941,8 @@ msgstr ""
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:1
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:54
+#: plugins/upr/templates/upr/_download_menu.html:1
+#: plugins/upr/templates/upr/_manage_tools.html:54
 msgid "PNG"
 msgstr ""
 
@@ -17816,7 +17816,7 @@ msgstr ""
 #: app/templates/forms/form_builder/form_builder.html:497
 #: app/templates/forms/form_builder/partials/_item_modal.html:1159
 #: app/templates/forms/form_builder/partials/_versions_modal.html:38
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:12
+#: plugins/upr/templates/upr/_manage_tools.html:12
 msgid "Preview"
 msgstr "预览"
 
@@ -18405,7 +18405,7 @@ msgstr ""
 
 #: app/templates/admin/ai/review_queue.html:59
 #: app/templates/admin/ai/review_queue.html:156
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:271
+#: plugins/upr/templates/upr/tab_panel.html:271
 msgid "Queued"
 msgstr ""
 
@@ -19109,7 +19109,7 @@ msgid ""
 "queries that expand each array."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:272
+#: plugins/upr/templates/upr/tab_panel.html:272
 msgid "Rendering…"
 msgstr ""
 
@@ -20422,8 +20422,8 @@ msgstr ""
 msgid "Search conversations"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:108
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:112
+#: plugins/upr/templates/upr/_manage_tools.html:108
+#: plugins/upr/templates/upr/_manage_tools.html:112
 msgid "Search countries"
 msgstr ""
 
@@ -20935,12 +20935,12 @@ msgstr ""
 #: app/templates/admin/organization/_nss_component.html:151
 #: app/templates/admin/user_management/user_form.html:970
 #: app/templates/auth/login.html:1152
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:41
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:277
+#: plugins/upr/templates/upr/_manage_tools.html:41
+#: plugins/upr/templates/upr/tab_panel.html:277
 msgid "Select a country"
 msgstr "选择国家"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:279
+#: plugins/upr/templates/upr/tab_panel.html:279
 msgid "Select a country to preview."
 msgstr ""
 
@@ -21030,8 +21030,8 @@ msgstr "所有活动类型"
 #: app/templates/admin/user_management/user_form.html:1155
 #: app/templates/admin/user_management/user_form.html:1163
 #: app/templates/admin/validation_dashboard.html:253
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:94
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:116
+#: plugins/upr/templates/upr/_manage_tools.html:94
+#: plugins/upr/templates/upr/_manage_tools.html:116
 msgid "Select all"
 msgstr ""
 
@@ -21043,20 +21043,20 @@ msgstr ""
 msgid "Select all visible"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:33
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:252
+#: plugins/upr/templates/upr/_manage_tools.html:33
+#: plugins/upr/templates/upr/tab_panel.html:252
 msgid "Select an assignment"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:253
+#: plugins/upr/templates/upr/tab_panel.html:253
 msgid "Select an assignment to load dashboards and countries."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:278
+#: plugins/upr/templates/upr/tab_panel.html:278
 msgid "Select an assignment to preview a country visual."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:261
+#: plugins/upr/templates/upr/tab_panel.html:261
 msgid "Select an assignment."
 msgstr ""
 
@@ -21065,7 +21065,7 @@ msgstr ""
 msgid "Select an entity"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:270
+#: plugins/upr/templates/upr/tab_panel.html:270
 msgid "Select an export type."
 msgstr ""
 
@@ -21078,11 +21078,11 @@ msgid ""
 "Select at least one country in Entity Assignments to preview the email."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:263
+#: plugins/upr/templates/upr/tab_panel.html:263
 msgid "Select at least one country."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:262
+#: plugins/upr/templates/upr/tab_panel.html:262
 msgid "Select at least one dashboard."
 msgstr ""
 
@@ -22885,7 +22885,7 @@ msgstr ""
 #: app/templates/forms/form_builder/field_mapping.html:15
 #: app/templates/forms/form_builder/field_mapping.html:262
 #: app/templates/forms/form_builder/field_mapping.html:283
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:14
+#: plugins/upr/templates/upr/_language_select.html:14
 msgid "Suggested"
 msgstr "建议"
 
@@ -23599,8 +23599,8 @@ msgid ""
 "first, then try again."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:80
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:39
+#: plugins/upr/templates/upr/_manage_tools.html:80
+#: plugins/upr/templates/upr/_narrative_modal.html:39
 #, python-brace-format
 msgid ""
 "The Word narrative will be translated into {language} after upload, before "
@@ -23708,7 +23708,7 @@ msgstr ""
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:260
+#: plugins/upr/templates/upr/tab_panel.html:260
 msgid "The server stopped during export. Restart Flask and try again."
 msgstr ""
 
@@ -23821,7 +23821,7 @@ msgid ""
 " until it is returned for revision."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:257
+#: plugins/upr/templates/upr/tab_panel.html:257
 msgid "This assignment has no countries."
 msgstr ""
 
@@ -24794,8 +24794,8 @@ msgstr "已翻译"
 msgid "Translated labels (optional)"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:5
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:281
+#: plugins/upr/templates/upr/assignment_panel.html:5
+#: plugins/upr/templates/upr/tab_panel.html:281
 #, python-brace-format
 msgid "Translating visuals… {done} of {total}"
 msgstr ""
@@ -25209,12 +25209,12 @@ msgstr ""
 msgid "UPR documents"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:9
-msgid "UPR visuals"
+#: plugins/upr/templates/upr/assignment_panel.html:9
+msgid "UPR"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:4
-msgid "UPR visuals tools"
+#: plugins/upr/templates/upr/_manage_tools.html:4
+msgid "UPR tools"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1143
@@ -26704,7 +26704,7 @@ msgstr ""
 msgid "Visuals"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:18
+#: plugins/upr/templates/upr/_narrative_modal.html:18
 msgid ""
 "Visuals come from this assignment. Narrative pages follow the Word file. "
 "InDesign downloads as a zip — unzip it, then open the .idml file."
@@ -28103,7 +28103,7 @@ msgstr "完成度"
 msgid "or"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:29
+#: plugins/upr/templates/upr/_narrative_modal.html:29
 msgid "or click to browse — .docx only"
 msgstr ""
 
@@ -28543,13 +28543,13 @@ msgstr ""
 msgid "{count} selected"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:6
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:282
+#: plugins/upr/templates/upr/assignment_panel.html:6
+#: plugins/upr/templates/upr/tab_panel.html:282
 #, python-brace-format
 msgid "{pending} remaining"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:265
+#: plugins/upr/templates/upr/tab_panel.html:265
 #, python-brace-format
 msgid "{selected} of {total} selected"
 msgstr ""

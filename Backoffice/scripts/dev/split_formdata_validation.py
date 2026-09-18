@@ -90,7 +90,7 @@ from app.services.ai.validation.parsers import (
     _is_blankish_value,
     _parse_int_number,
 )
-from app.services.ai.validation.upr_rules import (
+from plugins.upr.ai.upr_rules import (
     _format_int,
     _infer_primary_keyword,
     _median_int,
@@ -178,7 +178,7 @@ from app.services.ai.validation.parsers import (
     _upr_kpi_applicable,
     _upr_suggestion_reason,
 )
-from app.services.ai.validation.upr_rules import retrieve_upr_kpi_reference
+from plugins.upr.ai.upr_rules import retrieve_upr_kpi_reference
 from app.services.ai.validation.ui_payload import build_opinion_ui, compute_suggestion
 
 logger = logging.getLogger(__name__)

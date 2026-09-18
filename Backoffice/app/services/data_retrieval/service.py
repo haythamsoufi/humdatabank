@@ -544,8 +544,8 @@ def get_aes_with_joins(aes_id: int):
 
 
 # ==================== UPR Visual KPI Lookup ====================
-# Moved to app.services.upr.data_retrieval – re-exported for backward compat.
-from app.services.upr.data_retrieval import (  # noqa: E402,F401
+# Moved to plugins.upr.ai.data_retrieval – re-exported for backward compat.
+from plugins.upr.ai.data_retrieval import (  # noqa: E402,F401
     get_upr_kpi_value,
     get_upr_kpi_timeseries,
     get_upr_kpi_values_for_all_countries,

@@ -89,9 +89,9 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         # Read-only / UI plumbing POSTs.
         "data_exploration.get_ai_opinions_for_rows",
         "plugin_management.render_plugin_field_builder",
-        # Middleware skip only — assignment_narrative writes via _log_upr_visuals_generation.
-        "upr_visuals.assignment_narrative",
-        "upr_visuals.cancel",
+        # Middleware skip only — assignment_narrative writes via _log_upr_generation.
+        "upr.assignment_narrative",
+        "upr.cancel",
         "pb_progress.data_source",
         "pb_progress.mapping_sync",
         "utilities.preview_indicator_import",

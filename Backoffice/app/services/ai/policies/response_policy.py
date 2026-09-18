@@ -13,7 +13,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from app.services.upr.ux import UPR_TOOL_LABELS
+from plugins.upr.ai.ux import UPR_TOOL_LABELS
 
 logger = logging.getLogger(__name__)
 

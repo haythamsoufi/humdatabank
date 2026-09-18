@@ -29,14 +29,9 @@ from app.services.imports.async_import_job_store import (
     get_import_job,
     update_import_job,
 )
-from app.services.imports.fdrs_data_sync_job import (
-    build_fdrs_data_sync_status_payload,
-    create_fdrs_data_sync_job,
+from plugins.fdrs.services.fdrs_data_sync_job import (
     ensure_fdrs_data_sync_job_running,
     get_active_fdrs_data_sync_jobs_for_user,
-    request_fdrs_data_sync_cancel,
-    start_fdrs_data_sync_job,
-    _run_fdrs_data_sync_job,
 )
 from app.services.imports.import_change_log import (
     ImportChangeLogWriter,
@@ -330,20 +325,21 @@ def _sections_with_items_for_template(template: FormTemplate) -> List[Dict[str, 
 
 
 def _fdrs_imports_dir() -> str:
-    return os.path.normpath(os.path.join(current_app.root_path, "..", "scripts", "imports"))
+    from plugins.fdrs.routes import fdrs_imports_dir
+
+    return fdrs_imports_dir()
 
 
 def _fdrs_default_years_bounds() -> tuple[int, int]:
-    imports_dir = _fdrs_imports_dir()
-    if imports_dir not in sys.path:
-        sys.path.insert(0, imports_dir)
-    from fdrs_data_fetcher import DEFAULT_FDRS_YEARS_END, DEFAULT_FDRS_YEARS_START
+    from plugins.fdrs.routes import fdrs_default_years_bounds
 
-    return DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END
+    return fdrs_default_years_bounds()
 
 
 def _fdrs_sync_script_available() -> bool:
-    return os.path.isfile(os.path.join(_fdrs_imports_dir(), "import_fdrs_form_data.py"))
+    from plugins.fdrs.routes import fdrs_sync_script_available
+
+    return fdrs_sync_script_available()
 
 
 def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str] = None):
@@ -1312,274 +1308,3 @@ def export_preview_excel(template_id: int):
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
-
-@bp.route("/<int:template_id>/run-data-sync", methods=["POST"])
-@admin_permission_required("admin.templates.edit")
-def run_data_sync(template_id: int):
-    """
-    Trigger data sync for a template (import_fdrs_form_data.py pipeline).
-    Expects JSON: dry_run (bool), batch_size (int), fdrs_years (str, comma-separated), test (bool),
-    imputed_use_cache (bool), sync_documents (bool), async (bool), and optional fdrs_reported_import_states (list of IFRC State ints).
-    If fdrs_reported_import_states is omitted, the importer uses FDRS_REPORTED_IMPORT_STATES env or default all except Not filled (0).
-    """
-    try:
-        template = FormTemplate.query.get_or_404(template_id)
-        if not check_template_access(template_id, current_user.id):
-            return json_forbidden("Access denied")
-
-        data = get_json_safe()
-        dry_run = bool(data.get("dry_run", False))
-        batch_size_raw = data.get("batch_size", None)
-        if batch_size_raw in (None, ""):
-            batch_size = 1000
-        else:
-            try:
-                batch_size = int(batch_size_raw)
-            except Exception as e:
-                current_app.logger.debug("batch_size parse failed: %s", e)
-                return json_bad_request("Invalid batch_size: must be an integer (or omit it)")
-        if batch_size < 100:
-            return json_bad_request("Invalid batch_size: must be >= 100")
-        fdrs_years_raw = (data.get("fdrs_years") or "").strip()
-        test_mode = bool(data.get("test", False))
-        async_mode = bool(data.get("async", False))
-        imputed_use_cache = bool(data.get("imputed_use_cache", True))
-        sync_documents = bool(data.get("sync_documents", True))
-        try:
-            fdrs_reported_import_states = _parse_reported_import_states(data)
-        except ValueError as e:
-            return json_bad_request(str(e))
-
-        fdrs_years = None
-        test_limit = None
-        if test_mode:
-            fdrs_years = [2024]
-            test_limit = 1000
-        elif fdrs_years_raw:
-            try:
-                fdrs_years = [int(y.strip()) for y in fdrs_years_raw.split(",") if y.strip()]
-            except ValueError:
-                return json_bad_request("Invalid fdrs_years: use comma-separated integers")
-
-        imports_dir = _fdrs_imports_dir()
-        if imports_dir not in sys.path:
-            sys.path.insert(0, imports_dir)
-        from import_fdrs_form_data import run_import
-
-        preview_path = None
-        if dry_run:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-            tmp.close()
-            preview_path = tmp.name
-
-        # Async mode: run in background via ai_job_runner and expose progress via polling.
-        if async_mode:
-            sync_user_id = int(getattr(current_user, "id", 0) or 0) or None
-            with _DATA_SYNC_LOCK:
-                _cleanup_data_sync_jobs_locked(time.time())
-
-            job_id = create_fdrs_data_sync_job(
-                user_id=int(getattr(current_user, "id", 0) or 0),
-                template_id=template_id,
-                dry_run=dry_run,
-                batch_size=batch_size,
-                fdrs_years=fdrs_years,
-                test_limit=test_limit,
-                imputed_use_cache=imputed_use_cache,
-                sync_documents=sync_documents,
-                fdrs_reported_import_states=fdrs_reported_import_states,
-                preview_path=preview_path,
-                sync_user_id=sync_user_id,
-            )
-            set_import_audit_details(
-                log_id=job_id,
-                import_kind="fdrs_data_sync",
-                templates=[template.name or str(template_id)],
-                dry_run=dry_run,
-                extra={"years": fdrs_years} if fdrs_years else None,
-            )
-
-            worker_app = current_app._get_current_object()
-            if current_app.config.get("TESTING"):
-                _run_fdrs_data_sync_job(worker_app, job_id)
-            else:
-                start_fdrs_data_sync_job(worker_app, job_id)
-            return json_accepted(job_id=job_id)
-
-        log_id = uuid.uuid4().hex
-        set_import_audit_details(
-            log_id=log_id,
-            import_kind="fdrs_data_sync",
-            templates=[template.name or str(template_id)],
-            dry_run=dry_run,
-            extra={"years": fdrs_years} if fdrs_years else None,
-        )
-        writer = ImportChangeLogWriter(
-            log_id,
-            kind="fdrs_data_sync",
-            meta={
-                "template_id": template_id,
-                "dry_run": dry_run,
-                "fdrs_years": fdrs_years,
-            },
-        )
-        try:
-            stats = run_import(
-                input_path=None,
-                fdrs_api_url=None,
-                fdrs_from_data_api=True,
-                fdrs_data_api_base=None,
-                fdrs_data_api_key=None,
-                fdrs_imputed_url=None,
-                fdrs_imputed_from_api=False,
-                fdrs_imputed_kpi_codes_path=None,
-                fdrs_imputed_use_cache=imputed_use_cache,
-                fdrs_years=fdrs_years,
-                fdrs_reported_import_states=fdrs_reported_import_states,
-                indicator_mapping_path=None,
-                indicator_bank_api_base=None,
-                indicator_bank_api_key=None,
-                databank_base_url=None,
-                databank_api_key=None,
-                preview_excel_path=preview_path if dry_run else None,
-                test_limit=test_limit,
-                dry_run=dry_run,
-                batch_size=batch_size,
-                template_id=template_id,
-                sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
-                sync_documents=sync_documents,
-                change_recorder=writer.record,
-            )
-            writer.finalize(dict(stats or {}))
-            stats = dict(stats or {})
-            stats["change_log_id"] = log_id
-        except Exception:
-            if not writer._finalized:
-                writer.finalize({"success": False, "errors": 1})
-            raise
-        attach_import_change_log_to_activity(
-            log_id=log_id,
-            user_id=int(getattr(current_user, "id", 0) or 0) or None,
-            extra={
-                "rows_inserted": stats.get("inserted"),
-                "rows_updated": stats.get("updated"),
-                "rows_skipped": stats.get("skipped"),
-                "rows_errors": stats.get("errors"),
-            },
-        )
-
-        if dry_run and preview_path and os.path.isfile(preview_path):
-            @after_this_request
-            def _remove_preview(resp):
-                try:
-                    os.unlink(preview_path)
-                except OSError:
-                    pass
-                return resp
-            return send_file(
-                preview_path,
-                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                as_attachment=True,
-                download_name=f"data_sync_preview_{template_id}.xlsx",
-            )
-
-        return json_ok(
-            success=True,
-            dry_run=dry_run,
-            stats=stats,
-            change_log_id=log_id,
-            message=(
-                f"Loaded: {stats['loaded']}, Skipped: {stats['skipped']}, "
-                f"Inserted: {stats['inserted']}, Updated: {stats['updated']}, Errors: {stats['errors']}"
-                + (
-                    f"; Documents: +{stats.get('documents_inserted', 0)} "
-                    f"~{stats.get('documents_updated', 0)} "
-                    f"approved={stats.get('documents_status_approved', 0)} "
-                    f"pending={stats.get('documents_status_pending', 0)} "
-                    f"rejected={stats.get('documents_status_rejected', 0)} "
-                    f"err={stats.get('documents_errors', 0)}"
-                    if stats.get("documents_inserted") is not None or stats.get("documents_updated")
-                    else ""
-                )
-            ),
-        )
-    except (ValueError, RuntimeError) as e:
-        current_app.logger.error(f"Data sync error: {e}", exc_info=True)
-        msg = str(e).strip() or "Sync failed."
-        return json_bad_request(msg[:2000] if len(msg) > 2000 else msg)
-    except Exception as e:
-        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
-
-
-@bp.route("/<int:template_id>/data-sync-status/<job_id>", methods=["GET"])
-@admin_permission_required("admin.templates.edit")
-def data_sync_status(template_id: int, job_id: str):
-    """Poll data sync job status (for live UI progress)."""
-    with _DATA_SYNC_LOCK:
-        _cleanup_data_sync_jobs_locked(time.time())
-
-    job = get_import_job(job_id)
-    if not job or int(job.get("template_id") or 0) != int(template_id):
-        return json_not_found("Job not found")
-    if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
-        return json_forbidden("Access denied")
-
-    ensure_fdrs_data_sync_job_running(current_app._get_current_object(), job_id)
-    job_payload = build_fdrs_data_sync_status_payload(job_id, template_id)
-    if not job_payload:
-        return json_not_found("Job not found")
-
-    resp = {"success": True, "job": job_payload}
-    if resp["job"]["download_ready"]:
-        resp["job"]["download_url"] = url_for(
-            "data_sync_imputation.data_sync_download",
-            template_id=template_id,
-            job_id=job_id,
-        )
-    return json_ok(**resp) if isinstance(resp, dict) else json_ok(data=resp)
-
-
-@bp.route("/<int:template_id>/data-sync-cancel/<job_id>", methods=["POST"])
-@admin_permission_required("admin.templates.edit")
-def data_sync_cancel(template_id: int, job_id: str):
-    """Request cancellation for a running data sync job (best-effort)."""
-    job = get_import_job(job_id)
-    if not job or int(job.get("template_id") or 0) != int(template_id):
-        return json_not_found("Job not found")
-    if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
-        return json_forbidden("Access denied")
-
-    status = job.get("status")
-    if status in ("completed", "failed", "cancelled"):
-        return json_ok(status=status)
-
-    final_status = request_fdrs_data_sync_cancel(job_id)
-    return json_ok(status=final_status)
-
-
-@bp.route("/<int:template_id>/data-sync-download/<job_id>", methods=["GET"])
-@admin_permission_required("admin.templates.edit")
-def data_sync_download(template_id: int, job_id: str):
-    """Download preview Excel generated by an async dry-run sync."""
-    job = get_import_job(job_id)
-    if not job or int(job.get("template_id") or 0) != int(template_id):
-        return json_not_found("Job not found")
-    if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
-        return json_forbidden("Access denied")
-    path = job.get("preview_path")
-    if not path or not os.path.isfile(path):
-        return json_not_found("Preview file not available")
-
-    @after_this_request
-    def _remove_preview(resp):
-        with suppress(Exception):
-            os.unlink(path)
-        update_import_job(job_id, force=True, download_ready=False, preview_path=None)
-        return resp
-
-    return send_file(
-        path,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=f"data_sync_preview_{template_id}.xlsx",
-    )

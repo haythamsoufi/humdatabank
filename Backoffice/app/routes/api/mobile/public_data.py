@@ -12,12 +12,7 @@ Auth policy:
   - Auth-required: quiz/leaderboard, quiz/submit-score (scores are tied to authenticated users).
 """
 
-from collections import OrderedDict
-from contextlib import suppress
-from hashlib import sha256
-from threading import Lock
-
-from flask import request, current_app, make_response
+from flask import request, current_app
 from flask_login import current_user
 
 from app.utils.api_pagination import validate_pagination_params
@@ -36,12 +31,7 @@ from app.utils.transactions import request_transaction_rollback
 from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.sector_logo_urls import sector_logo_url
 from app.routes.api.mobile import mobile_bp
-from app.utils.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
-
-# In-process JPEG cache for unified-planning thumbnails (key = sha256 of URL).
-_UNIFIED_PLANNING_THUMB_JPEG: "OrderedDict[str, bytes]" = OrderedDict()
-_UNIFIED_PLANNING_THUMB_LOCK = Lock()
-_UNIFIED_PLANNING_THUMB_MAX_ENTRIES = 128
+# In-process JPEG cache lives in plugins.upr.mobile.
 
 
 @mobile_bp.route('/data/countrymap', methods=['GET'])
@@ -840,180 +830,19 @@ def public_resources():
 @mobile_bp.route('/data/unified-planning-config', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def unified_planning_config():
-    """Public config for unified planning documents: IFRC GO API URL and type IDs.
+    """Public config for unified planning documents: IFRC GO API URL and type IDs."""
+    from plugins.upr.mobile import unified_planning_config as _impl
 
-    The mobile app calls the IFRC API directly using credentials supplied in the app
-    build (not returned here). This endpoint only exposes the canonical base URL and
-    the three AppealsTypeId values (Plan, Mid-Year Report, Annual Report).
-
-    ``pdf_thumbnail_enabled`` is true only when the server has IFRC basic auth
-    configured so ``/data/unified-planning-thumbnail`` can fetch PDFs. The list
-    still works with app-side IFRC credentials alone; thumbnails require
-    ``IFRC_API_USER`` / ``IFRC_API_PASSWORD`` on the Backoffice host.
-    """
-    from app.routes.ai_documents.helpers import _get_ifrc_basic_auth
-
-    base = 'https://go-api.ifrc.org/Api/PublicSiteAppeals'
-    ids = APPEALS_TYPE_DEFAULT_IDS_STR
-    document_types = [
-        {'id': tid, 'label': APPEALS_TYPE_DISPLAY_NAMES[tid]}
-        for tid in sorted(APPEALS_TYPE_DISPLAY_NAMES.keys())
-    ]
-    return mobile_ok(
-        data={
-            'ifrc_public_site_appeals_base_url': base,
-            'appeals_type_ids': ids,
-            'ifrc_public_site_appeals_url': f'{base}?AppealsTypeId={ids}',
-            'document_types': document_types,
-            'pdf_thumbnail_enabled': _get_ifrc_basic_auth() is not None,
-        },
-    )
+    return _impl()
 
 
 @mobile_bp.route('/data/unified-planning-thumbnail', methods=['GET', 'POST'])
 @mobile_rate_limit(requests_per_minute=120)
 def unified_planning_thumbnail():
-    """Return a small JPEG of the PDF first page for unified-planning grid tiles.
+    """Return a small JPEG of the PDF first page for unified-planning grid tiles."""
+    from plugins.upr.mobile import unified_planning_thumbnail as _impl
 
-    The mobile app should prefer this over downloading full PDFs on-device. The server
-    fetches the IFRC PDF (same allowlist / Basic auth as document import), renders with
-    PyMuPDF, and returns ``image/jpeg`` (not the usual mobile JSON envelope).
-
-    **URL input (use POST in production):**
-
-    - **POST** ``application/json``: ``{"url_b64": "<base64url UTF-8 of url>"}`` — preferred;
-      avoids Azure WAF blocking raw IFRC URLs (tokens / ``&`` / ``=`` in JSON or query strings).
-    - **POST** ``{"url": "<https...>"}`` — legacy plaintext (may be blocked by WAF).
-    - **GET** ``?url=`` — legacy query string (often blocked by WAF for long SAS URLs).
-    """
-    import base64
-    from urllib.parse import unquote
-
-    import requests
-    import fitz  # PyMuPDF
-
-    from app.utils.api_helpers import get_json_safe
-
-    from app.routes.ai_documents.helpers import (
-        _get_ifrc_basic_auth,
-        _ifrc_get_with_validated_redirects,
-        _validate_ifrc_fetch_url,
-    )
-
-    _max_url_len = int(current_app.config.get('UNIFIED_PLANNING_THUMB_MAX_URL_CHARS') or 16384)
-    _max_b64_len = int(current_app.config.get('UNIFIED_PLANNING_THUMB_MAX_URL_B64_CHARS') or 32768)
-
-    if request.method == 'POST':
-        data = get_json_safe()
-        raw = ''
-        if isinstance(data, dict):
-            url_b64 = (data.get('url_b64') or '').strip()
-            if url_b64:
-                if len(url_b64) > _max_b64_len:
-                    return mobile_bad_request('url_b64 is too long')
-                try:
-                    pad = (-len(url_b64)) % 4
-                    if pad:
-                        url_b64 += '=' * pad
-                    raw = base64.urlsafe_b64decode(url_b64.encode('ascii')).decode('utf-8')
-                except Exception:
-                    return mobile_bad_request('Invalid url_b64')
-            else:
-                raw = (data.get('url') or '').strip()
-    else:
-        raw = (request.args.get('url') or '').strip()
-    if len(raw) > _max_url_len:
-        return mobile_bad_request('url is too long')
-    url = unquote(raw).strip()
-    ok, err = _validate_ifrc_fetch_url(url)
-    if not ok:
-        return mobile_bad_request(err)
-
-    cache_key = sha256(url.encode('utf-8')).hexdigest()
-    with _UNIFIED_PLANNING_THUMB_LOCK:
-        cached = _UNIFIED_PLANNING_THUMB_JPEG.get(cache_key)
-        if cached is not None:
-            _UNIFIED_PLANNING_THUMB_JPEG.move_to_end(cache_key)
-            resp = make_response(cached)
-            resp.headers['Content-Type'] = 'image/jpeg'
-            resp.headers['Cache-Control'] = 'public, max-age=86400'
-            return resp
-
-    max_bytes = int(current_app.config.get('UNIFIED_PLANNING_THUMB_MAX_BYTES') or (12 * 1024 * 1024))
-    auth = _get_ifrc_basic_auth()
-    if auth is None:
-        current_app.logger.warning('unified_planning_thumbnail: IFRC basic auth not configured')
-        return mobile_bad_request('IFRC credentials are not configured on the server')
-
-    r = None
-    try:
-        r = _ifrc_get_with_validated_redirects(
-            url,
-            headers={'User-Agent': 'hum-databank-backoffice/1.0'},
-            auth=auth,
-            timeout=90,
-            stream=True,
-        )
-        if r.status_code != 200:
-            return mobile_bad_request(f'Upstream HTTP {r.status_code}')
-        cl = r.headers.get('Content-Length')
-        if cl is not None:
-            with suppress(ValueError):
-                if int(cl) > max_bytes:
-                    return mobile_bad_request('PDF too large for thumbnail')
-        chunks = []
-        total = 0
-        for chunk in r.iter_content(chunk_size=65536):
-            if not chunk:
-                continue
-            total += len(chunk)
-            if total > max_bytes:
-                return mobile_bad_request('PDF too large for thumbnail')
-            chunks.append(chunk)
-        pdf_bytes = b''.join(chunks)
-    except requests.RequestException as e:
-        current_app.logger.warning('unified_planning_thumbnail fetch: %s', e)
-        return mobile_server_error()
-    finally:
-        if r is not None:
-            with suppress(Exception):
-                r.close()
-
-    doc = None
-    jpeg_bytes = b''
-    try:
-        doc = fitz.open(stream=pdf_bytes, filetype='pdf')
-        if doc.page_count < 1:
-            return mobile_bad_request('PDF has no pages')
-        page = doc.load_page(0)
-        rect = page.rect
-        if rect.width <= 0:
-            return mobile_bad_request('Invalid PDF page size')
-        zoom = min(280.0 / float(rect.width), 2.5)
-        mat = fitz.Matrix(zoom, zoom)
-        pix = page.get_pixmap(matrix=mat, alpha=False)
-        jpeg_bytes = pix.tobytes('jpeg', jpg_quality=82)
-    except Exception as e:
-        current_app.logger.warning('unified_planning_thumbnail render: %s', e, exc_info=True)
-        return mobile_bad_request('Could not render PDF thumbnail')
-    finally:
-        if doc is not None:
-            with suppress(Exception):
-                doc.close()
-
-    if not jpeg_bytes:
-        return mobile_server_error()
-
-    with _UNIFIED_PLANNING_THUMB_LOCK:
-        _UNIFIED_PLANNING_THUMB_JPEG[cache_key] = jpeg_bytes
-        _UNIFIED_PLANNING_THUMB_JPEG.move_to_end(cache_key)
-        while len(_UNIFIED_PLANNING_THUMB_JPEG) > _UNIFIED_PLANNING_THUMB_MAX_ENTRIES:
-            _UNIFIED_PLANNING_THUMB_JPEG.popitem(last=False)
-
-    resp = make_response(jpeg_bytes)
-    resp.headers['Content-Type'] = 'image/jpeg'
-    resp.headers['Cache-Control'] = 'public, max-age=86400'
-    return resp
+    return _impl()
 
 
 @mobile_bp.route('/data/quiz/submit-score', methods=['POST'])

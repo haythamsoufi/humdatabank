@@ -461,7 +461,7 @@ def apply_document_source_filters(filters, sources_cfg, query=None):
     elif not include_system and not include_upr:
         return False
     elif include_system and include_upr and query:
-        from app.services.upr.query_detection import query_prefers_upr_documents
+        from plugins.upr.ai.query_detection import query_prefers_upr_documents
         if query_prefers_upr_documents(query):
             filters["is_api_import"] = True
             filters["is_system_document"] = False

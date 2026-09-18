@@ -111,7 +111,9 @@ def sync_ai_document_is_public_from_submitted(submitted) -> None:
 
 
 def _fdrs_imports_dir() -> str:
-    return os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "scripts", "imports")
+    from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
+
+    return ensure_fdrs_scripts_in_path()
 
 
 def _download_fdrs_document_to_temp(url: str, filename_hint: str) -> Tuple[str, str, int, str, str]:

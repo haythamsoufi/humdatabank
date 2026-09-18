@@ -332,7 +332,7 @@ def _dispatch_assignment_created_notifications(app, aes_ids, notify_admins, acto
     Opens its own app context (own DB session/transaction) — Flask's current_app and
     db.session are context-local, so the request thread's context cannot be reused here
     (same pattern as the email-retry pool in app/services/email/delivery.py and the UPR
-    Excel import worker in app/routes/admin/upr_excel_import.py). Must only be started
+    Excel import worker in plugins/upr/excel/import_routes.py). Must only be started
     *after* the request's transaction has committed (see _start_assignment_notification_dispatch
     below), otherwise this fresh session would not see the newly created rows yet.
     """

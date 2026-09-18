@@ -1,6 +1,6 @@
 """Pluggable data quality methodology registry."""
 
-from app.services.data_quality.methodologies.fdrs_v1 import FdrsV1Methodology
+from plugins.fdrs.data_quality.fdrs_v1 import FdrsV1Methodology
 from app.utils.data_quality_constants import METHODOLOGY_FDRS_V1
 
 METHODOLOGIES = {

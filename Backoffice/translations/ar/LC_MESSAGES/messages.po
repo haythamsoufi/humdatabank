@@ -1409,8 +1409,8 @@ msgid ""
 "Words. Existing glossary terms are left unchanged."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:4
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:8
+#: plugins/upr/templates/upr/_narrative_modal.html:4
+#: plugins/upr/templates/upr/_narrative_modal.html:8
 msgid "Add narrative document"
 msgstr ""
 
@@ -2046,7 +2046,7 @@ msgstr "جميع حقول اللغة ممتلئة بالفعل."
 
 #: app/templates/admin/ai/knowledge_base.html:517
 #: plugins/pb_progress/templates/pb_progress/manage.html:141
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:21
+#: plugins/upr/templates/upr/_language_select.html:21
 msgid "All languages"
 msgstr "جميع اللغات"
 
@@ -3027,7 +3027,7 @@ msgstr ""
 #: app/templates/forms/entry_form/validation_summary_pdf.html:9
 #: app/templates/forms/entry_form/validation_summary_progress.html:9
 #: app/templates/notifications/center.html:107
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:29
+#: plugins/upr/templates/upr/_manage_tools.html:29
 msgid "Assignment"
 msgstr "المهام"
 
@@ -3230,7 +3230,7 @@ msgstr "تم تسليم الواجب بنجاح!"
 msgid "Assignment submitted: %(template)s"
 msgstr "الإحالة المقدمة: %(template)s"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:276
+#: plugins/upr/templates/upr/tab_panel.html:276
 #, python-brace-format
 msgid "Assignment {id}"
 msgstr ""
@@ -3921,7 +3921,7 @@ msgstr "قسم غير معروف"
 msgid "Bulk User Selection"
 msgstr "اختيار المستخدمين بالجملة"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:243
+#: plugins/upr/templates/upr/tab_panel.html:243
 msgid "Bulk export is available to system managers."
 msgstr ""
 
@@ -4164,8 +4164,8 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/tours/tours.html:16
 #: plugins/pb_progress/templates/pb_progress/manage.html:83
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:83
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:131
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:52
+#: plugins/upr/templates/upr/_manage_tools.html:131
+#: plugins/upr/templates/upr/_narrative_modal.html:52
 msgid "Cancel"
 msgstr "إلغاء"
 
@@ -4599,8 +4599,8 @@ msgstr "%(count)d نظفت الجلسات المنتهية صلاحيتها."
 #: app/templates/components/ag_grid_i18n_js.html:19
 #: app/templates/core/chat_immersive.html:48
 #: app/templates/notifications/center.html:152
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:96
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:118
+#: plugins/upr/templates/upr/_manage_tools.html:96
+#: plugins/upr/templates/upr/_manage_tools.html:118
 msgid "Clear"
 msgstr "مسح"
 
@@ -4828,7 +4828,7 @@ msgid "Click to change country or scope"
 msgstr ""
 
 #: app/templates/macros/excel_import_dropzone.html:46
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:30
+#: plugins/upr/templates/upr/_narrative_modal.html:30
 msgid "Click to change file"
 msgstr "انقر لتغيير الملف"
 
@@ -5812,7 +5812,7 @@ msgstr "لم أتمكن من استخراج النص من المستند."
 msgid "Could not fetch sync status."
 msgstr "لا يمكن الحصول على حالة التزامن."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:259
+#: plugins/upr/templates/upr/tab_panel.html:259
 msgid "Could not load data. Refresh the page and try again."
 msgstr ""
 
@@ -5855,11 +5855,11 @@ msgstr "لم أتمكن من تحميل سجلات الجلسة."
 msgid "Could not load the form. Try again or refresh the page."
 msgstr "لم أتمكن من تحميل النموذج. حاول مرة أخرى أو قم بتحديث الصفحة."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:283
+#: plugins/upr/templates/upr/tab_panel.html:283
 msgid "Could not load this preview."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:7
+#: plugins/upr/templates/upr/assignment_panel.html:7
 msgid "Could not load visuals."
 msgstr ""
 
@@ -5909,7 +5909,7 @@ msgstr "لم أتمكن من حفظ النوع."
 msgid "Could not save unit."
 msgstr "لم أتمكن من إنقاذ الوحدة."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:264
+#: plugins/upr/templates/upr/tab_panel.html:264
 msgid "Could not start export."
 msgstr ""
 
@@ -5969,7 +5969,7 @@ msgstr ""
 #: app/templates/admin/user_management/user_form.html:892
 #: app/templates/admin/validation_dashboard.html:97
 #: app/templates/admin/validation_dashboard.html:245
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:104
+#: plugins/upr/templates/upr/_manage_tools.html:104
 msgid "Countries"
 msgstr "البلدان"
 
@@ -6045,7 +6045,7 @@ msgstr "الدول – إكسل"
 #: app/templates/components/entity_dropdown.html:27
 #: app/templates/components/entity_dropdown.html:157
 #: app/templates/public_submission_export_pdf.html:17
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:37
+#: plugins/upr/templates/upr/_manage_tools.html:37
 msgid "Country"
 msgstr "البلد"
 
@@ -6590,8 +6590,8 @@ msgstr "لوحة التحكم"
 msgid "Dashboard URL"
 msgstr "رابط لوحة المعلومات"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:89
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:151
+#: plugins/upr/templates/upr/_manage_tools.html:89
+#: plugins/upr/templates/upr/_manage_tools.html:151
 msgid "Dashboards"
 msgstr ""
 
@@ -8132,10 +8132,10 @@ msgstr "نقرة مزدوجة"
 #: app/templates/admin/templates/data_sync_imputation.html:1692
 #: app/templates/macros/unified_country_plan_excel_instructions.html:12
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:22
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:156
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:157
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:14
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:15
+#: plugins/upr/templates/upr/_manage_tools.html:156
+#: plugins/upr/templates/upr/_manage_tools.html:157
+#: plugins/upr/templates/upr/assignment_panel.html:14
+#: plugins/upr/templates/upr/assignment_panel.html:15
 msgid "Download"
 msgstr "تحميل"
 
@@ -8155,7 +8155,7 @@ msgstr "تحميل ملف PDF"
 msgid "Download Starter Plugin"
 msgstr "تنزيل إضافة البدء"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:134
+#: plugins/upr/templates/upr/_manage_tools.html:134
 msgid "Download ZIP"
 msgstr ""
 
@@ -8283,7 +8283,7 @@ msgstr "سحب أنواع المستخدمين لتكوين التوزيع"
 msgid "Drop UPR Master.xlsx here or click to browse"
 msgstr "يمكنك Master.xlsx UPR هنا أو انقر للتصفح"
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:28
+#: plugins/upr/templates/upr/_narrative_modal.html:28
 msgid "Drop your Word document here"
 msgstr ""
 
@@ -9905,7 +9905,7 @@ msgid ""
 "Export all languages in a single Excel file. Easy to edit and reimport."
 msgstr "تصدير جميع اللغات في ملف إكسل واحد. من السهل تحريرها وإعادة تقديمها."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:275
+#: plugins/upr/templates/upr/tab_panel.html:275
 msgid "Export cancelled."
 msgstr ""
 
@@ -9913,7 +9913,7 @@ msgstr ""
 msgid "Export failed"
 msgstr "فشل التصدير"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:274
+#: plugins/upr/templates/upr/tab_panel.html:274
 msgid "Export failed."
 msgstr ""
 
@@ -9929,7 +9929,7 @@ msgstr "مؤشرات التصدير أو الاستيراد من إكسل"
 msgid "Export or import template structure to/from Excel"
 msgstr "هيكل القالب للتصدير أو الاستيراد إلى/من إكسل"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:273
+#: plugins/upr/templates/upr/tab_panel.html:273
 msgid "Export ready. Download the ZIP below."
 msgstr ""
 
@@ -9956,7 +9956,7 @@ msgstr "تصدير دفتر العمل المملوء مسبقا لهذا الب
 msgid "Export to Excel"
 msgstr "التصدير إلى إكسل"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:49
+#: plugins/upr/templates/upr/_manage_tools.html:49
 msgid "Export type"
 msgstr ""
 
@@ -11152,18 +11152,18 @@ msgstr "عام"
 msgid "General announcement"
 msgstr "إعلان عام"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:21
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:59
+#: plugins/upr/templates/upr/_manage_tools.html:21
+#: plugins/upr/templates/upr/_narrative_modal.html:59
 msgid "Generate"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:127
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:58
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:269
+#: plugins/upr/templates/upr/_manage_tools.html:127
+#: plugins/upr/templates/upr/_narrative_modal.html:58
+#: plugins/upr/templates/upr/tab_panel.html:269
 msgid "Generate InDesign"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:57
+#: plugins/upr/templates/upr/_narrative_modal.html:57
 msgid "Generate PDF"
 msgstr ""
 
@@ -11177,14 +11177,14 @@ msgstr ""
 msgid "Generate PDF Thumbnail"
 msgstr "URL المُنشأ"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:127
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:268
+#: plugins/upr/templates/upr/_manage_tools.html:127
+#: plugins/upr/templates/upr/tab_panel.html:268
 msgid "Generate PDFs"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:127
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:128
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:267
+#: plugins/upr/templates/upr/_manage_tools.html:127
+#: plugins/upr/templates/upr/_manage_tools.html:128
+#: plugins/upr/templates/upr/tab_panel.html:267
 msgid "Generate PNGs"
 msgstr ""
 
@@ -11260,8 +11260,8 @@ msgstr "إنشاء صورة مصغرة..."
 msgid "Generating..."
 msgstr "جاري التحميل..."
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:47
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:266
+#: plugins/upr/templates/upr/_narrative_modal.html:47
+#: plugins/upr/templates/upr/tab_panel.html:266
 msgid "Generating…"
 msgstr ""
 
@@ -12338,12 +12338,12 @@ msgstr ""
 msgid "In-app summary"
 msgstr "ملخص داخل التطبيق"
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:3
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:62
+#: plugins/upr/templates/upr/_download_menu.html:3
+#: plugins/upr/templates/upr/_manage_tools.html:62
 msgid "InDesign"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:6
+#: plugins/upr/templates/upr/_download_menu.html:6
 msgid "InDesign with narrative"
 msgstr ""
 
@@ -12398,7 +12398,7 @@ msgstr ""
 msgid "Include disaggregation data (default: excluded)"
 msgstr "تضمين بيانات التفكيك (افتراضي: مستبعد)"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:68
+#: plugins/upr/templates/upr/_manage_tools.html:68
 msgid "Include narrative (Word)"
 msgstr ""
 
@@ -13208,9 +13208,9 @@ msgstr ""
 #: app/templates/core/layout.html:264
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:53
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:104
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:6
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:12
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:13
+#: plugins/upr/templates/upr/_language_select.html:6
+#: plugins/upr/templates/upr/_language_select.html:12
+#: plugins/upr/templates/upr/_language_select.html:13
 msgid "Language"
 msgstr "اللغة"
 
@@ -13641,7 +13641,7 @@ msgstr "جاري تحميل التحليلات..."
 msgid "Loading assignments data..."
 msgstr "جاري تحميل بيانات المستخدمين..."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:254
+#: plugins/upr/templates/upr/tab_panel.html:254
 msgid "Loading assignments…"
 msgstr ""
 
@@ -13685,7 +13685,7 @@ msgid "Loading countries..."
 msgstr "تحميل الدول..."
 
 #: app/templates/admin/validation_dashboard.html:159
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:255
+#: plugins/upr/templates/upr/tab_panel.html:255
 msgid "Loading countries…"
 msgstr "تحميل الدول..."
 
@@ -13811,7 +13811,7 @@ msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:943
 #: app/templates/admin/communication/registry.html:135
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:280
+#: plugins/upr/templates/upr/tab_panel.html:280
 msgid "Loading preview…"
 msgstr ""
 
@@ -13901,7 +13901,7 @@ msgstr "جاري تحميل بيانات المستخدمين..."
 msgid "Loading validation questions…"
 msgstr "جاري تحميل أسئلة التحقق..."
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:4
+#: plugins/upr/templates/upr/assignment_panel.html:4
 msgid "Loading visuals…"
 msgstr ""
 
@@ -14557,7 +14557,7 @@ msgstr "الحد الأقصى المسموح به للوثائق"
 msgid "Maximum file size: 10MB"
 msgstr "الحد الأقصى لحجم الملف: 25 ميجابايت"
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:36
+#: plugins/upr/templates/upr/_narrative_modal.html:36
 msgid "Maximum file size: 20 MB"
 msgstr ""
 
@@ -15074,7 +15074,7 @@ msgstr "الاسم"
 msgid "Name (optional)"
 msgstr "ملاحظة النسخة (اختياري)"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:77
+#: plugins/upr/templates/upr/_manage_tools.html:77
 msgid ""
 "Name each .docx by ISO3 (AFG.docx), or upload a zip of those files. "
 "Countries without a match still export visuals only."
@@ -15092,7 +15092,7 @@ msgstr "الاسم/المصابيح المدمجة بالاسم:"
 msgid "Names"
 msgstr "الأسماء"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:71
+#: plugins/upr/templates/upr/_manage_tools.html:71
 msgid "Narrative files"
 msgstr ""
 
@@ -15535,7 +15535,7 @@ msgstr ""
 msgid "No URL!"
 msgstr "لا يوجد URL!"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:256
+#: plugins/upr/templates/upr/tab_panel.html:256
 msgid "No Unified Plan or Report assignments found."
 msgstr ""
 
@@ -15688,7 +15688,7 @@ msgstr "لم تظهر بيانات الدولة لهذا الاستعلام."
 msgid "No country information found."
 msgstr "لم يتم العثور على معلومات عن الدولة."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:258
+#: plugins/upr/templates/upr/tab_panel.html:258
 msgid "No dashboards available for this assignment."
 msgstr ""
 
@@ -16877,7 +16877,7 @@ msgstr ""
 "فقط مسارات /api/mobile/v1 (تطبيقات Flutter وواجهات برمجة التطبيقات للإدارة "
 "على الجوال)."
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:32
+#: plugins/upr/templates/upr/_manage_tools.html:32
 msgid "Only Unified Plan (24) and Report (33) assignments are listed."
 msgstr ""
 
@@ -17392,8 +17392,8 @@ msgstr ""
 "PCA: نظرة سريعة للحفاظ على الانتشار العام. t-SNE: أبطأ لكنه يجمع مؤشرات "
 "متشابهة بشكل أقرب إلى بعضها."
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:2
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:58
+#: plugins/upr/templates/upr/_download_menu.html:2
+#: plugins/upr/templates/upr/_manage_tools.html:58
 msgid "PDF"
 msgstr ""
 
@@ -17405,7 +17405,7 @@ msgstr "رفع مستند"
 msgid "PDF generation is not available on this deployment."
 msgstr "توليد PDF غير متاح في هذا النشر."
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:5
+#: plugins/upr/templates/upr/_download_menu.html:5
 msgid "PDF with narrative"
 msgstr ""
 
@@ -17413,8 +17413,8 @@ msgstr ""
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr "مسح المعلومات الشخصية لتقليل كشف البيانات الشخصية."
 
-#: plugins/upr_visuals/templates/upr_visuals/_download_menu.html:1
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:54
+#: plugins/upr/templates/upr/_download_menu.html:1
+#: plugins/upr/templates/upr/_manage_tools.html:54
 msgid "PNG"
 msgstr ""
 
@@ -18308,7 +18308,7 @@ msgstr "Presets"
 #: app/templates/forms/form_builder/form_builder.html:497
 #: app/templates/forms/form_builder/partials/_item_modal.html:1159
 #: app/templates/forms/form_builder/partials/_versions_modal.html:38
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:12
+#: plugins/upr/templates/upr/_manage_tools.html:12
 msgid "Preview"
 msgstr "معاينة"
 
@@ -18907,7 +18907,7 @@ msgstr "تراكم الطابور"
 
 #: app/templates/admin/ai/review_queue.html:59
 #: app/templates/admin/ai/review_queue.html:156
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:271
+#: plugins/upr/templates/upr/tab_panel.html:271
 msgid "Queued"
 msgstr "في الطابور"
 
@@ -19626,7 +19626,7 @@ msgstr ""
 "أعد تسمية هذا الاستعلام (مثلا Databank_Source)، ثم الإشارة إليه من استعلامات"
 " فرعية توسع كل مصفوفة."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:272
+#: plugins/upr/templates/upr/tab_panel.html:272
 msgid "Rendering…"
 msgstr ""
 
@@ -20969,8 +20969,8 @@ msgstr "أعمدة البحث..."
 msgid "Search conversations"
 msgstr "محادثات البحث"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:108
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:112
+#: plugins/upr/templates/upr/_manage_tools.html:108
+#: plugins/upr/templates/upr/_manage_tools.html:112
 msgid "Search countries"
 msgstr ""
 
@@ -21484,12 +21484,12 @@ msgstr "اختر حملة..."
 #: app/templates/admin/organization/_nss_component.html:151
 #: app/templates/admin/user_management/user_form.html:970
 #: app/templates/auth/login.html:1152
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:41
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:277
+#: plugins/upr/templates/upr/_manage_tools.html:41
+#: plugins/upr/templates/upr/tab_panel.html:277
 msgid "Select a country"
 msgstr "اختر بلداً"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:279
+#: plugins/upr/templates/upr/tab_panel.html:279
 msgid "Select a country to preview."
 msgstr ""
 
@@ -21581,8 +21581,8 @@ msgstr "جميع أنواع الأنشطة"
 #: app/templates/admin/user_management/user_form.html:1155
 #: app/templates/admin/user_management/user_form.html:1163
 #: app/templates/admin/validation_dashboard.html:253
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:94
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:116
+#: plugins/upr/templates/upr/_manage_tools.html:94
+#: plugins/upr/templates/upr/_manage_tools.html:116
 msgid "Select all"
 msgstr "اختر الجميع"
 
@@ -21594,20 +21594,20 @@ msgstr "اختر جميع الدول"
 msgid "Select all visible"
 msgstr "اختر كل ما يظهر"
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:33
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:252
+#: plugins/upr/templates/upr/_manage_tools.html:33
+#: plugins/upr/templates/upr/tab_panel.html:252
 msgid "Select an assignment"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:253
+#: plugins/upr/templates/upr/tab_panel.html:253
 msgid "Select an assignment to load dashboards and countries."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:278
+#: plugins/upr/templates/upr/tab_panel.html:278
 msgid "Select an assignment to preview a country visual."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:261
+#: plugins/upr/templates/upr/tab_panel.html:261
 msgid "Select an assignment."
 msgstr ""
 
@@ -21616,7 +21616,7 @@ msgstr ""
 msgid "Select an entity"
 msgstr "اختر كيانا"
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:270
+#: plugins/upr/templates/upr/tab_panel.html:270
 msgid "Select an export type."
 msgstr ""
 
@@ -21629,11 +21629,11 @@ msgid ""
 "Select at least one country in Entity Assignments to preview the email."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:263
+#: plugins/upr/templates/upr/tab_panel.html:263
 msgid "Select at least one country."
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:262
+#: plugins/upr/templates/upr/tab_panel.html:262
 msgid "Select at least one dashboard."
 msgstr ""
 
@@ -23499,7 +23499,7 @@ msgstr "مجهزة بنجاح: {حساب}"
 #: app/templates/forms/form_builder/field_mapping.html:15
 #: app/templates/forms/form_builder/field_mapping.html:262
 #: app/templates/forms/form_builder/field_mapping.html:283
-#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:14
+#: plugins/upr/templates/upr/_language_select.html:14
 msgid "Suggested"
 msgstr "المقترح"
 
@@ -24228,8 +24228,8 @@ msgstr ""
 "النسخة الإنجليزية من هذا القالب فارغة. أضف أو احفظ النص الإنجليزي أولا، ثم "
 "حاول مرة أخرى."
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:80
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:39
+#: plugins/upr/templates/upr/_manage_tools.html:80
+#: plugins/upr/templates/upr/_narrative_modal.html:39
 #, python-brace-format
 msgid ""
 "The Word narrative will be translated into {language} after upload, before "
@@ -24346,7 +24346,7 @@ msgstr "ولم يعثر على الموارد المطلوبة."
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr "الخادم غير متاح مؤقتا. يرجى المحاولة مرة أخرى بعد قليل."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:260
+#: plugins/upr/templates/upr/tab_panel.html:260
 msgid "The server stopped during export. Restart Flask and try again."
 msgstr ""
 
@@ -24480,7 +24480,7 @@ msgstr ""
 "تم إرسال هذا الواجب إلى %(org)s للمراجعة. لا يمكنك إجراء التعديلات حتى يتم "
 "إرجاعها للمراجعة."
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:257
+#: plugins/upr/templates/upr/tab_panel.html:257
 msgid "This assignment has no countries."
 msgstr ""
 
@@ -25508,8 +25508,8 @@ msgstr "مُترجم"
 msgid "Translated labels (optional)"
 msgstr "المترجمات (اختياري)"
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:5
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:281
+#: plugins/upr/templates/upr/assignment_panel.html:5
+#: plugins/upr/templates/upr/tab_panel.html:281
 #, python-brace-format
 msgid "Translating visuals… {done} of {total}"
 msgstr ""
@@ -25937,12 +25937,12 @@ msgstr "بطاقة مؤشر الأداء الرئيسي للجامعة العا�
 msgid "UPR documents"
 msgstr "وثائق UPR"
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:9
-msgid "UPR visuals"
+#: plugins/upr/templates/upr/assignment_panel.html:9
+msgid "UPR"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_manage_tools.html:4
-msgid "UPR visuals tools"
+#: plugins/upr/templates/upr/_manage_tools.html:4
+msgid "UPR tools"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1143
@@ -27497,7 +27497,7 @@ msgstr ""
 msgid "Visuals"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:18
+#: plugins/upr/templates/upr/_narrative_modal.html:18
 msgid ""
 "Visuals come from this assignment. Narrative pages follow the Word file. "
 "InDesign downloads as a zip — unzip it, then open the .idml file."
@@ -28950,7 +28950,7 @@ msgstr "الإنجاز"
 msgid "or"
 msgstr "أو"
 
-#: plugins/upr_visuals/templates/upr_visuals/_narrative_modal.html:29
+#: plugins/upr/templates/upr/_narrative_modal.html:29
 msgid "or click to browse — .docx only"
 msgstr ""
 
@@ -29392,13 +29392,13 @@ msgstr ""
 msgid "{count} selected"
 msgstr "{العد} تم اختياره"
 
-#: plugins/upr_visuals/templates/upr_visuals/assignment_panel.html:6
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:282
+#: plugins/upr/templates/upr/assignment_panel.html:6
+#: plugins/upr/templates/upr/tab_panel.html:282
 #, python-brace-format
 msgid "{pending} remaining"
 msgstr ""
 
-#: plugins/upr_visuals/templates/upr_visuals/tab_panel.html:265
+#: plugins/upr/templates/upr/tab_panel.html:265
 #, python-brace-format
 msgid "{selected} of {total} selected"
 msgstr ""

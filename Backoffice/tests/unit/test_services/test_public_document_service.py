@@ -20,7 +20,7 @@ from app.services.public.document_service import (
     search_public_documents,
     slim_public_document_chunk,
 )
-from app.services.upr.query_detection import query_requests_multi_year_documents
+from plugins.upr.ai.query_detection import query_requests_multi_year_documents
 
 
 class TestPublicDocumentHelpers:

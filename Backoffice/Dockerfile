@@ -91,8 +91,8 @@ RUN mkdir -p /usr/local/share/fonts/upr-visuals && \
        /app/app/static/fonts/OpenSans-Regular.ttf \
        /app/app/static/fonts/OpenSans-Bold.ttf \
        /usr/local/share/fonts/upr-visuals/ && \
-    cp /app/plugins/upr_visuals/fonts/Montserrat-Regular.ttf \
-       /app/plugins/upr_visuals/fonts/Montserrat-Bold.ttf \
+    cp /app/plugins/upr/fonts/Montserrat-Regular.ttf \
+       /app/plugins/upr/fonts/Montserrat-Bold.ttf \
        /usr/local/share/fonts/upr-visuals/ && \
     fc-cache -f
 

@@ -149,7 +149,7 @@ PY
   echo "RBAC permissions seeding (best-effort)"
   echo "=========================================="
   # Re-sync the RBAC catalog after every deploy so newly added plugin roles
-  # (e.g. admin_data_explorer_upr_visuals) land in an already-populated database.
+  # (e.g. admin_data_explorer_upr) land in an already-populated database.
   # The seeder is idempotent. Set RBAC_SEED_ON_STARTUP=false to skip.
   RBAC_SEED_ON_STARTUP="$(echo "${RBAC_SEED_ON_STARTUP:-true}" | tr '[:upper:]' '[:lower:]')"
   if [ "$RBAC_SEED_ON_STARTUP" != "false" ]; then

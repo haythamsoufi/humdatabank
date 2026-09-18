@@ -551,7 +551,7 @@ class TestTrackerPeriodsForTemplate:
 class TestReportingSectionRatiosExtended:
     @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.5)
     def test_finance_ratio_with_income_and_expenditure(self, _mock_income_ratio):
-        from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
+        from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 
         income_entry = MagicMock()
         expend_entry = MagicMock()
@@ -576,7 +576,7 @@ class TestReportingSectionRatiosExtended:
 
     @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
     def test_reach_ratio_with_all_reported(self, _mock_income_ratio):
-        from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
+        from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 
         kpi_data = {code: (MagicMock(), MagicMock()) for code in cat.REACH_KPI_CODES}
 
@@ -595,7 +595,7 @@ class TestReportingSectionRatiosExtended:
 
     @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
     def test_governance_ratio_with_all_reported(self, _mock_income_ratio):
-        from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
+        from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 
         kpi_data = {code: (MagicMock(), MagicMock()) for code in cat.GOVERNANCE_KPI_CODES}
 

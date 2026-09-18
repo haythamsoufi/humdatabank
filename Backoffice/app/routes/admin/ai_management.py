@@ -568,7 +568,7 @@ def _runner_for_ai_document_job_type(job_type: str):
     if job_type == "docs.bulk_reprocess_metadata":
         return _run_bulk_metadata_reprocess_job
     if job_type == "ifrc_api_bulk":
-        from app.routes.ai_documents.ifrc import _run_ifrc_bulk_import_job
+        from plugins.upr.ai.ifrc_routes import _run_ifrc_bulk_import_job
 
         return _run_ifrc_bulk_import_job
     return None
@@ -2466,7 +2466,7 @@ def list_system_documents():
 def download_system_document_for_import(doc_id):
     """Stream a submitted document for the AI import modal (plain 404, no HTML redirects)."""
     from app.models import SubmittedDocument
-    from app.services.imports.fdrs_document_fetch_service import try_materialize_public_fdrs_document
+    from plugins.fdrs.services.fdrs_document_fetch_service import try_materialize_public_fdrs_document
     from werkzeug.exceptions import NotFound
 
     document = SubmittedDocument.query.get_or_404(doc_id)

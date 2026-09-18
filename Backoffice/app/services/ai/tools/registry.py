@@ -30,12 +30,12 @@ from app.services.data_retrieval.service import (
     get_indicator_values_for_all_countries as get_indicator_values_for_all_countries_service,
     get_form_field_values_for_all_countries as get_form_field_values_for_all_countries_service,
 )
-from app.services.upr.data_retrieval import (
+from plugins.upr.ai.data_retrieval import (
     get_upr_kpi_value as get_upr_kpi_value_service,
     get_upr_kpi_timeseries as get_upr_kpi_timeseries_service,
     get_upr_kpi_values_for_all_countries as get_upr_kpi_values_for_all_countries_service,
 )
-from app.services.upr.tool_specs import UPR_TOOL_SPECS, UPR_KPI_TOOL_NAMES, UPR_CACHEABLE_TOOLS
+from plugins.upr.ai.tool_specs import UPR_TOOL_SPECS, UPR_KPI_TOOL_NAMES, UPR_CACHEABLE_TOOLS
 from app.services.ai.data.form_retrieval import resolve_indicator_to_primary_id
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.ai.documents.vector_store import AIVectorStore
@@ -67,7 +67,7 @@ from app.services.ai.tools._query_utils import (
     rewrite_document_search_query,
     resolve_country_search_filters,
 )
-from app.services.upr.query_detection import query_prefers_upr_documents
+from plugins.upr.ai.query_detection import query_prefers_upr_documents
 
 _INDICATOR_QUERY_PREAMBLE_RE = re.compile(
     r"^.*?(?:"
@@ -1070,7 +1070,7 @@ class AIToolsRegistry:
 
         from sqlalchemy import or_, not_
         from app.models.embeddings import AIDocument
-        from app.services.ai.tools._focus_area_analysis import (
+        from plugins.upr.ai.focus_area_tools import (
             resolve_area_config,
             compile_area_regexes,
             match_focus_areas,

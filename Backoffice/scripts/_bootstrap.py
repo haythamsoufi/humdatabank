@@ -40,9 +40,29 @@ def ensure_backoffice_in_path(from_file: str | Path | None = None) -> str:
     return path
 
 
-def setup_cli_paths(from_file: str | Path) -> tuple[Path, Path]:
+def plugin_scripts_dir(plugin_id: str, from_file: str | Path | None = None) -> Path:
+    return backoffice_dir(from_file) / "plugins" / plugin_id / "scripts"
+
+
+def ensure_plugin_scripts_in_path(plugin_id: str, from_file: str | Path | None = None) -> str:
+    """Insert plugins/<plugin_id>/scripts on sys.path (after core scripts/imports)."""
+    ensure_imports_in_path(from_file)
+    path = str(plugin_scripts_dir(plugin_id, from_file))
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    return path
+
+
+def setup_cli_paths(
+    from_file: str | Path,
+    *,
+    plugin_id: str | None = None,
+) -> tuple[Path, Path]:
     """Standard bootstrap for runnable scripts: Backoffice + imports on sys.path."""
     root = backoffice_dir(from_file)
     ensure_backoffice_in_path(from_file)
     ensure_imports_in_path(from_file)
+    if plugin_id:
+        ensure_plugin_scripts_in_path(plugin_id, from_file)
+        return root, plugin_scripts_dir(plugin_id, from_file)
     return root, imports_dir(from_file)

@@ -74,8 +74,8 @@ MANUAL_ACTIVITY_OVERRIDES: dict[tuple[str, str], ActivityEndpointSpec] = {
         description="Generated a Planning and Budgeting system dataset",
         activity_type="admin_plugin",
     ),
-    ("POST", "upr_visuals.generate"): ActivityEndpointSpec(
-        description="Generated UPR visuals",
+    ("POST", "upr.generate"): ActivityEndpointSpec(
+        description="Generated UPR",
         activity_type="admin_plugin",
     ),
     ("POST", "system_admin.edit_indicator_bank"): ActivityEndpointSpec(

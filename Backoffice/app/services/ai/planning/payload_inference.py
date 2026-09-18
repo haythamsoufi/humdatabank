@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from flask_babel import gettext as _
 
-from app.services.upr.ux import UPR_SOURCE_QUALIFIER
+from plugins.upr.ai.ux import UPR_SOURCE_QUALIFIER
 
 logger = logging.getLogger(__name__)
 

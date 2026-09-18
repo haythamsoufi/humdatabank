@@ -17,7 +17,7 @@ from app.models import AIDocument, AIDocumentChunk
 from app.models.enums import AIDocumentProcessingStatusValue
 from app.services.ai.documents.country_detection import detect_country_id_and_name
 from app.services.ai.documents.vector_store import AIVectorStore, VectorStoreError
-from app.services.upr.query_detection import (
+from plugins.upr.ai.query_detection import (
     query_prefers_upr_documents,
     query_requests_multi_year_documents,
 )

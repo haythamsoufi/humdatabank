@@ -35,7 +35,7 @@ from app.services.ai.tools._query_utils import (
     rewrite_document_search_query,
     resolve_country_search_filters,
 )
-from app.services.upr.query_detection import query_prefers_upr_documents
+from plugins.upr.ai.query_detection import query_prefers_upr_documents
 from app.services.ai.tools.registry import AIToolsRegistry
 
 __all__ = [

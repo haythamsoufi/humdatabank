@@ -151,10 +151,8 @@ PUBLIC_SUBMISSION_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
 DEDICATED_ASSIGNMENT_AUDIT_ENDPOINTS: dict[str, str] = {
     "main.approve_assignment": "assignments.approve_assignment",
     "main.reopen_assignment": "assignments.reopen_assignment",
-    "main.reopen_assignment_section": "assignments.reopen_assignment",
     "main.reopen_assignment_page": "assignments.reopen_assignment",
     "main.return_assignment_for_revision": "assignments.return_assignment_for_revision",
-    "main.return_assignment_section_for_revision": "assignments.return_assignment_for_revision",
     "main.return_assignment_page_for_revision": "assignments.return_assignment_for_revision",
 }
 

@@ -130,16 +130,10 @@ def _sync_scoped_statuses(assignment_entity_status, previous_status, new_status,
     if not aes_id:
         return
     try:
-        from app.services.assignments.section_submission_service import (
-            is_section_submission_enabled,
-            sync_section_statuses_for_entity_change,
-        )
         from app.services.assignments.page_submission_service import (
             is_page_submission_enabled,
             sync_page_statuses_for_entity_change,
         )
-        if is_section_submission_enabled(assignment_entity_status):
-            sync_section_statuses_for_entity_change(aes_id, previous_status, new_status, user_id)
         if is_page_submission_enabled(assignment_entity_status):
             sync_page_statuses_for_entity_change(aes_id, previous_status, new_status, user_id)
     except Exception as exc:

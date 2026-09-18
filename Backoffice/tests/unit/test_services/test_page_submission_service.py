@@ -6,8 +6,11 @@ import pytest
 from app.models import FormPage, FormSection
 from app.models.assignments import AssignedForm, AssignmentEntityStatus, AssignmentPageStatus
 from app.models.enums import AssignmentSectionStatusValue
+from app.models.enums import AssignmentEntityStatusValue
 from app.services.assignments.page_submission_service import (
     all_participating_pages_submitted,
+    apply_page_submission_mode_change,
+    clear_page_statuses_for_assignment,
     is_page_submission_enabled,
     page_boundary_section_ids,
     participating_page_ids,
@@ -176,3 +179,157 @@ class TestPageSubmissionPersistence:
             assert all_participating_pages_submitted(aes, [s1, s2]) is True
             result = prefetch_page_progress([aes])
             assert result[aes.id] == {'enabled': True, 'submitted': 2, 'total': 2}
+
+
+def _two_pages(db_session, aes):
+    template = aes.assigned_form.template
+    version_id = template.published_version_id
+    p1 = FormPage(template_id=template.id, version_id=version_id, name='P1', order=1)
+    p2 = FormPage(template_id=template.id, version_id=version_id, name='P2', order=2)
+    db_session.add_all([p1, p2])
+    db_session.commit()
+    s1 = FormSection(template_id=template.id, version_id=version_id, name='A', order=1, page_id=p1.id)
+    s2 = FormSection(template_id=template.id, version_id=version_id, name='B', order=2, page_id=p2.id)
+    db_session.add_all([s1, s2])
+    db_session.commit()
+    return p1, p2, s1, s2
+
+
+@pytest.mark.unit
+class TestPageModeTransitions:
+    def test_turn_off_partial_pages_keeps_in_progress_and_rows(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_page_submission = True
+            p1, p2, _, _ = _two_pages(db_session, aes)
+            db_session.add(AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p1.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ))
+            db_session.commit()
+
+            summary = apply_page_submission_mode_change(aes.assigned_form, False, user_id=None)
+            db_session.commit()
+            db_session.refresh(aes)
+            assert aes.status == AssignmentEntityStatusValue.in_progress
+            assert summary['partial_unlocked'] == 1
+            assert summary['rolled_up'] == 0
+            assert AssignmentPageStatus.query.filter_by(
+                assignment_entity_status_id=aes.id, form_page_id=p1.id
+            ).one().status == AssignmentSectionStatusValue.submitted.value
+
+    def test_turn_off_all_pages_submitted_rolls_up_assignment(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_page_submission = True
+            p1, p2, _, _ = _two_pages(db_session, aes)
+            db_session.add_all([
+                AssignmentPageStatus(
+                    assignment_entity_status_id=aes.id,
+                    form_page_id=p1.id,
+                    status=AssignmentSectionStatusValue.submitted.value,
+                ),
+                AssignmentPageStatus(
+                    assignment_entity_status_id=aes.id,
+                    form_page_id=p2.id,
+                    status=AssignmentSectionStatusValue.submitted.value,
+                ),
+            ])
+            db_session.commit()
+
+            summary = apply_page_submission_mode_change(aes.assigned_form, False, user_id=None)
+            db_session.commit()
+            db_session.refresh(aes)
+            assert aes.status == AssignmentEntityStatusValue.submitted
+            assert summary['rolled_up'] == 1
+
+    def test_turn_off_keeps_terminal_assignment_status(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='approved')
+            aes.assigned_form.enable_page_submission = True
+            p1, p2, _, _ = _two_pages(db_session, aes)
+            db_session.add_all([
+                AssignmentPageStatus(
+                    assignment_entity_status_id=aes.id,
+                    form_page_id=p1.id,
+                    status=AssignmentSectionStatusValue.approved.value,
+                ),
+                AssignmentPageStatus(
+                    assignment_entity_status_id=aes.id,
+                    form_page_id=p2.id,
+                    status=AssignmentSectionStatusValue.approved.value,
+                ),
+            ])
+            db_session.commit()
+
+            summary = apply_page_submission_mode_change(aes.assigned_form, False, user_id=None)
+            db_session.commit()
+            db_session.refresh(aes)
+            assert aes.status == AssignmentEntityStatusValue.approved
+            assert summary['terminal_unchanged'] == 1
+            assert summary['rolled_up'] == 0
+
+    def test_turn_on_seeds_missing_pages_from_assignment_status(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_page_submission = False
+            p1, p2, _, _ = _two_pages(db_session, aes)
+            db_session.commit()
+
+            summary = apply_page_submission_mode_change(aes.assigned_form, True, user_id=None)
+            db_session.commit()
+            rows = AssignmentPageStatus.query.filter_by(assignment_entity_status_id=aes.id).all()
+            assert summary['seeded_pages'] == 2
+            assert {row.form_page_id for row in rows} == {p1.id, p2.id}
+            assert {row.status for row in rows} == {AssignmentSectionStatusValue.in_progress.value}
+
+    def test_turn_on_keeps_existing_submitted_page(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_page_submission = False
+            p1, p2, _, _ = _two_pages(db_session, aes)
+            db_session.add(AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p1.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ))
+            db_session.commit()
+
+            apply_page_submission_mode_change(aes.assigned_form, True, user_id=None)
+            db_session.commit()
+            row1 = AssignmentPageStatus.query.filter_by(
+                assignment_entity_status_id=aes.id, form_page_id=p1.id
+            ).one()
+            row2 = AssignmentPageStatus.query.filter_by(
+                assignment_entity_status_id=aes.id, form_page_id=p2.id
+            ).one()
+            assert row1.status == AssignmentSectionStatusValue.submitted.value
+            assert row2.status == AssignmentSectionStatusValue.in_progress.value
+
+    def test_turn_on_terminal_assignment_locks_draft_pages(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='submitted')
+            aes.assigned_form.enable_page_submission = False
+            p1, p2, _, _ = _two_pages(db_session, aes)
+            db_session.commit()
+
+            apply_page_submission_mode_change(aes.assigned_form, True, user_id=None)
+            db_session.commit()
+            rows = AssignmentPageStatus.query.filter_by(assignment_entity_status_id=aes.id).all()
+            assert {row.status for row in rows} == {AssignmentSectionStatusValue.submitted.value}
+
+    def test_clear_page_statuses_on_template_change(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_page_submission = True
+            p1, _, _, _ = _two_pages(db_session, aes)
+            db_session.add(AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p1.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ))
+            db_session.commit()
+            deleted = clear_page_statuses_for_assignment(aes.assigned_form)
+            assert deleted == 1
+            assert AssignmentPageStatus.query.filter_by(assignment_entity_status_id=aes.id).count() == 0

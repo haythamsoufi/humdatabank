@@ -49,7 +49,6 @@ from .form_items import FormItem
 from .assignments import (
     AssignedForm,
     AssignmentEntityStatus,
-    AssignmentSectionStatus,
     AssignmentPageStatus,
     PublicSubmission,
     ReportingPeriod
@@ -258,7 +257,6 @@ __all__ = [
     # Assignment models
     'AssignedForm',
     'AssignmentEntityStatus',
-    'AssignmentSectionStatus',
     'AssignmentPageStatus',
     'PublicSubmission',
     'ReportingPeriod',

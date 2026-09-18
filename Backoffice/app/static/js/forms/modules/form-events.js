@@ -80,7 +80,7 @@ export function initFormEvents() {
       (submitter && submitter.name === 'action') ? submitter.value :
       (form.querySelector('input[name="action"][type="hidden"]')?.value || null);
 
-    if (actionValue !== 'submit' && actionValue !== 'submit_section' && actionValue !== 'submit_page') return;
+    if (actionValue !== 'submit' && actionValue !== 'submit_page') return;
 
     // If this submit was triggered programmatically by our own flow (presave -> requestSubmit,
     // or CSRF refresh -> requestSubmit), do NOT presave again (prevents loops / duplicate saves).
@@ -150,15 +150,10 @@ export function initFormEvents() {
     try {
       debugLog(MODULE_NAME, '🧩 presave: starting ajax save-before-submit');
       // Save draft silently (no "Progress saved successfully!" toast)
-      const presaveAction = actionValue === 'submit_section'
-        ? 'save_section'
-        : actionValue === 'submit_page'
-          ? 'save_page'
-          : 'save';
+      const presaveAction = actionValue === 'submit_page' ? 'save_page' : 'save';
       await saveFormBeforeSubmit({
         toast: false,
         action: presaveAction,
-        sectionId: submitter?.dataset?.sectionId || submitBtn?.dataset?.sectionId || '',
         pageId: submitter?.dataset?.pageId || submitBtn?.dataset?.pageId || '',
       });
       debugLog(MODULE_NAME, '🧩 presave: ajax save-before-submit complete');
@@ -504,9 +499,8 @@ export function initFormEvents() {
       const activeLink = document.querySelector('#sidebar-nav-scroll a.section-link.is-active');
       const activeSectionId = (activeLink?.dataset?.sectionId || '').replace('section-container-', '');
       const activePageId = activeLink?.closest('[data-page-id]')?.dataset?.pageId || '';
-      const scopedSave = (activeSectionId && document.querySelector(`.section-save-btn[data-section-id="${activeSectionId}"]`))
-        || (activePageId && document.querySelector(`.page-save-btn[data-page-id="${activePageId}"]`))
-        || document.querySelector('.section-save-btn:not(.hidden), .page-save-btn:not(.hidden)');
+      const scopedSave = (activePageId && document.querySelector(`.page-save-btn[data-page-id="${activePageId}"]`))
+        || document.querySelector('.page-save-btn:not(.hidden)');
       const saveSubmitter = (scopedSave && !scopedSave.closest('.hidden') && !scopedSave.disabled)
         ? scopedSave
         : form.querySelector('button[type="submit"][name="action"][value="save"]');
@@ -540,9 +534,8 @@ export function initFormEvents() {
       const activeLink = document.querySelector('#sidebar-nav-scroll a.section-link.is-active');
       const activeSectionId = (activeLink?.dataset?.sectionId || '').replace('section-container-', '');
       const activePageId = activeLink?.closest('[data-page-id]')?.dataset?.pageId || '';
-      const scopedSubmit = (activeSectionId && document.querySelector(`.section-submit-btn[data-section-id="${activeSectionId}"]`))
-        || (activePageId && document.querySelector(`.page-submit-btn[data-page-id="${activePageId}"]`))
-        || document.querySelector('.section-submit-btn, .page-submit-btn');
+      const scopedSubmit = (activePageId && document.querySelector(`.page-submit-btn[data-page-id="${activePageId}"]`))
+        || document.querySelector('.page-submit-btn');
       const submitSubmitter = form.querySelector('button[type="submit"][name="action"][value="submit"]');
       const sendForReviewSubmitter = form.querySelector('button[type="submit"][name="action"][value="send_for_review"]');
       const activeSubmitter = (scopedSubmit && !scopedSubmit.closest('.hidden') && !scopedSubmit.disabled)

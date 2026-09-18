@@ -5,7 +5,7 @@ from typing import Any, Iterable
 
 from app.extensions import db
 from app.models.assignments import AssignmentEntityStatus, AssignmentPageStatus
-from app.models.enums import AssignmentSectionStatusValue
+from app.models.enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue
 from app.models.forms import FormPage, FormSection, FormTemplate
 from app.services.assignments.scoped_status import (
     COMPLETE_SCOPED_STATUSES,
@@ -18,10 +18,17 @@ from app.services.assignments.scoped_status import (
     status_value,
     sync_scoped_rows_for_entity_change,
 )
-from app.services.assignments.section_submission_service import is_participating_section
 from app.utils.datetime_helpers import utcnow
 
+PARTICIPATING_SECTION_TYPES = frozenset({'standard', 'repeat', 'dynamic_indicators'})
 PAGE_ACTIONS = frozenset({'save_page', 'submit_page'})
+
+
+def is_participating_section(section) -> bool:
+    section_type = getattr(section, 'section_type', None) or 'standard'
+    if section_type == 'discussion':
+        return False
+    return section_type in PARTICIPATING_SECTION_TYPES
 
 
 def is_page_submission_enabled(assignment_entity_status) -> bool:
@@ -445,3 +452,173 @@ def prefetch_page_progress(assignment_entity_statuses: Iterable[AssignmentEntity
             'total': len(allowed),
         }
     return result
+
+
+_AES_TO_PAGE_STATUS = {
+    AssignmentEntityStatusValue.pending.value: AssignmentSectionStatusValue.not_started.value,
+    AssignmentEntityStatusValue.in_progress.value: AssignmentSectionStatusValue.in_progress.value,
+    AssignmentEntityStatusValue.requires_revision.value: AssignmentSectionStatusValue.requires_revision.value,
+    AssignmentEntityStatusValue.sent_for_review.value: AssignmentSectionStatusValue.sent_for_review.value,
+    AssignmentEntityStatusValue.submitted.value: AssignmentSectionStatusValue.submitted.value,
+    AssignmentEntityStatusValue.approved.value: AssignmentSectionStatusValue.approved.value,
+    AssignmentEntityStatusValue.cancelled.value: AssignmentSectionStatusValue.cancelled.value,
+}
+
+_DRAFT_AES_STATUSES = frozenset({
+    AssignmentEntityStatusValue.pending.value,
+    AssignmentEntityStatusValue.in_progress.value,
+    AssignmentEntityStatusValue.requires_revision.value,
+})
+
+
+def load_published_sections(assigned_form) -> list:
+    template = getattr(assigned_form, 'template', None)
+    if not template:
+        return []
+    try:
+        template_id = int(getattr(template, 'id', None))
+        version_id = int(getattr(template, 'published_version_id', None))
+    except (TypeError, ValueError):
+        return []
+    return (
+        FormSection.query.filter_by(
+            template_id=template_id,
+            version_id=version_id,
+            archived=False,
+        ).all()
+    )
+
+
+def _aes_status_value(assignment_entity_status) -> str:
+    return status_value(getattr(assignment_entity_status, 'status', None))
+
+
+def _page_status_for_aes(assignment_entity_status) -> str:
+    return _AES_TO_PAGE_STATUS.get(
+        _aes_status_value(assignment_entity_status),
+        AssignmentSectionStatusValue.not_started.value,
+    )
+
+
+def _rollup_status_from_page_statuses(page_statuses: list[str]):
+    from app.models.enums import AssignmentEntityStatusValue as AES
+
+    if not page_statuses:
+        return None
+    normalized = [status_value(item) for item in page_statuses]
+    if not all(item in COMPLETE_SCOPED_STATUSES for item in normalized):
+        return None
+    if all(item == AssignmentSectionStatusValue.approved.value for item in normalized):
+        return AES.approved
+    if any(item == AssignmentSectionStatusValue.sent_for_review.value for item in normalized):
+        return AES.sent_for_review
+    return AES.submitted
+
+
+def seed_missing_page_statuses(assignment_entity_status, all_sections: Iterable, user_id: int | None = None) -> int:
+    """Create page rows that do not exist yet, inheriting the entity assignment status."""
+    aes_id = getattr(assignment_entity_status, 'id', None)
+    if not aes_id:
+        return 0
+    created = 0
+    seed_status = AssignmentSectionStatusValue.normalize(_page_status_for_aes(assignment_entity_status))
+    for page_id in participating_page_ids(all_sections):
+        existing = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes_id,
+            form_page_id=page_id,
+        ).first()
+        if existing:
+            continue
+        row = get_or_create_row(aes_id, page_id)
+        _set_status(row, seed_status, user_id)
+        created += 1
+    return created
+
+
+def clear_page_statuses_for_assignment(assignment) -> int:
+    """Drop page-status rows for every entity on this assignment (e.g. template change)."""
+    aes_ids = [
+        aes.id
+        for aes in (assignment.entity_statuses.all() if assignment else [])
+        if getattr(aes, 'id', None)
+    ]
+    if not aes_ids:
+        return 0
+    deleted = AssignmentPageStatus.query.filter(
+        AssignmentPageStatus.assignment_entity_status_id.in_(aes_ids)
+    ).delete(synchronize_session=False)
+    db.session.flush()
+    return int(deleted or 0)
+
+
+def apply_page_submission_mode_change(assignment, enabled: bool, user_id: int | None = None) -> dict:
+    """Keep page rows and assignment statuses consistent when page mode is toggled.
+
+    Turning **on**: seed missing page rows from each entity's current AES status.
+    Existing page rows are kept (a previously submitted page stays locked).
+
+    Turning **off**: keep page history. Draft entities with every page already
+    complete are rolled up to that assignment status. Draft entities with only
+    some pages submitted stay in progress/requires revision — those pages
+    become editable again because page locks no longer apply. Terminal
+    assignment statuses are left alone.
+    """
+    summary = {
+        'enabled': bool(enabled),
+        'entities': 0,
+        'seeded_pages': 0,
+        'rolled_up': 0,
+        'partial_unlocked': 0,
+        'terminal_unchanged': 0,
+    }
+    if assignment is None:
+        return summary
+
+    all_sections = load_published_sections(assignment)
+    entities = list(assignment.entity_statuses.all())
+    summary['entities'] = len(entities)
+
+    if enabled:
+        for aes in entities:
+            summary['seeded_pages'] += seed_missing_page_statuses(aes, all_sections, user_id)
+            aes_status = _aes_status_value(aes)
+            if aes_status not in _DRAFT_AES_STATUSES:
+                seed_status = AssignmentSectionStatusValue.normalize(_page_status_for_aes(aes))
+                for page_id in participating_page_ids(all_sections):
+                    row = get_or_create_row(aes.id, page_id)
+                    if is_locked_status(row.status):
+                        continue
+                    _set_status(row, seed_status, user_id)
+                    summary['seeded_pages'] += 1
+                if aes_status == AssignmentEntityStatusValue.approved.value:
+                    sync_page_statuses_for_entity_change(
+                        aes.id,
+                        AssignmentEntityStatusValue.submitted,
+                        AssignmentEntityStatusValue.approved,
+                        user_id,
+                    )
+        return summary
+
+    from app.services.assignments.workflow_service import apply_entity_status_change
+
+    for aes in entities:
+        aes_status = _aes_status_value(aes)
+        page_ids = participating_page_ids(all_sections)
+        rows = AssignmentPageStatus.query.filter_by(assignment_entity_status_id=aes.id).all()
+        by_page = {int(row.form_page_id): status_value(row.status) for row in rows}
+        page_statuses = [by_page.get(page_id, AssignmentSectionStatusValue.not_started.value) for page_id in page_ids]
+        locked_count = sum(1 for item in page_statuses if item in LOCKED_SCOPED_STATUSES)
+
+        if aes_status not in _DRAFT_AES_STATUSES:
+            if locked_count or page_ids:
+                summary['terminal_unchanged'] += 1
+            continue
+
+        rollup = _rollup_status_from_page_statuses(page_statuses) if page_ids else None
+        if rollup is not None:
+            apply_entity_status_change(aes, rollup, user_id, sync_scoped=True)
+            summary['rolled_up'] += 1
+            continue
+        if locked_count:
+            summary['partial_unlocked'] += 1
+    return summary

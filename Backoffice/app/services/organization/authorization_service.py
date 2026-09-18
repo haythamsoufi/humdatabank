@@ -1234,39 +1234,6 @@ class AuthorizationService:
         return AuthorizationService.has_rbac_permission(user, "assignment.reopen", scope=scope)
 
     @staticmethod
-    def can_reopen_assignment_section(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
-        """True when the user may reopen an individual submitted section.
-
-        Uses the same ``assignment.reopen`` permission as whole-assignment reopen,
-        but does not require the assignment itself to already be in a terminal status
-        (partial section submissions keep the assignment ``in_progress``).
-        """
-        if not user or not user.is_authenticated:
-            return False
-        if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
-            return False
-        from app.services.assignments.section_submission_service import is_section_submission_enabled
-        if not is_section_submission_enabled(assignment_entity_status):
-            return False
-        if AuthorizationService.is_system_manager(user):
-            return True
-        try:
-            scope = {
-                "entity_type": assignment_entity_status.entity_type,
-                "entity_id": assignment_entity_status.entity_id,
-                "assigned_form_id": assignment_entity_status.assigned_form_id,
-                "template_id": assignment_entity_status.assigned_form.template_id if assignment_entity_status.assigned_form else None,
-            }
-        except Exception as e:
-            current_app.logger.debug("can_reopen_assignment_section scope build failed: %s", e)
-            scope = {
-                "entity_type": assignment_entity_status.entity_type,
-                "entity_id": assignment_entity_status.entity_id,
-                "assigned_form_id": assignment_entity_status.assigned_form_id,
-            }
-        return AuthorizationService.has_rbac_permission(user, "assignment.reopen", scope=scope)
-
-    @staticmethod
     def can_reopen_assignment_page(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
         """True when the user may reopen an individual submitted page."""
         if not user or not user.is_authenticated:
@@ -1295,19 +1262,14 @@ class AuthorizationService:
         return AuthorizationService.has_rbac_permission(user, "assignment.reopen", scope=scope)
 
     @staticmethod
-    def _can_return_scoped_item(assignment_entity_status: AssignmentEntityStatus, user, *, page: bool) -> bool:
+    def _can_return_scoped_item(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
         if not user or not user.is_authenticated:
             return False
         if not AuthorizationService.can_access_assignment(assignment_entity_status, user):
             return False
-        if page:
-            from app.services.assignments.page_submission_service import is_page_submission_enabled
-            if not is_page_submission_enabled(assignment_entity_status):
-                return False
-        else:
-            from app.services.assignments.section_submission_service import is_section_submission_enabled
-            if not is_section_submission_enabled(assignment_entity_status):
-                return False
+        from app.services.assignments.page_submission_service import is_page_submission_enabled
+        if not is_page_submission_enabled(assignment_entity_status):
+            return False
         from app.models.enums import AssignmentEntityStatusValue
         status = assignment_entity_status.status
         if hasattr(status, 'value'):
@@ -1340,12 +1302,8 @@ class AuthorizationService:
         return AuthorizationService.has_rbac_permission(user, "assignment.submit", scope=scope)
 
     @staticmethod
-    def can_return_assignment_section(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
-        return AuthorizationService._can_return_scoped_item(assignment_entity_status, user, page=False)
-
-    @staticmethod
     def can_return_assignment_page(assignment_entity_status: AssignmentEntityStatus, user) -> bool:
-        return AuthorizationService._can_return_scoped_item(assignment_entity_status, user, page=True)
+        return AuthorizationService._can_return_scoped_item(assignment_entity_status, user)
 
     @staticmethod
     def check_self_report_access(assignment_entity_status: AssignmentEntityStatus, user) -> bool:

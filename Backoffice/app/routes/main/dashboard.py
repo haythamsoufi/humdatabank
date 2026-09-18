@@ -580,9 +580,7 @@ def dashboard():
 
             aes_ids = [aes.id for aes in assigned_forms_statuses] if assigned_forms_statuses else []
             completion_prefetch = AssignmentCompletionService.prefetch(template_ids, aes_ids)
-            from app.services.assignments.section_submission_service import prefetch_section_progress
             from app.services.assignments.page_submission_service import prefetch_page_progress
-            section_progress_by_aes = prefetch_section_progress(assigned_forms_statuses)
             page_progress_by_aes = prefetch_page_progress(assigned_forms_statuses)
 
             # Batch compute the last modified user per assignment (by latest EntityActivityLog for this entity/country)
@@ -703,9 +701,6 @@ def dashboard():
                     'submitted_at': aes.submitted_at,
                     'sent_for_review_by_user': aes.sent_for_review_by_user,
                     'sent_for_review_at': aes.sent_for_review_at,
-                    'section_progress': section_progress_by_aes.get(aes.id) or {
-                        'enabled': False, 'submitted': 0, 'total': 0
-                    },
                     'page_progress': page_progress_by_aes.get(aes.id) or {
                         'enabled': False, 'submitted': 0, 'total': 0
                     },

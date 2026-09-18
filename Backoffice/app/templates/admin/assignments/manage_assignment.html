@@ -494,20 +494,6 @@
                 </div>
                 {% endif %}
 
-                {% if form.enable_section_submission is defined %}
-                <div class="border-t border-gray-200 pt-3">
-                    <div class="flex items-start gap-3">
-                        <div class="pt-0.5">
-                            {{ form.enable_section_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'section'}) }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            {{ form.enable_section_submission.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each section independently instead of the whole form at once.') }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
                 {% if form.enable_page_submission is defined %}
                 <div class="border-t border-gray-200 pt-3">
                     <div class="flex items-start gap-3">
@@ -516,7 +502,7 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             {{ form.enable_page_submission.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each page independently instead of the whole form at once. Applies to paginated templates.') }}</p>
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each page independently instead of the whole form at once. Applies to paginated templates. Turning this off later returns the assignment to whole-form save and submit; already-submitted assignment statuses stay as they are, and any pages that were only partly submitted become editable again.') }}</p>
                         </div>
                     </div>
                 </div>
@@ -581,26 +567,15 @@
             </div>
             {% endif %}
 
-            {% if form.enable_section_submission is defined %}
-            <div class="flex items-start gap-3">
-                <div class="pt-0.5">
-                    {{ form.enable_section_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'section'}) }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_section_submission.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each section independently instead of the whole form at once.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
             {% if form.enable_page_submission is defined %}
             <div class="flex items-start gap-3">
                 <div class="pt-0.5">
-                    {{ form.enable_page_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'page'}) }}
+                    {{ form.enable_page_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-page-mode-toggle", **{'data-scoped-mode': 'page', 'data-initial-page-mode': '1' if assignment.enable_page_submission else '0'}) }}
                 </div>
                 <div class="min-w-0 flex-1">
                     {{ form.enable_page_submission.label(class="text-sm font-medium text-gray-800") }}
                     <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each page independently instead of the whole form at once. Applies to paginated templates.') }}</p>
+                    <p class="mt-1 text-xs text-amber-800">{{ _('Changing this asks for confirmation. Turning it off unlocks pages that were submitted while the assignment is still in progress, and keeps submitted/approved assignment statuses. Turning it on gives each page a status that matches the entity (existing submitted pages stay locked).') }}</p>
                 </div>
             </div>
             {% endif %}
@@ -1404,12 +1379,16 @@ window.manageAssignmentConfig = {
 {% endif %}
 <script src="{{ static_url('js/admin/manage-assignment.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script nonce="{{ csp_nonce() }}">
-document.querySelectorAll('.js-scoped-submission-toggle').forEach((input) => {
+document.querySelectorAll('.js-page-mode-toggle').forEach((input) => {
+    const initial = input.dataset.initialPageMode === '1';
+    const enableMsg = {{ _('Enable per-page save and submit?\n\nPages that do not yet have a status will inherit each entity\'s current assignment status.\nExisting submitted pages stay locked.\nSubmitted, sent-for-review, approved, or cancelled entities keep that assignment status unless you reopen them.')|tojson }};
+    const disableMsg = {{ _('Switch this assignment to whole-form save and submit?\n\nEntities that are already submitted, sent for review, approved, or cancelled keep that assignment status.\nEntities still in progress with some pages submitted will be able to edit those pages again.\nIf every page of an in-progress entity is already submitted, that entity will be marked submitted (or sent for review).\nPage history is kept in case you turn this back on.')|tojson }};
     input.addEventListener('change', () => {
-        if (!input.checked) return;
-        document.querySelectorAll('.js-scoped-submission-toggle').forEach((other) => {
-            if (other !== input) other.checked = false;
-        });
+        if (input.checked === initial) return;
+        const ok = window.confirm(input.checked ? enableMsg : disableMsg);
+        if (!ok) {
+            input.checked = initial;
+        }
     });
 });
 </script>

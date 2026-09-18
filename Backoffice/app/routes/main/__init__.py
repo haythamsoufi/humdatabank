@@ -34,14 +34,6 @@ def inject_rbac_helpers():
             current_app.logger.debug("can_reopen_assignment failed: %s", e)
             return False
 
-    def can_reopen_assignment_section(aes):
-        """Check if current user can reopen an individual submitted section."""
-        try:
-            return AuthorizationService.can_reopen_assignment_section(aes, current_user)
-        except Exception as e:
-            current_app.logger.debug("can_reopen_assignment_section failed: %s", e)
-            return False
-
     def can_reopen_assignment_page(aes):
         """Check if current user can reopen an individual submitted page."""
         try:
@@ -76,13 +68,6 @@ def inject_rbac_helpers():
             current_app.logger.debug("can_return_for_revision failed: %s", e)
             return False
 
-    def can_return_assignment_section(aes):
-        try:
-            return AuthorizationService.can_return_assignment_section(aes, current_user)
-        except Exception as e:
-            current_app.logger.debug("can_return_assignment_section failed: %s", e)
-            return False
-
     def can_return_assignment_page(aes):
         try:
             return AuthorizationService.can_return_assignment_page(aes, current_user)
@@ -101,12 +86,10 @@ def inject_rbac_helpers():
         has_permission=has_permission,
         can_approve_assignment=can_approve_assignment,
         can_reopen_assignment=can_reopen_assignment,
-        can_reopen_assignment_section=can_reopen_assignment_section,
         can_reopen_assignment_page=can_reopen_assignment_page,
         can_reopen_closed_assignment=can_reopen_closed_assignment,
         can_send_for_review=can_send_for_review,
         can_return_for_revision=can_return_for_revision,
-        can_return_assignment_section=can_return_assignment_section,
         can_return_assignment_page=can_return_assignment_page,
         can_submit_assignment=can_submit_assignment,
     )

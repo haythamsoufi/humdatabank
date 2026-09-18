@@ -93,6 +93,54 @@ def _can_update_assignment_entity_status():
     return _can_manage_assignment_entities() or _has_assignment_perm(ASSIGNMENT_ENTITY_STATUS_PERMISSION)
 
 
+def _flash_page_mode_change(summary: dict, *, template_changed: bool = False) -> None:
+    """Tell the admin what the page-mode toggle did to entity/page statuses."""
+    if not summary:
+        return
+    if template_changed:
+        flash(
+            _("The form template changed, so previous per-page submission statuses were cleared."),
+            "warning",
+        )
+    if summary.get('enabled'):
+        seeded = int(summary.get('seeded_pages') or 0)
+        if seeded:
+            flash(
+                _("Per-page save and submit is on. %(count)s page status(es) were created or aligned from each entity's current assignment status. Existing submitted pages were kept.",
+                  count=seeded),
+                "info",
+            )
+        else:
+            flash(
+                _("Per-page save and submit is on. Existing page statuses were kept; new pages inherit each entity's assignment status when first saved."),
+                "info",
+            )
+        return
+    parts = [
+        _("Per-page save and submit is off. The assignment now uses whole-form save and submit."),
+    ]
+    rolled_up = int(summary.get('rolled_up') or 0)
+    partial = int(summary.get('partial_unlocked') or 0)
+    terminal = int(summary.get('terminal_unchanged') or 0)
+    if rolled_up:
+        parts.append(
+            _("%(count)s in-progress entit(ies) had every page submitted and were marked submitted (or sent for review).",
+              count=rolled_up)
+        )
+    if partial:
+        parts.append(
+            _("%(count)s entit(ies) had some pages submitted. Those pages can be edited again. Assignment status stays in progress or requires revision.",
+              count=partial)
+        )
+    if terminal:
+        parts.append(
+            _("%(count)s entit(ies) already submitted, sent for review, approved, or cancelled keep that assignment status.",
+              count=terminal)
+        )
+    parts.append(_("Previous page statuses were kept in case you turn per-page mode back on."))
+    flash(" ".join(str(part) for part in parts), "warning")
+
+
 def _manage_assignment_permission_context(*, is_create=False):
     """UI flags for manage_assignment.html. Create flow keeps full details/entity add."""
     if is_create:
@@ -412,10 +460,6 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Require delegation review before final submission",
         default=False,
     )
-    enable_section_submission = BooleanField(
-        "Allow save and submit per section",
-        default=False,
-    )
     enable_page_submission = BooleanField(
         "Allow save and submit per page",
         default=False,
@@ -501,7 +545,6 @@ def manage_assignments():
                 'public_url': public_url,
                 'public_submission_count': public_submission_count,
                 'requires_delegation_review': bool(getattr(assignment, 'requires_delegation_review', False)),
-                'enable_section_submission': bool(getattr(assignment, 'enable_section_submission', False)),
                 'enable_page_submission': bool(getattr(assignment, 'enable_page_submission', False)),
                 'enable_upr_country_reporting_excel': assignment_uses_upr_country_reporting_excel(assignment),
                 'enable_unified_country_plan_excel': assignment_uses_unified_country_plan_excel(assignment),
@@ -686,7 +729,6 @@ def new_assignment():
                 expiry_date=form.expiry_date.data if form.expiry_date.data else None,
                 data_owner_id=form.data_owner_id.data or None,
                 requires_delegation_review=bool(form.requires_delegation_review.data),
-                enable_section_submission=bool(form.enable_section_submission.data) and not bool(form.enable_page_submission.data),
                 enable_page_submission=bool(form.enable_page_submission.data),
                 enable_export_excel=bool(form.enable_export_excel.data),
                 enable_import_excel=bool(form.enable_import_excel.data),
@@ -1156,6 +1198,9 @@ def edit_assignment(assignment_id):
             audit_before = assignment_settings_snapshot(assignment)
             audit_due_date_before = country_due_dates_snapshot(assignment)
         try:
+            previous_template_id = assignment.template_id
+            previous_page_mode = bool(assignment.enable_page_submission)
+            next_page_mode = bool(form.enable_page_submission.data)
             assignment.template_id = form.template_id.data
             assignment.period_name = (form.period_name.data or '').strip()
             sync_assigned_form_reporting_period(assignment)
@@ -1164,15 +1209,29 @@ def edit_assignment(assignment_id):
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
-            assignment.enable_page_submission = bool(form.enable_page_submission.data)
-            assignment.enable_section_submission = (
-                bool(form.enable_section_submission.data) and not assignment.enable_page_submission
-            )
+            assignment.enable_page_submission = next_page_mode
             assignment.enable_export_excel = bool(form.enable_export_excel.data)
             assignment.enable_import_excel = bool(form.enable_import_excel.data)
             assignment.enable_export_pdf = bool(form.enable_export_pdf.data)
             sync_assignment_custom_excel_flags(assignment)
             _apply_submission_review_recipient_from_form(assignment, form)
+
+            template_changed = previous_template_id != assignment.template_id
+            page_mode_changed = previous_page_mode != next_page_mode
+            if template_changed or page_mode_changed:
+                from app.services.assignments.page_submission_service import (
+                    apply_page_submission_mode_change,
+                    clear_page_statuses_for_assignment,
+                )
+                if template_changed:
+                    clear_page_statuses_for_assignment(assignment)
+                if page_mode_changed or (template_changed and next_page_mode):
+                    page_mode_summary = apply_page_submission_mode_change(
+                        assignment,
+                        next_page_mode,
+                        getattr(current_user, 'id', None),
+                    )
+                    _flash_page_mode_change(page_mode_summary, template_changed=template_changed)
 
             # Warn if active assignment has no data owner
             if assignment.is_active and not assignment.data_owner_id:

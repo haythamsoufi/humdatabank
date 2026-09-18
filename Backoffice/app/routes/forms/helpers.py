@@ -552,11 +552,6 @@ def compute_entry_form_progress_metrics(
             assignment_entity_status.id
         )
 
-    from app.services.assignments.section_submission_service import (
-        is_section_submission_enabled,
-        section_progress_counts,
-        section_workflow_statuses,
-    )
     from app.services.assignments.page_submission_service import (
         is_page_submission_enabled,
         page_progress_counts,
@@ -565,16 +560,11 @@ def compute_entry_form_progress_metrics(
     )
 
     workflow_statuses = {}
-    submitted_count = 0
-    total_count = 0
     page_statuses = {}
     pages_submitted_count = 0
     pages_total_count = 0
     aes_id = getattr(assignment_entity_status, 'id', None)
-    if is_section_submission_enabled(assignment_entity_status) and aes_id:
-        workflow_statuses = section_workflow_statuses(aes_id, all_sections)
-        submitted_count, total_count = section_progress_counts(aes_id, all_sections)
-    elif is_page_submission_enabled(assignment_entity_status) and aes_id:
+    if is_page_submission_enabled(assignment_entity_status) and aes_id:
         page_statuses = page_workflow_statuses(aes_id, all_sections)
         workflow_statuses = section_workflow_from_pages(aes_id, all_sections)
         pages_submitted_count, pages_total_count = page_progress_counts(aes_id, all_sections)
@@ -583,8 +573,6 @@ def compute_entry_form_progress_metrics(
         'completion_rate': completion_rate,
         'section_statuses': section_statuses,
         'section_workflow_statuses': workflow_statuses,
-        'sections_submitted_count': submitted_count,
-        'sections_total_count': total_count,
         'page_workflow_statuses': page_statuses,
         'pages_submitted_count': pages_submitted_count,
         'pages_total_count': pages_total_count,

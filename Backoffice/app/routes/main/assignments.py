@@ -116,16 +116,10 @@ def reopen_assignment(aes_id):
                 )
             if round_was_closed:
                 assignment_entity_status.reopened_after_close = True
-            from app.services.assignments.section_submission_service import (
-                is_section_submission_enabled,
-                reset_all_section_statuses,
-            )
             from app.services.assignments.page_submission_service import (
                 is_page_submission_enabled,
                 reset_all_page_statuses,
             )
-            if is_section_submission_enabled(assignment_entity_status):
-                reset_all_section_statuses(assignment_entity_status.id, current_user.id)
             if is_page_submission_enabled(assignment_entity_status):
                 reset_all_page_statuses(assignment_entity_status.id, current_user.id)
             db.session.flush()
@@ -174,68 +168,6 @@ def reopen_assignment(aes_id):
          return redirect(url_for("main.dashboard", country_id=selected_country_id))
     else:
          return redirect(url_for("main.dashboard"))
-
-@bp.route("/reopen_assignment_section/<int:aes_id>/<int:section_id>", methods=["POST"])
-@login_required
-def reopen_assignment_section(aes_id, section_id):
-    """Reopen a single submitted section without unlocking the other sections."""
-    from app.services.organization.authorization_service import AuthorizationService
-    from app.services.assignments.section_submission_service import (
-        is_section_submission_enabled,
-        reset_section_status,
-    )
-
-    assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
-    if not AuthorizationService.can_reopen_assignment_section(assignment_entity_status, current_user):
-        flash(_("You do not have permission to reopen this assignment."), "danger")
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    form = ReopenAssignmentForm()
-    if not form.validate_on_submit():
-        flash(_("Invalid request. Please try again."), "danger")
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    if not is_section_submission_enabled(assignment_entity_status):
-        flash(_("Per-section submission is not enabled for this assignment."), "warning")
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    try:
-        row = reset_section_status(aes_id, section_id, current_user.id)
-        if row is None:
-            flash(_("That section has not been submitted."), "warning")
-            return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-        _submitted_statuses = {
-            AssignmentEntityStatusValue.submitted,
-            AssignmentEntityStatusValue.approved,
-            AssignmentEntityStatusValue.requires_revision,
-            AssignmentEntityStatusValue.sent_for_review,
-            AssignmentEntityStatusValue.cancelled,
-        }
-        if assignment_entity_status.status in _submitted_statuses:
-            apply_entity_status_change(
-                assignment_entity_status,
-                AssignmentEntityStatusValue.in_progress,
-                current_user.id,
-                sync_scoped=False,
-            )
-        db.session.flush()
-        try:
-            from app.services.notification.core import notify_assignment_reopened
-            notify_assignment_reopened(assignment_entity_status)
-        except Exception as e:
-            current_app.logger.error(
-                "Error sending assignment reopened notification: %s", e, exc_info=True
-            )
-        flash(_("Section reopened. Other submitted sections remain locked."), "success")
-    except Exception as e:
-        request_transaction_rollback()
-        flash(_("Error reopening section."), "danger")
-        current_app.logger.error(
-            "Error reopening section %s on assignment %s: %s", section_id, aes_id, e, exc_info=True
-        )
-    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
 
 @bp.route("/reopen_assignment_page/<int:aes_id>/<int:page_id>", methods=["POST"])
 @login_required
@@ -295,61 +227,6 @@ def reopen_assignment_page(aes_id, page_id):
         flash(_("Error reopening page."), "danger")
         current_app.logger.error(
             "Error reopening page %s on assignment %s: %s", page_id, aes_id, e, exc_info=True
-        )
-    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-
-@bp.route("/return_assignment_section/<int:aes_id>/<int:section_id>", methods=["POST"])
-@login_required
-def return_assignment_section_for_revision(aes_id, section_id):
-    """Return a single submitted section for revision without unlocking the others."""
-    from app.services.organization.authorization_service import AuthorizationService
-    from app.services.assignments.section_submission_service import (
-        is_section_submission_enabled,
-        mark_section_requires_revision,
-    )
-
-    assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
-    if not AuthorizationService.can_return_assignment_section(assignment_entity_status, current_user):
-        flash(_("You do not have permission to return this section for revision."), "danger")
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    form = ReopenAssignmentForm()
-    if not form.validate_on_submit():
-        flash(_("Invalid request. Please try again."), "danger")
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    if not is_section_submission_enabled(assignment_entity_status):
-        flash(_("Per-section submission is not enabled for this assignment."), "warning")
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    try:
-        row = mark_section_requires_revision(aes_id, section_id, current_user.id)
-        if row is None:
-            flash(_("That section cannot be returned for revision."), "warning")
-            return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-        if assignment_entity_status.status == AssignmentEntityStatusValue.sent_for_review:
-            apply_entity_status_change(
-                assignment_entity_status,
-                AssignmentEntityStatusValue.requires_revision,
-                current_user.id,
-                sync_scoped=False,
-            )
-        db.session.flush()
-        try:
-            from app.services.notification.core import notify_assignment_returned_for_revision
-            notify_assignment_returned_for_revision(assignment_entity_status)
-        except Exception as e:
-            current_app.logger.error(
-                "Error sending assignment returned for revision notification: %s", e, exc_info=True
-            )
-        flash(_("Section returned for revision. Other submitted sections remain locked."), "success")
-    except Exception as e:
-        request_transaction_rollback()
-        flash(_("Error returning section for revision."), "danger")
-        current_app.logger.error(
-            "Error returning section %s on assignment %s: %s", section_id, aes_id, e, exc_info=True
         )
     return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 

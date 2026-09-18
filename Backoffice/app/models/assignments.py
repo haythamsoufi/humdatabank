@@ -95,9 +95,7 @@ class AssignedForm(db.Model):
     # PDF export on entry form
     enable_export_pdf = Column(Boolean, default=False, nullable=False)
 
-    # When true, each top-level section can be saved/submitted independently
-    enable_section_submission = Column(Boolean, default=False, nullable=False)
-    # When true, each form page can be saved/submitted independently (mutually exclusive with section mode)
+    # When true, each form page can be saved/submitted independently
     enable_page_submission = Column(Boolean, default=False, nullable=False)
 
     # Optional override for the assignment's display name.
@@ -409,12 +407,6 @@ class AssignmentEntityStatus(db.Model):
     # Relationship to FormData
     data_entries = relationship('FormData', lazy='dynamic', cascade="all, delete-orphan", foreign_keys='FormData.assignment_entity_status_id')
 
-    section_statuses = relationship(
-        'AssignmentSectionStatus',
-        lazy='dynamic',
-        cascade="all, delete-orphan",
-        back_populates='assignment_entity_status',
-    )
     page_statuses = relationship(
         'AssignmentPageStatus',
         lazy='dynamic',
@@ -484,61 +476,6 @@ class AssignmentEntityStatus(db.Model):
     def __repr__(self):
         entity_info = f"{self.entity_type}:{self.entity_id}"
         return f'<AssignmentEntityStatus Assignment:{self.assigned_form_id}, Entity:{entity_info}, Status:{self.status.value}>'
-
-
-class AssignmentSectionStatus(db.Model):
-    """Per top-level section workflow status for one assignment entity."""
-
-    __tablename__ = 'assignment_section_status'
-
-    id = db.Column(db.Integer, primary_key=True)
-    assignment_entity_status_id = db.Column(
-        db.Integer,
-        db.ForeignKey('assignment_entity_status.id', ondelete='CASCADE'),
-        nullable=False,
-    )
-    form_section_id = db.Column(
-        db.Integer,
-        db.ForeignKey('form_section.id', ondelete='CASCADE'),
-        nullable=False,
-    )
-    status = db.Column(
-        db.String(20),
-        nullable=False,
-        default=AssignmentSectionStatusValue.not_started.value,
-    )
-    submitted_by_user_id = db.Column(
-        db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True
-    )
-    submitted_at = db.Column(db.DateTime, nullable=True)
-    status_changed_by_user_id = db.Column(
-        db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True
-    )
-    status_timestamp = db.Column(db.DateTime, default=utcnow)
-
-    assignment_entity_status = relationship(
-        'AssignmentEntityStatus',
-        back_populates='section_statuses',
-    )
-    submitted_by_user = db.relationship('User', foreign_keys=[submitted_by_user_id])
-    status_changed_by_user = db.relationship('User', foreign_keys=[status_changed_by_user_id])
-
-    __table_args__ = (
-        db.UniqueConstraint(
-            'assignment_entity_status_id',
-            'form_section_id',
-            name='uq_aes_section_status',
-        ),
-        db.Index('ix_ass_aes', 'assignment_entity_status_id'),
-        db.Index('ix_ass_section', 'form_section_id'),
-        db.Index('ix_ass_status', 'status'),
-    )
-
-    def __repr__(self):
-        return (
-            f'<AssignmentSectionStatus AES:{self.assignment_entity_status_id} '
-            f'Section:{self.form_section_id} Status:{self.status}>'
-        )
 
 
 class AssignmentPageStatus(db.Model):

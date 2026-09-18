@@ -55,7 +55,7 @@ export function initSectionAjaxSave() {
     }
     if (!form) return;
 
-    form.querySelectorAll('button[name="action"][value="save_section"]').forEach((button) => {
+    document.querySelectorAll('button[name="action"][value="save_section"]').forEach((button) => {
         if (button.dataset.sectionSaveBound === 'true') return;
         button.dataset.sectionSaveBound = 'true';
         button.addEventListener('click', (event) => {
@@ -87,7 +87,7 @@ export function initPageAjaxSave() {
     }
     if (!form) return;
 
-    form.querySelectorAll('button[name="action"][value="save_page"]').forEach((button) => {
+    document.querySelectorAll('button[name="action"][value="save_page"]').forEach((button) => {
         if (button.dataset.pageSaveBound === 'true') return;
         button.dataset.pageSaveBound = 'true';
         button.addEventListener('click', (event) => {
@@ -578,7 +578,11 @@ function updateFabSaveState(saving) {
  * Update save button state
  */
 function updateSaveButtonState(saving) {
-    if (saveButton) {
+    const scopedSaveButtons = [
+        ...document.querySelectorAll('.section-save-btn, .page-save-btn'),
+    ];
+    const buttonsToUpdate = [saveButton, ...scopedSaveButtons].filter(Boolean);
+    buttonsToUpdate.forEach((saveButton) => {
         const icon = saveButton.querySelector('i');
         const text = saveButton.querySelector('span') || saveButton;
 
@@ -603,7 +607,7 @@ function updateSaveButtonState(saving) {
                 textNode.textContent = textNode.textContent.replace(_t('Saving...'), _t('Save'));
             }
         }
-    }
+    });
 
     updateFabSaveState(saving);
 }

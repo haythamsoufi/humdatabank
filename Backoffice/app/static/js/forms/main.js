@@ -16,6 +16,7 @@ import { initDisaggregationCalculator } from './modules/disaggregation-calculato
 import { initializeFormValidation } from './modules/form-validation.js';
 import { initAjaxSave, triggerSave, isSavingForm } from './modules/ajax-save.js';
 import { initSectionLocks } from './modules/section-lock.js';
+import { initScopedNavActions } from './modules/scoped-nav-actions.js';
 import { installNativeSubmitTextEncoder } from './modules/question-text-waf-encode.js';
 import { installNativeSubmitMatrixChunker } from './modules/matrix-field-chunking.js';
 import { initSessionKeepalive } from './modules/session-keepalive.js';
@@ -213,6 +214,7 @@ async function initializeEntryForm() {
         // Initialize AJAX save functionality
         safeInit('initAjaxSave', () => initAjaxSave());
         safeInit('initSectionLocks', () => initSectionLocks());
+        safeInit('initScopedNavActions', () => initScopedNavActions());
 
         // WAF-safe encoding for free-text question answers on the native
         // (non-AJAX) final "Submit" path — the AJAX autosave path is covered

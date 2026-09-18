@@ -1,6 +1,5 @@
 {# Side navigation section list (included inside #sidebar-nav-scroll) #}
-{% set _section_mode = enable_section_submission|default(false) %}
-{% set _page_mode = (enable_page_submission|default(false)) and not _section_mode %}
+{% set _page_mode = enable_page_submission|default(false) %}
 <ul class="sidebar-nav-list space-y-2 px-6">
     {% if is_public_submission %}
         <li>
@@ -84,12 +83,11 @@
                     <div class="sidebar-page-label">{{ page_info.name }}</div>
                 </div>
                 {% endif %}
-                <ul class="sidebar-section-list{% if _section_mode %} sidebar-section-list--grouped{% endif %}">
+                <ul class="sidebar-section-list">
                     {% for section_nav_item in page_sections %}
                         {% set section_page_number = page_info.number %}
                         {% set section_page_name = page_info.name %}
                         {% set wf_status = section_workflow_statuses.get(section_nav_item.id|string) if section_workflow_statuses is defined else none %}
-                        {% set _section_participates = _section_mode and section_nav_item.section_type != 'discussion' %}
                         <li class="sidebar-section-item">
                             <a href="#section-container-{{ section_nav_item.id }}"
                                class="section-link group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
@@ -108,11 +106,6 @@
                                 {% set section_nav_display_name = section_nav_item._display_name_resolved if hasattr(section_nav_item, '_display_name_resolved') and section_nav_item._display_name_resolved else (section_nav_item.display_name if section_nav_item.display_name else section_nav_item.name) %}
                                 <span class="truncate min-w-0 flex-1">{{ section_nav_display_name }}</span>
                             </a>
-                            {% if _section_participates %}
-                                {% set scope_kind = 'section' %}
-                                {% set scope_id = section_nav_item.id %}
-                                {% include 'forms/entry_form/partials/_nav_scope_actions.html' %}
-                            {% endif %}
                             {% if section_nav_item.section_type == 'repeat' and section_nav_item.show_entries_in_navigation %}
                                 <ul class="repeat-entry-nav-list ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3" data-repeat-section-id="{{ section_nav_item.id }}"></ul>
                             {% endif %}

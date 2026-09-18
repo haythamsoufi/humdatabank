@@ -1,7 +1,7 @@
 """Excel import skips locked section/page values and warns only when they differ."""
 import pytest
 
-from app.models.assignments import AssignmentPageStatus, AssignmentSectionStatus
+from app.models.assignments import AssignmentPageStatus
 from app.models.enums import AssignmentSectionStatusValue
 from app.models.forms import FormData, FormPage
 from app.services.imports.scoped_import_guard import (
@@ -34,18 +34,34 @@ class TestValuesDiffer:
 
 @pytest.mark.unit
 class TestFilterLockedFieldUpdates:
-    def test_identical_locked_section_is_skipped_without_warning(self, db_session, app):
+    def test_identical_locked_page_is_skipped_without_warning(self, db_session, app):
         with app.app_context():
             aes = create_test_assignment_entity_status(db_session)
-            aes.assigned_form.enable_section_submission = True
+            aes.assigned_form.enable_page_submission = True
             template = aes.assigned_form.template
+            locked_page = FormPage(
+                template_id=template.id,
+                version_id=template.published_version_id,
+                name='People reached',
+                order=1,
+            )
+            open_page = FormPage(
+                template_id=template.id,
+                version_id=template.published_version_id,
+                name='Finance',
+                order=2,
+            )
+            db_session.add_all([locked_page, open_page])
+            db_session.commit()
             locked = create_test_section(db_session, template, name='People reached')
+            locked.page_id = locked_page.id
             open_section = create_test_section(db_session, template, name='Finance', order=2)
+            open_section.page_id = open_page.id
             locked_item = create_test_item(db_session, locked, template)
             open_item = create_test_item(db_session, open_section, template)
-            db_session.add(AssignmentSectionStatus(
+            db_session.add(AssignmentPageStatus(
                 assignment_entity_status_id=aes.id,
-                form_section_id=locked.id,
+                form_page_id=locked_page.id,
                 status=AssignmentSectionStatusValue.submitted.value,
             ))
             db_session.add(FormData(
@@ -62,34 +78,6 @@ class TestFilterLockedFieldUpdates:
             assert locked_item.id not in writable
             assert writable[open_item.id]['value'] == '4'
             assert warnings == []
-
-    def test_different_locked_section_warns_and_skips(self, db_session, app):
-        with app.app_context():
-            aes = create_test_assignment_entity_status(db_session)
-            aes.assigned_form.enable_section_submission = True
-            template = aes.assigned_form.template
-            locked = create_test_section(db_session, template, name='People reached')
-            locked_item = create_test_item(db_session, locked, template)
-            db_session.add(AssignmentSectionStatus(
-                assignment_entity_status_id=aes.id,
-                form_section_id=locked.id,
-                status=AssignmentSectionStatusValue.sent_for_review.value,
-            ))
-            db_session.add(FormData(
-                assignment_entity_status_id=aes.id,
-                form_item_id=locked_item.id,
-                value='10',
-            ))
-            db_session.commit()
-
-            writable, warnings = filter_locked_field_updates(aes, {
-                locked_item.id: {'value': '99'},
-            })
-            assert writable == {}
-            assert len(warnings) == 1
-            assert "People reached" in warnings[0]['message']
-            assert "Ask an administrator to reopen" in warnings[0]['message']
-            assert warnings[0]['scope'] == 'section'
 
     def test_different_locked_page_warns_once(self, db_session, app):
         with app.app_context():
@@ -133,15 +121,31 @@ class TestFilterStagedImportPayload:
     def test_drops_locked_fields_and_counts_remaining(self, db_session, app):
         with app.app_context():
             aes = create_test_assignment_entity_status(db_session)
-            aes.assigned_form.enable_section_submission = True
+            aes.assigned_form.enable_page_submission = True
             template = aes.assigned_form.template
+            locked_page = FormPage(
+                template_id=template.id,
+                version_id=template.published_version_id,
+                name='Locked',
+                order=1,
+            )
+            open_page = FormPage(
+                template_id=template.id,
+                version_id=template.published_version_id,
+                name='Open',
+                order=2,
+            )
+            db_session.add_all([locked_page, open_page])
+            db_session.commit()
             locked = create_test_section(db_session, template, name='Locked')
+            locked.page_id = locked_page.id
             open_section = create_test_section(db_session, template, name='Open', order=2)
+            open_section.page_id = open_page.id
             locked_item = create_test_item(db_session, locked, template)
             open_item = create_test_item(db_session, open_section, template)
-            db_session.add(AssignmentSectionStatus(
+            db_session.add(AssignmentPageStatus(
                 assignment_entity_status_id=aes.id,
-                form_section_id=locked.id,
+                form_page_id=locked_page.id,
                 status=AssignmentSectionStatusValue.submitted.value,
             ))
             db_session.add(FormData(

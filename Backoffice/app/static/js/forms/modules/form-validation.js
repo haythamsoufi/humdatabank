@@ -117,23 +117,20 @@ class FormValidator {
 
             debugLog(MODULE_NAME, `📝 FORM VALIDATION: Action detected - name: "${actionName}", value: "${actionValue}"`);
 
-            // Only validate for submit actions, not save / save_section / save_page
-            if (actionName === 'action' && (actionValue === 'save' || actionValue === 'save_section' || actionValue === 'save_page')) {
+            // Only validate for submit actions, not save / save_page
+            if (actionName === 'action' && (actionValue === 'save' || actionValue === 'save_page')) {
                 debugLog(MODULE_NAME, '💾 FORM VALIDATION: Save action detected - skipping validation (allowing save)');
                 return true;
             }
 
-            if (actionName === 'action' && (actionValue === 'submit' || actionValue === 'submit_section' || actionValue === 'submit_page')) {
+            if (actionName === 'action' && (actionValue === 'submit' || actionValue === 'submit_page')) {
                 debugLog(MODULE_NAME, '📤 FORM VALIDATION: Submit action detected - running validation');
             } else {
                 debugLog(MODULE_NAME, '🔍 FORM VALIDATION: Unknown or missing action - running validation as default');
             }
 
             let restoreSectionScope = null;
-            if (actionName === 'action' && actionValue === 'submit_section') {
-                const sectionId = submitter?.dataset?.sectionId;
-                restoreSectionScope = this.scopeValidationToSection(sectionId);
-            } else if (actionName === 'action' && actionValue === 'submit_page') {
+            if (actionName === 'action' && actionValue === 'submit_page') {
                 const pageId = submitter?.dataset?.pageId;
                 restoreSectionScope = this.scopeValidationToPage(pageId);
             }

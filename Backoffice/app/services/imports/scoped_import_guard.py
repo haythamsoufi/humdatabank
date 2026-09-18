@@ -13,11 +13,6 @@ from app.services.assignments.page_submission_service import (
     locked_section_ids as locked_page_section_ids,
     section_to_page_ids,
 )
-from app.services.assignments.section_submission_service import (
-    is_section_submission_enabled,
-    locked_section_ids,
-    top_level_section_id,
-)
 
 
 def _locked_import_warning(scope_kind: str, name: str) -> str:
@@ -50,12 +45,9 @@ def load_assignment_sections(assignment_entity_status) -> list:
 
 def locked_import_section_ids(assignment_entity_status, all_sections=None) -> set[int]:
     sections = all_sections if all_sections is not None else load_assignment_sections(assignment_entity_status)
-    locked = set()
-    if is_section_submission_enabled(assignment_entity_status):
-        locked |= locked_section_ids(assignment_entity_status, sections)
     if is_page_submission_enabled(assignment_entity_status):
-        locked |= locked_page_section_ids(assignment_entity_status, sections)
-    return locked
+        return locked_page_section_ids(assignment_entity_status, sections)
+    return set()
 
 
 def _normalize_value(value):
@@ -122,10 +114,7 @@ def _scope_label(section, all_sections, assignment_entity_status) -> tuple[str, 
         if page_id:
             page = db.session.get(FormPage, page_id)
             return 'page', getattr(page, 'name', None) or f'Page {page_id}'
-    top_id = top_level_section_id(section, all_sections)
-    by_id = {getattr(item, 'id', None): item for item in all_sections or []}
-    top = by_id.get(top_id) or section
-    return 'section', getattr(top, 'display_name', None) or getattr(top, 'name', None) or str(top_id)
+    return 'page', getattr(section, 'display_name', None) or getattr(section, 'name', None) or 'page'
 
 
 def _warning_for_scope(scope_kind: str, name: str) -> dict:

@@ -42,40 +42,7 @@ export function initAjaxSave() {
     mobileNavToggle = document.getElementById('mobile-nav-toggle-button');
 
     debugLog(MODULE_NAME, '✅ AJAX Save initialized');
-    initSectionAjaxSave();
     initPageAjaxSave();
-}
-
-/**
- * Bind per-section Save buttons to the same AJAX save path.
- */
-export function initSectionAjaxSave() {
-    if (!form) {
-        form = document.getElementById('focalDataEntryForm');
-    }
-    if (!form) return;
-
-    document.querySelectorAll('button[name="action"][value="save_section"]').forEach((button) => {
-        if (button.dataset.sectionSaveBound === 'true') return;
-        button.dataset.sectionSaveBound = 'true';
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            if (isSaving) return;
-            if (window.collectHiddenFieldsForSubmission) {
-                window.collectHiddenFieldsForSubmission();
-            }
-            const sectionId = button.dataset.sectionId || '';
-            const sectionInput = form.querySelector('input[name="section_id"]');
-            if (sectionInput) sectionInput.value = sectionId;
-            updateSaveButtonState(true);
-            queueSave({
-                toast: true,
-                buttonState: true,
-                action: 'save_section',
-                sectionId,
-            });
-        });
-    });
 }
 
 /**
@@ -579,7 +546,7 @@ function updateFabSaveState(saving) {
  */
 function updateSaveButtonState(saving) {
     const scopedSaveButtons = [
-        ...document.querySelectorAll('.section-save-btn, .page-save-btn'),
+        ...document.querySelectorAll('.page-save-btn'),
     ];
     const buttonsToUpdate = [saveButton, ...scopedSaveButtons].filter(Boolean);
     buttonsToUpdate.forEach((saveButton) => {

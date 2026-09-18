@@ -36,6 +36,18 @@ def _rename_permission(conn) -> None:
     ).fetchone()
     if new:
         conn.execute(
+            text(
+                """
+                DELETE FROM rbac_role_permission
+                WHERE permission_id = :old_id
+                  AND role_id IN (
+                      SELECT role_id FROM rbac_role_permission WHERE permission_id = :new_id
+                  )
+                """
+            ),
+            {"new_id": new[0], "old_id": old[0]},
+        )
+        conn.execute(
             text("UPDATE rbac_role_permission SET permission_id = :new_id WHERE permission_id = :old_id"),
             {"new_id": new[0], "old_id": old[0]},
         )

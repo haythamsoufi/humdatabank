@@ -997,6 +997,50 @@ def handle_assignment_form(aes_id):
                         )
                     else:
                         return redirect(url_for("main.dashboard"))
+                if submission_result.get('section_submitted'):
+                    flash(_("Section submitted successfully."), "success")
+                    is_ajax = is_json_request()
+                    progress = compute_entry_form_progress_metrics(
+                        assignment_entity_status,
+                        form_template,
+                        all_sections,
+                    )
+                    if is_ajax:
+                        return json_ok(
+                            message=_("Section submitted successfully."),
+                            completion_rate=float(progress['completion_rate']),
+                            section_statuses=progress['section_statuses'],
+                            section_workflow_statuses=progress.get('section_workflow_statuses') or {},
+                            sections_submitted_count=progress.get('sections_submitted_count', 0),
+                            sections_total_count=progress.get('sections_total_count', 0),
+                            page_workflow_statuses=progress.get('page_workflow_statuses') or {},
+                            pages_submitted_count=progress.get('pages_submitted_count', 0),
+                            pages_total_count=progress.get('pages_total_count', 0),
+                            section_id=submission_result.get('section_id'),
+                            section_submitted=True,
+                        )
+                    return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
+                if submission_result.get('page_submitted'):
+                    flash(_("Page submitted successfully."), "success")
+                    is_ajax = is_json_request()
+                    progress = compute_entry_form_progress_metrics(
+                        assignment_entity_status,
+                        form_template,
+                        all_sections,
+                    )
+                    if is_ajax:
+                        return json_ok(
+                            message=_("Page submitted successfully."),
+                            completion_rate=float(progress['completion_rate']),
+                            section_statuses=progress['section_statuses'],
+                            section_workflow_statuses=progress.get('section_workflow_statuses') or {},
+                            page_workflow_statuses=progress.get('page_workflow_statuses') or {},
+                            pages_submitted_count=progress.get('pages_submitted_count', 0),
+                            pages_total_count=progress.get('pages_total_count', 0),
+                            page_id=submission_result.get('page_id'),
+                            page_submitted=True,
+                        )
+                    return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
                 else:
                     is_ajax = is_json_request()
                     if is_ajax:
@@ -1033,6 +1077,14 @@ def handle_assignment_form(aes_id):
                             uploaded_documents=uploaded_documents,
                             completion_rate=float(progress['completion_rate']),
                             section_statuses=progress['section_statuses'],
+                            section_workflow_statuses=progress.get('section_workflow_statuses') or {},
+                            sections_submitted_count=progress.get('sections_submitted_count', 0),
+                            sections_total_count=progress.get('sections_total_count', 0),
+                            page_workflow_statuses=progress.get('page_workflow_statuses') or {},
+                            pages_submitted_count=progress.get('pages_submitted_count', 0),
+                            pages_total_count=progress.get('pages_total_count', 0),
+                            section_id=submission_result.get('section_id'),
+                            page_id=submission_result.get('page_id'),
                         )
                     else:
                         flash("Progress saved successfully.", "success")
@@ -1074,6 +1126,47 @@ def handle_assignment_form(aes_id):
         existing_submitted_documents_dict,
         skip_field_ids=empty_option_ids,
     )
+    enable_section_submission = bool(getattr(assignment, 'enable_section_submission', False))
+    enable_page_submission = bool(getattr(assignment, 'enable_page_submission', False))
+    section_workflow_statuses = {}
+    sections_submitted_count = 0
+    sections_total_count = 0
+    page_workflow_statuses = {}
+    pages_submitted_count = 0
+    pages_total_count = 0
+    section_page_ids = {}
+    page_first_section_ids = {}
+    page_last_section_ids = {}
+    if enable_section_submission:
+        from app.services.assignments.section_submission_service import (
+            section_progress_counts,
+            section_workflow_statuses as _section_workflow_map,
+        )
+        section_workflow_statuses = _section_workflow_map(
+            assignment_entity_status.id, all_sections
+        )
+        sections_submitted_count, sections_total_count = section_progress_counts(
+            assignment_entity_status.id, all_sections
+        )
+    elif enable_page_submission:
+        from app.services.assignments.page_submission_service import (
+            page_boundary_section_ids,
+            page_progress_counts,
+            page_workflow_statuses as _page_workflow_map,
+            section_to_page_ids,
+            section_workflow_from_pages,
+        )
+        page_workflow_statuses = _page_workflow_map(
+            assignment_entity_status.id, all_sections
+        )
+        section_workflow_statuses = section_workflow_from_pages(
+            assignment_entity_status.id, all_sections
+        )
+        pages_submitted_count, pages_total_count = page_progress_counts(
+            assignment_entity_status.id, all_sections
+        )
+        section_page_ids = section_to_page_ids(all_sections)
+        page_first_section_ids, page_last_section_ids = page_boundary_section_ids(all_sections)
     _entry_lap("section_statuses")
 
     for section in all_sections:
@@ -1195,6 +1288,17 @@ def handle_assignment_form(aes_id):
         sex_categories=SEX_CATEGORIES,
         form_type="assignment",
         section_statuses=section_statuses,
+        enable_section_submission=enable_section_submission,
+        enable_page_submission=enable_page_submission,
+        section_workflow_statuses=section_workflow_statuses,
+        sections_submitted_count=sections_submitted_count,
+        sections_total_count=sections_total_count,
+        page_workflow_statuses=page_workflow_statuses,
+        pages_submitted_count=pages_submitted_count,
+        pages_total_count=pages_total_count,
+        section_page_ids=section_page_ids,
+        page_first_section_ids=page_first_section_ids,
+        page_last_section_ids=page_last_section_ids,
         available_indicators_by_section=available_indicators_by_section,
         slugify_age_group=slugify_age_group,
         config=Config,

@@ -602,6 +602,7 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
         return str(value)
 
 from app.utils.matrix_activity import (  # noqa: E402
+    MATRIX_HEADER_ACTIVITY_ROW,
     collect_matrix_activity_cell_changes,
     is_matrix_activity_payload,
     matrix_activity_has_visible_changes as _matrix_activity_has_visible_changes,
@@ -910,17 +911,28 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
         html_parts = [f"{escape(field_label)}:<br>"]
         has_content = False
 
-        for row_code in sorted(rows.keys(), key=lambda rc: (not str(rc).isdigit(), int(rc) if str(rc).isdigit() else str(rc))):
-            entity_label = str(row_code)
-            try:
-                if str(row_code).isdigit():
-                    country = Country.query.get(int(row_code))
-                    if country:
-                        # Use localized NS name when available
-                        entity_label = _get_localized_national_society_name(country)
-            except Exception as e:
-                current_app.logger.debug("entity label lookup failed: %s", e)
+        def _row_sort_key(rc):
+            rc_str = str(rc)
+            if rc_str == MATRIX_HEADER_ACTIVITY_ROW:
+                return (0, 0, "")
+            if rc_str.isdigit():
+                return (1, int(rc_str), "")
+            return (2, 0, rc_str)
+
+        for row_code in sorted(rows.keys(), key=_row_sort_key):
+            if str(row_code) == MATRIX_HEADER_ACTIVITY_ROW:
+                entity_label = _("Column header")
+            else:
                 entity_label = str(row_code)
+                try:
+                    if str(row_code).isdigit():
+                        country = Country.query.get(int(row_code))
+                        if country:
+                            # Use localized NS name when available
+                            entity_label = _get_localized_national_society_name(country)
+                except Exception as e:
+                    current_app.logger.debug("entity label lookup failed: %s", e)
+                    entity_label = str(row_code)
 
             row_lines = []
             for col_label, old_v, new_v in sorted(rows[row_code], key=lambda item: str(item[0])):
@@ -1228,6 +1240,7 @@ def localize_status(status):
         'requires_revision': _('Requires Revision'),
         'sent_for_review': _('Sent for Review'),
         'cancelled': _('Cancelled'),
+        'not_started': _('Not Started'),
         'rejected': _('Rejected'),
         'closed': _('Closed'),
     }

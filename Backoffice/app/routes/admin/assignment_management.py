@@ -412,6 +412,14 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Require delegation review before final submission",
         default=False,
     )
+    enable_section_submission = BooleanField(
+        "Allow save and submit per section",
+        default=False,
+    )
+    enable_page_submission = BooleanField(
+        "Allow save and submit per page",
+        default=False,
+    )
     enable_export_excel = BooleanField(
         "Enable Export Excel button",
         default=False,
@@ -493,6 +501,8 @@ def manage_assignments():
                 'public_url': public_url,
                 'public_submission_count': public_submission_count,
                 'requires_delegation_review': bool(getattr(assignment, 'requires_delegation_review', False)),
+                'enable_section_submission': bool(getattr(assignment, 'enable_section_submission', False)),
+                'enable_page_submission': bool(getattr(assignment, 'enable_page_submission', False)),
                 'enable_upr_country_reporting_excel': assignment_uses_upr_country_reporting_excel(assignment),
                 'enable_unified_country_plan_excel': assignment_uses_unified_country_plan_excel(assignment),
                 'enable_export_excel': bool(getattr(assignment, 'enable_export_excel', False)),
@@ -676,6 +686,8 @@ def new_assignment():
                 expiry_date=form.expiry_date.data if form.expiry_date.data else None,
                 data_owner_id=form.data_owner_id.data or None,
                 requires_delegation_review=bool(form.requires_delegation_review.data),
+                enable_section_submission=bool(form.enable_section_submission.data) and not bool(form.enable_page_submission.data),
+                enable_page_submission=bool(form.enable_page_submission.data),
                 enable_export_excel=bool(form.enable_export_excel.data),
                 enable_import_excel=bool(form.enable_import_excel.data),
                 enable_export_pdf=bool(form.enable_export_pdf.data),
@@ -1152,6 +1164,10 @@ def edit_assignment(assignment_id):
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
+            assignment.enable_page_submission = bool(form.enable_page_submission.data)
+            assignment.enable_section_submission = (
+                bool(form.enable_section_submission.data) and not assignment.enable_page_submission
+            )
             assignment.enable_export_excel = bool(form.enable_export_excel.data)
             assignment.enable_import_excel = bool(form.enable_import_excel.data)
             assignment.enable_export_pdf = bool(form.enable_export_pdf.data)

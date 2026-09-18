@@ -92,8 +92,10 @@
                    data-page-number="{{ section_page_number }}"
                    data-page-name="{{ section_page_name }}">
                     {% set status = section_statuses.get(section_nav_item.name) %}
+                    {% set wf_status = section_workflow_statuses.get(section_nav_item.id|string) if section_workflow_statuses is defined else none %}
                     <i class="section-status-icon
-                        {% if status == 'Completed' %}fas fa-check-circle text-green-500
+                        {% if wf_status in ['submitted', 'sent_for_review', 'approved', 'cancelled'] %}fas fa-lock text-blue-600
+                        {% elif status == 'Completed' %}fas fa-check-circle text-green-500
                         {% elif status == 'in_progress' %}fas fa-pen text-blue-500
                         {% elif status == 'Not Started' %}far fa-circle text-gray-400
                         {% elif status == 'N/A' %}fas fa-minus-circle text-gray-500
@@ -123,8 +125,10 @@
                                    data-page-number="{{ sub_section_page_number }}"
                                    data-page-name="{{ sub_section_page_name }}">
                                     {% set sub_status = section_statuses.get(sub_section_nav.name) %}
+                                    {% set sub_wf_status = section_workflow_statuses.get(sub_section_nav.id|string) if section_workflow_statuses is defined else none %}
                                     <i class="section-status-icon
-                                        {% if sub_status == 'Completed' %}fas fa-check-circle text-green-500
+                                        {% if sub_wf_status in ['submitted', 'sent_for_review', 'approved', 'cancelled'] %}fas fa-lock text-blue-600
+                                        {% elif sub_status == 'Completed' %}fas fa-check-circle text-green-500
                                         {% elif sub_status == 'in_progress' %}fas fa-pen text-blue-500
                                         {% elif sub_status == 'Not Started' %}far fa-circle text-gray-400
                                         {% elif sub_status == 'N/A' %}fas fa-minus-circle text-gray-500

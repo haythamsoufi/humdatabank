@@ -799,7 +799,7 @@ class TestDashboardAssignmentCategorization:
         assert resp.status_code == 200
 
     def test_approved_old_goes_to_past(self, logged_in_client, db_session, app, admin_user):
-        old_ts = datetime.now(timezone.utc) - timedelta(days=60)
+        old_ts = datetime.now(timezone.utc) - timedelta(days=90)
         aes = self._build_aes_mock("approved", status_ts=old_ts)
         resp, _ = self._run_with_aes(logged_in_client, db_session, admin_user, [aes])
         assert resp.status_code == 200

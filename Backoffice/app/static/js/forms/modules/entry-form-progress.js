@@ -5,6 +5,7 @@ const STATUS_ICON_CLASSES = {
     in_progress: 'fas fa-pen text-blue-500',
     'Not Started': 'far fa-circle text-gray-400',
     'N/A': 'fas fa-minus-circle text-gray-500',
+    submitted: 'fas fa-lock text-blue-600',
 };
 
 const COMPLETION_COLOR_CLASSES = ['text-red-600', 'text-amber-600', 'text-green-700', 'text-gray-400', 'font-semibold'];
@@ -162,14 +163,15 @@ export function applyCompletionRate(completionRate) {
  * Update section/sub-section status icons in the side nav.
  * @param {Record<string, string>} sectionStatuses keyed by section id (string)
  */
-export function updateSectionStatusIcons(sectionStatuses) {
+export function updateSectionStatusIcons(sectionStatuses, workflowStatuses) {
     if (!sectionStatuses || typeof sectionStatuses !== 'object') {
         return;
     }
 
     document.querySelectorAll('a.section-link[data-section-id^="section-container-"]').forEach((link) => {
         const sectionId = (link.dataset.sectionId || '').replace(/^section-container-/, '');
-        const status = sectionStatuses[sectionId];
+        const workflow = workflowStatuses && workflowStatuses[sectionId];
+        const status = workflow === 'submitted' ? 'submitted' : sectionStatuses[sectionId];
         if (!status) {
             return;
         }
@@ -183,6 +185,98 @@ export function updateSectionStatusIcons(sectionStatuses) {
         const statusClasses = STATUS_ICON_CLASSES[status] || STATUS_ICON_CLASSES['Not Started'];
         icon.className = `section-status-icon ${statusClasses} flex-shrink-0 ${sizeClass}`;
     });
+}
+
+const LOCKED_SCOPED_STATUSES = new Set(['submitted', 'sent_for_review', 'approved', 'cancelled']);
+
+function pillLabel(status) {
+    if (status === 'submitted') return _t('Submitted');
+    if (status === 'in_progress') return _t('In Progress');
+    if (status === 'requires_revision') return _t('Requires Revision');
+    if (status === 'sent_for_review') return _t('Sent for Review');
+    if (status === 'approved') return _t('Approved');
+    if (status === 'cancelled') return _t('Cancelled');
+    if (status === 'pending') return _t('Pending');
+    return _t('Not Started');
+}
+
+function pillVariantClass(status) {
+    if (status === 'submitted') return 'status-label status-label--info';
+    if (status === 'in_progress') return 'status-label status-label--pending';
+    if (status === 'requires_revision') return 'status-label status-label--warning';
+    if (status === 'sent_for_review') return 'status-label status-label--review';
+    if (status === 'approved') return 'status-label status-label--success';
+    if (status === 'cancelled') return 'status-label status-label--danger';
+    return 'status-label status-label--neutral';
+}
+
+export function updateSectionWorkflowPills(workflowStatuses) {
+    if (!workflowStatuses || typeof workflowStatuses !== 'object') {
+        return;
+    }
+    Object.entries(workflowStatuses).forEach(([sectionId, status]) => {
+        const pill = document.querySelector(`.section-workflow-pill[data-section-id="${sectionId}"]`);
+        if (pill) {
+            pill.dataset.status = status;
+            const inner = pill.querySelector('span') || pill;
+            inner.textContent = pillLabel(status);
+            inner.className = pillVariantClass(status);
+        }
+        const container = document.getElementById(`section-container-${sectionId}`);
+        if (container && container.hasAttribute('data-section-workflow')) {
+            container.setAttribute('data-section-workflow', status);
+            import('./section-lock.js').then(({ applySectionLock }) => {
+                applySectionLock(container, LOCKED_SCOPED_STATUSES.has(status));
+            }).catch(() => { /* no-op */ });
+        }
+    });
+}
+
+export function updateSectionsSubmittedChip(submitted, total) {
+    const countEl = document.getElementById('sections-submitted-count');
+    const totalEl = document.getElementById('sections-submitted-total');
+    const chip = document.getElementById('sections-submitted-chip');
+    if (countEl) countEl.textContent = String(submitted);
+    if (totalEl) totalEl.textContent = String(total);
+    if (chip) {
+        chip.dataset.submitted = String(submitted);
+        chip.dataset.total = String(total);
+    }
+}
+
+export function updatePageWorkflowPills(workflowStatuses) {
+    if (!workflowStatuses || typeof workflowStatuses !== 'object') {
+        return;
+    }
+    Object.entries(workflowStatuses).forEach(([pageId, status]) => {
+        const pill = document.querySelector(`.page-workflow-pill[data-page-id="${pageId}"]`);
+        if (pill) {
+            pill.dataset.status = status;
+            const inner = pill.querySelector('span') || pill;
+            inner.textContent = pillLabel(status);
+            inner.className = pillVariantClass(status);
+        }
+        document.querySelectorAll(`[id^="section-container-"][data-page-id="${pageId}"]`).forEach((container) => {
+            if (container.hasAttribute('data-page-workflow')) {
+                container.setAttribute('data-page-workflow', status);
+            }
+            import('./section-lock.js').then(({ applySectionLock }) => {
+                applySectionLock(container, LOCKED_SCOPED_STATUSES.has(status));
+            }).catch(() => { /* no-op */ });
+        });
+    });
+}
+
+export function updatePagesSubmittedChip(submitted, total) {
+    const countEl = document.getElementById('pages-submitted-count');
+    const totalEl = document.getElementById('pages-submitted-total');
+    const chip = document.getElementById('pages-submitted-chip');
+    if (countEl) countEl.textContent = String(submitted);
+    if (totalEl) totalEl.textContent = String(total);
+    if (chip) {
+        chip.dataset.submitted = String(submitted);
+        chip.dataset.total = String(total);
+    }
 }
 
 function clearCompletionGapHighlights() {
@@ -556,7 +650,23 @@ export function applyEntryFormProgress(data) {
         markSaveAppliedProgress();
     }
     if (data.section_statuses) {
-        updateSectionStatusIcons(data.section_statuses);
+        updateSectionStatusIcons(data.section_statuses, data.section_workflow_statuses);
+    }
+    if (data.section_workflow_statuses) {
+        updateSectionWorkflowPills(data.section_workflow_statuses);
+    }
+    if (data.page_workflow_statuses) {
+        updatePageWorkflowPills(data.page_workflow_statuses);
+    }
+    const submittedCount = data.sections_submitted_count ?? data.data?.sections_submitted_count;
+    const totalCount = data.sections_total_count ?? data.data?.sections_total_count;
+    if (submittedCount != null && totalCount != null) {
+        updateSectionsSubmittedChip(submittedCount, totalCount);
+    }
+    const pagesSubmitted = data.pages_submitted_count ?? data.data?.pages_submitted_count;
+    const pagesTotal = data.pages_total_count ?? data.data?.pages_total_count;
+    if (pagesSubmitted != null && pagesTotal != null) {
+        updatePagesSubmittedChip(pagesSubmitted, pagesTotal);
     }
     if (gapsActive) {
         clearCompletionGapHighlights();

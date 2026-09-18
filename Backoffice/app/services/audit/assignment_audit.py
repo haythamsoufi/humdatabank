@@ -52,6 +52,8 @@ _ASSIGNMENT_FIELD_LABELS: Dict[str, str] = {
     "enable_export_excel": "Excel export",
     "enable_import_excel": "Excel import",
     "enable_export_pdf": "PDF export",
+    "enable_section_submission": "Per-section save and submit",
+    "enable_page_submission": "Per-page save and submit",
     "submission_review_mode": "Submission review notification",
     "submission_review_recipients": "Submission review recipients",
 }
@@ -216,6 +218,8 @@ def assignment_settings_snapshot(assignment: Any) -> Dict[str, Any]:
         "enable_export_excel": bool(getattr(assignment, "enable_export_excel", False)),
         "enable_import_excel": bool(getattr(assignment, "enable_import_excel", False)),
         "enable_export_pdf": bool(getattr(assignment, "enable_export_pdf", False)),
+        "enable_section_submission": bool(getattr(assignment, "enable_section_submission", False)),
+        "enable_page_submission": bool(getattr(assignment, "enable_page_submission", False)),
         "submission_review_mode": _submission_review_mode_label(
             getattr(assignment, "submission_review_recipient_mode", None)
         ),

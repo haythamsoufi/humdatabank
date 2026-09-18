@@ -21,6 +21,7 @@ from app.models.organization import (
     SecretariatDepartment,
     SecretariatRegionalOffice,
     SecretariatClusterOffice,
+    NS_STATUS_ACTIVE,
 )
 from app.services.organization.country_service import (
     assign_country_fds_member_user,
@@ -124,7 +125,7 @@ def new_national_society():
             code=form.code.data,
             description=form.description.data,
             country_id=form.country_id.data,
-            is_active=form.is_active.data,
+            status=form.status.data or NS_STATUS_ACTIVE,
             display_order=form.display_order.data or 0,
         )
         ns.name_translations = collect_translations(form, 'name')
@@ -155,6 +156,7 @@ def get_national_society_data(ns_id):
         description=ns.description or '',
         country_id=ns.country_id,
         country_name=ns.country.name if ns.country else '',
+        status=ns.status_label,
         is_active=bool(ns.is_active),
         display_order=ns.display_order or 0,
         logo_url=ns_logo_url(ns) or '',
@@ -176,7 +178,7 @@ def edit_national_society(ns_id):
         form.code.data = ns.code
         form.description.data = ns.description
         form.country_id.data = ns.country_id
-        form.is_active.data = ns.is_active
+        form.status.data = ns.status_label
         form.display_order.data = ns.display_order
 
         # Clear translation fields first to ensure they start empty
@@ -189,7 +191,7 @@ def edit_national_society(ns_id):
         ns.code = form.code.data
         ns.description = form.description.data
         ns.country_id = form.country_id.data
-        ns.is_active = form.is_active.data
+        ns.status = form.status.data or NS_STATUS_ACTIVE
         ns.display_order = form.display_order.data or 0
         ns.name_translations = collect_translations(form, 'name')
         _apply_ns_logo_upload(ns, form)

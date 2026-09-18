@@ -4,7 +4,7 @@ from flask_wtf.file import FileAllowed, FileField
 from wtforms import StringField, TextAreaField, BooleanField, IntegerField, SelectField, DateField
 from wtforms.validators import DataRequired, Optional, Length
 
-from app.models.organization import SecretariatRegionalOffice
+from app.models.organization import SecretariatRegionalOffice, NS_STATUS_CHOICES, NS_STATUS_ACTIVE
 from app.services.organization.secretariat_regional_office_service import ensure_secretariat_regional_offices
 from app.forms.organization.translation_helpers import add_translation_fields
 
@@ -35,7 +35,12 @@ class NationalSocietyForm(FlaskForm):
     code = StringField('Code', validators=[Optional(), Length(max=50)])
     description = TextAreaField('Description', validators=[Optional()])
     country_id = SelectField('Country', coerce=int, validators=[DataRequired()])
-    is_active = BooleanField('Active', default=True)
+    status = SelectField(
+        'Status',
+        validators=[Optional()],
+        choices=list(NS_STATUS_CHOICES),
+        default=NS_STATUS_ACTIVE,
+    )
     display_order = IntegerField('Display Order', validators=[Optional()])
     logo_file = FileField(
         'Logo (PNG, JPG, GIF, WEBP)',

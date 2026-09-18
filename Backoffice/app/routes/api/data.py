@@ -194,7 +194,7 @@ _DATA_ARRAY_CATALOG = {
         'grain': 'national_society',
         'key_fields': [
             'id', 'name', 'code', 'country_id', 'country_name', 'country_iso2', 'country_iso3',
-            'part_of',
+            'status', 'is_active', 'part_of',
         ],
     },
     'matrix_cells': {

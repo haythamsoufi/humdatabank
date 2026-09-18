@@ -18,6 +18,7 @@ from flask import current_app
 from sqlalchemy.orm import joinedload as _joinedload_impl
 from app.models import FormTemplate, AssignedForm
 from app.models.assignments import AssignmentEntityStatus, PublicSubmission
+from app.models.organization import resolve_ns_status
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,13 @@ def format_national_society_info(national_society):
     )
     multilingual_names = {lc: name_translations.get(lc) for lc in translatable_langs}
     part_of = getattr(national_society, 'part_of', None)
+    raw_status = getattr(national_society, 'status', None)
+    if not isinstance(raw_status, str):
+        raw_status = None
+    raw_is_active = getattr(national_society, 'is_active', True)
+    if not isinstance(raw_is_active, bool):
+        raw_is_active = bool(raw_is_active)
+    status, is_active = resolve_ns_status(raw_status, raw_is_active)
     return {
         'id': national_society.id,
         'name': national_society.name,
@@ -125,7 +133,8 @@ def format_national_society_info(national_society):
         'country_name': country.name if country else None,
         'country_iso2': country.iso2 if country else None,
         'country_iso3': country.iso3 if country else None,
-        'is_active': bool(getattr(national_society, 'is_active', True)),
+        'is_active': is_active,
+        'status': status,
         'part_of': part_of if isinstance(part_of, list) else [],
         'multilingual_names': multilingual_names,
     }

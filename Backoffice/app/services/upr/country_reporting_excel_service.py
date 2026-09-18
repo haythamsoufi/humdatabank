@@ -113,6 +113,13 @@ class UprCountryReportingExcelService:
             result = run_upr_country_reporting_import(int(aes.id), tmp.name, dry_run=False, persist=persist)
             if result.get("stage_only"):
                 result["success"] = True
+                from app.services.imports.scoped_import_guard import filter_staged_import_payload
+                extra = filter_staged_import_payload(aes, result.get("payload") or {})
+                result.setdefault("warnings", [])
+                result["warnings"] = list(result.get("warnings") or []) + list(extra.get("warnings") or [])
+                result.setdefault("warning_items", [])
+                result["warning_items"] = list(result.get("warning_items") or []) + list(extra.get("warning_items") or [])
+                result["updated_count"] = extra.get("updated_count", result.get("updated_count", 0))
                 return result
             result["success"] = int(result.get("errors", 0) or 0) == 0
             result["updated_count"] = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)

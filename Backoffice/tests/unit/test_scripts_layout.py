@@ -34,6 +34,7 @@ IMPORTS_MODULES = (
     "upr_import_warnings",
     "upr_country_reporting_excel_template",
     "fdrs_sync_constants",
+    "fdrs_sync_verify",
 )
 
 I18N_SCRIPTS = (

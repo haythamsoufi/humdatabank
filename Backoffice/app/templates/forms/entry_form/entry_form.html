@@ -5,9 +5,25 @@
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
 {% from "components/_form_helpers.html" import format_number_value %}
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
-{% from "components/_status_label.html" import status_label, status_label_for_data_flag %}
+{% from "components/_status_label.html" import status_label, status_label_for_assignment, status_label_for_data_flag %}
+{% set scoped_locked_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled'] %}
+{% set scoped_reopenable_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled', 'requires_revision'] %}
+{% set scoped_revision_statuses = ['submitted', 'sent_for_review', 'approved'] %}
 {% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
 {% set can_use_upr_visuals = (not is_public_submission|default(false)) and (not is_preview_mode|default(false)) and has_permission('admin.data_explore.upr_visuals') %}
+{% set enable_section_submission = enable_section_submission|default(false) %}
+{% set enable_page_submission = (enable_page_submission|default(false)) and not enable_section_submission %}
+{% set enable_scoped_submission = enable_section_submission or enable_page_submission %}
+{% set section_workflow_statuses = section_workflow_statuses if section_workflow_statuses is defined else {} %}
+{% set sections_submitted_count = sections_submitted_count|default(0) %}
+{% set sections_total_count = sections_total_count|default(0) %}
+{% set page_workflow_statuses = page_workflow_statuses if page_workflow_statuses is defined else {} %}
+{% set pages_submitted_count = pages_submitted_count|default(0) %}
+{% set pages_total_count = pages_total_count|default(0) %}
+{% set section_page_ids = section_page_ids if section_page_ids is defined else {} %}
+{% set page_first_section_ids = page_first_section_ids if page_first_section_ids is defined else {} %}
+{% set page_last_section_ids = page_last_section_ids if page_last_section_ids is defined else {} %}
+{% set show_whole_form_submit = (not enable_scoped_submission) or (enable_page_submission and not pages_total_count) %}
 {% set show_upr_visuals_assets = can_use_upr_visuals and template_structure and template_structure.id in [24, 33] %}
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
@@ -115,6 +131,26 @@
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
                                 {{ assignment_status_pipeline_badge(assignment_status.status, assignment_is_round_closed_for_entity(assignment_status), translation_key if translation_key is defined else 'en', assignment_status) }}
+                                {% if enable_section_submission and sections_total_count %}
+                                <span class="mx-2">•</span>
+                                <span id="sections-submitted-chip" class="inline-flex items-center gap-1 text-sm text-gray-700" data-submitted="{{ sections_submitted_count }}" data-total="{{ sections_total_count }}">
+                                    <span class="font-medium">{{ _('Sections:') }}</span>
+                                    <span id="sections-submitted-count" class="font-medium tabular-nums">{{ sections_submitted_count }}</span>
+                                    <span>/</span>
+                                    <span id="sections-submitted-total" class="tabular-nums">{{ sections_total_count }}</span>
+                                    <span>{{ _('submitted') }}</span>
+                                </span>
+                                {% endif %}
+                                {% if enable_page_submission and pages_total_count %}
+                                <span class="mx-2">•</span>
+                                <span id="pages-submitted-chip" class="inline-flex items-center gap-1 text-sm text-gray-700" data-submitted="{{ pages_submitted_count }}" data-total="{{ pages_total_count }}">
+                                    <span class="font-medium">{{ _('Pages:') }}</span>
+                                    <span id="pages-submitted-count" class="font-medium tabular-nums">{{ pages_submitted_count }}</span>
+                                    <span>/</span>
+                                    <span id="pages-submitted-total" class="tabular-nums">{{ pages_total_count }}</span>
+                                    <span>{{ _('submitted') }}</span>
+                                </span>
+                                {% endif %}
                                 {# Completion rate is stored on assignment_entity_status and rendered immediately. #}
                                 {% if assignment_entity_status_id_for_rate is defined and assignment_entity_status_id_for_rate %}
                                 <span class="mx-2">•</span>
@@ -386,6 +422,12 @@
             {% if assignment_entity_status_id is defined %}
             <input type="hidden" name="assignment_entity_status_id" value="{{ assignment_entity_status_id }}">
             {% endif %}
+            {% if enable_section_submission %}
+            <input type="hidden" name="section_id" id="section-action-id" value="">
+            {% endif %}
+            {% if enable_page_submission %}
+            <input type="hidden" name="page_id" id="page-action-id" value="">
+            {% endif %}
 
         {% endif %}
 
@@ -593,7 +635,7 @@
                                 {{ _('Save') }}
                             </button>
                             {% endif %}
-                            {% if can_send_for_review %}
+                            {% if show_whole_form_submit and can_send_for_review %}
                             <button type="submit" name="action" value="send_for_review"
                                     class="btn btn-success flex-1"
                                     data-confirm-title="{{ _('Send for Review?')|forceescape }}"
@@ -604,7 +646,7 @@
                                 {{ _('Send for Review') }}
                             </button>
                             {% endif %}
-                            {% if can_finalize_submit %}
+                            {% if show_whole_form_submit and can_finalize_submit %}
                             <button type="submit" name="action" value="submit"
                                     class="btn btn-success flex-1"
                                     data-confirm-title="{{ _('Submit Form?')|forceescape }}"
@@ -799,17 +841,85 @@
                                 {% set page_key_main = section.page_id if section.page_id is not none else 'default' %}
                                 {% set page_number_main = page_display_order_main.get(page_key_main, 1) %}
                                 {% set page_name_main = page_names_main.get(page_key_main, section.page.display_name if section.page and section.page.display_name else (section.page.name if section.page else 'Page ' ~ page_number_main)) %}
-                                <div id="section-container-{{ section.id }}" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20{% if section.hide_section_header %} section-container--no-header{% endif %}" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %}{% if section.section_type == 'repeat' and section.entry_label_item_id %} data-entry-label-item-id="{{ section.entry_label_item_id }}"{% endif %}{% if section.section_type == 'repeat' and section.show_entries_in_navigation %} data-show-entries-in-navigation="true"{% endif %}{% if section.hide_section_header %} data-hide-section-header="true"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}>
+                                {% set _section_wf = section_workflow_statuses.get(section.id|string, 'not_started') %}
+                                {% set _section_participates = enable_section_submission and section.section_type != 'discussion' %}
+                                {% set _page_id_for_section = section_page_ids.get(section.id|string) %}
+                                {% set _page_wf = page_workflow_statuses.get(_page_id_for_section|string, 'not_started') if _page_id_for_section else 'not_started' %}
+                                {% set _page_participates = enable_page_submission and section.section_type != 'discussion' and _page_id_for_section %}
+                                {% set _is_page_first = _page_participates and page_first_section_ids.get(_page_id_for_section|string) == section.id %}
+                                {% set _is_page_last = _page_participates and page_last_section_ids.get(_page_id_for_section|string) == section.id %}
+                                {% set _section_locked = (_section_participates and _section_wf in scoped_locked_statuses) or (_page_participates and _page_wf in scoped_locked_statuses) %}
+                                <div id="section-container-{{ section.id }}" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20{% if section.hide_section_header %} section-container--no-header{% endif %}{% if _section_locked %} section-container--locked{% endif %}" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %}{% if section.section_type == 'repeat' and section.entry_label_item_id %} data-entry-label-item-id="{{ section.entry_label_item_id }}"{% endif %}{% if section.section_type == 'repeat' and section.show_entries_in_navigation %} data-show-entries-in-navigation="true"{% endif %}{% if section.hide_section_header %} data-hide-section-header="true"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}{% if _page_id_for_section %} data-page-id="{{ _page_id_for_section }}"{% endif %}{% if _section_participates %} data-section-workflow="{{ _section_wf }}"{% if _section_locked %} data-section-locked="true"{% endif %}{% endif %}{% if _page_participates %} data-page-workflow="{{ _page_wf }}"{% if _section_locked %} data-page-locked="true"{% endif %}{% endif %}>
                                     {% if not section.hide_section_header %}
-                                    <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
+                                    <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center gap-2">
                                          <i class="fas fa-layer-group w-5 h-5 mr-2 text-gray-500"></i>
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
                                         {% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
                                         {{ section_display_name }}
+                                        {% if _section_participates %}
+                                        <span class="section-workflow-pill ml-2" data-section-id="{{ section.id }}" data-status="{{ _section_wf }}">
+                                            {{ status_label_for_assignment(_section_wf) }}
+                                        </span>
+                                        {% endif %}
+                                        {% if _is_page_first %}
+                                        <span class="page-workflow-pill ml-2" data-page-id="{{ _page_id_for_section }}" data-status="{{ _page_wf }}">
+                                            {{ status_label_for_assignment(_page_wf) }}
+                                        </span>
+                                        {% endif %}
                                         <button type="button" class="collapse-toggle btn btn-icon btn-sm ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
                                     </h3>
+                                    {% endif %}
+                                    {% if _section_locked and _section_participates %}
+                                    <div class="section-locked-banner bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 mb-4 flex flex-wrap items-center gap-2" data-section-id="{{ section.id }}">
+                                        <i class="fas fa-lock text-blue-600" aria-hidden="true"></i>
+                                        <span class="text-sm font-medium">{{ _('This section is locked and cannot be edited.') }}</span>
+                                        {% if assignment_status and can_return_assignment_section(assignment_status) and _section_wf in scoped_revision_statuses %}
+                                        <button type="submit"
+                                                form="return-section-form-{{ assignment_status.id }}-{{ section.id }}"
+                                                class="btn btn-warning btn-sm ml-auto return-section-btn"
+                                                data-confirm-title="{{ _('Return Section for Revision?')|forceescape }}"
+                                                data-confirm-label="{{ _('Request changes')|forceescape }}"
+                                                data-confirm-message="{{ _('Return this section to the National Society for changes? Other submitted sections will stay locked.')|forceescape }}">
+                                            <i class="fas fa-undo mr-1"></i>{{ _('Return this section') }}
+                                        </button>
+                                        {% elif assignment_status and can_reopen_assignment_section(assignment_status) %}
+                                        <button type="submit"
+                                                form="reopen-section-form-{{ assignment_status.id }}-{{ section.id }}"
+                                                class="btn btn-warning btn-sm ml-auto reopen-section-btn"
+                                                data-confirm-title="{{ _('Reopen Section?')|forceescape }}"
+                                                data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                                data-confirm-message="{{ _('Reopen this section for editing? Other submitted sections will stay locked.')|forceescape }}">
+                                            <i class="fas fa-undo mr-1"></i>{{ _('Reopen this section') }}
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if _section_locked and _is_page_first %}
+                                    <div class="page-locked-banner bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 mb-4 flex flex-wrap items-center gap-2" data-page-id="{{ _page_id_for_section }}">
+                                        <i class="fas fa-lock text-blue-600" aria-hidden="true"></i>
+                                        <span class="text-sm font-medium">{{ _('This page is locked and cannot be edited.') }}</span>
+                                        {% if assignment_status and can_return_assignment_page(assignment_status) and _page_wf in scoped_revision_statuses %}
+                                        <button type="submit"
+                                                form="return-page-form-{{ assignment_status.id }}-{{ _page_id_for_section }}"
+                                                class="btn btn-warning btn-sm ml-auto return-page-btn"
+                                                data-confirm-title="{{ _('Return Page for Revision?')|forceescape }}"
+                                                data-confirm-label="{{ _('Request changes')|forceescape }}"
+                                                data-confirm-message="{{ _('Return this page to the National Society for changes? Other submitted pages will stay locked.')|forceescape }}">
+                                            <i class="fas fa-undo mr-1"></i>{{ _('Return this page') }}
+                                        </button>
+                                        {% elif assignment_status and can_reopen_assignment_page(assignment_status) %}
+                                        <button type="submit"
+                                                form="reopen-page-form-{{ assignment_status.id }}-{{ _page_id_for_section }}"
+                                                class="btn btn-warning btn-sm ml-auto reopen-page-btn"
+                                                data-confirm-title="{{ _('Reopen Page?')|forceescape }}"
+                                                data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                                data-confirm-message="{{ _('Reopen this page for editing? Other submitted pages will stay locked.')|forceescape }}">
+                                            <i class="fas fa-undo mr-1"></i>{{ _('Reopen this page') }}
+                                        </button>
+                                        {% endif %}
+                                    </div>
                                     {% endif %}
 
                                     <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-4 sm:space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}
@@ -2555,6 +2665,50 @@
                                                 {% endif %} {# End of if section.id in sub_sections_by_parent_form for parent section #}
 
                                                 {# No message shown for sections without items - they may be dynamic sections or sections that will be populated later #}
+                                                {% if can_edit and _section_participates and not _section_locked and not is_preview_mode and not is_public_submission %}
+                                                <div class="section-action-toolbar mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2" data-section-id="{{ section.id }}">
+                                                    <button type="submit" name="action" value="save_section"
+                                                            class="btn btn-primary section-save-btn"
+                                                            data-section-id="{{ section.id }}">
+                                                        <i class="fas fa-save w-4 h-4 mr-2"></i>
+                                                        {{ _('Save Section') }}
+                                                    </button>
+                                                    {% if can_finalize_submit or can_send_for_review %}
+                                                    <button type="submit" name="action" value="submit_section"
+                                                            class="btn btn-success section-submit-btn"
+                                                            data-section-id="{{ section.id }}"
+                                                            data-confirm-title="{{ _('Submit Section?')|forceescape }}"
+                                                            data-confirm-label="{{ _('Submit')|forceescape }}"
+                                                            data-confirm-message="{{ _('Submit this section? You will not be able to edit it after submission unless an administrator reopens it.')|forceescape }}"
+                                                            data-loading-text="{{ _('Submitting…') }}">
+                                                        <i class="fas fa-paper-plane w-4 h-4 mr-2"></i>
+                                                        {{ _('Submit Section') }}
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                                {% if can_edit and _is_page_last and not _section_locked and not is_preview_mode and not is_public_submission %}
+                                                <div class="page-action-toolbar mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2" data-page-id="{{ _page_id_for_section }}">
+                                                    <button type="submit" name="action" value="save_page"
+                                                            class="btn btn-primary page-save-btn"
+                                                            data-page-id="{{ _page_id_for_section }}">
+                                                        <i class="fas fa-save w-4 h-4 mr-2"></i>
+                                                        {{ _('Save Page') }}
+                                                    </button>
+                                                    {% if can_finalize_submit or can_send_for_review %}
+                                                    <button type="submit" name="action" value="submit_page"
+                                                            class="btn btn-success page-submit-btn"
+                                                            data-page-id="{{ _page_id_for_section }}"
+                                                            data-confirm-title="{{ _('Submit Page?')|forceescape }}"
+                                                            data-confirm-label="{{ _('Submit')|forceescape }}"
+                                                            data-confirm-message="{{ _('Submit this page? You will not be able to edit it after submission unless an administrator reopens it.')|forceescape }}"
+                                                            data-loading-text="{{ _('Submitting…') }}">
+                                                        <i class="fas fa-paper-plane w-4 h-4 mr-2"></i>
+                                                        {{ _('Submit Page') }}
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
                                             </div> {# End space-y-6 for parent section #}
                                         </div> {# End section-container-{{ section.id }} for parent section #}
                                     {% endfor %} {# End main_sections_form loop #}
@@ -2601,12 +2755,14 @@
                     <i class="fas fa-save"></i>
                     <span class="tooltip-text">{{ _('Save') }}</span>
                 </button>
+                {% if show_whole_form_submit %}
                 <button type="button" id="fab-submit-btn"
                         class="fab-tooltip w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center border-2 border-white/30 mt-2"
                         aria-label="{{ _('Submit')|forceescape }}">
                     <i class="fas fa-paper-plane"></i>
                     <span class="tooltip-text">{{ _('Submit') }}</span>
                 </button>
+                {% endif %}
             </div>
             {% endif %}
 
@@ -2651,6 +2807,50 @@
             <div id="mobile-nav-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden xl:hidden"></div>
 
         </div> {# End entry-form-ui #}
+        {% if enable_section_submission and assignment_status and all_sections %}
+        {% for _reopen_section in all_sections %}
+            {% if _reopen_section.parent_section_id is none and _reopen_section.section_type != 'discussion' and section_workflow_statuses.get(_reopen_section.id|string) in scoped_reopenable_statuses %}
+        {% if can_reopen_assignment_section(assignment_status) %}
+        <form id="reopen-section-form-{{ assignment_status.id }}-{{ _reopen_section.id }}"
+              action="{{ url_for('main.reopen_assignment_section', aes_id=assignment_status.id, section_id=_reopen_section.id) }}"
+              method="POST"
+              class="hidden reopen-section-form">
+            {{ csrf_form.csrf_token }}
+        </form>
+        {% endif %}
+        {% if can_return_assignment_section(assignment_status) and section_workflow_statuses.get(_reopen_section.id|string) in scoped_revision_statuses %}
+        <form id="return-section-form-{{ assignment_status.id }}-{{ _reopen_section.id }}"
+              action="{{ url_for('main.return_assignment_section_for_revision', aes_id=assignment_status.id, section_id=_reopen_section.id) }}"
+              method="POST"
+              class="hidden return-section-form">
+            {{ csrf_form.csrf_token }}
+        </form>
+        {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% endif %}
+        {% if enable_page_submission and assignment_status and page_workflow_statuses %}
+        {% for _page_id, _page_status in page_workflow_statuses.items() %}
+            {% if _page_status in scoped_reopenable_statuses %}
+        {% if can_reopen_assignment_page(assignment_status) %}
+        <form id="reopen-page-form-{{ assignment_status.id }}-{{ _page_id }}"
+              action="{{ url_for('main.reopen_assignment_page', aes_id=assignment_status.id, page_id=_page_id) }}"
+              method="POST"
+              class="hidden reopen-page-form">
+            {{ csrf_form.csrf_token }}
+        </form>
+        {% endif %}
+        {% if can_return_assignment_page(assignment_status) and _page_status in scoped_revision_statuses %}
+        <form id="return-page-form-{{ assignment_status.id }}-{{ _page_id }}"
+              action="{{ url_for('main.return_assignment_page_for_revision', aes_id=assignment_status.id, page_id=_page_id) }}"
+              method="POST"
+              class="hidden return-page-form">
+            {{ csrf_form.csrf_token }}
+        </form>
+        {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% endif %}
         {% if can_return_for_revision and assignment_status %}
         {# Standalone form — must not live inside #focalDataEntryForm (HTML forbids nested forms). #}
         <form id="return-for-revision-form-{{ assignment_status.id }}"

@@ -95,12 +95,16 @@ def apply_entity_status_change(
     user_id: int | None = None,
     *,
     now: 'datetime | None' = None,
+    sync_scoped: bool = True,
 ) -> AssignmentEntityStatusValue:
     """Set status, timestamp, last setter, and status-specific accountability fields.
 
     ``user_id`` is recorded on ``status_changed_by_user_id`` for every status.
     Submitted / approved / sent-for-review also keep their dedicated actor fields.
     """
+    previous = assignment_entity_status.status
+    if hasattr(previous, 'value'):
+        previous = previous.value
     raw = new_status.value if hasattr(new_status, 'value') else new_status
     normalized = AssignmentEntityStatusValue.normalize(raw)
     stamp = now or utcnow()
@@ -116,4 +120,28 @@ def apply_entity_status_change(
         elif normalized == AssignmentEntityStatusValue.sent_for_review:
             assignment_entity_status.sent_for_review_by_user_id = user_id
             assignment_entity_status.sent_for_review_at = stamp
+    if sync_scoped:
+        _sync_scoped_statuses(assignment_entity_status, previous, normalized, user_id)
     return normalized
+
+
+def _sync_scoped_statuses(assignment_entity_status, previous_status, new_status, user_id: int | None) -> None:
+    aes_id = getattr(assignment_entity_status, 'id', None)
+    if not aes_id:
+        return
+    try:
+        from app.services.assignments.section_submission_service import (
+            is_section_submission_enabled,
+            sync_section_statuses_for_entity_change,
+        )
+        from app.services.assignments.page_submission_service import (
+            is_page_submission_enabled,
+            sync_page_statuses_for_entity_change,
+        )
+        if is_section_submission_enabled(assignment_entity_status):
+            sync_section_statuses_for_entity_change(aes_id, previous_status, new_status, user_id)
+        if is_page_submission_enabled(assignment_entity_status):
+            sync_page_statuses_for_entity_change(aes_id, previous_status, new_status, user_id)
+    except Exception as exc:
+        from flask import current_app
+        current_app.logger.debug("Scoped status sync failed for AES %s: %s", aes_id, exc)

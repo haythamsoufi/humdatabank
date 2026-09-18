@@ -29,7 +29,7 @@ from flask_babel import _
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
-from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAYS
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
 from app.services.platform.app_settings_service import is_organization_email
@@ -580,6 +580,10 @@ def dashboard():
 
             aes_ids = [aes.id for aes in assigned_forms_statuses] if assigned_forms_statuses else []
             completion_prefetch = AssignmentCompletionService.prefetch(template_ids, aes_ids)
+            from app.services.assignments.section_submission_service import prefetch_section_progress
+            from app.services.assignments.page_submission_service import prefetch_page_progress
+            section_progress_by_aes = prefetch_section_progress(assigned_forms_statuses)
+            page_progress_by_aes = prefetch_page_progress(assigned_forms_statuses)
 
             # Batch compute the last modified user per assignment (by latest EntityActivityLog for this entity/country)
             last_modified_user_by_assignment = {}
@@ -699,6 +703,12 @@ def dashboard():
                     'submitted_at': aes.submitted_at,
                     'sent_for_review_by_user': aes.sent_for_review_by_user,
                     'sent_for_review_at': aes.sent_for_review_at,
+                    'section_progress': section_progress_by_aes.get(aes.id) or {
+                        'enabled': False, 'submitted': 0, 'total': 0
+                    },
+                    'page_progress': page_progress_by_aes.get(aes.id) or {
+                        'enabled': False, 'submitted': 0, 'total': 0
+                    },
                 })
 
 
@@ -785,7 +795,7 @@ def dashboard():
 
             # NEW: Separate assignments into current and past based on status and timestamp
             from datetime import timedelta, timezone
-            one_month_ago = utcnow() - timedelta(days=30)
+            two_months_ago = utcnow() - timedelta(days=PAST_ASSIGNMENT_DAYS)
             one_year_ago = utcnow() - timedelta(days=365)
 
             for item in all_forms_for_display:
@@ -818,7 +828,7 @@ def dashboard():
                         if status_ts and status_ts.tzinfo is None:
                             status_ts = status_ts.replace(tzinfo=timezone.utc)
                         if item['status'] == 'approved':
-                            if status_ts and status_ts < one_month_ago:
+                            if status_ts and status_ts < two_months_ago:
                                 past_assignments.append(item)
                             else:
                                 current_assignments.append(item)

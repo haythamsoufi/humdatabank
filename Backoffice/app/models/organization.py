@@ -2,11 +2,62 @@
 Organization hierarchy models for National Society structure.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, Date
+from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, Date, event
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, backref, validates
 from ..extensions import db
 from app.utils.datetime_helpers import utcnow
+
+
+NS_STATUS_ACTIVE = "Active"
+NS_STATUS_DISSOLVED = "Dissolved"
+NS_STATUS_SUSPENDED = "Suspended"
+NS_STATUS_NO_DIRECT_COMMS = "No direct comms"
+NS_STATUS_INACTIVE = "Inactive"
+
+# Stored Title-Case values; Dissolved/Suspended are IFRC membership statuses.
+NS_STATUSES = (
+    NS_STATUS_ACTIVE,
+    NS_STATUS_DISSOLVED,
+    NS_STATUS_SUSPENDED,
+    NS_STATUS_NO_DIRECT_COMMS,
+    NS_STATUS_INACTIVE,
+)
+NS_STATUS_CHOICES = [(value, value) for value in NS_STATUSES]
+
+
+def _ns_status_key(value):
+    return " ".join((value or "").casefold().replace("_", " ").split())
+
+
+_NS_STATUS_LOOKUP = {_ns_status_key(value): value for value in NS_STATUSES}
+_NS_NON_ACTIVE_STATUSES = frozenset(
+    (NS_STATUS_DISSOLVED, NS_STATUS_SUSPENDED, NS_STATUS_NO_DIRECT_COMMS, NS_STATUS_INACTIVE)
+)
+
+
+def canonicalize_ns_status(value):
+    """Return a canonical NS status string, or None if blank/unknown."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    return _NS_STATUS_LOOKUP.get(_ns_status_key(raw))
+
+
+def resolve_ns_status(status=None, is_active=True):
+    """Resolve status + is_active into a stored (status, is_active) pair.
+
+    An explicit membership status wins. ``is_active`` is only used when status
+    is blank (legacy writes that only flipped the boolean).
+    """
+    canonical = canonicalize_ns_status(status)
+    if canonical in _NS_NON_ACTIVE_STATUSES:
+        return canonical, False
+    if canonical == NS_STATUS_ACTIVE:
+        return NS_STATUS_ACTIVE, True
+    if is_active is False:
+        return NS_STATUS_INACTIVE, False
+    return NS_STATUS_ACTIVE, True
 
 
 class NationalSociety(db.Model):
@@ -26,7 +77,14 @@ class NationalSociety(db.Model):
     # Projects/Emergencies/Programs this NS is part of
     part_of = db.Column(JSONB, nullable=True)
 
-    # Status and metadata
+    # Status and metadata. is_active is kept in sync with status (Active vs not).
+    # No Python-side default: before_insert derives status from is_active when blank.
+    status = db.Column(
+        db.String(50),
+        nullable=False,
+        index=True,
+        server_default=NS_STATUS_ACTIVE,
+    )
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     display_order = db.Column(db.Integer, default=0, nullable=True)
 
@@ -73,6 +131,22 @@ class NationalSociety(db.Model):
     @property
     def has_logo(self) -> bool:
         return bool((self.logo_filename or "").strip())
+
+    @property
+    def status_label(self) -> str:
+        status, _is_active = resolve_ns_status(self.status, self.is_active)
+        return status
+
+
+@event.listens_for(NationalSociety, "before_insert")
+@event.listens_for(NationalSociety, "before_update")
+def _sync_national_society_status(mapper, connection, target):
+    status, is_active = resolve_ns_status(
+        getattr(target, "status", None),
+        getattr(target, "is_active", True),
+    )
+    target.status = status
+    target.is_active = is_active
 
 
 class NSBranch(db.Model):

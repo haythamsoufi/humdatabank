@@ -203,20 +203,139 @@ class FormDataService(
                 }
 
         action = request.form.get('action')
-        # When action is 'save', do not block on required fields (including required matrix)
-        skip_required_validation = (action == 'save')
+        from app.services.assignments.section_submission_service import (
+            SECTION_ACTIONS,
+            all_participating_sections_submitted,
+            is_section_submission_enabled,
+            locked_section_ids,
+            mark_section_in_progress,
+            mark_section_submitted,
+            participating_top_level_sections,
+            resolve_requested_section,
+            section_progress_counts,
+        )
+        from app.services.assignments.page_submission_service import (
+            PAGE_ACTIONS,
+            all_participating_pages_submitted,
+            is_page_submission_enabled,
+            locked_section_ids as locked_page_section_ids,
+            mark_page_in_progress,
+            mark_page_submitted,
+            page_progress_counts,
+            participating_page_ids,
+            resolve_requested_page,
+        )
+
+        section_mode = (
+            not is_public_submission
+            and is_section_submission_enabled(assignment_entity_status)
+        )
+        page_mode = (
+            not is_public_submission
+            and is_page_submission_enabled(assignment_entity_status)
+        )
+        is_section_action = action in SECTION_ACTIONS
+        is_page_action = action in PAGE_ACTIONS
+        target_top_level_id = None
+        target_page_id = None
+        section_scope_ids = None
+        if is_section_action:
+            if not section_mode:
+                return {
+                    'success': False,
+                    'validation_errors': [
+                        'Per-section submission is not enabled for this assignment.'
+                    ],
+                    'field_changes': [],
+                }
+            target_top_level_id, section_scope_ids = resolve_requested_section(
+                all_sections, request.form.get('section_id')
+            )
+            if not target_top_level_id:
+                return {
+                    'success': False,
+                    'validation_errors': ['Select a valid section to save or submit.'],
+                    'field_changes': [],
+                }
+        if is_page_action:
+            if not page_mode:
+                return {
+                    'success': False,
+                    'validation_errors': [
+                        'Per-page submission is not enabled for this assignment.'
+                    ],
+                    'field_changes': [],
+                }
+            target_page_id, section_scope_ids = resolve_requested_page(
+                all_sections, request.form.get('page_id')
+            )
+            if not target_page_id:
+                return {
+                    'success': False,
+                    'validation_errors': ['Select a valid page to save or submit.'],
+                    'field_changes': [],
+                }
+
+        if section_mode and action in ('submit', 'send_for_review'):
+            return {
+                'success': False,
+                'validation_errors': [
+                    'This assignment uses per-section submission. Submit each section individually.'
+                ],
+                'field_changes': [],
+            }
+        if page_mode and action in ('submit', 'send_for_review'):
+            return {
+                'success': False,
+                'validation_errors': [
+                    'This assignment uses per-page submission. Submit each page individually.'
+                ],
+                'field_changes': [],
+            }
+
+        # When action is 'save' / 'save_section' / 'save_page', do not block on required fields
+        skip_required_validation = action in ('save', 'save_section', 'save_page')
         field_changes_tracker = []
         validation_errors = []
+        locked_ids = set()
+        if section_mode:
+            locked_ids |= locked_section_ids(assignment_entity_status, all_sections)
+        if page_mode:
+            locked_ids |= locked_page_section_ids(assignment_entity_status, all_sections)
+        if target_top_level_id and target_top_level_id in locked_ids:
+            return {
+                'success': False,
+                'validation_errors': [
+                    'This section has already been submitted and cannot be edited.'
+                ],
+                'field_changes': [],
+            }
+        if target_page_id and section_scope_ids and section_scope_ids <= locked_ids:
+            return {
+                'success': False,
+                'validation_errors': [
+                    'This page has already been submitted and cannot be edited.'
+                ],
+                'field_changes': [],
+            }
 
         try:
             # Process hidden fields first - clear their database records
-            hidden_fields_changes = cls._process_hidden_fields_clearing(assignment_entity_status)
+            hidden_fields_changes = cls._process_hidden_fields_clearing(
+                assignment_entity_status,
+                allowed_section_ids=section_scope_ids,
+                skip_section_ids=locked_ids or None,
+            )
             field_changes_tracker.extend(hidden_fields_changes)
 
             verbose_section_trace = cls._is_verbose_logging_enabled()
 
             # Process each section type
             for section in all_sections:
+                if section_scope_ids is not None and section.id not in section_scope_ids:
+                    continue
+                if section.id in locked_ids:
+                    continue
                 if verbose_section_trace:
                     logger.debug("Processing section %s of type %s", section.id, section.section_type)
 
@@ -273,10 +392,154 @@ class FormDataService(
                         "status_changed_by_user_id assignment failed: %s", e
                     )
 
+            if (section_mode or page_mode) and not is_public_submission:
+                try:
+                    from flask_login import current_user as _progress_user
+                    progress_user_id = (
+                        _progress_user.id
+                        if _progress_user and _progress_user.is_authenticated
+                        else None
+                    )
+                except Exception:
+                    progress_user_id = None
+                if target_top_level_id and action == 'save_section':
+                    mark_section_in_progress(
+                        assignment_entity_status.id, target_top_level_id, progress_user_id
+                    )
+                elif target_page_id and action == 'save_page':
+                    mark_page_in_progress(
+                        assignment_entity_status.id, target_page_id, progress_user_id
+                    )
+                elif action == 'save' and section_mode:
+                    for section in participating_top_level_sections(all_sections):
+                        if section.id in locked_ids:
+                            continue
+                        mark_section_in_progress(
+                            assignment_entity_status.id, section.id, progress_user_id
+                        )
+                elif action == 'save' and page_mode:
+                    for page_id in participating_page_ids(all_sections):
+                        page_scope = resolve_requested_page(all_sections, page_id)[1]
+                        if page_scope and page_scope <= locked_ids:
+                            continue
+                        mark_page_in_progress(
+                            assignment_entity_status.id, page_id, progress_user_id
+                        )
+
             # Persist changes (middleware will commit if we're in a managed request)
             cls._commit_or_flush()
 
             logger.debug(f"FormDataService: Committed changes, action: {action}")
+
+            if action == 'submit_section' and section_mode and target_top_level_id:
+                scoped_sections = [
+                    section for section in all_sections if section.id in (section_scope_ids or set())
+                ]
+                validation_result = cls._validate_for_submission(
+                    scoped_sections, assignment_entity_status
+                )
+                if validation_result['is_valid']:
+                    from flask_login import current_user as _cu
+                    submit_user_id = None
+                    try:
+                        if _cu and _cu.is_authenticated:
+                            submit_user_id = _cu.id
+                    except Exception:
+                        submit_user_id = None
+                    mark_section_submitted(
+                        assignment_entity_status.id, target_top_level_id, submit_user_id
+                    )
+                    cls._commit_or_flush()
+                    submitted_count, total_count = section_progress_counts(
+                        assignment_entity_status.id, all_sections
+                    )
+                    if all_participating_sections_submitted(
+                        assignment_entity_status, all_sections
+                    ):
+                        rollup = cls._finalize_assignment_submission(
+                            assignment_entity_status, field_changes_tracker, _cu
+                        )
+                        if rollup is not None:
+                            rollup['section_submitted'] = True
+                            rollup['section_id'] = target_top_level_id
+                            rollup['sections_submitted_count'] = submitted_count
+                            rollup['sections_total_count'] = total_count
+                            return rollup
+                    return {
+                        'success': True,
+                        'field_changes': field_changes_tracker,
+                        'validation_errors': [],
+                        'submitted': False,
+                        'section_submitted': True,
+                        'section_id': target_top_level_id,
+                        'sections_submitted_count': submitted_count,
+                        'sections_total_count': total_count,
+                    }
+                validation_errors.extend(validation_result['errors'])
+                logger.debug("FormDataService: Section submit validation failed: %s", validation_errors)
+                success = False
+                result = {
+                    'success': success,
+                    'field_changes': field_changes_tracker,
+                    'validation_errors': validation_errors,
+                    'submitted': False,
+                    'section_id': target_top_level_id,
+                }
+                return result
+
+            if action == 'submit_page' and page_mode and target_page_id:
+                scoped_sections = [
+                    section for section in all_sections if section.id in (section_scope_ids or set())
+                ]
+                validation_result = cls._validate_for_submission(
+                    scoped_sections, assignment_entity_status
+                )
+                if validation_result['is_valid']:
+                    from flask_login import current_user as _cu
+                    submit_user_id = None
+                    try:
+                        if _cu and _cu.is_authenticated:
+                            submit_user_id = _cu.id
+                    except Exception:
+                        submit_user_id = None
+                    mark_page_submitted(
+                        assignment_entity_status.id, target_page_id, submit_user_id
+                    )
+                    cls._commit_or_flush()
+                    submitted_count, total_count = page_progress_counts(
+                        assignment_entity_status.id, all_sections
+                    )
+                    if all_participating_pages_submitted(
+                        assignment_entity_status, all_sections
+                    ):
+                        rollup = cls._finalize_assignment_submission(
+                            assignment_entity_status, field_changes_tracker, _cu
+                        )
+                        if rollup is not None:
+                            rollup['page_submitted'] = True
+                            rollup['page_id'] = target_page_id
+                            rollup['pages_submitted_count'] = submitted_count
+                            rollup['pages_total_count'] = total_count
+                            return rollup
+                    return {
+                        'success': True,
+                        'field_changes': field_changes_tracker,
+                        'validation_errors': [],
+                        'submitted': False,
+                        'page_submitted': True,
+                        'page_id': target_page_id,
+                        'pages_submitted_count': submitted_count,
+                        'pages_total_count': total_count,
+                    }
+                validation_errors.extend(validation_result['errors'])
+                logger.debug("FormDataService: Page submit validation failed: %s", validation_errors)
+                return {
+                    'success': False,
+                    'field_changes': field_changes_tracker,
+                    'validation_errors': validation_errors,
+                    'submitted': False,
+                    'page_id': target_page_id,
+                }
 
             # Handle submission vs save
             effective_action = action
@@ -411,6 +674,76 @@ class FormDataService(
             return error_result
 
     @classmethod
+    def _finalize_assignment_submission(
+        cls, assignment_entity_status, field_changes_tracker, user
+    ) -> Dict[str, Any] | None:
+        """Apply the existing whole-form submit / send-for-review transition."""
+        from app.services.assignments.workflow_service import (
+            apply_entity_status_change,
+            resolve_submit_action,
+            should_apply_sent_for_review,
+        )
+
+        effective_action = resolve_submit_action(
+            assignment_entity_status, user, 'submit'
+        )
+        now = utcnow()
+        if should_apply_sent_for_review(assignment_entity_status, effective_action):
+            from app.services.organization.authorization_service import AuthorizationService
+
+            if not AuthorizationService.can_send_for_review(assignment_entity_status, user):
+                return {
+                    'success': False,
+                    'field_changes': field_changes_tracker,
+                    'validation_errors': [
+                        'You do not have permission to send this assignment for review.'
+                    ],
+                    'submitted': False,
+                }
+            review_user_id = None
+            try:
+                if user and user.is_authenticated:
+                    review_user_id = user.id
+            except Exception as e:
+                current_app.logger.debug(
+                    "sent_for_review_by_user_id assignment failed: %s", e
+                )
+            apply_entity_status_change(
+                assignment_entity_status,
+                AssignmentEntityStatusValue.sent_for_review,
+                review_user_id,
+                now=now,
+            )
+            cls._commit_or_flush()
+            return {
+                'success': True,
+                'field_changes': field_changes_tracker,
+                'validation_errors': [],
+                'submitted': False,
+                'sent_for_review': True,
+            }
+
+        submit_user_id = None
+        try:
+            if user and user.is_authenticated:
+                submit_user_id = user.id
+        except Exception as e:
+            current_app.logger.debug("submitted_by_user_id assignment failed: %s", e)
+        apply_entity_status_change(
+            assignment_entity_status,
+            AssignmentEntityStatusValue.submitted,
+            submit_user_id,
+            now=now,
+        )
+        cls._commit_or_flush()
+        return {
+            'success': True,
+            'field_changes': field_changes_tracker,
+            'validation_errors': [],
+            'submitted': True,
+        }
+
+    @classmethod
     @performance_monitor("Section Data Processing", quiet=True)
     def _process_section_data(cls, section, assignment_entity_status, validation_errors: List, *, skip_required_validation: bool = False) -> List[Dict]:
         """Process standard form items in a section (indicators, questions, documents)"""
@@ -459,7 +792,13 @@ class FormDataService(
         return field_changes
 
     @classmethod
-    def _process_hidden_fields_clearing(cls, assignment_entity_status) -> List[Dict]:
+    def _process_hidden_fields_clearing(
+        cls,
+        assignment_entity_status,
+        *,
+        allowed_section_ids: set | None = None,
+        skip_section_ids: set | None = None,
+    ) -> List[Dict]:
         """
         Process hidden fields by clearing their database records.
         Hidden fields are identified by the 'hidden_fields_to_clear' form parameter.
@@ -482,6 +821,11 @@ class FormDataService(
                     # Get the form item to determine its type
                     form_item = FormItem.query.filter_by(id=field_id).first()
                     if not form_item:
+                        continue
+                    section_id = getattr(form_item, 'section_id', None)
+                    if allowed_section_ids is not None and section_id not in allowed_section_ids:
+                        continue
+                    if skip_section_ids and section_id in skip_section_ids:
                         continue
 
                     # Clear the field data

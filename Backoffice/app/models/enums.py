@@ -21,6 +21,7 @@ STATUS_DISPLAY_LABELS: dict[str, str] = {
     'reviewed': 'Under Review',
     'implemented': 'Implemented',
     'closed': 'Closed',
+    'not_started': 'Not Started',
 }
 
 
@@ -127,6 +128,37 @@ class AssignmentEntityStatusValue(str, enum.Enum):
                 'sent for review': cls.sent_for_review,
             },
             default=cls.pending,
+        )
+
+
+class AssignmentSectionStatusValue(str, enum.Enum):
+    """Workflow status for one top-level section or page on an assignment entity."""
+
+    not_started = 'not_started'
+    pending = 'pending'
+    in_progress = 'in_progress'
+    requires_revision = 'requires_revision'
+    sent_for_review = 'sent_for_review'
+    submitted = 'submitted'
+    approved = 'approved'
+    cancelled = 'cancelled'
+
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        return tuple(member.value for member in cls)
+
+    @classmethod
+    def normalize(cls, raw: str | None) -> 'AssignmentSectionStatusValue':
+        return _normalize_str_enum(
+            cls,
+            raw,
+            legacy_map={
+                'in progress': cls.in_progress,
+                'requires revision': cls.requires_revision,
+                'send for review': cls.sent_for_review,
+                'sent for review': cls.sent_for_review,
+            },
+            default=cls.not_started,
         )
 
 

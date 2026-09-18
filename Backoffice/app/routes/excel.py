@@ -232,16 +232,23 @@ def import_assignment_excel(aes_id):
             activity_category="form",
             icon="fas fa-file-excel",
         )
-        if result['errors']:
-            error_msg = f"Excel import completed with {result['updated_count']} values saved. Errors: {', '.join(result['errors'][:5])}"
-            if len(result['errors']) > 5:
-                error_msg += f" (and {len(result['errors']) - 5} more)"
+        warnings = result.get('warnings') or []
+        if result['errors'] or warnings:
+            error_msg = f"Excel import completed with {result['updated_count']} values saved."
+            if result['errors']:
+                error_msg += f" Errors: {', '.join(result['errors'][:5])}"
+                if len(result['errors']) > 5:
+                    error_msg += f" (and {len(result['errors']) - 5} more)"
+            if warnings:
+                error_msg += " " + " ".join(warnings[:5])
             flash(error_msg, "warning")
             if is_ajax:
                 return json_ok(
                     message=error_msg,
                     updated_count=result['updated_count'],
                     errors=result['errors'],
+                    warnings=warnings,
+                    warning_items=result.get('warning_items') or [],
                 )
         else:
             success_msg = f"Excel import completed: {result['updated_count']} values saved."
@@ -454,6 +461,7 @@ def import_upr_country_reporting_template(aes_id):
             icon="fas fa-file-excel",
         )
         if warnings:
+            success_msg = f"{success_msg} {' '.join(warnings[:5])}"
             flash(success_msg, "warning")
             if is_ajax:
                 return json_ok(
@@ -618,6 +626,8 @@ def import_unified_country_plan_template(aes_id):
             activity_category="form",
             icon="fas fa-file-excel",
         )
+        if warnings:
+            success_msg = f"{success_msg} {' '.join(warnings[:5])}"
         flash(success_msg, "warning" if warnings else "success")
         if is_ajax:
             return json_ok(

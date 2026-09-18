@@ -2,7 +2,7 @@
 
 Track what the FDRS import pipeline (`Backoffice/scripts/imports/import_fdrs_form_data.py`) fills from [data-api.ifrc.org](https://data-api.ifrc.org), and what remains manual or blocked.
 
-**Last updated:** 2026-06-05
+**Last updated:** 2026-09-18
 
 ## Summary
 
@@ -98,6 +98,18 @@ cd Backoffice
 python scripts/imports/import_fdrs_form_data.py --fdrs-from-data-api --fdrs-years 2024
 ```
 
+### Verify API vs database
+
+After a sync (or to see what a sync would skip), compare every FDRS data point to `form_data`:
+
+```bash
+cd Backoffice
+python scripts/dev/verify_fdrs_sync.py --years 2024
+python scripts/dev/verify_fdrs_sync.py --years 2020-2024 --problems-only
+```
+
+Writes `instance/fdrs_sync_verification.xlsx` with `data_points` (FDRS value, databank value, status), `summary`, and `kpi_coverage`. Status is `matched`, `skipped_intentionally` (zeros, unpublished, unmapped KPIs, no assignment, workflow/network slots, …), `missing`, or `mismatch`. Exit code 1 when any missing/mismatch rows exist.
+
 Optional env:
 
 - `FDRS_DATA_API_KEY` — required for data-api.ifrc.org
@@ -108,11 +120,13 @@ Dry-run still counts document rows when `dry_run=true`.
 ## Tests
 
 - `Backoffice/tests/unit/test_fdrs_sync_helpers.py` — income matrix, network support matrix, assignment status, document plan
+- `Backoffice/tests/unit/test_fdrs_sync_verify.py` — API vs DB verification classification
 
 ## Change log
 
 | Date | Change |
 |---|---|
+| 2026-09-18 | Added `scripts/dev/verify_fdrs_sync.py` to compare FDRS API values to synced form_data |
 | 2026-06-05 | Disability `_ddd` / `_wgq` KPIs merged into `disagg_data.values.disability` on indicator sync |
 | 2026-06-05 | Assignment workflow sync from FDRS section WasSubmitted/WasValidated KPIs |
 | 2026-06-05 | Network Support matrices 919/929 synced from supported*/received_support* KPI CSV pairs |

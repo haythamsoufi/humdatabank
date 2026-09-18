@@ -26,7 +26,7 @@ from contextlib import suppress
 MAX_PER_PAGE = 100000  # Maximum items per page for API requests
 DEFAULT_PER_PAGE = 20
 DEFAULT_PAGE = 1
-PAST_ASSIGNMENT_DAYS = 30  # Days to consider an assignment as "past"
+PAST_ASSIGNMENT_DAYS = 60  # Days after approval before an assignment is treated as "past"
 
 # SECURITY: Generic message for API/JSON error responses to avoid leaking internal details
 GENERIC_ERROR_MESSAGE = "An internal error occurred."

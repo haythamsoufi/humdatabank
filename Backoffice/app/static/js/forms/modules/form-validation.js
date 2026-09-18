@@ -117,16 +117,25 @@ class FormValidator {
 
             debugLog(MODULE_NAME, `📝 FORM VALIDATION: Action detected - name: "${actionName}", value: "${actionValue}"`);
 
-            // Only validate for "submit" action, not "save" action
-            if (actionName === 'action' && actionValue === 'save') {
+            // Only validate for submit actions, not save / save_section / save_page
+            if (actionName === 'action' && (actionValue === 'save' || actionValue === 'save_section' || actionValue === 'save_page')) {
                 debugLog(MODULE_NAME, '💾 FORM VALIDATION: Save action detected - skipping validation (allowing save)');
                 return true;
             }
 
-            if (actionName === 'action' && actionValue === 'submit') {
+            if (actionName === 'action' && (actionValue === 'submit' || actionValue === 'submit_section' || actionValue === 'submit_page')) {
                 debugLog(MODULE_NAME, '📤 FORM VALIDATION: Submit action detected - running validation');
             } else {
                 debugLog(MODULE_NAME, '🔍 FORM VALIDATION: Unknown or missing action - running validation as default');
+            }
+
+            let restoreSectionScope = null;
+            if (actionName === 'action' && actionValue === 'submit_section') {
+                const sectionId = submitter?.dataset?.sectionId;
+                restoreSectionScope = this.scopeValidationToSection(sectionId);
+            } else if (actionName === 'action' && actionValue === 'submit_page') {
+                const pageId = submitter?.dataset?.pageId;
+                restoreSectionScope = this.scopeValidationToPage(pageId);
             }
 
             // Clear previous errors
@@ -137,7 +146,12 @@ class FormValidator {
             }
 
             // Validate form (including percentage fields)
-            const isValid = this.validateForm();
+            let isValid = false;
+            try {
+                isValid = this.validateForm();
+            } finally {
+                if (restoreSectionScope) restoreSectionScope();
+            }
 
             if (!isValid) {
                 debugLog(MODULE_NAME, `❌ FORM VALIDATION: Form validation failed with ${this.errors.length} errors`);
@@ -979,6 +993,45 @@ class FormValidator {
                 debugLog(MODULE_NAME, `❌ Error checking validation condition references: ${e}`);
             }
         });
+    }
+
+    scopeValidationToSection(sectionId) {
+        if (!sectionId) return null;
+        const target = document.getElementById(`section-container-${sectionId}`);
+        if (!target) return null;
+        const marked = [];
+        document.querySelectorAll('#sections-container > [id^="section-container-"]').forEach((el) => {
+            if (el === target || el.classList.contains('relevance-hidden')) return;
+            el.classList.add('relevance-hidden');
+            el.dataset.ifrcSectionValidateScope = '1';
+            marked.push(el);
+        });
+        return () => {
+            marked.forEach((el) => {
+                el.classList.remove('relevance-hidden');
+                delete el.dataset.ifrcSectionValidateScope;
+            });
+        };
+    }
+
+    scopeValidationToPage(pageId) {
+        if (!pageId) return null;
+        const pageKey = String(pageId);
+        const marked = [];
+        document.querySelectorAll('#sections-container > [id^="section-container-"]').forEach((el) => {
+            if (el.classList.contains('relevance-hidden')) return;
+            if (String(el.dataset.pageId || '') === pageKey) return;
+            el.classList.add('relevance-hidden');
+            el.dataset.ifrcPageValidateScope = '1';
+            marked.push(el);
+        });
+        if (!marked.length) return null;
+        return () => {
+            marked.forEach((el) => {
+                el.classList.remove('relevance-hidden');
+                delete el.dataset.ifrcPageValidateScope;
+            });
+        };
     }
 
     isFieldHidden(field) {

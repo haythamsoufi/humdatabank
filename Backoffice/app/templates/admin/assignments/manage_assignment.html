@@ -494,6 +494,34 @@
                 </div>
                 {% endif %}
 
+                {% if form.enable_section_submission is defined %}
+                <div class="border-t border-gray-200 pt-3">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_section_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'section'}) }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_section_submission.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each section independently instead of the whole form at once.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if form.enable_page_submission is defined %}
+                <div class="border-t border-gray-200 pt-3">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_page_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'page'}) }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_page_submission.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each page independently instead of the whole form at once. Applies to paginated templates.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if form.enable_export_excel is defined %}
                 <div class="border-t border-gray-200 pt-3" id="assignment-export-excel-row-create">
                     <div class="flex items-start gap-3">
@@ -549,6 +577,30 @@
                 <div class="min-w-0 flex-1">
                     {{ form.requires_delegation_review.label(class="text-sm font-medium text-gray-800") }}
                     <p class="mt-0.5 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_section_submission is defined %}
+            <div class="flex items-start gap-3">
+                <div class="pt-0.5">
+                    {{ form.enable_section_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'section'}) }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_section_submission.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each section independently instead of the whole form at once.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_page_submission is defined %}
+            <div class="flex items-start gap-3">
+                <div class="pt-0.5">
+                    {{ form.enable_page_submission(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded js-scoped-submission-toggle", **{'data-scoped-mode': 'page'}) }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_page_submission.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Let focal points save and submit each page independently instead of the whole form at once. Applies to paginated templates.') }}</p>
                 </div>
             </div>
             {% endif %}
@@ -1351,6 +1403,16 @@ window.manageAssignmentConfig = {
 <script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
 {% endif %}
 <script src="{{ static_url('js/admin/manage-assignment.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script nonce="{{ csp_nonce() }}">
+document.querySelectorAll('.js-scoped-submission-toggle').forEach((input) => {
+    input.addEventListener('change', () => {
+        if (!input.checked) return;
+        document.querySelectorAll('.js-scoped-submission-toggle').forEach((other) => {
+            if (other !== input) other.checked = false;
+        });
+    });
+});
+</script>
 <style>
 /* Assignment status overview: cards + bar chart on one row */
 .assignment-overview-row {

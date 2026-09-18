@@ -32,7 +32,7 @@ This page maps **administrator-facing screens** in the Backoffice to what they d
 - **Items requiring attention** — Pending public submissions, overdue country assignments, unresolved security alerts with **View** jumps to the right list.
 - **Recent activity (7 days)** — Successful logins, user activity events, active sessions.
 - **Most active users (30 days)** — Ranked list with links to per-user analytics.
-- **Data integration** (System Manager, when KoBo or FDRS routes are registered) — KoBo Toolbox import (`/admin/kobo-data-import`) and FDRS sync/imputation (`/admin/fdrs-sync-imputation`).
+- **Data integration** (System Manager, when KoBo, FDRS, or UPR routes are registered) — KoBo Toolbox import (`/admin/kobo-data-import`), FDRS sync/imputation (`/admin/fdrs-sync-imputation`), and UPR Excel sync/imputation (`/admin/upr-sync-imputation`).
 
 ---
 

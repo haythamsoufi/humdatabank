@@ -103,6 +103,7 @@ class TestAssignmentSettingsSnapshot:
         assert snapshot["data_owner"] == "Ada Lovelace (ada@example.org)"
         assert snapshot["enable_export_excel"] is True
         assert snapshot["enable_import_excel"] is False
+        assert snapshot["enable_section_submission"] is False
         assert snapshot["submission_review_mode"].startswith("Designated FDS member")
 
     def test_recipients_sorted_and_labelled(self):

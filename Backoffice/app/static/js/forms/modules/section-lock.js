@@ -36,16 +36,11 @@ export function applySectionLock(container, locked) {
         el.disabled = !!locked;
     });
 
-    const toolbar = container.querySelector('.section-action-toolbar');
-    if (toolbar) {
-        toolbar.classList.toggle('hidden', locked);
-        toolbar.setAttribute('aria-hidden', locked ? 'true' : 'false');
-    }
-    const pageToolbar = container.querySelector('.page-action-toolbar');
-    if (pageToolbar) {
-        pageToolbar.classList.toggle('hidden', locked);
-        pageToolbar.setAttribute('aria-hidden', locked ? 'true' : 'false');
-    }
+    try {
+        document.dispatchEvent(new CustomEvent('ifrc:scoped-status:changed', {
+            detail: { locked, containerId: container.id },
+        }));
+    } catch (_) { /* no-op */ }
 }
 
 export function initSectionLocks() {

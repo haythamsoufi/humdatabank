@@ -359,6 +359,33 @@ export function initFormEvents() {
     }, false);
   });
 
+  document.querySelectorAll(
+    '.sidebar-scope-actions .reopen-section-btn, .sidebar-scope-actions .reopen-page-btn, .sidebar-scope-actions .return-section-btn, .sidebar-scope-actions .return-page-btn'
+  ).forEach((button) => {
+    if (button.dataset.confirmHandlerBound === 'true') return;
+    button.dataset.confirmHandlerBound = 'true';
+    button.addEventListener('click', function(event) {
+      const formId = button.getAttribute('form');
+      const targetForm = formId ? document.getElementById(formId) : null;
+      if (!targetForm) {
+        event.preventDefault();
+        return;
+      }
+      const { message: confirmMessage, title, confirmText } = getConfirmDialogOptions(this);
+      if (!confirmMessage) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const submitScoped = () => targetForm.requestSubmit ? targetForm.requestSubmit() : targetForm.submit();
+      if (window.showSubmitConfirmation) {
+        window.showSubmitConfirmation(confirmMessage, submitScoped, null, confirmText, _t('Cancel'), title);
+      } else if (window.showConfirmation) {
+        window.showConfirmation(confirmMessage, submitScoped, null, confirmText, _t('Cancel'), title);
+      } else {
+        submitScoped();
+      }
+    });
+  });
+
   form.addEventListener('submit', function (event) {
     window.__clientLog && window.__clientLog('Form submit event fired');
     const submitButton = event.submitter;
@@ -474,7 +501,15 @@ export function initFormEvents() {
 
       // Use the same AJAX save function as the main save button
       // First try to trigger click on the original save button (which has the AJAX handler)
-      const saveSubmitter = form.querySelector('button[type="submit"][name="action"][value="save"]');
+      const activeLink = document.querySelector('#sidebar-nav-scroll a.section-link.is-active');
+      const activeSectionId = (activeLink?.dataset?.sectionId || '').replace('section-container-', '');
+      const activePageId = activeLink?.closest('[data-page-id]')?.dataset?.pageId || '';
+      const scopedSave = (activeSectionId && document.querySelector(`.section-save-btn[data-section-id="${activeSectionId}"]`))
+        || (activePageId && document.querySelector(`.page-save-btn[data-page-id="${activePageId}"]`))
+        || document.querySelector('.section-save-btn:not(.hidden), .page-save-btn:not(.hidden)');
+      const saveSubmitter = (scopedSave && !scopedSave.closest('.hidden') && !scopedSave.disabled)
+        ? scopedSave
+        : form.querySelector('button[type="submit"][name="action"][value="save"]');
       if (saveSubmitter) {
         // Simulate a click on the original save button to trigger its AJAX save handler
         // This ensures the FAB button uses the exact same function as the main save button
@@ -502,9 +537,17 @@ export function initFormEvents() {
 
       // Prefer the explicit submit button; fall back to send_for_review when submit is absent
       // (e.g. when delegation review is enabled and the current user is a focal point).
+      const activeLink = document.querySelector('#sidebar-nav-scroll a.section-link.is-active');
+      const activeSectionId = (activeLink?.dataset?.sectionId || '').replace('section-container-', '');
+      const activePageId = activeLink?.closest('[data-page-id]')?.dataset?.pageId || '';
+      const scopedSubmit = (activeSectionId && document.querySelector(`.section-submit-btn[data-section-id="${activeSectionId}"]`))
+        || (activePageId && document.querySelector(`.page-submit-btn[data-page-id="${activePageId}"]`))
+        || document.querySelector('.section-submit-btn, .page-submit-btn');
       const submitSubmitter = form.querySelector('button[type="submit"][name="action"][value="submit"]');
       const sendForReviewSubmitter = form.querySelector('button[type="submit"][name="action"][value="send_for_review"]');
-      const activeSubmitter = submitSubmitter || sendForReviewSubmitter;
+      const activeSubmitter = (scopedSubmit && !scopedSubmit.closest('.hidden') && !scopedSubmit.disabled)
+        ? scopedSubmit
+        : (submitSubmitter || sendForReviewSubmitter);
       const activeOptions = getConfirmDialogOptions(activeSubmitter);
       const activeAction = activeOptions.action;
 

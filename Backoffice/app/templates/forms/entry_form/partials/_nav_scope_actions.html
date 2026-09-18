@@ -1,0 +1,117 @@
+{# Save / submit / reopen / return for one section or page in the navigation pane. #}
+{% set _scope = scope_kind %}
+{% set _scope_id = scope_id %}
+{% set _wf = wf_status or 'not_started' %}
+{% set _locked = _wf in scoped_locked_statuses %}
+{% set _can_submit = can_finalize_submit or can_send_for_review %}
+{% if can_edit and not is_preview_mode and not is_public_submission and _scope_id %}
+<div class="sidebar-scope-actions"
+     data-scope="{{ _scope }}"
+     data-scope-id="{{ _scope_id }}"
+     data-status="{{ _wf }}">
+    <div class="sidebar-scope-actions__edit{% if _locked %} hidden{% endif %}">
+        {% if _scope == 'page' %}
+        <button type="submit" name="action" value="save_page"
+                class="btn btn-primary btn-sm page-save-btn"
+                form="focalDataEntryForm"
+                data-page-id="{{ _scope_id }}"
+                title="{{ _('Save this page')|forceescape }}"
+                aria-label="{{ _('Save this page')|forceescape }}">
+            <i class="fas fa-save" aria-hidden="true"></i>
+            <span>{{ _('Save') }}</span>
+        </button>
+        {% if _can_submit %}
+        <button type="submit" name="action" value="submit_page"
+                class="btn btn-success btn-sm page-submit-btn"
+                form="focalDataEntryForm"
+                data-page-id="{{ _scope_id }}"
+                title="{{ _('Submit this page')|forceescape }}"
+                aria-label="{{ _('Submit this page')|forceescape }}"
+                data-confirm-title="{{ _('Submit Page?')|forceescape }}"
+                data-confirm-label="{{ _('Submit')|forceescape }}"
+                data-confirm-message="{{ _('Submit this page? You will not be able to edit it after submission unless an administrator reopens it.')|forceescape }}"
+                data-loading-text="{{ _('Submitting…') }}">
+            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+            <span>{{ _('Submit') }}</span>
+        </button>
+        {% endif %}
+        {% else %}
+        <button type="submit" name="action" value="save_section"
+                class="btn btn-primary btn-sm section-save-btn"
+                form="focalDataEntryForm"
+                data-section-id="{{ _scope_id }}"
+                title="{{ _('Save this section')|forceescape }}"
+                aria-label="{{ _('Save this section')|forceescape }}">
+            <i class="fas fa-save" aria-hidden="true"></i>
+            <span>{{ _('Save') }}</span>
+        </button>
+        {% if _can_submit %}
+        <button type="submit" name="action" value="submit_section"
+                class="btn btn-success btn-sm section-submit-btn"
+                form="focalDataEntryForm"
+                data-section-id="{{ _scope_id }}"
+                title="{{ _('Submit this section')|forceescape }}"
+                aria-label="{{ _('Submit this section')|forceescape }}"
+                data-confirm-title="{{ _('Submit Section?')|forceescape }}"
+                data-confirm-label="{{ _('Submit')|forceescape }}"
+                data-confirm-message="{{ _('Submit this section? You will not be able to edit it after submission unless an administrator reopens it.')|forceescape }}"
+                data-loading-text="{{ _('Submitting…') }}">
+            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+            <span>{{ _('Submit') }}</span>
+        </button>
+        {% endif %}
+        {% endif %}
+    </div>
+    <div class="sidebar-scope-actions__locked{% if not _locked %} hidden{% endif %}">
+        {% if _scope == 'page' %}
+            {% if can_return_assignment_page(assignment_status) and _wf in scoped_revision_statuses %}
+            <button type="submit"
+                    form="return-page-form-{{ assignment_status.id }}-{{ _scope_id }}"
+                    class="btn btn-warning btn-sm return-page-btn"
+                    title="{{ _('Return this page for revision')|forceescape }}"
+                    data-confirm-title="{{ _('Return Page for Revision?')|forceescape }}"
+                    data-confirm-label="{{ _('Request changes')|forceescape }}"
+                    data-confirm-message="{{ _('Return this page to the National Society for changes? Other submitted pages will stay locked.')|forceescape }}">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                <span>{{ _('Return') }}</span>
+            </button>
+            {% elif can_reopen_assignment_page(assignment_status) and _wf in scoped_reopenable_statuses %}
+            <button type="submit"
+                    form="reopen-page-form-{{ assignment_status.id }}-{{ _scope_id }}"
+                    class="btn btn-warning btn-sm reopen-page-btn"
+                    title="{{ _('Reopen this page')|forceescape }}"
+                    data-confirm-title="{{ _('Reopen Page?')|forceescape }}"
+                    data-confirm-label="{{ _('Reopen')|forceescape }}"
+                    data-confirm-message="{{ _('Reopen this page for editing? Other submitted pages will stay locked.')|forceescape }}">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                <span>{{ _('Reopen') }}</span>
+            </button>
+            {% endif %}
+        {% else %}
+            {% if can_return_assignment_section(assignment_status) and _wf in scoped_revision_statuses %}
+            <button type="submit"
+                    form="return-section-form-{{ assignment_status.id }}-{{ _scope_id }}"
+                    class="btn btn-warning btn-sm return-section-btn"
+                    title="{{ _('Return this section for revision')|forceescape }}"
+                    data-confirm-title="{{ _('Return Section for Revision?')|forceescape }}"
+                    data-confirm-label="{{ _('Request changes')|forceescape }}"
+                    data-confirm-message="{{ _('Return this section to the National Society for changes? Other submitted sections will stay locked.')|forceescape }}">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                <span>{{ _('Return') }}</span>
+            </button>
+            {% elif can_reopen_assignment_section(assignment_status) and _wf in scoped_reopenable_statuses %}
+            <button type="submit"
+                    form="reopen-section-form-{{ assignment_status.id }}-{{ _scope_id }}"
+                    class="btn btn-warning btn-sm reopen-section-btn"
+                    title="{{ _('Reopen this section')|forceescape }}"
+                    data-confirm-title="{{ _('Reopen Section?')|forceescape }}"
+                    data-confirm-label="{{ _('Reopen')|forceescape }}"
+                    data-confirm-message="{{ _('Reopen this section for editing? Other submitted sections will stay locked.')|forceescape }}">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                <span>{{ _('Reopen') }}</span>
+            </button>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endif %}

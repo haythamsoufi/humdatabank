@@ -255,6 +255,11 @@ function createSectionNavScrollSpy(links, { isPaginated = false } = {}) {
     }
 
     debugLog(MODULE_NAME, 'Active section:', sectionId);
+    try {
+      document.dispatchEvent(new CustomEvent('ifrc:section-nav:active', {
+        detail: { sectionId },
+      }));
+    } catch (_) { /* no-op */ }
   }
 
   function persistActiveSection(sectionId) {

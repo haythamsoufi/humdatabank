@@ -467,6 +467,25 @@ class TestMissingCoreYesNoDefaults:
         assert aes == {1, 3}
         assert 2 not in aes
 
+    def test_reporting_aes_ids_from_excel_skips_live_myr26_even_when_present(self):
+        ctx = UprImportContext(template_ids=[33])
+        ctx.assignment_by_template = {
+            33: {
+                ("Jan-Jun 2025", "AFG"): 1,
+                ("Jan-Jun 2026", "AFG"): 2,
+                ("2026", "AFG"): 3,
+            }
+        }
+        rows = [
+            {"Round": "MYR25", "ISO3": "AFG", "Section": "Core indicators"},
+            {"Round": "MYR26", "ISO3": "AFG", "Section": "Core indicators"},
+            {"Round": "AR26", "ISO3": "AFG", "Section": "Core indicators"},
+        ]
+        aes = _reporting_aes_ids_from_excel(rows, ctx, template_ids=[33])
+        assert aes == {1}
+        assert 2 not in aes
+        assert 3 not in aes
+
     def test_reporting_aes_ids_from_excel_ignores_non_t33_sections(self):
         ctx = UprImportContext(template_ids=[33])
         ctx.assignment_by_template = {33: {("2025", "AFG"): 3}}

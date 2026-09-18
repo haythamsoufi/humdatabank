@@ -28,7 +28,7 @@ from upr_import_warnings import warning_text  # noqa: E402
 def _funding_source_row(**overrides):
     base = {
         "ISO3": "AFG",
-        "Round": "MYR26",
+        "Round": "MYR25",
         "Section": "Funding",
         "Entity": "IFRC Secretariat",
         "Attribute": "Funding Source",
@@ -62,7 +62,7 @@ def _planning_funding_row(**overrides):
 class TestT33FundingMatrixColumnKeys:
     def test_funding_source_uses_ctx_funding_col_not_legacy_suffix(self):
         ctx = UprImportContext(template_ids=[33])
-        ctx.assignment_by_template = {33: {("Jan-Jun 2026", "AFG"): 5001}}
+        ctx.assignment_by_template = {33: {("Jan-Jun 2025", "AFG"): 5001}}
         ctx.reporting_special_items = {
             33: {
                 "funding": ITEM_REPORTING_COUNTRY_FUNDING,
@@ -70,7 +70,7 @@ class TestT33FundingMatrixColumnKeys:
             }
         }
         rows = [_funding_source_row()]
-        import_rows = transform_to_import_rows(rows, ctx, template_ids=[33], rounds={"MYR26"})
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[33], rounds={"MYR25"})
         funding_rows = [r for r in import_rows if r[COL_ITEM] == str(ITEM_REPORTING_COUNTRY_FUNDING)]
         assert len(funding_rows) == 1
         cells = json.loads(funding_rows[0][COL_DISAGG])
@@ -316,11 +316,11 @@ class TestMatrixKeyWarning:
             db_session.commit()
 
             ctx = UprImportContext(template_ids=[33])
-            ctx.assignment_by_template = {33: {("Jan-Jun 2026", "AFG"): 5001}}
+            ctx.assignment_by_template = {33: {("Jan-Jun 2025", "AFG"): 5001}}
             ctx.reporting_special_items = {33: {"sp_breakdown": item.id}}
             rows = [{
                 "ISO3": "AFG",
-                "Round": "MYR26",
+                "Round": "MYR25",
                 "Section": "Funding",
                 "Entity": "HNS",
                 "Attribute": "SP Breakdown",
@@ -329,7 +329,7 @@ class TestMatrixKeyWarning:
                 "ValueNum": 12345,
                 "Area": "SP2",
             }]
-            import_rows = transform_to_import_rows(rows, ctx, template_ids=[33], rounds={"MYR26"})
+            import_rows = transform_to_import_rows(rows, ctx, template_ids=[33], rounds={"MYR25"})
 
             sp_rows = [r for r in import_rows if r[COL_ITEM] == str(item.id)]
             assert len(sp_rows) == 1
@@ -392,3 +392,63 @@ class TestMatrixKeyWarning:
                 column_name="Funding (CHF)",
                 row_name="Response - Disasters and Crises",
             ) is None
+
+
+class TestUprMasterAllowedRounds:
+    def test_later_myr26_rows_are_not_transformed(self):
+        ctx = UprImportContext(template_ids=[33])
+        ctx.assignment_by_template = {33: {("Jan-Jun 2026", "ZWE"): 5001}}
+        ctx.reporting_special_items = {
+            33: {
+                "funding": ITEM_REPORTING_COUNTRY_FUNDING,
+                "funding_col": "ns_fun",
+            }
+        }
+        rows = [_funding_source_row(Round="MYR26", ISO3="ZWE")]
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[33])
+        assert import_rows == []
+        assert any("MYR26" in w for w in ctx.warnings)
+
+    def test_later_ar26_and_p27_rows_are_not_transformed(self):
+        ctx = UprImportContext(template_ids=[24, 33])
+        ctx.assignment_by_template = {
+            24: {("2027", "AFG"): 1},
+            33: {("2026", "AFG"): 2},
+        }
+        rows = [
+            _planning_funding_row(Round="P27", Year=2027),
+            _funding_source_row(Round="AR26"),
+        ]
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[24, 33])
+        assert import_rows == []
+        assert any("P27" in w and "AR26" in w for w in ctx.warnings)
+
+    def test_explicit_later_round_filter_still_skips(self):
+        ctx = UprImportContext(template_ids=[33])
+        ctx.assignment_by_template = {33: {("Jan-Jun 2026", "ZWE"): 5001}}
+        rows = [_funding_source_row(Round="MYR26", ISO3="ZWE")]
+        import_rows = transform_to_import_rows(
+            rows, ctx, template_ids=[33], rounds={"MYR26"}
+        )
+        assert import_rows == []
+
+    def test_last_allowed_rounds_still_import(self):
+        ctx = UprImportContext(template_ids=[24, 33])
+        ctx.assignment_by_template = {
+            24: {("2026", "AFG"): 9001},
+            33: {("2025", "AFG"): 5001},
+        }
+        ctx.reporting_special_items = {
+            33: {
+                "funding": ITEM_REPORTING_COUNTRY_FUNDING,
+                "funding_col": "ns_fun",
+            }
+        }
+        rows = [
+            _planning_funding_row(Round="P26", Year=2026, Area="SP2"),
+            _funding_source_row(Round="AR25"),
+        ]
+        import_rows = transform_to_import_rows(
+            rows, ctx, template_ids=[24, 33], rounds={"P26", "AR25"}
+        )
+        assert len(import_rows) == 2

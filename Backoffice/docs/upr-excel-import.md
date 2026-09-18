@@ -37,7 +37,7 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 |--------|---------|
 | `ISO3` | Host country code |
 | `Country` | Country name |
-| `Round` | Planning round code (`P23`–`P26`) |
+| `Round` | Planning / reporting round code. Only **P23–P26**, **AR21–AR25**, and **MYR23–MYR25** are imported. |
 | `Year` | Calendar year the value applies to |
 | `Section` | Logical section: `NS Data`, `Funding`, `Reach`, `Support`, `Comments`, `Staff` |
 | `Entity` | Who owns the value: `HNS`, `IFRC Secretariat`, `PNS`, `All-PNS` |
@@ -57,9 +57,10 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 
 | Round code | `period_name` | Notes |
 |-----------|---------------|-------|
-| `P26` | `"2026"` | `2000 + int(round[1:])` |
-| `AR25` | `"2025"` | `2000 + int(round[2:])` |
-| `MYR26` | `"Jan-Jun 2026"` | `f"Jan-Jun {2000 + int(round[3:])}"` |
+| `P26` | `"2026"` | Last planning round imported from Master |
+| `AR25` | `"2025"` | Last annual-reporting round imported from Master |
+| `MYR25` | `"Jan-Jun 2025"` | Last mid-year round imported from Master |
+| `MYR26` / `AR26` / `P27` | — | Later rounds are **not imported** |
 
 The MYR format matches the period_name created for template 33 Mid-Year Review assignments.
 
@@ -109,6 +110,8 @@ UPR_TEMPLATE_PROFILES = {
          "sections": frozenset({"Funding"})},
 }
 ```
+
+**Only these rounds import** from UPR Master (`UPR_MASTER_ALLOWED_ROUNDS`): **P23–P26**, **AR21–AR25**, **MYR23–MYR25**. Later rounds (P27, AR26, MYR26, …) are live in the backoffice and are skipped even if the workbook contains them.
 
 Adding a new template means adding an entry here and a handler block in `transform_to_import_rows`.
 
@@ -482,7 +485,7 @@ Accessible from the **UPR Excel Sync** tile on the Admin Dashboard (`/admin/` �
 | Step | Panel | What happens |
 |------|-------|-------------|
 | 1 Upload | `panel-1` | Drag/drop or click to select file. The dropzone validates the file type/size client-side, then POSTs to `/upload` (server-side MIME + extension check), then immediately POSTs to `/analyze` (reads the "UPR Data" sheet). The workbook summary (rows, countries, rounds, sections) appears in the dropzone status panel on success, or an error message on failure. The **Next** button is only enabled after analyze succeeds. |
-| 2 Configure | `panel-2` | Template checkboxes, round filter (blank = all P*), batch size, dry-run toggle. **Preview import** (optional) calls `/preview` on demand and shows transformed row count, countries, and deduplicated warnings. **Run import** is available immediately after configuring settings; preview is not required. |
+| 2 Configure | `panel-2` | Template checkboxes, round filter (blank = all allowed rounds matching selected templates: P23–P26, AR21–AR25, MYR23–MYR25), batch size, dry-run toggle. **Preview import** (optional) calls `/preview` on demand and shows transformed row count, countries, and deduplicated warnings. **Run import** is available immediately after configuring settings; preview is not required. |
 | 3 Import | `panel-3` | Async background job via `/run`; polls `/status/<job_id>` every second; shows progress bar. |
 
 ### Warning display
@@ -685,19 +688,19 @@ python scripts/imports/import_upr_excel_data.py \
   --templates 33,23
 
 # ── Reporting — Mid-Year Review (MYR) ─────────────────────────────────────────
-# T23 has no MYR assignments — use template 33 only.
+# Later rounds (MYR26, AR26, P27) are not imported from UPR Master.
 
-# Dry run for MYR26
+# Dry run for historical MYR25
 python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
-  --rounds MYR26 \
+  --rounds MYR25 \
   --templates 33 \
   --dry-run
 
-# Live import MYR26
+# Live import MYR25
 python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
-  --rounds MYR26 \
+  --rounds MYR25 \
   --templates 33
 ```
 

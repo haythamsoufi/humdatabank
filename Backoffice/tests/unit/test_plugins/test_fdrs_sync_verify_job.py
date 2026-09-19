@@ -11,6 +11,7 @@ from app.services.imports.async_import_job_store import FDRS_SYNC_VERIFY_JOB_TYP
 from plugins.fdrs.services.fdrs_sync_verify_job import (
     create_fdrs_sync_verify_job,
     get_active_fdrs_sync_verify_jobs_for_user,
+    read_fdrs_sync_verify_workbook,
     request_fdrs_sync_verify_cancel,
 )
 
@@ -131,3 +132,33 @@ def test_execute_verification_reuses_app_context(app, tmp_path):
     assert out.is_file()
     assert result["total"] >= 1
     assert "matched" in result
+
+
+def test_read_fdrs_sync_verify_workbook_filters_and_paginates(tmp_path):
+    import openpyxl
+
+    path = tmp_path / "verify.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "data_points"
+    ws.append(["year", "ISO3", "status"])
+    ws.append([2024, "KEN", "matched"])
+    ws.append([2024, "UGA", "mismatch"])
+    ws.append([2024, "RWA", "mismatch"])
+    wb.create_sheet("summary").append(["status", "count"])
+    wb.save(path)
+    wb.close()
+
+    all_rows = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", page=1, per_page=2)
+    assert all_rows["total_rows"] == 3
+    assert all_rows["filtered_rows"] == 3
+    assert len(all_rows["rows"]) == 2
+    assert all_rows["sheets"] == ["data_points", "summary"]
+
+    page2 = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", page=2, per_page=2)
+    assert len(page2["rows"]) == 1
+    assert page2["rows"][0]["ISO3"] == "RWA"
+
+    mismatches = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", status="mismatch")
+    assert mismatches["filtered_rows"] == 2
+    assert {row["ISO3"] for row in mismatches["rows"]} == {"UGA", "RWA"}

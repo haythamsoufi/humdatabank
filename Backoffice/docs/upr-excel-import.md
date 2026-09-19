@@ -86,7 +86,7 @@ upsert_form_data_rows()        ← shared helper in import_fdrs_form_data.py; ba
 
 The script can be run:
 - **CLI:** `python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --rounds P26 --templates 24,22 --dry-run`
-- **UI wizard:** `/admin/upr-excel-import/` (3-step wizard, async background job). Open it from the **UPR Excel Sync** tile on the Admin Dashboard (`/admin/upr-sync-imputation` → header button) or directly.
+- **UI wizard:** in-page **Excel Import** tab on `/admin/upr-tools` (3-step wizard, async background job). `/admin/upr-excel-import/` and `/admin/upr-sync-imputation` redirect there (`#excel-import` for the former). Reachable from the **UPR Tools** tile on the Admin Dashboard.
 
 ---
 
@@ -479,8 +479,8 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 
 ## 9. UI wizard
 
-**URL:** `/admin/upr-excel-import/`  
-Accessible from the **UPR Excel Sync** tile on the Admin Dashboard (`/admin/` → Data Integration), which opens `/admin/upr-sync-imputation` and links to this wizard. The legacy path `/admin/templates/upr-excel-import/` redirects here.
+**URL:** `/admin/upr-tools#excel-import`  
+The **Excel Import** tab on UPR Tools (`/admin/upr-tools`), which is the **UPR Tools** tile on the Admin Dashboard (`/admin/` → Data Integration). `/admin/upr-excel-import/`, `/admin/upr-sync-imputation`, and the older `/admin/templates/upr-excel-import/` redirect here.
 
 | Step | Panel | What happens |
 |------|-------|-------------|

@@ -780,9 +780,43 @@ def _auth_for_view(view_fn) -> tuple[str, str | None]:
     return auth, perm
 
 
+def _collect_plugin_api_endpoints() -> list[dict]:
+    """Registry rows contributed by loaded plugins via ``get_api_endpoints()``."""
+    try:
+        pm = getattr(current_app, 'plugin_manager', None)
+    except RuntimeError:
+        return []
+    if pm is None:
+        return []
+    getter = getattr(pm, 'get_api_endpoints', None)
+    if getter is None:
+        return []
+    try:
+        return list(getter() or [])
+    except Exception:
+        current_app.logger.warning('plugin get_api_endpoints failed', exc_info=True)
+        return []
+
+
+def get_endpoint_registry() -> list[dict]:
+    """Core ``ENDPOINT_REGISTRY`` plus plugin-owned ``/api/*`` routes."""
+    combined = [dict(ep) for ep in ENDPOINT_REGISTRY]
+    seen = {_normalize_path(ep['path']) for ep in combined if ep.get('path')}
+    for ep in _collect_plugin_api_endpoints():
+        path = _normalize_path(ep.get('path') or '')
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        row = dict(ep)
+        row.setdefault('surface', _surface_for_path(path))
+        combined.append(row)
+    return combined
+
+
 def scan_flask_routes(app) -> dict:
     """
-    Scan the live Flask url_map and compare against ENDPOINT_REGISTRY.
+    Scan the live Flask url_map and compare against the unified registry
+    (core ``ENDPOINT_REGISTRY`` plus plugin ``get_api_endpoints()``).
 
     Returns a dict with:
       live          – list of dicts for every /api/* route found in url_map
@@ -790,10 +824,11 @@ def scan_flask_routes(app) -> dict:
       stale         – registry entries whose path is NOT in url_map
       coverage_pct  – float (0–100)
     """
+    registry = get_endpoint_registry()
     # ── Build a normalised set of registry paths ──────────────────────────
     registry_paths: set[str] = {
         _normalize_path(ep['path'])
-        for ep in ENDPOINT_REGISTRY
+        for ep in registry
     }
 
     # ── Walk the live url_map ─────────────────────────────────────────────
@@ -833,7 +868,7 @@ def scan_flask_routes(app) -> dict:
 
     # ── Stale: in registry but path not found in url_map ─────────────────
     stale_paths = registry_paths - live_paths
-    stale = [ep for ep in ENDPOINT_REGISTRY if _normalize_path(ep['path']) in stale_paths]
+    stale = [ep for ep in registry if _normalize_path(ep['path']) in stale_paths]
 
     total_live = len(live_paths)
     documented = total_live - len(undocumented)
@@ -944,8 +979,8 @@ def api_management():
     stale_paths = {_normalize_path(ep['path']) for ep in scan['stale']}
 
     # ── Unified endpoint registry ─────────────────────────────────────────────
-    # Make mutable copies so we can attach runtime stats without mutating module-level dicts
-    all_endpoints = [dict(ep) for ep in ENDPOINT_REGISTRY]
+    # Core registry plus plugin get_api_endpoints(); copies so usage stats stay request-local
+    all_endpoints = get_endpoint_registry()
 
     # Stamp stale flag on registry entries whose path is no longer live
     for ep in all_endpoints:

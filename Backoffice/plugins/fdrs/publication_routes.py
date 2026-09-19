@@ -10,7 +10,7 @@ that serves the published snapshot this tool writes.
 
 from __future__ import annotations
 
-from flask import render_template
+from flask import current_app, redirect, url_for
 from flask_login import current_user
 from werkzeug.exceptions import HTTPException
 
@@ -21,15 +21,23 @@ from app.routes.admin.shared import (
     system_manager_required,
 )
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_bad_request, json_forbidden, json_ok
+from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_ok
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from app.utils.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
+from plugins.fdrs.services.fdrs_publication_job import (
+    _run_fdrs_publication_job,
+    build_fdrs_publication_status_payload,
+    create_fdrs_publication_job,
+    ensure_fdrs_publication_job_running,
+    get_active_fdrs_publication_jobs_for_user,
+    request_fdrs_publication_cancel,
+    start_fdrs_publication_job,
+)
 from plugins.fdrs.services.fdrs_publication_service import (
+    _get_fdrs_assigned_form_or_404,
     get_assignment_publication_summary,
     get_country_change_detail,
-    list_fdrs_assignments,
-    publish_assignment,
 )
 
 
@@ -46,10 +54,8 @@ def _fdrs_template_access_denied():
 @admin_required
 @system_manager_required
 def publication_page():
-    return render_template(
-        "plugins/fdrs/admin/fdrs_publication.html",
-        assignments=list_fdrs_assignments(),
-    )
+    """Legacy URL: Manage Publication is now a tab on FDRS Tools."""
+    return redirect(url_for("fdrs.fdrs_tools") + "#publication")
 
 
 @bp.route("/admin/plugins/fdrs/publication/<int:assigned_form_id>/summary", methods=["GET"])
@@ -104,12 +110,73 @@ def publication_publish(assigned_form_id: int):
             except (TypeError, ValueError):
                 return json_bad_request("assignment_entity_status_ids must be a list of integers")
 
-        stats = publish_assignment(
-            assigned_form_id,
-            assignment_entity_status_ids=aes_ids,
-            user_id=int(getattr(current_user, "id", 0) or 0) or None,
+        _get_fdrs_assigned_form_or_404(assigned_form_id)
+        user_id = int(getattr(current_user, "id", 0) or 0)
+        active = get_active_fdrs_publication_jobs_for_user(
+            user_id, assigned_form_id=assigned_form_id
         )
-        return json_ok(success=True, **stats)
+        if active:
+            return json_error(
+                "A publication job is already running for this assignment",
+                status=409,
+                success=False,
+                job_id=active[0].get("job_id"),
+            )
+
+        job_id = create_fdrs_publication_job(
+            user_id=user_id,
+            assigned_form_id=assigned_form_id,
+            assignment_entity_status_ids=aes_ids,
+        )
+        worker_app = current_app._get_current_object()
+        if current_app.config.get("TESTING"):
+            _run_fdrs_publication_job(worker_app, job_id)
+        else:
+            start_fdrs_publication_job(worker_app, job_id)
+        return json_accepted(job_id=job_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route(
+    "/admin/plugins/fdrs/publication/<int:assigned_form_id>/publish/<job_id>/status",
+    methods=["GET"],
+)
+@admin_permission_required("admin.templates.view")
+def publication_status(assigned_form_id: int, job_id: str):
+    denied = _fdrs_template_access_denied()
+    if denied is not None:
+        return denied
+    try:
+        ensure_fdrs_publication_job_running(current_app._get_current_object(), job_id)
+        payload = build_fdrs_publication_status_payload(job_id, assigned_form_id)
+        if payload is None:
+            return json_error("Publication job not found", status=404, success=False)
+        return json_ok(success=True, **payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route(
+    "/admin/plugins/fdrs/publication/<int:assigned_form_id>/publish/<job_id>/cancel",
+    methods=["POST"],
+)
+@admin_permission_required("admin.templates.edit")
+@system_manager_required
+def publication_cancel(assigned_form_id: int, job_id: str):
+    denied = _fdrs_template_access_denied()
+    if denied is not None:
+        return denied
+    try:
+        payload = build_fdrs_publication_status_payload(job_id, assigned_form_id)
+        if payload is None:
+            return json_error("Publication job not found", status=404, success=False)
+        status = request_fdrs_publication_cancel(job_id)
+        return json_ok(success=True, job_id=job_id, status=status)
     except HTTPException:
         raise
     except Exception as e:

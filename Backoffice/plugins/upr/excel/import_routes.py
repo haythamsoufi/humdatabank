@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from pathlib import Path
 
-from flask import Blueprint, redirect, render_template, request, send_file, current_app, url_for
+from flask import Blueprint, redirect, request, send_file, current_app, url_for
 from flask_login import current_user
 
 from app.routes.admin.shared import admin_permission_required, system_manager_required
@@ -134,11 +134,8 @@ def _run_upr_import_with_change_log(
 @admin_permission_required("admin.templates.view")
 @system_manager_required
 def wizard():
-    return render_template(
-        "plugins/upr/admin/upr_excel_import.html",
-        title="UPR Excel Sync",
-        template_choices=UPR_TEMPLATE_CHOICES,
-    )
+    """Legacy URL: Excel Import is now a tab on UPR Tools."""
+    return redirect(url_for("upr.upr_tools") + "#excel-import")
 
 
 @bp.route("/upload", methods=["POST"])

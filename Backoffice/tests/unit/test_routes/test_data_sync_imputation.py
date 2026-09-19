@@ -125,7 +125,46 @@ class TestSpecialTemplateView:
         assert resp.status_code == 200
 
 
-class TestFdrsSyncImputationRoute:
+# ---------------------------------------------------------------------------
+# GET /  –  data_sync_landing (generic, platform-native dashboard tile)
+# ---------------------------------------------------------------------------
+
+class TestDataSyncLanding:
+    def test_get_renders_first_accessible_generic_template(self, logged_in_client, db_session, app):
+        template = create_test_template(db_session, name="Generic Imputation Template")
+        with _auth(), \
+             patch(
+                 "app.routes.admin.data_sync_imputation._accessible_templates_for_user",
+                 return_value=[{"id": template.id, "name": template.name}],
+             ), \
+             patch("app.routes.admin.data_sync_imputation._sections_with_items_for_template", return_value=[]), \
+             _mock_render() as mock_rt:
+            resp = logged_in_client.get("/admin/templates/data-sync/")
+        assert resp.status_code == 200
+        mock_rt.assert_called_once()
+        kwargs = mock_rt.call_args.kwargs
+        # Lands on the first accessible non-FDRS/non-UPR template, generically branded.
+        assert kwargs.get("sync_family") == "generic"
+        assert kwargs.get("template") is template
+
+    def test_get_redirects_when_no_accessible_templates(self, logged_in_client, db_session):
+        with _auth(), \
+             patch(
+                 "app.routes.admin.data_sync_imputation._accessible_templates_for_user",
+                 return_value=[],
+             ):
+            resp = logged_in_client.get("/admin/templates/data-sync/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" not in resp.location.lower()
+        assert "template" in resp.location.lower()
+
+    def test_get_unauthenticated_redirects(self, client):
+        resp = client.get("/admin/templates/data-sync/", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.location.lower()
+
+
+class TestFdrsToolsRoute:
     def test_get_renders_for_system_manager(self, logged_in_client, db_session, app):
         template = create_test_template(db_session, name="FDRS")
         with patch("app.utils.data_quality_constants.FDRS_TEMPLATE_ID", template.id), \
@@ -139,21 +178,31 @@ class TestFdrsSyncImputationRoute:
              patch("app.routes.admin.data_sync_imputation.get_active_fdrs_data_sync_jobs_for_user", return_value=[]), \
              patch("app.routes.admin.data_sync_imputation.get_active_fdrs_sync_verify_jobs_for_user", return_value=[]), \
              _mock_render() as mock_rt:
-            resp = logged_in_client.get("/admin/fdrs-sync-imputation")
+            resp = logged_in_client.get("/admin/fdrs-tools")
         assert resp.status_code == 200
         mock_rt.assert_called_once()
         kwargs = mock_rt.call_args.kwargs
         assert kwargs.get("sync_family") == "fdrs"
         assert kwargs.get("has_upr_excel") is False
         assert kwargs.get("has_data_sync") is True
+        tab_ids = [t.get("id") for t in (kwargs.get("extra_tabs") or [])]
+        assert tab_ids[0] == "sync"
+        assert "publication" in tab_ids
+
+    def test_legacy_url_redirects(self, logged_in_client, db_session, app):
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True):
+            resp = logged_in_client.get("/admin/fdrs-sync-imputation", follow_redirects=False)
+        assert resp.status_code == 301
+        assert "/admin/fdrs-tools" in (resp.location or "")
 
     def test_get_unauthenticated_redirects(self, client):
-        resp = client.get("/admin/fdrs-sync-imputation", follow_redirects=False)
+        resp = client.get("/admin/fdrs-tools", follow_redirects=False)
         assert resp.status_code == 302
         assert "login" in resp.location.lower()
 
 
-class TestUprSyncImputationRoute:
+class TestUprToolsRoute:
     def test_get_renders_for_system_manager(self, logged_in_client, db_session, app):
         template = create_test_template(db_session, name="UPR Planning")
         with patch("app.utils.data_quality_constants.UPR_PLANNING_TEMPLATE_ID", template.id), \
@@ -163,7 +212,7 @@ class TestUprSyncImputationRoute:
              patch("app.routes.admin.data_sync_imputation._accessible_templates_for_user", return_value=[]), \
              patch("app.routes.admin.data_sync_imputation._sections_with_items_for_template", return_value=[]), \
              _mock_render() as mock_rt:
-            resp = logged_in_client.get("/admin/upr-sync-imputation")
+            resp = logged_in_client.get("/admin/upr-tools")
         assert resp.status_code == 200
         mock_rt.assert_called_once()
         kwargs = mock_rt.call_args.kwargs
@@ -171,8 +220,15 @@ class TestUprSyncImputationRoute:
         assert kwargs.get("has_upr_excel") is True
         assert kwargs.get("has_data_sync") is False
 
+    def test_legacy_url_redirects(self, logged_in_client, db_session, app):
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True):
+            resp = logged_in_client.get("/admin/upr-sync-imputation", follow_redirects=False)
+        assert resp.status_code == 301
+        assert "/admin/upr-tools" in (resp.location or "")
+
     def test_get_unauthenticated_redirects(self, client):
-        resp = client.get("/admin/upr-sync-imputation", follow_redirects=False)
+        resp = client.get("/admin/upr-tools", follow_redirects=False)
         assert resp.status_code == 302
         assert "login" in resp.location.lower()
 
@@ -1133,11 +1189,10 @@ class TestInternalHelpers:
         assert _sync_family_for_template(33) == "upr"
         assert _sync_family_for_template(1) == "generic"
 
-    def test_sync_page_title_uses_family(self):
+    def test_sync_page_title_uses_optional_heading(self):
         from app.routes.admin.data_sync_imputation import _sync_page_title
-        assert "FDRS Data Sync" in _sync_page_title("FDRS", "fdrs")
-        assert "UPR Data Sync" in _sync_page_title("Unified Plan", "upr")
-        assert "Data Sync & Imputation" in _sync_page_title("Other", "generic")
+        assert _sync_page_title("FDRS", "FDRS Tools") == "FDRS — FDRS Tools"
+        assert "Data Sync & Imputation" in _sync_page_title("Other")
 
     def test_accessible_templates_family_filter(self):
         from types import SimpleNamespace
@@ -1306,3 +1361,83 @@ class TestSyncVerifyCancel:
             follow_redirects=False,
         )
         assert resp.status_code == 302
+
+
+def _write_verify_workbook(path):
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "data_points"
+    ws.append(["year", "ISO3", "status", "detail"])
+    ws.append([2024, "KEN", "matched", ""])
+    ws.append([2024, "UGA", "mismatch", "value_differs"])
+    ws.append([2024, "RWA", "missing", "no_databank"])
+    summary = wb.create_sheet("summary")
+    summary.append(["status", "detail", "count"])
+    summary.append(["matched", "", 1])
+    coverage = wb.create_sheet("kpi_coverage")
+    coverage.append(["KPI", "matched", "missing", "mismatch", "total"])
+    coverage.append(["KPI_PeopleVol", 1, 1, 1, 3])
+    wb.save(path)
+    wb.close()
+
+
+class TestSyncVerifyResults:
+    def test_owned_job_returns_table(self, logged_in_client, db_session, admin_user, tmp_path):
+        template = create_test_template(db_session, name="FDRS Verify Results Own")
+        xlsx = tmp_path / "verify.xlsx"
+        _write_verify_workbook(xlsx)
+        job_id = _create_sync_verify_test_job(
+            template.id,
+            user_id=admin_user.id,
+            status="completed",
+            download_ready=True,
+            preview_path=str(xlsx),
+        )
+        with _auth():
+            resp = logged_in_client.get(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-results/{job_id}"
+                "?sheet=data_points&status=mismatch"
+            )
+        assert resp.status_code == 200
+        data = resp.get_json() or {}
+        assert data.get("success") is True
+        assert data.get("sheet") == "data_points"
+        assert data.get("filtered_rows") == 1
+        assert data["rows"][0]["ISO3"] == "UGA"
+        assert data["rows"][0]["status"] == "mismatch"
+        assert "summary" in data.get("sheets")
+        assert data.get("download_url")
+
+    def test_wrong_user_returns_403(self, logged_in_client, db_session, test_user, tmp_path):
+        template = create_test_template(db_session, name="FDRS Verify Results Denied")
+        xlsx = tmp_path / "verify.xlsx"
+        _write_verify_workbook(xlsx)
+        job_id = _create_sync_verify_test_job(
+            template.id,
+            user_id=test_user.id,
+            status="completed",
+            download_ready=True,
+            preview_path=str(xlsx),
+        )
+        with _auth():
+            resp = logged_in_client.get(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-results/{job_id}"
+            )
+        assert resp.status_code == 403
+
+    def test_missing_file_returns_404(self, logged_in_client, db_session, admin_user):
+        template = create_test_template(db_session, name="FDRS Verify Results Missing")
+        job_id = _create_sync_verify_test_job(
+            template.id,
+            user_id=admin_user.id,
+            status="completed",
+            download_ready=True,
+            preview_path=None,
+        )
+        with _auth():
+            resp = logged_in_client.get(
+                f"/admin/templates/data-sync/{template.id}/sync-verify-results/{job_id}"
+            )
+        assert resp.status_code == 404

@@ -1173,6 +1173,16 @@ try {
                 {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
                 {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20)")|tojson|safe }}}
             ],
+            '/api/v1/fdrs/published-data': [
+                {name: 'period_name', type: 'text', placeholder: {{ _("Reporting period (e.g. 2024)")|tojson|safe }}, description: {{ _("Exact FDRS reporting period name")|tojson|safe }}},
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: {{ _("Filter by assignment ID")|tojson|safe }}},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
+                {name: 'country_iso2', type: 'text', placeholder: {{ _("ISO2 (e.g. BD)")|tojson|safe }}, description: {{ _("Filter by ISO 3166-1 alpha-2")|tojson|safe }}},
+                {name: 'country_iso3', type: 'text', placeholder: {{ _("ISO3 (e.g. BGD)")|tojson|safe }}, description: {{ _("Filter by ISO 3166-1 alpha-3")|tojson|safe }}},
+                {name: 'form_item_id', type: 'number', placeholder: {{ _("Form item ID")|tojson|safe }}, description: {{ _("Filter by FDRS form item ID")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20, max 100000)")|tojson|safe }}}
+            ],
             '/api/v1/submitted-documents': [
                 {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
                 {name: 'document_type', type: 'text', placeholder: {{ _("Document Type")|tojson|safe }}, description: {{ _("Filter by document type")|tojson|safe }}},

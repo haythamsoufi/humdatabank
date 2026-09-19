@@ -1065,3 +1065,25 @@ class PluginManager:
         if plugin is None:
             return {}
         return plugin.get_panel_render_context(flags, first_tab)
+
+    def get_api_endpoints(self) -> List[Dict[str, Any]]:
+        """Collect API Management registry rows from every loaded plugin."""
+        catalog: List[Dict[str, Any]] = []
+        seen: Set[str] = set()
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                endpoints = plugin.get_api_endpoints() or []
+            except Exception as exc:
+                self.logger.warning("get_api_endpoints failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for ep in endpoints:
+                if not isinstance(ep, dict):
+                    continue
+                path = (ep.get("path") or "").strip()
+                if not path or path in seen:
+                    continue
+                seen.add(path)
+                row = dict(ep)
+                row.setdefault("plugin_id", plugin_id)
+                catalog.append(row)
+        return catalog

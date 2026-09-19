@@ -957,6 +957,77 @@ class TestPostprocessActivitySummaryParams:
 
 
 # ---------------------------------------------------------------------------
+# activity assignment display title
+# ---------------------------------------------------------------------------
+
+class TestActivityAssignmentDisplayTitle:
+    def test_uses_custom_display_name(self):
+        from app.routes.main.helpers import activity_assignment_display_title
+
+        assigned = MagicMock()
+        assigned.display_name = "Bangladesh Midyear Reporting 2026"
+        assigned.period_name = "Jan-Jun 2026"
+        assert activity_assignment_display_title(assigned, "Unified Country Report") == (
+            "Bangladesh Midyear Reporting 2026"
+        )
+
+    def test_falls_back_to_template_and_period(self):
+        from app.routes.main.helpers import activity_assignment_display_title
+
+        assigned = MagicMock()
+        assigned.display_name = ""
+        assigned.period_name = "2024 Q1"
+        assert activity_assignment_display_title(assigned, "FDRS") == "FDRS \u2013 2024 Q1"
+
+    def test_none_assigned_form_uses_template(self):
+        from app.routes.main.helpers import activity_assignment_display_title
+
+        assert activity_assignment_display_title(None, "FDRS") == "FDRS"
+
+
+class TestEnrichActivityAssignmentDisplay:
+    def test_sets_assignment_title_from_display_name(self):
+        from app.routes.main.helpers import enrich_activity_assignment_display
+
+        params = {"template": "Unified Country Report"}
+        assigned = MagicMock()
+        assigned.display_name = "Custom Assignment Title"
+        assigned.period_name = "Jan-Jun 2026"
+        enrich_activity_assignment_display(params, assigned)
+        assert params["assignment_title"] == "Custom Assignment Title"
+        assert params["period"] == "Jan-Jun 2026"
+        assert params["template_period"] == "Custom Assignment Title"
+
+    def test_non_dict_params_ignored(self):
+        from app.routes.main.helpers import enrich_activity_assignment_display
+
+        enrich_activity_assignment_display(None, MagicMock())
+
+
+class TestEnrichDashboardRecentActivities:
+    def test_attaches_assignment_title_from_aes(self, app):
+        from app.routes.main.helpers import enrich_dashboard_recent_activities
+
+        activity = MagicMock()
+        activity.summary_key = "activity.assignment_submitted"
+        activity.summary_params = {"template": "Unified Country Report"}
+        activity.assignment_id = 42
+
+        mock_aes = MagicMock()
+        mock_aes.id = 42
+        mock_aes.assigned_form.display_name = "Bangladesh Midyear Reporting 2026"
+        mock_aes.assigned_form.period_name = "Jan-Jun 2026"
+
+        with app.app_context():
+            with patch("app.routes.main.helpers.AssignmentEntityStatus.query") as mock_query:
+                mock_query.filter.return_value.options.return_value.all.return_value = [mock_aes]
+                enrich_dashboard_recent_activities([activity])
+
+        assert activity.summary_params["assignment_title"] == "Bangladesh Midyear Reporting 2026"
+        assert activity.summary_params["period"] == "Jan-Jun 2026"
+
+
+# ---------------------------------------------------------------------------
 # localize_status (Jinja global)
 # ---------------------------------------------------------------------------
 
@@ -1373,12 +1444,34 @@ class TestRenderActivitySummary:
             result = render_activity_summary(act)
         assert "Form A" in result
 
-    def test_assignment_submitted(self, app):
+    def test_assignment_submitted_prefers_assignment_title(self, app):
         from app.routes.main.helpers import render_activity_summary
         with app.app_context():
-            act = self._activity("activity.assignment_submitted", {"template": "Form B"})
+            act = self._activity(
+                "activity.assignment_submitted",
+                {
+                    "template": "Unified Country Report",
+                    "assignment_title": "Bangladesh Midyear Reporting 2026",
+                },
+            )
             result = render_activity_summary(act)
-        assert "Form B" in result
+        assert "Bangladesh Midyear Reporting 2026" in result
+        assert "Unified Country Report" not in result
+
+    def test_multiple_fields_prefers_assignment_title(self, app):
+        from app.routes.main.helpers import render_activity_summary
+        with app.app_context():
+            act = self._activity(
+                "activity.form_data_updated.multiple",
+                {
+                    "count": 3,
+                    "template": "MyTemplate",
+                    "assignment_title": "Custom Assignment",
+                },
+            )
+            result = render_activity_summary(act)
+        assert "Custom Assignment" in result
+        assert "MyTemplate" not in result
 
     def test_assignment_approved(self, app):
         from app.routes.main.helpers import render_activity_summary

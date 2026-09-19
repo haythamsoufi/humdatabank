@@ -26,9 +26,15 @@ logger = logging.getLogger(__name__)
 
 FDRS_DATA_SYNC_JOB_TYPE = "fdrs.data_sync"
 FDRS_SYNC_VERIFY_JOB_TYPE = "fdrs.sync_verify"
+FDRS_PUBLICATION_JOB_TYPE = "fdrs.publication"
 UPR_EXCEL_IMPORT_JOB_TYPE = "upr.excel_import"
 IMPORT_JOB_TYPES = frozenset(
-    {FDRS_DATA_SYNC_JOB_TYPE, FDRS_SYNC_VERIFY_JOB_TYPE, UPR_EXCEL_IMPORT_JOB_TYPE}
+    {
+        FDRS_DATA_SYNC_JOB_TYPE,
+        FDRS_SYNC_VERIFY_JOB_TYPE,
+        FDRS_PUBLICATION_JOB_TYPE,
+        UPR_EXCEL_IMPORT_JOB_TYPE,
+    }
 )
 IMPORT_JOB_TTL_SECONDS = 6 * 60 * 60
 _PERSIST_MIN_INTERVAL = 0.5
@@ -74,6 +80,7 @@ def job_record_to_dict(job: AIJob) -> Dict[str, Any]:
         "job_id": job.id,
         "kind": meta.get("kind"),
         "template_id": meta.get("template_id"),
+        "assigned_form_id": meta.get("assigned_form_id"),
         "user_id": int(job.user_id or 0),
         "status": _status_str(job.status),
         "stage": meta.get("stage") or "",
@@ -177,6 +184,7 @@ def update_import_job(
             meta_keys = (
                 "kind",
                 "template_id",
+                "assigned_form_id",
                 "stage",
                 "message",
                 "current",

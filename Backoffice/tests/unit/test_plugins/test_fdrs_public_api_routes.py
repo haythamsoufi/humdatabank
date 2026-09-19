@@ -64,6 +64,7 @@ def published_scenario(db_session, monkeypatch):
         numeric_value=123.0,
         published_value="123",
         published_numeric_value=123.0,
+        published_source=FormData.PUBLISHED_SOURCE_REPORTED,
         published_at=utcnow(),
     )
     # Privacy is public, but published_* was never set for this item's private counterpart —
@@ -93,6 +94,18 @@ def published_scenario(db_session, monkeypatch):
     }
 
 
+class TestPluginRegistry:
+    def test_fdrs_plugin_registers_published_data(self):
+        from plugins.fdrs.plugin import FdrsPlugin
+
+        endpoints = FdrsPlugin().get_api_endpoints()
+        paths = [ep["path"] for ep in endpoints]
+        assert "/api/v1/fdrs/published-data" in paths
+        ep = next(e for e in endpoints if e["path"] == "/api/v1/fdrs/published-data")
+        assert ep["auth"] == "api_key_or_session"
+        assert "GET" in ep["methods"]
+
+
 class TestAuth:
     def test_missing_api_key_returns_401(self, client, db_session, published_scenario):
         response = client.get(_URL)
@@ -101,6 +114,13 @@ class TestAuth:
     def test_invalid_api_key_returns_401(self, client, db_session, published_scenario):
         response = client.get(_URL, headers=_bearer_headers("not-a-real-key"))
         assert response.status_code == 401
+
+    def test_authenticated_session_without_api_key_succeeds(
+        self, logged_in_client, db_session, published_scenario
+    ):
+        response = logged_in_client.get(_URL)
+        assert response.status_code == 200
+        assert_paginated_response(response, min_items=1)
 
 
 class TestPublishedDataContents:
@@ -114,9 +134,32 @@ class TestPublishedDataContents:
         row = data[0]
         assert row["value"] == "123"
         assert row["num_value"] == 123.0
+        assert row["value_source"] == "reported"
         assert row["data_status"] == "available"
         assert row["country_name"] == "Publishland"
         assert row["published_at"] is not None
+
+    def test_value_source_imputed_when_stamped(self, client, db_session, published_scenario):
+        row = FormData.query.filter_by(
+            form_item_id=published_scenario["item_public"].id,
+        ).one()
+        row.published_source = FormData.PUBLISHED_SOURCE_IMPUTED
+        db_session.commit()
+
+        api_key_obj, full_key = create_test_api_key(db_session)
+        response = client.get(_URL, headers=_bearer_headers(full_key))
+        assert response.get_json()["data"][0]["value_source"] == "imputed"
+
+    def test_value_source_null_when_unknown(self, client, db_session, published_scenario):
+        row = FormData.query.filter_by(
+            form_item_id=published_scenario["item_public"].id,
+        ).one()
+        row.published_source = None
+        db_session.commit()
+
+        api_key_obj, full_key = create_test_api_key(db_session)
+        response = client.get(_URL, headers=_bearer_headers(full_key))
+        assert response.get_json()["data"][0]["value_source"] is None
 
     def test_private_item_never_exposed_even_if_published_value_set(self, client, db_session, published_scenario):
         api_key_obj, full_key = create_test_api_key(db_session)

@@ -32,7 +32,11 @@ This page maps **administrator-facing screens** in the Backoffice to what they d
 - **Items requiring attention** — Pending public submissions, overdue country assignments, unresolved security alerts with **View** jumps to the right list.
 - **Recent activity (7 days)** — Successful logins, user activity events, active sessions.
 - **Most active users (30 days)** — Ranked list with links to per-user analytics.
-- **Data integration** (System Manager, when KoBo, FDRS, or UPR routes are registered) — KoBo Toolbox import (`/admin/kobo-data-import`), FDRS sync/imputation (`/admin/fdrs-sync-imputation`), and UPR Excel sync/imputation (`/admin/upr-sync-imputation`).
+- **Data integration** (System Manager, when KoBo, FDRS, or UPR routes are registered) — four tiles:
+  - **Import KoBo Data** (`/admin/kobo-data-import`).
+  - **Data Sync & Imputation** (`/admin/templates/data-sync/`) — the platform-native, generic tile. Opens the shared `app/routes/admin/data_sync_imputation.py` tool for whichever template (outside FDRS/UPR) is first accessible to the current user; an in-page selector switches templates.
+  - **FDRS Tools** (`/admin/fdrs-tools`) — Data Preview, Imputation Methods, Sync (Run / Verify sub-tabs), and Manage Publication as in-page tabs. Verification shows an on-page table of the Excel sheets (data points, summary, KPI coverage). Legacy `/admin/fdrs-sync-imputation` and `/admin/plugins/fdrs/publication` redirect here (`#publication` for the latter; `#sync` for Data Sync).
+  - **UPR Tools** (`/admin/upr-tools`) — Data Preview, Imputation Methods, and Excel Import as in-page tabs. Legacy `/admin/upr-sync-imputation` and `/admin/upr-excel-import/` redirect here (`#excel-import` for the latter).
 
 ---
 
@@ -265,7 +269,7 @@ Cross-guide: [Export and download data](user-guides/admin/export-download-data.m
 **What you get:**
 
 - **Summary cards** — Registry coverage (% of live routes documented in the static registry), total `/api` requests in the usage log, mean response time, HTTP success rate, distinct client IPs.
-- **Endpoint Registry** — One **AG Grid** across **External `/api/v1`**, **Mobile `/api/mobile/v1`**, and **AI `/api/ai/v2`**: methods, paths, auth mode, permissions, rate limits, overlap hints, usage counters, registry flags. **Filter chips** for surfaces, **issues**, **overlaps**, **logged traffic**, **undocumented** live routes, **stale** registry rows, and **gaps**. Row styling for undocumented / stale / flagged. **Export Report** → Markdown (issues, overlaps, full table). Column filters, column visibility, match-count footer, **legend** for auth icons (public, Bearer API key, key-or-session, session, AI identity, mobile JWT, mobile RBAC, rate limits).
+- **Endpoint Registry** — One **AG Grid** across **External `/api/v1`**, **Mobile `/api/mobile/v1`**, and **AI `/api/ai/v2`**: methods, paths, auth mode, permissions, rate limits, overlap hints, usage counters, registry flags. Plugin-owned routes (e.g. FDRS `GET /api/v1/fdrs/published-data`) register via `BasePlugin.get_api_endpoints()` and appear here as documented v1 rows. **Filter chips** for surfaces, **issues**, **overlaps**, **logged traffic**, **undocumented** live routes, **stale** registry rows, and **gaps**. Row styling for undocumented / stale / flagged. **Export Report** → Markdown (issues, overlaps, full table). Column filters, column visibility, match-count footer, **legend** for auth icons (public, Bearer API key, key-or-session, session, AI identity, mobile JWT, mobile RBAC, rate limits).
 - **API URL Builder** — Endpoint picker, dynamic query fields, optional API key (**browser-only**, for assembling URLs), **Copy** / **Open**, and an in-page **Documentation** modal (auth modes, pagination, `date_from` / `date_to`, `sort` / `order`, compression).
 - **Request Volume** — **Chart.js** chart with endpoint and period selectors (24h through yearly).
 

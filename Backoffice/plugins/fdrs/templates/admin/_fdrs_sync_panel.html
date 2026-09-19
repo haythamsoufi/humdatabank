@@ -1,0 +1,310 @@
+{# In-page Sync tab (Run + Verify) — injected by plugins.fdrs.routes.fdrs_tools. #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_subtab_btn_classes %}
+{% set fdrs_years_start = fdrs_years_start | default(0) %}
+{% set fdrs_years_end = fdrs_years_end | default(0) %}
+
+<div id="fdrs-sync-root">
+  {% call scroll_tab_bar(inner_id='fdrs-sync-subtabs', aria_label=_('Run sync or verify results'), wrapper_class='mb-3') %}
+    <button type="button" role="tab" data-fdrs-sync-subtab="run" aria-selected="true"
+            class="{{ admin_underline_subtab_btn_classes(true) }}">
+      <i class="fas fa-sync-alt mr-1.5"></i>{{ _('Run') }}
+    </button>
+    <button type="button" role="tab" data-fdrs-sync-subtab="verify" aria-selected="false"
+            class="{{ admin_underline_subtab_btn_classes(false) }}">
+      <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Verify') }}
+    </button>
+  {% endcall %}
+
+  <div id="fdrs-sync-subpanel-run">
+    <div id="data-sync-settings" class="space-y-3">
+      <p class="text-sm text-gray-600">{{ _('Sync data from the FDRS API into form data for this template.') }}</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+      <div>
+        <span class="block text-sm font-medium text-gray-700 mb-1">{{ _('Reporting years') }}</span>
+        <p class="text-xs text-gray-500 mb-1.5">{{ _('All years in the default range are selected initially.') }}</p>
+        <div class="relative" id="data-sync-years-wrap">
+          <button type="button"
+                  id="data-sync-years-toggle"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="data-sync-years-dropdown"
+                  class="w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-left text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between gap-2">
+            <span id="data-sync-years-label" class="truncate text-gray-900"></span>
+            <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <div id="data-sync-years-dropdown"
+               class="hidden absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg p-3"
+               role="listbox"
+               aria-multiselectable="true">
+            <div class="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-gray-100">
+              <span class="text-xs font-medium text-gray-600">{{ _('Select years') }}</span>
+              <div class="flex items-center gap-2">
+                <button type="button" id="data-sync-years-select-all" class="text-xs text-blue-600 hover:text-blue-800">{{ _('All') }}</button>
+                <span class="text-gray-300" aria-hidden="true">|</span>
+                <button type="button" id="data-sync-years-clear-all" class="text-xs text-blue-600 hover:text-blue-800">{{ _('None') }}</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-4 gap-x-3 gap-y-1.5 max-h-48 overflow-y-auto">
+              {% if fdrs_years_end >= fdrs_years_start and fdrs_years_end > 0 %}
+              {% for year in range(fdrs_years_start, fdrs_years_end + 1) %}
+              <label class="inline-flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+                <input type="checkbox" name="data-sync-year" value="{{ year }}"
+                       class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+                <span>{{ year }}</span>
+              </label>
+              {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label for="data-sync-batch-size" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Batch size') }}</label>
+        <p class="text-xs text-gray-500 mb-1.5">{{ _('Rows per database commit. Empty uses 1000.') }}</p>
+        <input type="number" id="data-sync-batch-size" min="100" placeholder="1000"
+               class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 text-sm">
+      </div>
+      </div>
+
+      <div class="border border-gray-200 rounded-md px-3 py-2.5 bg-gray-50">
+        <label class="flex items-start gap-2 text-sm text-gray-800 cursor-pointer">
+          <input type="checkbox" id="data-sync-documents" class="mt-0.5 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" checked>
+          <span>
+            <span class="font-medium">{{ _('Sync FDRS documents') }}</span>
+            <span class="block text-xs text-gray-600 mt-0.5">{{ _('Import submission documents when IFRC URLs are available.') }}</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+        <span class="block text-sm font-medium text-gray-800 mb-1">{{ _('Status of the data') }}</span>
+        <p class="text-xs text-gray-600 mb-1.5">{{ _('IFRC row statuses treated as importable reported values when there is no imputed value.') }}</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1.5">
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="data-sync-status" value="0" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+            <span>{{ _('Not filled') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="data-sync-status" value="100" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" checked>
+            <span>{{ _('Saved') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="data-sync-status" value="200" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" checked>
+            <span>{{ _('Reopened') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="data-sync-status" value="300" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" checked>
+            <span>{{ _('Submitted') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="data-sync-status" value="400" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" checked>
+            <span>{{ _('Validated') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="data-sync-status" value="500" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" checked>
+            <span>{{ _('Published') }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="data-sync-dry-run" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span>{{ _('Dry run (preview only, no DB write)') }}</span>
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="data-sync-test" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span>{{ _('Test mode (year 2024 only, max 1000 records)') }}</span>
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer sm:col-span-2">
+        <input type="checkbox" id="data-sync-imputed-cache" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+        <span>{{ _('Use cached imputed values (recommended; uncheck to fetch fresh from the API)') }}</span>
+      </label>
+      </div>
+    </div>
+
+    <div id="data-sync-config-summary" class="hidden mt-3 border border-purple-200 rounded-md p-3 bg-purple-50">
+      <h4 class="text-sm font-medium text-purple-900 mb-2">{{ _('Sync configuration') }}</h4>
+      <div id="data-sync-config-summary-body" class="space-y-1.5 text-sm"></div>
+    </div>
+
+    <div id="data-sync-progress" class="mt-3 hidden">
+      <div class="text-sm text-gray-700 mb-1.5">
+        <span class="font-medium">{{ _('Status') }}:</span>
+        <span id="data-sync-progress-stage">-</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2">
+        <div id="data-sync-progress-bar" class="bg-purple-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-500 mt-1.5">
+        <span id="data-sync-progress-text">0%</span>
+        <span id="data-sync-progress-count"></span>
+      </div>
+    </div>
+    <div id="data-sync-result" class="mt-3 pt-3 border-t border-gray-200 hidden">
+      <p id="data-sync-result-text" class="text-sm"></p>
+    </div>
+    <div id="data-sync-footer-settings" class="mt-3 pt-3 border-t border-gray-200 flex justify-end gap-2">
+      <button type="button" id="data-sync-run-btn" class="btn btn-purple">
+        <i class="fas fa-sync-alt mr-2"></i>
+        <span id="data-sync-run-btn-text">{{ _('Run Sync') }}</span>
+      </button>
+    </div>
+    <div id="data-sync-footer-running" class="mt-3 pt-3 border-t border-gray-200 flex justify-end hidden">
+      <button type="button" id="data-sync-stop-btn"
+              class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500">
+        <i class="fas fa-stop mr-2"></i>
+        <span id="data-sync-stop-btn-text">{{ _('Stop sync') }}</span>
+      </button>
+    </div>
+    <div id="data-sync-footer-done" class="mt-3 pt-3 border-t border-gray-200 flex justify-end gap-2 hidden">
+      <button type="button" id="data-sync-run-again-btn"
+              class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {{ _('Run again') }}
+      </button>
+      <button type="button" id="data-sync-reload-btn" class="btn btn-purple">
+        <i class="fas fa-redo mr-2"></i>
+        {{ _('Reload page') }}
+      </button>
+    </div>
+  </div>
+
+  <div id="fdrs-sync-subpanel-verify" class="hidden">
+    <div id="sync-verify-settings" class="space-y-3">
+      <p class="text-sm text-gray-600">{{ _('Compare FDRS API values to synced form data. Results appear in the table below (matched, skipped, missing, mismatch) and can also be downloaded as Excel.') }}</p>
+      <div>
+        <span class="block text-sm font-medium text-gray-700 mb-1">{{ _('Reporting years') }}</span>
+        <p class="text-xs text-gray-500 mb-1.5">{{ _('All years in the default range are selected initially.') }}</p>
+        <div class="relative max-w-md" id="sync-verify-years-wrap">
+          <button type="button"
+                  id="sync-verify-years-toggle"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="sync-verify-years-dropdown"
+                  class="w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-left text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between gap-2">
+            <span id="sync-verify-years-label" class="truncate text-gray-900"></span>
+            <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <div id="sync-verify-years-dropdown"
+               class="hidden absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg p-3"
+               role="listbox"
+               aria-multiselectable="true">
+            <div class="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-gray-100">
+              <span class="text-xs font-medium text-gray-600">{{ _('Select years') }}</span>
+              <div class="flex items-center gap-2">
+                <button type="button" id="sync-verify-years-select-all" class="text-xs text-blue-600 hover:text-blue-800">{{ _('All') }}</button>
+                <span class="text-gray-300" aria-hidden="true">|</span>
+                <button type="button" id="sync-verify-years-clear-all" class="text-xs text-blue-600 hover:text-blue-800">{{ _('None') }}</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-4 gap-x-3 gap-y-1.5 max-h-48 overflow-y-auto">
+              {% if fdrs_years_end >= fdrs_years_start and fdrs_years_end > 0 %}
+              {% for year in range(fdrs_years_start, fdrs_years_end + 1) %}
+              <label class="inline-flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+                <input type="checkbox" name="sync-verify-year" value="{{ year }}"
+                       class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+                <span>{{ year }}</span>
+              </label>
+              {% endfor %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="sync-verify-test" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span>{{ _('Test mode (year 2024 only)') }}</span>
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="sync-verify-skip-imputed" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span>{{ _('Skip imputed values (faster; reported values only)') }}</span>
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="sync-verify-imputed-cache" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+        <span>{{ _('Use cached imputed values (recommended)') }}</span>
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" id="sync-verify-problems-only" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+        <span>{{ _('Data points table: missing and mismatch rows only') }}</span>
+      </label>
+      </div>
+    </div>
+
+    <div id="sync-verify-config-summary" class="hidden mt-3 border border-blue-200 rounded-md p-3 bg-blue-50">
+      <h4 class="text-sm font-medium text-blue-900 mb-2">{{ _('Verification configuration') }}</h4>
+      <div id="sync-verify-config-summary-body" class="space-y-1.5 text-sm"></div>
+    </div>
+
+    <div id="sync-verify-progress" class="mt-3 hidden">
+      <div class="text-sm text-gray-700 mb-1.5">
+        <span class="font-medium">{{ _('Status') }}:</span>
+        <span id="sync-verify-progress-stage">-</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2">
+        <div id="sync-verify-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-500 mt-1.5">
+        <span id="sync-verify-progress-text">0%</span>
+        <span id="sync-verify-progress-count"></span>
+      </div>
+    </div>
+    <div id="sync-verify-result" class="mt-3 pt-3 border-t border-gray-200 hidden">
+      <p id="sync-verify-result-text" class="text-sm"></p>
+    </div>
+    <div id="sync-verify-footer-settings" class="mt-3 pt-3 border-t border-gray-200 flex justify-end gap-2">
+      <button type="button" id="sync-verify-run-btn" class="btn btn-primary">
+        <i class="fas fa-clipboard-check mr-2"></i>
+        <span id="sync-verify-run-btn-text">{{ _('Run verification') }}</span>
+      </button>
+    </div>
+    <div id="sync-verify-footer-running" class="mt-3 pt-3 border-t border-gray-200 flex justify-end hidden">
+      <button type="button" id="sync-verify-stop-btn"
+              class="inline-flex items-center px-4 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500">
+        <i class="fas fa-stop mr-2"></i>
+        <span id="sync-verify-stop-btn-text">{{ _('Stop verification') }}</span>
+      </button>
+    </div>
+    <div id="sync-verify-footer-done" class="mt-3 pt-3 border-t border-gray-200 flex justify-end gap-2 hidden">
+      <button type="button" id="sync-verify-run-again-btn"
+              class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {{ _('Run again') }}
+      </button>
+      <a id="sync-verify-download-btn" href="#" class="btn btn-primary hidden">
+        <i class="fas fa-download mr-2"></i>
+        {{ _('Download Excel') }}
+      </a>
+    </div>
+
+    <div id="sync-verify-table-wrap" class="hidden mt-5">
+      <div id="sync-verify-stats-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3"></div>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <div id="sync-verify-sheet-tabs" class="inline-flex rounded-md border border-gray-200 overflow-hidden" role="tablist" aria-label="{{ _('Verification sheets') }}">
+          <button type="button" data-verify-sheet="data_points" class="px-3 py-1.5 text-sm font-medium bg-blue-50 text-blue-700">{{ _('Data points') }}</button>
+          <button type="button" data-verify-sheet="summary" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('Summary') }}</button>
+          <button type="button" data-verify-sheet="kpi_coverage" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('KPI coverage') }}</button>
+        </div>
+        <label for="sync-verify-status-filter" class="sr-only">{{ _('Filter by status') }}</label>
+        <select id="sync-verify-status-filter" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white">
+          <option value="">{{ _('All statuses') }}</option>
+          <option value="matched">{{ _('Matched') }}</option>
+          <option value="skipped_intentionally">{{ _('Skipped') }}</option>
+          <option value="missing">{{ _('Missing') }}</option>
+          <option value="mismatch">{{ _('Mismatch') }}</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto border border-gray-200 rounded-md">
+        <table class="min-w-full text-sm">
+          <thead id="sync-verify-table-head" class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide"></thead>
+          <tbody id="sync-verify-table-body" class="bg-white divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+      <div id="sync-verify-pagination" class="flex items-center justify-between mt-3 text-sm text-gray-600"></div>
+    </div>
+  </div>
+</div>

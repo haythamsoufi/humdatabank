@@ -42,5 +42,10 @@ class FdrsPlugin(BasePlugin):
 
         return bp
 
+    def get_api_endpoints(self):
+        from plugins.fdrs.public_api_routes import API_ENDPOINTS
+
+        return list(API_ENDPOINTS)
+
     def is_admin_feature(self) -> bool:
         return True

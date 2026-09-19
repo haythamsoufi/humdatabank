@@ -267,23 +267,38 @@ class TestKoboDataImportUrl:
         assert url is None or isinstance(url, str)
 
 
-class TestDataSyncUrl:
+class TestGenericSyncUrl:
     def test_returns_none_or_url(self, app, db_session):
-        from app.routes.admin import _data_sync_url_for_dashboard
+        from app.routes.admin import _generic_sync_url_for_dashboard
 
         with app.test_request_context("/admin/"):
-            url = _data_sync_url_for_dashboard()
+            url = _generic_sync_url_for_dashboard()
         assert url is None or isinstance(url, str)
         if url is not None:
-            assert url.endswith("/admin/fdrs-sync-imputation")
+            # Platform-native generic landing (no template_id in the URL) — distinct
+            # from the FDRS/UPR product pages.
+            assert url.endswith("/admin/templates/data-sync/")
 
 
-class TestUprSyncUrl:
+class TestFdrsToolsUrl:
     def test_returns_none_or_url(self, app, db_session):
-        from app.routes.admin import _upr_sync_url_for_dashboard
+        from app.routes.admin import _fdrs_tools_url_for_dashboard
 
         with app.test_request_context("/admin/"):
-            url = _upr_sync_url_for_dashboard()
+            url = _fdrs_tools_url_for_dashboard()
         assert url is None or isinstance(url, str)
         if url is not None:
-            assert url.endswith("/admin/upr-sync-imputation")
+            # Opens the real tool directly, not the Settings/plugin-info page.
+            assert url.endswith("/admin/fdrs-tools")
+
+
+class TestUprToolsUrl:
+    def test_returns_none_or_url(self, app, db_session):
+        from app.routes.admin import _upr_tools_url_for_dashboard
+
+        with app.test_request_context("/admin/"):
+            url = _upr_tools_url_for_dashboard()
+        assert url is None or isinstance(url, str)
+        if url is not None:
+            # Opens the real tool directly, not the Settings/plugin-info page.
+            assert url.endswith("/admin/upr-tools")

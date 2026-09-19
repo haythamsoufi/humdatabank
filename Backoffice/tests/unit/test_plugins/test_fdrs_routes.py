@@ -28,7 +28,8 @@ def test_settings_page_renders_for_system_manager(logged_in_sm_client):
     response = logged_in_sm_client.get("/admin/plugins/fdrs/settings")
     assert response.status_code == 200
     assert b"FDRS Plugin Settings" in response.data
-    assert b"Data Sync" in response.data
+    assert b"#sync" in response.data
+    assert b"Sync" in response.data
 
 
 @pytest.mark.unit
@@ -43,6 +44,12 @@ def test_sync_verify_routes_are_registered(app):
         "/admin/templates/data-sync/21/sync-verify-status/abc"
     )
     assert endpoint == "fdrs.sync_verify_status"
+    assert values["job_id"] == "abc"
+
+    endpoint, values = app.url_map.bind("localhost").match(
+        "/admin/templates/data-sync/21/sync-verify-results/abc"
+    )
+    assert endpoint == "fdrs.sync_verify_results"
     assert values["job_id"] == "abc"
 
 

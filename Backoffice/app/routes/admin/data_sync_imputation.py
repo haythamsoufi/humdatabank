@@ -265,12 +265,9 @@ def _sync_family_for_template(template_id: int) -> str:
     return "generic"
 
 
-def _sync_page_title(template_name: str, sync_family: str) -> str:
-    if sync_family == "fdrs":
-        return f"{template_name} — FDRS Data Sync"
-    if sync_family == "upr":
-        return f"{template_name} — UPR Data Sync"
-    return f"{template_name} — Data Sync & Imputation"
+def _sync_page_title(template_name: str, page_heading: Optional[str] = None) -> str:
+    heading = page_heading or "Data Sync & Imputation"
+    return f"{template_name} — {heading}"
 
 
 def _accessible_templates_for_user(
@@ -347,11 +344,23 @@ def _fdrs_sync_script_available() -> bool:
     return fdrs_sync_script_available()
 
 
-def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str] = None):
-    """Render data sync & imputation UI for the given template.
+def render_data_sync_imputation_page(
+    template_id: int,
+    sync_family: Optional[str] = None,
+    *,
+    page_heading: Optional[str] = None,
+    page_icon: Optional[str] = None,
+    extra_tabs: Optional[List[Dict[str, Any]]] = None,
+    extra_panel_templates: Optional[List[Dict[str, str]]] = None,
+    extra_script_templates: Optional[List[str]] = None,
+    show_template_selector: bool = True,
+    extra_context: Optional[Dict[str, Any]] = None,
+):
+    """Render the generic data sync & imputation UI for a template.
 
-    ``sync_family`` locks the page to FDRS or UPR so each product keeps its own
-    header actions and scripts. When omitted, the family is inferred from the template.
+    Product-specific chrome (FDRS/UPR titles, extra tabs, extra panels) is
+    passed in by the plugin route — this renderer stays family-agnostic beyond
+    locking the template switcher to ``sync_family``.
     """
     template = FormTemplate.query.get_or_404(template_id)
 
@@ -396,20 +405,48 @@ def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str
                 if jid:
                     ensure_fdrs_sync_verify_job_running(worker_app, str(jid))
 
-    return render_template(
-        "admin/templates/data_sync_imputation.html",
-        template=template,
-        sections_with_items=sections_with_items,
-        title=_sync_page_title(template.name, sync_family),
-        sync_family=sync_family,
-        has_data_sync=has_data_sync,
-        has_upr_excel=has_upr_excel,
-        accessible_templates=accessible_templates,
-        fdrs_years_start=fdrs_years_start,
-        fdrs_years_end=fdrs_years_end,
-        active_fdrs_jobs=active_fdrs_jobs,
-        active_fdrs_verify_jobs=active_fdrs_verify_jobs,
-    )
+    ctx = {
+        "template": template,
+        "sections_with_items": sections_with_items,
+        "title": _sync_page_title(template.name, page_heading),
+        "sync_family": sync_family,
+        "has_data_sync": has_data_sync,
+        "has_upr_excel": has_upr_excel,
+        "accessible_templates": accessible_templates,
+        "fdrs_years_start": fdrs_years_start,
+        "fdrs_years_end": fdrs_years_end,
+        "active_fdrs_jobs": active_fdrs_jobs,
+        "active_fdrs_verify_jobs": active_fdrs_verify_jobs,
+        "page_heading": page_heading or "Data Sync & Imputation",
+        "page_icon": page_icon or "fas fa-sync-alt",
+        "extra_tabs": extra_tabs or [],
+        "extra_panel_templates": extra_panel_templates or [],
+        "extra_script_templates": extra_script_templates or [],
+        "show_template_selector": show_template_selector,
+    }
+    if extra_context:
+        ctx.update(extra_context)
+    return render_template("admin/templates/data_sync_imputation.html", **ctx)
+
+
+@bp.route("/", methods=["GET"])
+@admin_permission_required('admin.templates.view')
+def data_sync_landing():
+    """Generic, platform-native Data Sync & Imputation entry point (not FDRS/UPR).
+
+    FDRS and UPR each have their own dashboard tile straight into their own template
+    (see plugins/fdrs/routes.py::fdrs_tools, plugins/upr/routes.py::upr_tools).
+    This is the tile for every *other* template: it opens the
+    first template accessible to the current user that isn't already claimed by
+    those two families, using the same accessibility rules as the in-page template
+    switcher (``_accessible_templates_for_user``). The switcher on the resulting page
+    lets the user jump to any other accessible template from there.
+    """
+    accessible = _accessible_templates_for_user(current_user, family="generic")
+    if not accessible:
+        flash("No templates are available for Data Sync & Imputation yet.", "warning")
+        return redirect(url_for("form_builder.manage_templates"))
+    return render_data_sync_imputation_page(accessible[0]["id"], sync_family="generic")
 
 
 @bp.route("/<int:template_id>", methods=["GET"])
@@ -435,7 +472,7 @@ def get_template_context(template_id: int):
     return json_ok({
         "template_id": template_id,
         "template_name": template.name,
-        "page_title": _sync_page_title(template.name, sync_family),
+        "page_title": _sync_page_title(template.name),
         "sync_family": sync_family,
         "has_data_sync": sync_family == "fdrs" and _fdrs_sync_script_available(),
         "has_upr_excel": sync_family == "upr",

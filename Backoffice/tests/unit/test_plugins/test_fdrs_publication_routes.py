@@ -30,11 +30,13 @@ pytestmark = [pytest.mark.unit]
 def _patch_fdrs_template_id(monkeypatch, template_id: int) -> None:
     import plugins.fdrs.public_api_routes as public_api_routes
     import plugins.fdrs.publication_routes as publication_routes
+    import plugins.fdrs.services.fdrs_publication_job as pub_job
     import plugins.fdrs.services.fdrs_publication_service as svc
 
     monkeypatch.setattr(svc, "FDRS_TEMPLATE_ID", template_id)
     monkeypatch.setattr(publication_routes, "FDRS_TEMPLATE_ID", template_id)
     monkeypatch.setattr(public_api_routes, "FDRS_TEMPLATE_ID", template_id)
+    monkeypatch.setattr(pub_job, "FDRS_TEMPLATE_ID", template_id)
 
 
 @pytest.fixture
@@ -88,6 +90,20 @@ class TestRoutesRegistered:
         assert endpoint == "fdrs.publication_publish"
         assert values == {"assigned_form_id": 5}
 
+    def test_publication_status_registered(self, app):
+        endpoint, values = app.url_map.bind("localhost").match(
+            "/admin/plugins/fdrs/publication/5/publish/abc/status"
+        )
+        assert endpoint == "fdrs.publication_status"
+        assert values == {"assigned_form_id": 5, "job_id": "abc"}
+
+    def test_publication_cancel_registered(self, app):
+        endpoint, values = app.url_map.bind("localhost").match(
+            "/admin/plugins/fdrs/publication/5/publish/abc/cancel", method="POST"
+        )
+        assert endpoint == "fdrs.publication_cancel"
+        assert values == {"assigned_form_id": 5, "job_id": "abc"}
+
 
 class TestPublicationPage:
     def test_requires_login(self, client):
@@ -95,9 +111,10 @@ class TestPublicationPage:
         assert response.status_code in (302, 401)
 
     def test_renders_for_system_manager(self, logged_in_sm_client, db_session, fdrs_route_scenario):
-        response = logged_in_sm_client.get("/admin/plugins/fdrs/publication")
-        assert response.status_code == 200
-        assert b"Manage Publication" in response.data
+        response = logged_in_sm_client.get("/admin/plugins/fdrs/publication", follow_redirects=False)
+        assert response.status_code == 302
+        assert "/admin/fdrs-tools" in (response.location or "")
+        assert "publication" in (response.location or "")
 
     def test_denied_for_admin_without_system_manager_role(self, logged_in_admin_client, db_session, fdrs_route_scenario):
         response = logged_in_admin_client.get("/admin/plugins/fdrs/publication", follow_redirects=False)
@@ -170,13 +187,23 @@ class TestPublicationPublish:
     def _url(self, assigned_form_id):
         return f"/admin/plugins/fdrs/publication/{assigned_form_id}/publish"
 
-    def test_publish_all_countries(self, logged_in_sm_client, db_session, fdrs_route_scenario):
-        response = logged_in_sm_client.post(self._url(fdrs_route_scenario["assigned_form_id"]), json={})
-        assert_api_response(response, 200, expected_keys=["success", "published_countries", "totals"])
-        data = response.get_json()
-        assert data["published_countries"] == 1
-        assert data["totals"]["new"] == 1
+    def _status_url(self, assigned_form_id, job_id):
+        return f"/admin/plugins/fdrs/publication/{assigned_form_id}/publish/{job_id}/status"
 
+    def test_publish_all_countries(self, logged_in_sm_client, db_session, fdrs_route_scenario):
+        assigned_form_id = fdrs_route_scenario["assigned_form_id"]
+        response = logged_in_sm_client.post(self._url(assigned_form_id), json={})
+        assert_api_response(response, 202, expected_keys=["success", "job_id"])
+        job_id = response.get_json()["job_id"]
+
+        status = logged_in_sm_client.get(self._status_url(assigned_form_id, job_id))
+        assert_api_response(status, 200, expected_keys=["success", "status", "stats"])
+        data = status.get_json()
+        assert data["status"] == "completed"
+        assert data["stats"]["published_countries"] == 1
+        assert data["stats"]["totals"]["new"] == 1
+
+        db_session.expire_all()
         row = FormData.query.filter_by(
             assignment_entity_status_id=fdrs_route_scenario["aes"].id,
             form_item_id=fdrs_route_scenario["item"].id,
@@ -184,12 +211,15 @@ class TestPublicationPublish:
         assert row.published_value == "42"
 
     def test_publish_scoped_to_selected_countries(self, logged_in_sm_client, db_session, fdrs_route_scenario):
+        assigned_form_id = fdrs_route_scenario["assigned_form_id"]
         response = logged_in_sm_client.post(
-            self._url(fdrs_route_scenario["assigned_form_id"]),
+            self._url(assigned_form_id),
             json={"assignment_entity_status_ids": [fdrs_route_scenario["aes"].id]},
         )
-        assert response.status_code == 200
-        assert response.get_json()["published_countries"] == 1
+        assert response.status_code == 202
+        job_id = response.get_json()["job_id"]
+        status = logged_in_sm_client.get(self._status_url(assigned_form_id, job_id))
+        assert status.get_json()["stats"]["published_countries"] == 1
 
     def test_invalid_payload_returns_400(self, logged_in_sm_client, db_session, fdrs_route_scenario):
         response = logged_in_sm_client.post(

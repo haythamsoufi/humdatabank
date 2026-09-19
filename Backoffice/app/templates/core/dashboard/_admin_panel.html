@@ -173,6 +173,9 @@
                             {% endif %}
                             {% set template_period = activity.summary_params.get('template_period') if activity.summary_params else None %}
                             {% if not template_period %}
+                                {% set template_period = activity.summary_params.get('assignment_title') if activity.summary_params else None %}
+                            {% endif %}
+                            {% if not template_period %}
                                 {# Fallback: construct from template and period if template_period not available #}
                                 {% set template_name = activity.summary_params.get('template') if activity.summary_params else '' %}
                                 {% set period_name = activity.summary_params.get('period') if activity.summary_params else '' %}
@@ -208,10 +211,10 @@
                                 {% if unique_template_periods|length > 1 %}
                                     <div class="flex-1">
                                         <label for="activity-template-filter" class="block text-xs font-medium text-gray-700 mb-1">
-                                            {{ _('Filter by Template - Period') }}
+                                            {{ _('Filter by Assignment') }}
                                         </label>
                                         <select id="activity-template-filter" class="block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                            <option value="">{{ _('All Templates') }}</option>
+                                            <option value="">{{ _('All Assignments') }}</option>
                                             {% for template_period in unique_template_periods|sort %}
                                                 <option value="{{ template_period }}">{{ template_period }}</option>
                                             {% endfor %}
@@ -244,11 +247,12 @@
                                 {# Wrap the clickable card in an anchor when we have a target URL (CSP-safe, no inline JS) #}
                                 {% set activity_user_id = activity.user.id if activity.user else '' %}
                                 {% set activity_user_external_id = (activity.user.external_id|string if activity.user and activity.user.external_id else '') %}
-                                {% set activity_template_period = activity.summary_params.get('template_period') if activity.summary_params else '' %}
+                                {% set activity_title = sp.get('assignment_title') or sp.get('template') %}
+                                {% set activity_template_period = sp.get('template_period') or activity_title or '' %}
                                 {% if not activity_template_period %}
                                     {# Fallback: construct from template and period if template_period not available #}
-                                    {% set template_name = activity.summary_params.get('template') if activity.summary_params else '' %}
-                                    {% set period_name = activity.summary_params.get('period') if activity.summary_params else '' %}
+                                    {% set template_name = sp.get('template') or '' %}
+                                    {% set period_name = sp.get('period') or '' %}
                                     {% if template_name and period_name %}
                                         {% set activity_template_period = template_name ~ ' - ' ~ period_name %}
                                     {% elif template_name %}
@@ -294,11 +298,11 @@
                                                         {% endif %}
                                                     </span>
                                                 </h3>
-                                                {# Template / assignment title for context #}
-                                                {% if sp.get('template') %}
+                                                {# Assignment title (custom name when set, otherwise template – period) #}
+                                                {% if activity_title %}
                                                     <div class="text-xs text-gray-600 mt-1 flex items-center gap-1">
                                                         <i class="fas fa-file-alt text-gray-400"></i>
-                                                        <span class="font-medium">{{ sp.get('template') }}</span>
+                                                        <span class="font-medium">{{ activity_title }}</span>
                                                     </div>
                                                 {% endif %}
                                             </div>

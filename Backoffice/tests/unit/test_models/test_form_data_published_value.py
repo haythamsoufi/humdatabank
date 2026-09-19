@@ -79,6 +79,7 @@ class TestPublicationDiffKind:
             disagg_data={"mode": "total", "values": {"direct": 10}},
             published_value="10",
             published_disagg_data={"mode": "total", "values": {"direct": 10}},
+            published_source=FormData.PUBLISHED_SOURCE_REPORTED,
         )
         assert entry.publication_diff_kind() == "unchanged"
 
@@ -94,3 +95,120 @@ class TestPublicationDiffKind:
             published_disagg_data={"mode": "total", "values": {"direct": 7}},
         )
         assert entry.publication_diff_kind() == "changed"
+
+    def test_new_when_only_imputed_value_exists(self):
+        entry = FormData(
+            value=None,
+            disagg_data=None,
+            imputed_value="12",
+            published_value=None,
+            published_disagg_data=None,
+        )
+        assert entry.publication_diff_kind() == "new"
+
+    def test_unchanged_when_imputed_matches_published(self):
+        entry = FormData(
+            value=None,
+            disagg_data=None,
+            imputed_value="12",
+            published_value="12",
+            published_disagg_data=None,
+            published_source=FormData.PUBLISHED_SOURCE_IMPUTED,
+        )
+        assert entry.publication_diff_kind() == "unchanged"
+
+    def test_changed_when_imputed_differs_from_published(self):
+        entry = FormData(
+            value=None,
+            disagg_data=None,
+            imputed_value="15",
+            published_value="12",
+            published_disagg_data=None,
+        )
+        assert entry.publication_diff_kind() == "changed"
+
+    def test_reported_takes_precedence_over_imputed(self):
+        entry = FormData(
+            value="10",
+            disagg_data=None,
+            imputed_value="99",
+            published_value="10",
+            published_disagg_data=None,
+            published_source=FormData.PUBLISHED_SOURCE_REPORTED,
+        )
+        assert entry.publication_diff_kind() == "unchanged"
+
+    def test_source_when_values_match_but_published_source_missing(self):
+        entry = FormData(
+            value="10",
+            published_value="10",
+            published_source=None,
+        )
+        assert entry.publication_diff_kind() == "source"
+
+    def test_source_when_published_source_does_not_match_current(self):
+        entry = FormData(
+            value="10",
+            published_value="10",
+            published_source=FormData.PUBLISHED_SOURCE_IMPUTED,
+        )
+        assert entry.publication_diff_kind() == "source"
+
+    def test_removed_when_neither_reported_nor_imputed(self):
+        entry = FormData(
+            value=None,
+            disagg_data=None,
+            imputed_value=None,
+            published_value="10",
+            published_disagg_data=None,
+        )
+        assert entry.publication_diff_kind() == "removed"
+
+
+@pytest.mark.unit
+class TestPublicationCurrentPayload:
+    def test_uses_reported_when_present(self):
+        entry = FormData(value="10", numeric_value=10, imputed_value="99", imputed_numeric_value=99)
+        assert entry.publication_current_payload() == ("10", None, 10)
+        assert entry.publication_uses_imputed() is False
+
+    def test_falls_back_to_imputed_when_reported_missing(self):
+        entry = FormData(
+            value=None,
+            numeric_value=None,
+            imputed_value="12",
+            imputed_numeric_value=12,
+        )
+        assert entry.publication_current_payload() == ("12", None, 12)
+        assert entry.publication_uses_imputed() is True
+
+    def test_falls_back_to_imputed_disagg_when_reported_missing(self):
+        imputed_disagg = {"mode": "total", "values": {"direct": 8}}
+        entry = FormData(
+            value=None,
+            disagg_data=None,
+            imputed_value=None,
+            imputed_disagg_data=imputed_disagg,
+            imputed_numeric_value=8,
+        )
+        assert entry.publication_current_payload() == (None, imputed_disagg, 8)
+        assert entry.publication_uses_imputed() is True
+
+    def test_blank_when_neither_reported_nor_imputed(self):
+        entry = FormData(value=None, disagg_data=None, imputed_value=None, imputed_disagg_data=None)
+        assert entry.publication_current_payload() == (None, None, None)
+        assert entry.publication_uses_imputed() is False
+
+    def test_whitespace_reported_is_treated_as_missing(self):
+        entry = FormData(value="   ", imputed_value="12", imputed_numeric_value=12)
+        assert entry.publication_current_payload() == ("12", None, 12)
+        assert entry.publication_uses_imputed() is True
+        assert entry.publication_source_kind() == FormData.PUBLISHED_SOURCE_IMPUTED
+
+    def test_source_kind_is_reported_when_value_present(self):
+        entry = FormData(value="10", imputed_value="99")
+        assert entry.publication_source_kind() == FormData.PUBLISHED_SOURCE_REPORTED
+
+    def test_source_kind_is_none_when_nothing_to_publish(self):
+        entry = FormData(value=None, imputed_value=None)
+        assert entry.publication_source_kind() is None

@@ -1,0 +1,587 @@
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function () {
+  var select = document.getElementById('fdrs-assignment-select');
+  if (!select) return; // no assignments — nothing to wire up
+
+  var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+  var refreshBtn = document.getElementById('fdrs-pub-refresh');
+  var loadingEl = document.getElementById('fdrs-pub-loading');
+  var cardsEl = document.getElementById('fdrs-pub-summary-cards');
+  var tbody = document.getElementById('fdrs-pub-tbody');
+  var selectPendingBtn = document.getElementById('fdrs-pub-select-pending');
+  var clearSelectionBtn = document.getElementById('fdrs-pub-clear-selection');
+  var publishBtn = document.getElementById('fdrs-pub-publish-btn');
+  var publishCountEl = document.getElementById('fdrs-pub-publish-count');
+  var confirmBox = document.getElementById('fdrs-pub-confirm');
+  var confirmText = document.getElementById('fdrs-pub-confirm-text');
+  var confirmYesBtn = document.getElementById('fdrs-pub-confirm-yes');
+  var confirmNoBtn = document.getElementById('fdrs-pub-confirm-no');
+  var resultEl = document.getElementById('fdrs-pub-result');
+  var progressEl = document.getElementById('fdrs-pub-progress');
+  var progressTitleEl = document.getElementById('fdrs-pub-progress-title');
+  var progressStageEl = document.getElementById('fdrs-pub-progress-stage');
+  var progressBarEl = document.getElementById('fdrs-pub-progress-bar');
+  var progressTextEl = document.getElementById('fdrs-pub-progress-text');
+  var progressCountEl = document.getElementById('fdrs-pub-progress-count');
+  var progressSpinnerEl = document.getElementById('fdrs-pub-progress-spinner');
+  var cancelBtn = document.getElementById('fdrs-pub-cancel-btn');
+  var cancelBtnText = document.getElementById('fdrs-pub-cancel-btn-text');
+
+  // Built with placeholder id 0, then string-swapped for the real id (avoids
+  // relying on url_for accepting non-numeric placeholders for <int:> routes).
+  var summaryUrlTpl = {{ url_for('fdrs.publication_summary', assigned_form_id=0) | tojson }};
+  var detailUrlTpl  = {{ url_for('fdrs.publication_country_detail', assigned_form_id=0, assignment_entity_status_id=0) | tojson }};
+  var publishUrlTpl = {{ url_for('fdrs.publication_publish', assigned_form_id=0) | tojson }};
+  var statusUrlTpl  = {{ url_for('fdrs.publication_status', assigned_form_id=0, job_id='__JOB_ID__') | tojson }};
+  var cancelUrlTpl  = {{ url_for('fdrs.publication_cancel', assigned_form_id=0, job_id='__JOB_ID__') | tojson }};
+
+  function summaryUrl(id) { return summaryUrlTpl.replace('/0/summary', '/' + id + '/summary'); }
+  function detailUrl(id, aesId) {
+    return detailUrlTpl.replace('/0/countries/0/detail', '/' + id + '/countries/' + aesId + '/detail');
+  }
+  function publishUrl(id) { return publishUrlTpl.replace('/0/publish', '/' + id + '/publish'); }
+  function statusUrl(id, jobId) {
+    return statusUrlTpl.replace('/0/publish/', '/' + id + '/publish/').replace('__JOB_ID__', encodeURIComponent(jobId));
+  }
+  function cancelUrl(id, jobId) {
+    return cancelUrlTpl.replace('/0/publish/', '/' + id + '/publish/').replace('__JOB_ID__', encodeURIComponent(jobId));
+  }
+
+  var currentAssignmentId = null;
+  var currentCountries = [];
+  var selected = new Set();
+  var detailCache = {};
+  var summaryLoaded = false;
+  var activeJobId = null;
+  var pollTimer = null;
+  var pollDelayMs = 1000;
+  var lastPercent = 0;
+  var cancelRequested = false;
+  var POLL_INITIAL_MS = 1000;
+  var POLL_MAX_MS = 4000;
+  var POLL_BACKOFF = 1.5;
+
+  function escapeHtml(text) {
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function formatDate(iso) {
+    try {
+      var d = new Date(iso);
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) +
+        ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return iso; }
+  }
+
+  function card(label, value, colorClasses) {
+    return '<div class="bg-white rounded-lg border border-gray-200 p-4">' +
+      '<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">' + escapeHtml(label) + '</p>' +
+      '<p class="text-2xl font-semibold mt-1 ' + colorClasses + '">' + value + '</p>' +
+      '</div>';
+  }
+
+  function renderCards(data) {
+    var t = data.totals || {};
+    cardsEl.innerHTML =
+      card('Countries', data.countries_total, 'text-gray-900') +
+      card('Pending changes', data.countries_with_pending_changes, data.countries_with_pending_changes ? 'text-amber-600' : 'text-gray-900') +
+      card('New', t.new || 0, 'text-green-600') +
+      card('Changed', t.changed || 0, 'text-amber-600') +
+      card('Removed', t.removed || 0, 'text-red-600') +
+      card('Source', t.source || 0, t.source ? 'text-blue-900' : 'text-gray-500') +
+      card('Already up to date', t.unchanged || 0, 'text-gray-500');
+  }
+
+  function statusBadge(country) {
+    if (country.pending_count > 0) {
+      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending changes</span>';
+    }
+    if (country.total_public_items > 0) {
+      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Up to date</span>';
+    }
+    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No data</span>';
+  }
+
+  function countBadge(n, colorClasses, prefix) {
+    if (!n) return '<span class="text-gray-300">—</span>';
+    return '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + colorClasses + '">' + prefix + n + '</span>';
+  }
+
+  function renderTable() {
+    if (!currentCountries.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">No countries in this assignment.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = currentCountries.map(function (c) {
+      var counts = c.counts || {};
+      var countryLabel = escapeHtml(c.country_name) + (c.country_iso3 ? ' <span class="text-gray-400">(' + escapeHtml(c.country_iso3) + ')</span>' : '');
+      var lastPublished = c.published_at
+        ? formatDate(c.published_at) + (c.published_by_name ? ' by ' + escapeHtml(c.published_by_name) : '')
+        : 'Never';
+      var viewDisabled = c.total_public_items ? '' : ' disabled';
+      return (
+        '<tr class="border-b border-gray-100">' +
+          '<td class="px-3 py-2"><input type="checkbox" class="fdrs-pub-row-checkbox h-4 w-4" data-aes-id="' + c.assignment_entity_status_id + '"></td>' +
+          '<td class="px-3 py-2 text-sm font-medium text-gray-900">' + countryLabel + '</td>' +
+          '<td class="px-3 py-2">' + statusBadge(c) + '</td>' +
+          '<td class="px-3 py-2">' + countBadge(counts.new, 'bg-green-100 text-green-800', '+') + '</td>' +
+          '<td class="px-3 py-2">' + countBadge(counts.changed, 'bg-amber-100 text-amber-800', '~') + '</td>' +
+          '<td class="px-3 py-2">' + countBadge(counts.removed, 'bg-red-100 text-red-800', '-') + '</td>' +
+          '<td class="px-3 py-2">' + countBadge(counts.source, 'bg-blue-50 text-blue-900', '') + '</td>' +
+          '<td class="px-3 py-2 text-xs text-gray-500">' + lastPublished + '</td>' +
+          '<td class="px-3 py-2 text-right">' +
+            '<button type="button" class="fdrs-pub-view-btn text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline" data-aes-id="' + c.assignment_entity_status_id + '"' + viewDisabled + '>View changes</button>' +
+          '</td>' +
+        '</tr>' +
+        '<tr class="fdrs-pub-detail-row hidden" data-detail-for="' + c.assignment_entity_status_id + '">' +
+          '<td colspan="9" class="px-3 py-3 bg-gray-50"><div class="fdrs-pub-detail-body text-sm text-gray-600">Loading…</div></td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = parseInt(cb.getAttribute('data-aes-id'), 10);
+        if (cb.checked) selected.add(id); else selected.delete(id);
+        updatePublishButton();
+      });
+    });
+    tbody.querySelectorAll('.fdrs-pub-view-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { toggleDetail(parseInt(btn.getAttribute('data-aes-id'), 10)); });
+    });
+    syncCheckboxesFromSelection();
+  }
+
+  function syncCheckboxesFromSelection() {
+    tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
+      cb.checked = selected.has(parseInt(cb.getAttribute('data-aes-id'), 10));
+    });
+  }
+
+  function apiError(data, fallback) {
+    if (!data) return fallback;
+    return data.error || data.message || fallback;
+  }
+
+  function isPublishing() {
+    return !!activeJobId;
+  }
+
+  function setPublishControlsDisabled(disabled) {
+    publishBtn.disabled = disabled || selected.size === 0;
+    confirmYesBtn.disabled = disabled;
+    select.disabled = disabled;
+    refreshBtn.disabled = disabled;
+    selectPendingBtn.disabled = disabled;
+    clearSelectionBtn.disabled = disabled;
+    tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
+      cb.disabled = disabled;
+    });
+  }
+
+  function updatePublishButton() {
+    publishCountEl.textContent = String(selected.size);
+    publishBtn.disabled = isPublishing() || selected.size === 0;
+    if (!isPublishing()) confirmBox.classList.add('hidden');
+  }
+
+  function setProgress(percent, stage, message, current, total, opts) {
+    opts = opts || {};
+    if (opts.reset) lastPercent = 0;
+    var raw = Math.max(0, Math.min(100, Number(percent || 0)));
+    var pct = opts.reset ? raw : Math.max(lastPercent, raw);
+    lastPercent = pct;
+    if (progressBarEl) progressBarEl.style.width = pct + '%';
+    if (progressTextEl) progressTextEl.textContent = Math.round(pct) + '%';
+    if (progressStageEl) {
+      progressStageEl.textContent = (message && String(message).trim()) ? String(message).trim() : (stage || 'Publishing…');
+    }
+    if (progressTitleEl) {
+      progressTitleEl.textContent = cancelRequested ? 'Stopping…' : 'Publishing…';
+    }
+    if (progressCountEl) {
+      if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
+        progressCountEl.textContent = (current || 0) + ' / ' + total + ' countries';
+      } else {
+        progressCountEl.textContent = '';
+      }
+    }
+  }
+
+  function showProgress() {
+    if (progressEl) progressEl.classList.remove('hidden');
+    if (progressSpinnerEl) progressSpinnerEl.classList.remove('hidden');
+    if (cancelBtn) {
+      cancelBtn.disabled = false;
+      cancelBtn.classList.remove('hidden');
+    }
+    if (cancelBtnText) cancelBtnText.textContent = 'Stop publishing';
+    confirmBox.classList.add('hidden');
+    setPublishControlsDisabled(true);
+  }
+
+  function hideProgress() {
+    if (progressEl) progressEl.classList.add('hidden');
+    if (progressSpinnerEl) progressSpinnerEl.classList.add('hidden');
+    cancelRequested = false;
+    setPublishControlsDisabled(false);
+    updatePublishButton();
+  }
+
+  function stopPolling() {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    activeJobId = null;
+    pollDelayMs = POLL_INITIAL_MS;
+  }
+
+  function schedulePoll() {
+    pollTimer = setTimeout(pollStatus, pollDelayMs);
+    pollDelayMs = Math.min(Math.round(pollDelayMs * POLL_BACKOFF), POLL_MAX_MS);
+  }
+
+  function renderPublishResult(job) {
+    var stats = (job && job.stats) || {};
+    var t = stats.totals || {};
+    var countries = stats.published_countries || 0;
+    resultEl.innerHTML =
+      '<p class="text-green-700 text-sm py-3"><i class="fas fa-check-circle mr-1" aria-hidden="true"></i>Published ' +
+      countries + ' countr' + (countries === 1 ? 'y' : 'ies') + ': +' +
+      (t.new || 0) + ' new, ~' + (t.changed || 0) + ' changed, -' + (t.removed || 0) +
+      ' removed, ' + (t.source || 0) + ' source.</p>';
+  }
+
+  function finishJob(job, kind) {
+    stopPolling();
+    hideProgress();
+    if (kind === 'completed') {
+      renderPublishResult(job);
+      if (currentAssignmentId) loadSummary(currentAssignmentId, { keepResult: true });
+      return;
+    }
+    if (kind === 'cancelled') {
+      resultEl.innerHTML = '<p class="text-amber-800 text-sm py-3">Publishing stopped. Already-published countries stay published.</p>';
+      if (currentAssignmentId) loadSummary(currentAssignmentId, { keepResult: true });
+      return;
+    }
+    resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' +
+      escapeHtml((job && (job.error || job.message)) || 'Publish failed') + '</p>';
+  }
+
+  function pollStatus() {
+    if (!activeJobId || !currentAssignmentId) return;
+    fetch(statusUrl(currentAssignmentId, activeJobId), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (result) {
+        var data = result.data || {};
+        if (!result.ok || !data.success) {
+          throw new Error(apiError(data, 'Failed to read publication status'));
+        }
+        setProgress(data.percent, data.stage, data.message, data.current, data.total);
+        if (data.status === 'completed') {
+          finishJob(data, 'completed');
+          return;
+        }
+        if (data.status === 'failed') {
+          finishJob(data, 'failed');
+          return;
+        }
+        if (data.status === 'cancelled') {
+          finishJob(data, 'cancelled');
+          return;
+        }
+        if (data.status === 'cancel_requested') {
+          cancelRequested = true;
+          if (progressTitleEl) progressTitleEl.textContent = 'Stopping…';
+          if (cancelBtn) cancelBtn.disabled = true;
+          if (cancelBtnText) cancelBtnText.textContent = 'Stopping…';
+        }
+        schedulePoll();
+      })
+      .catch(function (err) {
+        stopPolling();
+        hideProgress();
+        resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' +
+          escapeHtml(err.message || 'Failed to read publication status') + '</p>';
+      });
+  }
+
+  function attachToJob(jobId, assignmentId, opts) {
+    opts = opts || {};
+    activeJobId = jobId;
+    cancelRequested = false;
+    pollDelayMs = POLL_INITIAL_MS;
+    if (assignmentId && String(select.value) !== String(assignmentId)) {
+      select.value = String(assignmentId);
+    }
+    currentAssignmentId = assignmentId || currentAssignmentId || parseInt(select.value, 10);
+    showProgress();
+    setProgress(0, 'queued', opts.message || 'Starting…', 0, null, { reset: true });
+    resultEl.innerHTML = '';
+    pollStatus();
+  }
+
+  function readActiveJobs() {
+    var el = document.getElementById('fdrs-publication-active-jobs');
+    if (!el) return [];
+    try {
+      return JSON.parse(el.textContent || '[]') || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function kindBadge(kind) {
+    var map = {
+      new: 'bg-green-100 text-green-800',
+      changed: 'bg-amber-100 text-amber-800',
+      removed: 'bg-red-100 text-red-800',
+      source: 'bg-blue-50 text-blue-900',
+      unchanged: 'bg-gray-100 text-gray-600'
+    };
+    return '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ' + (map[kind] || map.unchanged) + '">' + escapeHtml(kind) + '</span>';
+  }
+
+  function fmtVal(v, disagg, isImputed) {
+    if (v === null || v === undefined || String(v).trim() === '') return '<span class="text-gray-300">—</span>';
+    var out = escapeHtml(v);
+    if (disagg) out += ' <span class="text-gray-400" title="Has a disaggregated breakdown">&#9638;</span>';
+    if (isImputed) {
+      out += ' <span class="text-amber-800" title="Reported value is missing; the imputed value will be published">(imputed)</span>';
+    }
+    return out;
+  }
+
+  function renderDetail(row, data) {
+    var body = row.querySelector('.fdrs-pub-detail-body');
+    var items = data.items || [];
+    if (!items.length) {
+      body.innerHTML = '<span class="text-gray-500">No pending changes for this country.</span>';
+      return;
+    }
+    body.innerHTML =
+      '<table class="w-full text-xs">' +
+        '<thead><tr class="text-left text-gray-500">' +
+          '<th class="py-1 pr-3">Indicator</th><th class="py-1 pr-3">Change</th>' +
+          '<th class="py-1 pr-3">Current value</th><th class="py-1 pr-3">Published value</th>' +
+        '</tr></thead><tbody>' +
+        items.map(function (it) {
+          return '<tr class="border-t border-gray-200">' +
+            '<td class="py-1 pr-3 text-gray-800">' + escapeHtml(it.label) + '</td>' +
+            '<td class="py-1 pr-3">' + kindBadge(it.kind) + '</td>' +
+            '<td class="py-1 pr-3">' + fmtVal(it.current_value, it.current_disagg_data, it.current_is_imputed) + '</td>' +
+            '<td class="py-1 pr-3">' + fmtVal(it.published_value, it.published_disagg_data, it.published_source === 'imputed') + '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table>';
+  }
+
+  function toggleDetail(aesId) {
+    var row = tbody.querySelector('tr.fdrs-pub-detail-row[data-detail-for="' + aesId + '"]');
+    if (!row) return;
+    var willOpen = row.classList.contains('hidden');
+    tbody.querySelectorAll('tr.fdrs-pub-detail-row').forEach(function (r) { r.classList.add('hidden'); });
+    if (!willOpen) return;
+    row.classList.remove('hidden');
+    if (detailCache[aesId]) { renderDetail(row, detailCache[aesId]); return; }
+    var body = row.querySelector('.fdrs-pub-detail-body');
+    body.textContent = 'Loading…';
+    fetch(detailUrl(currentAssignmentId, aesId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success) {
+          body.innerHTML = '<span class="text-red-600">' + escapeHtml(data.message || 'Failed to load') + '</span>';
+          return;
+        }
+        detailCache[aesId] = data;
+        renderDetail(row, data);
+      })
+      .catch(function (err) {
+        body.innerHTML = '<span class="text-red-600">' + escapeHtml(err.message || 'Failed to load') + '</span>';
+      });
+  }
+
+  function loadSummary(assignedFormId, opts) {
+    opts = opts || {};
+    if (isPublishing() && assignedFormId !== currentAssignmentId) return;
+    currentAssignmentId = assignedFormId;
+    selected = new Set();
+    detailCache = {};
+    loadingEl.classList.remove('hidden');
+    if (!opts.keepResult && !isPublishing()) resultEl.innerHTML = '';
+    confirmBox.classList.add('hidden');
+    cardsEl.innerHTML = '';
+        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">Loading…</td></tr>';
+
+    fetch(summaryUrl(assignedFormId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        loadingEl.classList.add('hidden');
+        summaryLoaded = true;
+        if (!data.success) {
+          tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-red-600">' + escapeHtml(data.message || 'Failed to load preview') + '</td></tr>';
+          return;
+        }
+        currentCountries = data.countries || [];
+        renderCards(data);
+        // Default selection: everything with a pending change, so the common
+        // "publish what changed" action needs zero extra clicks.
+        currentCountries.forEach(function (c) {
+          if (c.has_pending_changes) selected.add(c.assignment_entity_status_id);
+        });
+        renderTable();
+        if (isPublishing()) setPublishControlsDisabled(true);
+        updatePublishButton();
+      })
+      .catch(function (err) {
+        loadingEl.classList.add('hidden');
+        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-red-600">' + escapeHtml(err.message || 'Failed to load preview') + '</td></tr>';
+      });
+  }
+
+  function ensureSummaryLoaded() {
+    if (summaryLoaded || !select.value) return;
+    loadSummary(parseInt(select.value, 10));
+  }
+
+  select.addEventListener('change', function () { loadSummary(parseInt(select.value, 10)); });
+  refreshBtn.addEventListener('click', function () { if (currentAssignmentId) loadSummary(currentAssignmentId); });
+
+  selectPendingBtn.addEventListener('click', function () {
+    selected = new Set(
+      currentCountries.filter(function (c) { return c.has_pending_changes; })
+        .map(function (c) { return c.assignment_entity_status_id; })
+    );
+    syncCheckboxesFromSelection();
+    updatePublishButton();
+  });
+
+  clearSelectionBtn.addEventListener('click', function () {
+    selected = new Set();
+    syncCheckboxesFromSelection();
+    updatePublishButton();
+  });
+
+  publishBtn.addEventListener('click', function () {
+    if (!selected.size) return;
+    var chosen = currentCountries.filter(function (c) { return selected.has(c.assignment_entity_status_id); });
+    var newTotal = 0, changedTotal = 0, removedTotal = 0, sourceTotal = 0;
+    chosen.forEach(function (c) {
+      var counts = c.counts || {};
+      newTotal += counts.new || 0;
+      changedTotal += counts.changed || 0;
+      removedTotal += counts.removed || 0;
+      sourceTotal += counts.source || 0;
+    });
+
+    var msg = 'Publish ' + chosen.length + ' countr' + (chosen.length === 1 ? 'y' : 'ies') + ': ' +
+      '<strong>+' + newTotal + '</strong> new, <strong>~' + changedTotal + '</strong> changed';
+    if (sourceTotal > 0) {
+      msg += ', <strong>' + sourceTotal + '</strong> source stamp' + (sourceTotal === 1 ? '' : 's') +
+        ' (reported vs imputed; figures stay the same)';
+    }
+    if (removedTotal > 0) {
+      msg += ', and <strong class="text-red-700">' + removedTotal + ' value(s) that will be cleared</strong> from the public site (previously published, no longer reported)';
+    }
+    msg += '.';
+    confirmText.innerHTML = msg;
+    confirmBox.classList.remove('hidden');
+    confirmBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  confirmNoBtn.addEventListener('click', function () { confirmBox.classList.add('hidden'); });
+
+  confirmYesBtn.addEventListener('click', function () {
+    if (!selected.size || isPublishing()) return;
+    confirmYesBtn.disabled = true;
+    showProgress();
+    setProgress(0, 'queued', 'Starting…', 0, null, { reset: true });
+    resultEl.innerHTML = '';
+    fetch(publishUrl(currentAssignmentId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'Accept': 'application/json' },
+      body: JSON.stringify({ assignment_entity_status_ids: Array.from(selected) })
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; }); })
+      .then(function (result) {
+        var data = result.data || {};
+        if (result.status === 409 && data.job_id) {
+          attachToJob(data.job_id, currentAssignmentId, { message: 'Resuming publication…' });
+          return;
+        }
+        if (!result.ok || !data.success || !data.job_id) {
+          throw new Error(apiError(data, 'Publish failed'));
+        }
+        attachToJob(data.job_id, currentAssignmentId, { message: 'Queued' });
+      })
+      .catch(function (err) {
+        hideProgress();
+        resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' + escapeHtml(err.message || 'Publish failed') + '</p>';
+      });
+  });
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function () {
+      if (!activeJobId || cancelRequested) return;
+      cancelRequested = true;
+      cancelBtn.disabled = true;
+      if (cancelBtnText) cancelBtnText.textContent = 'Stopping…';
+      if (progressTitleEl) progressTitleEl.textContent = 'Stopping…';
+      fetch(cancelUrl(currentAssignmentId, activeJobId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'Accept': 'application/json' }
+      })
+        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        .then(function (result) {
+          if (!result.ok || !(result.data && result.data.success)) {
+            throw new Error(apiError(result.data, 'Failed to stop publishing'));
+          }
+        })
+        .catch(function (err) {
+          cancelRequested = false;
+          cancelBtn.disabled = false;
+          if (cancelBtnText) cancelBtnText.textContent = 'Stop publishing';
+          resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' + escapeHtml(err.message || 'Failed to stop publishing') + '</p>';
+        });
+    });
+  }
+
+  function resumeActiveJobIfNeeded() {
+    var jobs = readActiveJobs().filter(function (j) { return j && j.job_id; });
+    if (!jobs.length) return false;
+    var match = jobs[0];
+    if (select.value) {
+      var current = parseInt(select.value, 10);
+      match = jobs.find(function (j) { return parseInt(j.assigned_form_id, 10) === current; }) || jobs[0];
+    }
+    var assignmentId = parseInt(match.assigned_form_id, 10);
+    if (assignmentId && String(select.value) !== String(assignmentId)) {
+      select.value = String(assignmentId);
+    }
+    if (window.AdminUnderlineTabs) {
+      window.AdminUnderlineTabs.activateStripTab('#data-sync-tabs', 'publication', { panelSelector: '.data-panel' });
+    }
+    if ((location.hash || '').replace('#', '') !== 'publication') {
+      try { history.replaceState(null, '', '#publication'); } catch (e) { /* ignore */ }
+    }
+    ensureSummaryLoaded();
+    attachToJob(match.job_id, assignmentId, { message: match.message || 'Resuming publication…' });
+    return true;
+  }
+
+  // Deep-link #publication, or wait until the user opens the tab so we don't
+  // fire a summary request while the panel is hidden.
+  if (!resumeActiveJobIfNeeded()) {
+    if ((location.hash || '').replace('#', '') === 'publication') {
+      ensureSummaryLoaded();
+    }
+  }
+  document.querySelectorAll('#data-sync-tabs .settings-tab[data-tab="publication"]').forEach(function (btn) {
+    btn.addEventListener('click', function () { ensureSummaryLoaded(); });
+  });
+});
+</script>

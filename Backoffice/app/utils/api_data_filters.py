@@ -15,6 +15,12 @@ from app.services.data_retrieval.shared import escape_like_pattern
 from app.services.forms.reporting_period_service import sort_period_names
 from app.utils.stable_key import normalize_stable_key, resolve_published_form_item_id
 
+# NOTE: "published" here is about *form-schema* versioning — which FormItem a
+# stable_key resolves to (FormTemplate.published_version_id / FormItem.version_id).
+# It is unrelated to FDRS's FormData.published_value snapshot (plugins/fdrs/
+# services/fdrs_publication_service.py), which is about which *data values* a
+# public website may see. Two distinct "published" concepts by design — do not
+# conflate them when extending either one.
 VERSION_SCOPE_PUBLISHED = 'published'
 VERSION_SCOPE_ALL = 'all'
 

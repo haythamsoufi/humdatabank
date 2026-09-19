@@ -91,7 +91,7 @@ See `interactive_map/` for a complete example plugin implementation.
 
 For **org-specific admin tools** (Data Explorer tabs, custom report pipelines, etc.) that should be removable without editing core app code, use a **plugin** with optional admin hooks on `BasePlugin` — same `plugin.py` entry point as form-field plugins.
 
-- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`, optional `get_data_explorer_tab()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`)
+- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`, optional `get_data_explorer_tab()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`, `get_api_endpoints()` for Admin → API Management)
 - Discovery: `Backoffice/app/plugins/manager.py` scans `plugins/*/plugin.py`
 - Example: `pb_progress/` (P&B Visuals + Quarto/Playwright pipeline in `visuals/`)
 - FDRS: `fdrs/` (backend-only data-api sync, documents, matrix validation, quality methodology)

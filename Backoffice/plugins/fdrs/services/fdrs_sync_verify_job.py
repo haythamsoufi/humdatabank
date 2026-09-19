@@ -201,6 +201,104 @@ def build_fdrs_sync_verify_status_payload(job_id: str, template_id: int) -> Opti
     }
 
 
+_VERIFY_SHEET_ALIASES = {
+    "data_points": "data_points",
+    "datapoints": "data_points",
+    "summary": "summary",
+    "kpi_coverage": "kpi_coverage",
+    "kpi-coverage": "kpi_coverage",
+    "coverage": "kpi_coverage",
+}
+
+
+def _cell_to_json(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
+def read_fdrs_sync_verify_workbook(
+    path: str,
+    *,
+    sheet: str = "data_points",
+    status: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 200,
+) -> Dict[str, Any]:
+    """Read one verification Excel sheet as paginated table rows.
+
+    The workbook written by ``verify_fdrs_sync`` has ``data_points``,
+    ``summary``, and ``kpi_coverage``. Status filter applies only to
+    ``data_points`` (column ``status``).
+    """
+    import openpyxl
+
+    page = max(1, int(page or 1))
+    per_page = min(500, max(1, int(per_page or 200)))
+    wanted = _VERIFY_SHEET_ALIASES.get((sheet or "").strip().lower(), "data_points")
+    status_filter = (status or "").strip().lower() or None
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        sheet_names = list(wb.sheetnames)
+        if wanted not in wb.sheetnames:
+            wanted = sheet_names[0] if sheet_names else wanted
+        ws = wb[wanted] if wanted in wb.sheetnames else None
+        if ws is None:
+            return {
+                "sheet": wanted,
+                "sheets": sheet_names,
+                "columns": [],
+                "rows": [],
+                "page": page,
+                "per_page": per_page,
+                "total_rows": 0,
+                "filtered_rows": 0,
+            }
+
+        rows_iter = ws.iter_rows(values_only=True)
+        raw_header = next(rows_iter, None) or ()
+        columns = [str(c) if c is not None else "" for c in raw_header]
+        status_idx = None
+        for i, col in enumerate(columns):
+            if col.lower() == "status":
+                status_idx = i
+                break
+
+        matched: List[Dict[str, Any]] = []
+        total_rows = 0
+        for raw in rows_iter:
+            total_rows += 1
+            if status_filter and status_idx is not None:
+                cell = raw[status_idx] if status_idx < len(raw) else None
+                if str(cell or "").strip().lower() != status_filter:
+                    continue
+            row: Dict[str, Any] = {}
+            for i, col in enumerate(columns):
+                if not col:
+                    continue
+                row[col] = _cell_to_json(raw[i] if i < len(raw) else None)
+            matched.append(row)
+
+        filtered_rows = len(matched)
+        start = (page - 1) * per_page
+        page_rows = matched[start:start + per_page]
+        return {
+            "sheet": wanted,
+            "sheets": sheet_names,
+            "columns": [c for c in columns if c],
+            "rows": page_rows,
+            "page": page,
+            "per_page": per_page,
+            "total_rows": total_rows,
+            "filtered_rows": filtered_rows,
+        }
+    finally:
+        wb.close()
+
+
 def _process_fdrs_sync_verify_item(app, *, job_id: str, item_id: int) -> None:
     with app.app_context():
         item = AIJobItem.query.get(int(item_id))

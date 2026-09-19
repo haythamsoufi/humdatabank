@@ -845,6 +845,7 @@ flowchart LR
 | `published_value` | `TEXT` | yes |  | — |
 | `published_disagg_data` | `JSON` | yes |  | — |
 | `published_numeric_value` | `FLOAT` | yes |  | — |
+| `published_source` | `VARCHAR(16)` | yes |  | — |
 | `published_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
 | `published_by_user_id` | `INTEGER` | yes |  | `user.id` |
 | `created_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
@@ -857,7 +858,7 @@ flowchart LR
 | `numeric_value` | `FLOAT` | yes |  | — |
 | `submitted_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
 
-**Constraints:** `CHECK disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR (disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')`; `CHECK (assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)`
+**Constraints:** `CHECK disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR (disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')`; `CHECK (assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)`; `CHECK published_source IS NULL OR published_source IN ('reported', 'imputed')`
 
 **Indexes:** `INDEX (form_item_id)`; `INDEX (submitted_at)`; `INDEX (assignment_entity_status_id, form_item_id)`; `INDEX (created_by_user_id)`; `INDEX (public_submission_id, form_item_id)`; `INDEX (published_at)`; `INDEX (published_by_user_id)`
 

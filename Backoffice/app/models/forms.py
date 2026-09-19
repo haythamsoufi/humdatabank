@@ -893,15 +893,24 @@ class FormData(DataEntryMixin, db.Model):
     # Imputed values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
-    # Published snapshot — a curated copy of the reported value/disagg_data, written only
-    # when an admin runs the FDRS publication tool (plugins/fdrs; see fdrs_publication_service.py).
+    # Published snapshot — a curated copy of the reported value/disagg_data (falling
+    # back to imputed_* when the reported value is missing), written only when an
+    # admin runs the FDRS publication tool (plugins/fdrs; see fdrs_publication_service.py).
     # Never written by regular form submission. This is what the public-facing
     # GET /api/v1/fdrs/published-data endpoint serves to external consumers, decoupling
     # what is live/editable internally from what is currently visible on the public site.
+    PUBLISHED_SOURCE_REPORTED = 'reported'
+    PUBLISHED_SOURCE_IMPUTED = 'imputed'
+    PUBLISHED_SOURCES = (PUBLISHED_SOURCE_REPORTED, PUBLISHED_SOURCE_IMPUTED)
+
     published_value = db.Column(db.Text(), nullable=True)
     # Published values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     published_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     published_numeric_value = db.Column(db.Float, nullable=True)
+    # Provenance of the snapshot at publish time: 'reported' | 'imputed' | NULL.
+    # NULL means never published, cleared, or published before this column existed.
+    # Do not infer this from live value/imputed_value — those can change after publish.
+    published_source = db.Column(db.String(16), nullable=True)
     published_at = db.Column(db.DateTime, nullable=True)
     published_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
@@ -928,6 +937,10 @@ class FormData(DataEntryMixin, db.Model):
             "disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR "
             "(disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')",
             name='ck_form_data_disagg_shape',
+        ),
+        db.CheckConstraint(
+            "published_source IS NULL OR published_source IN ('reported', 'imputed')",
+            name='ck_form_data_published_source',
         ),
     )
 
@@ -990,23 +1003,54 @@ class FormData(DataEntryMixin, db.Model):
         """Whether this row has ever been published (has a non-empty published snapshot)."""
         return not self._is_blank_value(self.published_value, self.published_disagg_data)
 
+    def publication_current_payload(self):
+        """(value, disagg, numeric) that publishing would write to the snapshot.
+
+        Uses the reported value when present; falls back to the imputed value when
+        the reported value is missing. Prefilled values are never published.
+        """
+        if not self._is_blank_value(self.value, self.disagg_data):
+            return self.value, self.disagg_data, self.numeric_value
+        if not self._is_blank_value(self.imputed_value, self.imputed_disagg_data):
+            return self.imputed_value, self.imputed_disagg_data, self.imputed_numeric_value
+        return None, None, None
+
+    def publication_uses_imputed(self):
+        """True when publishing would write the imputed value (reported is missing)."""
+        return (
+            self._is_blank_value(self.value, self.disagg_data)
+            and not self._is_blank_value(self.imputed_value, self.imputed_disagg_data)
+        )
+
+    def publication_source_kind(self):
+        """Source publishing would stamp on the snapshot, or None if nothing to publish."""
+        if self.publication_uses_imputed():
+            return self.PUBLISHED_SOURCE_IMPUTED
+        if not self._is_blank_value(self.value, self.disagg_data):
+            return self.PUBLISHED_SOURCE_REPORTED
+        return None
+
     def publication_diff_kind(self):
         """
-        Classify how the reported "main" value (``value`` / ``disagg_data``) compares to the
-        last published snapshot (``published_value`` / ``published_disagg_data``).
+        Classify how the publishable current value (reported, or imputed when
+        reported is missing) compares to the last published snapshot
+        (``published_value`` / ``published_disagg_data``).
 
         Used by the FDRS publication tool (plugins/fdrs/services/fdrs_publication_service.py)
         to preview and highlight what publishing would change, without writing anything.
 
         Returns one of:
-          - ``'new'``       reported data exists; nothing has been published yet.
+          - ``'new'``       a publishable value exists; nothing has been published yet.
           - ``'changed'``   both exist and differ.
-          - ``'removed'``   something was published before, but there is no reported value
-                            now — publishing would clear the public value.
-          - ``'unchanged'``  both exist and are identical (same scalar and disagg payload).
-          - ``'empty'``     nothing reported and nothing published (no-op either way).
+          - ``'removed'``   something was published before, but there is no reported or
+                            imputed value now — publishing would clear the public value.
+          - ``'source'``    values match, but ``published_source`` is missing or differs
+                            from the source a publish would stamp (reported vs imputed).
+          - ``'unchanged'``  both exist, values match, and ``published_source`` is current.
+          - ``'empty'``     nothing to publish and nothing published (no-op either way).
         """
-        current_blank = self._is_blank_value(self.value, self.disagg_data)
+        current_value, current_disagg, _ = self.publication_current_payload()
+        current_blank = self._is_blank_value(current_value, current_disagg)
         published_blank = self._is_blank_value(self.published_value, self.published_disagg_data)
 
         if current_blank and published_blank:
@@ -1015,7 +1059,9 @@ class FormData(DataEntryMixin, db.Model):
             return 'removed'
         if published_blank:
             return 'new'
-        if self.value == self.published_value and self.disagg_data == self.published_disagg_data:
+        if current_value == self.published_value and current_disagg == self.published_disagg_data:
+            if self.published_source != self.publication_source_kind():
+                return 'source'
             return 'unchanged'
         return 'changed'
 

@@ -3,13 +3,15 @@
 ``GET /api/v1/fdrs/published-data`` is the one external-facing endpoint this
 plugin exposes so a public website can pull FDRS figures. It only ever reads the
 published snapshot (``FormData.published_value`` / ``published_disagg_data`` /
-``published_numeric_value``), written when an admin runs the "Manage Publication"
+``published_numeric_value`` / ``published_source``), written when an admin runs the "Manage Publication"
 tool (``plugins/fdrs/publication_routes.py``) — never the live/editable ``value``.
 See ``plugins/fdrs/services/fdrs_publication_service.py`` for how that snapshot is
 filled.
 
-Requires a Bearer API key (``Authorization: Bearer YOUR_API_KEY``), same as the
-rest of ``/api/v1`` — provision one via Admin > API Keys for the consuming website.
+Auth: Bearer API key *or* an authenticated Backoffice session (same as
+``/api/v1/data``). External consumers provision a key via Admin > API Keys;
+logged-in admins can open the URL in the browser. Register the route in
+Admin → API Management via ``API_ENDPOINTS`` / ``FdrsPlugin.get_api_endpoints()``.
 """
 
 from __future__ import annotations
@@ -28,18 +30,34 @@ from app.utils.api_helpers import (
     api_error,
     json_data_response,
 )
-from app.utils.auth import require_api_key
+from app.utils.auth import require_api_key_or_session
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from app.utils.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
 
-
-def _is_blank(value, disagg) -> bool:
-    return (value is None or str(value).strip() == "") and not disagg
+# Owned by this plugin — PluginManager merges these into API Management.
+API_ENDPOINTS = [
+    {
+        "group": "FDRS",
+        "path": "/api/v1/fdrs/published-data",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Published FDRS figures for the public website (published_* snapshot only). "
+            "Bearer API key or an authenticated Backoffice session. "
+            "Each row includes value_source (reported | imputed | null). "
+            "Filters: period_name, assignment_id, country_id / country_iso2 / country_iso3, "
+            "form_item_id, page, per_page."
+        ),
+        "consumers": "Public website, Backoffice session",
+    },
+]
 
 
 @bp.route("/api/v1/fdrs/published-data", methods=["GET"])
-@require_api_key
+@require_api_key_or_session
 def get_fdrs_published_data():
     """
     Published FDRS figures for the public website integration.
@@ -87,6 +105,7 @@ def get_fdrs_published_data():
                 FormData.published_value,
                 FormData.published_numeric_value,
                 FormData.published_disagg_data,
+                FormData.published_source,
                 FormData.published_at,
                 AssignmentEntityStatus.id.label('submission_id'),
                 AssignedForm.id.label('assignment_id'),
@@ -170,7 +189,11 @@ def get_fdrs_published_data():
                 'value': r.published_value,
                 'num_value': r.published_numeric_value,
                 'disaggregation_data': r.published_disagg_data,
-                'data_status': 'no_data' if _is_blank(r.published_value, r.published_disagg_data) else 'available',
+                'value_source': r.published_source,
+                'data_status': (
+                    'no_data' if FormData._is_blank_value(r.published_value, r.published_disagg_data)
+                    else 'available'
+                ),
                 'published_at': r.published_at.isoformat() if r.published_at else None,
             }
             for r in rows

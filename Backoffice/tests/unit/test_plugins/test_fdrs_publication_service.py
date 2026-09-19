@@ -35,13 +35,29 @@ def _patch_fdrs_template_id(monkeypatch, template_id: int) -> None:
     monkeypatch.setattr(public_api_routes, "FDRS_TEMPLATE_ID", template_id)
 
 
-def _set_form_data(db_session, aes, item, *, value=None, published_value=None, numeric_value=None):
+def _set_form_data(
+    db_session,
+    aes,
+    item,
+    *,
+    value=None,
+    published_value=None,
+    published_source=None,
+    numeric_value=None,
+    imputed_value=None,
+    imputed_numeric_value=None,
+    imputed_disagg_data=None,
+):
     row = FormData(
         assignment_entity_status_id=aes.id,
         form_item_id=item.id,
         value=value,
         numeric_value=numeric_value,
         published_value=published_value,
+        published_source=published_source,
+        imputed_value=imputed_value,
+        imputed_numeric_value=imputed_numeric_value,
+        imputed_disagg_data=imputed_disagg_data,
     )
     db_session.add(row)
     return row
@@ -91,7 +107,10 @@ def fdrs_scenario(db_session, monkeypatch):
     _set_form_data(db_session, aes_a, item_private, value="secret-a", published_value=None)
 
     # Country B: item_pub1 -> unchanged, item_pub2 -> removed, item_pub3 -> empty
-    _set_form_data(db_session, aes_b, item_pub1, value="5", numeric_value=5, published_value="5")
+    _set_form_data(
+        db_session, aes_b, item_pub1, value="5", numeric_value=5, published_value="5",
+        published_source=FormData.PUBLISHED_SOURCE_REPORTED,
+    )
     _set_form_data(db_session, aes_b, item_pub2, value=None, published_value="99")
     _set_form_data(db_session, aes_b, item_pub3, value=None, published_value=None)
     _set_form_data(db_session, aes_b, item_private, value="secret-b", published_value=None)
@@ -138,7 +157,7 @@ class TestGetAssignmentPublicationSummary:
         assert summary["countries_total"] == 2
         assert summary["countries_with_pending_changes"] == 2
         assert summary["totals"] == {
-            "new": 1, "changed": 1, "removed": 1, "unchanged": 1, "empty": 2,
+            "new": 1, "changed": 1, "removed": 1, "source": 0, "unchanged": 1, "empty": 2,
         }
         assert summary["pending_total"] == 3
 
@@ -205,6 +224,24 @@ class TestGetCountryChangeDetail:
         changed_item = next(i for i in detail["items"] if i["kind"] == "changed")
         assert changed_item["current_value"] == "20"
         assert changed_item["published_value"] == "15"
+        assert changed_item["current_is_imputed"] is False
+
+    def test_detail_shows_imputed_as_current_value_when_reported_missing(self, db_session, fdrs_scenario):
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_a"].id,
+            form_item_id=fdrs_scenario["item_pub3"].id,
+        ).one()
+        row.imputed_value = "42"
+        db_session.commit()
+
+        detail = svc.get_country_change_detail(
+            fdrs_scenario["assigned_form_id"], fdrs_scenario["aes_a"].id
+        )
+        imputed_item = next(i for i in detail["items"] if i["form_item_id"] == fdrs_scenario["item_pub3"].id)
+        assert imputed_item["current_value"] == "42"
+        assert imputed_item["current_is_imputed"] is True
+        assert imputed_item["kind"] == "new"
+        assert imputed_item["published_source"] is None
 
     def test_404_for_aes_from_a_different_assignment(self, db_session, fdrs_scenario):
         other_country = create_test_country(db_session, name="Gamma")
@@ -223,7 +260,7 @@ class TestPublishAssignment:
 
         assert stats["published_countries"] == 2
         assert stats["totals"] == {
-            "new": 1, "changed": 1, "removed": 1, "unchanged": 1, "empty": 2,
+            "new": 1, "changed": 1, "removed": 1, "source": 0, "unchanged": 1, "empty": 2,
         }
         assert stats["pending_total"] == 3
 
@@ -236,6 +273,7 @@ class TestPublishAssignment:
         ).one()
         assert row.published_value == "10"
         assert row.published_numeric_value == 10
+        assert row.published_source == FormData.PUBLISHED_SOURCE_REPORTED
         assert row.published_at is not None
         assert row.published_by_user_id == fdrs_scenario["publisher"].id
 
@@ -248,6 +286,7 @@ class TestPublishAssignment:
         ).one()
         # Was published_value="99" with no current value -> publishing clears it.
         assert row.published_value is None
+        assert row.published_source is None
 
     def test_private_item_never_touched(self, db_session, fdrs_scenario):
         svc.publish_assignment(fdrs_scenario["assigned_form_id"], user_id=fdrs_scenario["publisher"].id)
@@ -294,7 +333,9 @@ class TestPublishAssignment:
             user_id=fdrs_scenario["publisher"].id,
         )
         assert stats["published_countries"] == 0
-        assert stats["totals"] == {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "empty": 0}
+        assert stats["totals"] == {
+            "new": 0, "changed": 0, "removed": 0, "source": 0, "unchanged": 0, "empty": 0,
+        }
 
     def test_404_for_non_fdrs_assignment(self, db_session, fdrs_scenario):
         other_template = create_test_template(db_session, name="Not FDRS 3")
@@ -303,3 +344,180 @@ class TestPublishAssignment:
         )
         with pytest.raises(NotFound):
             svc.publish_assignment(other_aes.assigned_form_id, user_id=fdrs_scenario["publisher"].id)
+
+    def test_country_with_no_public_form_data_rows_is_not_marked_published(self, db_session, fdrs_scenario):
+        """A selected country with zero FormData rows on any public item (nothing
+        ever reported/imported for it) has nothing to publish: it must not be
+        counted in published_countries, and its audit fields stay untouched."""
+        country_c = create_test_country(db_session, name="Gamma")
+        aes_c = AssignmentEntityStatus(
+            assigned_form_id=fdrs_scenario["aes_a"].assigned_form_id,
+            entity_type="country",
+            entity_id=country_c.id,
+            status=fdrs_scenario["aes_a"].status,
+        )
+        db_session.add(aes_c)
+        db_session.commit()
+        db_session.refresh(aes_c)
+
+        stats = svc.publish_assignment(
+            fdrs_scenario["assigned_form_id"],
+            assignment_entity_status_ids=[aes_c.id],
+            user_id=fdrs_scenario["publisher"].id,
+        )
+        assert stats["published_countries"] == 0
+        assert stats["totals"] == {
+            "new": 0, "changed": 0, "removed": 0, "source": 0, "unchanged": 0, "empty": 0,
+        }
+
+        db_session.refresh(aes_c)
+        assert aes_c.published_at is None
+        assert aes_c.published_by_user_id is None
+
+    def test_mixed_selection_only_counts_countries_with_data(self, db_session, fdrs_scenario):
+        """Selecting one country with data and one without: only the one with
+        data is counted/stamped, but the one with data still publishes normally."""
+        country_c = create_test_country(db_session, name="Delta")
+        aes_c = AssignmentEntityStatus(
+            assigned_form_id=fdrs_scenario["aes_a"].assigned_form_id,
+            entity_type="country",
+            entity_id=country_c.id,
+            status=fdrs_scenario["aes_a"].status,
+        )
+        db_session.add(aes_c)
+        db_session.commit()
+        db_session.refresh(aes_c)
+
+        stats = svc.publish_assignment(
+            fdrs_scenario["assigned_form_id"],
+            assignment_entity_status_ids=[fdrs_scenario["aes_a"].id, aes_c.id],
+            user_id=fdrs_scenario["publisher"].id,
+        )
+        assert stats["published_countries"] == 1
+
+        db_session.refresh(fdrs_scenario["aes_a"])
+        db_session.refresh(aes_c)
+        assert fdrs_scenario["aes_a"].published_at is not None
+        assert aes_c.published_at is None
+
+    def test_publishes_imputed_value_when_reported_is_missing(self, db_session, fdrs_scenario):
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_a"].id,
+            form_item_id=fdrs_scenario["item_pub3"].id,
+        ).one()
+        row.imputed_value = "42"
+        row.imputed_numeric_value = 42
+        db_session.commit()
+
+        stats = svc.publish_assignment(
+            fdrs_scenario["assigned_form_id"],
+            assignment_entity_status_ids=[fdrs_scenario["aes_a"].id],
+            user_id=fdrs_scenario["publisher"].id,
+        )
+        assert stats["totals"]["new"] == 2  # item_pub1 reported + item_pub3 imputed
+        assert stats["totals"]["empty"] == 0
+
+        db_session.refresh(row)
+        assert row.published_value == "42"
+        assert row.published_numeric_value == 42
+        assert row.published_source == FormData.PUBLISHED_SOURCE_IMPUTED
+
+    def test_reported_value_wins_over_imputed_on_publish(self, db_session, fdrs_scenario):
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_a"].id,
+            form_item_id=fdrs_scenario["item_pub1"].id,
+        ).one()
+        row.imputed_value = "99"
+        row.imputed_numeric_value = 99
+        db_session.commit()
+
+        svc.publish_assignment(
+            fdrs_scenario["assigned_form_id"],
+            assignment_entity_status_ids=[fdrs_scenario["aes_a"].id],
+        )
+
+        db_session.refresh(row)
+        assert row.published_value == "10"
+        assert row.published_numeric_value == 10
+        assert row.published_source == FormData.PUBLISHED_SOURCE_REPORTED
+
+    def test_stamps_published_source_when_values_already_match(self, db_session, fdrs_scenario):
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_b"].id,
+            form_item_id=fdrs_scenario["item_pub1"].id,
+        ).one()
+        row.published_source = None
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        country_b = next(c for c in summary["countries"] if c["country_id"] == fdrs_scenario["country_b"].id)
+        assert country_b["counts"]["source"] == 1
+        assert country_b["has_pending_changes"] is True
+
+        stats = svc.publish_assignment(
+            fdrs_scenario["assigned_form_id"],
+            assignment_entity_status_ids=[fdrs_scenario["aes_b"].id],
+        )
+        assert stats["totals"]["source"] == 1
+
+        db_session.refresh(row)
+        assert row.published_value == "5"
+        assert row.published_source == FormData.PUBLISHED_SOURCE_REPORTED
+
+    def test_no_public_items_on_template_publishes_nothing(self, db_session, monkeypatch):
+        """If the FDRS template has zero privacy='public' items at all, publishing
+        must not stamp AssignmentEntityStatus.published_at — nothing was published."""
+        template = create_test_template(db_session, name="FDRS No Public Items Template")
+        _patch_fdrs_template_id(monkeypatch, template.id)
+        section = create_test_section(db_session, template)
+        item = create_test_item(db_session, section, template, label="Internal Only Item")
+        # default privacy is 'ifrc_network' — never marked public for this template.
+        country = create_test_country(db_session, name="Deltaland")
+        aes = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2024",
+        )
+        db_session.add(FormData(assignment_entity_status_id=aes.id, form_item_id=item.id, value="1"))
+        db_session.commit()
+
+        stats = svc.publish_assignment(aes.assigned_form_id)
+        assert stats["published_countries"] == 0
+        assert stats["totals"] == {
+            "new": 0, "changed": 0, "removed": 0, "source": 0, "unchanged": 0, "empty": 0,
+        }
+
+        db_session.refresh(aes)
+        assert aes.published_at is None
+        assert aes.published_by_user_id is None
+
+
+class TestGetCountryChangeDetailQueryEfficiency:
+    def test_form_item_labels_do_not_trigger_n_plus_one_queries(self, db_session, fdrs_scenario):
+        """row.form_item must be eager-loaded via the existing FormItem join —
+        regression test for the N+1 lazy-load this used to trigger per row."""
+        from sqlalchemy import event
+
+        from app.extensions import db as _db
+
+        statements = []
+
+        def _capture(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(_db.engine, "before_cursor_execute", _capture)
+        try:
+            statements.clear()
+            detail = svc.get_country_change_detail(
+                fdrs_scenario["assigned_form_id"], fdrs_scenario["aes_a"].id
+            )
+        finally:
+            event.remove(_db.engine, "before_cursor_execute", _capture)
+
+        # Correctness: labels are still populated correctly.
+        assert {i["label"] for i in detail["items"]} == {"Public Item 1", "Public Item 2"}
+        # One SELECT for the assignment, one for the aes, one for the country, one
+        # for the joined form_data+form_item rows — no per-row form_item lookup.
+        select_statements = [s for s in statements if s.strip().upper().startswith("SELECT")]
+        assert len(select_statements) <= 4, (
+            f"expected form_item to be eager-loaded, got {len(select_statements)} SELECTs:\n"
+            + "\n".join(select_statements)
+        )

@@ -272,6 +272,18 @@ class BasePlugin(ABC):
         """Extra template context when rendering a Data Explorer panel."""
         return {}
 
+    def get_api_endpoints(self) -> List[Dict[str, Any]]:
+        """Public/admin API routes this plugin owns, for Admin → API Management.
+
+        Each dict matches ``EXTERNAL_API_REGISTRY`` rows in
+        ``app/routes/admin/api_management.py`` (``path``, ``methods``, ``auth``,
+        ``group``, ``description``, optional ``rate_limited`` / ``consumers`` /
+        ``featured``). ``PluginManager.get_api_endpoints()`` merges these into
+        the live registry so plugin routes are documented rather than flagged
+        undocumented.
+        """
+        return []
+
     def get_settings(self) -> Dict[str, Any]:
         """Return plugin settings for the Plugin Management API and settings page."""
         return {}

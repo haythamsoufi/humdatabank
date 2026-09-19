@@ -295,7 +295,7 @@
 </div>
 
 <!-- Data Integration (System Managers only; tiles omitted when routes are not registered) -->
-{% if current_is_system_manager and (kobo_data_import_url or data_sync_url or upr_sync_url) %}
+{% if current_is_system_manager and (kobo_data_import_url or generic_sync_url or fdrs_tools_url or upr_tools_url) %}
 <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
     <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
         <i class="fas fa-file-import text-amber-500 mr-2"></i>
@@ -308,16 +308,22 @@
             <span class="text-sm font-medium text-amber-700">{{ _('Import KoBo Data') }}</span>
         </a>
         {% endif %}
-        {% if data_sync_url %}
-        <a href="{{ data_sync_url }}" class="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center" title="{{ _('Sync FDRS indicator data from the external API and run imputation')|forceescape }}">
-            <i class="fas fa-sync-alt text-purple-500 text-2xl mb-2"></i>
-            <span class="text-sm font-medium text-purple-700">{{ _('FDRS Data Sync') }}</span>
+        {% if generic_sync_url %}
+        <a href="{{ generic_sync_url }}" class="flex flex-col items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-center" title="{{ _('Generic data sync & imputation for templates outside FDRS and UPR')|forceescape }}">
+            <i class="fas fa-sync-alt text-blue-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-blue-700">{{ _('Data Sync & Imputation') }}</span>
         </a>
         {% endif %}
-        {% if upr_sync_url %}
-        <a href="{{ upr_sync_url }}" class="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center" title="{{ _('Import from UPR Master Excel and run imputation on UPR templates')|forceescape }}">
-            <i class="fas fa-file-excel text-green-600 text-2xl mb-2"></i>
-            <span class="text-sm font-medium text-green-700">{{ _('UPR Excel Sync') }}</span>
+        {% if fdrs_tools_url %}
+        <a href="{{ fdrs_tools_url }}" class="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-center" title="{{ _('FDRS data sync, imputation, and manage publication')|forceescape }}">
+            <i class="fas fa-cogs text-purple-500 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-purple-700">{{ _('FDRS Tools') }}</span>
+        </a>
+        {% endif %}
+        {% if upr_tools_url %}
+        <a href="{{ upr_tools_url }}" class="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-center" title="{{ _('UPR data sync, imputation, and Excel import')|forceescape }}">
+            <i class="fas fa-cogs text-green-600 text-2xl mb-2"></i>
+            <span class="text-sm font-medium text-green-700">{{ _('UPR Tools') }}</span>
         </a>
         {% endif %}
     </div>

@@ -1345,3 +1345,26 @@ class TestGetPluginCleanupAndResourceWithoutMethods:
         pm.plugins["bare"] = mock_plugin
         result = pm.get_plugin_resource_usage("bare")
         assert result is None
+
+
+@pytest.mark.unit
+class TestGetApiEndpoints:
+    def test_collects_plugin_rows_and_skips_duplicates(self, tmp_path):
+        pm, _ = _make_manager(tmp_path)
+        plugin_a = MagicMock()
+        plugin_a.get_api_endpoints.return_value = [
+            {"path": "/api/v1/fdrs/published-data", "methods": ["GET"], "auth": "api_key_or_session"},
+            {"path": "/api/v1/fdrs/published-data", "methods": ["GET"]},
+            {"path": ""},
+            "not-a-dict",
+        ]
+        plugin_b = MagicMock()
+        plugin_b.get_api_endpoints.side_effect = RuntimeError("boom")
+        plugin_c = MagicMock()
+        plugin_c.get_api_endpoints.return_value = None
+        pm.plugins = {"fdrs": plugin_a, "broken": plugin_b, "empty": plugin_c}
+
+        rows = pm.get_api_endpoints()
+        assert len(rows) == 1
+        assert rows[0]["path"] == "/api/v1/fdrs/published-data"
+        assert rows[0]["plugin_id"] == "fdrs"

@@ -154,9 +154,14 @@ def _kobo_data_import_url_for_dashboard():
         return None
 
 
-def _data_sync_url_for_dashboard():
-    """URL for FDRS data sync & imputation, or None if the route is not registered."""
-    ep = "fdrs.fdrs_sync_imputation"
+def _generic_sync_url_for_dashboard():
+    """URL for the platform-native, generic Data Sync & Imputation tile.
+
+    Distinct from the FDRS/UPR tiles below: it opens whichever *other* template
+    (not FDRS, not UPR — those have their own product pages) is first accessible
+    to the current user. See ``data_sync_imputation.data_sync_landing``.
+    """
+    ep = "data_sync_imputation.data_sync_landing"
     if ep not in current_app.view_functions:
         return None
     try:
@@ -165,9 +170,13 @@ def _data_sync_url_for_dashboard():
         return None
 
 
-def _upr_sync_url_for_dashboard():
-    """URL for UPR data sync & Excel import, or None if the route is not registered."""
-    ep = "upr.upr_sync_imputation"
+def _fdrs_tools_url_for_dashboard():
+    """URL for FDRS's own tools (Data Sync & Imputation), or None if not registered.
+
+    Opens the real, usable tool directly (not the Settings/plugin-info page).
+    Manage Publication is an in-page tab on that same FDRS tools surface.
+    """
+    ep = "fdrs.fdrs_tools"
     if ep not in current_app.view_functions:
         return None
     try:
@@ -176,7 +185,22 @@ def _upr_sync_url_for_dashboard():
         return None
 
 
-# GET /admin/upr-sync-imputation is registered by plugins.upr.routes.upr_sync_imputation
+def _upr_tools_url_for_dashboard():
+    """URL for UPR's own tools (Data Sync & Imputation), or None if not registered.
+
+    Same reasoning as ``_fdrs_tools_url_for_dashboard``: opens the real tool
+    directly. Excel Import is an in-page tab on that same UPR tools surface.
+    """
+    ep = "upr.upr_tools"
+    if ep not in current_app.view_functions:
+        return None
+    try:
+        return url_for(ep)
+    except BuildError:
+        return None
+
+
+# GET /admin/upr-tools is registered by plugins.upr.routes.upr_tools
 
 
 # Legacy URL: API key admin UI now lives under /admin/api-management/api-keys
@@ -200,8 +224,9 @@ def legacy_api_key_admin_redirect(subpath=None):
 def admin_dashboard():
     """Main admin dashboard with overview statistics"""
     kobo_data_import_url = _kobo_data_import_url_for_dashboard()
-    data_sync_url = _data_sync_url_for_dashboard()
-    upr_sync_url = _upr_sync_url_for_dashboard()
+    generic_sync_url = _generic_sync_url_for_dashboard()
+    fdrs_tools_url = _fdrs_tools_url_for_dashboard()
+    upr_tools_url = _upr_tools_url_for_dashboard()
     try:
         from app.services.organization.authorization_service import AuthorizationService
 
@@ -370,8 +395,9 @@ def admin_dashboard():
                              pending_public_submissions_count=pending_public_submissions_count,
                              security_audit_widget=security_audit_widget,
                              kobo_data_import_url=kobo_data_import_url,
-                             data_sync_url=data_sync_url,
-                             upr_sync_url=upr_sync_url,
+                             generic_sync_url=generic_sync_url,
+                             fdrs_tools_url=fdrs_tools_url,
+                             upr_tools_url=upr_tools_url,
                              title="Admin Dashboard")
 
     except Exception as e:
@@ -397,8 +423,9 @@ def admin_dashboard():
                              pending_public_submissions_count=0,
                              security_audit_widget={"high_risk_actions_30d": 0, "suspicious_logins_30d": 0, "failed_login_rate_30d": 0.0},
                              kobo_data_import_url=kobo_data_import_url,
-                             data_sync_url=data_sync_url,
-                             upr_sync_url=upr_sync_url,
+                             generic_sync_url=generic_sync_url,
+                             fdrs_tools_url=fdrs_tools_url,
+                             upr_tools_url=upr_tools_url,
                              title="Admin Dashboard",
                              dashboard_error="Error loading dashboard statistics")
 

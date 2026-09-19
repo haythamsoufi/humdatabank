@@ -202,15 +202,40 @@ def settings_page():
     return render_template("plugins/upr/settings.html", settings=upr_settings_status())
 
 
+@bp.route("/admin/upr-tools", methods=["GET"])
+@admin_required
+@system_manager_required
+def upr_tools():
+    """UPR tools hub: data sync & imputation, plus Excel import."""
+    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
+    from app.utils.data_quality_constants import UPR_PLANNING_TEMPLATE_ID
+    from plugins.upr.excel.import_routes import UPR_TEMPLATE_CHOICES
+
+    return render_data_sync_imputation_page(
+        UPR_PLANNING_TEMPLATE_ID,
+        sync_family="upr",
+        page_heading="UPR Tools",
+        page_icon="fas fa-cogs",
+        extra_tabs=[{
+            "id": "excel-import",
+            "label": _("Excel Import"),
+            "icon": "fas fa-file-excel",
+        }],
+        extra_panel_templates=[{
+            "id": "excel-import",
+            "template": "plugins/upr/admin/_upr_excel_import_panel.html",
+        }],
+        extra_script_templates=["plugins/upr/admin/_upr_excel_import_script.html"],
+        extra_context={"upr_template_choices": list(UPR_TEMPLATE_CHOICES)},
+    )
+
+
 @bp.route("/admin/upr-sync-imputation", methods=["GET"])
 @admin_required
 @system_manager_required
 def upr_sync_imputation():
-    """UPR Excel sync and imputation (Data Integration)."""
-    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-    from app.utils.data_quality_constants import UPR_PLANNING_TEMPLATE_ID
-
-    return render_data_sync_imputation_page(UPR_PLANNING_TEMPLATE_ID, sync_family="upr")
+    """Legacy URL for the UPR tools hub."""
+    return redirect(url_for("upr.upr_tools"), code=301)
 
 
 @bp.route("/upr/static/<path:filename>", methods=["GET"])

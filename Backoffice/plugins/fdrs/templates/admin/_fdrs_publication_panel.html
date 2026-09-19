@@ -1,0 +1,119 @@
+{# In-page Manage Publication panel — injected by plugins.fdrs.routes.fdrs_tools. #}
+<style nonce="{{ csp_nonce() }}">
+.fdrs-pub-detail-row td { border-top: none; }
+#fdrs-pub-loading {
+  width: 2rem; height: 2rem; margin: 0 auto;
+  border: 4px solid #e5e7eb; border-top-color: #dc2626;
+  border-radius: 50%; animation: fdrs-pub-spin 1s linear infinite;
+}
+@keyframes fdrs-pub-spin { to { transform: rotate(360deg); } }
+</style>
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
+  <i class="fas fa-info-circle mr-2"></i>
+  Publishing copies the current reported value for each public-privacy indicator into the
+  published snapshot that <code>GET /api/v1/fdrs/published-data</code> serves externally. When
+  nothing is reported, the imputed value is published instead. It never changes what is
+  reported internally — only what the public site can see. Rows published before source was
+  recorded show as a source update — re-publish to stamp reported vs imputed without changing
+  the figures. Nothing is published automatically; review the preview below and publish one
+  assignment (reporting period) at a time.
+</div>
+
+{% if not assignments %}
+  <div class="text-center py-8 text-gray-500">
+    No FDRS assignments found yet. Run Data Sync first to bring in reported data.
+  </div>
+{% else %}
+  <div class="flex flex-wrap items-end gap-3 mb-6">
+    <div>
+      <label for="fdrs-assignment-select" class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+        Assignment (reporting period)
+      </label>
+      <select id="fdrs-assignment-select" class="border border-gray-300 rounded-md px-3 py-2 text-sm min-w-[16rem]">
+        {% for a in assignments %}
+          <option value="{{ a.id }}">
+            {{ a.display_name }}{% if a.is_closed %} (closed){% endif %}{% if not a.is_active %} (inactive){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="button" id="fdrs-pub-refresh" class="btn btn-secondary">
+      <i class="fas fa-rotate mr-2" aria-hidden="true"></i>Refresh preview
+    </button>
+    <div id="fdrs-pub-loading" class="hidden ml-2" role="status" aria-label="Loading"></div>
+  </div>
+
+  <div id="fdrs-pub-summary-cards" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6"></div>
+
+  <div class="border border-gray-200 rounded-lg">
+    <div class="flex flex-wrap items-center gap-2 p-4 border-b border-gray-200">
+      <button type="button" id="fdrs-pub-select-pending" class="btn btn-secondary text-sm">
+        Select all with pending changes
+      </button>
+      <button type="button" id="fdrs-pub-clear-selection" class="btn btn-secondary text-sm">
+        Clear selection
+      </button>
+      <div class="ml-auto">
+        <button type="button" id="fdrs-pub-publish-btn" class="btn btn-primary" disabled>
+          <i class="fas fa-tower-broadcast mr-2" aria-hidden="true"></i>
+          Publish selected (<span id="fdrs-pub-publish-count">0</span>)
+        </button>
+      </div>
+    </div>
+
+    <div id="fdrs-pub-confirm" class="hidden mx-4 mt-4 p-4 bg-amber-50 border border-amber-300 rounded-md text-sm text-amber-900">
+      <p id="fdrs-pub-confirm-text" class="mb-3"></p>
+      <div class="flex gap-2">
+        <button type="button" id="fdrs-pub-confirm-yes" class="btn btn-primary text-sm">Confirm publish</button>
+        <button type="button" id="fdrs-pub-confirm-no" class="btn btn-secondary text-sm">Cancel</button>
+      </div>
+    </div>
+
+    <div id="fdrs-pub-progress" class="hidden mx-4 mt-4 p-4 border border-purple-200 rounded-md bg-purple-50" role="status" aria-live="polite">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-2">
+        <div>
+          <p class="text-sm font-medium text-purple-900">
+            <i class="fas fa-spinner fa-spin mr-2" id="fdrs-pub-progress-spinner" aria-hidden="true"></i>
+            <span id="fdrs-pub-progress-title">Publishing…</span>
+          </p>
+          <p id="fdrs-pub-progress-stage" class="text-sm text-purple-800 mt-1">Starting…</p>
+        </div>
+        <button type="button" id="fdrs-pub-cancel-btn" class="inline-flex items-center px-3 py-1.5 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
+          <i class="fas fa-stop mr-2" aria-hidden="true"></i>
+          <span id="fdrs-pub-cancel-btn-text">Stop publishing</span>
+        </button>
+      </div>
+      <div class="w-full bg-white rounded-full h-2">
+        <div id="fdrs-pub-progress-bar" class="bg-purple-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-purple-800 mt-1.5">
+        <span id="fdrs-pub-progress-text">0%</span>
+        <span id="fdrs-pub-progress-count"></span>
+      </div>
+    </div>
+
+    <div id="fdrs-pub-result" class="px-4"></div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <tr>
+            <th class="px-3 py-2 w-8"></th>
+            <th class="px-3 py-2">Country</th>
+            <th class="px-3 py-2">Status</th>
+            <th class="px-3 py-2">New</th>
+            <th class="px-3 py-2">Changed</th>
+            <th class="px-3 py-2">Removed</th>
+            <th class="px-3 py-2">Source</th>
+            <th class="px-3 py-2">Last published</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="fdrs-pub-tbody">
+          <tr><td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+<script type="application/json" id="fdrs-publication-active-jobs">{{ (active_fdrs_publication_jobs or [])|tojson }}</script>

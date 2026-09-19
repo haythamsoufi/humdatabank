@@ -11,7 +11,7 @@ import uuid
 from contextlib import suppress
 from typing import Any, Dict, List, Optional
 
-from flask import after_this_request, current_app, redirect, render_template, send_file, url_for
+from flask import after_this_request, current_app, redirect, render_template, request, send_file, url_for
 from flask_login import current_user
 
 from app.models import FormTemplate
@@ -56,6 +56,7 @@ from plugins.fdrs.services.fdrs_sync_verify_job import (
     build_fdrs_sync_verify_status_payload,
     create_fdrs_sync_verify_job,
     ensure_fdrs_sync_verify_job_running,
+    read_fdrs_sync_verify_workbook,
     request_fdrs_sync_verify_cancel,
     start_fdrs_sync_verify_job,
     _run_fdrs_sync_verify_job,
@@ -173,20 +174,80 @@ def parse_reported_import_states(data: Dict[str, Any]) -> Optional[List[int]]:
     bad = [x for x in out if x not in _SYNC_ALLOWED_STATES]
     if bad:
         raise ValueError(
-            "Unknown data status value(s): %s. Use only the statuses shown in the sync dialog."
+            "Unknown data status value(s): %s. Use only the statuses shown on the Sync tab."
             % (", ".join(str(x) for x in sorted(set(bad))),)
         )
     return out
+
+
+@bp.route("/admin/fdrs-tools", methods=["GET"])
+@admin_required
+@system_manager_required
+def fdrs_tools():
+    """FDRS tools hub: preview, imputation, Sync (run/verify), and publication."""
+    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
+    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID as fdrs_template_id
+    from flask import current_app
+    from flask_login import current_user
+    from plugins.fdrs.services.fdrs_publication_job import (
+        ensure_fdrs_publication_job_running,
+        get_active_fdrs_publication_jobs_for_user,
+    )
+    from plugins.fdrs.services.fdrs_publication_service import list_fdrs_assignments
+
+    user_id = int(getattr(current_user, "id", 0) or 0)
+    active_publication_jobs = get_active_fdrs_publication_jobs_for_user(user_id) if user_id else []
+    worker_app = current_app._get_current_object()
+    for active in active_publication_jobs:
+        jid = active.get("job_id")
+        if jid:
+            ensure_fdrs_publication_job_running(worker_app, str(jid))
+
+    return render_data_sync_imputation_page(
+        fdrs_template_id,
+        sync_family="fdrs",
+        page_heading="FDRS Tools",
+        page_icon="fas fa-cogs",
+        extra_tabs=[
+            {
+                "id": "sync",
+                "label": "Sync",
+                "icon": "fas fa-sync-alt",
+            },
+            {
+                "id": "publication",
+                "label": "Manage Publication",
+                "icon": "fas fa-tower-broadcast",
+            },
+        ],
+        extra_panel_templates=[
+            {
+                "id": "sync",
+                "template": "plugins/fdrs/admin/_fdrs_sync_panel.html",
+            },
+            {
+                "id": "publication",
+                "template": "plugins/fdrs/admin/_fdrs_publication_panel.html",
+            },
+        ],
+        extra_script_templates=[
+            "plugins/fdrs/admin/_fdrs_sync_script.html",
+            "plugins/fdrs/admin/_fdrs_publication_script.html",
+        ],
+        show_template_selector=False,
+        extra_context={
+            "assignments": list_fdrs_assignments(),
+            "active_fdrs_publication_jobs": active_publication_jobs,
+        },
+    )
 
 
 @bp.route("/admin/fdrs-sync-imputation", methods=["GET"])
 @admin_required
 @system_manager_required
 def fdrs_sync_imputation():
-    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID as fdrs_template_id
-
-    return render_data_sync_imputation_page(fdrs_template_id, sync_family="fdrs")
+    """Legacy URL for the FDRS tools hub."""
+    return redirect(url_for("fdrs.fdrs_tools"), code=301)
 
 
 @bp.route("/admin/templates/data-sync/<int:template_id>/run-data-sync", methods=["POST"])
@@ -547,6 +608,11 @@ def sync_verify_status(template_id: int, job_id: str):
             template_id=template_id,
             job_id=job_id,
         )
+        resp["job"]["results_url"] = url_for(
+            "fdrs.sync_verify_results",
+            template_id=template_id,
+            job_id=job_id,
+        )
     return json_ok(**resp)
 
 
@@ -575,16 +641,51 @@ def sync_verify_download(template_id: int, job_id: str):
     if not path or not os.path.isfile(path):
         return json_not_found("Verification file not available")
 
-    @after_this_request
-    def _remove_workbook(resp):
-        with suppress(Exception):
-            os.unlink(path)
-        update_import_job(job_id, force=True, download_ready=False, preview_path=None)
-        return resp
-
     return send_file(
         path,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=f"fdrs_sync_verification_{template_id}.xlsx",
     )
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-results/<job_id>", methods=["GET"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_results(template_id: int, job_id: str):
+    """JSON table of the verification workbook (same sheets as the Excel)."""
+    job, err = _owned_import_job_or_error(template_id, job_id)
+    if err is not None:
+        return err
+    path = job.get("preview_path")
+    if not path or not os.path.isfile(path):
+        return json_not_found("Verification file not available")
+
+    sheet = (request.args.get("sheet") or "data_points").strip()
+    status = (request.args.get("status") or "").strip()
+    try:
+        page = int(request.args.get("page") or 1)
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = int(request.args.get("per_page") or 200)
+    except (TypeError, ValueError):
+        per_page = 200
+
+    try:
+        table = read_fdrs_sync_verify_workbook(
+            path,
+            sheet=sheet,
+            status=status,
+            page=page,
+            per_page=per_page,
+        )
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+    table["stats"] = job.get("stats")
+    table["download_url"] = url_for(
+        "fdrs.sync_verify_download",
+        template_id=template_id,
+        job_id=job_id,
+    )
+    return json_ok(**table)

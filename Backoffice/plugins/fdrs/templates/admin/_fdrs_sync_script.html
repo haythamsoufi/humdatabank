@@ -1,0 +1,1256 @@
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function () {
+    const syncRoot = document.getElementById('fdrs-sync-root');
+    if (!syncRoot) return;
+
+    let currentTemplateId = {{ template.id }};
+    const TEMPLATE_API_URLS = {
+        runDataSync: {{ url_for("fdrs.run_data_sync", template_id=0) | tojson }},
+        dataSyncStatus: {{ url_for("fdrs.data_sync_status", template_id=0, job_id="__JOB_ID__") | tojson }},
+        dataSyncCancel: {{ url_for("fdrs.data_sync_cancel", template_id=0, job_id="__JOB_ID__") | tojson }},
+        runSyncVerify: {{ url_for("fdrs.run_sync_verify", template_id=0) | tojson }},
+        syncVerifyStatus: {{ url_for("fdrs.sync_verify_status", template_id=0, job_id="__JOB_ID__") | tojson }},
+        syncVerifyCancel: {{ url_for("fdrs.sync_verify_cancel", template_id=0, job_id="__JOB_ID__") | tojson }},
+        syncVerifyResults: {{ url_for("fdrs.sync_verify_results", template_id=0, job_id="__JOB_ID__") | tojson }}
+    };
+
+    function templateApiUrl(pathTemplate, templateId) {
+        return pathTemplate.replace(/\/0(\/|$|\?|(?=\/))/, '/' + encodeURIComponent(templateId) + '$1');
+    }
+
+    function escapeHtmlAttr(value) {
+        if (window.escapeHtmlAttr) return window.escapeHtmlAttr(value);
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function activateSyncMainTab() {
+        if (window.AdminUnderlineTabs) {
+            window.AdminUnderlineTabs.activateStripTab('#data-sync-tabs', 'sync', { panelSelector: '.data-panel' });
+        }
+        if ((location.hash || '').replace('#', '') !== 'sync') {
+            history.replaceState(null, '', '#sync');
+        }
+    }
+
+    function showFdrsSyncSubtab(which) {
+        activateSyncMainTab();
+        const runPanel = document.getElementById('fdrs-sync-subpanel-run');
+        const verifyPanel = document.getElementById('fdrs-sync-subpanel-verify');
+        const buttons = document.querySelectorAll('#fdrs-sync-subtabs [data-fdrs-sync-subtab]');
+        buttons.forEach(function (btn) {
+            const on = btn.getAttribute('data-fdrs-sync-subtab') === which;
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            btn.classList.toggle('active', on);
+            btn.classList.toggle('border-blue-500', on);
+            btn.classList.toggle('text-blue-600', on);
+            btn.classList.toggle('border-transparent', !on);
+            btn.classList.toggle('text-gray-500', !on);
+        });
+        if (runPanel) runPanel.classList.toggle('hidden', which !== 'run');
+        if (verifyPanel) verifyPanel.classList.toggle('hidden', which !== 'verify');
+    }
+
+    document.querySelectorAll('#fdrs-sync-subtabs [data-fdrs-sync-subtab]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            showFdrsSyncSubtab(this.getAttribute('data-fdrs-sync-subtab'));
+        });
+    });
+
+    let syncVerifyResultsUrl = null;
+    let syncVerifyTableState = { sheet: 'data_points', status: '', page: 1 };
+
+    function resetSyncVerifyTable() {
+        syncVerifyResultsUrl = null;
+        syncVerifyTableState = { sheet: 'data_points', status: '', page: 1 };
+        const wrap = document.getElementById('sync-verify-table-wrap');
+        if (wrap) wrap.classList.add('hidden');
+        const head = document.getElementById('sync-verify-table-head');
+        const body = document.getElementById('sync-verify-table-body');
+        const pager = document.getElementById('sync-verify-pagination');
+        const cards = document.getElementById('sync-verify-stats-cards');
+        if (head) head.innerHTML = '';
+        if (body) body.innerHTML = '';
+        if (pager) pager.innerHTML = '';
+        if (cards) cards.innerHTML = '';
+        const filter = document.getElementById('sync-verify-status-filter');
+        if (filter) filter.value = '';
+    }
+
+    function statusBadgeClass(status) {
+        const s = String(status || '').toLowerCase();
+        if (s === 'matched') return 'bg-green-50 text-green-800';
+        if (s === 'missing') return 'bg-red-50 text-red-800';
+        if (s === 'mismatch') return 'bg-amber-50 text-amber-800';
+        if (s.indexOf('skip') === 0) return 'bg-gray-100 text-gray-700';
+        return 'bg-gray-50 text-gray-700';
+    }
+
+    function renderSyncVerifyStats(stats) {
+        const cards = document.getElementById('sync-verify-stats-cards');
+        if (!cards) return;
+        stats = stats || {};
+        const items = [
+            { label: {{ _("Matched")|tojson|safe }}, value: stats.matched || 0, cls: 'border-green-200 bg-green-50 text-green-800' },
+            { label: {{ _("Skipped")|tojson|safe }}, value: stats.skipped_intentionally || 0, cls: 'border-gray-200 bg-gray-50 text-gray-700' },
+            { label: {{ _("Missing")|tojson|safe }}, value: stats.missing || 0, cls: 'border-red-200 bg-red-50 text-red-800' },
+            { label: {{ _("Mismatch")|tojson|safe }}, value: stats.mismatch || 0, cls: 'border-amber-200 bg-amber-50 text-amber-800' }
+        ];
+        cards.innerHTML = items.map(function (item) {
+            return '<div class="border rounded-md px-3 py-2 ' + item.cls + '">'
+                + '<div class="text-xs uppercase tracking-wide font-medium">' + escapeHtmlAttr(item.label) + '</div>'
+                + '<div class="text-lg font-semibold">' + escapeHtmlAttr(item.value) + '</div>'
+                + '</div>';
+        }).join('');
+    }
+
+    function setActiveSheetButton(sheet) {
+        document.querySelectorAll('#sync-verify-sheet-tabs [data-verify-sheet]').forEach(function (btn) {
+            const on = btn.getAttribute('data-verify-sheet') === sheet;
+            btn.classList.toggle('bg-blue-50', on);
+            btn.classList.toggle('text-blue-700', on);
+            btn.classList.toggle('text-gray-600', !on);
+            btn.classList.toggle('bg-white', !on);
+        });
+        const filter = document.getElementById('sync-verify-status-filter');
+        if (filter) filter.classList.toggle('hidden', sheet !== 'data_points');
+    }
+
+    function renderSyncVerifyTable(data) {
+        const wrap = document.getElementById('sync-verify-table-wrap');
+        const head = document.getElementById('sync-verify-table-head');
+        const body = document.getElementById('sync-verify-table-body');
+        const pager = document.getElementById('sync-verify-pagination');
+        if (!wrap || !head || !body) return;
+        wrap.classList.remove('hidden');
+        renderSyncVerifyStats(data.stats);
+        setActiveSheetButton(data.sheet || syncVerifyTableState.sheet);
+        const columns = data.columns || [];
+        head.innerHTML = '<tr>' + columns.map(function (col) {
+            return '<th class="px-3 py-2 whitespace-nowrap">' + escapeHtmlAttr(col) + '</th>';
+        }).join('') + '</tr>';
+        const rows = data.rows || [];
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="' + Math.max(columns.length, 1) + '" class="px-3 py-6 text-center text-gray-500">'
+                + escapeHtmlAttr({{ _("No rows in this sheet for the current filter.")|tojson|safe }})
+                + '</td></tr>';
+        } else {
+            body.innerHTML = rows.map(function (row) {
+                return '<tr>' + columns.map(function (col) {
+                    const raw = row[col];
+                    const text = raw == null ? '' : String(raw);
+                    const extra = col.toLowerCase() === 'status'
+                        ? '<span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium ' + statusBadgeClass(text) + '">' + escapeHtmlAttr(text) + '</span>'
+                        : escapeHtmlAttr(text);
+                    return '<td class="px-3 py-1.5 whitespace-nowrap align-top">' + extra + '</td>';
+                }).join('') + '</tr>';
+            }).join('');
+        }
+        if (pager) {
+            const filtered = data.filtered_rows || 0;
+            const page = data.page || 1;
+            const perPage = data.per_page || 200;
+            const pages = Math.max(1, Math.ceil(filtered / perPage));
+            let html = '<span>' + escapeHtmlAttr(filtered) + ' '
+                + escapeHtmlAttr({{ _("rows")|tojson|safe }})
+                + (data.total_rows && data.total_rows !== filtered
+                    ? ' / ' + escapeHtmlAttr(data.total_rows)
+                    : '')
+                + '</span>';
+            if (pages > 1) {
+                html += '<span class="flex items-center gap-2">'
+                    + '<button type="button" id="sync-verify-page-prev" class="px-2 py-1 border border-gray-300 rounded-md bg-white"'
+                    + (page <= 1 ? ' disabled' : '') + '>' + escapeHtmlAttr({{ _("Previous")|tojson|safe }}) + '</button>'
+                    + '<span>' + escapeHtmlAttr(page) + ' / ' + escapeHtmlAttr(pages) + '</span>'
+                    + '<button type="button" id="sync-verify-page-next" class="px-2 py-1 border border-gray-300 rounded-md bg-white"'
+                    + (page >= pages ? ' disabled' : '') + '>' + escapeHtmlAttr({{ _("Next")|tojson|safe }}) + '</button>'
+                    + '</span>';
+            }
+            pager.innerHTML = html;
+            const prev = document.getElementById('sync-verify-page-prev');
+            const next = document.getElementById('sync-verify-page-next');
+            if (prev) prev.addEventListener('click', function () {
+                if (syncVerifyTableState.page > 1) {
+                    syncVerifyTableState.page -= 1;
+                    fetchSyncVerifyResultsPage();
+                }
+            });
+            if (next) next.addEventListener('click', function () {
+                syncVerifyTableState.page += 1;
+                fetchSyncVerifyResultsPage();
+            });
+        }
+    }
+
+    function fetchSyncVerifyResultsPage() {
+        if (!syncVerifyResultsUrl) return;
+        const params = new URLSearchParams();
+        params.set('sheet', syncVerifyTableState.sheet);
+        params.set('page', String(syncVerifyTableState.page));
+        params.set('per_page', '200');
+        if (syncVerifyTableState.sheet === 'data_points' && syncVerifyTableState.status) {
+            params.set('status', syncVerifyTableState.status);
+        }
+        fetch(syncVerifyResultsUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || data.success === false) {
+                    throw new Error((data && data.error) || {{ _("Failed to load verification table")|tojson|safe }});
+                }
+                renderSyncVerifyTable(data);
+            })
+            .catch(function (err) {
+                const wrap = document.getElementById('sync-verify-table-wrap');
+                if (wrap) wrap.classList.remove('hidden');
+                const body = document.getElementById('sync-verify-table-body');
+                if (body) {
+                    body.innerHTML = '<tr><td class="px-3 py-4 text-sm text-red-700">'
+                        + escapeHtmlAttr(err.message || {{ _("Failed to load verification table")|tojson|safe }})
+                        + '</td></tr>';
+                }
+            });
+    }
+
+    function loadSyncVerifyResults(resultsUrl) {
+        syncVerifyResultsUrl = resultsUrl;
+        syncVerifyTableState.page = 1;
+        fetchSyncVerifyResultsPage();
+    }
+
+    document.querySelectorAll('#sync-verify-sheet-tabs [data-verify-sheet]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            syncVerifyTableState.sheet = this.getAttribute('data-verify-sheet');
+            syncVerifyTableState.page = 1;
+            fetchSyncVerifyResultsPage();
+        });
+    });
+    const statusFilter = document.getElementById('sync-verify-status-filter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function () {
+            syncVerifyTableState.status = this.value || '';
+            syncVerifyTableState.page = 1;
+            fetchSyncVerifyResultsPage();
+        });
+    }
+
+    window.updateDataSyncUrlTemplates = function (templateId) {
+        currentTemplateId = templateId;
+        updateDataSyncUrlTemplates(templateId);
+    };
+
+// Data Sync (in-page Run sub-tab)
+const dataSyncModal = document.getElementById('fdrs-sync-root');
+const dataSyncModalClose = null;
+const dataSyncModalCancel = null;
+const dataSyncOpenBtn = null;
+const dataSyncRunBtn = document.getElementById('data-sync-run-btn');
+const dataSyncRunBtnText = document.getElementById('data-sync-run-btn-text');
+const dataSyncSettings = document.getElementById('data-sync-settings');
+const dataSyncConfigSummary = document.getElementById('data-sync-config-summary');
+const dataSyncConfigSummaryBody = document.getElementById('data-sync-config-summary-body');
+const dataSyncFooterSettings = document.getElementById('data-sync-footer-settings');
+const dataSyncFooterRunning = document.getElementById('data-sync-footer-running');
+const dataSyncFooterDone = document.getElementById('data-sync-footer-done');
+const dataSyncStopBtn = document.getElementById('data-sync-stop-btn');
+const dataSyncStopBtnText = document.getElementById('data-sync-stop-btn-text');
+const dataSyncRunAgainBtn = document.getElementById('data-sync-run-again-btn');
+const dataSyncReloadBtn = document.getElementById('data-sync-reload-btn');
+const dataSyncResult = document.getElementById('data-sync-result');
+const dataSyncResultText = document.getElementById('data-sync-result-text');
+const dataSyncProgress = document.getElementById('data-sync-progress');
+const dataSyncProgressStage = document.getElementById('data-sync-progress-stage');
+const dataSyncProgressBar = document.getElementById('data-sync-progress-bar');
+const dataSyncProgressText = document.getElementById('data-sync-progress-text');
+const dataSyncProgressCount = document.getElementById('data-sync-progress-count');
+
+const SYNC_STATUS_LABELS = {
+    0: {{ _("Not filled")|tojson|safe }},
+    100: {{ _("Saved")|tojson|safe }},
+    200: {{ _("Reopened")|tojson|safe }},
+    300: {{ _("Submitted")|tojson|safe }},
+    400: {{ _("Validated")|tojson|safe }},
+    500: {{ _("Published")|tojson|safe }}
+};
+const FDRS_YEARS_START = {{ fdrs_years_start }};
+const FDRS_YEARS_END = {{ fdrs_years_end }};
+
+const dataSyncYearsWrap = document.getElementById('data-sync-years-wrap');
+const dataSyncYearsToggle = document.getElementById('data-sync-years-toggle');
+const dataSyncYearsDropdown = document.getElementById('data-sync-years-dropdown');
+const dataSyncYearsLabel = document.getElementById('data-sync-years-label');
+const dataSyncYearsSelectAll = document.getElementById('data-sync-years-select-all');
+const dataSyncYearsClearAll = document.getElementById('data-sync-years-clear-all');
+
+function getDataSyncYearCheckboxes() {
+    return Array.from(document.querySelectorAll('input[name="data-sync-year"]'));
+}
+
+function getSelectedDataSyncYears() {
+    return getDataSyncYearCheckboxes()
+        .filter(function (el) { return el.checked; })
+        .map(function (el) { return parseInt(el.value, 10); })
+        .filter(function (n) { return !isNaN(n); })
+        .sort(function (a, b) { return a - b; });
+}
+
+function formatDataSyncYearsDisplay(years) {
+    if (!years.length) {
+        return {{ _("No years selected")|tojson|safe }};
+    }
+    const allYears = [];
+    for (let y = FDRS_YEARS_START; y <= FDRS_YEARS_END; y += 1) {
+        allYears.push(y);
+    }
+    if (years.length === allYears.length) {
+        return FDRS_YEARS_START + '\u2013' + FDRS_YEARS_END + ' (' + years.length + ' ' + {{ _("years")|tojson|safe }} + ')';
+    }
+    if (years.length <= 4) {
+        return years.join(', ');
+    }
+    return years[0] + '\u2013' + years[years.length - 1] + ' (' + years.length + ' ' + {{ _("years")|tojson|safe }} + ')';
+}
+
+function updateDataSyncYearsLabel() {
+    if (!dataSyncYearsLabel) return;
+    dataSyncYearsLabel.textContent = formatDataSyncYearsDisplay(getSelectedDataSyncYears());
+}
+
+function setDataSyncYearsOpen(isOpen) {
+    if (!dataSyncYearsDropdown || !dataSyncYearsToggle) return;
+    dataSyncYearsDropdown.classList.toggle('hidden', !isOpen);
+    dataSyncYearsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+function setAllDataSyncYears(checked) {
+    getDataSyncYearCheckboxes().forEach(function (el) {
+        el.checked = checked;
+    });
+    updateDataSyncYearsLabel();
+}
+
+if (dataSyncYearsToggle && dataSyncYearsDropdown) {
+    updateDataSyncYearsLabel();
+    dataSyncYearsToggle.addEventListener('click', function (event) {
+        event.stopPropagation();
+        const isOpen = dataSyncYearsDropdown.classList.contains('hidden');
+        setDataSyncYearsOpen(isOpen);
+    });
+    dataSyncYearsDropdown.addEventListener('click', function (event) {
+        event.stopPropagation();
+    });
+    document.addEventListener('click', function () {
+        setDataSyncYearsOpen(false);
+    });
+    getDataSyncYearCheckboxes().forEach(function (el) {
+        el.addEventListener('change', updateDataSyncYearsLabel);
+    });
+    if (dataSyncYearsSelectAll) {
+        dataSyncYearsSelectAll.addEventListener('click', function () {
+            setAllDataSyncYears(true);
+        });
+    }
+    if (dataSyncYearsClearAll) {
+        dataSyncYearsClearAll.addEventListener('click', function () {
+            setAllDataSyncYears(false);
+        });
+    }
+}
+
+let dataSyncStatusUrlTemplate = TEMPLATE_API_URLS.dataSyncStatus;
+let dataSyncCancelUrlTemplate = TEMPLATE_API_URLS.dataSyncCancel;
+let syncVerifyStatusUrlTemplate = TEMPLATE_API_URLS.syncVerifyStatus;
+let syncVerifyCancelUrlTemplate = TEMPLATE_API_URLS.syncVerifyCancel;
+let dataSyncActiveJobId = null;
+let dataSyncPollTimer = null;
+let dataSyncPollDelayMs = 2000;
+const DATA_SYNC_POLL_INITIAL_MS = 2000;
+const DATA_SYNC_POLL_MAX_MS = 5000;
+const DATA_SYNC_POLL_BACKOFF_FACTOR = 1.5;
+const DATA_SYNC_STORAGE_KEY = 'fdrs_data_sync_job_' + currentTemplateId;
+let dataSyncUIMode = 'settings';
+let dataSyncStopRequested = false;
+let dataSyncLastPercent = 0;
+
+function readDataSyncActiveJobs() {
+    const el = document.getElementById('data-sync-active-jobs');
+    if (!el) return [];
+    try {
+        return JSON.parse(el.textContent || '[]') || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function writeDataSyncStorage(jobId) {
+    try {
+        localStorage.setItem(DATA_SYNC_STORAGE_KEY, JSON.stringify({ jobId: jobId }));
+    } catch (e) { /* ignore */ }
+}
+
+function clearDataSyncStorage() {
+    try {
+        localStorage.removeItem(DATA_SYNC_STORAGE_KEY);
+    } catch (e) { /* ignore */ }
+}
+
+function updateDataSyncUrlTemplates(templateId) {
+    dataSyncStatusUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.dataSyncStatus, templateId);
+    dataSyncCancelUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.dataSyncCancel, templateId);
+    syncVerifyStatusUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.syncVerifyStatus, templateId);
+    syncVerifyCancelUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.syncVerifyCancel, templateId);
+}
+updateDataSyncUrlTemplates(currentTemplateId);
+
+function isSafeHref(url) {
+    if (!url || typeof url !== 'string') return false;
+    const u = url.trim();
+    return u.startsWith('/') || u.startsWith('https://') || u.startsWith('http://');
+}
+
+function stopDataSyncPolling() {
+    if (dataSyncPollTimer) {
+        clearTimeout(dataSyncPollTimer);
+        dataSyncPollTimer = null;
+    }
+    dataSyncActiveJobId = null;
+    dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+}
+
+function scheduleDataSyncPoll() {
+    dataSyncPollTimer = setTimeout(pollDataSyncStatus, dataSyncPollDelayMs);
+    dataSyncPollDelayMs = Math.min(
+        Math.round(dataSyncPollDelayMs * DATA_SYNC_POLL_BACKOFF_FACTOR),
+        DATA_SYNC_POLL_MAX_MS
+    );
+}
+
+function collectDataSyncParams() {
+    const selectedYears = getSelectedDataSyncYears();
+    const years = selectedYears.join(',');
+    const batchSizeRaw = (document.getElementById('data-sync-batch-size') && document.getElementById('data-sync-batch-size').value) || '';
+    const batchSizeRawTrim = (batchSizeRaw || '').trim();
+    const batchSize = batchSizeRawTrim ? parseInt(batchSizeRawTrim, 10) : null;
+    const dryRun = !!(document.getElementById('data-sync-dry-run') && document.getElementById('data-sync-dry-run').checked);
+    const test = !!(document.getElementById('data-sync-test') && document.getElementById('data-sync-test').checked);
+    const imputedUseCache = !!(document.getElementById('data-sync-imputed-cache') && document.getElementById('data-sync-imputed-cache').checked);
+    const syncDocuments = !!(document.getElementById('data-sync-documents') && document.getElementById('data-sync-documents').checked);
+    const statusBoxes = document.querySelectorAll('input[name="data-sync-status"]:checked');
+    const reportedStates = Array.from(statusBoxes).map(function (el) {
+        return parseInt(el.value, 10);
+    }).filter(function (n) { return !isNaN(n); });
+
+    return {
+        years: years,
+        selectedYears: selectedYears,
+        batchSizeRawTrim: batchSizeRawTrim,
+        batchSize: batchSize,
+        dryRun: dryRun,
+        test: test,
+        imputedUseCache: imputedUseCache,
+        syncDocuments: syncDocuments,
+        reportedStates: reportedStates
+    };
+}
+
+function dataSyncBoolIcon(isTrue) {
+    if (isTrue) {
+        return '<span class="inline-flex items-center text-green-600" aria-label="' + {{ _("Yes")|tojson|safe }} + '"><i class="fas fa-check-circle" aria-hidden="true"></i></span>';
+    }
+    return '<span class="inline-flex items-center text-gray-400" aria-label="' + {{ _("No")|tojson|safe }} + '"><i class="fas fa-times-circle" aria-hidden="true"></i></span>';
+}
+
+function renderDataSyncConfigSummary(params) {
+    if (!dataSyncConfigSummaryBody) return;
+
+    const yearsDisplay = formatDataSyncYearsDisplay(params.selectedYears || []);
+    const batchDisplay = params.batchSize !== null && !isNaN(params.batchSize)
+        ? String(params.batchSize)
+        : {{ _("Default (1000)")|tojson|safe }};
+    const statusLabels = (params.reportedStates || [])
+        .map(function (code) { return SYNC_STATUS_LABELS[code] || String(code); })
+        .join(', ');
+
+    const rows = [
+        { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
+        { label: {{ _("Batch size")|tojson|safe }}, value: batchDisplay },
+        { label: {{ _("Data status")|tojson|safe }}, value: statusLabels || '-' },
+        { label: {{ _("Sync documents")|tojson|safe }}, value: dataSyncBoolIcon(params.syncDocuments), html: true, inline: true },
+        { label: {{ _("Dry run")|tojson|safe }}, value: dataSyncBoolIcon(params.dryRun), html: true, inline: true },
+        { label: {{ _("Test mode")|tojson|safe }}, value: dataSyncBoolIcon(params.test), html: true, inline: true },
+        { label: {{ _("Cached imputed values")|tojson|safe }}, value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true }
+    ];
+
+    dataSyncConfigSummaryBody.innerHTML = rows.map(function (row) {
+        const valueHtml = row.html ? row.value : escapeHtmlAttr(row.value);
+        if (row.inline) {
+            return '<div class="flex items-center gap-2">'
+                + '<span class="text-gray-500">' + escapeHtmlAttr(row.label) + '</span>'
+                + valueHtml
+                + '</div>';
+        }
+        return '<div class="flex items-start justify-between gap-4">'
+            + '<span class="text-gray-500 shrink-0">' + escapeHtmlAttr(row.label) + '</span>'
+            + '<span class="font-medium text-gray-900 text-right">' + valueHtml + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+function setDataSyncUIMode(mode) {
+    dataSyncUIMode = mode;
+    const isSettings = mode === 'settings';
+    const isRunning = mode === 'running';
+    const isDone = mode === 'done';
+
+    if (dataSyncSettings) dataSyncSettings.classList.toggle('hidden', !isSettings);
+    if (dataSyncConfigSummary) dataSyncConfigSummary.classList.toggle('hidden', isSettings);
+    if (dataSyncFooterSettings) dataSyncFooterSettings.classList.toggle('hidden', !isSettings);
+    if (dataSyncFooterRunning) dataSyncFooterRunning.classList.toggle('hidden', !isRunning);
+    if (dataSyncFooterDone) dataSyncFooterDone.classList.toggle('hidden', !isDone);
+
+}
+
+function resetDataSyncRunButton() {
+    if (!dataSyncRunBtn || !dataSyncRunBtnText) return;
+    dataSyncRunBtn.disabled = false;
+    dataSyncRunBtnText.textContent = {{ _("Run Sync")|tojson|safe }};
+    const spinIcon = dataSyncRunBtn.querySelector('i.fa-spinner');
+    if (spinIcon) spinIcon.remove();
+    if (!dataSyncRunBtn.querySelector('i.fa-sync-alt')) {
+        dataSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+    }
+}
+
+function resetDataSyncStopButton() {
+    dataSyncStopRequested = false;
+    if (!dataSyncStopBtn || !dataSyncStopBtnText) return;
+    dataSyncStopBtn.disabled = false;
+    dataSyncStopBtnText.textContent = {{ _("Stop sync")|tojson|safe }};
+}
+
+function setDataSyncStopping() {
+    dataSyncStopRequested = true;
+    if (!dataSyncStopBtn || !dataSyncStopBtnText) return;
+    dataSyncStopBtn.disabled = true;
+    dataSyncStopBtnText.textContent = {{ _("Stopping...")|tojson|safe }};
+}
+
+function showDataSyncDone() {
+    setDataSyncUIMode('done');
+}
+
+function resetDataSyncUI() {
+    dataSyncResult.classList.add('hidden');
+    dataSyncResultText.textContent = '';
+    if (dataSyncProgress) dataSyncProgress.classList.add('hidden');
+    if (dataSyncProgressStage) dataSyncProgressStage.textContent = '-';
+    if (dataSyncProgressBar) dataSyncProgressBar.style.width = '0%';
+    if (dataSyncProgressText) dataSyncProgressText.textContent = '0%';
+    if (dataSyncProgressCount) dataSyncProgressCount.textContent = '';
+    if (dataSyncConfigSummaryBody) dataSyncConfigSummaryBody.innerHTML = '';
+    dataSyncLastPercent = 0;
+    stopDataSyncPolling();
+    resetDataSyncRunButton();
+    resetDataSyncStopButton();
+    setDataSyncUIMode('settings');
+}
+
+function setDataSyncProgress(percent, stage, message, current, total, opts) {
+    opts = opts || {};
+    if (opts.resetProgress) {
+        dataSyncLastPercent = 0;
+    }
+    const raw = Math.max(0, Math.min(100, Number(percent || 0)));
+    const pct = opts.resetProgress ? raw : Math.max(dataSyncLastPercent, raw);
+    dataSyncLastPercent = pct;
+    if (dataSyncProgressBar) dataSyncProgressBar.style.width = pct + '%';
+    if (dataSyncProgressText) dataSyncProgressText.textContent = `${Math.round(pct)}%`;
+    if (dataSyncProgressStage) {
+        const stageText = (message && message.trim()) ? message.trim() : (stage || '-');
+        dataSyncProgressStage.textContent = stageText;
+    }
+    if (dataSyncProgressCount) {
+        if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
+            dataSyncProgressCount.textContent = `${current || 0} / ${total}`;
+        } else {
+            dataSyncProgressCount.textContent = '';
+        }
+    }
+}
+
+function pollDataSyncStatus() {
+    if (!dataSyncActiveJobId) return;
+    const url = dataSyncStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(dataSyncActiveJobId));
+
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (!data || !data.success || !data.job) {
+                throw new Error((data && data.error) || 'Failed to read sync status');
+            }
+            const job = data.job;
+
+            setDataSyncProgress(job.percent, job.stage, job.message, job.current, job.total);
+
+            if (job.status === 'completed') {
+                const finishedJobId = dataSyncActiveJobId;
+                stopDataSyncPolling();
+                clearDataSyncStorage();
+                dataSyncResult.classList.remove('hidden');
+                const stats = job.stats || {};
+                let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Unchanged: ${stats.unchanged || 0}, Errors: ${stats.errors || 0}`;
+                let logHtml = '';
+                if (finishedJobId && /^[a-fA-F0-9]{32}$/.test(finishedJobId)) {
+                    logHtml = ` <a class="text-purple-700 underline" href="/admin/import-logs/${encodeURIComponent(finishedJobId)}" target="_blank" rel="noopener">` + {{ _("View change log")|tojson|safe }} + `</a>`;
+                }
+                if (job.download_ready && job.download_url) {
+                    msg += `\n\n` + {{ _("Preview Excel ready:")|tojson|safe }} + ` `;
+                    const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
+                    dataSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">` + {{ _("Download")|tojson|safe }} + `</a>${logHtml}`;
+                } else {
+                    dataSyncResultText.textContent = msg;
+                    if (logHtml) {
+                        dataSyncResultText.insertAdjacentHTML('beforeend', logHtml);
+                    }
+                }
+                dataSyncResultText.className = 'text-sm text-green-700';
+                showDataSyncDone();
+                return;
+            }
+            if (job.status === 'failed') {
+                stopDataSyncPolling();
+                clearDataSyncStorage();
+                dataSyncResult.classList.remove('hidden');
+                dataSyncResultText.textContent = job.error || {{ _("Sync failed")|tojson|safe }};
+                dataSyncResultText.className = 'text-sm text-red-700';
+                showDataSyncDone();
+                return;
+            }
+            if (job.status === 'cancelled') {
+                stopDataSyncPolling();
+                clearDataSyncStorage();
+                dataSyncResult.classList.remove('hidden');
+                dataSyncResultText.textContent = job.error || {{ _("Sync cancelled.")|tojson|safe }};
+                dataSyncResultText.className = 'text-sm text-amber-700';
+                showDataSyncDone();
+                return;
+            }
+            if (job.status === 'cancel_requested') {
+                setDataSyncStopping();
+            }
+
+            // Continue polling (2s initially, backs off to 5s to limit access-log noise)
+            scheduleDataSyncPoll();
+        })
+        .catch(err => {
+            stopDataSyncPolling();
+            dataSyncResult.classList.remove('hidden');
+            dataSyncResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
+            dataSyncResultText.className = 'text-sm text-red-700';
+            showDataSyncDone();
+        });
+}
+
+if (dataSyncRunAgainBtn) {
+    dataSyncRunAgainBtn.addEventListener('click', resetDataSyncUI);
+}
+if (dataSyncReloadBtn) {
+    dataSyncReloadBtn.addEventListener('click', function() {
+        window.location.reload();
+    });
+}
+if (dataSyncStopBtn) {
+    dataSyncStopBtn.addEventListener('click', function() {
+        if (!dataSyncActiveJobId || dataSyncStopRequested) return;
+        setDataSyncStopping();
+        const url = dataSyncCancelUrlTemplate.replace('__JOB_ID__', encodeURIComponent(dataSyncActiveJobId));
+        const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
+            }
+        })
+        .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+        .then(function(result) {
+            if (!result.ok || !(result.data && result.data.success)) {
+                throw new Error((result.data && result.data.error) || {{ _("Failed to stop sync")|tojson|safe }});
+            }
+        })
+        .catch(function(err) {
+            resetDataSyncStopButton();
+            dataSyncResult.classList.remove('hidden');
+            dataSyncResultText.textContent = err.message || {{ _("Failed to stop sync")|tojson|safe }};
+            dataSyncResultText.className = 'text-sm text-red-700';
+        });
+    });
+}
+if (dataSyncRunBtn) {
+    dataSyncRunBtn.addEventListener('click', function() {
+        const params = collectDataSyncParams();
+
+        if (params.batchSizeRawTrim) {
+            if (isNaN(params.batchSize) || params.batchSize < 100) {
+                dataSyncResult.classList.remove('hidden');
+                dataSyncResultText.textContent = {{ _("Invalid batch size. Please enter a number >= 100 (or leave empty).")|tojson|safe }};
+                dataSyncResultText.className = 'text-sm text-red-700';
+                return;
+            }
+        }
+
+        if (!params.selectedYears.length) {
+            dataSyncResult.classList.remove('hidden');
+            dataSyncResultText.textContent = {{ _("Select at least one reporting year.")|tojson|safe }};
+            dataSyncResultText.className = 'text-sm text-red-700';
+            return;
+        }
+
+        if (!params.reportedStates.length) {
+            dataSyncResult.classList.remove('hidden');
+            dataSyncResultText.textContent = {{ _("Select at least one data status to include.")|tojson|safe }};
+            dataSyncResultText.className = 'text-sm text-red-700';
+            return;
+        }
+
+        resetDataSyncUI();
+        renderDataSyncConfigSummary(params);
+        setDataSyncUIMode('running');
+        if (dataSyncProgress) dataSyncProgress.classList.remove('hidden');
+        setDataSyncProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
+        dataSyncRunBtn.disabled = true;
+        dataSyncRunBtnText.textContent = {{ _("Running...")|tojson|safe }};
+        dataSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
+        const iconEl = dataSyncRunBtn.querySelector('i.fa-sync-alt');
+        if (iconEl) iconEl.remove();
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const payload = {
+            fdrs_years: params.years,
+            dry_run: params.dryRun,
+            test: params.test,
+            async: true,
+            imputed_use_cache: params.imputedUseCache,
+            sync_documents: params.syncDocuments,
+            fdrs_reported_import_states: params.reportedStates
+        };
+        if (params.batchSize !== null) {
+            payload.batch_size = params.batchSize;
+        }
+        fetch(templateApiUrl(TEMPLATE_API_URLS.runDataSync, currentTemplateId), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+        .then(function(result) {
+            var ok = result.ok;
+            var data = result.data || {};
+            if (!ok || !data.success || !data.job_id) {
+                throw new Error(data.error || {{ _("Sync failed")|tojson|safe }});
+            }
+            dataSyncActiveJobId = data.job_id;
+            writeDataSyncStorage(data.job_id);
+            dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+            pollDataSyncStatus();
+        })
+        .catch(function(err) {
+            dataSyncResult.classList.remove('hidden');
+            dataSyncResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
+            dataSyncResultText.className = 'text-sm text-red-700';
+            showDataSyncDone();
+        });
+    });
+}
+
+function resumeDataSyncJobIfNeeded() {
+    let jobId = null;
+    const serverJobs = readDataSyncActiveJobs().filter(function (j) { return j && j.job_id; });
+    if (serverJobs.length) {
+        jobId = serverJobs[0].job_id;
+    } else {
+        try {
+            const stored = JSON.parse(localStorage.getItem(DATA_SYNC_STORAGE_KEY) || 'null');
+            if (stored && stored.jobId) {
+                jobId = stored.jobId;
+            }
+        } catch (e) { /* ignore */ }
+    }
+    if (!jobId || !dataSyncModal) return;
+
+    dataSyncActiveJobId = jobId;
+    writeDataSyncStorage(jobId);
+    showFdrsSyncSubtab('run');
+    setDataSyncUIMode('running');
+    if (dataSyncProgress) dataSyncProgress.classList.remove('hidden');
+    setDataSyncProgress(0, 'resuming', {{ _("Resuming sync...")|tojson|safe }}, 0, null, { resetProgress: true });
+    dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+    pollDataSyncStatus();
+}
+
+resumeDataSyncJobIfNeeded();
+
+// Verify (in-page Verify sub-tab)
+const syncVerifyModal = document.getElementById('fdrs-sync-root');
+const syncVerifyModalClose = null;
+const syncVerifyModalCancel = null;
+const syncVerifyOpenBtn = null;
+const syncVerifyRunBtn = document.getElementById('sync-verify-run-btn');
+const syncVerifyRunBtnText = document.getElementById('sync-verify-run-btn-text');
+const syncVerifySettings = document.getElementById('sync-verify-settings');
+const syncVerifyConfigSummary = document.getElementById('sync-verify-config-summary');
+const syncVerifyConfigSummaryBody = document.getElementById('sync-verify-config-summary-body');
+const syncVerifyFooterSettings = document.getElementById('sync-verify-footer-settings');
+const syncVerifyFooterRunning = document.getElementById('sync-verify-footer-running');
+const syncVerifyFooterDone = document.getElementById('sync-verify-footer-done');
+const syncVerifyStopBtn = document.getElementById('sync-verify-stop-btn');
+const syncVerifyStopBtnText = document.getElementById('sync-verify-stop-btn-text');
+const syncVerifyRunAgainBtn = document.getElementById('sync-verify-run-again-btn');
+const syncVerifyDownloadBtn = document.getElementById('sync-verify-download-btn');
+const syncVerifyResult = document.getElementById('sync-verify-result');
+const syncVerifyResultText = document.getElementById('sync-verify-result-text');
+const syncVerifyProgress = document.getElementById('sync-verify-progress');
+const syncVerifyProgressStage = document.getElementById('sync-verify-progress-stage');
+const syncVerifyProgressBar = document.getElementById('sync-verify-progress-bar');
+const syncVerifyProgressText = document.getElementById('sync-verify-progress-text');
+const syncVerifyProgressCount = document.getElementById('sync-verify-progress-count');
+const syncVerifyYearsToggle = document.getElementById('sync-verify-years-toggle');
+const syncVerifyYearsDropdown = document.getElementById('sync-verify-years-dropdown');
+const syncVerifyYearsLabel = document.getElementById('sync-verify-years-label');
+const syncVerifyYearsSelectAll = document.getElementById('sync-verify-years-select-all');
+const syncVerifyYearsClearAll = document.getElementById('sync-verify-years-clear-all');
+
+function getSyncVerifyYearCheckboxes() {
+    return Array.from(document.querySelectorAll('input[name="sync-verify-year"]'));
+}
+
+function getSelectedSyncVerifyYears() {
+    return getSyncVerifyYearCheckboxes()
+        .filter(function (el) { return el.checked; })
+        .map(function (el) { return parseInt(el.value, 10); })
+        .filter(function (n) { return !isNaN(n); })
+        .sort(function (a, b) { return a - b; });
+}
+
+function updateSyncVerifyYearsLabel() {
+    if (!syncVerifyYearsLabel) return;
+    syncVerifyYearsLabel.textContent = formatDataSyncYearsDisplay(getSelectedSyncVerifyYears());
+}
+
+function setSyncVerifyYearsOpen(isOpen) {
+    if (!syncVerifyYearsDropdown || !syncVerifyYearsToggle) return;
+    syncVerifyYearsDropdown.classList.toggle('hidden', !isOpen);
+    syncVerifyYearsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+function setAllSyncVerifyYears(checked) {
+    getSyncVerifyYearCheckboxes().forEach(function (el) {
+        el.checked = checked;
+    });
+    updateSyncVerifyYearsLabel();
+}
+
+if (syncVerifyYearsToggle && syncVerifyYearsDropdown) {
+    updateSyncVerifyYearsLabel();
+    syncVerifyYearsToggle.addEventListener('click', function (event) {
+        event.stopPropagation();
+        const isOpen = syncVerifyYearsDropdown.classList.contains('hidden');
+        setSyncVerifyYearsOpen(isOpen);
+    });
+    syncVerifyYearsDropdown.addEventListener('click', function (event) {
+        event.stopPropagation();
+    });
+    document.addEventListener('click', function () {
+        setSyncVerifyYearsOpen(false);
+    });
+    getSyncVerifyYearCheckboxes().forEach(function (el) {
+        el.addEventListener('change', updateSyncVerifyYearsLabel);
+    });
+    if (syncVerifyYearsSelectAll) {
+        syncVerifyYearsSelectAll.addEventListener('click', function () {
+            setAllSyncVerifyYears(true);
+        });
+    }
+    if (syncVerifyYearsClearAll) {
+        syncVerifyYearsClearAll.addEventListener('click', function () {
+            setAllSyncVerifyYears(false);
+        });
+    }
+}
+
+let syncVerifyActiveJobId = null;
+let syncVerifyPollTimer = null;
+let syncVerifyPollDelayMs = 2000;
+const SYNC_VERIFY_STORAGE_KEY = 'fdrs_sync_verify_job_' + currentTemplateId;
+let syncVerifyUIMode = 'settings';
+let syncVerifyStopRequested = false;
+let syncVerifyLastPercent = 0;
+
+function readSyncVerifyActiveJobs() {
+    const el = document.getElementById('sync-verify-active-jobs');
+    if (!el) return [];
+    try {
+        return JSON.parse(el.textContent || '[]') || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function writeSyncVerifyStorage(jobId) {
+    try {
+        localStorage.setItem(SYNC_VERIFY_STORAGE_KEY, JSON.stringify({ jobId: jobId }));
+    } catch (e) { /* ignore */ }
+}
+
+function clearSyncVerifyStorage() {
+    try {
+        localStorage.removeItem(SYNC_VERIFY_STORAGE_KEY);
+    } catch (e) { /* ignore */ }
+}
+
+function stopSyncVerifyPolling() {
+    if (syncVerifyPollTimer) {
+        clearTimeout(syncVerifyPollTimer);
+        syncVerifyPollTimer = null;
+    }
+    syncVerifyActiveJobId = null;
+    syncVerifyPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+}
+
+function scheduleSyncVerifyPoll() {
+    syncVerifyPollTimer = setTimeout(pollSyncVerifyStatus, syncVerifyPollDelayMs);
+    syncVerifyPollDelayMs = Math.min(
+        Math.round(syncVerifyPollDelayMs * DATA_SYNC_POLL_BACKOFF_FACTOR),
+        DATA_SYNC_POLL_MAX_MS
+    );
+}
+
+function collectSyncVerifyParams() {
+    const selectedYears = getSelectedSyncVerifyYears();
+    const test = !!(document.getElementById('sync-verify-test') && document.getElementById('sync-verify-test').checked);
+    return {
+        years: selectedYears.join(','),
+        selectedYears: selectedYears,
+        test: test,
+        skipImputed: !!(document.getElementById('sync-verify-skip-imputed') && document.getElementById('sync-verify-skip-imputed').checked),
+        imputedUseCache: !!(document.getElementById('sync-verify-imputed-cache') && document.getElementById('sync-verify-imputed-cache').checked),
+        problemsOnly: !!(document.getElementById('sync-verify-problems-only') && document.getElementById('sync-verify-problems-only').checked)
+    };
+}
+
+function renderSyncVerifyConfigSummary(params) {
+    if (!syncVerifyConfigSummaryBody) return;
+    const yearsDisplay = params.test
+        ? '2024'
+        : formatDataSyncYearsDisplay(params.selectedYears || []);
+    const rows = [
+        { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
+        { label: {{ _("Test mode")|tojson|safe }}, value: dataSyncBoolIcon(params.test), html: true, inline: true },
+        { label: {{ _("Skip imputed")|tojson|safe }}, value: dataSyncBoolIcon(params.skipImputed), html: true, inline: true },
+        { label: {{ _("Cached imputed values")|tojson|safe }}, value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true },
+        { label: {{ _("Problems only")|tojson|safe }}, value: dataSyncBoolIcon(params.problemsOnly), html: true, inline: true }
+    ];
+    syncVerifyConfigSummaryBody.innerHTML = rows.map(function (row) {
+        const valueHtml = row.html ? row.value : escapeHtmlAttr(row.value);
+        if (row.inline) {
+            return '<div class="flex items-center gap-2">'
+                + '<span class="text-gray-500">' + escapeHtmlAttr(row.label) + '</span>'
+                + valueHtml
+                + '</div>';
+        }
+        return '<div class="flex items-start justify-between gap-4">'
+            + '<span class="text-gray-500 shrink-0">' + escapeHtmlAttr(row.label) + '</span>'
+            + '<span class="font-medium text-gray-900 text-right">' + valueHtml + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+function setSyncVerifyUIMode(mode) {
+    syncVerifyUIMode = mode;
+    const isSettings = mode === 'settings';
+    const isRunning = mode === 'running';
+    const isDone = mode === 'done';
+    if (syncVerifySettings) syncVerifySettings.classList.toggle('hidden', !isSettings);
+    if (syncVerifyConfigSummary) syncVerifyConfigSummary.classList.toggle('hidden', isSettings);
+    if (syncVerifyFooterSettings) syncVerifyFooterSettings.classList.toggle('hidden', !isSettings);
+    if (syncVerifyFooterRunning) syncVerifyFooterRunning.classList.toggle('hidden', !isRunning);
+    if (syncVerifyFooterDone) syncVerifyFooterDone.classList.toggle('hidden', !isDone);
+}
+
+function resetSyncVerifyRunButton() {
+    if (!syncVerifyRunBtn || !syncVerifyRunBtnText) return;
+    syncVerifyRunBtn.disabled = false;
+    const spinner = syncVerifyRunBtn.querySelector('i.fa-spinner');
+    if (spinner) spinner.remove();
+    if (!syncVerifyRunBtn.querySelector('i.fa-clipboard-check')) {
+        syncVerifyRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-clipboard-check mr-2"></i>');
+    }
+    syncVerifyRunBtnText.textContent = {{ _("Run verification")|tojson|safe }};
+}
+
+function resetSyncVerifyStopButton() {
+    syncVerifyStopRequested = false;
+    if (!syncVerifyStopBtn || !syncVerifyStopBtnText) return;
+    syncVerifyStopBtn.disabled = false;
+    syncVerifyStopBtnText.textContent = {{ _("Stop verification")|tojson|safe }};
+}
+
+function setSyncVerifyStopping() {
+    syncVerifyStopRequested = true;
+    if (!syncVerifyStopBtn || !syncVerifyStopBtnText) return;
+    syncVerifyStopBtn.disabled = true;
+    syncVerifyStopBtnText.textContent = {{ _("Stopping...")|tojson|safe }};
+}
+
+function showSyncVerifyDone() {
+    setSyncVerifyUIMode('done');
+}
+
+function resetSyncVerifyUI() {
+    syncVerifyResult.classList.add('hidden');
+    syncVerifyResultText.textContent = '';
+    if (syncVerifyProgress) syncVerifyProgress.classList.add('hidden');
+    if (syncVerifyProgressStage) syncVerifyProgressStage.textContent = '-';
+    if (syncVerifyProgressBar) syncVerifyProgressBar.style.width = '0%';
+    if (syncVerifyProgressText) syncVerifyProgressText.textContent = '0%';
+    if (syncVerifyProgressCount) syncVerifyProgressCount.textContent = '';
+    if (syncVerifyConfigSummaryBody) syncVerifyConfigSummaryBody.innerHTML = '';
+    if (syncVerifyDownloadBtn) {
+        syncVerifyDownloadBtn.classList.add('hidden');
+        syncVerifyDownloadBtn.setAttribute('href', '#');
+    }
+    resetSyncVerifyTable();
+    syncVerifyLastPercent = 0;
+    stopSyncVerifyPolling();
+    resetSyncVerifyRunButton();
+    resetSyncVerifyStopButton();
+    setSyncVerifyUIMode('settings');
+}
+
+function setSyncVerifyProgress(percent, stage, message, current, total, opts) {
+    opts = opts || {};
+    if (opts.resetProgress) {
+        syncVerifyLastPercent = 0;
+    }
+    const raw = Math.max(0, Math.min(100, Number(percent || 0)));
+    const pct = opts.resetProgress ? raw : Math.max(syncVerifyLastPercent, raw);
+    syncVerifyLastPercent = pct;
+    if (syncVerifyProgressBar) syncVerifyProgressBar.style.width = pct + '%';
+    if (syncVerifyProgressText) syncVerifyProgressText.textContent = `${Math.round(pct)}%`;
+    if (syncVerifyProgressStage) {
+        const stageText = (message && message.trim()) ? message.trim() : (stage || '-');
+        syncVerifyProgressStage.textContent = stageText;
+    }
+    if (syncVerifyProgressCount) {
+        if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
+            syncVerifyProgressCount.textContent = `${current || 0} / ${total}`;
+        } else {
+            syncVerifyProgressCount.textContent = '';
+        }
+    }
+}
+
+function formatSyncVerifyStats(stats) {
+    stats = stats || {};
+    return {{ _("Points:")|tojson|safe }}
+        + ' ' + String(stats.total || 0)
+        + ' — '
+        + String(stats.matched || 0) + ' ' + {{ _("matched")|tojson|safe }}
+        + ', '
+        + String(stats.skipped_intentionally || 0) + ' ' + {{ _("skipped")|tojson|safe }}
+        + ', '
+        + String(stats.missing || 0) + ' ' + {{ _("missing")|tojson|safe }}
+        + ', '
+        + String(stats.mismatch || 0) + ' ' + {{ _("mismatch")|tojson|safe }};
+}
+
+function pollSyncVerifyStatus() {
+    if (!syncVerifyActiveJobId) return;
+    const url = syncVerifyStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(syncVerifyActiveJobId));
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (!data || !data.success || !data.job) {
+                throw new Error((data && data.error) || 'Failed to read verification status');
+            }
+            const job = data.job;
+            setSyncVerifyProgress(job.percent, job.stage, job.message, job.current, job.total);
+            if (job.status === 'completed') {
+                stopSyncVerifyPolling();
+                clearSyncVerifyStorage();
+                syncVerifyResult.classList.remove('hidden');
+                const stats = job.stats || {};
+                const problems = (stats.missing || 0) + (stats.mismatch || 0);
+                let msg = formatSyncVerifyStats(stats);
+                if (job.download_ready && job.download_url) {
+                    const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
+                    if (syncVerifyDownloadBtn) {
+                        syncVerifyDownloadBtn.classList.remove('hidden');
+                        syncVerifyDownloadBtn.setAttribute('href', safeUrl);
+                    }
+                    msg += ' ';
+                    syncVerifyResultText.innerHTML = escapeHtmlAttr(msg)
+                        + ' <a class="text-blue-700 underline" href="' + safeUrl + '">'
+                        + {{ _("Download Excel")|tojson|safe }}
+                        + '</a>';
+                } else {
+                    syncVerifyResultText.textContent = msg;
+                }
+                syncVerifyResultText.className = problems ? 'text-sm text-amber-700' : 'text-sm text-green-700';
+                showSyncVerifyDone();
+                if (job.results_url) {
+                    loadSyncVerifyResults(job.results_url);
+                }
+                return;
+            }
+            if (job.status === 'failed') {
+                stopSyncVerifyPolling();
+                clearSyncVerifyStorage();
+                syncVerifyResult.classList.remove('hidden');
+                syncVerifyResultText.textContent = job.error || {{ _("Verification failed")|tojson|safe }};
+                syncVerifyResultText.className = 'text-sm text-red-700';
+                showSyncVerifyDone();
+                return;
+            }
+            if (job.status === 'cancelled') {
+                stopSyncVerifyPolling();
+                clearSyncVerifyStorage();
+                syncVerifyResult.classList.remove('hidden');
+                syncVerifyResultText.textContent = job.error || {{ _("Verification cancelled.")|tojson|safe }};
+                syncVerifyResultText.className = 'text-sm text-amber-700';
+                showSyncVerifyDone();
+                return;
+            }
+            if (job.status === 'cancel_requested') {
+                setSyncVerifyStopping();
+            }
+            scheduleSyncVerifyPoll();
+        })
+        .catch(err => {
+            stopSyncVerifyPolling();
+            syncVerifyResult.classList.remove('hidden');
+            syncVerifyResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
+            syncVerifyResultText.className = 'text-sm text-red-700';
+            showSyncVerifyDone();
+        });
+}
+
+if (syncVerifyRunAgainBtn) {
+    syncVerifyRunAgainBtn.addEventListener('click', resetSyncVerifyUI);
+}
+if (syncVerifyStopBtn) {
+    syncVerifyStopBtn.addEventListener('click', function() {
+        if (!syncVerifyActiveJobId || syncVerifyStopRequested) return;
+        setSyncVerifyStopping();
+        const url = syncVerifyCancelUrlTemplate.replace('__JOB_ID__', encodeURIComponent(syncVerifyActiveJobId));
+        const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
+            }
+        })
+        .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+        .then(function(result) {
+            if (!result.ok || !(result.data && result.data.success)) {
+                throw new Error((result.data && result.data.error) || {{ _("Failed to stop verification")|tojson|safe }});
+            }
+        })
+        .catch(function(err) {
+            resetSyncVerifyStopButton();
+            syncVerifyResult.classList.remove('hidden');
+            syncVerifyResultText.textContent = err.message || {{ _("Failed to stop verification")|tojson|safe }};
+            syncVerifyResultText.className = 'text-sm text-red-700';
+        });
+    });
+}
+if (syncVerifyRunBtn) {
+    syncVerifyRunBtn.addEventListener('click', function() {
+        const params = collectSyncVerifyParams();
+        if (!params.test && !params.selectedYears.length) {
+            syncVerifyResult.classList.remove('hidden');
+            syncVerifyResultText.textContent = {{ _("Select at least one reporting year.")|tojson|safe }};
+            syncVerifyResultText.className = 'text-sm text-red-700';
+            return;
+        }
+        resetSyncVerifyUI();
+        renderSyncVerifyConfigSummary(params);
+        setSyncVerifyUIMode('running');
+        if (syncVerifyProgress) syncVerifyProgress.classList.remove('hidden');
+        setSyncVerifyProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
+        syncVerifyRunBtn.disabled = true;
+        syncVerifyRunBtnText.textContent = {{ _("Running...")|tojson|safe }};
+        syncVerifyRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
+        const iconEl = syncVerifyRunBtn.querySelector('i.fa-clipboard-check');
+        if (iconEl) iconEl.remove();
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const payload = {
+            fdrs_years: params.years,
+            test: params.test,
+            skip_imputed: params.skipImputed,
+            imputed_use_cache: params.imputedUseCache,
+            problems_only: params.problemsOnly
+        };
+        fetch(templateApiUrl(TEMPLATE_API_URLS.runSyncVerify, currentTemplateId), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+        .then(function(result) {
+            var ok = result.ok;
+            var data = result.data || {};
+            if (!ok || !data.success || !data.job_id) {
+                throw new Error(data.error || {{ _("Verification failed")|tojson|safe }});
+            }
+            syncVerifyActiveJobId = data.job_id;
+            writeSyncVerifyStorage(data.job_id);
+            syncVerifyPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+            pollSyncVerifyStatus();
+        })
+        .catch(function(err) {
+            syncVerifyResult.classList.remove('hidden');
+            syncVerifyResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
+            syncVerifyResultText.className = 'text-sm text-red-700';
+            showSyncVerifyDone();
+        });
+    });
+}
+
+function resumeSyncVerifyJobIfNeeded() {
+    let jobId = null;
+    const serverJobs = readSyncVerifyActiveJobs().filter(function (j) { return j && j.job_id; });
+    if (serverJobs.length) {
+        jobId = serverJobs[0].job_id;
+    } else {
+        try {
+            const stored = JSON.parse(localStorage.getItem(SYNC_VERIFY_STORAGE_KEY) || 'null');
+            if (stored && stored.jobId) {
+                jobId = stored.jobId;
+            }
+        } catch (e) { /* ignore */ }
+    }
+    if (!jobId || !syncVerifyModal) return;
+    syncVerifyActiveJobId = jobId;
+    writeSyncVerifyStorage(jobId);
+    showFdrsSyncSubtab('verify');
+    setSyncVerifyUIMode('running');
+    if (syncVerifyProgress) syncVerifyProgress.classList.remove('hidden');
+    setSyncVerifyProgress(0, 'resuming', {{ _("Resuming verification...")|tojson|safe }}, 0, null, { resetProgress: true });
+    syncVerifyPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+    pollSyncVerifyStatus();
+}
+
+resumeSyncVerifyJobIfNeeded();
+});
+</script>

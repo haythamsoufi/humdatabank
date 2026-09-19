@@ -701,14 +701,17 @@ class TestDashboardActivityProcessing:
         assert resp.status_code == 200
 
     def test_activity_with_assignment_id_period_enrichment(self, logged_in_client, db_session, app, admin_user):
-        """Activity with assignment_id gets period enriched."""
+        """Activity with assignment_id gets assignment title and period enriched."""
         activity = MagicMock()
-        activity.summary_key = "activity.assignment_created"
+        activity.summary_key = "activity.assignment_submitted"
+        activity.activity_type = "assignment_submitted"
         activity.summary_params = {"template": "SomeTemplate"}
         activity.assignment_id = 42
 
         mock_aes = MagicMock()
+        mock_aes.id = 42
         mock_aes.assigned_form.period_name = "2024 Q1"
+        mock_aes.assigned_form.display_name = "Custom Title 2024"
 
         country = create_test_country(db_session)
         _grant_entity_permission(db_session, admin_user, "country", country.id)
@@ -718,19 +721,20 @@ class TestDashboardActivityProcessing:
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
              patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
-             patch("app.routes.main.dashboard.AssignmentEntityStatus.query") as mock_aes_query, \
+             patch("app.routes.main.helpers.AssignmentEntityStatus.query") as mock_aes_query, \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>ok</html>"):
             mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
             mock_aes_query.filter.return_value.options.return_value.all.return_value = [mock_aes]
-            mock_aes.id = 42
             mock_prefetch.return_value = MagicMock()
             mock_prefetch.return_value.metrics_for.return_value = MagicMock(
                 completion_rate=0.0, filled_items=0, total_items=0
             )
             resp = logged_in_client.get("/")
         assert resp.status_code == 200
+        assert activity.summary_params.get("assignment_title") == "Custom Title 2024"
+        assert activity.summary_params.get("period") == "2024 Q1"
 
 
 # ---------------------------------------------------------------------------
@@ -995,18 +999,20 @@ class TestLoadMoreActivities:
         db_session.commit()
 
         activity = MagicMock()
-        activity.summary_key = "activity.assignment_created"
+        activity.summary_key = "activity.assignment_submitted"
+        activity.activity_type = "assignment_submitted"
         activity.summary_params = {"template": "T"}
         activity.assignment_id = 99
 
         mock_aes = MagicMock()
         mock_aes.id = 99
         mock_aes.assigned_form.period_name = "2024 Q2"
+        mock_aes.assigned_form.display_name = "Custom Load More Title"
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
-             patch("app.routes.main.dashboard.AssignmentEntityStatus.query") as mock_q, \
+             patch("app.routes.main.helpers.AssignmentEntityStatus.query") as mock_q, \
              patch("app.routes.main.dashboard.render_template", return_value=""):
             mock_q.filter.return_value.options.return_value.all.return_value = [mock_aes]
             resp = logged_in_client.post(
@@ -1014,6 +1020,7 @@ class TestLoadMoreActivities:
                 data={"offset": "0", "limit": "10", "country_id": str(country.id)},
             )
         assert resp.status_code == 200
+        assert activity.summary_params.get("assignment_title") == "Custom Load More Title"
 
 
 # ---------------------------------------------------------------------------

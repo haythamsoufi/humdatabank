@@ -45,10 +45,10 @@ from app.routes.main.helpers import (
     DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES,
     _parse_int,
     filter_dashboard_assignment_activities,
+    enrich_dashboard_recent_activities,
     get_localized_template_name,
     localized_field_name,
     format_activity_value,
-    postprocess_activity_summary_params,
     render_activity_summary,
     render_matrix_change,
 )
@@ -932,47 +932,8 @@ def dashboard():
 
         current_app.logger.debug(f"Found {len(recent_activities)} recent activities for {selected_country.name}")
 
-        # Post-process recent activities so matrix-style field changes only include changed cells
         try:
-            # Batch-load all AES records referenced by activities in a single query
-            # to avoid an N+1 SELECT per activity when enriching period/template_period.
-            _activity_aes_ids = [
-                getattr(a, 'assignment_id', None)
-                for a in recent_activities
-                if getattr(a, 'assignment_id', None)
-            ]
-            _aes_by_id: dict = {}
-            if _activity_aes_ids:
-                _aes_rows = (
-                    AssignmentEntityStatus.query
-                    .filter(AssignmentEntityStatus.id.in_(_activity_aes_ids))
-                    .options(joinedload(AssignmentEntityStatus.assigned_form))
-                    .all()
-                )
-                _aes_by_id = {aes.id: aes for aes in _aes_rows}
-
-            for activity in recent_activities:
-                params = getattr(activity, 'summary_params', None)
-                if not isinstance(params, dict):
-                    params = {}
-                    activity.summary_params = params
-
-                # Add period information if assignment_id is available
-                assignment_id = getattr(activity, 'assignment_id', None)
-                if assignment_id and 'period' not in params:
-                    try:
-                        aes = _aes_by_id.get(assignment_id)
-                        if aes and aes.assigned_form:
-                            period_name = aes.assigned_form.period_name
-                            params['period'] = period_name
-                            template_name = params.get('template', '')
-                            if template_name:
-                                params['template_period'] = f"{template_name} - {period_name}"
-                    except Exception as e:
-                        current_app.logger.debug(f"Could not get period for activity {assignment_id}: {e}")
-
-                key = getattr(activity, 'summary_key', None)
-                postprocess_activity_summary_params(params, key)
+            enrich_dashboard_recent_activities(recent_activities)
         except Exception as e:
             current_app.logger.error(
                 f"Error post-processing recent activities for matrix diffs: {e}",
@@ -1069,49 +1030,10 @@ def load_more_activities():
         more_activities = all_activities[offset:offset + limit] if offset < len(all_activities) else []
         has_more = len(all_activities) >= fetch_limit
 
-        # Batch-load AES records for period enrichment — avoids N+1 per activity.
-        _more_aes_ids = [
-            getattr(a, 'assignment_id', None)
-            for a in more_activities
-            if getattr(a, 'assignment_id', None)
-        ]
-        _more_aes_by_id: dict = {}
-        if _more_aes_ids:
-            _more_aes_rows = (
-                AssignmentEntityStatus.query
-                .filter(AssignmentEntityStatus.id.in_(_more_aes_ids))
-                .options(joinedload(AssignmentEntityStatus.assigned_form))
-                .all()
-            )
-            _more_aes_by_id = {aes.id: aes for aes in _more_aes_rows}
-
-        # Post-process activities (same as dashboard)
-        for activity in more_activities:
-            params = getattr(activity, 'summary_params', None)
-            if not isinstance(params, dict):
-                params = {}
-                activity.summary_params = params
-
-            # Add period information if assignment_id is available
-            assignment_id = getattr(activity, 'assignment_id', None)
-            if assignment_id and 'period' not in params:
-                try:
-                    aes = _more_aes_by_id.get(assignment_id)
-                    if aes and aes.assigned_form:
-                        period_name = aes.assigned_form.period_name
-                        params['period'] = period_name
-                        template_name = params.get('template', '')
-                        if template_name:
-                            params['template_period'] = f"{template_name} - {period_name}"
-                except Exception as e:
-                    current_app.logger.debug(f"Could not get period for activity {assignment_id}: {e}")
-
-            # Trim matrix-style diffs and drop no-op matrix entries
-            try:
-                key = getattr(activity, 'summary_key', None)
-                postprocess_activity_summary_params(params, key)
-            except Exception as e:
-                current_app.logger.debug(f"Matrix diff trimming failed for load_more activities: {e}")
+        try:
+            enrich_dashboard_recent_activities(more_activities)
+        except Exception as e:
+            current_app.logger.debug(f"Activity enrichment failed for load_more activities: {e}")
 
         # Render activities to HTML using template partial
         activity_html = render_template('core/activity_items_partial.html',

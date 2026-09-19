@@ -1,11 +1,14 @@
 """FDRS publication service — preview and run the publish-to-public-website step.
 
-Copies the reported "main" value (``FormData.value`` / ``disagg_data`` /
-``numeric_value``) into the published snapshot (``FormData.published_value`` /
-``published_disagg_data`` / ``published_numeric_value``) for one FDRS assignment
-(``AssignedForm``, template 21) at a time, scoped to form items marked
-``privacy='public'`` in the Form Builder — the same gate ``GET /api/v1/data`` uses
-for unauthenticated readers (see
+Copies the publishable current value into the published snapshot
+(``FormData.published_value`` / ``published_disagg_data`` /
+``published_numeric_value`` / ``published_source``)
+for one FDRS assignment (``AssignedForm``, template 21) at a time: the reported
+"main" value (``value`` / ``disagg_data`` / ``numeric_value``) when present, or
+the imputed value (``imputed_value`` / ``imputed_disagg_data`` /
+``imputed_numeric_value``) when the reported value is missing. Scoped to form
+items marked ``privacy='public'`` in the Form Builder — the same gate
+``GET /api/v1/data`` uses for unauthenticated readers (see
 ``app.services.data_retrieval.shared.form_item_privacy_is_public_expr``).
 
 Nothing here writes automatically: publishing only happens when an admin runs
@@ -18,9 +21,10 @@ reads that snapshot — never the live ``value``.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from flask import abort
+from sqlalchemy.orm import contains_eager
 
 from app.extensions import db
 from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, User
@@ -28,9 +32,11 @@ from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from app.utils.datetime_helpers import utcnow
 
-# 'empty' = nothing reported and nothing published (not actionable, but tallied for
-# transparency so counts always add up to total_public_items).
-ALL_DIFF_KINDS = ('new', 'changed', 'removed', 'unchanged', 'empty')
+# 'empty' = nothing to publish (no reported, no imputed) and nothing published
+# (not actionable, but tallied for transparency so counts always add up to
+# total_public_items).
+ALL_DIFF_KINDS = ('new', 'changed', 'removed', 'source', 'unchanged', 'empty')
+PENDING_DIFF_KINDS = ('new', 'changed', 'removed', 'source')
 
 
 def _empty_counts() -> Dict[str, int]:
@@ -130,7 +136,7 @@ def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
         counts = counts_by_aes[aes.id]
         for kind, n in counts.items():
             totals[kind] += n
-        pending = counts['new'] + counts['changed'] + counts['removed']
+        pending = sum(counts[kind] for kind in PENDING_DIFF_KINDS)
         country = countries_by_id.get(aes.entity_id)
         publisher = publishers_by_id.get(aes.published_by_user_id) if aes.published_by_user_id else None
         countries.append({
@@ -150,7 +156,7 @@ def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
     # Most actionable first, then alphabetical for a stable secondary order.
     countries.sort(key=lambda c: (-c['pending_count'], c['country_name'] or ''))
 
-    pending_total = totals['new'] + totals['changed'] + totals['removed']
+    pending_total = sum(totals[kind] for kind in PENDING_DIFF_KINDS)
     return {
         'assignment': {
             'id': assigned_form.id,
@@ -180,6 +186,9 @@ def get_country_change_detail(assigned_form_id: int, assignment_entity_status_id
 
     rows = (
         _public_form_data_query(assigned_form_id)
+        # Reuse the FormItem join _public_form_data_query already does for filtering
+        # to also populate row.form_item (below), instead of one lazy-load query per row.
+        .options(contains_eager(FormData.form_item))
         .filter(FormData.assignment_entity_status_id == assignment_entity_status_id)
         .all()
     )
@@ -188,18 +197,21 @@ def get_country_change_detail(assigned_form_id: int, assignment_entity_status_id
     for row in rows:
         kind = row.publication_diff_kind()
         if kind == 'empty':
-            continue  # nothing reported and nothing published — no point showing it
+            continue  # nothing to publish and nothing published — no point showing it
+        current_value, current_disagg, _ = row.publication_current_payload()
         items.append({
             'form_item_id': row.form_item_id,
             'label': row.form_item.label if row.form_item else f'Item {row.form_item_id}',
             'kind': kind,
-            'current_value': row.value,
-            'current_disagg_data': row.disagg_data,
+            'current_value': current_value,
+            'current_disagg_data': current_disagg,
+            'current_is_imputed': row.publication_uses_imputed(),
             'published_value': row.published_value,
             'published_disagg_data': row.published_disagg_data,
+            'published_source': row.published_source,
         })
 
-    kind_order = {'changed': 0, 'removed': 1, 'new': 2, 'unchanged': 3}
+    kind_order = {'changed': 0, 'removed': 1, 'new': 2, 'source': 3, 'unchanged': 4}
     items.sort(key=lambda i: (kind_order.get(i['kind'], 9), i['label'] or ''))
 
     return {
@@ -217,11 +229,20 @@ def publish_assignment(
     user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
-    Copy the reported value into the published snapshot for one FDRS assignment.
+    Copy the publishable current value (reported, or imputed when reported is
+    missing) into the published snapshot for one FDRS assignment.
 
     ``assignment_entity_status_ids``: scope to these countries only (per-assignment,
     per-country publication). ``None``/omitted publishes every country in the
     assignment. Ids that do not belong to this assignment are silently dropped.
+
+    Only countries with at least one ``FormData`` row on a public-privacy item are
+    counted as published: ``published_countries`` and each country's
+    ``AssignmentEntityStatus.published_at`` / ``published_by_user_id`` are left
+    untouched for a selected country that has nothing to publish (e.g. the FDRS
+    template has zero ``privacy='public'`` items, or that country has never had
+    any data reported/imported for one) — so "last published" never claims an
+    action that did not actually happen.
 
     Returns the counts of rows moved into each diff bucket (see
     ``FormData.publication_diff_kind``) plus how many countries were touched.
@@ -252,6 +273,10 @@ def publish_assignment(
 
     public_item_ids = _public_form_item_ids()
     totals = _empty_counts()
+    # Only aes ids that actually own >=1 public FormData row get marked as
+    # published below — an aes with zero rows in scope has nothing to publish,
+    # regardless of whether it was explicitly selected.
+    touched_aes_ids: Set[int] = set()
 
     if public_item_ids:
         scoped_rows = (
@@ -259,40 +284,38 @@ def publish_assignment(
             .filter(FormData.assignment_entity_status_id.in_(target_aes_ids))
             .filter(FormData.form_item_id.in_(public_item_ids))
         )
+        now = utcnow()
         for row in scoped_rows.all():
+            # Classify against the existing snapshot *before* overwriting it.
             totals[row.publication_diff_kind()] += 1
+            touched_aes_ids.add(row.assignment_entity_status_id)
+            src_value, src_disagg, src_numeric = row.publication_current_payload()
+            row.published_value = src_value
+            row.published_disagg_data = src_disagg
+            row.published_numeric_value = src_numeric
+            row.published_source = row.publication_source_kind()
+            row.published_at = now
+            row.published_by_user_id = user_id
 
-        now = utcnow()
-        scoped_rows.update(
-            {
-                FormData.published_value: FormData.value,
-                FormData.published_disagg_data: FormData.disagg_data,
-                FormData.published_numeric_value: FormData.numeric_value,
-                FormData.published_at: now,
-                FormData.published_by_user_id: user_id,
-            },
-            synchronize_session=False,
-        )
-    else:
-        now = utcnow()
+        if touched_aes_ids:
+            (
+                AssignmentEntityStatus.query
+                .filter(AssignmentEntityStatus.id.in_(touched_aes_ids))
+                .update(
+                    {
+                        AssignmentEntityStatus.published_at: now,
+                        AssignmentEntityStatus.published_by_user_id: user_id,
+                    },
+                    synchronize_session=False,
+                )
+            )
 
-    (
-        AssignmentEntityStatus.query
-        .filter(AssignmentEntityStatus.id.in_(target_aes_ids))
-        .update(
-            {
-                AssignmentEntityStatus.published_at: now,
-                AssignmentEntityStatus.published_by_user_id: user_id,
-            },
-            synchronize_session=False,
-        )
-    )
     db.session.commit()
 
-    pending_total = totals['new'] + totals['changed'] + totals['removed']
+    pending_total = sum(totals[kind] for kind in PENDING_DIFF_KINDS)
     return {
         'assignment_id': assigned_form.id,
-        'published_countries': len(target_aes_ids),
+        'published_countries': len(touched_aes_ids),
         'totals': totals,
         'pending_total': pending_total,
     }

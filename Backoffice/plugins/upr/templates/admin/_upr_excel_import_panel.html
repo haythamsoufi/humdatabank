@@ -1,0 +1,129 @@
+{# In-page Excel Import wizard — injected by plugins.upr.routes.upr_tools.
+   IDs are upr-excel-* so they do not collide with the imputation preview. #}
+<style nonce="{{ csp_nonce() }}">
+.upr-excel-wizard-step.active { color: #2563eb; border-color: #2563eb; }
+.upr-excel-wizard-step.completed { color: #059669; border-color: #059669; }
+.upr-excel-wizard-connector { height: 2px; flex: 1; background: #d1d5db; }
+.upr-excel-wizard-connector.completed { background: #059669; }
+.upr-excel-wizard-connector.active { background: #2563eb; }
+.upr-wizard-spinner {
+  width: 2rem; height: 2rem;
+  border: 4px solid #e5e7eb; border-top-color: #2563eb;
+  border-radius: 50%; animation: spin 1s linear infinite;
+}
+</style>
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+<div id="upr-excel-import-root">
+  <p class="text-sm text-gray-600 mb-6">
+    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning and reporting templates. Allowed rounds: planning P23–P26 (templates 24 and 22); annual reports AR21–AR25 (templates 33 and 23); mid-year MYR23–MYR25 (template 33). Later rounds such as P27, AR26, and MYR26 are not imported.') }}
+  </p>
+
+  {% set step_labels = [_('Upload'), _('Configure'), _('Import')] %}
+  <div class="flex items-center mb-8 gap-2" id="upr-excel-wizard-steps">
+    {% for label in step_labels %}
+    <div class="upr-excel-wizard-step flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium
+                {% if loop.first %}active{% else %}text-gray-400 border-gray-300{% endif %}"
+         data-step="{{ loop.index }}" title="{{ label }}">{{ loop.index }}</div>
+    {% if not loop.last %}<div class="upr-excel-wizard-connector"></div>{% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="border border-gray-200 rounded-lg p-6">
+
+    <div class="upr-excel-wizard-panel" id="upr-excel-panel-1">
+      <h3 class="text-lg font-medium text-gray-900 mb-2">{{ _('Upload UPR Master file') }}</h3>
+      <p class="text-sm text-gray-600 mb-4">
+        {{ _('Select the Excel workbook containing the "UPR Data" sheet. The file is validated and analyzed automatically after upload — the workbook summary must appear before you can proceed.') }}
+      </p>
+      {{ excel_import_dropzone(
+          'upr-excel-dropzone',
+          input_id='upr_excel_file',
+          input_name='upr_excel_file',
+          accept='.xlsx,.xls',
+          title=_('Drop UPR Master.xlsx here or click to browse')
+      ) }}
+    </div>
+
+    <div class="upr-excel-wizard-panel hidden" id="upr-excel-panel-2">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Import settings') }}</h3>
+      <div class="space-y-4">
+        <div>
+          <span class="block text-sm font-medium text-gray-700 mb-2">{{ _('Templates to sync') }}</span>
+          {% for t in upr_template_choices|default([]) %}
+          <label class="flex items-center gap-2 text-sm text-gray-800 mb-1">
+            <input type="checkbox" class="upr-excel-template-checkbox h-4 w-4" value="{{ t.id }}" checked>
+            <span>{{ t.name }} (ID {{ t.id }})</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div>
+          <label for="upr-rounds" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ _('Rounds (comma-separated, e.g. P26, AR25, MYR25 — empty = all allowed rounds matching selected templates: P23–P26, AR21–AR25, MYR23–MYR25)') }}
+          </label>
+          <input type="text" id="upr-rounds" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="P26, AR25, MYR25">
+        </div>
+        <div>
+          <label for="upr-batch-size" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Batch size') }}</label>
+          <input type="number" id="upr-batch-size" min="100" value="1000" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+        </div>
+        <label class="flex items-center gap-2 text-sm text-gray-800">
+          <input type="checkbox" id="upr-dry-run" class="h-4 w-4">
+          <span>{{ _('Dry run (preview counts + Excel, no DB write)') }}</span>
+        </label>
+      </div>
+      <div class="mt-6 pt-4 border-t border-gray-200">
+        <p class="text-sm font-medium text-gray-900">{{ _('Import preview (optional)') }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+          {{ _('Configure templates and rounds above, then use Preview import below for row counts and warnings. You can run the import without preview.') }}
+        </p>
+      </div>
+      <div id="upr-excel-preview-stale-hint" class="hidden mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+        {{ _('Settings changed since the last preview — click Preview import for updated counts.') }}
+      </div>
+      <div id="upr-excel-preview-loading" class="hidden text-center py-8 mt-4 border-t border-gray-200 pt-4"
+           role="status" aria-live="polite">
+        <div class="upr-wizard-spinner mx-auto mb-4" aria-hidden="true"></div>
+        <p class="text-sm text-gray-700 font-medium">{{ _('Building import preview…') }}</p>
+        <p class="text-xs text-gray-500 mt-2">{{ _('Transforming rows and matching assignments.') }}</p>
+      </div>
+      <div id="upr-excel-preview-summary" class="mt-4 hidden text-sm text-gray-700 border-t border-gray-200 pt-4"></div>
+    </div>
+
+    <div class="upr-excel-wizard-panel hidden" id="upr-excel-panel-3">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Import progress') }}</h3>
+      <div id="upr-excel-import-progress" class="hidden mb-4">
+        <p class="text-sm text-gray-700 mb-2">
+          <span class="font-medium">{{ _('Status') }}:</span>
+          <span id="upr-excel-import-stage">-</span>
+        </p>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+          <div id="upr-excel-import-progress-bar" class="bg-purple-600 h-2 rounded-full transition-all" style="width:0%"></div>
+        </div>
+        <p id="upr-excel-import-progress-text" class="text-xs text-gray-500 mt-2">0%</p>
+      </div>
+      <div id="upr-excel-import-result" class="text-sm"></div>
+    </div>
+
+    <div class="mt-6 pt-4 border-t border-gray-200 flex justify-between">
+      <button type="button" id="upr-excel-wizard-back"
+              class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hidden">
+        {{ _('Back') }}
+      </button>
+      <div class="ml-auto flex flex-wrap justify-end gap-2">
+        <button type="button" id="upr-excel-wizard-preview" class="btn btn-secondary hidden">{{ _('Preview import') }}</button>
+        <button type="button" id="upr-excel-wizard-next" class="btn btn-primary" disabled>{{ _('Next') }}</button>
+        <button type="button" id="upr-excel-wizard-run" class="btn btn-purple hidden">{{ _('Run import') }}</button>
+        <div id="upr-excel-wizard-done-actions" class="hidden flex gap-2">
+          <a href="{{ url_for('admin.admin_dashboard') }}"
+             class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <i class="fas fa-home mr-2" aria-hidden="true"></i>{{ _('Admin Dashboard') }}
+          </a>
+          <button type="button" id="upr-excel-wizard-restart"
+                  class="btn btn-primary">
+            <i class="fas fa-redo mr-2" aria-hidden="true"></i>{{ _('New import') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

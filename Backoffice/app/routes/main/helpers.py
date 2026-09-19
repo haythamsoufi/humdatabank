@@ -15,6 +15,7 @@ from app.models.assignments import AssignmentEntityStatus
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from flask_babel import _
 from contextlib import suppress
+from sqlalchemy.orm import joinedload
 import json
 import re
 
@@ -40,6 +41,78 @@ def filter_dashboard_assignment_activities(activities):
             continue
         filtered.append(activity)
     return filtered
+
+
+def activity_assignment_display_title(assigned_form, fallback_template=None):
+    """Assignment label for activity UI: custom title when set, else template – period."""
+    if assigned_form is not None:
+        with suppress(Exception):
+            title = getattr(assigned_form, 'display_name', None)
+            if title and str(title).strip():
+                return str(title).strip()
+    fallback = str(fallback_template).strip() if fallback_template else ''
+    if not fallback:
+        return None
+    period_name = getattr(assigned_form, 'period_name', None) if assigned_form else None
+    if period_name:
+        return f"{fallback} \u2013 {period_name}"
+    return fallback
+
+
+def enrich_activity_assignment_display(params, assigned_form):
+    """Attach assignment title/period to activity summary params for dashboard display."""
+    if not isinstance(params, dict):
+        return
+
+    period_name = getattr(assigned_form, 'period_name', None) if assigned_form else None
+    if period_name and 'period' not in params:
+        params['period'] = period_name
+
+    title = activity_assignment_display_title(assigned_form, params.get('template'))
+    if title:
+        params['assignment_title'] = title
+        params['template_period'] = title
+
+
+def enrich_dashboard_recent_activities(activities):
+    """Batch-load assignment titles and trim matrix diffs on recent-activity params."""
+    if not activities:
+        return activities
+
+    assignment_ids = [
+        getattr(activity, 'assignment_id', None)
+        for activity in activities
+        if getattr(activity, 'assignment_id', None)
+    ]
+    aes_by_id = {}
+    if assignment_ids:
+        rows = (
+            AssignmentEntityStatus.query
+            .filter(AssignmentEntityStatus.id.in_(assignment_ids))
+            .options(joinedload(AssignmentEntityStatus.assigned_form))
+            .all()
+        )
+        aes_by_id = {aes.id: aes for aes in rows}
+
+    for activity in activities:
+        try:
+            params = getattr(activity, 'summary_params', None)
+            if not isinstance(params, dict):
+                params = {}
+                activity.summary_params = params
+
+            assignment_id = getattr(activity, 'assignment_id', None)
+            aes = aes_by_id.get(assignment_id) if assignment_id else None
+            assigned_form = getattr(aes, 'assigned_form', None) if aes else None
+            enrich_activity_assignment_display(params, assigned_form)
+            postprocess_activity_summary_params(params, getattr(activity, 'summary_key', None))
+        except Exception as e:
+            current_app.logger.debug(
+                "Could not enrich dashboard activity %s: %s",
+                getattr(activity, 'id', None),
+                e,
+            )
+    return activities
 
 
 def _parse_int(value, field_name, *, minimum=None) -> int:
@@ -1283,6 +1356,10 @@ def render_activity_summary(activity):
         params = {}
 
     key = getattr(activity, 'summary_key', None)
+
+    assignment_title = str(params.get('assignment_title') or '').strip()
+    if assignment_title:
+        params['template'] = assignment_title
 
     # Get field_id for matrix formatting
     field_id = params.get('field_id')

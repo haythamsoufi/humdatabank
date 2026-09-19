@@ -280,6 +280,28 @@ class TestApiManagementHelpers:
         assert rows[0]["surface"] == "v1"
         assert rows[0]["has_stats"] is True
 
+    def test_get_endpoint_registry_includes_fdrs_published_data(self, app):
+        from app.routes.admin.api_management import get_endpoint_registry
+
+        with app.app_context():
+            registry = get_endpoint_registry()
+        paths = [ep["path"] for ep in registry]
+        assert "/api/v1/fdrs/published-data" in paths
+        ep = next(e for e in registry if e["path"] == "/api/v1/fdrs/published-data")
+        assert ep["surface"] == "v1"
+        assert ep["auth"] == "api_key_or_session"
+        assert ep.get("plugin_id") == "fdrs"
+
+    def test_scan_does_not_flag_fdrs_published_data_undocumented(self, app):
+        from app.routes.admin.api_management import scan_flask_routes
+
+        with app.app_context():
+            scan = scan_flask_routes(app)
+        undoc = [r["path"] for r in scan["undocumented"]]
+        live = [r["path"] for r in scan["live"]]
+        assert "/api/v1/fdrs/published-data" in live
+        assert "/api/v1/fdrs/published-data" not in undoc
+
     def test_endpoint_registry_grid_rows_ai_documents(self):
         from app.routes.admin.api_management import _endpoint_registry_grid_rows
         eps = [

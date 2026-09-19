@@ -735,10 +735,12 @@ flowchart LR
 | `sent_for_review_by_user_id` | `INTEGER` | yes |  | `user.id` |
 | `sent_for_review_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
 | `reopened_after_close` | `BOOLEAN` | no |  | — |
+| `published_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
+| `published_by_user_id` | `INTEGER` | yes |  | `user.id` |
 
 **Constraints:** `UNIQUE (assigned_form_id, entity_type, entity_id)`
 
-**Indexes:** `INDEX (is_public_available)`; `INDEX (status_timestamp)`; `INDEX (sent_for_review_by_user_id)`; `INDEX (submitted_by_user_id)`; `INDEX (sent_for_review_at)`; `INDEX (approved_by_user_id)`; `INDEX (status)`; `INDEX (due_date)`; `INDEX (entity_type, entity_id)`; `INDEX (submitted_at)`; `INDEX (assigned_form_id)`
+**Indexes:** `INDEX (is_public_available)`; `INDEX (status_timestamp)`; `INDEX (sent_for_review_by_user_id)`; `INDEX (submitted_by_user_id)`; `INDEX (sent_for_review_at)`; `INDEX (approved_by_user_id)`; `INDEX (status)`; `INDEX (due_date)`; `INDEX (entity_type, entity_id)`; `INDEX (submitted_at)`; `INDEX (assigned_form_id)`; `INDEX (published_at)`; `INDEX (published_by_user_id)`
 
 #### `public_submission`
 
@@ -840,6 +842,11 @@ flowchart LR
 | `imputed_value` | `TEXT` | yes |  | — |
 | `imputed_disagg_data` | `JSON` | yes |  | — |
 | `imputed_numeric_value` | `FLOAT` | yes |  | — |
+| `published_value` | `TEXT` | yes |  | — |
+| `published_disagg_data` | `JSON` | yes |  | — |
+| `published_numeric_value` | `FLOAT` | yes |  | — |
+| `published_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
+| `published_by_user_id` | `INTEGER` | yes |  | `user.id` |
 | `created_at` | `TIMESTAMP WITHOUT TIME ZONE` | yes |  | — |
 | `created_by_user_id` | `INTEGER` | yes |  | `user.id` |
 | `value` | `TEXT` | yes |  | — |
@@ -852,7 +859,7 @@ flowchart LR
 
 **Constraints:** `CHECK disagg_data IS NULL OR NOT (disagg_data::jsonb ? 'mode') OR (disagg_data::jsonb ? 'mode' AND disagg_data::jsonb ? 'values')`; `CHECK (assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)`
 
-**Indexes:** `INDEX (form_item_id)`; `INDEX (submitted_at)`; `INDEX (assignment_entity_status_id, form_item_id)`; `INDEX (created_by_user_id)`; `INDEX (public_submission_id, form_item_id)`
+**Indexes:** `INDEX (form_item_id)`; `INDEX (submitted_at)`; `INDEX (assignment_entity_status_id, form_item_id)`; `INDEX (created_by_user_id)`; `INDEX (public_submission_id, form_item_id)`; `INDEX (published_at)`; `INDEX (published_by_user_id)`
 
 #### `plugin_data`
 

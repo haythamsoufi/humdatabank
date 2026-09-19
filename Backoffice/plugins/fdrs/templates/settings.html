@@ -67,6 +67,18 @@
                     <i class="fas fa-sync-alt mr-2"></i>
                     Data Sync &amp; Imputation
                 </a>
+                <a href="{{ url_for('fdrs.publication_page') }}"
+                   class="flex items-center w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-lg">
+                    <i class="fas fa-tower-broadcast mr-2"></i>
+                    Manage Publication
+                </a>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm text-gray-600">
+                    Manage Publication copies public-privacy indicators into the snapshot served by
+                    <code>GET /api/v1/fdrs/published-data</code>, with a preview of additions, changes,
+                    and removals before anything goes live — per reporting-period assignment.
+                </p>
             </div>
         </div>
     </div>

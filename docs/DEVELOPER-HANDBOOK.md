@@ -488,7 +488,7 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 | Plugin contract | [`Backoffice/app/plugins/base.py`](Backoffice/app/plugins/base.py) (`BasePlugin`, optional admin hooks) |
 | Discovery & lifecycle | [`Backoffice/app/plugins/manager.py`](Backoffice/app/plugins/manager.py) (`PluginManager`) |
 | Example plugin | [`Backoffice/plugins/pb_progress/`](Backoffice/plugins/pb_progress/) |
-| FDRS plugin | [`Backoffice/plugins/fdrs/`](Backoffice/plugins/fdrs/) — backend-only Federation-wide Databank & Reporting System: data-api sync, document fetch, matrix validation, and quality methodology. No Data Explorer tab. |
+| FDRS plugin | [`Backoffice/plugins/fdrs/`](Backoffice/plugins/fdrs/) — backend-only Federation-wide Databank & Reporting System: data-api sync, document fetch, matrix validation, quality methodology, and publication to the public FDRS website (see [FDRS publication](#fdrs-publication-published_value) below). No Data Explorer tab. |
 | UPR plugin | [`Backoffice/plugins/upr/`](Backoffice/plugins/upr/) — Unified Plan (template 24) / Report (template 33): live dashboards, Excel import/export, GO-API document import, and AI/RAG document intelligence. PNG/PDF/InDesign download; optional Word-narrative PDF or InDesign package; bulk PNG export on the Data Explorer **UPR** tab (replaces Tableau `UPR.twb`). Temporary People reached remapping: [`people-reached.md`](../Backoffice/plugins/upr/docs/people-reached.md) |
 | Standalone tool scripts | `Backoffice/plugins/<id>/visuals/` (or similar subfolder) |
 
@@ -957,6 +957,21 @@ GET /api/v1/data?submission_id=1610&item_id=1403
 ```
 
 **Star layout (`layout=star`, `schema_version: "1.2"`):** all facts live under `data.tables.fact_form_values` (static, dynamic, and repeat rows — filter by `field_type`); every row keeps its real `id`/`value`/etc. from the underlying FormData/DynamicIndicatorData/RepeatGroupData record. `matrix` is always `null` here (unlike `matrix_cells[].matrix` in the flat layout, a different, row/column/entity-grouped shape) — matrix cell values instead appear as a long array directly on `disaggregation_data`/`prefilled_disaggregation_data`/`imputed_disaggregation_data`: `[{row_entity_id, column_key, column_label, value, is_calculated_total?, total_kind?}, …]`. The same long array, keyed by `form_data_id`, is mirrored in `data.tables.bridge_disagg_values[]` for BI tools that prefer a dedicated bridge table over expanding a nested array.
+
+### FDRS publication (`published_value`)
+
+`FormData` carries a **published snapshot** — `published_value` / `published_disagg_data` / `published_numeric_value` / `published_at` / `published_by_user_id` — alongside the existing `prefilled_*`/`imputed_*` columns. It is a curated copy of the live `value`/`disagg_data`, decoupling what is currently editable/internal from what a public website actually displays. Nothing writes it automatically (regular form submission never touches it); it only changes when an admin runs the FDRS "Manage Publication" tool. `AssignmentEntityStatus` mirrors `published_at`/`published_by_user_id` so list views can show "last published" per country without aggregating `form_data` on every page load.
+
+| Piece | Location |
+|-------|----------|
+| Diff/copy logic | [`Backoffice/plugins/fdrs/services/fdrs_publication_service.py`](../Backoffice/plugins/fdrs/services/fdrs_publication_service.py) — `get_assignment_publication_summary()` (per-country counts), `get_country_change_detail()` (item-level diff), `publish_assignment()` (the actual copy) |
+| Admin UI | `/admin/plugins/fdrs/publication` (from FDRS Settings → **Manage Publication**) — pick one assignment (reporting period), preview additions/changes/removals per country with a diff highlighted per item, then publish all countries or a selected subset |
+| Diff classification | `FormData.publication_diff_kind()`: `new` (reported, never published) / `changed` / `removed` (published before, no longer reported — publishing would clear the public value) / `unchanged` / `empty` |
+| Public endpoint | `GET /api/v1/fdrs/published-data` ([`Backoffice/plugins/fdrs/public_api_routes.py`](../Backoffice/plugins/fdrs/public_api_routes.py)) |
+
+Publication is **scoped to one `AssignedForm` (template + reporting period) at a time**, and within it to whichever `AssignmentEntityStatus` (country) rows are selected — the granularity the tool exposes is per-assignment-per-country, not a single global "publish everything" switch. It only ever touches `FormItem`s marked `privacy='public'` on the FDRS template (`FDRS_TEMPLATE_ID`, currently 21) — the same gate `GET /api/v1/data` uses for unauthenticated readers (`form_item_privacy_is_public_expr()` in `app/services/data_retrieval/shared.py`). `admin.templates.edit` + system-manager access is required to publish; `admin.templates.view` is enough to preview.
+
+`GET /api/v1/fdrs/published-data` requires an API key (`Authorization: Bearer ...`, same as the rest of `/api/v1`) and only ever reads the `published_*` columns — never the live `value` — so a row with unpublished edits still returns the last-published figure until the next publish. Query params: `period_name`, `assignment_id` (`AssignedForm.id`), `country_id` / `country_iso2` / `country_iso3`, `form_item_id`, `page`, `per_page`. Each row in `data[]` includes `submission_id`, `assignment_id`, `period_name`, `country_id`/`country_name`/`iso2`/`iso3`, `form_item_id`, `stable_key`, `indicator_bank_id`, `item_label`, `value`, `num_value`, `disaggregation_data`, `data_status`, and `published_at`.
 
 ## Troubleshooting (Common)
 

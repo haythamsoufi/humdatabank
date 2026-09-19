@@ -397,12 +397,21 @@ class AssignmentEntityStatus(db.Model):
     # Denormalized cache of AssignmentCompletionService.compute_for_assignment() (refreshed on save).
     completion_rate = db.Column(db.Numeric(5, 1), nullable=True)
 
+    # Publication audit — when/who last ran the FDRS publication tool for this entity
+    # (see FormData.published_value / plugins/fdrs/services/fdrs_publication_service.py).
+    # Independent of the submit/approve workflow above: an entity can be (re-)published
+    # regardless of its assignment status. Lets list/summary views show "last published"
+    # without aggregating over form_data on every page load.
+    published_at = db.Column(db.DateTime, nullable=True)
+    published_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+
     # Relationships
     assigned_form = relationship('AssignedForm', backref=db.backref('entity_statuses', lazy='dynamic', cascade="all, delete-orphan"))
     submitted_by_user = db.relationship('User', foreign_keys=[submitted_by_user_id])
     approved_by_user = db.relationship('User', foreign_keys=[approved_by_user_id])
     status_changed_by_user = db.relationship('User', foreign_keys=[status_changed_by_user_id])
     sent_for_review_by_user = db.relationship('User', foreign_keys=[sent_for_review_by_user_id])
+    published_by_user = db.relationship('User', foreign_keys=[published_by_user_id])
 
     # Relationship to FormData
     data_entries = relationship('FormData', lazy='dynamic', cascade="all, delete-orphan", foreign_keys='FormData.assignment_entity_status_id')
@@ -438,6 +447,8 @@ class AssignmentEntityStatus(db.Model):
         db.Index('ix_aes_submitted_at', 'submitted_at'),
         db.Index('ix_aes_sent_for_review_by', 'sent_for_review_by_user_id'),
         db.Index('ix_aes_sent_for_review_at', 'sent_for_review_at'),
+        db.Index('ix_aes_published_at', 'published_at'),
+        db.Index('ix_aes_published_by', 'published_by_user_id'),
     )
 
     @property

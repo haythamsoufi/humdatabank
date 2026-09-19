@@ -56,6 +56,15 @@ def changes_path(log_id: str, *, log_dir: Optional[str] = None) -> str:
     return os.path.join(import_logs_dir(log_dir), f"{log_id}.jsonl")
 
 
+_JSON_SCALAR_PAIR_RE = re.compile(
+    r'"((?:\\.|[^"\\])*)"\s*:\s*(-?\d+(?:\.\d+)?|null|true|false)'
+)
+
+
+def _dump_json(value: Any) -> str:
+    return json.dumps(value, default=str, ensure_ascii=True, sort_keys=True)
+
+
 def compact_import_value(value: Any, *, limit: int = _VALUE_PREVIEW_LIMIT) -> Any:
     """Shrink scalars/JSON for the change log without dropping the fact of a write."""
     if value is None or value == "":
@@ -64,7 +73,7 @@ def compact_import_value(value: Any, *, limit: int = _VALUE_PREVIEW_LIMIT) -> An
         return value
     if isinstance(value, dict):
         try:
-            text = json.dumps(value, default=str, ensure_ascii=True)
+            text = _dump_json(value)
         except TypeError:
             text = str(value)
         if len(text) <= limit:
@@ -72,7 +81,7 @@ def compact_import_value(value: Any, *, limit: int = _VALUE_PREVIEW_LIMIT) -> An
         return {"keys": len(value), "preview": text[:limit] + "…"}
     if isinstance(value, list):
         try:
-            text = json.dumps(value, default=str, ensure_ascii=True)
+            text = _dump_json(value)
         except TypeError:
             text = str(value)
         if len(text) <= limit:
@@ -80,6 +89,73 @@ def compact_import_value(value: Any, *, limit: int = _VALUE_PREVIEW_LIMIT) -> An
         return {"n": len(value), "preview": text[:limit] + "…"}
     text = str(value)
     return text if len(text) <= limit else text[:limit] + "…"
+
+
+def _preview_scalar_pairs(value: Any) -> Optional[frozenset]:
+    """Order-independent fingerprint of scalar JSON pairs in a value or compact preview."""
+    if value is None or value == "":
+        return frozenset()
+    if isinstance(value, dict) and "preview" in value and set(value.keys()) <= {"keys", "n", "preview"}:
+        text = str(value.get("preview") or "")
+        if text.endswith("…"):
+            text = text[:-1]
+    else:
+        try:
+            text = _dump_json(value)
+        except TypeError:
+            return None
+    return frozenset(_JSON_SCALAR_PAIR_RE.findall(text))
+
+
+def _is_structured_import_value(value: Any) -> bool:
+    if isinstance(value, (dict, list)):
+        return True
+    if isinstance(value, str) and value[:1] in "{[":
+        return True
+    return False
+
+
+def import_values_equivalent(left: Any, right: Any) -> bool:
+    """True when two logged values are the same, ignoring JSON key order and compact previews."""
+    if left == right:
+        return True
+    if compact_import_value(left) == compact_import_value(right):
+        return True
+    if not (_is_structured_import_value(left) or _is_structured_import_value(right)):
+        return False
+    left_pairs = _preview_scalar_pairs(left)
+    right_pairs = _preview_scalar_pairs(right)
+    return left_pairs is not None and left_pairs == right_pairs
+
+
+def _is_truncated_preview(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and "preview" in value
+        and set(value.keys()) <= {"keys", "n", "preview"}
+        and str(value.get("preview") or "").endswith("…")
+    )
+
+
+def is_noop_import_change(change: Dict[str, Any]) -> bool:
+    """True when an update row has the same before/after value and disagg."""
+    if not isinstance(change, dict):
+        return True
+    op = str(change.get("op") or "update").strip().lower()
+    if op in ("insert", "stage"):
+        return False
+    if not import_values_equivalent(change.get("old_value"), change.get("new_value")):
+        return False
+    if import_values_equivalent(change.get("old_disagg"), change.get("new_disagg")):
+        return True
+    # Compacted previews are truncated, so key-order differences look like
+    # disagg changes even when the stored objects were equal. Same scalar
+    # value + same preview key-count is not a user-visible change.
+    old_d = change.get("old_disagg")
+    new_d = change.get("new_disagg")
+    if _is_truncated_preview(old_d) and _is_truncated_preview(new_d):
+        return old_d.get("keys") == new_d.get("keys")
+    return False
 
 
 def change_log_url_for(log_id: str) -> Optional[str]:
@@ -187,6 +263,8 @@ class ImportChangeLogWriter:
     def record(self, change: Dict[str, Any]) -> None:
         if not isinstance(change, dict) or not change:
             return
+        if is_noop_import_change(change):
+            return
         row = {
             "op": change.get("op") or "update",
             "aes_id": change.get("aes_id"),
@@ -231,6 +309,7 @@ class ImportChangeLogWriter:
                     "skipped",
                     "inserted",
                     "updated",
+                    "unchanged",
                     "errors",
                     "updated_count",
                     "transformed",
@@ -381,18 +460,52 @@ def iter_import_log_changes(
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(row, dict):
+            if isinstance(row, dict) and not is_noop_import_change(row):
                 yield row
                 n += 1
 
 
-def count_import_log_changes(log_id: str, *, log_dir: Optional[str] = None) -> int:
+def count_import_log_changes(
+    log_id: str,
+    *,
+    log_dir: Optional[str] = None,
+    include_noops: bool = False,
+) -> int:
     path = changes_path(log_id, log_dir=log_dir)
     if not os.path.isfile(path):
         return 0
     n = 0
     with open(path, encoding="utf-8") as fh:
         for line in fh:
-            if line.strip():
+            line = line.strip()
+            if not line:
+                continue
+            if include_noops:
+                n += 1
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict) and not is_noop_import_change(row):
+                n += 1
+    return n
+
+
+def count_import_log_noops(log_id: str, *, log_dir: Optional[str] = None) -> int:
+    path = changes_path(log_id, log_dir=log_dir)
+    if not os.path.isfile(path):
+        return 0
+    n = 0
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict) and is_noop_import_change(row):
                 n += 1
     return n

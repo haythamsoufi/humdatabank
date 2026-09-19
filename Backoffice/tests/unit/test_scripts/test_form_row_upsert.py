@@ -79,6 +79,46 @@ class TestUpsertFormDataRowsUnchangedDetection:
             reloaded = db_session.get(FormData, existing_id)
             assert reloaded.value == "42"
 
+    def test_change_recorder_skips_unchanged_rows(self, db_session, app):
+        with app.app_context():
+            aes_same, item_same = _make_aes_and_item(db_session)
+            aes_changed, item_changed = _make_aes_and_item(db_session)
+            aes_new, item_new = _make_aes_and_item(db_session)
+            same_row = FormData(
+                assignment_entity_status_id=aes_same.id,
+                form_item_id=item_same.id,
+                value="42",
+                disagg_type="simple",
+            )
+            same_row._sync_numeric_value_from_string()
+            changed_row = FormData(
+                assignment_entity_status_id=aes_changed.id,
+                form_item_id=item_changed.id,
+                value="10",
+                disagg_type="simple",
+            )
+            changed_row._sync_numeric_value_from_string()
+            db_session.add_all([same_row, changed_row])
+            db_session.commit()
+
+            recorded = []
+            stats = upsert_form_data_rows(
+                [
+                    _row(aes_same.id, item_same.id, "42"),
+                    _row(aes_changed.id, item_changed.id, "11"),
+                    _row(aes_new.id, item_new.id, "7"),
+                ],
+                batch_size=100,
+                change_recorder=recorded.append,
+            )
+
+            assert stats["unchanged"] == 1
+            assert stats["updated"] == 1
+            assert stats["inserted"] == 1
+            assert [row["op"] for row in recorded] == ["update", "insert"]
+            assert recorded[0]["old_value"] == "10"
+            assert recorded[0]["new_value"] == "11"
+
     def test_changed_value_is_updated(self, db_session, app):
         with app.app_context():
             aes, item = _make_aes_and_item(db_session)

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, after_this_request
 from flask_login import current_user
+from werkzeug.exceptions import HTTPException
 import tempfile
 from app.models import db, FormTemplate, FormItem, FormSection, FormPage, AssignedForm, FormData, Country, TemplateShare
 from app.models.assignments import AssignmentEntityStatus
@@ -610,6 +611,8 @@ def preview_data(template_id: int):
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -753,6 +756,8 @@ def preview_imputation(template_id: int):
 
         return json_ok(success=True, data=preview_data)
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -879,6 +884,8 @@ def preview_data_chunked(template_id: int):
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1127,6 +1134,8 @@ def preview_imputation_chunked(template_id: int):
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1176,6 +1185,8 @@ def get_filter_options(template_id: int):
 
         return json_ok(success=True, countries=countries, items=items)
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1202,6 +1213,8 @@ def get_available_periods(template_id: int):
             latest=period_names[0] if period_names else None,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1221,6 +1234,10 @@ def run_imputation_filtered(template_id: int):
 
         if not year:
             return json_bad_request('Year parameter required')
+
+        # Fail fast with a real 404 (matching the other data-sync endpoints) instead of
+        # letting a missing template surface as a generic 400 from the service layer below.
+        FormTemplate.query.get_or_404(template_id)
 
         result = ImputationService.impute_template_filtered(
             template_id=template_id,
@@ -1245,6 +1262,8 @@ def run_imputation_filtered(template_id: int):
         else:
             return json_bad_request(result.get('error', 'Imputation failed'))
 
+    except HTTPException:
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 

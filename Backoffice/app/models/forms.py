@@ -893,12 +893,24 @@ class FormData(DataEntryMixin, db.Model):
     # Imputed values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
+    # Published snapshot — a curated copy of the reported value/disagg_data, written only
+    # when an admin runs the FDRS publication tool (plugins/fdrs; see fdrs_publication_service.py).
+    # Never written by regular form submission. This is what the public-facing
+    # GET /api/v1/fdrs/published-data endpoint serves to external consumers, decoupling
+    # what is live/editable internally from what is currently visible on the public site.
+    published_value = db.Column(db.Text(), nullable=True)
+    # Published values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
+    published_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
+    published_numeric_value = db.Column(db.Float, nullable=True)
+    published_at = db.Column(db.DateTime, nullable=True)
+    published_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     form_item = relationship('FormItem', foreign_keys=[form_item_id], overlaps="data_entries")
     assignment_entity_status = relationship('AssignmentEntityStatus', foreign_keys=[assignment_entity_status_id], overlaps="data_entries")
     public_submission = relationship('PublicSubmission', overlaps="data_entries")
     created_by_user = relationship('User', foreign_keys=[created_by_user_id])
+    published_by_user = relationship('User', foreign_keys=[published_by_user_id])
 
     __table_args__ = (
         db.Index('ix_form_data_aes_item', 'assignment_entity_status_id', 'form_item_id'),
@@ -906,6 +918,8 @@ class FormData(DataEntryMixin, db.Model):
         db.Index('ix_form_data_form_item', 'form_item_id'),
         db.Index('ix_form_data_submitted_at', 'submitted_at'),
         db.Index('ix_form_data_created_by', 'created_by_user_id'),
+        db.Index('ix_form_data_published_at', 'published_at'),
+        db.Index('ix_form_data_published_by', 'published_by_user_id'),
         db.CheckConstraint(
             '(assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)',
             name='ck_form_data_parent',
@@ -966,6 +980,44 @@ class FormData(DataEntryMixin, db.Model):
         has_reported = (self.value is not None and str(self.value).strip() != "") or (self.disagg_data is not None)
         has_prefilled = (self.prefilled_value is not None) or (self.prefilled_disagg_data is not None)
         return (not has_reported) and has_prefilled
+
+    @staticmethod
+    def _is_blank_value(value, disagg):
+        """True when neither a scalar value nor a disagg payload is present."""
+        return (value is None or str(value).strip() == "") and not disagg
+
+    def is_published(self):
+        """Whether this row has ever been published (has a non-empty published snapshot)."""
+        return not self._is_blank_value(self.published_value, self.published_disagg_data)
+
+    def publication_diff_kind(self):
+        """
+        Classify how the reported "main" value (``value`` / ``disagg_data``) compares to the
+        last published snapshot (``published_value`` / ``published_disagg_data``).
+
+        Used by the FDRS publication tool (plugins/fdrs/services/fdrs_publication_service.py)
+        to preview and highlight what publishing would change, without writing anything.
+
+        Returns one of:
+          - ``'new'``       reported data exists; nothing has been published yet.
+          - ``'changed'``   both exist and differ.
+          - ``'removed'``   something was published before, but there is no reported value
+                            now — publishing would clear the public value.
+          - ``'unchanged'``  both exist and are identical (same scalar and disagg payload).
+          - ``'empty'``     nothing reported and nothing published (no-op either way).
+        """
+        current_blank = self._is_blank_value(self.value, self.disagg_data)
+        published_blank = self._is_blank_value(self.published_value, self.published_disagg_data)
+
+        if current_blank and published_blank:
+            return 'empty'
+        if current_blank:
+            return 'removed'
+        if published_blank:
+            return 'new'
+        if self.value == self.published_value and self.disagg_data == self.published_disagg_data:
+            return 'unchanged'
+        return 'changed'
 
     def __repr__(self):
         item_label = 'N/A'

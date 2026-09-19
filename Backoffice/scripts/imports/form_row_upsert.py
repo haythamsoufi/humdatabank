@@ -552,23 +552,6 @@ def upsert_form_data_rows(
             else:
                 existing = existing_by_pub.get((int(public_submission_id), int(form_item_id)))
 
-            if change_recorder:
-                try:
-                    change_recorder({
-                        "op": "update" if existing else "insert",
-                        "aes_id": assignment_entity_status_id,
-                        "item_id": form_item_id,
-                        "iso3": (row.get("_debug_iso3") or "").strip() or None,
-                        "year": (row.get("_debug_year") or "").strip() or None,
-                        "kpi": (row.get("_debug_kpi_code") or "").strip() or None,
-                        "old_value": getattr(existing, "value", None) if existing else None,
-                        "old_disagg": getattr(existing, "disagg_data", None) if existing else None,
-                        "new_value": payload.get("value"),
-                        "new_disagg": payload.get("disagg_data"),
-                    })
-                except Exception:
-                    logger.debug("import change recorder failed", exc_info=True)
-
             try:
                 disagg_new = _disagg_data_for_db(payload["disagg_data"])
                 prefilled_for_db = FormData._coerce_scalar_text_value(payload["prefilled_value"])
@@ -605,6 +588,23 @@ def upsert_form_data_rows(
                 and existing.imputed_value == imputed_for_db
                 and (new_submitted_at is None or existing.submitted_at == new_submitted_at)
             )
+
+            if change_recorder and not unchanged:
+                try:
+                    change_recorder({
+                        "op": "update" if existing else "insert",
+                        "aes_id": assignment_entity_status_id,
+                        "item_id": form_item_id,
+                        "iso3": (row.get("_debug_iso3") or "").strip() or None,
+                        "year": (row.get("_debug_year") or "").strip() or None,
+                        "kpi": (row.get("_debug_kpi_code") or "").strip() or None,
+                        "old_value": getattr(existing, "value", None) if existing else None,
+                        "old_disagg": getattr(existing, "disagg_data", None) if existing else None,
+                        "new_value": payload.get("value"),
+                        "new_disagg": payload.get("disagg_data"),
+                    })
+                except Exception:
+                    logger.debug("import change recorder failed", exc_info=True)
 
             if dry_run:
                 if existing:

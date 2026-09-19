@@ -11,6 +11,7 @@ from app.services.imports.import_change_log import (
     VIEWER_CHANGE_LIMIT,
     changes_path,
     count_import_log_changes,
+    count_import_log_noops,
     is_valid_import_log_id,
     iter_import_log_changes,
     load_import_log_summary,
@@ -30,10 +31,20 @@ def _require_log_id(log_id: str) -> str:
 @permission_required_any("admin.audit.view", "admin.templates.view")
 def view_log(log_id: str):
     log_id = _require_log_id(log_id)
-    summary = load_import_log_summary(log_id)
+    summary = load_import_log_summary(log_id) or {}
     changes = list(iter_import_log_changes(log_id, limit=VIEWER_CHANGE_LIMIT))
-    change_total = int((summary or {}).get("change_count") or 0) or count_import_log_changes(log_id)
-    ready = bool(summary) or os.path.isfile(changes_path(log_id))
+    change_total = count_import_log_changes(log_id)
+    stats = dict((summary.get("stats") or {}))
+    noop_count = count_import_log_noops(log_id)
+    if stats.get("unchanged") is None or int(stats.get("unchanged") or 0) < noop_count:
+        stats["unchanged"] = noop_count
+    inserted = int(stats.get("inserted") or 0)
+    real_updates = max(change_total - inserted, 0)
+    recorded_updates = int(stats.get("updated") or 0)
+    if recorded_updates > real_updates:
+        stats["updated"] = real_updates
+    summary = {**summary, "stats": stats}
+    ready = bool(summary.get("log_id")) or os.path.isfile(changes_path(log_id))
     return render_template(
         "admin/analytics/import_change_log.html",
         title="Import change log",

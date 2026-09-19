@@ -7,7 +7,10 @@ from unittest.mock import patch
 from app.services.imports.import_change_log import (
     ImportChangeLogWriter,
     compact_import_value,
+    count_import_log_changes,
+    is_noop_import_change,
     is_valid_import_log_id,
+    iter_import_log_changes,
     persist_import_change_log,
     staged_payload_changes,
 )
@@ -37,6 +40,60 @@ class TestCompactImportValue:
         out = compact_import_value(text, limit=20)
         assert out.endswith("…")
         assert len(out) == 21
+
+
+class TestIsNoopImportChange:
+    def test_identical_update_is_noop(self):
+        assert is_noop_import_change({
+            "op": "update",
+            "old_value": "9365",
+            "new_value": "9365",
+        })
+
+    def test_changed_update_is_not_noop(self):
+        assert not is_noop_import_change({
+            "op": "update",
+            "old_value": "1",
+            "new_value": "2",
+        })
+
+    def test_insert_is_never_noop(self):
+        assert not is_noop_import_change({"op": "insert", "new_value": None})
+
+    def test_same_disagg_different_key_order_is_noop(self):
+        assert is_noop_import_change({
+            "op": "update",
+            "old_value": "56",
+            "new_value": "56",
+            "old_disagg": {"mode": "sex_age", "values": {"direct": {"male_50_": 7, "female_18_49": 15}}},
+            "new_disagg": {"values": {"direct": {"female_18_49": 15, "male_50_": 7}}, "mode": "sex_age"},
+        })
+
+    def test_compacted_preview_same_pairs_is_noop(self):
+        old = {
+            "keys": 2,
+            "preview": '{"mode": "sex_age", "values": {"direct": {"male_50_": 7, "female_18_49": 15}}}…',
+        }
+        new = {
+            "keys": 2,
+            "preview": '{"mode": "sex_age", "values": {"direct": {"female_18_49": 15, "male_50_": 7}}}…',
+        }
+        assert is_noop_import_change({
+            "op": "update",
+            "old_value": "56",
+            "new_value": "56",
+            "old_disagg": old,
+            "new_disagg": new,
+        })
+
+    def test_truncated_previews_with_same_value_and_key_count_are_noop(self):
+        assert is_noop_import_change({
+            "op": "update",
+            "old_value": "27332",
+            "new_value": "27332",
+            "old_disagg": {"keys": 2, "preview": '{"mode": "sex_age", "values": {"direct": {"female_unknown": 2}}}…'},
+            "new_disagg": {"keys": 2, "preview": '{"mode": "sex_age", "values": {"direct": {"unknown_5_17": 1176}}}…'},
+        })
 
 
 class TestStagedPayloadChanges:
@@ -83,6 +140,26 @@ class TestImportChangeLogWriter:
         first = json.loads(lines[0])
         assert first["iso3"] == "KEN"
         assert first["new_value"] == 5
+
+    def test_skips_identical_before_after_updates(self, tmp_path):
+        log_id = "e" * 32
+        persist_import_change_log(
+            log_id=log_id,
+            kind="fdrs_data_sync",
+            changes=[
+                {"op": "update", "iso3": "SLE", "old_value": "9365", "new_value": "9365"},
+                {"op": "insert", "iso3": "KEN", "new_value": 5},
+                {"op": "update", "iso3": "BGD", "old_value": "16", "new_value": "99"},
+            ],
+            stats={"updated": 1, "inserted": 1, "unchanged": 1, "success": True},
+            log_dir=str(tmp_path),
+        )
+        summary = json.loads((tmp_path / f"{log_id}.json").read_text(encoding="utf-8"))
+        assert summary["change_count"] == 2
+        assert summary["stats"]["unchanged"] == 1
+        rows = list(iter_import_log_changes(log_id, log_dir=str(tmp_path)))
+        assert [row["iso3"] for row in rows] == ["KEN", "BGD"]
+        assert count_import_log_changes(log_id, log_dir=str(tmp_path)) == 2
 
     def test_context_manager_finalizes_on_error(self, tmp_path):
         log_id = "c" * 32

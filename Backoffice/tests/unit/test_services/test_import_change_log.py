@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from unittest.mock import patch
 
 from app.services.imports.import_change_log import (
@@ -172,6 +173,41 @@ class TestImportChangeLogWriter:
         summary = json.loads((tmp_path / f"{log_id}.json").read_text(encoding="utf-8"))
         assert summary["change_count"] == 1
         assert summary["stats"]["success"] is False
+
+
+class TestImportChangeLogStorage:
+    def test_survives_local_cache_delete(self, app):
+        from app.services.imports.import_change_log import (
+            STORAGE_CATEGORY,
+            _storage_rel,
+            changes_path,
+            load_import_log_summary,
+            persist_import_change_log,
+            summary_path,
+        )
+        from app.services.platform import storage_service
+
+        log_id = "ab" + ("f" * 30)
+        with app.app_context():
+            persist_import_change_log(
+                log_id=log_id,
+                kind="upr_excel",
+                meta={"filename": "upr.xlsx"},
+                changes=[{"op": "insert", "iso3": "KEN", "new_value": 4}],
+                stats={"inserted": 1, "success": True},
+            )
+            assert storage_service.exists(STORAGE_CATEGORY, _storage_rel(log_id, "json"))
+            assert storage_service.exists(STORAGE_CATEGORY, _storage_rel(log_id, "jsonl"))
+            os.remove(summary_path(log_id))
+            os.remove(changes_path(log_id))
+            summary = load_import_log_summary(log_id)
+            assert summary is not None
+            assert summary["kind"] == "upr_excel"
+            assert summary["change_count"] == 1
+            rows = list(iter_import_log_changes(log_id))
+            assert rows[0]["iso3"] == "KEN"
+            storage_service.delete(STORAGE_CATEGORY, _storage_rel(log_id, "json"))
+            storage_service.delete(STORAGE_CATEGORY, _storage_rel(log_id, "jsonl"))
 
 
 class TestSetImportAuditDetails:

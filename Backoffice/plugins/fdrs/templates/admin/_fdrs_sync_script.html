@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', function () {
         runSyncVerify: {{ url_for("fdrs.run_sync_verify", template_id=0) | tojson }},
         syncVerifyStatus: {{ url_for("fdrs.sync_verify_status", template_id=0, job_id="__JOB_ID__") | tojson }},
         syncVerifyCancel: {{ url_for("fdrs.sync_verify_cancel", template_id=0, job_id="__JOB_ID__") | tojson }},
-        syncVerifyResults: {{ url_for("fdrs.sync_verify_results", template_id=0, job_id="__JOB_ID__") | tojson }}
+        syncVerifyResults: {{ url_for("fdrs.sync_verify_results", template_id=0, job_id="__JOB_ID__") | tojson }},
+        syncVerifyLatest: {{ url_for("fdrs.sync_verify_latest", template_id=0) | tojson }},
+        syncVerifyLatestResults: {{ url_for("fdrs.sync_verify_latest_results", template_id=0) | tojson }}
     };
 
     function templateApiUrl(pathTemplate, templateId) {
@@ -36,48 +38,75 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function showFdrsSyncSubtab(which) {
-        activateSyncMainTab();
-        const runPanel = document.getElementById('fdrs-sync-subpanel-run');
-        const verifyPanel = document.getElementById('fdrs-sync-subpanel-verify');
-        const buttons = document.querySelectorAll('#fdrs-sync-subtabs [data-fdrs-sync-subtab]');
-        buttons.forEach(function (btn) {
-            const on = btn.getAttribute('data-fdrs-sync-subtab') === which;
-            btn.setAttribute('aria-selected', on ? 'true' : 'false');
-            btn.classList.toggle('active', on);
-            btn.classList.toggle('border-blue-500', on);
-            btn.classList.toggle('text-blue-600', on);
-            btn.classList.toggle('border-transparent', !on);
-            btn.classList.toggle('text-gray-500', !on);
-        });
-        if (runPanel) runPanel.classList.toggle('hidden', which !== 'run');
-        if (verifyPanel) verifyPanel.classList.toggle('hidden', which !== 'verify');
+    function setSyncRunDetailsOpen(kind, open) {
+        const id = kind === 'verify' ? 'fdrs-sync-verify-run-details' : 'fdrs-sync-run-details';
+        const el = document.getElementById(id);
+        if (el) el.open = !!open;
     }
 
-    document.querySelectorAll('#fdrs-sync-subtabs [data-fdrs-sync-subtab]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            showFdrsSyncSubtab(this.getAttribute('data-fdrs-sync-subtab'));
-        });
-    });
+    function showFdrsSyncSubtab(which) {
+        activateSyncMainTab();
+        if (which === 'run' || which === 'verify') {
+            setSyncRunDetailsOpen(which, true);
+        }
+    }
 
     let syncVerifyResultsUrl = null;
-    let syncVerifyTableState = { sheet: 'data_points', status: '', page: 1 };
+    let syncVerifyTableState = { sheet: 'data_points' };
+    let syncVerifyGridHelper = null;
+
+    function formatFdrsLastRunDate(iso) {
+        if (!iso) return '';
+        const parsed = new Date(iso);
+        if (isNaN(parsed.getTime())) return String(iso);
+        return parsed.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+    }
+
+    function renderSyncVerifyLastRun(meta) {
+        const banner = document.getElementById('sync-verify-last-run');
+        if (!banner || !meta || !meta.exists && !meta.completed_at && !meta.stats) {
+            if (banner && !(meta && (meta.completed_at || meta.stats))) banner.classList.add('hidden');
+            return;
+        }
+        banner.classList.remove('hidden');
+        const dateEl = document.getElementById('sync-verify-last-run-date');
+        if (dateEl && meta.completed_at) {
+            dateEl.textContent = ' · ' + formatFdrsLastRunDate(meta.completed_at);
+        }
+        const statsEl = document.getElementById('sync-verify-last-run-stats');
+        if (statsEl && meta.stats) {
+            statsEl.textContent = formatSyncVerifyStats(meta.stats);
+        }
+        const dl = document.getElementById('sync-verify-last-run-download');
+        if (dl && meta.download_url && isSafeHref(meta.download_url)) {
+            dl.classList.remove('hidden');
+            dl.setAttribute('href', meta.download_url);
+        }
+    }
+
+    function showVerifyGridError(message) {
+        const err = document.getElementById('sync-verify-grid-error');
+        if (!err) return;
+        if (!message) {
+            err.classList.add('hidden');
+            err.textContent = '';
+            return;
+        }
+        err.textContent = message;
+        err.classList.remove('hidden');
+    }
 
     function resetSyncVerifyTable() {
         syncVerifyResultsUrl = null;
-        syncVerifyTableState = { sheet: 'data_points', status: '', page: 1 };
+        syncVerifyTableState = { sheet: 'data_points' };
         const wrap = document.getElementById('sync-verify-table-wrap');
         if (wrap) wrap.classList.add('hidden');
-        const head = document.getElementById('sync-verify-table-head');
-        const body = document.getElementById('sync-verify-table-body');
-        const pager = document.getElementById('sync-verify-pagination');
         const cards = document.getElementById('sync-verify-stats-cards');
-        if (head) head.innerHTML = '';
-        if (body) body.innerHTML = '';
-        if (pager) pager.innerHTML = '';
         if (cards) cards.innerHTML = '';
-        const filter = document.getElementById('sync-verify-status-filter');
-        if (filter) filter.value = '';
+        const search = document.getElementById('sync-verify-search');
+        if (search) search.value = '';
+        showVerifyGridError('');
+        if (syncVerifyGridHelper) syncVerifyGridHelper.setRowData([]);
     }
 
     function statusBadgeClass(status) {
@@ -115,85 +144,93 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.classList.toggle('text-gray-600', !on);
             btn.classList.toggle('bg-white', !on);
         });
-        const filter = document.getElementById('sync-verify-status-filter');
-        if (filter) filter.classList.toggle('hidden', sheet !== 'data_points');
+    }
+
+    function buildVerifyColumnDefs(columns, rows) {
+        const defs = (columns || []).map(function (col) {
+            const key = String(col || '').toLowerCase();
+            const def = {
+                field: col,
+                headerName: col,
+                minWidth: (key === 'kpi' || key === 'name' || key.indexOf('message') !== -1) ? 220 : 120,
+                flex: 1
+            };
+            if (key === 'status') {
+                def.cellRenderer = function (params) {
+                    const text = params.value == null ? '' : String(params.value);
+                    if (!text) return '';
+                    return '<span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium '
+                        + statusBadgeClass(text) + '">' + escapeHtmlAttr(text) + '</span>';
+                };
+                def.filter = 'customSetFilter';
+                def.minWidth = 140;
+            }
+            return def;
+        });
+        if (window.AgGridHelper && typeof AgGridHelper.autoDetectColumnFilters === 'function') {
+            AgGridHelper.autoDetectColumnFilters(defs, rows || []);
+        }
+        return defs.length ? defs : [{ field: '_empty', headerName: '', hide: true }];
+    }
+
+    function applyVerifyQuickFilter() {
+        const search = document.getElementById('sync-verify-search');
+        if (syncVerifyGridHelper && syncVerifyGridHelper.gridApi && typeof syncVerifyGridHelper.gridApi.setGridOption === 'function') {
+            syncVerifyGridHelper.gridApi.setGridOption('quickFilterText', (search && search.value) || '');
+        }
+    }
+
+    function applyVerifyGrid(columns, rows) {
+        if (typeof AgGridHelper === 'undefined' || !document.getElementById('syncVerifyGrid')) return;
+        const colDefs = buildVerifyColumnDefs(columns, rows);
+        if (!syncVerifyGridHelper) {
+            syncVerifyGridHelper = new AgGridHelper({
+                containerId: 'syncVerifyGrid',
+                templateId: 'fdrs-sync-verify',
+                columnDefs: colDefs,
+                rowData: rows || [],
+                filterPersistence: false,
+                columnVisibilityOptions: { enableExport: true, enableReset: true },
+                heightOptions: { minHeight: 400, maxHeight: 560, viewportOffset: 180 },
+                options: {
+                    getRowStyle: function (params) {
+                        if (!params.data) return null;
+                        const s = String(params.data.status || '').toLowerCase();
+                        if (s === 'missing') return { backgroundColor: '#fef2f2' };
+                        if (s === 'mismatch') return { backgroundColor: '#fffbeb' };
+                        return null;
+                    }
+                }
+            });
+            syncVerifyGridHelper.initialize();
+        } else if (syncVerifyGridHelper.gridApi) {
+            if (typeof syncVerifyGridHelper.gridApi.setFilterModel === 'function') {
+                syncVerifyGridHelper.gridApi.setFilterModel(null);
+            }
+            if (typeof syncVerifyGridHelper.gridApi.setGridOption === 'function') {
+                syncVerifyGridHelper.gridApi.setGridOption('columnDefs', colDefs);
+            }
+            syncVerifyGridHelper._hasSizedColumnsToFit = false;
+            syncVerifyGridHelper.setRowData(rows || []);
+        }
+        applyVerifyQuickFilter();
     }
 
     function renderSyncVerifyTable(data) {
         const wrap = document.getElementById('sync-verify-table-wrap');
-        const head = document.getElementById('sync-verify-table-head');
-        const body = document.getElementById('sync-verify-table-body');
-        const pager = document.getElementById('sync-verify-pagination');
-        if (!wrap || !head || !body) return;
+        if (!wrap) return;
         wrap.classList.remove('hidden');
+        showVerifyGridError('');
         renderSyncVerifyStats(data.stats);
         setActiveSheetButton(data.sheet || syncVerifyTableState.sheet);
-        const columns = data.columns || [];
-        head.innerHTML = '<tr>' + columns.map(function (col) {
-            return '<th class="px-3 py-2 whitespace-nowrap">' + escapeHtmlAttr(col) + '</th>';
-        }).join('') + '</tr>';
-        const rows = data.rows || [];
-        if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="' + Math.max(columns.length, 1) + '" class="px-3 py-6 text-center text-gray-500">'
-                + escapeHtmlAttr({{ _("No rows in this sheet for the current filter.")|tojson|safe }})
-                + '</td></tr>';
-        } else {
-            body.innerHTML = rows.map(function (row) {
-                return '<tr>' + columns.map(function (col) {
-                    const raw = row[col];
-                    const text = raw == null ? '' : String(raw);
-                    const extra = col.toLowerCase() === 'status'
-                        ? '<span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium ' + statusBadgeClass(text) + '">' + escapeHtmlAttr(text) + '</span>'
-                        : escapeHtmlAttr(text);
-                    return '<td class="px-3 py-1.5 whitespace-nowrap align-top">' + extra + '</td>';
-                }).join('') + '</tr>';
-            }).join('');
-        }
-        if (pager) {
-            const filtered = data.filtered_rows || 0;
-            const page = data.page || 1;
-            const perPage = data.per_page || 200;
-            const pages = Math.max(1, Math.ceil(filtered / perPage));
-            let html = '<span>' + escapeHtmlAttr(filtered) + ' '
-                + escapeHtmlAttr({{ _("rows")|tojson|safe }})
-                + (data.total_rows && data.total_rows !== filtered
-                    ? ' / ' + escapeHtmlAttr(data.total_rows)
-                    : '')
-                + '</span>';
-            if (pages > 1) {
-                html += '<span class="flex items-center gap-2">'
-                    + '<button type="button" id="sync-verify-page-prev" class="px-2 py-1 border border-gray-300 rounded-md bg-white"'
-                    + (page <= 1 ? ' disabled' : '') + '>' + escapeHtmlAttr({{ _("Previous")|tojson|safe }}) + '</button>'
-                    + '<span>' + escapeHtmlAttr(page) + ' / ' + escapeHtmlAttr(pages) + '</span>'
-                    + '<button type="button" id="sync-verify-page-next" class="px-2 py-1 border border-gray-300 rounded-md bg-white"'
-                    + (page >= pages ? ' disabled' : '') + '>' + escapeHtmlAttr({{ _("Next")|tojson|safe }}) + '</button>'
-                    + '</span>';
-            }
-            pager.innerHTML = html;
-            const prev = document.getElementById('sync-verify-page-prev');
-            const next = document.getElementById('sync-verify-page-next');
-            if (prev) prev.addEventListener('click', function () {
-                if (syncVerifyTableState.page > 1) {
-                    syncVerifyTableState.page -= 1;
-                    fetchSyncVerifyResultsPage();
-                }
-            });
-            if (next) next.addEventListener('click', function () {
-                syncVerifyTableState.page += 1;
-                fetchSyncVerifyResultsPage();
-            });
-        }
+        applyVerifyGrid(data.columns || [], data.rows || []);
     }
 
     function fetchSyncVerifyResultsPage() {
         if (!syncVerifyResultsUrl) return;
         const params = new URLSearchParams();
         params.set('sheet', syncVerifyTableState.sheet);
-        params.set('page', String(syncVerifyTableState.page));
-        params.set('per_page', '200');
-        if (syncVerifyTableState.sheet === 'data_points' && syncVerifyTableState.status) {
-            params.set('status', syncVerifyTableState.status);
-        }
+        params.set('all', '1');
         fetch(syncVerifyResultsUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
@@ -205,35 +242,26 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(function (err) {
                 const wrap = document.getElementById('sync-verify-table-wrap');
                 if (wrap) wrap.classList.remove('hidden');
-                const body = document.getElementById('sync-verify-table-body');
-                if (body) {
-                    body.innerHTML = '<tr><td class="px-3 py-4 text-sm text-red-700">'
-                        + escapeHtmlAttr(err.message || {{ _("Failed to load verification table")|tojson|safe }})
-                        + '</td></tr>';
-                }
+                showVerifyGridError(err.message || {{ _("Failed to load verification table")|tojson|safe }});
             });
     }
 
     function loadSyncVerifyResults(resultsUrl) {
         syncVerifyResultsUrl = resultsUrl;
-        syncVerifyTableState.page = 1;
         fetchSyncVerifyResultsPage();
     }
 
     document.querySelectorAll('#sync-verify-sheet-tabs [data-verify-sheet]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             syncVerifyTableState.sheet = this.getAttribute('data-verify-sheet');
-            syncVerifyTableState.page = 1;
+            const search = document.getElementById('sync-verify-search');
+            if (search) search.value = '';
             fetchSyncVerifyResultsPage();
         });
     });
-    const statusFilter = document.getElementById('sync-verify-status-filter');
-    if (statusFilter) {
-        statusFilter.addEventListener('change', function () {
-            syncVerifyTableState.status = this.value || '';
-            syncVerifyTableState.page = 1;
-            fetchSyncVerifyResultsPage();
-        });
+    const verifySearch = document.getElementById('sync-verify-search');
+    if (verifySearch) {
+        verifySearch.addEventListener('input', applyVerifyQuickFilter);
     }
 
     window.updateDataSyncUrlTemplates = function (templateId) {
@@ -1011,7 +1039,8 @@ function showSyncVerifyDone() {
     setSyncVerifyUIMode('done');
 }
 
-function resetSyncVerifyUI() {
+function resetSyncVerifyUI(opts) {
+    opts = opts || {};
     syncVerifyResult.classList.add('hidden');
     syncVerifyResultText.textContent = '';
     if (syncVerifyProgress) syncVerifyProgress.classList.add('hidden');
@@ -1020,11 +1049,13 @@ function resetSyncVerifyUI() {
     if (syncVerifyProgressText) syncVerifyProgressText.textContent = '0%';
     if (syncVerifyProgressCount) syncVerifyProgressCount.textContent = '';
     if (syncVerifyConfigSummaryBody) syncVerifyConfigSummaryBody.innerHTML = '';
-    if (syncVerifyDownloadBtn) {
+    if (syncVerifyDownloadBtn && !opts.keepTable) {
         syncVerifyDownloadBtn.classList.add('hidden');
         syncVerifyDownloadBtn.setAttribute('href', '#');
     }
-    resetSyncVerifyTable();
+    if (!opts.keepTable) {
+        resetSyncVerifyTable();
+    }
     syncVerifyLastPercent = 0;
     stopSyncVerifyPolling();
     resetSyncVerifyRunButton();
@@ -1087,8 +1118,9 @@ function pollSyncVerifyStatus() {
                 const stats = job.stats || {};
                 const problems = (stats.missing || 0) + (stats.mismatch || 0);
                 let msg = formatSyncVerifyStats(stats);
-                if (job.download_ready && job.download_url) {
-                    const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
+                const downloadUrl = job.download_url || templateApiUrl(TEMPLATE_API_URLS.syncVerifyLatest, currentTemplateId).replace(/\/sync-verify-latest$/, '/sync-verify-latest/download');
+                if (job.download_ready && downloadUrl) {
+                    const safeUrl = isSafeHref(downloadUrl) ? escapeHtmlAttr(downloadUrl) : '#';
                     if (syncVerifyDownloadBtn) {
                         syncVerifyDownloadBtn.classList.remove('hidden');
                         syncVerifyDownloadBtn.setAttribute('href', safeUrl);
@@ -1102,9 +1134,16 @@ function pollSyncVerifyStatus() {
                     syncVerifyResultText.textContent = msg;
                 }
                 syncVerifyResultText.className = problems ? 'text-sm text-amber-700' : 'text-sm text-green-700';
+                renderSyncVerifyLastRun({
+                    exists: true,
+                    completed_at: new Date().toISOString(),
+                    stats: stats,
+                    download_url: downloadUrl
+                });
                 showSyncVerifyDone();
-                if (job.results_url) {
-                    loadSyncVerifyResults(job.results_url);
+                const resultsUrl = job.results_url || templateApiUrl(TEMPLATE_API_URLS.syncVerifyLatestResults, currentTemplateId);
+                if (resultsUrl) {
+                    loadSyncVerifyResults(resultsUrl);
                 }
                 return;
             }
@@ -1141,7 +1180,9 @@ function pollSyncVerifyStatus() {
 }
 
 if (syncVerifyRunAgainBtn) {
-    syncVerifyRunAgainBtn.addEventListener('click', resetSyncVerifyUI);
+    syncVerifyRunAgainBtn.addEventListener('click', function () {
+        resetSyncVerifyUI({ keepTable: true });
+    });
 }
 if (syncVerifyStopBtn) {
     syncVerifyStopBtn.addEventListener('click', function() {
@@ -1180,6 +1221,8 @@ if (syncVerifyRunBtn) {
             return;
         }
         resetSyncVerifyUI();
+        const tableWrap = document.getElementById('sync-verify-table-wrap');
+        if (tableWrap) tableWrap.classList.add('hidden');
         renderSyncVerifyConfigSummary(params);
         setSyncVerifyUIMode('running');
         if (syncVerifyProgress) syncVerifyProgress.classList.remove('hidden');
@@ -1251,6 +1294,30 @@ function resumeSyncVerifyJobIfNeeded() {
     pollSyncVerifyStatus();
 }
 
+function restoreLatestVerifyIfNeeded() {
+    if (readSyncVerifyActiveJobs().length) return;
+    try {
+        const stored = JSON.parse(localStorage.getItem(SYNC_VERIFY_STORAGE_KEY) || 'null');
+        if (stored && stored.jobId) return;
+    } catch (e) { /* ignore */ }
+    const latestUrl = templateApiUrl(TEMPLATE_API_URLS.syncVerifyLatest, currentTemplateId);
+    fetch(latestUrl, { headers: { 'Accept': 'application/json' } })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (!data || data.success === false || !data.exists) return;
+            renderSyncVerifyLastRun(data);
+            if (data.download_url && syncVerifyDownloadBtn && isSafeHref(data.download_url)) {
+                syncVerifyDownloadBtn.classList.remove('hidden');
+                syncVerifyDownloadBtn.setAttribute('href', data.download_url);
+            }
+            if (data.results_url) {
+                loadSyncVerifyResults(data.results_url);
+            }
+        })
+        .catch(function () { /* keep page usable without latest snapshot */ });
+}
+
 resumeSyncVerifyJobIfNeeded();
+restoreLatestVerifyIfNeeded();
 });
 </script>

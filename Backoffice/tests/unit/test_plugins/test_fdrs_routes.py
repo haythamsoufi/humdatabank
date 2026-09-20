@@ -52,6 +52,22 @@ def test_sync_verify_routes_are_registered(app):
     assert endpoint == "fdrs.sync_verify_results"
     assert values["job_id"] == "abc"
 
+    endpoint, values = app.url_map.bind("localhost").match(
+        "/admin/templates/data-sync/21/sync-verify-latest"
+    )
+    assert endpoint == "fdrs.sync_verify_latest"
+    assert values == {"template_id": 21}
+
+    endpoint, values = app.url_map.bind("localhost").match(
+        "/admin/fdrs-tools/documents/run", method="POST"
+    )
+    assert endpoint == "fdrs.run_document_status"
+
+    endpoint, values = app.url_map.bind("localhost").match(
+        "/admin/fdrs-tools/documents/latest"
+    )
+    assert endpoint == "fdrs.document_status_latest"
+
 
 class TestJobLooksActivelyRunning:
     """_job_looks_actively_running lets status polls skip stale-job reconciliation

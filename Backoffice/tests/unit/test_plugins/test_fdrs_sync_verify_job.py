@@ -162,3 +162,7 @@ def test_read_fdrs_sync_verify_workbook_filters_and_paginates(tmp_path):
     mismatches = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", status="mismatch")
     assert mismatches["filtered_rows"] == 2
     assert {row["ISO3"] for row in mismatches["rows"]} == {"UGA", "RWA"}
+
+    unpaged = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", per_page=0)
+    assert len(unpaged["rows"]) == 3
+    assert unpaged["page"] == 1

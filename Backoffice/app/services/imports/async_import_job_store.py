@@ -26,12 +26,14 @@ logger = logging.getLogger(__name__)
 
 FDRS_DATA_SYNC_JOB_TYPE = "fdrs.data_sync"
 FDRS_SYNC_VERIFY_JOB_TYPE = "fdrs.sync_verify"
+FDRS_DOCUMENT_STATUS_JOB_TYPE = "fdrs.document_status"
 FDRS_PUBLICATION_JOB_TYPE = "fdrs.publication"
 UPR_EXCEL_IMPORT_JOB_TYPE = "upr.excel_import"
 IMPORT_JOB_TYPES = frozenset(
     {
         FDRS_DATA_SYNC_JOB_TYPE,
         FDRS_SYNC_VERIFY_JOB_TYPE,
+        FDRS_DOCUMENT_STATUS_JOB_TYPE,
         FDRS_PUBLICATION_JOB_TYPE,
         UPR_EXCEL_IMPORT_JOB_TYPE,
     }

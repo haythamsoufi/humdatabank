@@ -1,21 +1,16 @@
 {# In-page Sync tab (Run + Verify) — injected by plugins.fdrs.routes.fdrs_tools. #}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_subtab_btn_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
 {% set fdrs_years_start = fdrs_years_start | default(0) %}
 {% set fdrs_years_end = fdrs_years_end | default(0) %}
 
 <div id="fdrs-sync-root">
-  {% call scroll_tab_bar(inner_id='fdrs-sync-subtabs', aria_label=_('Run sync or verify results'), wrapper_class='mb-3') %}
-    <button type="button" role="tab" data-fdrs-sync-subtab="run" aria-selected="true"
-            class="{{ admin_underline_subtab_btn_classes(true) }}">
-      <i class="fas fa-sync-alt mr-1.5"></i>{{ _('Run') }}
-    </button>
-    <button type="button" role="tab" data-fdrs-sync-subtab="verify" aria-selected="false"
-            class="{{ admin_underline_subtab_btn_classes(false) }}">
-      <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Verify') }}
-    </button>
-  {% endcall %}
-
-  <div id="fdrs-sync-subpanel-run">
+  <details id="fdrs-sync-run-details" class="group mb-3 border border-gray-200 rounded-md bg-white">
+    <summary class="flex items-center gap-2 cursor-pointer list-none select-none px-3 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
+      <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
+      <i class="fas fa-sync-alt text-purple-600" aria-hidden="true"></i>
+      <span>{{ _('Run sync') }}</span>
+    </summary>
+    <div id="fdrs-sync-subpanel-run" class="px-3 pb-3 pt-1 border-t border-gray-100">
     <div id="data-sync-settings" class="space-y-3">
       <p class="text-sm text-gray-600">{{ _('Sync data from the FDRS API into form data for this template.') }}</p>
 
@@ -170,11 +165,18 @@
         {{ _('Reload page') }}
       </button>
     </div>
-  </div>
+    </div>
+  </details>
 
-  <div id="fdrs-sync-subpanel-verify" class="hidden">
+  <details id="fdrs-sync-verify-run-details" class="group mb-3 border border-gray-200 rounded-md bg-white">
+    <summary class="flex items-center gap-2 cursor-pointer list-none select-none px-3 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
+      <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
+      <i class="fas fa-clipboard-check text-blue-600" aria-hidden="true"></i>
+      <span>{{ _('Run verification') }}</span>
+    </summary>
+    <div class="px-3 pb-3 pt-1 border-t border-gray-100">
     <div id="sync-verify-settings" class="space-y-3">
-      <p class="text-sm text-gray-600">{{ _('Compare FDRS API values to synced form data. Results appear in the table below (matched, skipped, missing, mismatch) and can also be downloaded as Excel.') }}</p>
+      <p class="text-sm text-gray-600">{{ _('Compare FDRS API values to synced form data. Results stay on this page after reload (stored in blob storage) and can also be downloaded as Excel.') }}</p>
       <div>
         <span class="block text-sm font-medium text-gray-700 mb-1">{{ _('Reporting years') }}</span>
         <p class="text-xs text-gray-500 mb-1.5">{{ _('All years in the default range are selected initially.') }}</p>
@@ -280,6 +282,39 @@
         {{ _('Download Excel') }}
       </a>
     </div>
+    </div>
+  </details>
+
+  {% set verify_latest = fdrs_verify_latest or None %}
+  <div id="fdrs-sync-subpanel-verify">
+    <div id="sync-verify-last-run" class="mb-3 border border-gray-200 rounded-md px-3 py-2.5 bg-gray-50{% if not verify_latest %} hidden{% endif %}"
+         data-completed-at="{{ (verify_latest.completed_at if verify_latest else '')|e }}">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p class="text-sm font-medium text-gray-800">
+            <i class="fas fa-history mr-1.5 text-gray-500"></i>{{ _('Last verification') }}
+            <span id="sync-verify-last-run-date" class="font-normal text-gray-600">
+              {% if verify_latest and verify_latest.completed_at %}
+                · {{ verify_latest.completed_at }}
+              {% endif %}
+            </span>
+          </p>
+          <p id="sync-verify-last-run-stats" class="text-sm text-gray-600 mt-0.5">
+            {% if verify_latest and verify_latest.stats %}
+              {{ _('Points:') }} {{ verify_latest.stats.total or 0 }} —
+              {{ verify_latest.stats.matched or 0 }} {{ _('matched') }},
+              {{ verify_latest.stats.skipped_intentionally or 0 }} {{ _('skipped') }},
+              {{ verify_latest.stats.missing or 0 }} {{ _('missing') }},
+              {{ verify_latest.stats.mismatch or 0 }} {{ _('mismatch') }}
+            {% endif %}
+          </p>
+        </div>
+        <a id="sync-verify-last-run-download" href="{{ url_for('fdrs.sync_verify_latest_download', template_id=template.id) }}"
+           class="text-sm text-blue-700 hover:underline{% if not verify_latest %} hidden{% endif %}">
+          <i class="fas fa-download mr-1"></i>{{ _('Download Excel') }}
+        </a>
+      </div>
+    </div>
 
     <div id="sync-verify-table-wrap" class="hidden mt-5">
       <div id="sync-verify-stats-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3"></div>
@@ -289,22 +324,13 @@
           <button type="button" data-verify-sheet="summary" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('Summary') }}</button>
           <button type="button" data-verify-sheet="kpi_coverage" class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border-l border-gray-200">{{ _('KPI coverage') }}</button>
         </div>
-        <label for="sync-verify-status-filter" class="sr-only">{{ _('Filter by status') }}</label>
-        <select id="sync-verify-status-filter" class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white">
-          <option value="">{{ _('All statuses') }}</option>
-          <option value="matched">{{ _('Matched') }}</option>
-          <option value="skipped_intentionally">{{ _('Skipped') }}</option>
-          <option value="missing">{{ _('Missing') }}</option>
-          <option value="mismatch">{{ _('Mismatch') }}</option>
-        </select>
+        <label for="sync-verify-search" class="sr-only">{{ _('Search verification rows') }}</label>
+        <input type="search" id="sync-verify-search" placeholder="{{ _('Search…') }}"
+               class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white w-48">
       </div>
-      <div class="overflow-x-auto border border-gray-200 rounded-md">
-        <table class="min-w-full text-sm">
-          <thead id="sync-verify-table-head" class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wide"></thead>
-          <tbody id="sync-verify-table-body" class="bg-white divide-y divide-gray-100"></tbody>
-        </table>
-      </div>
-      <div id="sync-verify-pagination" class="flex items-center justify-between mt-3 text-sm text-gray-600"></div>
+      <p id="sync-verify-grid-error" class="hidden text-sm text-red-700 mb-2"></p>
+      {{ ag_grid_header_toolbar(placeholder_id='syncVerifyGrid-colvis', wrapper_class='mb-2') }}
+      {{ ag_grid_body_wrap('syncVerifyGrid', loading_text=_('Loading verification…'), placeholder_id='syncVerifyGrid-colvis', grid_height='560px', show_loading_overlay=false, use_container=false, empty_message=_('No rows in this sheet.')) }}
     </div>
   </div>
 </div>

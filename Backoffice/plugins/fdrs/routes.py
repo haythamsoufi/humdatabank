@@ -61,6 +61,7 @@ from plugins.fdrs.services.fdrs_sync_verify_job import (
     start_fdrs_sync_verify_job,
     _run_fdrs_sync_verify_job,
 )
+from plugins.fdrs.services import fdrs_tools_artifacts as artifacts
 
 _SYNC_LOCK = threading.Lock()
 _SYNC_ALLOWED_STATES = frozenset({0, 100, 200, 300, 400, 500})
@@ -184,11 +185,15 @@ def parse_reported_import_states(data: Dict[str, Any]) -> Optional[List[int]]:
 @admin_required
 @system_manager_required
 def fdrs_tools():
-    """FDRS tools hub: preview, imputation, Sync (run/verify), and publication."""
+    """FDRS tools hub: preview, imputation, Sync (run/verify), documents, and publication."""
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
     from app.utils.data_quality_constants import FDRS_TEMPLATE_ID as fdrs_template_id
     from flask import current_app
     from flask_login import current_user
+    from plugins.fdrs.services.fdrs_document_status_job import (
+        ensure_fdrs_document_status_job_running,
+        get_active_fdrs_document_status_jobs_for_user,
+    )
     from plugins.fdrs.services.fdrs_publication_job import (
         ensure_fdrs_publication_job_running,
         get_active_fdrs_publication_jobs_for_user,
@@ -197,11 +202,16 @@ def fdrs_tools():
 
     user_id = int(getattr(current_user, "id", 0) or 0)
     active_publication_jobs = get_active_fdrs_publication_jobs_for_user(user_id) if user_id else []
+    active_document_jobs = get_active_fdrs_document_status_jobs_for_user(user_id) if user_id else []
     worker_app = current_app._get_current_object()
     for active in active_publication_jobs:
         jid = active.get("job_id")
         if jid:
             ensure_fdrs_publication_job_running(worker_app, str(jid))
+    for active in active_document_jobs:
+        jid = active.get("job_id")
+        if jid:
+            ensure_fdrs_document_status_job_running(worker_app, str(jid))
 
     return render_data_sync_imputation_page(
         fdrs_template_id,
@@ -215,6 +225,11 @@ def fdrs_tools():
                 "icon": "fas fa-sync-alt",
             },
             {
+                "id": "documents",
+                "label": "Documents",
+                "icon": "fas fa-file-alt",
+            },
+            {
                 "id": "publication",
                 "label": "Manage Publication",
                 "icon": "fas fa-tower-broadcast",
@@ -226,18 +241,26 @@ def fdrs_tools():
                 "template": "plugins/fdrs/admin/_fdrs_sync_panel.html",
             },
             {
+                "id": "documents",
+                "template": "plugins/fdrs/admin/_fdrs_documents_panel.html",
+            },
+            {
                 "id": "publication",
                 "template": "plugins/fdrs/admin/_fdrs_publication_panel.html",
             },
         ],
         extra_script_templates=[
             "plugins/fdrs/admin/_fdrs_sync_script.html",
+            "plugins/fdrs/admin/_fdrs_documents_script.html",
             "plugins/fdrs/admin/_fdrs_publication_script.html",
         ],
         show_template_selector=False,
         extra_context={
             "assignments": list_fdrs_assignments(),
             "active_fdrs_publication_jobs": active_publication_jobs,
+            "active_fdrs_document_jobs": active_document_jobs,
+            "fdrs_verify_latest": artifacts.load_verify_latest_meta(fdrs_template_id),
+            "fdrs_documents_latest": artifacts.load_documents_latest_meta(),
         },
     )
 
@@ -631,6 +654,33 @@ def sync_verify_cancel(template_id: int, job_id: str):
     return json_ok(status=final_status)
 
 
+def _verify_workbook_source(template_id: int, job: Optional[Dict[str, Any]] = None):
+    """Prefer the job's temp file, then the durable latest blob."""
+    path = (job or {}).get("preview_path")
+    if path and os.path.isfile(path):
+        return path
+    if artifacts.verify_latest_exists(template_id):
+        return artifacts.download_bytes(artifacts.verify_xlsx_rel(template_id))
+    return None
+
+
+def _verify_table_args():
+    sheet = (request.args.get("sheet") or "data_points").strip()
+    status = (request.args.get("status") or "").strip()
+    try:
+        page = int(request.args.get("page") or 1)
+    except (TypeError, ValueError):
+        page = 1
+    all_rows = (request.args.get("all") or "").strip().lower() in ("1", "true", "yes")
+    try:
+        per_page = int(request.args.get("per_page") or (0 if all_rows else 200))
+    except (TypeError, ValueError):
+        per_page = 0 if all_rows else 200
+    if all_rows:
+        per_page = 0
+    return sheet, status, page, per_page
+
+
 @bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-download/<job_id>", methods=["GET"])
 @admin_permission_required("admin.templates.edit")
 def sync_verify_download(template_id: int, job_id: str):
@@ -638,15 +688,19 @@ def sync_verify_download(template_id: int, job_id: str):
     if err is not None:
         return err
     path = job.get("preview_path")
-    if not path or not os.path.isfile(path):
-        return json_not_found("Verification file not available")
-
-    return send_file(
-        path,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=f"fdrs_sync_verification_{template_id}.xlsx",
-    )
+    if path and os.path.isfile(path):
+        return send_file(
+            path,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=f"fdrs_sync_verification_{template_id}.xlsx",
+        )
+    if artifacts.exists(artifacts.verify_xlsx_rel(template_id)):
+        return artifacts.stream_xlsx(
+            artifacts.verify_xlsx_rel(template_id),
+            f"fdrs_sync_verification_{template_id}.xlsx",
+        )
+    return json_not_found("Verification file not available")
 
 
 @bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-results/<job_id>", methods=["GET"])
@@ -656,24 +710,14 @@ def sync_verify_results(template_id: int, job_id: str):
     job, err = _owned_import_job_or_error(template_id, job_id)
     if err is not None:
         return err
-    path = job.get("preview_path")
-    if not path or not os.path.isfile(path):
+    source = _verify_workbook_source(template_id, job)
+    if source is None:
         return json_not_found("Verification file not available")
 
-    sheet = (request.args.get("sheet") or "data_points").strip()
-    status = (request.args.get("status") or "").strip()
-    try:
-        page = int(request.args.get("page") or 1)
-    except (TypeError, ValueError):
-        page = 1
-    try:
-        per_page = int(request.args.get("per_page") or 200)
-    except (TypeError, ValueError):
-        per_page = 200
-
+    sheet, status, page, per_page = _verify_table_args()
     try:
         table = read_fdrs_sync_verify_workbook(
-            path,
+            source,
             sheet=sheet,
             status=status,
             page=page,
@@ -682,10 +726,73 @@ def sync_verify_results(template_id: int, job_id: str):
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
-    table["stats"] = job.get("stats")
+    latest = artifacts.load_verify_latest_meta(template_id) or {}
+    table["stats"] = job.get("stats") or latest.get("stats")
+    table["completed_at"] = latest.get("completed_at")
     table["download_url"] = url_for(
         "fdrs.sync_verify_download",
         template_id=template_id,
         job_id=job_id,
     )
     return json_ok(**table)
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-latest", methods=["GET"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_latest(template_id: int):
+    if not check_template_access(template_id, current_user.id):
+        return json_forbidden("Access denied")
+    meta = artifacts.load_verify_latest_meta(template_id)
+    if not meta:
+        return json_ok(exists=False)
+    return json_ok(
+        exists=True,
+        completed_at=meta.get("completed_at"),
+        stats=meta.get("stats") or {},
+        fdrs_years=meta.get("fdrs_years"),
+        skip_imputed=meta.get("skip_imputed"),
+        problems_only=meta.get("problems_only"),
+        download_url=url_for("fdrs.sync_verify_latest_download", template_id=template_id),
+        results_url=url_for("fdrs.sync_verify_latest_results", template_id=template_id),
+    )
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-latest/results", methods=["GET"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_latest_results(template_id: int):
+    if not check_template_access(template_id, current_user.id):
+        return json_forbidden("Access denied")
+    source = _verify_workbook_source(template_id)
+    if source is None:
+        return json_not_found("Verification file not available")
+
+    sheet, status, page, per_page = _verify_table_args()
+    try:
+        table = read_fdrs_sync_verify_workbook(
+            source,
+            sheet=sheet,
+            status=status,
+            page=page,
+            per_page=per_page,
+        )
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+    latest = artifacts.load_verify_latest_meta(template_id) or {}
+    table["stats"] = latest.get("stats")
+    table["completed_at"] = latest.get("completed_at")
+    table["download_url"] = url_for("fdrs.sync_verify_latest_download", template_id=template_id)
+    return json_ok(**table)
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-latest/download", methods=["GET"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_latest_download(template_id: int):
+    if not check_template_access(template_id, current_user.id):
+        return json_forbidden("Access denied")
+    if artifacts.exists(artifacts.verify_xlsx_rel(template_id)):
+        return artifacts.stream_xlsx(
+            artifacts.verify_xlsx_rel(template_id),
+            f"fdrs_sync_verification_{template_id}.xlsx",
+        )
+    return json_not_found("Verification file not available")

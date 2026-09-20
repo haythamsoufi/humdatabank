@@ -62,6 +62,14 @@ MANUAL_ACTIVITY_OVERRIDES: dict[tuple[str, str], ActivityEndpointSpec] = {
         description="Cancelled FDRS sync verification",
         activity_type="admin_system",
     ),
+    ("POST", "fdrs.run_document_status"): ActivityEndpointSpec(
+        description="Ran FDRS document URL status scan",
+        activity_type="admin_system",
+    ),
+    ("POST", "fdrs.document_status_cancel"): ActivityEndpointSpec(
+        description="Cancelled FDRS document URL status scan",
+        activity_type="admin_system",
+    ),
     ("POST", "upr_excel_import.run_import"): ActivityEndpointSpec(
         description="Imported UPR country reporting data",
         activity_type="admin_assignments",

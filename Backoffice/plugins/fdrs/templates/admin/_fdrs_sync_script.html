@@ -29,6 +29,74 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/>/g, '&gt;');
     }
 
+    function prependFaIcon(btn, className) {
+        if (!btn) return;
+        const icon = document.createElement('i');
+        icon.className = className;
+        icon.setAttribute('aria-hidden', 'true');
+        btn.insertBefore(icon, btn.firstChild);
+    }
+
+    function renderStatCards(container, items) {
+        if (!container) return;
+        container.replaceChildren();
+        items.forEach(function (item) {
+            const wrap = document.createElement('div');
+            wrap.className = 'border rounded-md px-3 py-2 ' + item.cls;
+            const label = document.createElement('div');
+            label.className = 'text-xs uppercase tracking-wide font-medium';
+            label.textContent = item.label;
+            const value = document.createElement('div');
+            value.className = 'text-lg font-semibold';
+            value.textContent = String(item.value);
+            wrap.append(label, value);
+            container.appendChild(wrap);
+        });
+    }
+
+    function renderConfigSummaryRows(container, rows) {
+        if (!container) return;
+        container.replaceChildren();
+        rows.forEach(function (row) {
+            const wrap = document.createElement('div');
+            wrap.className = row.inline ? 'flex items-center gap-2' : 'flex items-start justify-between gap-4';
+            const label = document.createElement('span');
+            label.className = row.inline ? 'text-gray-500' : 'text-gray-500 shrink-0';
+            label.textContent = row.label;
+            wrap.appendChild(label);
+            if (row.node) {
+                wrap.appendChild(row.node);
+            } else {
+                const value = document.createElement('span');
+                value.className = 'font-medium text-gray-900 text-right';
+                value.textContent = row.value == null ? '' : String(row.value);
+                wrap.appendChild(value);
+            }
+            container.appendChild(wrap);
+        });
+    }
+
+    function appendMultilineText(parent, text) {
+        String(text == null ? '' : text).split('\n').forEach(function (part, i) {
+            if (i) parent.appendChild(document.createElement('br'));
+            parent.appendChild(document.createTextNode(part));
+        });
+    }
+
+    function appendTextLink(parent, href, text, className, attrs) {
+        const a = document.createElement('a');
+        a.className = className || 'text-purple-700 underline';
+        a.textContent = text;
+        a.setAttribute('href', href);
+        if (attrs) {
+            Object.keys(attrs).forEach(function (key) {
+                a.setAttribute(key, attrs[key]);
+            });
+        }
+        parent.appendChild(a);
+        return a;
+    }
+
     function activateSyncMainTab() {
         if (window.AdminUnderlineTabs) {
             window.AdminUnderlineTabs.activateStripTab('#data-sync-tabs', 'sync', { panelSelector: '.data-panel' });
@@ -102,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const wrap = document.getElementById('sync-verify-table-wrap');
         if (wrap) wrap.classList.add('hidden');
         const cards = document.getElementById('sync-verify-stats-cards');
-        if (cards) cards.innerHTML = '';
+        if (cards) cards.replaceChildren();
         const search = document.getElementById('sync-verify-search');
         if (search) search.value = '';
         showVerifyGridError('');
@@ -128,12 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: {{ _("Missing")|tojson|safe }}, value: stats.missing || 0, cls: 'border-red-200 bg-red-50 text-red-800' },
             { label: {{ _("Mismatch")|tojson|safe }}, value: stats.mismatch || 0, cls: 'border-amber-200 bg-amber-50 text-amber-800' }
         ];
-        cards.innerHTML = items.map(function (item) {
-            return '<div class="border rounded-md px-3 py-2 ' + item.cls + '">'
-                + '<div class="text-xs uppercase tracking-wide font-medium">' + escapeHtmlAttr(item.label) + '</div>'
-                + '<div class="text-lg font-semibold">' + escapeHtmlAttr(item.value) + '</div>'
-                + '</div>';
-        }).join('');
+        renderStatCards(cards, items);
     }
 
     function setActiveSheetButton(sheet) {
@@ -484,10 +547,14 @@ function collectDataSyncParams() {
 }
 
 function dataSyncBoolIcon(isTrue) {
-    if (isTrue) {
-        return '<span class="inline-flex items-center text-green-600" aria-label="' + {{ _("Yes")|tojson|safe }} + '"><i class="fas fa-check-circle" aria-hidden="true"></i></span>';
-    }
-    return '<span class="inline-flex items-center text-gray-400" aria-label="' + {{ _("No")|tojson|safe }} + '"><i class="fas fa-times-circle" aria-hidden="true"></i></span>';
+    const wrap = document.createElement('span');
+    wrap.className = 'inline-flex items-center ' + (isTrue ? 'text-green-600' : 'text-gray-400');
+    wrap.setAttribute('aria-label', isTrue ? {{ _("Yes")|tojson|safe }} : {{ _("No")|tojson|safe }});
+    const icon = document.createElement('i');
+    icon.className = isTrue ? 'fas fa-check-circle' : 'fas fa-times-circle';
+    icon.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(icon);
+    return wrap;
 }
 
 function renderDataSyncConfigSummary(params) {
@@ -505,25 +572,12 @@ function renderDataSyncConfigSummary(params) {
         { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
         { label: {{ _("Batch size")|tojson|safe }}, value: batchDisplay },
         { label: {{ _("Data status")|tojson|safe }}, value: statusLabels || '-' },
-        { label: {{ _("Sync documents")|tojson|safe }}, value: dataSyncBoolIcon(params.syncDocuments), html: true, inline: true },
-        { label: {{ _("Dry run")|tojson|safe }}, value: dataSyncBoolIcon(params.dryRun), html: true, inline: true },
-        { label: {{ _("Test mode")|tojson|safe }}, value: dataSyncBoolIcon(params.test), html: true, inline: true },
-        { label: {{ _("Cached imputed values")|tojson|safe }}, value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true }
+        { label: {{ _("Sync documents")|tojson|safe }}, node: dataSyncBoolIcon(params.syncDocuments), inline: true },
+        { label: {{ _("Dry run")|tojson|safe }}, node: dataSyncBoolIcon(params.dryRun), inline: true },
+        { label: {{ _("Test mode")|tojson|safe }}, node: dataSyncBoolIcon(params.test), inline: true },
+        { label: {{ _("Cached imputed values")|tojson|safe }}, node: dataSyncBoolIcon(params.imputedUseCache), inline: true }
     ];
-
-    dataSyncConfigSummaryBody.innerHTML = rows.map(function (row) {
-        const valueHtml = row.html ? row.value : escapeHtmlAttr(row.value);
-        if (row.inline) {
-            return '<div class="flex items-center gap-2">'
-                + '<span class="text-gray-500">' + escapeHtmlAttr(row.label) + '</span>'
-                + valueHtml
-                + '</div>';
-        }
-        return '<div class="flex items-start justify-between gap-4">'
-            + '<span class="text-gray-500 shrink-0">' + escapeHtmlAttr(row.label) + '</span>'
-            + '<span class="font-medium text-gray-900 text-right">' + valueHtml + '</span>'
-            + '</div>';
-    }).join('');
+    renderConfigSummaryRows(dataSyncConfigSummaryBody, rows);
 }
 
 function setDataSyncUIMode(mode) {
@@ -547,7 +601,7 @@ function resetDataSyncRunButton() {
     const spinIcon = dataSyncRunBtn.querySelector('i.fa-spinner');
     if (spinIcon) spinIcon.remove();
     if (!dataSyncRunBtn.querySelector('i.fa-sync-alt')) {
-        dataSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-sync-alt mr-2"></i>');
+        prependFaIcon(dataSyncRunBtn, 'fas fa-sync-alt mr-2');
     }
 }
 
@@ -577,7 +631,7 @@ function resetDataSyncUI() {
     if (dataSyncProgressBar) dataSyncProgressBar.style.width = '0%';
     if (dataSyncProgressText) dataSyncProgressText.textContent = '0%';
     if (dataSyncProgressCount) dataSyncProgressCount.textContent = '';
-    if (dataSyncConfigSummaryBody) dataSyncConfigSummaryBody.innerHTML = '';
+    if (dataSyncConfigSummaryBody) dataSyncConfigSummaryBody.replaceChildren();
     dataSyncLastPercent = 0;
     stopDataSyncPolling();
     resetDataSyncRunButton();
@@ -629,19 +683,28 @@ function pollDataSyncStatus() {
                 dataSyncResult.classList.remove('hidden');
                 const stats = job.stats || {};
                 let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Unchanged: ${stats.unchanged || 0}, Errors: ${stats.errors || 0}`;
-                let logHtml = '';
-                if (finishedJobId && /^[a-fA-F0-9]{32}$/.test(finishedJobId)) {
-                    logHtml = ` <a class="text-purple-700 underline" href="/admin/import-logs/${encodeURIComponent(finishedJobId)}" target="_blank" rel="noopener">` + {{ _("View change log")|tojson|safe }} + `</a>`;
-                }
+                dataSyncResultText.replaceChildren();
                 if (job.download_ready && job.download_url) {
                     msg += `\n\n` + {{ _("Preview Excel ready:")|tojson|safe }} + ` `;
-                    const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
-                    dataSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">` + {{ _("Download")|tojson|safe }} + `</a>${logHtml}`;
+                    appendMultilineText(dataSyncResultText, msg);
+                    appendTextLink(
+                        dataSyncResultText,
+                        isSafeHref(job.download_url) ? job.download_url : '#',
+                        {{ _("Download")|tojson|safe }},
+                        'text-purple-700 underline'
+                    );
                 } else {
-                    dataSyncResultText.textContent = msg;
-                    if (logHtml) {
-                        dataSyncResultText.insertAdjacentHTML('beforeend', logHtml);
-                    }
+                    appendMultilineText(dataSyncResultText, msg);
+                }
+                if (finishedJobId && /^[a-fA-F0-9]{32}$/.test(finishedJobId)) {
+                    dataSyncResultText.appendChild(document.createTextNode(' '));
+                    appendTextLink(
+                        dataSyncResultText,
+                        '/admin/import-logs/' + encodeURIComponent(finishedJobId),
+                        {{ _("View change log")|tojson|safe }},
+                        'text-purple-700 underline',
+                        { target: '_blank', rel: 'noopener' }
+                    );
                 }
                 dataSyncResultText.className = 'text-sm text-green-700';
                 showDataSyncDone();
@@ -750,9 +813,9 @@ if (dataSyncRunBtn) {
         setDataSyncProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
         dataSyncRunBtn.disabled = true;
         dataSyncRunBtnText.textContent = {{ _("Running...")|tojson|safe }};
-        dataSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
         const iconEl = dataSyncRunBtn.querySelector('i.fa-sync-alt');
         if (iconEl) iconEl.remove();
+        prependFaIcon(dataSyncRunBtn, 'fas fa-spinner fa-spin mr-2');
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const payload = {
@@ -978,24 +1041,12 @@ function renderSyncVerifyConfigSummary(params) {
         : formatDataSyncYearsDisplay(params.selectedYears || []);
     const rows = [
         { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
-        { label: {{ _("Test mode")|tojson|safe }}, value: dataSyncBoolIcon(params.test), html: true, inline: true },
-        { label: {{ _("Skip imputed")|tojson|safe }}, value: dataSyncBoolIcon(params.skipImputed), html: true, inline: true },
-        { label: {{ _("Cached imputed values")|tojson|safe }}, value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true },
-        { label: {{ _("Problems only")|tojson|safe }}, value: dataSyncBoolIcon(params.problemsOnly), html: true, inline: true }
+        { label: {{ _("Test mode")|tojson|safe }}, node: dataSyncBoolIcon(params.test), inline: true },
+        { label: {{ _("Skip imputed")|tojson|safe }}, node: dataSyncBoolIcon(params.skipImputed), inline: true },
+        { label: {{ _("Cached imputed values")|tojson|safe }}, node: dataSyncBoolIcon(params.imputedUseCache), inline: true },
+        { label: {{ _("Problems only")|tojson|safe }}, node: dataSyncBoolIcon(params.problemsOnly), inline: true }
     ];
-    syncVerifyConfigSummaryBody.innerHTML = rows.map(function (row) {
-        const valueHtml = row.html ? row.value : escapeHtmlAttr(row.value);
-        if (row.inline) {
-            return '<div class="flex items-center gap-2">'
-                + '<span class="text-gray-500">' + escapeHtmlAttr(row.label) + '</span>'
-                + valueHtml
-                + '</div>';
-        }
-        return '<div class="flex items-start justify-between gap-4">'
-            + '<span class="text-gray-500 shrink-0">' + escapeHtmlAttr(row.label) + '</span>'
-            + '<span class="font-medium text-gray-900 text-right">' + valueHtml + '</span>'
-            + '</div>';
-    }).join('');
+    renderConfigSummaryRows(syncVerifyConfigSummaryBody, rows);
 }
 
 function setSyncVerifyUIMode(mode) {
@@ -1016,7 +1067,7 @@ function resetSyncVerifyRunButton() {
     const spinner = syncVerifyRunBtn.querySelector('i.fa-spinner');
     if (spinner) spinner.remove();
     if (!syncVerifyRunBtn.querySelector('i.fa-clipboard-check')) {
-        syncVerifyRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-clipboard-check mr-2"></i>');
+        prependFaIcon(syncVerifyRunBtn, 'fas fa-clipboard-check mr-2');
     }
     syncVerifyRunBtnText.textContent = {{ _("Run verification")|tojson|safe }};
 }
@@ -1048,7 +1099,7 @@ function resetSyncVerifyUI(opts) {
     if (syncVerifyProgressBar) syncVerifyProgressBar.style.width = '0%';
     if (syncVerifyProgressText) syncVerifyProgressText.textContent = '0%';
     if (syncVerifyProgressCount) syncVerifyProgressCount.textContent = '';
-    if (syncVerifyConfigSummaryBody) syncVerifyConfigSummaryBody.innerHTML = '';
+    if (syncVerifyConfigSummaryBody) syncVerifyConfigSummaryBody.replaceChildren();
     if (syncVerifyDownloadBtn && !opts.keepTable) {
         syncVerifyDownloadBtn.classList.add('hidden');
         syncVerifyDownloadBtn.setAttribute('href', '#');
@@ -1120,16 +1171,20 @@ function pollSyncVerifyStatus() {
                 let msg = formatSyncVerifyStats(stats);
                 const downloadUrl = job.download_url || templateApiUrl(TEMPLATE_API_URLS.syncVerifyLatest, currentTemplateId).replace(/\/sync-verify-latest$/, '/sync-verify-latest/download');
                 if (job.download_ready && downloadUrl) {
-                    const safeUrl = isSafeHref(downloadUrl) ? escapeHtmlAttr(downloadUrl) : '#';
+                    const safeUrl = isSafeHref(downloadUrl) ? downloadUrl : '#';
                     if (syncVerifyDownloadBtn) {
                         syncVerifyDownloadBtn.classList.remove('hidden');
                         syncVerifyDownloadBtn.setAttribute('href', safeUrl);
                     }
                     msg += ' ';
-                    syncVerifyResultText.innerHTML = escapeHtmlAttr(msg)
-                        + ' <a class="text-blue-700 underline" href="' + safeUrl + '">'
-                        + {{ _("Download Excel")|tojson|safe }}
-                        + '</a>';
+                    syncVerifyResultText.replaceChildren();
+                    syncVerifyResultText.appendChild(document.createTextNode(msg));
+                    appendTextLink(
+                        syncVerifyResultText,
+                        safeUrl,
+                        {{ _("Download Excel")|tojson|safe }},
+                        'text-blue-700 underline'
+                    );
                 } else {
                     syncVerifyResultText.textContent = msg;
                 }
@@ -1229,9 +1284,9 @@ if (syncVerifyRunBtn) {
         setSyncVerifyProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
         syncVerifyRunBtn.disabled = true;
         syncVerifyRunBtnText.textContent = {{ _("Running...")|tojson|safe }};
-        syncVerifyRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
         const iconEl = syncVerifyRunBtn.querySelector('i.fa-clipboard-check');
         if (iconEl) iconEl.remove();
+        prependFaIcon(syncVerifyRunBtn, 'fas fa-spinner fa-spin mr-2');
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const payload = {

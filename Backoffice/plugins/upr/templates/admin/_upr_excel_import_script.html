@@ -42,6 +42,37 @@ document.addEventListener('DOMContentLoaded', function () {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function appendText(parent, text) {
+    parent.appendChild(document.createTextNode(text == null ? '' : String(text)));
+  }
+
+  function setParagraph(container, className, text) {
+    container.replaceChildren(el('p', className, text));
+  }
+
+  function isSafeHref(url) {
+    if (!url || typeof url !== 'string') return false;
+    var u = url.trim();
+    return u.startsWith('/') || u.startsWith('https://') || u.startsWith('http://');
+  }
+
+  function appendTextLink(parent, href, text, className, attrs) {
+    var a = el('a', className || 'text-purple-700 underline', text);
+    a.setAttribute('href', isSafeHref(href) ? href : '#');
+    if (attrs) {
+      Object.keys(attrs).forEach(function (key) { a.setAttribute(key, attrs[key]); });
+    }
+    parent.appendChild(a);
+    return a;
+  }
+
   function postJSON(url, body) {
     return fetch(url, {
       method: 'POST',
@@ -75,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
     previewLoaded = false;
     previewStale = false;
     previewSummaryEl.classList.add('hidden');
-    previewSummaryEl.innerHTML = '';
+    previewSummaryEl.replaceChildren();
     if (previewStaleHintEl) previewStaleHintEl.classList.add('hidden');
   }
 
@@ -133,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (previewLoading || !canRunImport()) return;
     previewLoading = true;
     previewSummaryEl.classList.add('hidden');
-    previewSummaryEl.innerHTML = '';
+    previewSummaryEl.replaceChildren();
     if (previewStaleHintEl) previewStaleHintEl.classList.add('hidden');
     previewLoadingEl.classList.remove('hidden');
     updateNavButtons();
@@ -143,14 +174,16 @@ document.addEventListener('DOMContentLoaded', function () {
         previewLoaded = !!data.success;
         previewStale = false;
         previewSummaryEl.classList.remove('hidden');
-        previewSummaryEl.innerHTML = data.success
-          ? renderPreviewSummary(data)
-          : '<p class="text-red-600">' + escapeHtml(data.message || {{ _("Preview failed")|tojson|safe }}) + '</p>';
+        if (data.success) {
+          renderPreviewSummary(previewSummaryEl, data);
+        } else {
+          setParagraph(previewSummaryEl, 'text-red-600', data.message || {{ _("Preview failed")|tojson|safe }});
+        }
       })
       .catch(function (err) {
         previewLoaded = false;
         previewSummaryEl.classList.remove('hidden');
-        previewSummaryEl.innerHTML = '<p class="text-red-600">' + escapeHtml(err.message || {{ _("Preview failed")|tojson|safe }}) + '</p>';
+        setParagraph(previewSummaryEl, 'text-red-600', err.message || {{ _("Preview failed")|tojson|safe }});
       })
       .finally(function () {
         previewLoading = false;
@@ -173,21 +206,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── Configure preview ────────────────────────────────────────────────────
 
-  function renderPreviewSummary(data) {
-    var html = '<p><strong>' + {{ _("Transformed form_data rows")|tojson|safe }} + ':</strong> ' + data.transformed_rows + '</p>'
-             + '<p><strong>' + {{ _("Countries with data")|tojson|safe }} + ':</strong> ' + data.countries + '</p>';
+  function labeledParagraph(label, value, className) {
+    var p = el('p', className || '');
+    p.appendChild(el('strong', '', label + ':'));
+    appendText(p, ' ' + value);
+    return p;
+  }
+
+  function renderPreviewSummary(container, data) {
+    var nodes = [
+      labeledParagraph({{ _("Transformed form_data rows")|tojson|safe }}, data.transformed_rows),
+      labeledParagraph({{ _("Countries with data")|tojson|safe }}, data.countries)
+    ];
     if (data.warning_count) {
       var warnLabel = String(data.warning_count);
       if (data.warning_unique_count && data.warning_unique_count !== data.warning_count) {
         warnLabel += ' (' + data.warning_unique_count + ' ' + {{ _("unique")|tojson|safe }} + ')';
       }
-      html += '<p class="text-amber-700"><strong>' + {{ _("Warnings")|tojson|safe }} + ':</strong> ' + warnLabel + '</p>'
-            + '<div class="max-h-72 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3">'
-            + '<ul class="list-disc ml-5 space-y-1 text-amber-900 text-sm">'
-            + (data.warnings || []).map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('')
-            + '</ul></div>';
+      nodes.push(labeledParagraph({{ _("Warnings")|tojson|safe }}, warnLabel, 'text-amber-700'));
+      var wrap = el('div', 'max-h-72 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3');
+      var list = el('ul', 'list-disc ml-5 space-y-1 text-amber-900 text-sm');
+      (data.warnings || []).forEach(function (w) {
+        list.appendChild(el('li', '', w));
+      });
+      wrap.appendChild(list);
+      nodes.push(wrap);
     }
-    return html;
+    container.replaceChildren.apply(container, nodes);
   }
 
   // ── Import job polling ───────────────────────────────────────────────────
@@ -204,8 +249,11 @@ document.addEventListener('DOMContentLoaded', function () {
       async:                true
     }).then(function (data) {
       if (!data.success || !data.job_id) {
-        document.getElementById('upr-excel-import-result').innerHTML =
-          '<p class="text-red-700">' + escapeHtml(data.message || data.error || 'Import failed') + '</p>';
+        setParagraph(
+          document.getElementById('upr-excel-import-result'),
+          'text-red-700',
+          data.message || data.error || 'Import failed'
+        );
         doneActions.classList.remove('hidden');
         return;
       }
@@ -231,27 +279,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (job.status === 'completed') {
           var stats = job.stats || {};
-          var msg = 'Loaded: ' + (stats.loaded  || 0)
-                  + ', Inserted: '  + (stats.inserted || 0)
-                  + ', Updated: '   + (stats.updated  || 0)
-                  + ', Skipped: '   + (stats.skipped  || 0)
-                  + ', Errors: '    + (stats.errors   || 0);
+          var resultEl = document.getElementById('upr-excel-import-result');
+          var p = el('p', 'text-green-700');
+          appendText(p, 'Loaded: ' + (stats.loaded || 0)
+            + ', Inserted: ' + (stats.inserted || 0)
+            + ', Updated: ' + (stats.updated || 0)
+            + ', Skipped: ' + (stats.skipped || 0)
+            + ', Errors: ' + (stats.errors || 0));
           if (job.download_ready && job.download_url) {
-            msg += ' <a class="text-purple-700 underline" href="'
-                 + escapeHtml(job.download_url) + '">' + {{ _("Download preview Excel")|tojson|safe }} + '</a>';
+            appendText(p, ' ');
+            appendTextLink(p, job.download_url, {{ _("Download preview Excel")|tojson|safe }});
           }
           if (/^[a-fA-F0-9]{32}$/.test(activeJobId || '')) {
-            msg += ' <a class="text-purple-700 underline" href="/admin/import-logs/'
-                 + encodeURIComponent(activeJobId) + '" target="_blank" rel="noopener">'
-                 + {{ _("View change log")|tojson|safe }} + '</a>';
+            appendText(p, ' ');
+            appendTextLink(
+              p,
+              '/admin/import-logs/' + encodeURIComponent(activeJobId),
+              {{ _("View change log")|tojson|safe }},
+              'text-purple-700 underline',
+              { target: '_blank', rel: 'noopener' }
+            );
           }
-          document.getElementById('upr-excel-import-result').innerHTML = '<p class="text-green-700">' + msg + '</p>';
+          resultEl.replaceChildren(p);
           doneActions.classList.remove('hidden');
           return;
         }
         if (job.status === 'failed') {
-          document.getElementById('upr-excel-import-result').innerHTML =
-            '<p class="text-red-700">' + escapeHtml(job.error || 'Failed') + '</p>';
+          setParagraph(document.getElementById('upr-excel-import-result'), 'text-red-700', job.error || 'Failed');
           doneActions.classList.remove('hidden');
           return;
         }
@@ -350,12 +404,15 @@ document.addEventListener('DOMContentLoaded', function () {
           function setPending(msg) {
             if (!statusEl) return;
             statusEl.className = DZ + '__status ' + DZ + '__status--pending';
-            statusEl.innerHTML =
-              '<div class="' + DZ + '__preview">'
-              + '<p class="' + DZ + '__preview-line ' + DZ + '__preview-line--pending">'
-              + '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>'
-              + '<span>' + escapeHtml(msg) + '</span>'
-              + '</p></div>';
+            var preview = el('div', DZ + '__preview');
+            var line = el('p', DZ + '__preview-line ' + DZ + '__preview-line--pending');
+            var spinner = document.createElement('i');
+            spinner.className = 'fas fa-spinner fa-spin';
+            spinner.setAttribute('aria-hidden', 'true');
+            line.appendChild(spinner);
+            line.appendChild(el('span', '', msg));
+            preview.appendChild(line);
+            statusEl.replaceChildren(preview);
           }
 
           // Step A: upload

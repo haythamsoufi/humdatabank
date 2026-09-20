@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _MAYBE_BACKOFFICE = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))
@@ -43,12 +43,25 @@ DEFAULT_OUTPUT = (
 _DUP_SUFFIX_RE = re.compile(r"_([1-9]\d?)(\.[A-Za-z0-9]+)$")
 
 
+class FdrsDocumentScanCancelled(Exception):
+    """User cancelled the FDRS document URL status scan."""
+
+
 def _load_api_key(explicit: Optional[str]) -> str:
     if explicit and explicit.strip():
         return explicit.strip()
     key = (os.environ.get("FDRS_DATA_API_KEY") or "").strip()
     if key:
         return key
+    try:
+        from flask import current_app, has_app_context
+
+        if has_app_context():
+            cfg = (current_app.config.get("FDRS_DATA_API_KEY") or "").strip()
+            if cfg:
+                return cfg
+    except Exception:
+        pass
     env_candidates = [
         os.path.join(SCRIPT_DIR, ".env"),
         os.path.join(os.getcwd(), ".env"),
@@ -64,7 +77,7 @@ def _load_api_key(explicit: Optional[str]) -> str:
                 val = line.split("=", 1)[1].strip().strip('"').strip("'")
                 if val:
                     return val
-    raise SystemExit(
+    raise RuntimeError(
         "FDRS_DATA_API_KEY is required (--api-key, env, or .env)."
     )
 
@@ -219,37 +232,80 @@ def _probe_row(doc: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def export_url_status_excel(
+def execute_document_url_status_scan(
     *,
     output_path: str,
     api_key: Optional[str] = None,
     base_url: str = DEFAULT_BASE,
     workers: int = 20,
     limit: Optional[int] = None,
-) -> str:
+    progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> Dict[str, Any]:
+    """Probe the FDRS document catalog and write the status Excel.
+
+    Returns a stats dict (total_documents, downloadable_count, …). Raises
+    ``FdrsDocumentScanCancelled`` when *cancel_check* returns True.
+    """
     import pandas as pd
 
+    def _progress(payload: Dict[str, Any]) -> None:
+        if progress_cb:
+            progress_cb(payload)
+
+    def _cancelled() -> bool:
+        return bool(cancel_check and cancel_check())
+
+    if _cancelled():
+        raise FdrsDocumentScanCancelled()
+
     key = _load_api_key(api_key)
+    _progress({"stage": "fetch_catalog", "message": "Fetching FDRS document catalog...", "percent": 2.0})
     documents = fetch_fdrs_documents(base_url, key)
     if limit is not None:
         documents = documents[: int(limit)]
 
     total = len(documents)
     if total == 0:
-        raise SystemExit("No documents returned from FDRS API.")
+        raise RuntimeError("No documents returned from FDRS API.")
 
     rows: List[Optional[Dict[str, Any]]] = [None] * total
     done = 0
     workers = max(1, min(int(workers), 64))
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+    _progress({
+        "stage": "probe",
+        "message": f"Probing {total} document URLs...",
+        "current": 0,
+        "total": total,
+        "percent": 5.0,
+    })
+
+    pool = ThreadPoolExecutor(max_workers=workers)
+    try:
         futures = {pool.submit(_probe_row, doc): i for i, doc in enumerate(documents)}
         for fut in as_completed(futures):
+            if _cancelled():
+                raise FdrsDocumentScanCancelled()
             idx = futures[fut]
             rows[idx] = fut.result()
             done += 1
-            if done == 1 or done % 250 == 0 or done == total:
-                print(f"Probed {done}/{total}...", flush=True)
+            if done == 1 or done % 50 == 0 or done == total:
+                pct = 5.0 + (90.0 * done / total) if total else 95.0
+                _progress({
+                    "stage": "probe",
+                    "message": f"Probed {done}/{total} document URLs",
+                    "current": done,
+                    "total": total,
+                    "percent": pct,
+                })
+                if done == 1 or done % 250 == 0 or done == total:
+                    print(f"Probed {done}/{total}...", flush=True)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    if _cancelled():
+        raise FdrsDocumentScanCancelled()
 
     assert all(r is not None for r in rows)
     df = pd.DataFrame(rows)  # type: ignore[arg-type]
@@ -284,7 +340,11 @@ def export_url_status_excel(
     )
     print(f"Suffix fallback tried: {fallback_tried}; recovered: {fallback_ok}")
 
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    if _cancelled():
+        raise FdrsDocumentScanCancelled()
+
+    _progress({"stage": "write_excel", "message": "Writing Excel...", "percent": 96.0, "current": total, "total": total})
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
     scanned_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
@@ -332,6 +392,51 @@ def export_url_status_excel(
         meta_df.to_excel(writer, sheet_name="meta", index=False)
 
     print(f"\nWrote {output_path}")
+    years: List[int] = []
+    for y in df["year"].dropna().tolist():
+        try:
+            years.append(int(y))
+        except (TypeError, ValueError):
+            continue
+    years = sorted(set(years), reverse=True)
+    document_types = sorted({str(t).strip() for t in df["document_type"].fillna("").tolist() if str(t).strip()})
+    http_statuses = [str(c) for c in summary.index.tolist()]
+    stats = {
+        "scanned_at_utc": scanned_at,
+        "total_documents": total,
+        "downloadable_count": ok,
+        "http_403_public_unexpected": pub403,
+        "http_403_private_expected": priv403,
+        "suffix_fallback_tried": fallback_tried,
+        "suffix_fallback_recovered": fallback_ok,
+        "workers": workers,
+        "base_url": base_url,
+        "limit": limit,
+        "filter_options": {
+            "years": years,
+            "document_types": document_types,
+            "http_statuses": http_statuses,
+        },
+    }
+    _progress({"stage": "complete", "message": "Completed", "percent": 100.0, "current": total, "total": total, "stats": stats})
+    return stats
+
+
+def export_url_status_excel(
+    *,
+    output_path: str,
+    api_key: Optional[str] = None,
+    base_url: str = DEFAULT_BASE,
+    workers: int = 20,
+    limit: Optional[int] = None,
+) -> str:
+    execute_document_url_status_scan(
+        output_path=output_path,
+        api_key=api_key,
+        base_url=base_url,
+        workers=workers,
+        limit=limit,
+    )
     return output_path
 
 
@@ -350,13 +455,16 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=20, help="Concurrent probe workers")
     parser.add_argument("--limit", type=int, default=None, help="Probe only first N documents (testing)")
     args = parser.parse_args()
-    export_url_status_excel(
-        output_path=args.output,
-        api_key=args.api_key,
-        base_url=args.base_url,
-        workers=args.workers,
-        limit=args.limit,
-    )
+    try:
+        export_url_status_excel(
+            output_path=args.output,
+            api_key=args.api_key,
+            base_url=args.base_url,
+            workers=args.workers,
+            limit=args.limit,
+        )
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 if __name__ == "__main__":

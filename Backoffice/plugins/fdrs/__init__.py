@@ -15,6 +15,7 @@ bp = Blueprint(
 
 from plugins.fdrs import routes  # noqa: E402, F401
 from plugins.fdrs import publication_routes  # noqa: E402, F401
+from plugins.fdrs import document_status_routes  # noqa: E402, F401
 from plugins.fdrs import public_api_routes  # noqa: E402, F401
 
 __all__ = ["bp", "_PLUGIN_DIR"]

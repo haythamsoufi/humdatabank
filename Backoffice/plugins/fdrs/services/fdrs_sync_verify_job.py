@@ -211,16 +211,8 @@ _VERIFY_SHEET_ALIASES = {
 }
 
 
-def _cell_to_json(value: Any) -> Any:
-    if value is None:
-        return None
-    if isinstance(value, (str, int, float, bool)):
-        return value
-    return str(value)
-
-
 def read_fdrs_sync_verify_workbook(
-    path: str,
+    source,
     *,
     sheet: str = "data_points",
     status: Optional[str] = None,
@@ -231,72 +223,23 @@ def read_fdrs_sync_verify_workbook(
 
     The workbook written by ``verify_fdrs_sync`` has ``data_points``,
     ``summary``, and ``kpi_coverage``. Status filter applies only to
-    ``data_points`` (column ``status``).
+    ``data_points`` (column ``status``). *source* may be a filesystem
+    path or workbook bytes (used when the latest file lives in blob storage).
     """
-    import openpyxl
+    from plugins.fdrs.services.fdrs_tools_artifacts import read_xlsx_sheet
 
-    page = max(1, int(page or 1))
-    per_page = min(500, max(1, int(per_page or 200)))
-    wanted = _VERIFY_SHEET_ALIASES.get((sheet or "").strip().lower(), "data_points")
-    status_filter = (status or "").strip().lower() or None
-
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    try:
-        sheet_names = list(wb.sheetnames)
-        if wanted not in wb.sheetnames:
-            wanted = sheet_names[0] if sheet_names else wanted
-        ws = wb[wanted] if wanted in wb.sheetnames else None
-        if ws is None:
-            return {
-                "sheet": wanted,
-                "sheets": sheet_names,
-                "columns": [],
-                "rows": [],
-                "page": page,
-                "per_page": per_page,
-                "total_rows": 0,
-                "filtered_rows": 0,
-            }
-
-        rows_iter = ws.iter_rows(values_only=True)
-        raw_header = next(rows_iter, None) or ()
-        columns = [str(c) if c is not None else "" for c in raw_header]
-        status_idx = None
-        for i, col in enumerate(columns):
-            if col.lower() == "status":
-                status_idx = i
-                break
-
-        matched: List[Dict[str, Any]] = []
-        total_rows = 0
-        for raw in rows_iter:
-            total_rows += 1
-            if status_filter and status_idx is not None:
-                cell = raw[status_idx] if status_idx < len(raw) else None
-                if str(cell or "").strip().lower() != status_filter:
-                    continue
-            row: Dict[str, Any] = {}
-            for i, col in enumerate(columns):
-                if not col:
-                    continue
-                row[col] = _cell_to_json(raw[i] if i < len(raw) else None)
-            matched.append(row)
-
-        filtered_rows = len(matched)
-        start = (page - 1) * per_page
-        page_rows = matched[start:start + per_page]
-        return {
-            "sheet": wanted,
-            "sheets": sheet_names,
-            "columns": [c for c in columns if c],
-            "rows": page_rows,
-            "page": page,
-            "per_page": per_page,
-            "total_rows": total_rows,
-            "filtered_rows": filtered_rows,
-        }
-    finally:
-        wb.close()
+    filters = {}
+    status_filter = (status or "").strip().lower()
+    if status_filter:
+        filters["status"] = status_filter
+    return read_xlsx_sheet(
+        source,
+        sheet=sheet,
+        aliases=_VERIFY_SHEET_ALIASES,
+        page=page,
+        per_page=per_page,
+        filters=filters or None,
+    )
 
 
 def _process_fdrs_sync_verify_item(app, *, job_id: str, item_id: int) -> None:
@@ -427,6 +370,27 @@ def _process_fdrs_sync_verify_item(app, *, job_id: str, item_id: int) -> None:
                 progress_cb=_progress_cb,
                 cancel_check=_cancel_check,
             )
+            persisted = False
+            if output_path and os.path.isfile(output_path):
+                try:
+                    from plugins.fdrs.services import fdrs_tools_artifacts as artifacts
+
+                    artifacts.persist_verify_latest(
+                        template_id=template_id,
+                        local_xlsx_path=str(output_path),
+                        stats=dict(stats or {}),
+                        extra={
+                            "job_id": job_id,
+                            "fdrs_years": payload.get("fdrs_years"),
+                            "skip_imputed": bool(payload.get("skip_imputed")),
+                            "problems_only": bool(payload.get("problems_only")),
+                        },
+                    )
+                    persisted = True
+                except Exception:
+                    logger.exception(
+                        "FDRS verify %s: failed to persist workbook to storage", job_id
+                    )
             update_import_job(
                 job_id,
                 force=True,
@@ -435,7 +399,9 @@ def _process_fdrs_sync_verify_item(app, *, job_id: str, item_id: int) -> None:
                 message="Completed",
                 percent=100.0,
                 stats=dict(stats or {}),
-                download_ready=bool(output_path and os.path.isfile(output_path)),
+                download_ready=bool(
+                    persisted or (output_path and os.path.isfile(output_path))
+                ),
             )
             item.status = "completed"
             item.error = None

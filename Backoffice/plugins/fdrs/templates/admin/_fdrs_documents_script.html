@@ -1,0 +1,523 @@
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function () {
+    const root = document.getElementById('fdrs-documents-root');
+    if (!root) return;
+
+    const URLS = {
+        run: {{ url_for("fdrs.run_document_status") | tojson }},
+        status: {{ url_for("fdrs.document_status_job_status", job_id="__JOB_ID__") | tojson }},
+        cancel: {{ url_for("fdrs.document_status_cancel", job_id="__JOB_ID__") | tojson }},
+        latest: {{ url_for("fdrs.document_status_latest") | tojson }},
+        results: {{ url_for("fdrs.document_status_latest_results") | tojson }},
+        download: {{ url_for("fdrs.document_status_latest_download") | tojson }}
+    };
+    const STORAGE_KEY = 'fdrs_document_status_job';
+    const POLL_INITIAL_MS = 2000;
+    const POLL_MAX_MS = 8000;
+    const POLL_BACKOFF = 1.25;
+
+    const settingsEl = document.getElementById('fdrs-docs-settings');
+    const footerSettings = document.getElementById('fdrs-docs-footer-settings');
+    const footerRunning = document.getElementById('fdrs-docs-footer-running');
+    const footerDone = document.getElementById('fdrs-docs-footer-done');
+    const runBtn = document.getElementById('fdrs-docs-run-btn');
+    const runBtnText = document.getElementById('fdrs-docs-run-btn-text');
+    const stopBtn = document.getElementById('fdrs-docs-stop-btn');
+    const stopBtnText = document.getElementById('fdrs-docs-stop-btn-text');
+    const runAgainBtn = document.getElementById('fdrs-docs-run-again-btn');
+    const downloadBtn = document.getElementById('fdrs-docs-download-btn');
+    const progress = document.getElementById('fdrs-docs-progress');
+    const progressStage = document.getElementById('fdrs-docs-progress-stage');
+    const progressBar = document.getElementById('fdrs-docs-progress-bar');
+    const progressText = document.getElementById('fdrs-docs-progress-text');
+    const progressCount = document.getElementById('fdrs-docs-progress-count');
+    const result = document.getElementById('fdrs-docs-result');
+    const resultText = document.getElementById('fdrs-docs-result-text');
+
+    let activeJobId = null;
+    let pollTimer = null;
+    let pollDelay = POLL_INITIAL_MS;
+    let lastPercent = 0;
+    let stopRequested = false;
+    let resultsUrl = URLS.results;
+    let tableState = { sheet: 'documents' };
+    let docsGridHelper = null;
+
+    function escapeHtmlAttr(value) {
+        if (window.escapeHtmlAttr) return window.escapeHtmlAttr(value);
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function isSafeHref(url) {
+        if (!url) return false;
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.origin === window.location.origin && parsed.pathname.indexOf('//') === -1;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function formatLastRunDate(iso) {
+        if (!iso) return '';
+        const parsed = new Date(iso);
+        if (isNaN(parsed.getTime())) return String(iso);
+        return parsed.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+    }
+
+    function formatDocsStats(stats) {
+        stats = stats || {};
+        const total = stats.total_documents || 0;
+        const ok = stats.downloadable_count || 0;
+        let msg = String(total) + ' ' + {{ _("documents")|tojson|safe }}
+            + ' — ' + String(ok) + ' ' + {{ _("downloadable")|tojson|safe }};
+        if (stats.http_403_public_unexpected) {
+            msg += ' · ' + String(stats.http_403_public_unexpected) + ' '
+                + {{ _("public 403s unexpected")|tojson|safe }};
+        }
+        return msg;
+    }
+
+    function setUIMode(mode) {
+        const isSettings = mode === 'settings';
+        const isRunning = mode === 'running';
+        const isDone = mode === 'done';
+        if (settingsEl) settingsEl.classList.toggle('hidden', !isSettings);
+        if (footerSettings) footerSettings.classList.toggle('hidden', !isSettings);
+        if (footerRunning) footerRunning.classList.toggle('hidden', !isRunning);
+        if (footerDone) footerDone.classList.toggle('hidden', !isDone);
+    }
+
+    function resetRunButton() {
+        if (!runBtn || !runBtnText) return;
+        runBtn.disabled = false;
+        const spinner = runBtn.querySelector('i.fa-spinner');
+        if (spinner) spinner.remove();
+        if (!runBtn.querySelector('i.fa-search')) {
+            runBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-search mr-2"></i>');
+        }
+        runBtnText.textContent = {{ _("Scan document URLs")|tojson|safe }};
+    }
+
+    function resetStopButton() {
+        stopRequested = false;
+        if (!stopBtn || !stopBtnText) return;
+        stopBtn.disabled = false;
+        stopBtnText.textContent = {{ _("Stop scan")|tojson|safe }};
+    }
+
+    function setProgress(percent, stage, message, current, total, opts) {
+        opts = opts || {};
+        if (opts.resetProgress) lastPercent = 0;
+        const raw = Math.max(0, Math.min(100, Number(percent || 0)));
+        const pct = opts.resetProgress ? raw : Math.max(lastPercent, raw);
+        lastPercent = pct;
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = Math.round(pct) + '%';
+        if (progressStage) {
+            progressStage.textContent = (message && message.trim()) ? message.trim() : (stage || '-');
+        }
+        if (progressCount) {
+            if (total !== null && total !== undefined && Number(total) > 0) {
+                progressCount.textContent = (current || 0) + ' / ' + total;
+            } else {
+                progressCount.textContent = '';
+            }
+        }
+    }
+
+    function renderLastRun(meta) {
+        const banner = document.getElementById('fdrs-docs-last-run');
+        if (!banner || !meta) return;
+        if (!meta.exists && !meta.completed_at && !meta.stats) {
+            banner.classList.add('hidden');
+            return;
+        }
+        banner.classList.remove('hidden');
+        const dateEl = document.getElementById('fdrs-docs-last-run-date');
+        if (dateEl && meta.completed_at) {
+            dateEl.textContent = ' · ' + formatLastRunDate(meta.completed_at);
+        }
+        const statsEl = document.getElementById('fdrs-docs-last-run-stats');
+        if (statsEl && meta.stats) {
+            statsEl.textContent = formatDocsStats(meta.stats);
+        }
+        const dl = document.getElementById('fdrs-docs-last-run-download');
+        if (dl) {
+            dl.classList.remove('hidden');
+            dl.setAttribute('href', URLS.download);
+        }
+        if (downloadBtn) {
+            downloadBtn.classList.remove('hidden');
+            downloadBtn.setAttribute('href', URLS.download);
+        }
+    }
+
+    function httpBadgeClass(status) {
+        const n = Number(status);
+        if (n === 200 || n === 206) return 'bg-green-50 text-green-800';
+        if (n === 403) return 'bg-amber-50 text-amber-800';
+        if (n === 404 || n >= 500) return 'bg-red-50 text-red-800';
+        return 'bg-gray-50 text-gray-700';
+    }
+
+    function showDocsGridError(message) {
+        const err = document.getElementById('fdrs-docs-grid-error');
+        if (!err) return;
+        if (!message) {
+            err.classList.add('hidden');
+            err.textContent = '';
+            return;
+        }
+        err.textContent = message;
+        err.classList.remove('hidden');
+    }
+
+    function isTruthyFlag(value) {
+        return value === true || String(value).toLowerCase() === 'true' || String(value) === '1';
+    }
+
+    function docsUrlRenderer(params) {
+        const text = params.value == null ? '' : String(params.value);
+        if (!text) return '';
+        if (!/^https?:\/\//i.test(text)) return escapeHtmlAttr(text);
+        return '<a class="text-blue-700 underline" href="' + escapeHtmlAttr(text)
+            + '" target="_blank" rel="noopener noreferrer">' + escapeHtmlAttr(text) + '</a>';
+    }
+
+    function renderStatsCards(stats) {
+        const cards = document.getElementById('fdrs-docs-stats-cards');
+        if (!cards) return;
+        stats = stats || {};
+        const items = [
+            { label: {{ _("Documents")|tojson|safe }}, value: stats.total_documents || 0, cls: 'border-gray-200 bg-gray-50 text-gray-800' },
+            { label: {{ _("Downloadable")|tojson|safe }}, value: stats.downloadable_count || 0, cls: 'border-green-200 bg-green-50 text-green-800' },
+            { label: {{ _("Public 403s")|tojson|safe }}, value: stats.http_403_public_unexpected || 0, cls: 'border-amber-200 bg-amber-50 text-amber-800' },
+            { label: {{ _("Private 403s")|tojson|safe }}, value: stats.http_403_private_expected || 0, cls: 'border-gray-200 bg-gray-50 text-gray-700' }
+        ];
+        cards.innerHTML = items.map(function (item) {
+            return '<div class="border rounded-md px-3 py-2 ' + item.cls + '">'
+                + '<div class="text-xs uppercase tracking-wide font-medium">' + escapeHtmlAttr(item.label) + '</div>'
+                + '<div class="text-lg font-semibold">' + escapeHtmlAttr(item.value) + '</div>'
+                + '</div>';
+        }).join('');
+    }
+
+    function setActiveSheet(sheet) {
+        document.querySelectorAll('#fdrs-docs-sheet-tabs [data-docs-sheet]').forEach(function (btn) {
+            const on = btn.getAttribute('data-docs-sheet') === sheet;
+            btn.classList.toggle('bg-blue-50', on);
+            btn.classList.toggle('text-blue-700', on);
+            btn.classList.toggle('text-gray-600', !on);
+            btn.classList.toggle('bg-white', !on);
+        });
+    }
+
+    function buildDocsColumnDefs(columns, rows) {
+        const defs = (columns || []).map(function (col) {
+            const key = String(col || '').toLowerCase();
+            const def = {
+                field: col,
+                headerName: col,
+                minWidth: (key === 'url' || key === 'fallback_url' || key === 'name') ? 220 : 110,
+                flex: 1
+            };
+            if (key === 'http_status') {
+                def.cellRenderer = function (params) {
+                    const text = params.value == null ? '' : String(params.value);
+                    if (!text) return '';
+                    return '<span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium '
+                        + httpBadgeClass(text) + '">' + escapeHtmlAttr(text) + '</span>';
+                };
+                def.filter = 'customSetFilter';
+                def.minWidth = 130;
+            } else if (key === 'downloadable') {
+                def.cellRenderer = function (params) {
+                    return isTruthyFlag(params.value)
+                        ? '<span class="text-green-700">' + escapeHtmlAttr({{ _("Yes")|tojson|safe }}) + '</span>'
+                        : '<span class="text-gray-500">' + escapeHtmlAttr({{ _("No")|tojson|safe }}) + '</span>';
+                };
+                def.filter = 'customSetFilter';
+            } else if (key === 'is_public') {
+                def.cellRenderer = function (params) {
+                    return isTruthyFlag(params.value)
+                        ? escapeHtmlAttr({{ _("Public")|tojson|safe }})
+                        : escapeHtmlAttr({{ _("Private")|tojson|safe }});
+                };
+                def.filter = 'customSetFilter';
+            } else if (key === 'url' || key === 'fallback_url') {
+                def.cellRenderer = docsUrlRenderer;
+            }
+            return def;
+        });
+        if (window.AgGridHelper && typeof AgGridHelper.autoDetectColumnFilters === 'function') {
+            AgGridHelper.autoDetectColumnFilters(defs, rows || []);
+        }
+        return defs.length ? defs : [{ field: '_empty', headerName: '', hide: true }];
+    }
+
+    function applyDocsQuickFilter() {
+        const search = document.getElementById('fdrs-docs-search');
+        if (docsGridHelper && docsGridHelper.gridApi && typeof docsGridHelper.gridApi.setGridOption === 'function') {
+            docsGridHelper.gridApi.setGridOption('quickFilterText', (search && search.value) || '');
+        }
+    }
+
+    function applyDocsGrid(columns, rows) {
+        if (typeof AgGridHelper === 'undefined' || !document.getElementById('fdrsDocsGrid')) return;
+        const colDefs = buildDocsColumnDefs(columns, rows);
+        if (!docsGridHelper) {
+            docsGridHelper = new AgGridHelper({
+                containerId: 'fdrsDocsGrid',
+                templateId: 'fdrs-docs-status',
+                columnDefs: colDefs,
+                rowData: rows || [],
+                filterPersistence: false,
+                columnVisibilityOptions: { enableExport: true, enableReset: true },
+                heightOptions: { minHeight: 400, maxHeight: 560, viewportOffset: 180 },
+                options: {
+                    getRowStyle: function (params) {
+                        if (!params.data) return null;
+                        const n = Number(params.data.http_status);
+                        if (n === 404) return { backgroundColor: '#fef2f2' };
+                        if (n === 403) return { backgroundColor: '#fffbeb' };
+                        return null;
+                    }
+                }
+            });
+            docsGridHelper.initialize();
+        } else if (docsGridHelper.gridApi) {
+            if (typeof docsGridHelper.gridApi.setFilterModel === 'function') {
+                docsGridHelper.gridApi.setFilterModel(null);
+            }
+            if (typeof docsGridHelper.gridApi.setGridOption === 'function') {
+                docsGridHelper.gridApi.setGridOption('columnDefs', colDefs);
+            }
+            docsGridHelper._hasSizedColumnsToFit = false;
+            docsGridHelper.setRowData(rows || []);
+        }
+        applyDocsQuickFilter();
+    }
+
+    function renderTable(data) {
+        const wrap = document.getElementById('fdrs-docs-table-wrap');
+        if (!wrap) return;
+        wrap.classList.remove('hidden');
+        showDocsGridError('');
+        renderStatsCards(data.stats);
+        setActiveSheet(data.sheet || tableState.sheet);
+        applyDocsGrid(data.columns || [], data.rows || []);
+    }
+
+    function fetchResultsPage() {
+        const params = new URLSearchParams();
+        params.set('sheet', tableState.sheet);
+        params.set('all', '1');
+        fetch(resultsUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || data.success === false) {
+                    throw new Error((data && data.error) || {{ _("Failed to load document table")|tojson|safe }});
+                }
+                renderTable(data);
+            })
+            .catch(function (err) {
+                const wrap = document.getElementById('fdrs-docs-table-wrap');
+                if (wrap) wrap.classList.remove('hidden');
+                showDocsGridError(err.message || {{ _("Failed to load document table")|tojson|safe }});
+            });
+    }
+
+    document.querySelectorAll('#fdrs-docs-sheet-tabs [data-docs-sheet]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            tableState.sheet = this.getAttribute('data-docs-sheet');
+            const search = document.getElementById('fdrs-docs-search');
+            if (search) search.value = '';
+            fetchResultsPage();
+        });
+    });
+    const searchEl = document.getElementById('fdrs-docs-search');
+    if (searchEl) {
+        searchEl.addEventListener('input', applyDocsQuickFilter);
+    }
+
+    function stopPolling() {
+        if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+        activeJobId = null;
+        pollDelay = POLL_INITIAL_MS;
+    }
+
+    function writeStorage(jobId) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId: jobId })); } catch (e) { /* ignore */ }
+    }
+    function clearStorage() {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+    }
+
+    function pollStatus() {
+        if (!activeJobId) return;
+        const url = URLS.status.replace('__JOB_ID__', encodeURIComponent(activeJobId));
+        fetch(url)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || !data.success || !data.job) {
+                    throw new Error((data && data.error) || {{ _("Failed to read scan status")|tojson|safe }});
+                }
+                const job = data.job;
+                setProgress(job.percent, job.stage, job.message, job.current, job.total);
+                if (job.status === 'completed') {
+                    stopPolling();
+                    clearStorage();
+                    result.classList.remove('hidden');
+                    resultText.textContent = formatDocsStats(job.stats || {});
+                    resultText.className = 'text-sm text-green-700';
+                    renderLastRun({ exists: true, completed_at: new Date().toISOString(), stats: job.stats || {} });
+                    setUIMode('done');
+                    fetchResultsPage();
+                    return;
+                }
+                if (job.status === 'failed' || job.status === 'cancelled') {
+                    stopPolling();
+                    clearStorage();
+                    result.classList.remove('hidden');
+                    resultText.textContent = job.error || (job.status === 'cancelled'
+                        ? {{ _("Document scan cancelled.")|tojson|safe }}
+                        : {{ _("Document scan failed")|tojson|safe }});
+                    resultText.className = job.status === 'cancelled' ? 'text-sm text-amber-700' : 'text-sm text-red-700';
+                    setUIMode('done');
+                    return;
+                }
+                if (job.status === 'cancel_requested') {
+                    stopRequested = true;
+                    if (stopBtn) stopBtn.disabled = true;
+                    if (stopBtnText) stopBtnText.textContent = {{ _("Stopping...")|tojson|safe }};
+                }
+                pollTimer = setTimeout(pollStatus, pollDelay);
+                pollDelay = Math.min(Math.round(pollDelay * POLL_BACKOFF), POLL_MAX_MS);
+            })
+            .catch(function (err) {
+                stopPolling();
+                result.classList.remove('hidden');
+                resultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
+                resultText.className = 'text-sm text-red-700';
+                setUIMode('done');
+            });
+    }
+
+    if (runAgainBtn) {
+        runAgainBtn.addEventListener('click', function () {
+            result.classList.add('hidden');
+            if (progress) progress.classList.add('hidden');
+            resetRunButton();
+            resetStopButton();
+            setUIMode('settings');
+        });
+    }
+    if (stopBtn) {
+        stopBtn.addEventListener('click', function () {
+            if (!activeJobId || stopRequested) return;
+            stopRequested = true;
+            stopBtn.disabled = true;
+            stopBtnText.textContent = {{ _("Stopping...")|tojson|safe }};
+            const url = URLS.cancel.replace('__JOB_ID__', encodeURIComponent(activeJobId));
+            const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' }
+            }).catch(function () { /* status poll will surface the outcome */ });
+        });
+    }
+    if (runBtn) {
+        runBtn.addEventListener('click', function () {
+            const test = !!(document.getElementById('fdrs-docs-test') && document.getElementById('fdrs-docs-test').checked);
+            result.classList.add('hidden');
+            const tableWrap = document.getElementById('fdrs-docs-table-wrap');
+            if (tableWrap) tableWrap.classList.add('hidden');
+            setUIMode('running');
+            if (progress) progress.classList.remove('hidden');
+            setProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
+            runBtn.disabled = true;
+            runBtnText.textContent = {{ _("Scanning...")|tojson|safe }};
+            runBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
+            const iconEl = runBtn.querySelector('i.fa-search');
+            if (iconEl) iconEl.remove();
+            const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch(URLS.run, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+                body: JSON.stringify({ test: test })
+            })
+            .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+            .then(function (resultBody) {
+                const data = resultBody.data || {};
+                if (!resultBody.ok || !data.success || !data.job_id) {
+                    throw new Error(data.error || {{ _("Document scan failed")|tojson|safe }});
+                }
+                activeJobId = data.job_id;
+                writeStorage(data.job_id);
+                pollDelay = POLL_INITIAL_MS;
+                pollStatus();
+            })
+            .catch(function (err) {
+                result.classList.remove('hidden');
+                resultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
+                resultText.className = 'text-sm text-red-700';
+                setUIMode('done');
+            });
+        });
+    }
+
+    function readActiveJobs() {
+        const el = document.getElementById('fdrs-docs-active-jobs');
+        if (!el) return [];
+        try { return JSON.parse(el.textContent || '[]') || []; } catch (e) { return []; }
+    }
+
+    function resumeIfNeeded() {
+        let jobId = null;
+        const serverJobs = readActiveJobs().filter(function (j) { return j && j.job_id; });
+        if (serverJobs.length) {
+            jobId = serverJobs[0].job_id;
+        } else {
+            try {
+                const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+                if (stored && stored.jobId) jobId = stored.jobId;
+            } catch (e) { /* ignore */ }
+        }
+        if (!jobId) return false;
+        activeJobId = jobId;
+        writeStorage(jobId);
+        if (window.AdminUnderlineTabs) {
+            window.AdminUnderlineTabs.activateStripTab('#data-sync-tabs', 'documents', { panelSelector: '.data-panel' });
+        }
+        setUIMode('running');
+        if (progress) progress.classList.remove('hidden');
+        setProgress(0, 'resuming', {{ _("Resuming scan...")|tojson|safe }}, 0, null, { resetProgress: true });
+        pollDelay = POLL_INITIAL_MS;
+        pollStatus();
+        return true;
+    }
+
+    function restoreLatest() {
+        fetch(URLS.latest, { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || data.success === false || !data.exists) return;
+                renderLastRun(data);
+                fetchResultsPage();
+            })
+            .catch(function () { /* keep page usable */ });
+    }
+
+    if (!resumeIfNeeded()) {
+        restoreLatest();
+    }
+});
+</script>

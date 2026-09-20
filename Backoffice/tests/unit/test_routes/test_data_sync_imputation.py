@@ -187,6 +187,7 @@ class TestFdrsToolsRoute:
         assert kwargs.get("has_data_sync") is True
         tab_ids = [t.get("id") for t in (kwargs.get("extra_tabs") or [])]
         assert tab_ids[0] == "sync"
+        assert "documents" in tab_ids
         assert "publication" in tab_ids
 
     def test_legacy_url_redirects(self, logged_in_client, db_session, app):

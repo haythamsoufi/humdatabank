@@ -1,8 +1,13 @@
 """Durable per-import change logs, linked from the audit trail Details panel.
 
-Bulk UPR/FDRS upserts and assignment Excel imports write a summary JSON plus a
-JSONL of row-level changes under ``instance/import_logs/``. The audit row stores
+Bulk UPR/FDRS upserts and assignment Excel imports stream a summary JSON plus a
+JSONL of row-level changes. Writes go to a local cache under
+``instance/import_logs/`` and, on finalize, to ``storage_service`` (filesystem
+locally, Azure Blob in prod) so they survive redeploys. The audit row stores
 ``change_log_url``; View Details opens that page.
+
+Do not store the JSONL in the database — a single UPR import can be thousands
+of change rows.
 """
 
 from __future__ import annotations
@@ -27,6 +32,7 @@ LOG_ID_RE = re.compile(r"^[a-fA-F0-9]{32}$")
 _VALUE_PREVIEW_LIMIT = 240
 _MAX_WARNING_LINES = 200
 VIEWER_CHANGE_LIMIT = 500
+STORAGE_CATEGORY = "import_logs"
 
 
 def utc_iso() -> str:
@@ -54,6 +60,91 @@ def summary_path(log_id: str, *, log_dir: Optional[str] = None) -> str:
 
 def changes_path(log_id: str, *, log_dir: Optional[str] = None) -> str:
     return os.path.join(import_logs_dir(log_dir), f"{log_id}.jsonl")
+
+
+def _storage_rel(log_id: str, ext: str) -> str:
+    return f"{log_id}.{ext}"
+
+
+def _use_durable_storage(log_dir: Optional[str] = None) -> bool:
+    return log_dir is None and has_app_context()
+
+
+def persist_import_log_to_storage(log_id: str, *, log_dir: Optional[str] = None) -> None:
+    """Copy local summary + JSONL into durable storage. No-op for test *log_dir*."""
+    if not is_valid_import_log_id(log_id) or not _use_durable_storage(log_dir):
+        return
+    from app.services.platform import storage_service
+
+    try:
+        for ext, path in (("json", summary_path(log_id, log_dir=log_dir)), ("jsonl", changes_path(log_id, log_dir=log_dir))):
+            if not os.path.isfile(path):
+                continue
+            with open(path, "rb") as handle:
+                storage_service.upload(STORAGE_CATEGORY, _storage_rel(log_id, ext), handle.read())
+    except Exception:
+        logger.exception("Failed to persist import change log %s to durable storage", log_id)
+
+
+def hydrate_import_log_from_storage(log_id: str, ext: str, *, log_dir: Optional[str] = None) -> bool:
+    """Ensure the local cache file exists, downloading from blob if needed."""
+    path = summary_path(log_id, log_dir=log_dir) if ext == "json" else changes_path(log_id, log_dir=log_dir)
+    if os.path.isfile(path):
+        return True
+    if not is_valid_import_log_id(log_id) or not _use_durable_storage(log_dir):
+        return False
+    from app.services.platform import storage_service
+
+    rel = _storage_rel(log_id, ext)
+    if not storage_service.exists(STORAGE_CATEGORY, rel):
+        return False
+    try:
+        data = storage_service.download(STORAGE_CATEGORY, rel)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as handle:
+            handle.write(data)
+        os.replace(tmp, path)
+        return True
+    except Exception:
+        logger.exception("Failed to hydrate import change log %s.%s from storage", log_id, ext)
+        return False
+
+
+def import_log_file_exists(log_id: str, ext: str, *, log_dir: Optional[str] = None) -> bool:
+    path = summary_path(log_id, log_dir=log_dir) if ext == "json" else changes_path(log_id, log_dir=log_dir)
+    if os.path.isfile(path):
+        return True
+    if not is_valid_import_log_id(log_id) or not _use_durable_storage(log_dir):
+        return False
+    from app.services.platform import storage_service
+
+    return storage_service.exists(STORAGE_CATEGORY, _storage_rel(log_id, ext))
+
+
+def stream_import_log_file(log_id: str, ext: str, *, filename: str, mimetype: str):
+    """Flask response for a summary/JSONL download (storage first, then local cache)."""
+    if not is_valid_import_log_id(log_id):
+        from werkzeug.exceptions import NotFound
+
+        raise NotFound()
+    from flask import send_file
+    from app.services.platform import storage_service
+
+    if _use_durable_storage() and storage_service.exists(STORAGE_CATEGORY, _storage_rel(log_id, ext)):
+        return storage_service.stream_response(
+            STORAGE_CATEGORY,
+            _storage_rel(log_id, ext),
+            filename,
+            mimetype=mimetype,
+            as_attachment=True,
+        )
+    path = summary_path(log_id) if ext == "json" else changes_path(log_id)
+    if hydrate_import_log_from_storage(log_id, ext) and os.path.isfile(path):
+        return send_file(path, mimetype=mimetype, as_attachment=True, download_name=filename)
+    from werkzeug.exceptions import NotFound
+
+    raise NotFound()
 
 
 _JSON_SCALAR_PAIR_RE = re.compile(
@@ -327,6 +418,7 @@ class ImportChangeLogWriter:
         path = summary_path(self.log_id, log_dir=self.log_dir)
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, default=str, ensure_ascii=True)
+        persist_import_log_to_storage(self.log_id, log_dir=self.log_dir)
         return path
 
 
@@ -428,6 +520,8 @@ def record_assignment_import_audit(
 def load_import_log_summary(log_id: str, *, log_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
     path = summary_path(log_id, log_dir=log_dir)
     if not os.path.isfile(path):
+        hydrate_import_log_from_storage(log_id, "json", log_dir=log_dir)
+    if not os.path.isfile(path):
         return None
     try:
         with open(path, encoding="utf-8") as fh:
@@ -445,6 +539,8 @@ def iter_import_log_changes(
     log_dir: Optional[str] = None,
 ) -> Iterator[Dict[str, Any]]:
     path = changes_path(log_id, log_dir=log_dir)
+    if not os.path.isfile(path):
+        hydrate_import_log_from_storage(log_id, "jsonl", log_dir=log_dir)
     if not os.path.isfile(path):
         return
         yield  # pragma: no cover  # makes this a generator
@@ -473,6 +569,8 @@ def count_import_log_changes(
 ) -> int:
     path = changes_path(log_id, log_dir=log_dir)
     if not os.path.isfile(path):
+        hydrate_import_log_from_storage(log_id, "jsonl", log_dir=log_dir)
+    if not os.path.isfile(path):
         return 0
     n = 0
     with open(path, encoding="utf-8") as fh:
@@ -494,6 +592,8 @@ def count_import_log_changes(
 
 def count_import_log_noops(log_id: str, *, log_dir: Optional[str] = None) -> int:
     path = changes_path(log_id, log_dir=log_dir)
+    if not os.path.isfile(path):
+        hydrate_import_log_from_storage(log_id, "jsonl", log_dir=log_dir)
     if not os.path.isfile(path):
         return 0
     n = 0

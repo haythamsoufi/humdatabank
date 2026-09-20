@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import os
-
-from flask import Blueprint, abort, render_template, send_file
+from flask import Blueprint, abort, render_template
 
 from app.routes.admin.shared import permission_required_any
 from app.services.imports.import_change_log import (
     VIEWER_CHANGE_LIMIT,
-    changes_path,
     count_import_log_changes,
     count_import_log_noops,
+    import_log_file_exists,
     is_valid_import_log_id,
     iter_import_log_changes,
     load_import_log_summary,
-    summary_path,
+    stream_import_log_file,
 )
 
 bp = Blueprint("import_change_log", __name__, url_prefix="/admin/import-logs")
@@ -44,7 +42,7 @@ def view_log(log_id: str):
     if recorded_updates > real_updates:
         stats["updated"] = real_updates
     summary = {**summary, "stats": stats}
-    ready = bool(summary.get("log_id")) or os.path.isfile(changes_path(log_id))
+    ready = bool(summary.get("log_id")) or import_log_file_exists(log_id, "jsonl")
     return render_template(
         "admin/analytics/import_change_log.html",
         title="Import change log",
@@ -62,14 +60,11 @@ def view_log(log_id: str):
 @permission_required_any("admin.audit.view", "admin.templates.view")
 def download_summary(log_id: str):
     log_id = _require_log_id(log_id)
-    path = summary_path(log_id)
-    if not os.path.isfile(path):
-        abort(404)
-    return send_file(
-        path,
+    return stream_import_log_file(
+        log_id,
+        "json",
+        filename=f"import_change_log_{log_id}.json",
         mimetype="application/json",
-        as_attachment=True,
-        download_name=f"import_change_log_{log_id}.json",
     )
 
 
@@ -77,12 +72,9 @@ def download_summary(log_id: str):
 @permission_required_any("admin.audit.view", "admin.templates.view")
 def download_changes(log_id: str):
     log_id = _require_log_id(log_id)
-    path = changes_path(log_id)
-    if not os.path.isfile(path):
-        abort(404)
-    return send_file(
-        path,
+    return stream_import_log_file(
+        log_id,
+        "jsonl",
+        filename=f"import_changes_{log_id}.jsonl",
         mimetype="application/x-ndjson",
-        as_attachment=True,
-        download_name=f"import_changes_{log_id}.jsonl",
     )

@@ -69,6 +69,31 @@ document.addEventListener('DOMContentLoaded', function () {
         return parsed.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
     }
 
+    function prependFaIcon(btn, className) {
+        if (!btn) return;
+        const icon = document.createElement('i');
+        icon.className = className;
+        icon.setAttribute('aria-hidden', 'true');
+        btn.insertBefore(icon, btn.firstChild);
+    }
+
+    function renderStatCards(container, items) {
+        if (!container) return;
+        container.replaceChildren();
+        items.forEach(function (item) {
+            const wrap = document.createElement('div');
+            wrap.className = 'border rounded-md px-3 py-2 ' + item.cls;
+            const label = document.createElement('div');
+            label.className = 'text-xs uppercase tracking-wide font-medium';
+            label.textContent = item.label;
+            const value = document.createElement('div');
+            value.className = 'text-lg font-semibold';
+            value.textContent = String(item.value);
+            wrap.append(label, value);
+            container.appendChild(wrap);
+        });
+    }
+
     function formatDocsStats(stats) {
         stats = stats || {};
         const total = stats.total_documents || 0;
@@ -98,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const spinner = runBtn.querySelector('i.fa-spinner');
         if (spinner) spinner.remove();
         if (!runBtn.querySelector('i.fa-search')) {
-            runBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-search mr-2"></i>');
+            prependFaIcon(runBtn, 'fas fa-search mr-2');
         }
         runBtnText.textContent = {{ _("Scan document URLs")|tojson|safe }};
     }
@@ -199,12 +224,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: {{ _("Public 403s")|tojson|safe }}, value: stats.http_403_public_unexpected || 0, cls: 'border-amber-200 bg-amber-50 text-amber-800' },
             { label: {{ _("Private 403s")|tojson|safe }}, value: stats.http_403_private_expected || 0, cls: 'border-gray-200 bg-gray-50 text-gray-700' }
         ];
-        cards.innerHTML = items.map(function (item) {
-            return '<div class="border rounded-md px-3 py-2 ' + item.cls + '">'
-                + '<div class="text-xs uppercase tracking-wide font-medium">' + escapeHtmlAttr(item.label) + '</div>'
-                + '<div class="text-lg font-semibold">' + escapeHtmlAttr(item.value) + '</div>'
-                + '</div>';
-        }).join('');
+        renderStatCards(cards, items);
     }
 
     function setActiveSheet(sheet) {
@@ -445,9 +465,9 @@ document.addEventListener('DOMContentLoaded', function () {
             setProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
             runBtn.disabled = true;
             runBtnText.textContent = {{ _("Scanning...")|tojson|safe }};
-            runBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
             const iconEl = runBtn.querySelector('i.fa-search');
             if (iconEl) iconEl.remove();
+            prependFaIcon(runBtn, 'fas fa-spinner fa-spin mr-2');
             const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             fetch(URLS.run, {
                 method: 'POST',

@@ -61,10 +61,40 @@ document.addEventListener('DOMContentLoaded', function () {
   var POLL_MAX_MS = 4000;
   var POLL_BACKOFF = 1.5;
 
-  function escapeHtml(text) {
-    return String(text == null ? '' : text)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function appendText(parent, text) {
+    parent.appendChild(document.createTextNode(text == null ? '' : String(text)));
+  }
+
+  function setResultMessage(container, className, text, iconClass) {
+    if (!container) return;
+    container.replaceChildren();
+    if (!text && !iconClass) return;
+    var p = el('p', className);
+    if (iconClass) {
+      var icon = document.createElement('i');
+      icon.className = iconClass;
+      icon.setAttribute('aria-hidden', 'true');
+      p.appendChild(icon);
+      appendText(p, ' ');
+    }
+    appendText(p, text);
+    container.appendChild(p);
+  }
+
+  function setTbodyMessage(message, extraClass) {
+    tbody.replaceChildren();
+    var tr = document.createElement('tr');
+    var td = el('td', 'px-4 py-6 text-center text-sm ' + (extraClass || 'text-gray-500'), message);
+    td.colSpan = 9;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
   }
 
   function formatDate(iso) {
@@ -76,70 +106,99 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function card(label, value, colorClasses) {
-    return '<div class="bg-white rounded-lg border border-gray-200 p-4">' +
-      '<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">' + escapeHtml(label) + '</p>' +
-      '<p class="text-2xl font-semibold mt-1 ' + colorClasses + '">' + value + '</p>' +
-      '</div>';
+    var wrap = el('div', 'bg-white rounded-lg border border-gray-200 p-4');
+    wrap.appendChild(el('p', 'text-xs font-medium text-gray-500 uppercase tracking-wide', label));
+    wrap.appendChild(el('p', 'text-2xl font-semibold mt-1 ' + colorClasses, String(value)));
+    return wrap;
   }
 
   function renderCards(data) {
     var t = data.totals || {};
-    cardsEl.innerHTML =
-      card('Countries', data.countries_total, 'text-gray-900') +
-      card('Pending changes', data.countries_with_pending_changes, data.countries_with_pending_changes ? 'text-amber-600' : 'text-gray-900') +
-      card('New', t.new || 0, 'text-green-600') +
-      card('Changed', t.changed || 0, 'text-amber-600') +
-      card('Removed', t.removed || 0, 'text-red-600') +
-      card('Source', t.source || 0, t.source ? 'text-blue-900' : 'text-gray-500') +
-      card('Already up to date', t.unchanged || 0, 'text-gray-500');
+    cardsEl.replaceChildren(
+      card('Countries', data.countries_total, 'text-gray-900'),
+      card('Pending changes', data.countries_with_pending_changes, data.countries_with_pending_changes ? 'text-amber-600' : 'text-gray-900'),
+      card('New', t.new || 0, 'text-green-600'),
+      card('Changed', t.changed || 0, 'text-amber-600'),
+      card('Removed', t.removed || 0, 'text-red-600'),
+      card('Source', t.source || 0, t.source ? 'text-blue-900' : 'text-gray-500'),
+      card('Already up to date', t.unchanged || 0, 'text-gray-500')
+    );
   }
 
   function statusBadge(country) {
     if (country.pending_count > 0) {
-      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pending changes</span>';
+      return el('span', 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800', 'Pending changes');
     }
     if (country.total_public_items > 0) {
-      return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Up to date</span>';
+      return el('span', 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800', 'Up to date');
     }
-    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No data</span>';
+    return el('span', 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600', 'No data');
   }
 
   function countBadge(n, colorClasses, prefix) {
-    if (!n) return '<span class="text-gray-300">—</span>';
-    return '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + colorClasses + '">' + prefix + n + '</span>';
+    if (!n) return el('span', 'text-gray-300', '—');
+    return el('span', 'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + colorClasses, prefix + n);
   }
 
   function renderTable() {
     if (!currentCountries.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">No countries in this assignment.</td></tr>';
+      setTbodyMessage('No countries in this assignment.');
       return;
     }
-    tbody.innerHTML = currentCountries.map(function (c) {
+    tbody.replaceChildren();
+    currentCountries.forEach(function (c) {
       var counts = c.counts || {};
-      var countryLabel = escapeHtml(c.country_name) + (c.country_iso3 ? ' <span class="text-gray-400">(' + escapeHtml(c.country_iso3) + ')</span>' : '');
       var lastPublished = c.published_at
-        ? formatDate(c.published_at) + (c.published_by_name ? ' by ' + escapeHtml(c.published_by_name) : '')
+        ? formatDate(c.published_at) + (c.published_by_name ? ' by ' + c.published_by_name : '')
         : 'Never';
-      var viewDisabled = c.total_public_items ? '' : ' disabled';
-      return (
-        '<tr class="border-b border-gray-100">' +
-          '<td class="px-3 py-2"><input type="checkbox" class="fdrs-pub-row-checkbox h-4 w-4" data-aes-id="' + c.assignment_entity_status_id + '"></td>' +
-          '<td class="px-3 py-2 text-sm font-medium text-gray-900">' + countryLabel + '</td>' +
-          '<td class="px-3 py-2">' + statusBadge(c) + '</td>' +
-          '<td class="px-3 py-2">' + countBadge(counts.new, 'bg-green-100 text-green-800', '+') + '</td>' +
-          '<td class="px-3 py-2">' + countBadge(counts.changed, 'bg-amber-100 text-amber-800', '~') + '</td>' +
-          '<td class="px-3 py-2">' + countBadge(counts.removed, 'bg-red-100 text-red-800', '-') + '</td>' +
-          '<td class="px-3 py-2">' + countBadge(counts.source, 'bg-blue-50 text-blue-900', '') + '</td>' +
-          '<td class="px-3 py-2 text-xs text-gray-500">' + lastPublished + '</td>' +
-          '<td class="px-3 py-2 text-right">' +
-            '<button type="button" class="fdrs-pub-view-btn text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline" data-aes-id="' + c.assignment_entity_status_id + '"' + viewDisabled + '>View changes</button>' +
-          '</td>' +
-        '</tr>' +
-        '<tr class="fdrs-pub-detail-row hidden" data-detail-for="' + c.assignment_entity_status_id + '">' +
-          '<td colspan="9" class="px-3 py-3 bg-gray-50"><div class="fdrs-pub-detail-body text-sm text-gray-600">Loading…</div></td>' +
-        '</tr>'
-      );
-    }).join('');
+
+      var tr = el('tr', 'border-b border-gray-100');
+      var checkTd = el('td', 'px-3 py-2');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'fdrs-pub-row-checkbox h-4 w-4';
+      cb.setAttribute('data-aes-id', String(c.assignment_entity_status_id));
+      checkTd.appendChild(cb);
+      tr.appendChild(checkTd);
+
+      var nameTd = el('td', 'px-3 py-2 text-sm font-medium text-gray-900');
+      appendText(nameTd, c.country_name || '');
+      if (c.country_iso3) {
+        appendText(nameTd, ' ');
+        nameTd.appendChild(el('span', 'text-gray-400', '(' + c.country_iso3 + ')'));
+      }
+      tr.appendChild(nameTd);
+      function appendCell(className, child) {
+        var td = el('td', className);
+        if (typeof child === 'string') td.textContent = child;
+        else if (child) td.appendChild(child);
+        tr.appendChild(td);
+      }
+      appendCell('px-3 py-2', statusBadge(c));
+      appendCell('px-3 py-2', countBadge(counts.new, 'bg-green-100 text-green-800', '+'));
+      appendCell('px-3 py-2', countBadge(counts.changed, 'bg-amber-100 text-amber-800', '~'));
+      appendCell('px-3 py-2', countBadge(counts.removed, 'bg-red-100 text-red-800', '-'));
+      appendCell('px-3 py-2', countBadge(counts.source, 'bg-blue-50 text-blue-900', ''));
+      appendCell('px-3 py-2 text-xs text-gray-500', lastPublished);
+
+      var actionTd = el('td', 'px-3 py-2 text-right');
+      var viewBtn = el('button', 'fdrs-pub-view-btn text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline', 'View changes');
+      viewBtn.type = 'button';
+      viewBtn.setAttribute('data-aes-id', String(c.assignment_entity_status_id));
+      if (!c.total_public_items) viewBtn.disabled = true;
+      actionTd.appendChild(viewBtn);
+      tr.appendChild(actionTd);
+
+      var detailTr = el('tr', 'fdrs-pub-detail-row hidden');
+      detailTr.setAttribute('data-detail-for', String(c.assignment_entity_status_id));
+      var detailTd = el('td', 'px-3 py-3 bg-gray-50');
+      detailTd.colSpan = 9;
+      detailTd.appendChild(el('div', 'fdrs-pub-detail-body text-sm text-gray-600', 'Loading…'));
+      detailTr.appendChild(detailTd);
+
+      tbody.appendChild(tr);
+      tbody.appendChild(detailTr);
+    });
 
     tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
       cb.addEventListener('change', function () {
@@ -248,11 +307,14 @@ document.addEventListener('DOMContentLoaded', function () {
     var stats = (job && job.stats) || {};
     var t = stats.totals || {};
     var countries = stats.published_countries || 0;
-    resultEl.innerHTML =
-      '<p class="text-green-700 text-sm py-3"><i class="fas fa-check-circle mr-1" aria-hidden="true"></i>Published ' +
-      countries + ' countr' + (countries === 1 ? 'y' : 'ies') + ': +' +
-      (t.new || 0) + ' new, ~' + (t.changed || 0) + ' changed, -' + (t.removed || 0) +
-      ' removed, ' + (t.source || 0) + ' source.</p>';
+    setResultMessage(
+      resultEl,
+      'text-green-700 text-sm py-3',
+      'Published ' + countries + ' countr' + (countries === 1 ? 'y' : 'ies') + ': +' +
+        (t.new || 0) + ' new, ~' + (t.changed || 0) + ' changed, -' + (t.removed || 0) +
+        ' removed, ' + (t.source || 0) + ' source.',
+      'fas fa-check-circle mr-1'
+    );
   }
 
   function finishJob(job, kind) {
@@ -264,12 +326,11 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     if (kind === 'cancelled') {
-      resultEl.innerHTML = '<p class="text-amber-800 text-sm py-3">Publishing stopped. Already-published countries stay published.</p>';
+      setResultMessage(resultEl, 'text-amber-800 text-sm py-3', 'Publishing stopped. Already-published countries stay published.');
       if (currentAssignmentId) loadSummary(currentAssignmentId, { keepResult: true });
       return;
     }
-    resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' +
-      escapeHtml((job && (job.error || job.message)) || 'Publish failed') + '</p>';
+    setResultMessage(resultEl, 'text-red-700 text-sm py-3', (job && (job.error || job.message)) || 'Publish failed');
   }
 
   function pollStatus() {
@@ -305,8 +366,7 @@ document.addEventListener('DOMContentLoaded', function () {
       .catch(function (err) {
         stopPolling();
         hideProgress();
-        resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' +
-          escapeHtml(err.message || 'Failed to read publication status') + '</p>';
+        setResultMessage(resultEl, 'text-red-700 text-sm py-3', err.message || 'Failed to read publication status');
       });
   }
 
@@ -321,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
     currentAssignmentId = assignmentId || currentAssignmentId || parseInt(select.value, 10);
     showProgress();
     setProgress(0, 'queued', opts.message || 'Starting…', 0, null, { reset: true });
-    resultEl.innerHTML = '';
+    resultEl.replaceChildren();
     pollStatus();
   }
 
@@ -343,41 +403,63 @@ document.addEventListener('DOMContentLoaded', function () {
       source: 'bg-blue-50 text-blue-900',
       unchanged: 'bg-gray-100 text-gray-600'
     };
-    return '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ' + (map[kind] || map.unchanged) + '">' + escapeHtml(kind) + '</span>';
+    return el('span', 'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ' + (map[kind] || map.unchanged), kind);
   }
 
   function fmtVal(v, disagg, isImputed) {
-    if (v === null || v === undefined || String(v).trim() === '') return '<span class="text-gray-300">—</span>';
-    var out = escapeHtml(v);
-    if (disagg) out += ' <span class="text-gray-400" title="Has a disaggregated breakdown">&#9638;</span>';
-    if (isImputed) {
-      out += ' <span class="text-amber-800" title="Reported value is missing; the imputed value will be published">(imputed)</span>';
+    var frag = document.createDocumentFragment();
+    if (v === null || v === undefined || String(v).trim() === '') {
+      frag.appendChild(el('span', 'text-gray-300', '—'));
+      return frag;
     }
-    return out;
+    appendText(frag, v);
+    if (disagg) {
+      appendText(frag, ' ');
+      var mark = el('span', 'text-gray-400', '\u25A6');
+      mark.title = 'Has a disaggregated breakdown';
+      frag.appendChild(mark);
+    }
+    if (isImputed) {
+      appendText(frag, ' ');
+      var imp = el('span', 'text-amber-800', '(imputed)');
+      imp.title = 'Reported value is missing; the imputed value will be published';
+      frag.appendChild(imp);
+    }
+    return frag;
   }
 
   function renderDetail(row, data) {
     var body = row.querySelector('.fdrs-pub-detail-body');
     var items = data.items || [];
     if (!items.length) {
-      body.innerHTML = '<span class="text-gray-500">No pending changes for this country.</span>';
+      body.replaceChildren(el('span', 'text-gray-500', 'No pending changes for this country.'));
       return;
     }
-    body.innerHTML =
-      '<table class="w-full text-xs">' +
-        '<thead><tr class="text-left text-gray-500">' +
-          '<th class="py-1 pr-3">Indicator</th><th class="py-1 pr-3">Change</th>' +
-          '<th class="py-1 pr-3">Current value</th><th class="py-1 pr-3">Published value</th>' +
-        '</tr></thead><tbody>' +
-        items.map(function (it) {
-          return '<tr class="border-t border-gray-200">' +
-            '<td class="py-1 pr-3 text-gray-800">' + escapeHtml(it.label) + '</td>' +
-            '<td class="py-1 pr-3">' + kindBadge(it.kind) + '</td>' +
-            '<td class="py-1 pr-3">' + fmtVal(it.current_value, it.current_disagg_data, it.current_is_imputed) + '</td>' +
-            '<td class="py-1 pr-3">' + fmtVal(it.published_value, it.published_disagg_data, it.published_source === 'imputed') + '</td>' +
-          '</tr>';
-        }).join('') +
-        '</tbody></table>';
+    var table = el('table', 'w-full text-xs');
+    var thead = document.createElement('thead');
+    var headRow = el('tr', 'text-left text-gray-500');
+    ['Indicator', 'Change', 'Current value', 'Published value'].forEach(function (label) {
+      headRow.appendChild(el('th', 'py-1 pr-3', label));
+    });
+    thead.appendChild(headRow);
+    var tbodyEl = document.createElement('tbody');
+    items.forEach(function (it) {
+      var tr = el('tr', 'border-t border-gray-200');
+      tr.appendChild(el('td', 'py-1 pr-3 text-gray-800', it.label));
+      var kindTd = el('td', 'py-1 pr-3');
+      kindTd.appendChild(kindBadge(it.kind));
+      tr.appendChild(kindTd);
+      var currentTd = el('td', 'py-1 pr-3');
+      currentTd.appendChild(fmtVal(it.current_value, it.current_disagg_data, it.current_is_imputed));
+      tr.appendChild(currentTd);
+      var publishedTd = el('td', 'py-1 pr-3');
+      publishedTd.appendChild(fmtVal(it.published_value, it.published_disagg_data, it.published_source === 'imputed'));
+      tr.appendChild(publishedTd);
+      tbodyEl.appendChild(tr);
+    });
+    table.appendChild(thead);
+    table.appendChild(tbodyEl);
+    body.replaceChildren(table);
   }
 
   function toggleDetail(aesId) {
@@ -394,14 +476,14 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data.success) {
-          body.innerHTML = '<span class="text-red-600">' + escapeHtml(data.message || 'Failed to load') + '</span>';
+          body.replaceChildren(el('span', 'text-red-600', data.message || 'Failed to load'));
           return;
         }
         detailCache[aesId] = data;
         renderDetail(row, data);
       })
       .catch(function (err) {
-        body.innerHTML = '<span class="text-red-600">' + escapeHtml(err.message || 'Failed to load') + '</span>';
+        body.replaceChildren(el('span', 'text-red-600', err.message || 'Failed to load'));
       });
   }
 
@@ -412,10 +494,10 @@ document.addEventListener('DOMContentLoaded', function () {
     selected = new Set();
     detailCache = {};
     loadingEl.classList.remove('hidden');
-    if (!opts.keepResult && !isPublishing()) resultEl.innerHTML = '';
+    if (!opts.keepResult && !isPublishing()) resultEl.replaceChildren();
     confirmBox.classList.add('hidden');
-    cardsEl.innerHTML = '';
-        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-gray-500">Loading…</td></tr>';
+    cardsEl.replaceChildren();
+    setTbodyMessage('Loading…');
 
     fetch(summaryUrl(assignedFormId))
       .then(function (r) { return r.json(); })
@@ -423,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loadingEl.classList.add('hidden');
         summaryLoaded = true;
         if (!data.success) {
-          tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-red-600">' + escapeHtml(data.message || 'Failed to load preview') + '</td></tr>';
+          setTbodyMessage(data.message || 'Failed to load preview', 'text-red-600');
           return;
         }
         currentCountries = data.countries || [];
@@ -439,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .catch(function (err) {
         loadingEl.classList.add('hidden');
-        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-sm text-red-600">' + escapeHtml(err.message || 'Failed to load preview') + '</td></tr>';
+        setTbodyMessage(err.message || 'Failed to load preview', 'text-red-600');
       });
   }
 
@@ -478,17 +560,24 @@ document.addEventListener('DOMContentLoaded', function () {
       sourceTotal += counts.source || 0;
     });
 
-    var msg = 'Publish ' + chosen.length + ' countr' + (chosen.length === 1 ? 'y' : 'ies') + ': ' +
-      '<strong>+' + newTotal + '</strong> new, <strong>~' + changedTotal + '</strong> changed';
+    confirmText.replaceChildren();
+    appendText(confirmText, 'Publish ' + chosen.length + ' countr' + (chosen.length === 1 ? 'y' : 'ies') + ': ');
+    confirmText.appendChild(el('strong', '', '+' + newTotal));
+    appendText(confirmText, ' new, ');
+    confirmText.appendChild(el('strong', '', '~' + changedTotal));
+    appendText(confirmText, ' changed');
     if (sourceTotal > 0) {
-      msg += ', <strong>' + sourceTotal + '</strong> source stamp' + (sourceTotal === 1 ? '' : 's') +
-        ' (reported vs imputed; figures stay the same)';
+      appendText(confirmText, ', ');
+      confirmText.appendChild(el('strong', '', String(sourceTotal)));
+      appendText(confirmText, ' source stamp' + (sourceTotal === 1 ? '' : 's') +
+        ' (reported vs imputed; figures stay the same)');
     }
     if (removedTotal > 0) {
-      msg += ', and <strong class="text-red-700">' + removedTotal + ' value(s) that will be cleared</strong> from the public site (previously published, no longer reported)';
+      appendText(confirmText, ', and ');
+      confirmText.appendChild(el('strong', 'text-red-700', removedTotal + ' value(s) that will be cleared'));
+      appendText(confirmText, ' from the public site (previously published, no longer reported)');
     }
-    msg += '.';
-    confirmText.innerHTML = msg;
+    appendText(confirmText, '.');
     confirmBox.classList.remove('hidden');
     confirmBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
@@ -500,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function () {
     confirmYesBtn.disabled = true;
     showProgress();
     setProgress(0, 'queued', 'Starting…', 0, null, { reset: true });
-    resultEl.innerHTML = '';
+    resultEl.replaceChildren();
     fetch(publishUrl(currentAssignmentId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken, 'Accept': 'application/json' },
@@ -520,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .catch(function (err) {
         hideProgress();
-        resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' + escapeHtml(err.message || 'Publish failed') + '</p>';
+        setResultMessage(resultEl, 'text-red-700 text-sm py-3', err.message || 'Publish failed');
       });
   });
 
@@ -545,7 +634,7 @@ document.addEventListener('DOMContentLoaded', function () {
           cancelRequested = false;
           cancelBtn.disabled = false;
           if (cancelBtnText) cancelBtnText.textContent = 'Stop publishing';
-          resultEl.innerHTML = '<p class="text-red-700 text-sm py-3">' + escapeHtml(err.message || 'Failed to stop publishing') + '</p>';
+          setResultMessage(resultEl, 'text-red-700 text-sm py-3', err.message || 'Failed to stop publishing');
         });
     });
   }

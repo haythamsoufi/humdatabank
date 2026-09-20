@@ -20,6 +20,15 @@
     return headers;
   }
 
+  function setTrustedHtml(container, html) {
+    if (!container) return;
+    container.replaceChildren();
+    const raw = html == null ? "" : String(html);
+    if (!raw) return;
+    const doc = new DOMParser().parseFromString(raw, "text/html");
+    container.append(...Array.from(doc.body.childNodes));
+  }
+
   function rememberHtml(cache, dashboardId, data) {
     const byId = data && data.html_by_dashboard;
     if (byId && typeof byId === "object") {
@@ -63,7 +72,10 @@
     button.className = className;
     button.tabIndex = -1;
     button.setAttribute("aria-hidden", "true");
-    button.innerHTML = '<i class="fas ' + icon + '" aria-hidden="true"></i>';
+    const chevron = document.createElement("i");
+    chevron.className = "fas " + icon;
+    chevron.setAttribute("aria-hidden", "true");
+    button.replaceChildren(chevron);
     wrap.appendChild(button);
     return button;
   }
@@ -490,6 +502,7 @@
   global.UprVisualsShared = {
     csrfToken,
     csrfHeaders,
+    setTrustedHtml,
     rememberHtml,
     renderDashboardTabs,
     markActiveTab,

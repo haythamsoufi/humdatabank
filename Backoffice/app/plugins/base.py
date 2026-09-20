@@ -228,6 +228,14 @@ class BasePlugin(ABC):
         """Return Flask blueprint if this plugin provides routes"""
         return None
 
+    def get_additional_blueprints(self) -> List[Blueprint]:
+        """Extra blueprints beyond get_blueprint(), for plugins that own more than one
+        URL namespace (e.g. a dedicated wizard blueprint plus a legacy-redirect
+        blueprint). Registered the same way as get_blueprint() — for admin-feature
+        plugins, always on and not activation-gated.
+        """
+        return []
+
     def get_admin_menu_items(self) -> List[Dict[str, Any]]:
         """Return admin menu items if this plugin provides admin functionality"""
         return []

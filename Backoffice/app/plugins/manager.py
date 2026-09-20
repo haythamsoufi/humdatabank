@@ -964,26 +964,42 @@ class PluginManager:
         return self.plugin_installations.copy()
 
     def register_admin_feature_blueprints(self) -> None:
-        """Register blueprints for admin-feature plugins (always on, not activation-gated)."""
+        """Register blueprints for admin-feature plugins (always on, not activation-gated).
+
+        Each plugin may contribute a primary blueprint (``get_blueprint()``) plus any
+        number of additional blueprints (``get_additional_blueprints()``) — e.g. a
+        plugin that owns a dedicated import-wizard blueprint or a legacy-redirect
+        blueprint alongside its main one.
+        """
         registered: list[str] = []
         for plugin_id, plugin in self.plugins.items():
             if not plugin.is_admin_feature():
                 continue
-            blueprint = plugin.get_blueprint()
-            if blueprint is None:
+
+            blueprints = []
+            primary = plugin.get_blueprint()
+            if primary is not None:
+                blueprints.append(primary)
+            blueprints.extend(plugin.get_additional_blueprints())
+            if not blueprints:
                 continue
-            if blueprint.name in self.app.blueprints:
-                continue
-            try:
-                self.app.register_blueprint(blueprint)
+
+            plugin_registered = False
+            for blueprint in blueprints:
+                if blueprint is None or blueprint.name in self.app.blueprints:
+                    continue
+                try:
+                    self.app.register_blueprint(blueprint)
+                    plugin_registered = True
+                except Exception as exc:
+                    if "has already been registered" not in str(exc):
+                        self.logger.error(
+                            "Failed to register admin-feature blueprint for %s: %s",
+                            plugin_id,
+                            exc,
+                        )
+            if plugin_registered:
                 registered.append(plugin_id)
-            except Exception as exc:
-                if "has already been registered" not in str(exc):
-                    self.logger.error(
-                        "Failed to register admin-feature blueprint for %s: %s",
-                        plugin_id,
-                        exc,
-                    )
 
         if registered:
             self.logger.info(

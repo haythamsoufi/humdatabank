@@ -12,10 +12,10 @@ from app.models.core import Country
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.enums import status_display_label
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
+from plugins.fdrs.data_quality.fdrs_v1_catalog import fdrs_compliance_doc_label_matches
 from app.services.data_quality.helpers import (
     active_country_map_query,
     compute_income_sources_ratio,
-    fdrs_compliance_doc_label_matches,
     is_reported_value,
     load_form_data_by_kpi,
     numeric_value,

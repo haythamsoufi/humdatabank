@@ -73,6 +73,27 @@ INCOME_SOURCE_KPI_CODES = (
 
 COMPLIANCE_DOC_TYPES = ("Annual Report", "Audited Financial Statement")
 
+
+def fdrs_compliance_doc_label_matches(label: str | None, doc_type: str) -> bool:
+    """
+    Return True when a FDRS document-field label maps to a compliance doc type.
+
+    Uses substring matching for flexibility (e.g. "Our Audited Financial Statements"),
+    but excludes unaudited statements from counting as audited.
+    """
+    normalized = (label or "").strip().lower()
+    if not normalized:
+        return False
+
+    target = (doc_type or "").strip().lower()
+    if not target:
+        return False
+
+    if target == "audited financial statement" and "unaudited financial statement" in normalized:
+        return False
+
+    return target in normalized
+
 # FDRS section groups for timeliness (matched by section name/display substring).
 # Template 21 published sections: Governing Board, Local Units and Branches,
 # National Society Volunteers/Staff, National Society Financial Data, Network Support,

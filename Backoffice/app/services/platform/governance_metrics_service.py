@@ -33,8 +33,11 @@ from app.models.rbac import (
     RbacUserRole,
     RbacAccessGrant,
 )
-from plugins.fdrs.data_quality.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
-from app.services.data_quality.helpers import active_country_map_query, fdrs_compliance_doc_label_matches
+from plugins.fdrs.data_quality.fdrs_v1_catalog import (
+    COMPLIANCE_DOC_TYPES,
+    fdrs_compliance_doc_label_matches,
+)
+from app.services.data_quality.helpers import active_country_map_query
 from app.utils.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)

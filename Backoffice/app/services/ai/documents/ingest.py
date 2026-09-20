@@ -1,10 +1,7 @@
 """Background AI/RAG ingest for SubmittedDocument (library and assignment uploads)."""
 
-import hashlib
 import logging
 import os
-import sys
-import tempfile
 from typing import Any, Dict, Optional, Tuple
 
 from flask import current_app
@@ -110,58 +107,19 @@ def sync_ai_document_is_public_from_submitted(submitted) -> None:
     sync_ai_document_from_submitted(submitted)
 
 
-def _fdrs_imports_dir() -> str:
-    from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
-
-    return ensure_fdrs_scripts_in_path()
-
-
-def _download_fdrs_document_to_temp(url: str, filename_hint: str) -> Tuple[str, str, int, str, str]:
-    """Download a public FDRS document URL to a temp file for AI processing."""
-    imports_dir = os.path.abspath(_fdrs_imports_dir())
-    if imports_dir not in sys.path:
-        sys.path.insert(0, imports_dir)
-
-    from fdrs_documents_sync import fetch_fdrs_document_bytes
-
-    data, status = fetch_fdrs_document_bytes(url)
-    if status not in (200, 206) or not data:
-        raise FileNotFoundError(
-            f"Could not download FDRS document (HTTP {status}). "
-            "The file may be private, unavailable, or blocked by IFRC."
-        )
-
-    filename = (filename_hint or "document").strip() or "document"
-    ext = os.path.splitext(filename)[1].lower()
-    if ext not in {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".md", ".html"}:
-        ext = ".pdf"
-        if not filename.lower().endswith(".pdf"):
-            filename = f"{filename}{ext}"
-
-    fd, temp_path = tempfile.mkstemp(suffix=ext)
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(data)
-    except Exception:
-        try:
-            os.remove(temp_path)
-        except OSError:
-            pass
-        raise
-
-    file_size = len(data)
-    content_hash = hashlib.sha256(data).hexdigest()
-    file_type = ext.lstrip(".") or "pdf"
-    return temp_path, filename, file_size, content_hash, file_type
-
-
 def _download_submitted_document_from_source_url(submitted_doc) -> Tuple[str, str, int, str, str]:
     """
     Download bytes for a submitted document that only has ``source_url`` (FDRS / IFRC API).
 
+    Generic dispatch hook: this module stays provenance-agnostic and defers to the
+    FDRS plugin's downloader (``plugins.fdrs.services.fdrs_document_fetch_service``)
+    only when the document looks FDRS-sourced, falling back to the generic IFRC
+    fetch either way.
+
     Returns (temp_path, filename, file_size, content_hash, file_type).
     """
     from app.routes.ai_documents.helpers import _download_ifrc_document
+    from plugins.fdrs.services.fdrs_document_fetch_service import download_fdrs_document_to_temp
 
     source_url = (getattr(submitted_doc, "source_url", None) or "").strip()
     if not source_url:
@@ -174,7 +132,7 @@ def _download_submitted_document_from_source_url(submitted_doc) -> Tuple[str, st
 
     if prefer_fdrs:
         try:
-            return _download_fdrs_document_to_temp(source_url, filename_hint)
+            return download_fdrs_document_to_temp(source_url, filename_hint)
         except Exception as fdrs_err:
             logger.warning(
                 "FDRS download failed for submitted_document %s, trying IFRC fetch: %s",
@@ -190,7 +148,7 @@ def _download_submitted_document_from_source_url(submitted_doc) -> Tuple[str, st
             getattr(submitted_doc, "id", None),
             ifrc_err,
         )
-        return _download_fdrs_document_to_temp(source_url, filename_hint)
+        return download_fdrs_document_to_temp(source_url, filename_hint)
 
 
 def _resolve_submitted_document_for_ai_processing(submitted_doc) -> Dict[str, Any]:

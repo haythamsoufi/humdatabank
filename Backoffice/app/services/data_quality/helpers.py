@@ -462,24 +462,3 @@ def compliance_doc_status_counts_toward_requirement(status: str | None) -> bool:
 def active_country_map_query():
     """Active countries from the country map (Country.status == 'Active')."""
     return Country.query.filter_by(status="Active").order_by(Country.name)
-
-
-def fdrs_compliance_doc_label_matches(label: str | None, doc_type: str) -> bool:
-    """
-    Return True when a FDRS document-field label maps to a compliance doc type.
-
-    Uses substring matching for flexibility (e.g. "Our Audited Financial Statements"),
-    but excludes unaudited statements from counting as audited.
-    """
-    normalized = (label or "").strip().lower()
-    if not normalized:
-        return False
-
-    target = (doc_type or "").strip().lower()
-    if not target:
-        return False
-
-    if target == "audited financial statement" and "unaudited financial statement" in normalized:
-        return False
-
-    return target in normalized

@@ -55,6 +55,11 @@ class UprPlugin(BasePlugin):
 
         return bp
 
+    def get_additional_blueprints(self):
+        from plugins.upr.excel.import_routes import bp as excel_import_bp, legacy_bp as excel_import_legacy_bp
+
+        return [excel_import_bp, excel_import_legacy_bp]
+
     def is_admin_feature(self) -> bool:
         return True
 

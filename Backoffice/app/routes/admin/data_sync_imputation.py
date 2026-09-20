@@ -249,18 +249,32 @@ def _imputable_items_for_template(
     return items
 
 
-# Templates that support external data sync (FDRS pipeline).
-# Other templates get imputation only until their sync source is configured.
-_TEMPLATES_WITH_DATA_SYNC: frozenset = frozenset({21})
-_UPR_EXCEL_TEMPLATE_IDS: frozenset = frozenset({22, 23, 24, 33})
+# Templates that support external data sync (FDRS pipeline) or the UPR Excel
+# import wizard. Other templates get imputation only until their sync source
+# is configured. Lazily imported (not module-level) — plugins.upr.excel.import_routes
+# imports back from this module, so a top-level import here would be circular.
 _SYNC_FAMILIES = frozenset({"fdrs", "upr", "generic"})
+
+
+def _fdrs_family_template_ids() -> frozenset:
+    """Single source of truth: FDRS_TEMPLATE_ID (data_quality_constants)."""
+    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+
+    return frozenset({FDRS_TEMPLATE_ID})
+
+
+def _upr_family_template_ids() -> frozenset:
+    """Single source of truth: the UPR plugin's own Excel-import template choices."""
+    from plugins.upr.excel.import_routes import UPR_TEMPLATE_CHOICES
+
+    return frozenset(int(choice["id"]) for choice in UPR_TEMPLATE_CHOICES)
 
 
 def _sync_family_for_template(template_id: int) -> str:
     """Which dashboard product a template belongs to (FDRS, UPR, or generic imputation)."""
-    if template_id in _TEMPLATES_WITH_DATA_SYNC:
+    if template_id in _fdrs_family_template_ids():
         return "fdrs"
-    if template_id in _UPR_EXCEL_TEMPLATE_IDS:
+    if template_id in _upr_family_template_ids():
         return "upr"
     return "generic"
 
@@ -295,17 +309,17 @@ def _accessible_templates_for_user(
     rows = [{"id": t.id, "name": t.name} for t in templates]
 
     if family == "fdrs":
-        allowed = set(_TEMPLATES_WITH_DATA_SYNC)
+        allowed = set(_fdrs_family_template_ids())
         if current_template_id:
             allowed.add(current_template_id)
         rows = [r for r in rows if r["id"] in allowed]
     elif family == "upr":
-        allowed = set(_UPR_EXCEL_TEMPLATE_IDS)
+        allowed = set(_upr_family_template_ids())
         if current_template_id:
             allowed.add(current_template_id)
         rows = [r for r in rows if r["id"] in allowed]
     elif family == "generic":
-        excluded = set(_TEMPLATES_WITH_DATA_SYNC) | set(_UPR_EXCEL_TEMPLATE_IDS)
+        excluded = set(_fdrs_family_template_ids()) | set(_upr_family_template_ids())
         if current_template_id:
             excluded.discard(current_template_id)
         rows = [r for r in rows if r["id"] not in excluded]

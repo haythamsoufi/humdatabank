@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
+import tempfile
 from typing import Optional, Tuple
 
 from app.extensions import db
@@ -15,6 +17,51 @@ def _fdrs_imports_dir() -> str:
     from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
 
     return ensure_fdrs_scripts_in_path()
+
+
+def download_fdrs_document_to_temp(url: str, filename_hint: str) -> Tuple[str, str, int, str, str]:
+    """Download a public FDRS document URL to a temp file for AI processing.
+
+    Used by ``app.services.ai.documents.ingest`` as the FDRS-specific downloader
+    behind its generic ``source_url`` resolution hook.
+
+    Returns (temp_path, filename, file_size, content_hash, file_type).
+    """
+    imports_dir = os.path.abspath(_fdrs_imports_dir())
+    if imports_dir not in sys.path:
+        sys.path.insert(0, imports_dir)
+
+    from fdrs_documents_sync import fetch_fdrs_document_bytes
+
+    data, status = fetch_fdrs_document_bytes(url)
+    if status not in (200, 206) or not data:
+        raise FileNotFoundError(
+            f"Could not download FDRS document (HTTP {status}). "
+            "The file may be private, unavailable, or blocked by IFRC."
+        )
+
+    filename = (filename_hint or "document").strip() or "document"
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".md", ".html"}:
+        ext = ".pdf"
+        if not filename.lower().endswith(".pdf"):
+            filename = f"{filename}{ext}"
+
+    fd, temp_path = tempfile.mkstemp(suffix=ext)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
+
+    file_size = len(data)
+    content_hash = hashlib.sha256(data).hexdigest()
+    file_type = ext.lstrip(".") or "pdf"
+    return temp_path, filename, file_size, content_hash, file_type
 
 
 def try_materialize_public_fdrs_document(document: SubmittedDocument) -> Tuple[bool, Optional[str]]:

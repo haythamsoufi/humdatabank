@@ -124,7 +124,7 @@ def retrieve_upr_kpi_reference(context: Dict[str, Any]) -> Optional[Dict[str, An
             return None
         if not context.get("country_id"):
             return None
-        from app.services.data_retrieval.service import get_upr_kpi_value as get_upr_kpi_value_service
+        from plugins.upr.ai.data_retrieval import get_upr_kpi_value as get_upr_kpi_value_service
 
         upr = get_upr_kpi_value_service(
             country_identifier=int(context["country_id"]),

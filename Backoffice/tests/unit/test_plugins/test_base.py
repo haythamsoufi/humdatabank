@@ -211,6 +211,9 @@ class TestBasePluginDefaults:
     def test_get_blueprint_none(self):
         assert self.plugin.get_blueprint() is None
 
+    def test_get_additional_blueprints_empty(self):
+        assert self.plugin.get_additional_blueprints() == []
+
     def test_get_admin_menu_items_empty(self):
         assert self.plugin.get_admin_menu_items() == []
 

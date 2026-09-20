@@ -13,9 +13,9 @@ from app import db
 from app.models import FormData, FormItem, FormSection, SubmittedDocument
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
+from plugins.fdrs.data_quality.fdrs_v1_catalog import fdrs_compliance_doc_label_matches
 from app.services.data_quality.helpers import (
     compute_income_sources_ratio,
-    fdrs_compliance_doc_label_matches,
     get_assignment_aes,
     is_reported_value,
     load_form_data_by_kpi,

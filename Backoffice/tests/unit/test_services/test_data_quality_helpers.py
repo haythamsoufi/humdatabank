@@ -14,7 +14,6 @@ from app.services.data_quality.helpers import (
     _sum_numeric_mapping,
     build_compliance_document_lookups,
     compliance_doc_status_counts_toward_requirement,
-    fdrs_compliance_doc_label_matches,
     form_item_label,
     is_reported_value,
     numeric_value,
@@ -23,6 +22,7 @@ from app.services.data_quality.helpers import (
     section_name_matches,
     sum_matrix_disagg_values,
 )
+from plugins.fdrs.data_quality.fdrs_v1_catalog import fdrs_compliance_doc_label_matches
 
 
 # ---------------------------------------------------------------------------

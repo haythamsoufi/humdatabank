@@ -1042,6 +1042,120 @@ class TestRegisterBlueprints:
 
 
 # ---------------------------------------------------------------------------
+# register_admin_feature_blueprints
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestRegisterAdminFeatureBlueprints:
+    def test_skips_non_admin_feature_plugins(self, tmp_path):
+        pm, plugins_dir = _make_manager(tmp_path)
+        _create_plugin_dir(plugins_dir, "plugin_a")
+
+        with patch("app.plugins.manager.utcnow") as m:
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            pm.load_plugins()
+
+        mock_bp = MagicMock()
+        mock_bp.name = "should_not_register"
+        pm.plugins["plugin_a"].get_blueprint = MagicMock(return_value=mock_bp)
+        # is_admin_feature() defaults to False (no Data Explorer tab) for SamplePlugin.
+
+        pm.register_admin_feature_blueprints()
+        assert "should_not_register" not in pm.app.blueprints
+
+    def test_registers_primary_blueprint(self, tmp_path):
+        from flask import Blueprint
+        pm, plugins_dir = _make_manager(tmp_path)
+        _create_plugin_dir(plugins_dir, "plugin_a")
+
+        with patch("app.plugins.manager.utcnow") as m:
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            pm.load_plugins()
+
+        mock_bp = Blueprint("admin_feature_bp", __name__)
+        pm.plugins["plugin_a"].is_admin_feature = MagicMock(return_value=True)
+        pm.plugins["plugin_a"].get_blueprint = MagicMock(return_value=mock_bp)
+
+        pm.register_admin_feature_blueprints()
+        assert "admin_feature_bp" in pm.app.blueprints
+
+    def test_registers_primary_and_additional_blueprints(self, tmp_path):
+        from flask import Blueprint
+        pm, plugins_dir = _make_manager(tmp_path)
+        _create_plugin_dir(plugins_dir, "plugin_a")
+
+        with patch("app.plugins.manager.utcnow") as m:
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            pm.load_plugins()
+
+        primary_bp = Blueprint("admin_feature_primary", __name__)
+        extra_bp = Blueprint("admin_feature_extra", __name__)
+        legacy_bp = Blueprint("admin_feature_legacy", __name__)
+        pm.plugins["plugin_a"].is_admin_feature = MagicMock(return_value=True)
+        pm.plugins["plugin_a"].get_blueprint = MagicMock(return_value=primary_bp)
+        pm.plugins["plugin_a"].get_additional_blueprints = MagicMock(
+            return_value=[extra_bp, legacy_bp]
+        )
+
+        pm.register_admin_feature_blueprints()
+        assert "admin_feature_primary" in pm.app.blueprints
+        assert "admin_feature_extra" in pm.app.blueprints
+        assert "admin_feature_legacy" in pm.app.blueprints
+
+    def test_registers_additional_blueprints_with_no_primary(self, tmp_path):
+        from flask import Blueprint
+        pm, plugins_dir = _make_manager(tmp_path)
+        _create_plugin_dir(plugins_dir, "plugin_a")
+
+        with patch("app.plugins.manager.utcnow") as m:
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            pm.load_plugins()
+
+        extra_bp = Blueprint("admin_feature_only_extra", __name__)
+        pm.plugins["plugin_a"].is_admin_feature = MagicMock(return_value=True)
+        pm.plugins["plugin_a"].get_blueprint = MagicMock(return_value=None)
+        pm.plugins["plugin_a"].get_additional_blueprints = MagicMock(return_value=[extra_bp])
+
+        pm.register_admin_feature_blueprints()
+        assert "admin_feature_only_extra" in pm.app.blueprints
+
+    def test_skips_already_registered_additional_blueprint(self, tmp_path):
+        from flask import Blueprint
+        pm, plugins_dir = _make_manager(tmp_path)
+        _create_plugin_dir(plugins_dir, "plugin_a")
+
+        with patch("app.plugins.manager.utcnow") as m:
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            pm.load_plugins()
+
+        existing_bp = Blueprint("already_there", __name__)
+        pm.app.blueprints["already_there"] = existing_bp
+        pm.plugins["plugin_a"].is_admin_feature = MagicMock(return_value=True)
+        pm.plugins["plugin_a"].get_blueprint = MagicMock(return_value=None)
+        pm.plugins["plugin_a"].get_additional_blueprints = MagicMock(return_value=[existing_bp])
+
+        pm.register_admin_feature_blueprints()  # Should not raise
+
+    def test_handles_additional_blueprint_registration_exception(self, tmp_path):
+        pm, plugins_dir = _make_manager(tmp_path)
+        _create_plugin_dir(plugins_dir, "plugin_a")
+
+        with patch("app.plugins.manager.utcnow") as m:
+            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
+            pm.load_plugins()
+
+        mock_bp = MagicMock()
+        mock_bp.name = "boom_bp"
+        pm.plugins["plugin_a"].is_admin_feature = MagicMock(return_value=True)
+        pm.plugins["plugin_a"].get_blueprint = MagicMock(return_value=None)
+        pm.plugins["plugin_a"].get_additional_blueprints = MagicMock(return_value=[mock_bp])
+        pm.app.register_blueprint = MagicMock(side_effect=RuntimeError("fail"))
+        pm.app.blueprints = {}
+
+        pm.register_admin_feature_blueprints()  # Should not raise
+
+
+# ---------------------------------------------------------------------------
 # get_plugin_info and related
 # ---------------------------------------------------------------------------
 

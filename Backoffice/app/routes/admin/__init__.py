@@ -30,7 +30,9 @@ from app.routes.admin.analytics import bp as analytics_bp
 from app.routes.admin.analytics_api import bp as analytics_api_bp
 from app.routes.admin.utilities import bp as utilities_bp
 from app.routes.admin.data_sync_imputation import bp as data_sync_imputation_bp
-from plugins.upr.excel.import_routes import bp as upr_excel_import_bp, legacy_bp as upr_excel_import_legacy_bp
+# UPR Excel import blueprints (upr_excel_import / upr_excel_import_legacy) are
+# registered by plugins.upr.plugin.UprPlugin.get_additional_blueprints() via
+# PluginManager.register_admin_feature_blueprints() below, not here.
 from app.routes.admin.import_change_log import bp as import_change_log_bp
 from app.routes.admin.settings import bp as settings_bp
 from app.routes.admin.organization import bp as organization_bp
@@ -81,8 +83,6 @@ def register_admin_blueprints(app):
     app.register_blueprint(utilities_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(data_sync_imputation_bp)
-    app.register_blueprint(upr_excel_import_bp)
-    app.register_blueprint(upr_excel_import_legacy_bp)
     app.register_blueprint(import_change_log_bp)
     app.register_blueprint(organization_bp)
     app.register_blueprint(monitoring_bp)

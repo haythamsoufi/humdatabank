@@ -13,7 +13,6 @@ from app.services.ai.data.form_retrieval import (
     get_assignment_indicator_values,
     get_form_field_value,
     get_form_field_values_for_all_countries,
-    get_fdrs_income_sources_for_all_countries,
     numeric_from_formdata_value,
 )
 
@@ -25,6 +24,5 @@ __all__ = [
     "get_assignment_indicator_values",
     "get_form_field_value",
     "get_form_field_values_for_all_countries",
-    "get_fdrs_income_sources_for_all_countries",
     "numeric_from_formdata_value",
 ]

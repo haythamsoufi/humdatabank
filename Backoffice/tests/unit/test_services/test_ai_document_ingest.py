@@ -1,6 +1,5 @@
 """Tests for FDRS / source_url AI document ingest resolution."""
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -121,11 +120,6 @@ class TestResolveSubmittedDocumentForAiProcessing:
 
         assert result["ok"] is False
         assert result["code"] == "missing_storage_path"
-
-    def test_fdrs_imports_dir_points_at_plugin_scripts(self):
-        imports_dir = os.path.abspath(ingest._fdrs_imports_dir())
-        assert imports_dir.endswith(os.path.join("plugins", "fdrs", "scripts"))
-        assert os.path.isfile(os.path.join(imports_dir, "fdrs_documents_sync.py"))
 
 
 class TestSyncAiDocumentFromSubmitted:

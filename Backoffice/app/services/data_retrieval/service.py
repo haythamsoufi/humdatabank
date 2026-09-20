@@ -57,7 +57,6 @@ from .form import (
 from app.services.ai.data.form_retrieval import (
     get_value_breakdown,
     get_indicator_values_for_all_countries,
-    get_fdrs_income_sources_for_all_countries,
     get_form_field_values_for_all_countries,
     get_assignment_indicator_values,
     get_form_field_value,
@@ -543,13 +542,9 @@ def get_aes_with_joins(aes_id: int):
         return None
 
 
-# ==================== UPR Visual KPI Lookup ====================
-# Moved to plugins.upr.ai.data_retrieval – re-exported for backward compat.
-from plugins.upr.ai.data_retrieval import (  # noqa: E402,F401
-    get_upr_kpi_value,
-    get_upr_kpi_timeseries,
-    get_upr_kpi_values_for_all_countries,
-)
+# UPR Visual KPI Lookup lives in plugins.upr.ai.data_retrieval — import from
+# there directly (get_upr_kpi_value / get_upr_kpi_timeseries /
+# get_upr_kpi_values_for_all_countries). No re-export here.
 
 
 # check_aes_access_light backs the high-frequency presence endpoints (one sync
@@ -643,7 +638,6 @@ __all__ = [
     'get_template_structure',
     'get_value_breakdown',
     'get_indicator_values_for_all_countries',
-    'get_fdrs_income_sources_for_all_countries',
     'get_form_field_values_for_all_countries',
     'get_assignments_for_country',
     'get_assignment_indicator_values',
@@ -657,8 +651,6 @@ __all__ = [
     'ensure_aes_access',
     'get_user_countries',
     'get_user_country_ids',
-    'get_upr_kpi_value',
-    'get_upr_kpi_values_for_all_countries',
     'query_form_data',
     'get_form_data_queries',
     'get_form_field_value',

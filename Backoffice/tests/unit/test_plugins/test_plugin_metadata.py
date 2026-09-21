@@ -47,7 +47,7 @@ def test_settings_plugin_info_uses_live_plugin_metadata(app):
         ("/admin/plugins/upr/settings", b"UPR Plugin Settings"),
         ("/admin/plugins/emergency_operations/settings", b"Emergency Operations Plugin Settings"),
         ("/admin/plugins/interactive_map/settings", b"Interactive Map Plugin Settings"),
-        ("/admin/plugins/pb_progress/settings", b"P&B Progress Plugin Settings"),
+        ("/admin/plugins/pb_progress/settings", b"P&amp;B Progress Plugin Settings"),
     ],
 )
 def test_settings_pages_render_author_homepage(logged_in_sm_client, path, title):

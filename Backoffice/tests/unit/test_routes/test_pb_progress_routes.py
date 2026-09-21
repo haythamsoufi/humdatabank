@@ -50,7 +50,7 @@ class TestPBProgressRouteAuth:
     def test_settings_page_ok_for_system_manager(self, logged_in_sm_client):
         resp = logged_in_sm_client.get("/admin/plugins/pb_progress/settings")
         assert resp.status_code == 200
-        assert b"P&B Progress Plugin Settings" in resp.data
+        assert b"P&amp;B Progress Plugin Settings" in resp.data
         assert b"Haytham Alsoufi" in resp.data
         assert b"https://github.com/haythamsoufi" in resp.data
 

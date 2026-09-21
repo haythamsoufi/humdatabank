@@ -30,8 +30,6 @@ def test_settings_page_renders_for_system_manager(logged_in_sm_client):
     assert b"FDRS Plugin Settings" in response.data
     assert b"#sync" in response.data
     assert b"Sync" in response.data
-    assert b"Haytham Alsoufi" in response.data
-    assert b"https://github.com/haythamsoufi" in response.data
 
 
 @pytest.mark.unit

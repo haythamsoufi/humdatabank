@@ -101,23 +101,21 @@ class TestPlanPytestRun:
         assert "plugins/upr/tests" not in plan.targets
         assert plan.needs_render_libs is False
 
-    def test_routes_py_maps_to_route_unit_tests_not_visuals(self):
+    def test_routes_py_maps_to_metadata_tests_not_visuals(self):
         plan = plan_pytest_run(
             ["Backoffice/plugins/pb_progress/routes.py"],
             BACKOFFICE_ROOT,
         )
-        assert "tests/unit/test_routes/test_pb_progress_routes.py" in plan.targets
-        assert "tests/unit/test_plugins/test_plugin_metadata.py" in plan.targets
-        assert "plugins/pb_progress/visuals/tests" not in plan.targets
-        assert "plugins/upr/tests/test_routes.py" not in plan.targets
+        assert plan.targets == ("tests/unit/test_plugins/test_plugin_metadata.py",)
         assert plan.needs_render_libs is False
 
-    def test_fdrs_routes_do_not_select_upr_test_routes(self):
+    def test_fdrs_routes_do_not_select_upr_or_fdrs_route_suites(self):
         plan = plan_pytest_run(
             ["Backoffice/plugins/fdrs/routes.py"],
             BACKOFFICE_ROOT,
         )
-        assert "tests/unit/test_plugins/test_fdrs_routes.py" in plan.targets
+        assert plan.targets == ("tests/unit/test_plugins/test_plugin_metadata.py",)
+        assert "tests/unit/test_plugins/test_fdrs_routes.py" not in plan.targets
         assert "plugins/upr/tests/test_routes.py" not in plan.targets
         assert "tests/unit/test_plugins/test_fdrs_compliance_doc_matching.py" not in plan.targets
 

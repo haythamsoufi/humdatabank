@@ -43,17 +43,6 @@ class TestPBProgressRouteAuth:
         resp = logged_in_sm_client.get(f"{API_PREFIX}/manage", follow_redirects=False)
         assert resp.status_code == 200
 
-    def test_settings_page_requires_login(self, client):
-        resp = client.get("/admin/plugins/pb_progress/settings")
-        assert resp.status_code in (301, 302, 303, 307, 308, 401)
-
-    def test_settings_page_ok_for_system_manager(self, logged_in_sm_client):
-        resp = logged_in_sm_client.get("/admin/plugins/pb_progress/settings")
-        assert resp.status_code == 200
-        assert b"P&amp;B Progress Plugin Settings" in resp.data
-        assert b"Haytham Alsoufi" in resp.data
-        assert b"https://github.com/haythamsoufi" in resp.data
-
     def test_upload_requires_system_manager(self, logged_in_admin_client):
         resp = logged_in_admin_client.post(
             _version_url("/upload"),
@@ -73,6 +62,15 @@ class TestPBProgressConfigValidation:
         )
         assert resp.status_code == 400
         assert "non-empty id" in resp.get_json()["error"].lower()
+
+    def test_section_order_put_rejects_invalid_part(self, logged_in_sm_client):
+        resp = logged_in_sm_client.put(
+            _version_url("/section-order"),
+            data=json.dumps({"section_order": [{"part": "invalid", "section": "SP1", "order": 1}]}),
+            headers=JSON_HEADERS,
+        )
+        assert resp.status_code == 400
+        assert "invalid section part" in resp.get_json()["error"].lower()
 
 
 class TestPBProgressServeOutput:

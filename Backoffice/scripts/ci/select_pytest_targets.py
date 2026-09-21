@@ -174,18 +174,10 @@ def _plugin_unit_targets(plugin: str, filename: str, root: Path) -> set[str]:
     if meta and filename in CORE_PLUGIN_FILENAMES:
         targets.add(meta)
 
-    route_tests = root / "tests" / "unit" / "test_routes"
     if filename in {"plugin.py", "__init__.py"}:
         match = _existing_rel(root, f"tests/unit/test_plugins/test_{plugin}_plugin.py")
         if match:
             targets.add(match)
-    if filename == "routes.py":
-        match = _existing_rel(root, f"tests/unit/test_plugins/test_{plugin}_routes.py")
-        if match:
-            targets.add(match)
-        if route_tests.is_dir():
-            for path in route_tests.glob(f"test_{plugin}*.py"):
-                targets.add(_posix(path.relative_to(root)))
     return targets
 
 

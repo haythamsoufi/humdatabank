@@ -433,6 +433,7 @@ def plugin_settings_page(plugin_name):
 
         return render_template('admin/plugin_settings.html',
                              plugin=plugin_info,
+                             plugin_name=plugin_info.get('display_name') or plugin_name,
                              settings=settings)
     except Exception as e:
         current_app.logger.error(f"Error rendering plugin settings page for {plugin_name}: {e}", exc_info=True)

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from app.plugins.base import BasePlugin
+from plugins.metadata import FirstPartyPluginMetadata
 
 
-class FdrsPlugin(BasePlugin):
+class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def plugin_id(self) -> str:
         return "fdrs"
@@ -24,10 +25,6 @@ class FdrsPlugin(BasePlugin):
             "Federation-wide Databank & Reporting System: data-api sync, "
             "document fetch, matrix validation, and quality methodology."
         )
-
-    @property
-    def author(self) -> str:
-        return "IFRC Development Team"
 
     def get_settings(self):
         from plugins.fdrs.routes import fdrs_settings_status

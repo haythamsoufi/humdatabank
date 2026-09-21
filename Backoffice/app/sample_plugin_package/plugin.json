@@ -3,6 +3,7 @@
   "display_name": "Sample Plugin",
   "version": "1.0.0",
   "description": "Starter plugin package for the Humanitarian Databank plugin system.",
-  "author": "Humanitarian Databank",
+  "author": "Haytham Alsoufi",
+  "homepage": "https://github.com/haythamsoufi",
   "license": "MIT"
 }

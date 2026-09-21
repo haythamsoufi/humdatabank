@@ -29,7 +29,11 @@ class SamplePackagePlugin(BasePlugin):
 
     @property
     def author(self) -> str:
-        return "Humanitarian Databank"
+        return "Haytham Alsoufi"
+
+    @property
+    def homepage(self) -> str:
+        return "https://github.com/haythamsoufi"
 
     @property
     def license(self) -> str:

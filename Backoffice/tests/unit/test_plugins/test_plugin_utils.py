@@ -93,6 +93,37 @@ class TestPluginErrors:
         assert isinstance(e, PluginError)
 
 
+@pytest.mark.unit
+class TestSettingsPluginInfo:
+    def test_returns_installation_info_from_manager(self):
+        from app.plugins.plugin_utils import settings_plugin_info
+
+        plugin = MagicMock()
+        plugin.get_installation_info.return_value = {
+            "plugin_id": "demo",
+            "author": "Haytham Alsoufi",
+            "homepage": "https://github.com/haythamsoufi",
+        }
+        manager = MagicMock()
+        manager.get_plugin.return_value = plugin
+        app = _make_flask_app()
+        app.plugin_manager = manager
+
+        with app.app_context():
+            info = settings_plugin_info("demo")
+
+        assert info["author"] == "Haytham Alsoufi"
+        assert info["homepage"] == "https://github.com/haythamsoufi"
+        manager.get_plugin.assert_called_once_with("demo")
+
+    def test_returns_empty_dict_without_manager(self):
+        from app.plugins.plugin_utils import settings_plugin_info
+
+        app = _make_flask_app()
+        with app.app_context():
+            assert settings_plugin_info("missing") == {}
+
+
 # ---------------------------------------------------------------------------
 # plugin_error_handler decorator
 # ---------------------------------------------------------------------------

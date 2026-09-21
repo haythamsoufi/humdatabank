@@ -13,6 +13,7 @@ from app.plugins.base import (
     SeedPermission,
     SeedRole,
 )
+from plugins.metadata import FirstPartyPluginMetadata
 
 _UPR_PDF_VIEWER_CSP = (
     "default-src 'self'; "
@@ -26,7 +27,7 @@ _UPR_PDF_VIEWER_CSP = (
 )
 
 
-class UprPlugin(BasePlugin):
+class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def plugin_id(self) -> str:
         return "upr"
@@ -45,10 +46,6 @@ class UprPlugin(BasePlugin):
             "Unified Plan and Report: live dashboards, Excel import/export, "
             "GO-API documents, and AI/RAG document intelligence."
         )
-
-    @property
-    def author(self) -> str:
-        return "IFRC Development Team"
 
     def get_settings(self):
         from plugins.upr.routes import upr_settings_status

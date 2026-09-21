@@ -272,31 +272,20 @@ class TestPluginAdminRouteWrapper:
 
         assert admin_view.__name__ == "admin_view"
 
-    def test_focal_point_gets_403_on_plugin_config_post(self, client, app):
-        mock_user = MagicMock(is_authenticated=True)
-        with patch("flask_login.utils._get_user", return_value=mock_user), \
-             patch("app.routes.admin.shared.user_has_permission", return_value=False):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = "1"
-                sess["_fresh"] = True
-            resp = client.post(
+    def test_focal_point_gets_403_on_plugin_config_post(self, logged_in_focal_client):
+        resp = logged_in_focal_client.post(
+            "/admin/plugins/interactive_map/api/config",
+            json={"global_settings": {"default_zoom_level": 12}},
+        )
+        assert resp.status_code == 403
+
+    def test_admin_with_manage_permission_succeeds_on_plugin_config_post(self, logged_in_sm_client):
+        with patch("app.plugins.plugin_utils.get_json_safe", return_value={"global_settings": {}}), \
+             patch("app.plugins.db_config.DbPluginConfig.update_config", return_value=True):
+            resp = logged_in_sm_client.post(
                 "/admin/plugins/interactive_map/api/config",
                 json={"global_settings": {"default_zoom_level": 12}},
             )
-        assert resp.status_code == 403
-
-    def test_admin_with_manage_permission_succeeds_on_plugin_config_post(self, client, app):
-        with patch("app.routes.admin.shared.user_has_permission", return_value=True):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = "999999"
-                sess["_fresh"] = True
-            with patch("flask_login.utils._get_user", return_value=MagicMock(is_authenticated=True)), \
-                 patch("app.plugins.plugin_utils.get_json_safe", return_value={"global_settings": {}}), \
-                 patch("app.plugins.db_config.DbPluginConfig.update_config", return_value=True):
-                resp = client.post(
-                    "/admin/plugins/interactive_map/api/config",
-                    json={"global_settings": {"default_zoom_level": 12}},
-                )
         assert resp.status_code == 200
 
 

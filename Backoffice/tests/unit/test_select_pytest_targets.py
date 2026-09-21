@@ -79,6 +79,60 @@ class TestPlanPytestRun:
         assert "plugins/upr/tests/test_raster.py" in plan.targets
         assert plan.needs_render_libs is True
 
+    def test_plugin_py_does_not_select_visuals_or_excel_suites(self):
+        plan = plan_pytest_run(
+            ["Backoffice/plugins/pb_progress/plugin.py"],
+            BACKOFFICE_ROOT,
+        )
+        assert plan.mode == "selected"
+        assert "tests/unit/test_plugins/test_plugin_metadata.py" in plan.targets
+        assert "plugins/pb_progress/visuals/tests" not in plan.targets
+        assert "plugins/pb_progress/tests" not in plan.targets
+        assert plan.needs_render_libs is False
+
+    def test_upr_plugin_py_maps_to_plugin_unit_tests_not_excel_suite(self):
+        plan = plan_pytest_run(
+            ["Backoffice/plugins/upr/plugin.py"],
+            BACKOFFICE_ROOT,
+        )
+        assert "tests/unit/test_plugins/test_plugin_metadata.py" in plan.targets
+        assert "tests/unit/test_plugins/test_upr_plugin.py" in plan.targets
+        assert "tests/unit/test_plugins/test_upr_bulk_job.py" not in plan.targets
+        assert "plugins/upr/tests" not in plan.targets
+        assert plan.needs_render_libs is False
+
+    def test_routes_py_maps_to_route_unit_tests_not_visuals(self):
+        plan = plan_pytest_run(
+            ["Backoffice/plugins/pb_progress/routes.py"],
+            BACKOFFICE_ROOT,
+        )
+        assert "tests/unit/test_routes/test_pb_progress_routes.py" in plan.targets
+        assert "tests/unit/test_plugins/test_plugin_metadata.py" in plan.targets
+        assert "plugins/pb_progress/visuals/tests" not in plan.targets
+        assert "plugins/upr/tests/test_routes.py" not in plan.targets
+        assert plan.needs_render_libs is False
+
+    def test_fdrs_routes_do_not_select_upr_test_routes(self):
+        plan = plan_pytest_run(
+            ["Backoffice/plugins/fdrs/routes.py"],
+            BACKOFFICE_ROOT,
+        )
+        assert "tests/unit/test_plugins/test_fdrs_routes.py" in plan.targets
+        assert "plugins/upr/tests/test_routes.py" not in plan.targets
+        assert "tests/unit/test_plugins/test_fdrs_compliance_doc_matching.py" not in plan.targets
+
+    def test_shared_metadata_module_maps_to_metadata_tests(self):
+        plan = plan_pytest_run(
+            ["Backoffice/plugins/metadata.py"],
+            BACKOFFICE_ROOT,
+        )
+        assert plan == PytestPlan(
+            "selected",
+            ("tests/unit/test_plugins/test_plugin_metadata.py",),
+            "Mapped changed files to tests",
+            False,
+        )
+
     def test_unmapped_python_skips_rather_than_full_suite(self, tmp_path: Path):
         (tmp_path / "app").mkdir()
         (tmp_path / "app" / "no_tests_here.py").write_text("# dummy\n", encoding="utf-8")

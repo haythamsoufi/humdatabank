@@ -10,7 +10,7 @@
         breadcrumbs=[
             {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
             {'name': 'Plugin Management', 'url': url_for('admin.plugin_management')},
-            {'name': plugin.display_name or plugin.name or plugin_name}
+            {'name': plugin.display_name or plugin.name or plugin.plugin_id}
         ],
         actions=[
             {

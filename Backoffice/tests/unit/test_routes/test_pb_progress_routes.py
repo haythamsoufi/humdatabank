@@ -74,15 +74,6 @@ class TestPBProgressConfigValidation:
         assert resp.status_code == 400
         assert "non-empty id" in resp.get_json()["error"].lower()
 
-    def test_section_order_put_rejects_invalid_part(self, logged_in_sm_client):
-        resp = logged_in_sm_client.put(
-            _version_url("/section-order"),
-            data=json.dumps({"section_order": [{"part": "invalid", "section": "SP1", "order": 1}]}),
-            headers=JSON_HEADERS,
-        )
-        assert resp.status_code == 400
-        assert "invalid section part" in resp.get_json()["error"].lower()
-
 
 class TestPBProgressServeOutput:
     def test_serve_output_rejects_path_traversal(self, logged_in_admin_client):

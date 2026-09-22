@@ -1,6 +1,7 @@
 from app.plugins.base import BasePlugin, BaseFieldType
 from typing import List, Dict, Any
 from flask import current_app
+from plugins.metadata import FirstPartyPluginMetadata
 
 
 def _relevance_measures() -> List[Dict[str, Any]]:
@@ -100,7 +101,7 @@ class EmergencyOperationsFieldType(BaseFieldType):
             return False
 
 
-class EmergencyOperationsPlugin(BasePlugin):
+class EmergencyOperationsPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def plugin_id(self) -> str:
         return "emergency_operations"
@@ -116,14 +117,6 @@ class EmergencyOperationsPlugin(BasePlugin):
     @property
     def description(self) -> str:
         return "Provides a field type that lists active IFRC operations for a country using GO API"
-
-    @property
-    def author(self) -> str:
-        return "IFRC Development Team"
-
-    @property
-    def license(self) -> str:
-        return "MIT"
 
     def get_field_types(self) -> List[BaseFieldType]:
         return [EmergencyOperationsFieldType()]

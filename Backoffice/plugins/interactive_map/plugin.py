@@ -21,6 +21,7 @@ from plugins.interactive_map.data_utils import (
     summarize_map_payload_for_display,
 )
 from plugins.interactive_map.config import plugin_config
+from plugins.metadata import FirstPartyPluginMetadata
 from app.utils.schema_validation import validate_plugin_config, validate_plugin_data, sanitize_plugin_data
 
 
@@ -250,7 +251,7 @@ class InteractiveMapFieldType(BaseFieldType):
         return plugin_config.is_provider_enabled(provider)
 
 
-class InteractiveMapPlugin(BasePlugin):
+class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     """Plugin providing interactive map field type."""
 
     @property
@@ -268,18 +269,6 @@ class InteractiveMapPlugin(BasePlugin):
     @property
     def description(self) -> str:
         return "Provides interactive map field type for location selection in forms"
-
-    @property
-    def author(self) -> str:
-        return "IFRC Development Team"
-
-    @property
-    def homepage(self) -> str:
-        return "https://github.com/ifrc/ifrc-network-databank"
-
-    @property
-    def license(self) -> str:
-        return "MIT"
 
     def get_field_types(self) -> List[BaseFieldType]:
         return [InteractiveMapFieldType()]

@@ -156,6 +156,15 @@ def plugin_admin_route_wrapper(plugin_name: str, permission: str = PLUGIN_MANAGE
     return decorator
 
 
+def settings_plugin_info(plugin_id: str) -> Dict[str, Any]:
+    """Installation metadata for plugin settings pages (author, homepage, version)."""
+    plugin_manager = getattr(current_app, "plugin_manager", None)
+    plugin = plugin_manager.get_plugin(plugin_id) if plugin_manager else None
+    if plugin:
+        return plugin.get_installation_info()
+    return {}
+
+
 class BasePluginRoutes:
     """Base class for plugin routes with common functionality."""
 
@@ -212,7 +221,11 @@ class BasePluginRoutes:
             @plugin_admin_route_wrapper(self.display_name)
             def settings_page():
                 """Plugin settings page."""
-                return template_renderer(self.plugin_id, 'settings.html')
+                return template_renderer(
+                    self.plugin_id,
+                    'settings.html',
+                    plugin_info=settings_plugin_info(self.plugin_id),
+                )
 
 
 def validate_plugin_config(config: Dict[str, Any], schema: Dict[str, Any]) -> bool:

@@ -145,7 +145,13 @@ def fdrs_settings_status() -> Dict[str, Any]:
 @admin_required
 @permission_required("admin.plugins.manage")
 def settings_page():
-    return render_template("plugins/fdrs/settings.html", settings=fdrs_settings_status())
+    from app.plugins.plugin_utils import settings_plugin_info
+
+    return render_template(
+        "plugins/fdrs/settings.html",
+        settings=fdrs_settings_status(),
+        plugin_info=settings_plugin_info("fdrs"),
+    )
 
 
 def parse_reported_import_states(data: Dict[str, Any]) -> Optional[List[int]]:

@@ -199,7 +199,13 @@ def upr_settings_status() -> dict:
 @login_required
 @permission_required("admin.plugins.manage")
 def settings_page():
-    return render_template("plugins/upr/settings.html", settings=upr_settings_status())
+    from app.plugins.plugin_utils import settings_plugin_info
+
+    return render_template(
+        "plugins/upr/settings.html",
+        settings=upr_settings_status(),
+        plugin_info=settings_plugin_info("upr"),
+    )
 
 
 @bp.route("/admin/upr-tools", methods=["GET"])

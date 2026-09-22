@@ -99,6 +99,8 @@ For **org-specific admin tools** (Data Explorer tabs, custom report pipelines, e
 
 Required file: `plugin.py` with a concrete `BasePlugin` subclass. Set `get_field_types()` to `[]` for admin-only tools. Optional: `routes.py`, `service.py`, `templates/`, `static/`, and tool subfolders.
 
+First-party plugins share author metadata from `plugins/metadata.py` (`Haytham Alsoufi`, `https://github.com/haythamsoufi`). Settings pages should render that via `settings_plugin_info()` rather than hardcoding.
+
 Admin-feature blueprints register at startup regardless of activate/deactivate state. Templates are referenced as `plugins/<plugin_id>/...`.
 
 ## Best Practices

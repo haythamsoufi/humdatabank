@@ -1,0 +1,63 @@
+{# Shared Plugin Information card for first-party and generic settings pages.
+   Expects plugin_info (dict) with display_name/name, version, author, homepage, license, description. #}
+{% set info = plugin_info or {} %}
+{% set plugin_display_name = info.display_name or info.name or '' %}
+{% set plugin_author = info.author or '' %}
+{% set plugin_homepage = info.homepage or '' %}
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+    <h3 class="text-lg font-semibold text-gray-700 mb-4">
+        <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+        Plugin Information
+    </h3>
+
+    <div class="space-y-3">
+        <div class="flex justify-between gap-4">
+            <span class="text-gray-600">Name:</span>
+            <span class="font-medium text-right">{{ plugin_display_name }}</span>
+        </div>
+        <div class="flex justify-between gap-4">
+            <span class="text-gray-600">Version:</span>
+            <span class="font-medium">{{ info.version or '' }}</span>
+        </div>
+        <div class="flex justify-between gap-4">
+            <span class="text-gray-600">Author:</span>
+            <span class="font-medium text-right">
+                {% if plugin_homepage and plugin_author %}
+                    <a href="{{ plugin_homepage }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-blue-600 hover:text-blue-800 hover:underline">{{ plugin_author }}</a>
+                {% else %}
+                    {{ plugin_author }}
+                {% endif %}
+            </span>
+        </div>
+        {% if plugin_homepage %}
+        <div class="flex justify-between gap-4">
+            <span class="text-gray-600">Homepage:</span>
+            <span class="font-medium text-right">
+                <a href="{{ plugin_homepage }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="text-blue-600 hover:text-blue-800 hover:underline break-all">{{ plugin_homepage }}</a>
+            </span>
+        </div>
+        {% endif %}
+        <div class="flex justify-between gap-4">
+            <span class="text-gray-600">License:</span>
+            <span class="font-medium">{{ info.license or 'MIT' }}</span>
+        </div>
+        <div class="flex justify-between gap-4">
+            <span class="text-gray-600">Status:</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Active
+            </span>
+        </div>
+    </div>
+
+    {% if info.description %}
+    <div class="mt-4 pt-4 border-t border-gray-200">
+        <p class="text-sm text-gray-600">{{ info.description }}</p>
+    </div>
+    {% endif %}
+</div>

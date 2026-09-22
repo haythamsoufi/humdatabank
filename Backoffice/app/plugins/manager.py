@@ -475,6 +475,14 @@ class PluginManager:
             def author(self) -> str:
                 return config.get('author', 'Unknown')
 
+            @property
+            def homepage(self) -> str:
+                return config.get('homepage', '')
+
+            @property
+            def license(self) -> str:
+                return config.get('license', 'MIT')
+
             def get_field_types(self) -> List[BaseFieldType]:
                 # Create dynamic field types from JSON config
                 field_types = []

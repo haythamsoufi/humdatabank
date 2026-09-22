@@ -36,6 +36,16 @@
         return (Array.isArray(pluginsData) ? pluginsData : []).find(p => String(getPluginId(p)) === String(pluginId)) || null;
     }
 
+    function renderPluginAuthor(plugin, extraClasses) {
+        const author = plugin?.author || '';
+        const homepage = plugin?.homepage || '';
+        const css = extraClasses || 'text-blue-600 hover:text-blue-800 hover:underline';
+        if (homepage && author) {
+            return `<a href="${escapeHtmlAttr(homepage)}" target="_blank" rel="noopener noreferrer" class="${css}">${escapeHtml(author)}</a>`;
+        }
+        return escapeHtml(author);
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         loadPlugins();
         updateOverviewCounts();
@@ -242,7 +252,7 @@
                     ${plugin.field_types ? plugin.field_types.length : 0}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${escapeHtml(plugin.author || '')}
+                    ${renderPluginAuthor(plugin)}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex space-x-2 plugin-actions" data-plugin-name="${escapeHtmlAttr(pluginId)}">
@@ -415,8 +425,14 @@
                 </div>
                 <div>
                     <h4 class="font-medium text-gray-700">${i18n.details_author}</h4>
-                    <p class="text-gray-600">${escapeHtml(plugin.author || '')}</p>
+                    <p class="text-gray-600">${renderPluginAuthor(plugin)}</p>
                 </div>
+                ${plugin.homepage ? `
+                <div>
+                    <h4 class="font-medium text-gray-700">${i18n.details_homepage}</h4>
+                    <p class="text-gray-600"><a href="${escapeHtmlAttr(plugin.homepage)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 hover:underline break-all">${escapeHtml(plugin.homepage)}</a></p>
+                </div>
+                ` : ''}
                 <div>
                     <h4 class="font-medium text-gray-700">${i18n.details_license}</h4>
                     <p class="text-gray-600">${escapeHtml(plugin.license || i18n.details_not_specified)}</p>

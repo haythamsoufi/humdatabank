@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="0;url={{ next_url }}">
+    <title>{{ _('Signing you in…') }}</title>
+</head>
+<body>
+    <p>{{ _('Signing you in…') }}</p>
+    <p><a id="login-continue" href="{{ next_url }}">{{ _('Continue') }}</a></p>
+    <script nonce="{{ csp_nonce() }}">
+        location.replace({{ next_url|tojson }});
+    </script>
+</body>
+</html>

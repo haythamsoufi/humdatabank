@@ -87,20 +87,39 @@ class TestCsrfErrorHandler:
             follow_redirects=False,
         )
         assert resp.status_code == 302
-        assert resp.headers["Location"] == "http://localhost/form-page"
+        assert "/login" in (resp.headers.get("Location") or "")
         assert b"Page Needs Refresh" not in resp.data
         assert b"csrf-retry-form" not in resp.data
 
-    def test_html_response_flashes_warning_before_redirect(self, client):
-        """A silent redirect with no explanation would drop the user's form data
-        with zero feedback — a flash message must be queued before the redirect."""
+    def test_unauthenticated_html_csrf_does_not_flash_or_set_session_cookie(self, client, app):
+        """Anonymous CSRF must not write a replacement session cookie or the
+        misleading 'changes were not saved' flash (phones omit the login cookie
+        from the POST, then a new cookie would overwrite it)."""
         resp = client.post(
             "/test-error/csrf",
             headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
             follow_redirects=False,
         )
         assert resp.status_code == 302
+        assert "/login" in (resp.headers.get("Location") or "")
         with client.session_transaction() as sess:
+            assert not sess.get("_flashes")
+        cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
+        prefix = f"{cookie_name}="
+        for header in resp.headers.getlist("Set-Cookie"):
+            assert not header.startswith(prefix)
+
+    def test_authenticated_html_csrf_flashes_warning_before_redirect(self, logged_in_client):
+        """A silent redirect with no explanation would drop the user's form data
+        with zero feedback — a flash message must be queued before the redirect."""
+        resp = logged_in_client.post(
+            "/test-error/csrf",
+            headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "http://localhost/form-page"
+        with logged_in_client.session_transaction() as sess:
             flashes = sess.get("_flashes", [])
         assert len(flashes) == 1
         category, message = flashes[0]
@@ -108,11 +127,25 @@ class TestCsrfErrorHandler:
         assert "refresh" in message.lower()
         assert "not saved" in message.lower()
 
-    def test_html_response_flash_failure_is_suppressed(self, client):
+    def test_authenticated_context_switch_csrf_does_not_claim_unsaved_work(self, logged_in_client):
+        resp = logged_in_client.post(
+            "/test-error/csrf",
+            data={"country_select": "1"},
+            headers={**HTML_HEADERS, "Referer": "http://localhost/"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        with logged_in_client.session_transaction() as sess:
+            flashes = sess.get("_flashes", [])
+        assert len(flashes) == 1
+        _category, message = flashes[0]
+        assert "not saved" not in message.lower()
+
+    def test_html_response_flash_failure_is_suppressed(self, logged_in_client):
         """If flash() itself raises (e.g. no request context edge case), the
         redirect must still succeed rather than turning into a 500."""
         with patch("app.error_handlers.flash", side_effect=RuntimeError("flash failed")):
-            resp = client.post(
+            resp = logged_in_client.post(
                 "/test-error/csrf",
                 headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
                 follow_redirects=False,

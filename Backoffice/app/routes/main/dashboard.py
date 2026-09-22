@@ -314,11 +314,22 @@ def dashboard():
         if len(user_entities) > 1:
             show_entity_select = True
 
-    if request.method == "POST":
-        # Check if the POST is for country selection
-        if countries_group_enabled and 'country_select' in request.form:
-            selected_country_id_str = request.form.get('country_select')
-            current_app.logger.debug(f"Dashboard POST request: Country Selection. Selected country ID string from form: {selected_country_id_str}")
+    country_select_submitted = (
+        countries_group_enabled
+        and "country_select" in request.values
+        and "self_report_template_id" not in request.form
+    )
+    entity_select_submitted = (
+        "entity_select" in request.values
+        and "self_report_template_id" not in request.form
+    )
+
+    if country_select_submitted or entity_select_submitted or request.method == "POST":
+        # Country/entity switching accepts GET or POST. GET avoids CSRF on phones
+        # (first navigation after login). POST remains for older clients/tests.
+        if country_select_submitted:
+            selected_country_id_str = request.values.get('country_select')
+            current_app.logger.debug(f"Dashboard country selection. Selected country ID string: {selected_country_id_str}")
             if selected_country_id_str:
                 try:
                     selected_country_id = int(selected_country_id_str)
@@ -346,10 +357,9 @@ def dashboard():
                  selected_country = None # Will be set to a default below
                  current_app.logger.warning(f"User {current_user.email} submitted POST without a country selection.")
 
-        # NEW: Handle POST for entity selection (multi-entity support)
-        elif 'entity_select' in request.form:
-            entity_select_value = request.form.get('entity_select', '')
-            current_app.logger.debug(f"Dashboard POST request: Entity Selection. Raw value: '{entity_select_value}'")
+        elif entity_select_submitted:
+            entity_select_value = request.values.get('entity_select', '')
+            current_app.logger.debug(f"Dashboard entity selection. Raw value: '{entity_select_value}'")
             if entity_select_value and ':' in entity_select_value:
                 try:
                     selected_type, selected_id_str = entity_select_value.split(':', 1)

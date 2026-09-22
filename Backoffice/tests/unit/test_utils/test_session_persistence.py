@@ -14,6 +14,7 @@ from app.utils.session_persistence import (
     reset_oauth_logout_hint_cache_for_tests,
     session_set_cookie_bytes,
     store_oauth_logout_hint,
+    strip_session_set_cookie,
 )
 
 
@@ -103,6 +104,17 @@ class TestSessionCookieSize:
         size = session_set_cookie_bytes(resp)
         if size:
             assert size < BROWSER_COOKIE_MAX_BYTES
+
+    def test_strip_session_set_cookie_keeps_other_cookies(self, app):
+        from flask import make_response
+
+        with app.test_request_context("/"):
+            resp = make_response("ok")
+            resp.headers.add("Set-Cookie", "session=abc; Path=/")
+            resp.headers.add("Set-Cookie", "ui_language=en; Path=/")
+            strip_session_set_cookie(resp)
+            cookies = resp.headers.getlist("Set-Cookie")
+        assert cookies == ["ui_language=en; Path=/"]
 
     def test_log_oversized_cookie_warns(self, app, caplog):
         from flask import make_response

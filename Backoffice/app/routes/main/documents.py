@@ -57,8 +57,8 @@ def documents_submit():
     enabled_entity_groups = get_enabled_entity_groups()
     countries_group_enabled = "countries" in enabled_entity_groups
 
-    if request.method == "POST" and "entity_select" in request.form:
-        entity_select_value = request.form.get("entity_select", "")
+    if "entity_select" in request.values:
+        entity_select_value = request.values.get("entity_select", "")
         if entity_select_value and ":" in entity_select_value:
             try:
                 selected_type, selected_id_str = entity_select_value.split(":", 1)

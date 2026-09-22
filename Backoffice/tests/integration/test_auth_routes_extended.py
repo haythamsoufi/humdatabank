@@ -35,7 +35,10 @@ class TestLoginRouteExtended:
                 'email': 'login-ok@example.com',
                 'password': 'TestPass123!',
             }, follow_redirects=False)
-        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert resp.status_code in (200, 301, 302, 303, 307, 308)
+        if resp.status_code == 200:
+            assert b'id="login-continue"' in resp.data
+            assert b'href="/"' in resp.data or b"location.replace" in resp.data
 
     def test_login_account_locked(self, client, db_session, app):
         from app.models.core import UserLoginLog

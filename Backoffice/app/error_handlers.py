@@ -2,7 +2,7 @@
 
 from contextlib import suppress
 
-from flask import render_template, request, session, current_app, url_for, redirect, flash, jsonify
+from flask import render_template, request, session, current_app, url_for, redirect, flash, jsonify, g
 from flask_babel import _
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError, generate_csrf
@@ -20,6 +20,17 @@ def _safe_csrf_reload_url():
     with suppress(Exception):
         return url_for("main.dashboard")
     return "/"
+
+
+def _is_context_switch_csrf_request():
+    """True when CSRF failed on a country/entity navigation POST, not a data save."""
+    values = request.values
+    return "country_select" in values or "entity_select" in values
+
+
+def _suppress_anonymous_session_cookie():
+    """Do not emit a replacement session cookie for an unauthenticated CSRF failure."""
+    g.suppress_session_cookie = True
 
 
 def register_error_handlers(app):
@@ -43,6 +54,8 @@ def register_error_handlers(app):
             # responseIndicatesCsrfFailure() in csrf.js matches on) *and* a
             # distinct human-readable 'message' through that helper without one
             # silently clobbering the other or a duplicate-argument TypeError.
+            if not getattr(current_user, "is_authenticated", False):
+                _suppress_anonymous_session_cookie()
             response = jsonify({
                 "success": False,
                 "error": "CSRF validation failed",
@@ -53,15 +66,28 @@ def register_error_handlers(app):
             response.status_code = 400
             return response
 
-        # Client-side csrf.js refreshes tokens before submit/fetch; if we still
-        # get here, mint a new session token and send the user back to the form.
-        # Flash a visible notice first — otherwise the redirect silently drops
-        # whatever the user just submitted with no explanation at all.
-        with suppress(Exception):
-            flash(
-                _("Your session needed a refresh, so your last submission was not saved. Please try again."),
-                "warning",
+        # No usable login session on this request. Do not flash() or mint a
+        # CSRF token — that would write a new anonymous session cookie and
+        # overwrite a login cookie the browser still has but omitted from this
+        # POST (common on phones after OAuth / oversized cookies). Send the
+        # user to login without the misleading "changes were not saved" notice.
+        if not getattr(current_user, "is_authenticated", False):
+            _suppress_anonymous_session_cookie()
+            with suppress(Exception):
+                return redirect(url_for("auth.login"))
+            return redirect("/login")
+
+        # Still logged in: token/referer mismatch. Refresh the token and return
+        # to the page they came from. Country/entity switching is navigation,
+        # not a data save — do not claim their submission was discarded.
+        if _is_context_switch_csrf_request():
+            flash_message = _("Please try that again.")
+        else:
+            flash_message = _(
+                "Your session needed a refresh, so your last submission was not saved. Please try again."
             )
+        with suppress(Exception):
+            flash(flash_message, "warning")
         with suppress(Exception):
             generate_csrf()
         return redirect(_safe_csrf_reload_url())

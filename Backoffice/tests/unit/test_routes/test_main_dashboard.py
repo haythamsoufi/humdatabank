@@ -396,6 +396,20 @@ class TestDashboardPostCountrySelect:
             resp = logged_in_client.post("/", data={"country_select": str(country.id)})
         assert resp.status_code == 302
 
+    def test_valid_country_selection_via_get_updates_session(self, logged_in_client, db_session, app, admin_user):
+        country = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", country.id)
+        db_session.commit()
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query:
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            resp = logged_in_client.get(f"/?country_select={country.id}")
+        assert resp.status_code == 302
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_country_id") == country.id
+
     def test_invalid_country_selection_shows_warning(self, logged_in_client, db_session, app, admin_user):
         country = create_test_country(db_session)
         _grant_entity_permission(db_session, admin_user, "country", country.id)
@@ -455,6 +469,22 @@ class TestDashboardPostEntitySelect:
             mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
             resp = logged_in_client.post("/", data={"entity_select": f"country:{country.id}"})
         assert resp.status_code == 302
+
+    def test_valid_entity_selection_via_get(self, logged_in_client, db_session, app, admin_user):
+        country = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", country.id)
+        db_session.commit()
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
+             patch("app.routes.main.dashboard.EntityService.get_country_for_entity", return_value=country):
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            resp = logged_in_client.get(f"/?entity_select=country:{country.id}")
+        assert resp.status_code == 302
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_entity_type") == "country"
+            assert sess.get("selected_entity_id") == country.id
 
     def test_invalid_entity_selection_not_in_user_pairs(self, logged_in_client, db_session, app, admin_user):
         """Entity not belonging to user shows warning and redirects."""

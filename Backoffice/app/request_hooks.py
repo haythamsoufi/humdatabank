@@ -1,12 +1,13 @@
 """Flask before_request and after_request hooks."""
 
-from flask import current_app, redirect, request, session, url_for
+from flask import current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from app.i18n import persist_queued_language_cookie, update_session_activity
 from app.utils.session_persistence import (
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
+    strip_session_set_cookie,
 )
 from app.utils.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
 from app.utils.api_responses import json_ok
@@ -148,6 +149,16 @@ def register_request_hooks(app):
             migrate_oauth_logout_hint_from_session()
         except Exception as e:
             current_app.logger.debug("migrate_oauth_logout_hint_from_session failed: %s", e)
+
+    @app.after_request
+    def _suppress_anonymous_session_cookie(response):
+        if not getattr(g, "suppress_session_cookie", False):
+            return response
+        try:
+            return strip_session_set_cookie(response)
+        except Exception as e:
+            current_app.logger.debug("strip_session_set_cookie failed: %s", e)
+            return response
 
     @app.after_request
     def _log_oversized_session_cookie(response):

@@ -315,7 +315,7 @@ def dev_act_as_login():
 
     _complete_dev_act_as_login(user)
     next_page = request.form.get('next') or request.args.get('next')
-    return safe_redirect(next_page, default_route='main.dashboard')
+    return safe_redirect(next_page, default_route='main.dashboard', persist_session_cookie=True)
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -466,7 +466,7 @@ def login():
                 current_app.logger.debug(f"Login redirect: next_page={next_page}")
 
             # Use safe redirect utility to prevent open redirect vulnerabilities
-            return safe_redirect(next_page, default_route='main.dashboard')
+            return safe_redirect(next_page, default_route='main.dashboard', persist_session_cookie=True)
 
         else:
             # Log failed login attempt with specific reason
@@ -1080,7 +1080,7 @@ def azure_callback():
             current_app.logger.error("Mobile OAuth: failed to issue JWT tokens: %s", e, exc_info=True)
             # Fall through to normal web redirect as a best-effort fallback
 
-    return safe_redirect(next_page_from_state, default_route='main.dashboard')
+    return safe_redirect(next_page_from_state, default_route='main.dashboard', persist_session_cookie=True)
 
 @bp.route("/logout")
 @login_required # Ensure user is logged in before logging out

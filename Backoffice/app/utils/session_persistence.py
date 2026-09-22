@@ -165,6 +165,33 @@ def session_set_cookie_bytes(response) -> int:
     return max(sizes) if sizes else 0
 
 
+def strip_session_set_cookie(response):
+    """Remove session Set-Cookie headers so this response cannot replace a login cookie.
+
+    Mobile browsers sometimes omit an existing session cookie from a POST
+    (oversized cookie, ITP, SameSite after an OAuth redirect). If we then
+    flash() or mint a CSRF token, Flask writes a *new* anonymous session
+    cookie that overwrites the still-valid login cookie and boots the user
+    to /login.
+    """
+    cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+    prefix = f"{cookie_name}="
+    headers = response.headers
+    existing = headers.getlist("Set-Cookie")
+    if not existing:
+        return response
+    kept = [header for header in existing if not header.startswith(prefix)]
+    if len(kept) == len(existing):
+        return response
+    try:
+        del headers["Set-Cookie"]
+    except Exception:
+        headers.remove("Set-Cookie")
+    for header in kept:
+        headers.add("Set-Cookie", header)
+    return response
+
+
 def log_oversized_session_cookie(response):
     """Warn when the outgoing session cookie is close to the browser limit."""
     size = session_set_cookie_bytes(response)

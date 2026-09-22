@@ -172,7 +172,29 @@ def get_safe_redirect_url(target_url: Optional[str], default_route: str = 'main.
         return url_for(default_route)
 
 
-def safe_redirect(target_url: Optional[str], default_route: str = 'main.dashboard'):
+def first_party_login_continue(safe_url: str):
+    """Return a 200 HTML hop so mobile browsers persist the login session cookie.
+
+    Set-Cookie on a 302 after Azure B2C (or even a first-party login POST) is
+    often discarded by mobile Safari / Chrome ITP. The following GET in the
+    redirect chain can still look logged-in, then the next user action has no
+    cookie. Serving a same-origin 200 with the cookie, then navigating, sticks.
+    """
+    from flask import make_response, render_template
+
+    html = render_template("auth/login_continue.html", next_url=safe_url)
+    response = make_response(html)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+def safe_redirect(
+    target_url: Optional[str],
+    default_route: str = 'main.dashboard',
+    *,
+    persist_session_cookie: bool = False,
+):
     """
     Safely redirect to a URL, falling back to a default route if the target is unsafe.
 
@@ -181,10 +203,14 @@ def safe_redirect(target_url: Optional[str], default_route: str = 'main.dashboar
     Args:
         target_url: The target URL to validate and redirect to
         default_route: The Flask route name to redirect to if target is unsafe
+        persist_session_cookie: After login, return a 200 continue page instead
+            of a 302 so mobile browsers keep the new session cookie.
 
     Returns:
-        Flask redirect response
+        Flask redirect response, or a 200 continue page after login.
     """
     from flask import redirect
     safe_url = get_safe_redirect_url(target_url, default_route)
+    if persist_session_cookie:
+        return first_party_login_continue(safe_url)
     return redirect(safe_url)

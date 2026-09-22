@@ -154,6 +154,32 @@ class SubmittedDocument(db.Model):
         return f'<SubmittedDocument "{self.filename}" for "{field_label}" ({country_name})>'
 
 
+class GuidanceDocument(db.Model):
+    """Staff-uploaded guidance or reference file (plugin or system owner)."""
+
+    __tablename__ = "guidance_document"
+
+    id = db.Column(db.Integer, primary_key=True)
+    owner_key = db.Column(db.String(50), nullable=False, index=True)
+    title = db.Column(db.String(500), nullable=True)
+    filename = db.Column(db.String(255), nullable=False)
+    storage_path = db.Column(db.String(1000), nullable=False)
+    file_size_bytes = db.Column(db.Integer, nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    uploaded_by_user = relationship("User", foreign_keys=[uploaded_by_user_id])
+
+    __table_args__ = (
+        db.Index("ix_guidance_document_owner_uploaded", "owner_key", "uploaded_at"),
+    )
+
+    def __repr__(self):
+        return f'<GuidanceDocument {self.id}: {self.filename} ({self.owner_key})>'
+
+
 class ResourceSubcategory(db.Model):
     """Admin-managed subcategory for resources (e.g. publication series)."""
     __tablename__ = 'resource_subcategory'

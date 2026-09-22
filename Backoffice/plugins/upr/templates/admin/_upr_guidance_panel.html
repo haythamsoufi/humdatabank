@@ -1,0 +1,64 @@
+{# Injected by plugins.upr.routes.upr_tools. #}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+<div id="upr-guidance-root">
+  <p class="text-sm text-gray-600 mb-4">
+    {{ _('Upload official UPR guidance (PDF, Word, Excel, Markdown, or HTML). Import these files later from the AI Knowledge Base so the chatbot can use them as the Unified Planning and Reporting Assistant.') }}
+  </p>
+  <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+    <i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>
+    {{ _('Deleting a guidance document also removes any linked Knowledge Base copy, including chunks and embeddings.') }}
+  </p>
+
+  <div class="border border-gray-200 rounded-lg p-5 mb-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-3">{{ _('Upload guidance') }}</h3>
+    {% call excel_import_dropzone(
+        'upr-guidance-dropzone',
+        input_id='upr_guidance_file',
+        input_name='file',
+        accept='.pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.html',
+        title=_('Drop guidance files here or click to browse'),
+        hint=_('Supported: PDF, Word, Excel, Text, Markdown, HTML — multiple files allowed'),
+        selected_icon='fa-file-alt',
+        show_status_panel=false,
+        multiple=true
+    ) %}{% endcall %}
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <input type="text" id="upr-guidance-title" class="border border-gray-300 rounded-md px-3 py-2 text-sm"
+             placeholder="{{ _('Title (optional)')|forceescape }}">
+      <input type="text" id="upr-guidance-description" class="border border-gray-300 rounded-md px-3 py-2 text-sm"
+             placeholder="{{ _('Notes (optional)')|forceescape }}">
+    </div>
+    <div class="mt-4 flex justify-end">
+      <button type="button" id="upr-guidance-upload-btn" class="btn btn-primary" disabled>
+        <i class="fas fa-upload mr-2"></i>{{ _('Upload') }}
+      </button>
+    </div>
+    <p id="upr-guidance-upload-status" class="hidden mt-3 text-sm" role="status"></p>
+  </div>
+
+  <div class="border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="text-lg font-medium text-gray-900">{{ _('Uploaded guidance') }}</h3>
+      <button type="button" id="upr-guidance-refresh-btn" class="btn btn-secondary btn-sm">
+        <i class="fas fa-sync-alt mr-1"></i>{{ _('Refresh') }}
+      </button>
+    </div>
+    <div id="upr-guidance-empty" class="px-4 py-8 text-sm text-gray-500 text-center">
+      {{ _('No guidance documents yet.') }}
+    </div>
+    <div id="upr-guidance-table-wrap" class="hidden overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+          <tr>
+            <th class="px-4 py-2">{{ _('Title') }}</th>
+            <th class="px-4 py-2">{{ _('File') }}</th>
+            <th class="px-4 py-2">{{ _('Uploaded') }}</th>
+            <th class="px-4 py-2">{{ _('Knowledge Base') }}</th>
+            <th class="px-4 py-2 text-right">{{ _('Actions') }}</th>
+          </tr>
+        </thead>
+        <tbody id="upr-guidance-tbody" class="divide-y divide-gray-100"></tbody>
+      </table>
+    </div>
+  </div>
+</div>

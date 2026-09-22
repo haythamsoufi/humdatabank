@@ -30,6 +30,51 @@ def test_settings_page_renders_for_system_manager(logged_in_sm_client):
     assert response.status_code == 200
     assert b"UPR Plugin Settings" in response.data
     assert b"Excel Import" in response.data
+    assert b"Guidance" in response.data
+
+
+@pytest.mark.unit
+def test_guidance_dropzone_accepts_multiple_files(app):
+    from flask import render_template
+
+    with app.test_request_context():
+        html = render_template("plugins/upr/admin/_upr_guidance_panel.html")
+    assert 'id="upr_guidance_file"' in html
+    assert "multiple" in html
+    assert 'data-multiple="true"' in html
+
+
+@pytest.mark.unit
+def test_guidance_routes_are_registered(app):
+    endpoint, values = app.url_map.bind("localhost").match("/admin/upr-tools/guidance/list")
+    assert endpoint == "upr.guidance_list"
+    assert values == {}
+    endpoint, values = app.url_map.bind("localhost").match(
+        "/admin/upr-tools/guidance/12/delete", method="POST"
+    )
+    assert endpoint == "upr.guidance_delete"
+    assert values == {"doc_id": 12}
+    from flask import url_for
+
+    with app.test_request_context():
+        download = url_for("upr.guidance_download", doc_id=0)
+        delete = url_for("upr.guidance_delete", doc_id=0)
+    assert download.endswith("/guidance/0/download")
+    assert delete.endswith("/guidance/0/delete")
+    assert download.replace("/0/download", "/12/download").endswith("/guidance/12/download")
+    assert delete.replace("/0/delete", "/12/delete").endswith("/guidance/12/delete")
+
+
+@pytest.mark.unit
+def test_guidance_routes_require_login(client):
+    assert client.get("/admin/upr-tools/guidance/list").status_code in (302, 401)
+    assert client.post("/admin/upr-tools/guidance/upload").status_code in (302, 401)
+
+
+@pytest.mark.unit
+def test_guidance_routes_forbid_non_system_manager(logged_in_focal_client):
+    resp = logged_in_focal_client.get("/admin/upr-tools/guidance/list")
+    assert resp.status_code in (302, 403)
 
 
 @pytest.mark.unit

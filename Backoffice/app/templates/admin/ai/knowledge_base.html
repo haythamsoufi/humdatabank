@@ -5,6 +5,7 @@
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
 {% from "components/ag_grid_includes.html" import ag_grid_container %}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 
 {% block title %}{{ _('AI Knowledge Base') }}{% endblock %}
 
@@ -296,6 +297,14 @@
                                 tabindex="-1">
                             <i class="fas fa-globe mr-2"></i>{{ _('Import from external API') }}
                         </button>
+                        <button type="button" id="guidanceTab"
+                                class="tab-button inline-flex items-center px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 transition-colors bg-transparent hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+                                role="tab"
+                                aria-selected="false"
+                                aria-controls="guidanceContent"
+                                tabindex="-1">
+                            <i class="fas fa-book mr-2"></i>{{ _('Guidance Documents') }}
+                        </button>
                     {% endcall %}
                 </div>
 
@@ -423,6 +432,68 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="guidanceContent" class="tab-content hidden flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="guidanceTab" aria-hidden="true">
+                    <div class="px-6 pt-6 flex-shrink-0">
+                        <p class="text-sm text-gray-600 mb-3">
+                            <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                            {{ _('Import plugin or system guidance files into the Knowledge Base. New uploads here are stored as system guidance and stay staff-only after import.') }}
+                        </p>
+                        <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                            {{ _('Deleting a guidance document also removes any linked Knowledge Base copy.') }}
+                        </p>
+                        <form id="guidanceUploadForm" class="mb-4 flex flex-col gap-3">
+                            {% call excel_import_dropzone(
+                                'kb-guidance-dropzone',
+                                input_id='guidanceFileInput',
+                                input_name='file',
+                                accept='.pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.html',
+                                title=_('Drop guidance files here or click to browse'),
+                                hint=_('Supported: PDF, Word, Excel, Text, Markdown, HTML — multiple files allowed'),
+                                selected_icon='fa-file-alt',
+                                show_status_panel=false,
+                                multiple=true,
+                                required=false
+                            ) %}{% endcall %}
+                            <p id="guidanceSelectedFile" class="hidden text-sm text-gray-600"></p>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <input type="text" id="guidanceDocTitle" placeholder="{{ _('Title (optional)')|forceescape }}" class="flex-1 min-w-[160px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <button type="submit" class="btn btn-primary" id="guidanceUploadBtn" disabled>
+                                    <i class="fas fa-upload mr-2"></i>{{ _('Upload') }}
+                                </button>
+                            </div>
+                        </form>
+                        <div class="flex gap-3 mb-4">
+                            <input type="text" id="guidanceSearch" placeholder="{{ _('Search guidance...')|forceescape }}" class="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <button type="button" id="guidanceRefreshBtn" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-sync-alt mr-2"></i>{{ _('Refresh') }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-col flex-1 min-h-0 overflow-hidden px-6 pb-6">
+                        <div id="guidanceLoading" class="hidden text-center py-8 flex-shrink-0">
+                            <div class="inline-flex items-center space-x-3">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                <span class="text-sm text-gray-600">{{ _('Loading documents...') }}</span>
+                            </div>
+                        </div>
+                        <p id="guidanceEmptyHint" class="text-sm text-gray-500 py-2">{{ _('No guidance documents yet.') }}</p>
+                        <div id="guidanceTableWrap" class="hidden overflow-auto border border-gray-200 rounded-md">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                    <tr>
+                                        <th class="px-3 py-2"><span class="sr-only">{{ _('Select') }}</span></th>
+                                        <th class="px-3 py-2">{{ _('Title') }}</th>
+                                        <th class="px-3 py-2">{{ _('Owner') }}</th>
+                                        <th class="px-3 py-2">{{ _('Status') }}</th>
+                                        <th class="px-3 py-2 text-right">{{ _('Actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="guidanceTbody" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 </div>
 
                 <div id="uploadImportModalFooter" class="upload-import-modal-footer hidden flex-shrink-0">
@@ -442,6 +513,15 @@
                                 <i class="fas fa-download mr-2"></i> {{ _('Import Selected') }}
                             </button>
                             <button type="button" class="btn btn-secondary" id="ifrcTabCancelBtn">{{ _('Cancel') }}</button>
+                        </div>
+                    </div>
+                    <div id="guidanceTabFooter" class="upload-import-tab-footer hidden w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p id="guidanceSelectedSummary" class="text-sm text-gray-600 m-0 min-w-0"></p>
+                        <div class="flex flex-row-reverse flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+                            <button type="button" class="btn btn-primary" id="guidanceImportSelectedBtn" disabled>
+                                <i class="fas fa-robot mr-2"></i> {{ _('Import Selected') }}
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="guidanceTabCancelBtn">{{ _('Cancel') }}</button>
                         </div>
                     </div>
                 </div>
@@ -554,6 +634,11 @@ window.aiDocumentsConfig.urls = {
   importSystemBulk: {{ url_for('ai_management.import_system_bulk')|tojson }},
   importSystemBulkStatus: {{ url_for('ai_management.import_system_bulk_status', job_id='__JOB__')|tojson }},
   importSystemBulkCancel: {{ url_for('ai_management.import_system_bulk_cancel', job_id='__JOB__')|tojson }},
+  listGuidanceDocuments: {{ url_for('ai_management.list_guidance_documents')|tojson }},
+  uploadGuidanceDocument: {{ url_for('ai_management.upload_guidance_document')|tojson }},
+  deleteGuidanceDocument: {{ url_for('ai_management.delete_guidance_document_from_kb', doc_id=0)|tojson }},
+  importGuidanceBulk: {{ url_for('ai_management.import_guidance_bulk')|tojson }},
+  excelImportDropzone: {{ static_url('js/components/excel-import-dropzone.js')|tojson }},
   documentsList: {{ url_for('ai_documents.list_documents')|tojson }},
   activeJobs: {{ url_for('ai_management.ai_documents_active_jobs')|tojson }},
   mineTerminology: {{ url_for('ai_management.mine_document_terminology')|tojson }},
@@ -733,6 +818,7 @@ window.aiDocumentsConfig.t = {
   upload_complete_635c737d: {{ _('Upload complete!')|tojson }},
   upload_complete_f79598ab: {{ _('Upload complete')|tojson }},
   upload_failed_0e76390e: {{ _('Upload failed:')|tojson }},
+  uploaded_ok_of_total_files_9c1e4a70: {{ _('Uploaded {ok} of {total} files. Failed: {failed}')|tojson }},
   assignment_8b3f1a2c: {{ _('Assignment')|tojson }},
   document_type_4e7c9d1b: {{ _('Document Type')|tojson }},
   entity_2a6f8c3e: {{ _('Entity')|tojson }},

@@ -229,6 +229,9 @@ class TestBasePluginDefaults:
     def test_get_api_endpoints_empty(self):
         assert self.plugin.get_api_endpoints() == []
 
+    def test_get_documentation_source_none(self):
+        assert self.plugin.get_documentation_source() is None
+
     def test_get_settings_empty(self):
         assert self.plugin.get_settings() == {}
 

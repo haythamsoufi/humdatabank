@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from flask import Flask, current_app
-from .base import BasePlugin, BaseFieldType, CspOverride, DataExplorerTabConfig
+from .base import BasePlugin, BaseFieldType, CspOverride, DataExplorerTabConfig, PluginDocsSource
 import shutil
 import json
 from datetime import datetime
@@ -1022,6 +1022,25 @@ class PluginManager:
             if plugin.get_data_explorer_tab() is not None
         ]
         return sorted(tabs, key=lambda tab: tab.priority)
+
+    def get_documentation_sources(self) -> List[PluginDocsSource]:
+        """Collect plugin documentation sources for the in-app docs UI."""
+        sources: List[PluginDocsSource] = []
+        seen: Set[str] = set()
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                source = plugin.get_documentation_source()
+            except Exception as exc:
+                self.logger.warning("get_documentation_source failed for plugin %s: %s", plugin_id, exc)
+                continue
+            if source is None:
+                continue
+            category = (source.category or "").strip().lower()
+            if not category or category in seen:
+                continue
+            seen.add(category)
+            sources.append(source)
+        return sources
 
     def get_data_explorer_permission_codes(self) -> List[str]:
         codes = list(CORE_DATA_EXPLORER_PERMISSIONS)

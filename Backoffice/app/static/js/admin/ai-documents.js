@@ -1830,6 +1830,7 @@ function syncUploadImportModalIfrcCompactLayout() {
 
 let importTabHasRows = false;
 let ifrcTabHasRows = false;
+let guidanceTabHasRows = false;
 
 function formatImportFooterSummary(count) {
     const n = Number(count) || 0;
@@ -1844,21 +1845,28 @@ function syncUploadImportModalFooter() {
     const footer = document.getElementById('uploadImportModalFooter');
     const importFooter = document.getElementById('importTabFooter');
     const ifrcFooter = document.getElementById('ifrcTabFooter');
+    const guidanceFooter = document.getElementById('guidanceTabFooter');
     const importContent = document.getElementById('importContent');
     const ifrcContent = document.getElementById('ifrcApiContent');
+    const guidanceContent = document.getElementById('guidanceContent');
     const importVisible = !!(importContent && !importContent.classList.contains('hidden'));
     const ifrcVisible = !!(ifrcContent && !ifrcContent.classList.contains('hidden'));
+    const guidanceVisible = !!(guidanceContent && !guidanceContent.classList.contains('hidden'));
     const showImportFooter = importVisible && importTabHasRows;
     const showIfrcFooter = ifrcVisible && ifrcTabHasRows;
+    const showGuidanceFooter = guidanceVisible && guidanceTabHasRows;
 
     if (footer) {
-        footer.classList.toggle('hidden', !showImportFooter && !showIfrcFooter);
+        footer.classList.toggle('hidden', !showImportFooter && !showIfrcFooter && !showGuidanceFooter);
     }
     if (importFooter) {
         importFooter.classList.toggle('hidden', !showImportFooter);
     }
     if (ifrcFooter) {
         ifrcFooter.classList.toggle('hidden', !showIfrcFooter);
+    }
+    if (guidanceFooter) {
+        guidanceFooter.classList.toggle('hidden', !showGuidanceFooter);
     }
 }
 
@@ -1867,16 +1875,21 @@ function initializeTabs() {
     const uploadTab = document.getElementById('uploadTab');
     const importTab = document.getElementById('importTab');
     const ifrcApiTab = document.getElementById('ifrcApiTab');
+    const guidanceTab = document.getElementById('guidanceTab');
     const uploadContent = document.getElementById('uploadContent');
     const importContent = document.getElementById('importContent');
     const ifrcApiContent = document.getElementById('ifrcApiContent');
+    const guidanceContent = document.getElementById('guidanceContent');
     const importRefreshBtn = document.getElementById('importRefreshBtn');
 
     if (!uploadTab || !importTab || !ifrcApiTab || !uploadContent || !importContent || !ifrcApiContent) return;
 
+    const allTabs = [uploadTab, importTab, ifrcApiTab].concat(guidanceTab ? [guidanceTab] : []);
+    const allPanels = [uploadContent, importContent, ifrcApiContent].concat(guidanceContent ? [guidanceContent] : []);
+
     function setActiveTab(activeTab, activeContent) {
         // Reset all tabs
-        [uploadTab, importTab, ifrcApiTab].forEach(tab => {
+        allTabs.forEach(tab => {
             tab.classList.remove('active');
             tab.classList.remove('border-blue-500', 'text-blue-600');
             tab.classList.add('border-transparent', 'text-gray-600');
@@ -1885,7 +1898,7 @@ function initializeTabs() {
         });
 
         // Reset all content
-        [uploadContent, importContent, ifrcApiContent].forEach(content => {
+        allPanels.forEach(content => {
             content.classList.add('hidden');
             content.setAttribute('aria-hidden', 'true');
         });
@@ -1904,8 +1917,8 @@ function initializeTabs() {
     }
 
     function activateTabByIndex(idx) {
-        const tabs = [uploadTab, importTab, ifrcApiTab];
-        const panels = [uploadContent, importContent, ifrcApiContent];
+        const tabs = allTabs;
+        const panels = allPanels;
         const nextIdx = Math.max(0, Math.min(tabs.length - 1, idx));
         const tab = tabs[nextIdx];
         const panel = panels[nextIdx];
@@ -1914,14 +1927,14 @@ function initializeTabs() {
         try { tab.focus(); } catch (e) { /* ignore */ }
     }
 
-    [uploadTab, importTab, ifrcApiTab].forEach((tab, idx) => {
+    allTabs.forEach((tab, idx) => {
         tab.addEventListener('keydown', function(e) {
             if (!e) return;
             const key = e.key;
             if (key === 'ArrowRight') { e.preventDefault(); activateTabByIndex(idx + 1); }
             else if (key === 'ArrowLeft') { e.preventDefault(); activateTabByIndex(idx - 1); }
             else if (key === 'Home') { e.preventDefault(); activateTabByIndex(0); }
-            else if (key === 'End') { e.preventDefault(); activateTabByIndex(2); }
+            else if (key === 'End') { e.preventDefault(); activateTabByIndex(allTabs.length - 1); }
             else if (key === 'Enter' || key === ' ') { e.preventDefault(); activateTabByIndex(idx); }
         });
     });
@@ -1945,6 +1958,16 @@ function initializeTabs() {
             });
         }
     });
+
+    if (guidanceTab && guidanceContent) {
+        guidanceTab.addEventListener('click', function() {
+            setActiveTab(guidanceTab, guidanceContent);
+            if (!guidanceTab.dataset.loaded) {
+                loadGuidanceDocuments();
+                guidanceTab.dataset.loaded = 'true';
+            }
+        });
+    }
 
     ifrcApiTab.addEventListener('click', async function() {
         setActiveTab(ifrcApiTab, ifrcApiContent);
@@ -4663,6 +4686,262 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAiDocsJobProgress);
 } else {
     initAiDocsJobProgress();
+}
+
+let guidanceDocumentsCache = [];
+const selectedGuidanceIds = new Set();
+
+function guidanceDeleteUrl(docId) {
+    const tpl = (cfg.urls || {}).deleteGuidanceDocument || '/admin/ai/knowledge-base/guidance-documents/0/delete';
+    return String(tpl).replace(/0(?=\/delete$)/, String(docId));
+}
+
+function syncGuidanceFooter() {
+    const btn = document.getElementById('guidanceImportSelectedBtn');
+    const summary = document.getElementById('guidanceSelectedSummary');
+    const count = selectedGuidanceIds.size;
+    guidanceTabHasRows = guidanceDocumentsCache.length > 0;
+    if (btn) btn.disabled = count === 0;
+    if (summary) summary.textContent = formatImportFooterSummary(count);
+    syncUploadImportModalFooter();
+}
+
+function renderGuidanceRows(documents) {
+    const tbody = document.getElementById('guidanceTbody');
+    const empty = document.getElementById('guidanceEmptyHint');
+    const wrap = document.getElementById('guidanceTableWrap');
+    if (!tbody || !empty || !wrap) return;
+    tbody.replaceChildren();
+    const q = ((document.getElementById('guidanceSearch') || {}).value || '').trim().toLowerCase();
+    const filtered = (documents || []).filter(function(doc) {
+        if (!q) return true;
+        return (
+            String(doc.title || '').toLowerCase().includes(q) ||
+            String(doc.filename || '').toLowerCase().includes(q) ||
+            String(doc.owner_key || '').toLowerCase().includes(q)
+        );
+    });
+    if (!filtered.length) {
+        empty.classList.remove('hidden');
+        wrap.classList.add('hidden');
+        guidanceTabHasRows = false;
+        syncGuidanceFooter();
+        return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+    filtered.forEach(function(doc) {
+        const tr = document.createElement('tr');
+        const selectTd = document.createElement('td');
+        selectTd.className = 'px-3 py-2';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'rounded border-gray-300 text-blue-600';
+        cb.checked = selectedGuidanceIds.has(doc.id);
+        cb.addEventListener('change', function() {
+            if (cb.checked) selectedGuidanceIds.add(doc.id);
+            else selectedGuidanceIds.delete(doc.id);
+            syncGuidanceFooter();
+        });
+        selectTd.appendChild(cb);
+        const titleTd = document.createElement('td');
+        titleTd.className = 'px-3 py-2 text-gray-900';
+        titleTd.textContent = doc.title || doc.filename || '';
+        const ownerTd = document.createElement('td');
+        ownerTd.className = 'px-3 py-2';
+        const badge = document.createElement('span');
+        badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-800';
+        badge.textContent = String(doc.owner_key || 'system').toUpperCase();
+        ownerTd.appendChild(badge);
+        const statusTd = document.createElement('td');
+        statusTd.className = 'px-3 py-2 text-gray-600';
+        statusTd.textContent = doc.ai_processed
+            ? (doc.ai_status || cfg.t.imported_fe8d588f || 'Imported')
+            : (cfg.t.not_processed_0fe381df || 'Not Processed');
+        const actionsTd = document.createElement('td');
+        actionsTd.className = 'px-3 py-2 text-right';
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'text-red-700 hover:underline bg-transparent border-0 p-0 cursor-pointer';
+        del.textContent = cfg.t.delete_f2a6c498 || 'Delete';
+        del.addEventListener('click', function() { deleteGuidanceDocument(doc.id); });
+        actionsTd.appendChild(del);
+        tr.append(selectTd, titleTd, ownerTd, statusTd, actionsTd);
+        tbody.appendChild(tr);
+    });
+    syncGuidanceFooter();
+}
+
+async function loadGuidanceDocuments() {
+    const loading = document.getElementById('guidanceLoading');
+    if (loading) loading.classList.remove('hidden');
+    try {
+        const url = (cfg.urls || {}).listGuidanceDocuments || '/admin/ai/knowledge-base/list-guidance-documents';
+        const res = await fetch(url, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok) throw new Error((data && (data.error || data.message)) || 'Failed to load');
+        guidanceDocumentsCache = data.documents || [];
+        renderGuidanceRows(guidanceDocumentsCache);
+    } catch (err) {
+        const empty = document.getElementById('guidanceEmptyHint');
+        if (empty) {
+            empty.classList.remove('hidden');
+            empty.textContent = cfg.t.failed_to_load_documents_94b93867 || 'Failed to load documents';
+        }
+    } finally {
+        if (loading) loading.classList.add('hidden');
+    }
+}
+
+async function deleteGuidanceDocument(docId) {
+    const confirmMsg = cfg.t.delete_document_137e0e00 || 'Delete document';
+    if (!window.confirm(confirmMsg)) return;
+    try {
+        const res = await csrfFetch(guidanceDeleteUrl(docId), { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error((data && (data.error || data.message)) || 'Delete failed');
+        selectedGuidanceIds.delete(docId);
+        await loadGuidanceDocuments();
+    } catch (err) {
+        if (window.showAlert) window.showAlert(err.message || cfg.t.failed_to_delete_document_94ab7a09, 'error');
+    }
+}
+
+async function uploadGuidanceDocument(ev) {
+    if (ev) ev.preventDefault();
+    const input = document.getElementById('guidanceFileInput');
+    const btn = document.getElementById('guidanceUploadBtn');
+    const files = input && input.files ? Array.from(input.files) : [];
+    if (!files.length) return;
+    const title = ((document.getElementById('guidanceDocTitle') || {}).value || '').trim();
+    if (btn) btn.disabled = true;
+    const failures = [];
+    let uploaded = 0;
+    try {
+        const url = (cfg.urls || {}).uploadGuidanceDocument || '/admin/ai/knowledge-base/guidance-documents/upload';
+        for (const file of files) {
+            const form = new FormData();
+            form.append('file', file);
+            if (files.length === 1 && title) form.append('title', title);
+            const res = await csrfFetch(url, { method: 'POST', body: form });
+            const data = await res.json();
+            if (!res.ok) {
+                failures.push(file.name + ': ' + ((data && (data.error || data.message)) || cfg.t.upload_failed_0e76390e));
+            } else {
+                uploaded += 1;
+            }
+        }
+        input.value = '';
+        const titleEl = document.getElementById('guidanceDocTitle');
+        if (titleEl) {
+            titleEl.value = '';
+            titleEl.disabled = false;
+        }
+        const selected = document.getElementById('guidanceSelectedFile');
+        if (selected) selected.classList.add('hidden');
+        await loadGuidanceDocuments();
+        if (!uploaded) throw new Error(failures.join(' '));
+        if (window.showAlert) {
+            if (failures.length) {
+                window.showAlert(
+                    (cfg.t.uploaded_ok_of_total_files_9c1e4a70 || 'Uploaded {ok} of {total} files. Failed: {failed}')
+                        .replace('{ok}', String(uploaded))
+                        .replace('{total}', String(files.length))
+                        .replace('{failed}', failures.join('; ')),
+                    'warning'
+                );
+            } else {
+                window.showAlert(cfg.t.upload_complete_f79598ab || 'Upload complete', 'success');
+            }
+        }
+    } catch (err) {
+        if (window.showAlert) window.showAlert(err.message || cfg.t.upload_failed_0e76390e, 'error');
+    } finally {
+        if (btn) btn.disabled = !(input.files && input.files[0]);
+    }
+}
+
+async function importSelectedGuidance() {
+    const ids = Array.from(selectedGuidanceIds);
+    if (!ids.length) {
+        if (window.showAlert) window.showAlert(cfg.t.please_select_at_least_one_document_db0de074, 'warning');
+        return;
+    }
+    const confirmMsg = (cfg.t.process_count_document_s_with_ai_this_wi_b44c5b13 || 'Process {count} document(s) with AI?').replace('{count}', ids.length);
+    const proceed = async function() {
+        const btn = document.getElementById('guidanceImportSelectedBtn');
+        if (typeof closeUploadModal === 'function') closeUploadModal();
+        try {
+            const url = (cfg.urls || {}).importGuidanceBulk || '/admin/ai/knowledge-base/import-guidance-bulk';
+            const response = await csrfFetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ guidance_document_ids: ids })
+            });
+            const result = await response.json();
+            if (!response.ok || !result || !result.job_id) {
+                throw new Error((result && (result.error || result.message)) || cfg.t.failed_to_start_import_d9e1bb79);
+            }
+            startSystemImportJobPolling(result.job_id, Number(result.total) || ids.length);
+        } catch (error) {
+            hideProcessingBanner();
+            if (window.showAlert) {
+                window.showAlert((cfg.t.failed_to_start_import_d9e1bb79 || 'Failed to start import') + ': ' + (error.message || error), 'error');
+            }
+        } finally {
+            if (btn) btn.disabled = selectedGuidanceIds.size === 0;
+        }
+    };
+    if (window.showConfirm) {
+        window.showConfirm(confirmMsg, proceed, null, cfg.t.process_documents_056842a0);
+    } else if (window.confirm(confirmMsg)) {
+        proceed();
+    }
+}
+
+function initGuidanceDocumentsTab() {
+    const form = document.getElementById('guidanceUploadForm');
+    const input = document.getElementById('guidanceFileInput');
+    const btn = document.getElementById('guidanceUploadBtn');
+    const refresh = document.getElementById('guidanceRefreshBtn');
+    const search = document.getElementById('guidanceSearch');
+    const importBtn = document.getElementById('guidanceImportSelectedBtn');
+    const cancelBtn = document.getElementById('guidanceTabCancelBtn');
+    if (form) form.addEventListener('submit', uploadGuidanceDocument);
+    if (input && btn) {
+        input.addEventListener('change', function() {
+            const files = input.files ? Array.from(input.files) : [];
+            btn.disabled = files.length === 0;
+            const selected = document.getElementById('guidanceSelectedFile');
+            if (selected) {
+                selected.textContent = files.map(function(file) { return file.name; }).join(', ');
+                selected.classList.toggle('hidden', files.length === 0);
+            }
+            const titleEl = document.getElementById('guidanceDocTitle');
+            if (titleEl) titleEl.disabled = files.length > 1;
+        });
+        const moduleUrl = (cfg.urls && cfg.urls.excelImportDropzone) || '/static/js/components/excel-import-dropzone.js';
+        import(moduleUrl).then(function(mod) {
+            mod.initExcelImportDropzone('#kb-guidance-dropzone', {
+                multiple: true,
+                acceptExtensions: ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.html', '.markdown', '.htm'],
+                submitBtn: btn,
+                requireValidation: false
+            });
+        }).catch(function() { /* native file input still works */ });
+    }
+    if (refresh) refresh.addEventListener('click', loadGuidanceDocuments);
+    if (search) search.addEventListener('input', function() { renderGuidanceRows(guidanceDocumentsCache); });
+    if (importBtn) importBtn.addEventListener('click', importSelectedGuidance);
+    if (cancelBtn && typeof closeUploadModal === 'function') {
+        cancelBtn.addEventListener('click', closeUploadModal);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGuidanceDocumentsTab);
+} else {
+    initGuidanceDocumentsTab();
 }
 
 })();

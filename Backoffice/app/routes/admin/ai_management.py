@@ -238,7 +238,10 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
     with app.app_context():
         from app.models import AIJobItem
         from app.routes.ai_documents.upload import _process_document_sync
-        from app.services.ai.documents.ingest import _prepare_submitted_document_ai_import
+        from app.services.ai.documents.ingest import (
+            _prepare_guidance_document_ai_import,
+            _prepare_submitted_document_ai_import,
+        )
 
         item = AIJobItem.query.get(int(item_id))
         if not item:
@@ -251,14 +254,24 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
             return
 
         payload = item.payload if isinstance(item.payload, dict) else {}
-        submitted_doc_id = payload.get("submitted_document_id")
-        if submitted_doc_id is None and item.entity_type == "submitted_document" and item.entity_id:
-            submitted_doc_id = int(item.entity_id)
+        is_guidance = (
+            item.entity_type == "guidance_document"
+            or (isinstance(payload, dict) and payload.get("guidance_document_id") is not None)
+        )
+        source_id = None
+        if isinstance(payload, dict):
+            source_id = payload.get("guidance_document_id" if is_guidance else "submitted_document_id")
+        if source_id is None and item.entity_id and (
+            is_guidance or item.entity_type == "submitted_document"
+        ):
+            source_id = item.entity_id
         try:
-            submitted_doc_id = int(submitted_doc_id)
+            source_id = int(source_id)
         except (TypeError, ValueError):
             item.status = "failed"
-            item.error = "Invalid submitted document ID"
+            item.error = (
+                "Invalid guidance document ID" if is_guidance else "Invalid submitted document ID"
+            )
             db.session.commit()
             return
 
@@ -276,7 +289,12 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
         item.error = None
         db.session.commit()
 
-        prep = _prepare_submitted_document_ai_import(submitted_doc_id, user_id=job_user_id)
+        prepare = (
+            _prepare_guidance_document_ai_import
+            if is_guidance
+            else _prepare_submitted_document_ai_import
+        )
+        prep = prepare(source_id, user_id=job_user_id)
         if not prep.get("ok"):
             item.status = "failed"
             item.error = prep.get("message") or prep.get("code") or "Processing failed"
@@ -561,7 +579,7 @@ def _auto_recover_stale_processing_documents() -> int:
 
 def _runner_for_ai_document_job_type(job_type: str):
     """Return the background target for an AI documents job type, if known."""
-    if job_type == "docs.bulk_import_system":
+    if job_type in ("docs.bulk_import_system", "docs.bulk_import_guidance"):
         return _run_system_bulk_import_job
     if job_type == "docs.bulk_reprocess":
         return _run_bulk_reprocess_job
@@ -1854,6 +1872,166 @@ def import_system_bulk_cancel(job_id: str):
         db.session.commit()
         signal_job_cancel(str(job_id))
         return json_ok(status="cancel_requested")
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/knowledge-base/list-guidance-documents", methods=["GET"])
+@admin_permission_required("admin.ai.manage")
+def list_guidance_documents():
+    """List reusable guidance documents for AI Knowledge Base import."""
+    try:
+        from app.services.documents.guidance_document_service import list_guidance_documents as list_docs
+
+        search_query = (request.args.get("q") or "").strip().lower()
+        documents = list_docs()
+        if search_query:
+            documents = [
+                row
+                for row in documents
+                if search_query in (row.get("title") or "").lower()
+                or search_query in (row.get("filename") or "").lower()
+                or search_query in (row.get("owner_key") or "").lower()
+            ]
+        return json_ok(documents=documents, total=len(documents), returned=len(documents))
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/knowledge-base/guidance-documents/upload", methods=["POST"])
+@admin_permission_required("admin.ai.manage")
+def upload_guidance_document():
+    """Upload a system-owned guidance document from the Knowledge Base modal."""
+    try:
+        from app.services.documents.guidance_document_service import (
+            GuidanceDocumentError,
+            save_guidance_document,
+            serialize_guidance_document,
+        )
+
+        upload = request.files.get("file")
+        if upload is None or not (upload.filename or "").strip():
+            return json_bad_request("Please select a file")
+        title = (request.form.get("title") or "").strip() or None
+        description = (request.form.get("description") or "").strip() or None
+        doc = save_guidance_document(
+            upload,
+            owner_key="system",
+            uploaded_by_user_id=int(current_user.id),
+            title=title,
+            description=description,
+        )
+        return json_ok(document=serialize_guidance_document(doc), message="Guidance document uploaded")
+    except Exception as e:
+        from app.services.documents.guidance_document_service import GuidanceDocumentError
+
+        if isinstance(e, GuidanceDocumentError):
+            return json_bad_request(str(e))
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/knowledge-base/guidance-documents/<int:doc_id>/delete", methods=["POST"])
+@admin_permission_required("admin.ai.manage")
+def delete_guidance_document_from_kb(doc_id):
+    """Delete a guidance document (cascades any linked AI copy)."""
+    try:
+        from app.services.documents.guidance_document_service import (
+            delete_guidance_document,
+            get_guidance_document,
+        )
+
+        doc = get_guidance_document(doc_id)
+        if not doc:
+            return json_not_found("Guidance document not found")
+        delete_guidance_document(doc)
+        return json_ok(message="Guidance document deleted")
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/knowledge-base/import-guidance-bulk", methods=["POST"])
+@admin_permission_required("admin.ai.manage")
+def import_guidance_bulk():
+    """Start a bulk AI import job for selected guidance documents."""
+    try:
+        if not _check_ai_reprocess_job_tables_exist():
+            return json_server_error("AI job tables not found. Please run 'flask db upgrade' and try again.")
+
+        from app.models import AIJob, AIJobItem, GuidanceDocument
+
+        ids: list[int] = []
+        concurrency = None
+        if is_json_request():
+            payload = get_json_safe() or {}
+            raw_ids = payload.get("guidance_document_ids") or payload.get("ids")
+            if isinstance(raw_ids, list):
+                for raw in raw_ids:
+                    try:
+                        ids.append(int(raw))
+                    except (TypeError, ValueError):
+                        continue
+            try:
+                concurrency = int(payload.get("concurrency")) if payload.get("concurrency") is not None else None
+            except (TypeError, ValueError):
+                concurrency = None
+        if not ids:
+            ids = parse_ids_from_request("guidance_document_ids") or parse_ids_from_request("ids")
+        if not ids:
+            return json_bad_request("No guidance document IDs provided")
+        if len(ids) > 500:
+            return json_bad_request("Too many documents selected (max 500)")
+
+        if concurrency is None:
+            concurrency = int(
+                current_app.config.get("AI_DOCS_SYSTEM_IMPORT_CONCURRENCY")
+                or current_app.config.get("AI_DOCS_IFRC_IMPORT_CONCURRENCY", 2)
+                or 2
+            )
+        concurrency = max(1, min(int(concurrency), 4))
+
+        docs = GuidanceDocument.query.filter(GuidanceDocument.id.in_(ids)).all()
+        docs_by_id = {int(d.id): d for d in docs}
+
+        job_id = str(uuid.uuid4())
+        job = AIJob(
+            id=job_id,
+            job_type="docs.bulk_import_guidance",
+            user_id=int(current_user.id),
+            status="queued",
+            total_items=len(ids),
+            meta={"concurrency": concurrency},
+        )
+        db.session.add(job)
+        db.session.flush()
+
+        for idx, gid in enumerate(ids):
+            doc = docs_by_id.get(int(gid))
+            status = "queued"
+            err = None
+            if not doc:
+                status = "failed"
+                err = "Guidance document not found"
+
+            it = AIJobItem(
+                job_id=job_id,
+                item_index=idx,
+                entity_type="guidance_document" if doc else None,
+                entity_id=int(gid) if doc else None,
+                status=status,
+                error=err,
+                payload={"guidance_document_id": int(gid)},
+            )
+            db.session.add(it)
+
+        db.session.commit()
+        start_ai_job_thread(current_app._get_current_object(), job_id, _run_system_bulk_import_job)
+        return json_accepted(
+            success=True,
+            job_id=job_id,
+            total=len(ids),
+            concurrency=concurrency,
+            message="Bulk guidance import started",
+        )
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 

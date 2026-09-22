@@ -7,8 +7,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var refreshBtn = document.getElementById('fdrs-pub-refresh');
   var loadingEl = document.getElementById('fdrs-pub-loading');
   var cardsEl = document.getElementById('fdrs-pub-summary-cards');
+  var secondaryCountsEl = document.getElementById('fdrs-pub-secondary-counts');
+  var allClearEl = document.getElementById('fdrs-pub-all-clear');
   var tbody = document.getElementById('fdrs-pub-tbody');
-  var selectPendingBtn = document.getElementById('fdrs-pub-select-pending');
+  var selectVisibleBtn = document.getElementById('fdrs-pub-select-visible');
   var clearSelectionBtn = document.getElementById('fdrs-pub-clear-selection');
   var publishBtn = document.getElementById('fdrs-pub-publish-btn');
   var publishCountEl = document.getElementById('fdrs-pub-publish-count');
@@ -26,6 +28,16 @@ document.addEventListener('DOMContentLoaded', function () {
   var progressSpinnerEl = document.getElementById('fdrs-pub-progress-spinner');
   var cancelBtn = document.getElementById('fdrs-pub-cancel-btn');
   var cancelBtnText = document.getElementById('fdrs-pub-cancel-btn-text');
+  var queueFiltersEl = document.getElementById('fdrs-pub-queue-filters');
+  var searchInput = document.getElementById('fdrs-pub-country-search');
+  var listFilterNoteEl = document.getElementById('fdrs-pub-list-filter-note');
+  var listViewBtns = document.querySelectorAll('.fdrs-pub-list-view');
+  var queueTitleEl = document.getElementById('fdrs-pub-queue-title');
+  var tableEl = document.getElementById('fdrs-pub-table');
+  var theadEl = document.getElementById('fdrs-pub-thead');
+  var actionBar = document.getElementById('fdrs-pub-action-bar');
+  var actionSummaryEl = document.getElementById('fdrs-pub-action-summary');
+  var actionFlagsEl = document.getElementById('fdrs-pub-action-flags');
 
   // Built with placeholder id 0, then string-swapped for the real id (avoids
   // relying on url_for accepting non-numeric placeholders for <int:> routes).
@@ -47,11 +59,29 @@ document.addEventListener('DOMContentLoaded', function () {
     return cancelUrlTpl.replace('/0/publish/', '/' + id + '/publish/').replace('__JOB_ID__', encodeURIComponent(jobId));
   }
 
+  var QUEUE_FILTERS = [
+    { id: 'attention', label: 'Needs attention' },
+    { id: 'global', label: 'Global impact' },
+    { id: 'variation', label: 'Large variation' },
+    { id: 'removed', label: 'Values removed' },
+    { id: 'all', label: 'All changed' }
+  ];
+
   var currentAssignmentId = null;
+  var currentSummary = null;
   var currentCountries = [];
+  var currentFlags = [];
+  var reviewsByAes = {};
+  var flaggedItemByAes = {};
   var selected = new Set();
   var detailCache = {};
   var summaryLoaded = false;
+  var queueFilter = 'attention';
+  var listMode = 'country';
+  var searchQuery = '';
+  var openDetailAesId = null;
+  var analysisPriorPeriodName = '';
+  var summaryRequestId = 0;
   var activeJobId = null;
   var pollTimer = null;
   var pollDelayMs = 1000;
@@ -92,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
     tbody.replaceChildren();
     var tr = document.createElement('tr');
     var td = el('td', 'px-4 py-6 text-center text-sm ' + (extraClass || 'text-gray-500'), message);
-    td.colSpan = 9;
+    td.colSpan = listMode === 'issue' ? 7 : 6;
     tr.appendChild(td);
     tbody.appendChild(tr);
   }
@@ -105,49 +135,538 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (e) { return iso; }
   }
 
-  function card(label, value, colorClasses) {
+  function formatPct(pct) {
+    if (pct === null || pct === undefined || !isFinite(pct)) return '';
+    return (pct > 0 ? '+' : '') + Math.round(pct * 100) + '%';
+  }
+
+  function formatAnalysisNumber(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    var n = typeof value === 'number' ? value : Number(String(value).trim().replace(/,/g, ''));
+    if (!isFinite(n)) return String(value);
+    return n.toLocaleString(undefined, { maximumFractionDigits: 2, useGrouping: true });
+  }
+
+  function formatShare(pct) {
+    if (pct === null || pct === undefined || !isFinite(pct)) return '';
+    return Math.round(Math.abs(pct) * 100) + '%';
+  }
+
+  function emptyReview() {
+    return {
+      flags: [],
+      flagCount: 0,
+      maxSeverity: null,
+      maxGlobalShare: 0,
+      hasGlobal: false,
+      hasVariation: false,
+      hasRemoved: false,
+      chips: { global: 0, variation: 0, removed: 0 }
+    };
+  }
+
+  function reviewFor(aesId) {
+    return reviewsByAes[aesId] || emptyReview();
+  }
+
+  function reasonGroup(code) {
+    if (code === 'global_share' || code === 'global_impact') return 'global';
+    if (code === 'cleared') return 'removed';
+    if (code === 'large_variation' || code === 'from_zero' || code === 'outlier') return 'variation';
+    return null;
+  }
+
+  function reasonLabel(reason) {
+    var vs = reason.vs === 'prior' ? 'previous period' : 'last published';
+    if (reason.code === 'cleared') return 'Will be cleared from the public site';
+    if (reason.code === 'from_zero') return 'Was 0 ' + (reason.vs === 'prior' ? 'in the previous period' : 'when last published');
+    if (reason.code === 'outlier') return 'Outlier vs other countries';
+    if (reason.code === 'global_share') {
+      var share = formatShare(reason.share != null ? reason.share : reason.pct);
+      return share ? (share + ' of the global total') : 'Large share of the global total';
+    }
+    if (reason.code === 'global_impact') {
+      var impact = formatShare(reason.pct);
+      return impact ? ('Change is ' + impact + ' of the global total') : 'Change moves the global total';
+    }
+    if (reason.code === 'large_variation') {
+      var pct = formatPct(reason.pct);
+      return (pct ? pct + ' ' : 'Large change ') + 'vs ' + vs;
+    }
+    return reason.code || 'Review';
+  }
+
+  function buildReviews() {
+    reviewsByAes = {};
+    flaggedItemByAes = {};
+    currentFlags.forEach(function (flag) {
+      var aesId = flag.assignment_entity_status_id;
+      if (aesId == null) return;
+      if (!reviewsByAes[aesId]) reviewsByAes[aesId] = emptyReview();
+      var review = reviewsByAes[aesId];
+      review.flags.push(flag);
+      review.flagCount += 1;
+      if (flag.severity === 'high') review.maxSeverity = 'high';
+      else if (flag.severity === 'medium' && review.maxSeverity !== 'high') review.maxSeverity = 'medium';
+      if (!flaggedItemByAes[aesId]) flaggedItemByAes[aesId] = {};
+      flaggedItemByAes[aesId][flag.form_item_id] = flag;
+      var seen = {};
+      (flag.reasons || []).forEach(function (reason) {
+        var group = reasonGroup(reason.code);
+        if (!group || seen[group]) return;
+        seen[group] = true;
+        review.chips[group] += 1;
+        if (group === 'global') {
+          review.hasGlobal = true;
+          var share = reason.share != null ? reason.share : reason.pct;
+          if (share != null && isFinite(share) && share > review.maxGlobalShare) {
+            review.maxGlobalShare = share;
+          }
+        }
+        if (group === 'variation') review.hasVariation = true;
+        if (group === 'removed') review.hasRemoved = true;
+      });
+    });
+  }
+
+  function countryMatchesFilter(country) {
+    var review = reviewFor(country.assignment_entity_status_id);
+    if (queueFilter === 'attention') return review.flagCount > 0;
+    if (queueFilter === 'global') return review.hasGlobal;
+    if (queueFilter === 'variation') return review.hasVariation;
+    if (queueFilter === 'removed') return review.hasRemoved;
+    return !!country.has_pending_changes;
+  }
+
+  function countryMatchesSearch(country) {
+    if (!searchQuery) return true;
+    var q = searchQuery.toLowerCase();
+    return (country.country_name || '').toLowerCase().indexOf(q) !== -1 ||
+      (country.country_iso3 || '').toLowerCase().indexOf(q) !== -1;
+  }
+
+  function compareCountries(a, b) {
+    var ra = reviewFor(a.assignment_entity_status_id);
+    var rb = reviewFor(b.assignment_entity_status_id);
+    var sevA = ra.maxSeverity === 'high' ? 2 : (ra.maxSeverity === 'medium' ? 1 : 0);
+    var sevB = rb.maxSeverity === 'high' ? 2 : (rb.maxSeverity === 'medium' ? 1 : 0);
+    if (sevB !== sevA) return sevB - sevA;
+    if (rb.maxGlobalShare !== ra.maxGlobalShare) return rb.maxGlobalShare - ra.maxGlobalShare;
+    if (rb.flagCount !== ra.flagCount) return rb.flagCount - ra.flagCount;
+    if ((b.pending_count || 0) !== (a.pending_count || 0)) return (b.pending_count || 0) - (a.pending_count || 0);
+    return (a.country_name || '').localeCompare(b.country_name || '');
+  }
+
+  function visibleCountries() {
+    return currentCountries.filter(function (country) {
+      return countryMatchesFilter(country) && countryMatchesSearch(country);
+    }).sort(compareCountries);
+  }
+
+  function flagReasonGroups(flag) {
+    var groups = { global: false, variation: false, removed: false };
+    (flag.reasons || []).forEach(function (reason) {
+      var group = reasonGroup(reason.code);
+      if (group) groups[group] = true;
+    });
+    return groups;
+  }
+
+  function flagMatchesFilter(flag) {
+    var groups = flagReasonGroups(flag);
+    if (queueFilter === 'global') return groups.global;
+    if (queueFilter === 'variation') return groups.variation;
+    if (queueFilter === 'removed') return groups.removed;
+    return true;
+  }
+
+  function flagMatchesSearch(flag) {
+    if (!searchQuery) return true;
+    var q = searchQuery.toLowerCase();
+    return (flag.country_name || '').toLowerCase().indexOf(q) !== -1 ||
+      (flag.country_iso3 || '').toLowerCase().indexOf(q) !== -1 ||
+      (flag.label || '').toLowerCase().indexOf(q) !== -1;
+  }
+
+  function compareFlags(a, b) {
+    var sevA = a.severity === 'high' ? 2 : (a.severity === 'medium' ? 1 : 0);
+    var sevB = b.severity === 'high' ? 2 : (b.severity === 'medium' ? 1 : 0);
+    if (sevB !== sevA) return sevB - sevA;
+    var shareA = 0;
+    var shareB = 0;
+    (a.reasons || []).forEach(function (r) {
+      if ((r.code === 'global_share' || r.code === 'global_impact') && r.share != null && r.share > shareA) shareA = r.share;
+      else if ((r.code === 'global_share' || r.code === 'global_impact') && r.pct != null && r.pct > shareA) shareA = r.pct;
+    });
+    (b.reasons || []).forEach(function (r) {
+      if ((r.code === 'global_share' || r.code === 'global_impact') && r.share != null && r.share > shareB) shareB = r.share;
+      else if ((r.code === 'global_share' || r.code === 'global_impact') && r.pct != null && r.pct > shareB) shareB = r.pct;
+    });
+    if (shareB !== shareA) return shareB - shareA;
+    return (a.country_name || '').localeCompare(b.country_name || '') ||
+      (a.label || '').localeCompare(b.label || '');
+  }
+
+  function visibleFlags() {
+    return currentFlags.filter(function (flag) {
+      return flagMatchesFilter(flag) && flagMatchesSearch(flag);
+    }).sort(compareFlags);
+  }
+
+  function visibleAesIds() {
+    var ids = [];
+    var seen = {};
+    if (listMode === 'issue') {
+      visibleFlags().forEach(function (flag) {
+        var id = parseInt(flag.assignment_entity_status_id, 10);
+        if (!id || seen[id]) return;
+        seen[id] = true;
+        ids.push(id);
+      });
+      return ids;
+    }
+    visibleCountries().forEach(function (country) {
+      var id = parseInt(country.assignment_entity_status_id, 10);
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      ids.push(id);
+    });
+    return ids;
+  }
+
+  function filterCounts() {
+    var counts = { attention: 0, global: 0, variation: 0, removed: 0, all: 0 };
+    if (listMode === 'issue') {
+      currentFlags.forEach(function (flag) {
+        counts.attention += 1;
+        counts.all += 1;
+        var groups = flagReasonGroups(flag);
+        if (groups.global) counts.global += 1;
+        if (groups.variation) counts.variation += 1;
+        if (groups.removed) counts.removed += 1;
+      });
+      return counts;
+    }
+    currentCountries.forEach(function (country) {
+      var review = reviewFor(country.assignment_entity_status_id);
+      if (review.flagCount > 0) counts.attention += 1;
+      if (review.hasGlobal) counts.global += 1;
+      if (review.hasVariation) counts.variation += 1;
+      if (review.hasRemoved) counts.removed += 1;
+      if (country.has_pending_changes) counts.all += 1;
+    });
+    return counts;
+  }
+
+  function selectedFlaggedCountryCount() {
+    var n = 0;
+    selected.forEach(function (aesId) {
+      if (reviewFor(aesId).flagCount > 0) n += 1;
+    });
+    return n;
+  }
+
+  function card(label, value, colorClasses, hint) {
     var wrap = el('div', 'bg-white rounded-lg border border-gray-200 p-4');
     wrap.appendChild(el('p', 'text-xs font-medium text-gray-500 uppercase tracking-wide', label));
     wrap.appendChild(el('p', 'text-2xl font-semibold mt-1 ' + colorClasses, String(value)));
+    if (hint) wrap.appendChild(el('p', 'text-xs text-gray-500 mt-1', hint));
     return wrap;
   }
 
-  function renderCards(data) {
-    var t = data.totals || {};
+  function renderCards() {
+    var data = currentSummary || {};
+    var attention = (data.analysis && data.analysis.country_count) || 0;
+    var changed = data.countries_with_pending_changes || 0;
     cardsEl.replaceChildren(
-      card('Countries', data.countries_total, 'text-gray-900'),
-      card('Pending changes', data.countries_with_pending_changes, data.countries_with_pending_changes ? 'text-amber-600' : 'text-gray-900'),
-      card('New', t.new || 0, 'text-green-600'),
-      card('Changed', t.changed || 0, 'text-amber-600'),
-      card('Removed', t.removed || 0, 'text-red-600'),
-      card('Source', t.source || 0, t.source ? 'text-blue-900' : 'text-gray-500'),
-      card('Already up to date', t.unchanged || 0, 'text-gray-500')
+      card('Countries changed', changed, changed ? 'text-amber-600' : 'text-gray-900', 'Have pending public updates'),
+      card('Need attention', attention, attention ? 'text-red-700' : 'text-gray-900', 'Advisory review flags'),
+      card('Selected to publish', selected.size, selected.size ? 'text-blue-700' : 'text-gray-900', 'Filtering does not change this')
     );
-  }
-
-  function statusBadge(country) {
-    if (country.pending_count > 0) {
-      return el('span', 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800', 'Pending changes');
+    var totals = data.totals || {};
+    if (secondaryCountsEl) {
+      secondaryCountsEl.textContent = '+' + (totals.new || 0) + ' new  ·  ~' +
+        (totals.changed || 0) + ' changed  ·  −' + (totals.removed || 0) + ' removed';
+      secondaryCountsEl.classList.toggle('hidden', !summaryLoaded);
     }
-    if (country.total_public_items > 0) {
-      return el('span', 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800', 'Up to date');
+  }
+
+  function renderAllClear() {
+    if (!allClearEl) return;
+    if (!summaryLoaded) {
+      allClearEl.classList.add('hidden');
+      allClearEl.textContent = '';
+      return;
     }
-    return el('span', 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600', 'No data');
+    if (currentFlags.length) {
+      allClearEl.classList.add('hidden');
+      allClearEl.textContent = '';
+      return;
+    }
+    allClearEl.textContent = 'No large variations, outliers, or major global contributors versus the previous period or last published snapshot.';
+    allClearEl.classList.remove('hidden');
   }
 
-  function countBadge(n, colorClasses, prefix) {
-    if (!n) return el('span', 'text-gray-300', '—');
-    return el('span', 'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + colorClasses, prefix + n);
+  function renderQueueFilters() {
+    if (!queueFiltersEl) return;
+    var counts = filterCounts();
+    queueFiltersEl.replaceChildren();
+    QUEUE_FILTERS.forEach(function (spec) {
+      var on = queueFilter === spec.id;
+      var btn = el(
+        'button',
+        'fdrs-pub-queue-filter btn text-sm ' + (on ? 'btn-primary' : 'btn-secondary'),
+        spec.label + ' (' + counts[spec.id] + ')'
+      );
+      btn.type = 'button';
+      btn.setAttribute('data-queue-filter', spec.id);
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      btn.disabled = isPublishing();
+      btn.addEventListener('click', function () { setQueueFilter(spec.id); });
+      queueFiltersEl.appendChild(btn);
+    });
   }
 
-  function renderTable() {
-    if (!currentCountries.length) {
-      setTbodyMessage('No countries in this assignment.');
+  function updateListFilterNote() {
+    if (!listFilterNoteEl) return;
+    var counts = filterCounts();
+    var focusLabel = (QUEUE_FILTERS.find(function (spec) { return spec.id === queueFilter; }) || {}).label || 'All changed';
+    var suffix = searchQuery ? ' matching “' + searchQuery + '”' : '';
+    if (listMode === 'issue') {
+      var flags = visibleFlags();
+      var countries = {};
+      flags.forEach(function (flag) { countries[flag.assignment_entity_status_id] = true; });
+      var countryN = Object.keys(countries).length;
+      listFilterNoteEl.textContent = 'Showing ' + flags.length + ' of ' +
+        counts[queueFilter] + ' issues across ' + countryN +
+        ' countr' + (countryN === 1 ? 'y' : 'ies') + ' · ' + focusLabel + suffix;
+      return;
+    }
+    var visible = visibleCountries();
+    listFilterNoteEl.textContent = 'Showing ' + visible.length + ' of ' +
+      counts[queueFilter] + ' countries · ' + focusLabel + suffix;
+  }
+
+  function renderListViewToggle() {
+    listViewBtns.forEach(function (btn) {
+      var on = btn.getAttribute('data-list-view') === listMode;
+      btn.className = 'fdrs-pub-list-view px-2.5 py-1 text-xs font-medium ' +
+        (on ? 'btn-primary' : 'bg-white text-gray-700 hover:bg-gray-50');
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      btn.disabled = isPublishing();
+    });
+    if (queueTitleEl) queueTitleEl.textContent = listMode === 'issue' ? 'Issues' : 'Countries';
+    if (tableEl) {
+      tableEl.setAttribute('aria-label', listMode === 'issue'
+        ? 'Flagged issues to review or publish'
+        : 'Countries to review or publish');
+    }
+    if (searchInput) {
+      searchInput.placeholder = listMode === 'issue'
+        ? 'Search countries or indicators'
+        : 'Search countries';
+    }
+  }
+
+  function setQueueFilter(mode) {
+    var valid = QUEUE_FILTERS.some(function (spec) { return spec.id === mode; });
+    queueFilter = valid ? mode : 'all';
+    renderQueue();
+  }
+
+  function setListMode(mode) {
+    listMode = mode === 'issue' ? 'issue' : 'country';
+    renderQueue();
+  }
+
+  var DELTA_TOOLTIP = 'Percentage change versus last published, or the previous period if this value was never published.';
+
+  function deltaHeader(className) {
+    var th = el('th', className || 'px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase');
+    th.scope = 'col';
+    var abbr = document.createElement('abbr');
+    abbr.className = 'cursor-help no-underline border-b border-dotted border-gray-400';
+    abbr.title = DELTA_TOOLTIP;
+    abbr.setAttribute('aria-label', DELTA_TOOLTIP);
+    abbr.textContent = 'Δ';
+    th.appendChild(abbr);
+    return th;
+  }
+
+  function renderTableHeaders() {
+    if (!theadEl) return;
+    var labels = listMode === 'issue'
+      ? ['', 'Country', 'Indicator', 'Why', 'Compared to', 'Current', 'Δ']
+      : ['', 'Country', 'Review', 'Changes', 'Last published', ''];
+    var tr = el('tr', '');
+    labels.forEach(function (label, i) {
+      var className = (i === labels.length - 1 && listMode === 'country'
+        ? 'px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase'
+        : 'px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase');
+      if (label === 'Δ') {
+        tr.appendChild(deltaHeader(className));
+        return;
+      }
+      var th = el('th', className, label);
+      th.scope = 'col';
+      if (!label) {
+        var sr = el('span', 'sr-only', i === 0 ? 'Select' : '');
+        th.textContent = '';
+        th.appendChild(sr);
+      }
+      tr.appendChild(th);
+    });
+    theadEl.replaceChildren(tr);
+  }
+
+  function renderQueue() {
+    renderListViewToggle();
+    renderQueueFilters();
+    updateListFilterNote();
+    renderTableHeaders();
+    renderTable();
+    updatePublishButton();
+  }
+
+  function reviewChips(review) {
+    var wrap = el('div', 'flex flex-wrap gap-1');
+    if (!review.flagCount) {
+      wrap.appendChild(el('span', 'text-gray-300', '—'));
+      return wrap;
+    }
+    var chipClass = review.maxSeverity === 'high'
+      ? 'bg-red-100 text-red-800'
+      : 'bg-amber-100 text-amber-800';
+    [
+      { key: 'global', label: 'Global impact' },
+      { key: 'variation', label: 'Large variation' },
+      { key: 'removed', label: 'Values removed' }
+    ].forEach(function (chip) {
+      var n = review.chips[chip.key];
+      if (!n) return;
+      wrap.appendChild(el(
+        'span',
+        'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + chipClass,
+        chip.label + ' ' + n
+      ));
+    });
+    if (!wrap.childNodes.length) {
+      wrap.appendChild(el(
+        'span',
+        'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + chipClass,
+        review.flagCount === 1 ? '1 flag' : (review.flagCount + ' flags')
+      ));
+    }
+    return wrap;
+  }
+
+  function changesCell(country) {
+    var counts = country.counts || {};
+    var wrap = el('div', 'flex flex-wrap gap-1 text-xs');
+    if (counts.new) wrap.appendChild(el('span', 'text-green-700 font-semibold', '+' + counts.new));
+    if (counts.changed) wrap.appendChild(el('span', 'text-amber-800 font-semibold', '~' + counts.changed));
+    if (counts.removed) wrap.appendChild(el('span', 'text-red-700 font-semibold', '−' + counts.removed));
+    if (counts.source) wrap.appendChild(el('span', 'text-gray-500', String(counts.source) + ' source'));
+    if (!wrap.childNodes.length) wrap.appendChild(el('span', 'text-gray-300', '—'));
+    return wrap;
+  }
+
+  function renderIssueTable() {
+    var flags = visibleFlags();
+    if (!flags.length) {
+      var empty = 'No issues match this focus.';
+      if (!currentFlags.length) {
+        empty = 'No flagged issues in this preview. Switch to By country to publish pending countries.';
+      } else if (searchQuery) {
+        empty = 'No issues match this search.';
+      }
+      setTbodyMessage(empty);
       return;
     }
     tbody.replaceChildren();
-    currentCountries.forEach(function (c) {
-      var counts = c.counts || {};
+    flags.forEach(function (flag) {
+      var aesId = flag.assignment_entity_status_id;
+      var tr = el('tr', 'border-b border-gray-100');
+      var checkTd = el('td', 'px-3 py-2');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'fdrs-pub-row-checkbox h-4 w-4';
+      cb.setAttribute('data-aes-id', String(aesId));
+      cb.setAttribute('aria-label', 'Select ' + (flag.country_name || 'country'));
+      checkTd.appendChild(cb);
+      tr.appendChild(checkTd);
+
+      var nameTd = el('td', 'px-3 py-2 text-sm font-medium text-gray-900');
+      appendText(nameTd, flag.country_name || '');
+      if (flag.country_iso3) {
+        appendText(nameTd, ' ');
+        nameTd.appendChild(el('span', 'text-gray-400', '(' + flag.country_iso3 + ')'));
+      }
+      tr.appendChild(nameTd);
+      tr.appendChild(el('td', 'px-3 py-2 text-sm text-gray-800', flag.label || ''));
+
+      var whyTd = el('td', 'px-3 py-2');
+      var whyWrap = el('div', 'flex flex-wrap gap-1');
+      var sev = flag.severity === 'high' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800';
+      (flag.reasons || []).forEach(function (reason) {
+        whyWrap.appendChild(el(
+          'span',
+          'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ' + sev,
+          reasonLabel(reason)
+        ));
+      });
+      whyTd.appendChild(whyWrap);
+      tr.appendChild(whyTd);
+
+      tr.appendChild(el('td', 'px-3 py-2 text-sm text-gray-600', comparedToCell(flag)));
+      tr.appendChild(el(
+        'td',
+        'px-3 py-2 text-sm text-gray-900 font-medium',
+        formatAnalysisNumber(flag.current_numeric != null ? flag.current_numeric : flag.current_value)
+      ));
+      var changePct = flag.pct_vs_published != null ? flag.pct_vs_published : flag.pct_vs_prior;
+      var changeClass = 'px-3 py-2 text-sm font-semibold ' + (flag.severity === 'high' ? 'text-red-700' : 'text-amber-800');
+      tr.appendChild(el('td', changeClass, flag.kind === 'removed' ? 'Cleared' : (formatPct(changePct) || '—')));
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = parseInt(cb.getAttribute('data-aes-id'), 10);
+        if (cb.checked) selected.add(id); else selected.delete(id);
+        syncCheckboxesFromSelection();
+        updatePublishButton();
+      });
+    });
+    syncCheckboxesFromSelection();
+    if (isPublishing()) setPublishControlsDisabled(true);
+  }
+
+  function renderTable() {
+    if (listMode === 'issue') {
+      renderIssueTable();
+      return;
+    }
+    var rows = visibleCountries();
+    if (!rows.length) {
+      var empty = 'No countries match this focus.';
+      if (queueFilter === 'attention' && !currentFlags.length) {
+        empty = 'Nothing needs extra attention. Switch to All changed to publish pending countries.';
+      } else if (searchQuery) {
+        empty = 'No countries match this search.';
+      } else if (!currentCountries.length) {
+        empty = 'No countries in this assignment.';
+      } else if (!currentCountries.some(function (c) { return c.has_pending_changes; })) {
+        empty = 'No pending changes in this reporting period.';
+      }
+      setTbodyMessage(empty);
+      return;
+    }
+    tbody.replaceChildren();
+    rows.forEach(function (c) {
+      var aesId = c.assignment_entity_status_id;
+      var review = reviewFor(aesId);
       var lastPublished = c.published_at
         ? formatDate(c.published_at) + (c.published_by_name ? ' by ' + c.published_by_name : '')
         : 'Never';
@@ -157,7 +676,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.className = 'fdrs-pub-row-checkbox h-4 w-4';
-      cb.setAttribute('data-aes-id', String(c.assignment_entity_status_id));
+      cb.setAttribute('data-aes-id', String(aesId));
+      cb.setAttribute('aria-label', 'Select ' + (c.country_name || 'country'));
       checkTd.appendChild(cb);
       tr.appendChild(checkTd);
 
@@ -168,31 +688,34 @@ document.addEventListener('DOMContentLoaded', function () {
         nameTd.appendChild(el('span', 'text-gray-400', '(' + c.country_iso3 + ')'));
       }
       tr.appendChild(nameTd);
-      function appendCell(className, child) {
-        var td = el('td', className);
-        if (typeof child === 'string') td.textContent = child;
-        else if (child) td.appendChild(child);
-        tr.appendChild(td);
-      }
-      appendCell('px-3 py-2', statusBadge(c));
-      appendCell('px-3 py-2', countBadge(counts.new, 'bg-green-100 text-green-800', '+'));
-      appendCell('px-3 py-2', countBadge(counts.changed, 'bg-amber-100 text-amber-800', '~'));
-      appendCell('px-3 py-2', countBadge(counts.removed, 'bg-red-100 text-red-800', '-'));
-      appendCell('px-3 py-2', countBadge(counts.source, 'bg-blue-50 text-blue-900', ''));
-      appendCell('px-3 py-2 text-xs text-gray-500', lastPublished);
+
+      var reviewTd = el('td', 'px-3 py-2');
+      reviewTd.appendChild(reviewChips(review));
+      tr.appendChild(reviewTd);
+
+      var changesTd = el('td', 'px-3 py-2');
+      changesTd.appendChild(changesCell(c));
+      tr.appendChild(changesTd);
+
+      tr.appendChild(el('td', 'px-3 py-2 text-xs text-gray-500', lastPublished));
 
       var actionTd = el('td', 'px-3 py-2 text-right');
-      var viewBtn = el('button', 'fdrs-pub-view-btn text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline', 'View changes');
+      var viewBtn = el(
+        'button',
+        'fdrs-pub-view-btn text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline',
+        review.flagCount ? 'Review' : 'View changes'
+      );
       viewBtn.type = 'button';
-      viewBtn.setAttribute('data-aes-id', String(c.assignment_entity_status_id));
+      viewBtn.setAttribute('data-aes-id', String(aesId));
+      viewBtn.setAttribute('aria-expanded', openDetailAesId === aesId ? 'true' : 'false');
       if (!c.total_public_items) viewBtn.disabled = true;
       actionTd.appendChild(viewBtn);
       tr.appendChild(actionTd);
 
-      var detailTr = el('tr', 'fdrs-pub-detail-row hidden');
-      detailTr.setAttribute('data-detail-for', String(c.assignment_entity_status_id));
+      var detailTr = el('tr', 'fdrs-pub-detail-row' + (openDetailAesId === aesId ? '' : ' hidden'));
+      detailTr.setAttribute('data-detail-for', String(aesId));
       var detailTd = el('td', 'px-3 py-3 bg-gray-50');
-      detailTd.colSpan = 9;
+      detailTd.colSpan = 6;
       detailTd.appendChild(el('div', 'fdrs-pub-detail-body text-sm text-gray-600', 'Loading…'));
       detailTr.appendChild(detailTd);
 
@@ -211,6 +734,12 @@ document.addEventListener('DOMContentLoaded', function () {
       btn.addEventListener('click', function () { toggleDetail(parseInt(btn.getAttribute('data-aes-id'), 10)); });
     });
     syncCheckboxesFromSelection();
+    if (openDetailAesId) {
+      var openRow = tbody.querySelector('tr.fdrs-pub-detail-row[data-detail-for="' + openDetailAesId + '"]');
+      if (openRow) loadDetailInto(openRow, openDetailAesId);
+      else openDetailAesId = null;
+    }
+    if (isPublishing()) setPublishControlsDisabled(true);
   }
 
   function syncCheckboxesFromSelection() {
@@ -233,17 +762,39 @@ document.addEventListener('DOMContentLoaded', function () {
     confirmYesBtn.disabled = disabled;
     select.disabled = disabled;
     refreshBtn.disabled = disabled;
-    selectPendingBtn.disabled = disabled;
+    if (selectVisibleBtn) selectVisibleBtn.disabled = disabled;
     clearSelectionBtn.disabled = disabled;
+    if (searchInput) searchInput.disabled = disabled;
+    if (queueFiltersEl) {
+      queueFiltersEl.querySelectorAll('button').forEach(function (btn) { btn.disabled = disabled; });
+    }
+    listViewBtns.forEach(function (btn) { btn.disabled = disabled; });
     tbody.querySelectorAll('.fdrs-pub-row-checkbox').forEach(function (cb) {
       cb.disabled = disabled;
     });
   }
 
   function updatePublishButton() {
-    publishCountEl.textContent = String(selected.size);
+    var flaggedSelected = selectedFlaggedCountryCount();
+    if (publishCountEl) publishCountEl.textContent = String(selected.size);
     publishBtn.disabled = isPublishing() || selected.size === 0;
     if (!isPublishing()) confirmBox.classList.add('hidden');
+    if (actionBar) actionBar.classList.toggle('hidden', !summaryLoaded);
+    if (actionSummaryEl) {
+      actionSummaryEl.textContent = selected.size
+        ? (selected.size + ' countr' + (selected.size === 1 ? 'y' : 'ies') + ' selected')
+        : 'No countries selected';
+    }
+    if (actionFlagsEl) {
+      if (!selected.size) {
+        actionFlagsEl.textContent = 'Select countries, then publish. Flags are advisory.';
+      } else if (flaggedSelected) {
+        actionFlagsEl.textContent = flaggedSelected + ' of those have advisory flags.';
+      } else {
+        actionFlagsEl.textContent = 'None of the selected countries have advisory flags.';
+      }
+    }
+    if (summaryLoaded) renderCards();
   }
 
   function setProgress(percent, stage, message, current, total, opts) {
@@ -386,10 +937,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function readActiveJobs() {
-    var el = document.getElementById('fdrs-publication-active-jobs');
-    if (!el) return [];
+    var payload = document.getElementById('fdrs-publication-active-jobs');
+    if (!payload) return [];
     try {
-      return JSON.parse(el.textContent || '[]') || [];
+      return JSON.parse(payload.textContent || '[]') || [];
     } catch (e) {
       return [];
     }
@@ -412,7 +963,7 @@ document.addEventListener('DOMContentLoaded', function () {
       frag.appendChild(el('span', 'text-gray-300', '—'));
       return frag;
     }
-    appendText(frag, v);
+    appendText(frag, formatAnalysisNumber(v));
     if (disagg) {
       appendText(frag, ' ');
       var mark = el('span', 'text-gray-400', '\u25A6');
@@ -428,33 +979,81 @@ document.addEventListener('DOMContentLoaded', function () {
     return frag;
   }
 
+  function comparedToCell(flag, item) {
+    if (flag) {
+      var published = flag.published_numeric != null ? flag.published_numeric : flag.published_value;
+      if (published != null && published !== '') {
+        return formatAnalysisNumber(published) + ' last published';
+      }
+      var prior = flag.prior_numeric != null ? flag.prior_numeric : flag.prior_value;
+      if (prior != null && prior !== '') {
+        return formatAnalysisNumber(prior) + (analysisPriorPeriodName ? (' in ' + analysisPriorPeriodName) : ' previous period');
+      }
+    }
+    if (item && item.published_value != null && item.published_value !== '') {
+      return formatAnalysisNumber(item.published_value) + ' last published';
+    }
+    return '—';
+  }
+
+  function changeCell(flag, item) {
+    if (item && item.kind === 'removed') return 'Cleared';
+    if (!flag) return '—';
+    var changePct = flag.pct_vs_published != null ? flag.pct_vs_published : flag.pct_vs_prior;
+    return formatPct(changePct) || '—';
+  }
+
   function renderDetail(row, data) {
     var body = row.querySelector('.fdrs-pub-detail-body');
-    var items = data.items || [];
+    var items = (data.items || []).slice();
     if (!items.length) {
       body.replaceChildren(el('span', 'text-gray-500', 'No pending changes for this country.'));
       return;
     }
+    var flaggedItems = flaggedItemByAes[data.assignment_entity_status_id] || {};
+    items.sort(function (a, b) {
+      var fa = flaggedItems[a.form_item_id] ? 0 : 1;
+      var fb = flaggedItems[b.form_item_id] ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return (a.label || '').localeCompare(b.label || '');
+    });
     var table = el('table', 'w-full text-xs');
     var thead = document.createElement('thead');
     var headRow = el('tr', 'text-left text-gray-500');
-    ['Indicator', 'Change', 'Current value', 'Published value'].forEach(function (label) {
+    ['Indicator', 'Change', 'Review', 'Compared to', 'Current value', 'Δ'].forEach(function (label) {
+      if (label === 'Δ') {
+        headRow.appendChild(deltaHeader('py-1 pr-3 text-left font-medium'));
+        return;
+      }
       headRow.appendChild(el('th', 'py-1 pr-3', label));
     });
     thead.appendChild(headRow);
     var tbodyEl = document.createElement('tbody');
     items.forEach(function (it) {
-      var tr = el('tr', 'border-t border-gray-200');
-      tr.appendChild(el('td', 'py-1 pr-3 text-gray-800', it.label));
+      var flag = flaggedItems[it.form_item_id];
+      var tr = el('tr', 'border-t border-gray-200' + (flag ? ' bg-amber-50' : ''));
+      tr.appendChild(el('td', 'py-1 pr-3 text-gray-800', it.label || ''));
       var kindTd = el('td', 'py-1 pr-3');
       kindTd.appendChild(kindBadge(it.kind));
       tr.appendChild(kindTd);
+      var whyTd = el('td', 'py-1 pr-3');
+      if (flag && flag.reasons && flag.reasons.length) {
+        var whyWrap = el('div', 'flex flex-wrap gap-1');
+        var sev = flag.severity === 'high' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800';
+        flag.reasons.forEach(function (reason) {
+          whyWrap.appendChild(el('span', 'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ' + sev, reasonLabel(reason)));
+        });
+        whyTd.appendChild(whyWrap);
+      } else {
+        whyTd.appendChild(el('span', 'text-gray-300', '—'));
+      }
+      tr.appendChild(whyTd);
+      tr.appendChild(el('td', 'py-1 pr-3 text-gray-600', comparedToCell(flag, it)));
       var currentTd = el('td', 'py-1 pr-3');
       currentTd.appendChild(fmtVal(it.current_value, it.current_disagg_data, it.current_is_imputed));
       tr.appendChild(currentTd);
-      var publishedTd = el('td', 'py-1 pr-3');
-      publishedTd.appendChild(fmtVal(it.published_value, it.published_disagg_data, it.published_source === 'imputed'));
-      tr.appendChild(publishedTd);
+      var changeClass = 'py-1 pr-3 font-semibold ' + (flag && flag.severity === 'high' ? 'text-red-700' : 'text-gray-800');
+      tr.appendChild(el('td', changeClass, changeCell(flag, it)));
       tbodyEl.appendChild(tr);
     });
     table.appendChild(thead);
@@ -462,13 +1061,7 @@ document.addEventListener('DOMContentLoaded', function () {
     body.replaceChildren(table);
   }
 
-  function toggleDetail(aesId) {
-    var row = tbody.querySelector('tr.fdrs-pub-detail-row[data-detail-for="' + aesId + '"]');
-    if (!row) return;
-    var willOpen = row.classList.contains('hidden');
-    tbody.querySelectorAll('tr.fdrs-pub-detail-row').forEach(function (r) { r.classList.add('hidden'); });
-    if (!willOpen) return;
-    row.classList.remove('hidden');
+  function loadDetailInto(row, aesId) {
     if (detailCache[aesId]) { renderDetail(row, detailCache[aesId]); return; }
     var body = row.querySelector('.fdrs-pub-detail-body');
     body.textContent = 'Loading…';
@@ -487,39 +1080,76 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
+  function openDetail(aesId) {
+    openDetailAesId = aesId;
+    tbody.querySelectorAll('tr.fdrs-pub-detail-row').forEach(function (r) { r.classList.add('hidden'); });
+    tbody.querySelectorAll('.fdrs-pub-view-btn').forEach(function (btn) {
+      btn.setAttribute('aria-expanded', btn.getAttribute('data-aes-id') === String(aesId) ? 'true' : 'false');
+    });
+    var row = tbody.querySelector('tr.fdrs-pub-detail-row[data-detail-for="' + aesId + '"]');
+    if (!row) return;
+    row.classList.remove('hidden');
+    loadDetailInto(row, aesId);
+  }
+
+  function toggleDetail(aesId) {
+    if (openDetailAesId === aesId) {
+      openDetailAesId = null;
+      var row = tbody.querySelector('tr.fdrs-pub-detail-row[data-detail-for="' + aesId + '"]');
+      if (row) row.classList.add('hidden');
+      var btn = tbody.querySelector('.fdrs-pub-view-btn[data-aes-id="' + aesId + '"]');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    openDetail(aesId);
+  }
+
   function loadSummary(assignedFormId, opts) {
     opts = opts || {};
     if (isPublishing() && assignedFormId !== currentAssignmentId) return;
     currentAssignmentId = assignedFormId;
     selected = new Set();
+    currentFlags = [];
+    reviewsByAes = {};
+    flaggedItemByAes = {};
+    currentSummary = null;
+    openDetailAesId = null;
+    searchQuery = '';
+    if (searchInput) searchInput.value = '';
     detailCache = {};
     loadingEl.classList.remove('hidden');
     if (!opts.keepResult && !isPublishing()) resultEl.replaceChildren();
     confirmBox.classList.add('hidden');
     cardsEl.replaceChildren();
+    if (secondaryCountsEl) secondaryCountsEl.classList.add('hidden');
+    if (allClearEl) allClearEl.classList.add('hidden');
+    if (actionBar) actionBar.classList.add('hidden');
     setTbodyMessage('Loading…');
+    var requestId = ++summaryRequestId;
 
     fetch(summaryUrl(assignedFormId))
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (requestId !== summaryRequestId) return;
         loadingEl.classList.add('hidden');
         summaryLoaded = true;
         if (!data.success) {
           setTbodyMessage(data.message || 'Failed to load preview', 'text-red-600');
           return;
         }
+        currentSummary = data;
         currentCountries = data.countries || [];
-        renderCards(data);
-        // Default selection: everything with a pending change, so the common
-        // "publish what changed" action needs zero extra clicks.
-        currentCountries.forEach(function (c) {
-          if (c.has_pending_changes) selected.add(c.assignment_entity_status_id);
-        });
-        renderTable();
+        currentFlags = (data.analysis && data.analysis.flags) || [];
+        analysisPriorPeriodName = (data.analysis && data.analysis.prior_period_name) || '';
+        buildReviews();
+        queueFilter = currentFlags.length ? 'attention' : 'all';
+        renderCards();
+        renderAllClear();
+        renderQueue();
         if (isPublishing()) setPublishControlsDisabled(true);
-        updatePublishButton();
       })
       .catch(function (err) {
+        if (requestId !== summaryRequestId) return;
         loadingEl.classList.add('hidden');
         setTbodyMessage(err.message || 'Failed to load preview', 'text-red-600');
       });
@@ -533,14 +1163,41 @@ document.addEventListener('DOMContentLoaded', function () {
   select.addEventListener('change', function () { loadSummary(parseInt(select.value, 10)); });
   refreshBtn.addEventListener('click', function () { if (currentAssignmentId) loadSummary(currentAssignmentId); });
 
-  selectPendingBtn.addEventListener('click', function () {
-    selected = new Set(
-      currentCountries.filter(function (c) { return c.has_pending_changes; })
-        .map(function (c) { return c.assignment_entity_status_id; })
-    );
-    syncCheckboxesFromSelection();
-    updatePublishButton();
+  if (selectVisibleBtn) {
+    selectVisibleBtn.addEventListener('click', function () {
+      visibleAesIds().forEach(function (id) { selected.add(id); });
+      syncCheckboxesFromSelection();
+      updatePublishButton();
+    });
+  }
+
+  listViewBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      setListMode(btn.getAttribute('data-list-view'));
+    });
   });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      searchQuery = (searchInput.value || '').trim();
+      renderQueue();
+    });
+  }
+
+  if (queueFiltersEl) {
+    queueFiltersEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var buttons = Array.prototype.slice.call(queueFiltersEl.querySelectorAll('.fdrs-pub-queue-filter'));
+      var i = buttons.indexOf(document.activeElement);
+      if (i < 0) return;
+      e.preventDefault();
+      var next = e.key === 'ArrowRight'
+        ? (i + 1) % buttons.length
+        : (i - 1 + buttons.length) % buttons.length;
+      buttons[next].focus();
+      buttons[next].click();
+    });
+  }
 
   clearSelectionBtn.addEventListener('click', function () {
     selected = new Set();
@@ -577,7 +1234,19 @@ document.addEventListener('DOMContentLoaded', function () {
       confirmText.appendChild(el('strong', 'text-red-700', removedTotal + ' value(s) that will be cleared'));
       appendText(confirmText, ' from the public site (previously published, no longer reported)');
     }
+    var selectedAes = selected;
+    var reviewInSelection = currentFlags.filter(function (f) {
+      return selectedAes.has(f.assignment_entity_status_id);
+    }).length;
+    var flaggedCountries = selectedFlaggedCountryCount();
     appendText(confirmText, '.');
+    if (reviewInSelection) {
+      appendText(confirmText, ' Includes ');
+      confirmText.appendChild(el('strong', 'text-amber-900', String(reviewInSelection)));
+      appendText(confirmText, ' flagged variation' + (reviewInSelection === 1 ? '' : 's') +
+        ' across ' + flaggedCountries + ' countr' + (flaggedCountries === 1 ? 'y' : 'ies') +
+        '. Flags are advisory.');
+    }
     confirmBox.classList.remove('hidden');
     confirmBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });

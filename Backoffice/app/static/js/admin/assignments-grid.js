@@ -14,6 +14,13 @@
 
     var columnDefs = [
         {
+            field: 'id',
+            headerName: cfg.t.id_e369853d,
+            width: 90, minWidth: 70, maxWidth: 120,
+            filter: 'agNumberColumnFilter', sortable: true,
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
             field: 'display_name',
             headerName: cfg.t.name_d4a1c2b3,
             width: 260, minWidth: 180, maxWidth: 400,

@@ -219,6 +219,94 @@ def import_values_equivalent(left: Any, right: Any) -> bool:
     return left_pairs is not None and left_pairs == right_pairs
 
 
+def _is_default_disability(disability: Any) -> bool:
+    """True for the FDRS 'not disaggregated' marker, which is not a data change."""
+    if not isinstance(disability, dict):
+        return False
+    allowed = {"disaggregated_by_disability", "washington_group_compliant"}
+    if not set(disability.keys()) <= allowed:
+        return False
+    for key in allowed:
+        if disability.get(key) not in (None, False):
+            return False
+    return True
+
+
+def normalize_disagg_for_compare(value: Any) -> Any:
+    """Drop sync noise that does not change the reported breakdown.
+
+    FDRS re-syncs attach ``disability.disaggregated_by_disability = false`` and an
+    empty ``direct`` object onto rows whose numbers did not change.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not text or text.lower() in ("null", "none"):
+            return None
+        if text[:1] in "{[":
+            try:
+                value = json.loads(text)
+            except json.JSONDecodeError:
+                return value
+        else:
+            return value
+    if not isinstance(value, dict):
+        return value
+    if "preview" in value and set(value.keys()) <= {"keys", "n", "preview"}:
+        return value
+    values = value.get("values")
+    if not isinstance(values, dict):
+        return value
+    values = dict(values)
+    if _is_default_disability(values.get("disability")):
+        values.pop("disability", None)
+    if values.get("direct") in ({}, None):
+        values.pop("direct", None)
+    if "indirect" in values and values.get("indirect") is None:
+        values.pop("indirect", None)
+    if not values:
+        return None
+    normalized = {"values": values}
+    if value.get("mode"):
+        normalized["mode"] = value.get("mode")
+    return normalized
+
+
+def disagg_equivalent(left: Any, right: Any) -> bool:
+    return import_values_equivalent(
+        normalize_disagg_for_compare(left),
+        normalize_disagg_for_compare(right),
+    )
+
+
+def _flag_value(change: Dict[str, Any], key: str) -> bool:
+    if key not in change or change.get(key) is None:
+        return False
+    return bool(change.get(key))
+
+
+def _availability_flags_differ(change: Dict[str, Any]) -> bool:
+    for key in ("data_not_available", "not_applicable"):
+        old_key = f"old_{key}"
+        new_key = f"new_{key}"
+        if old_key not in change and new_key not in change:
+            continue
+        if _flag_value(change, old_key) != _flag_value(change, new_key):
+            return True
+    return False
+
+
+def _side_has_no_reported_data(change: Dict[str, Any], prefix: str) -> bool:
+    if not import_values_equivalent(change.get(f"{prefix}_value"), None):
+        return False
+    if not disagg_equivalent(change.get(f"{prefix}_disagg"), None):
+        return False
+    if _flag_value(change, f"{prefix}_data_not_available"):
+        return False
+    if _flag_value(change, f"{prefix}_not_applicable"):
+        return False
+    return True
+
+
 def _is_truncated_preview(value: Any) -> bool:
     return (
         isinstance(value, dict)
@@ -229,15 +317,19 @@ def _is_truncated_preview(value: Any) -> bool:
 
 
 def is_noop_import_change(change: Dict[str, Any]) -> bool:
-    """True when an update row has the same before/after value and disagg."""
+    """True when a logged row does not change the reported value, breakdown, or flags."""
     if not isinstance(change, dict):
         return True
     op = str(change.get("op") or "update").strip().lower()
-    if op in ("insert", "stage"):
+    if op == "stage":
         return False
+    if _availability_flags_differ(change):
+        return False
+    if op == "insert":
+        return _side_has_no_reported_data(change, "new")
     if not import_values_equivalent(change.get("old_value"), change.get("new_value")):
         return False
-    if import_values_equivalent(change.get("old_disagg"), change.get("new_disagg")):
+    if disagg_equivalent(change.get("old_disagg"), change.get("new_disagg")):
         return True
     # Compacted previews are truncated, so key-order differences look like
     # disagg changes even when the stored objects were equal. Same scalar
@@ -369,6 +461,14 @@ class ImportChangeLogWriter:
             "old_disagg": compact_import_value(change.get("old_disagg")),
             "new_disagg": compact_import_value(change.get("new_disagg")),
         }
+        for key in (
+            "old_data_not_available",
+            "new_data_not_available",
+            "old_not_applicable",
+            "new_not_applicable",
+        ):
+            if _flag_value(change, key):
+                row[key] = True
         self._fh.write(json.dumps(row, default=str, ensure_ascii=True) + "\n")
         self.change_count += 1
 

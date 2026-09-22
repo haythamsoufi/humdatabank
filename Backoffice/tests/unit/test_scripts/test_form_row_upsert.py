@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime
 
 import pytest
 
@@ -78,6 +79,35 @@ class TestUpsertFormDataRowsUnchangedDetection:
             db_session.expire_all()
             reloaded = db_session.get(FormData, existing_id)
             assert reloaded.value == "42"
+
+    def test_sync_timestamp_does_not_rewrite_or_overwrite_submitted_at(self, db_session, app):
+        with app.app_context():
+            aes, item = _make_aes_and_item(db_session)
+            original = datetime(2024, 6, 1, 9, 30, 0)
+            existing = FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                value="42",
+                disagg_type="simple",
+                submitted_at=original,
+            )
+            existing._sync_numeric_value_from_string()
+            db_session.add(existing)
+            db_session.commit()
+            existing_id = existing.id
+
+            stats = upsert_form_data_rows(
+                [_row(aes.id, item.id, "42", submitted_at="22/09/2026  16:46:31")],
+                batch_size=100,
+            )
+
+            assert stats["unchanged"] == 1
+            assert stats["updated"] == 0
+
+            db_session.expire_all()
+            reloaded = db_session.get(FormData, existing_id)
+            assert reloaded.value == "42"
+            assert reloaded.submitted_at == original
 
     def test_change_recorder_skips_unchanged_rows(self, db_session, app):
         with app.app_context():

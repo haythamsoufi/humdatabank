@@ -1060,7 +1060,7 @@ def _support_plan(payload: dict[str, Any]) -> str:
     total = payload.get("support_total") or {}
     total_display = escape((total.get("display") or "").strip() or format_compact_chf(total.get("value")) or "0")
     confirmed_total = sum(float(row.get("confirmed") or 0) for row in rows)
-    confirmed_total_display = escape(format_compact_chf(confirmed_total) if confirmed_total else "") or "&nbsp;"
+    confirmed_total_display = format_compact_chf(confirmed_total) if confirmed_total else ""
     cols = [
         "<col class='upr-support-col-ns'>",
         "<col class='upr-support-col-year'>",
@@ -1079,7 +1079,7 @@ def _support_plan(payload: dict[str, Any]) -> str:
         f"<td class='upr-ns'>{escape(t('Total'))}</td>",
         "<td></td>",
         f"<td class='upr-num upr-support-total'{_ltr_num_attr()}>{_amount_html(with_chf(total_display, prefix=True))}</td>",
-        f"<td class='upr-num upr-support-confirmed'{_ltr_num_attr()}>{_amount_html(confirmed_total_display) or confirmed_total_display}</td>",
+        f"<td class='upr-num upr-support-confirmed'{_ltr_num_attr()}>{_amount_html(confirmed_total_display) or '&nbsp;'}</td>",
         f"<td colspan='{n_areas}'></td>",
     ]
     return (

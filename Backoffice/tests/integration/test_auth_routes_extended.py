@@ -4,7 +4,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from flask import g, make_response
+from flask import make_response
 from werkzeug.exceptions import NotFound
 
 pytestmark = [pytest.mark.integration, pytest.mark.auth_security]
@@ -134,6 +134,7 @@ class TestAccountSettingsAndDevices:
                 form.name.data = 'Updated Name'
                 form.title.data = 'Analyst'
                 form.chatbot_enabled.data = True
+                form.translation_review_tool_enabled.data = False
                 form.profile_color.data = '#3B82F6'
                 resp = account_settings()
             db.session.commit()
@@ -179,7 +180,7 @@ class TestAccountSettingsAndDevices:
             method='POST',
         ):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            resp, status = _view_result(kickout_own_device(device_id))
             db.session.commit()
         assert status == 200
         assert resp.get_json()['success'] is True
@@ -211,7 +212,7 @@ class TestAccountSettingsAndDevices:
             method='DELETE',
         ):
             login_user(User.query.get(user_id))
-            resp, status = remove_own_device(device_id)
+            resp, status = _view_result(remove_own_device(device_id))
             db.session.commit()
         assert status == 200
         assert resp.get_json()['success'] is True
@@ -244,7 +245,7 @@ class TestAccountSettingsAndDevices:
             method='POST',
         ):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            resp, status = _view_result(kickout_own_device(device_id))
             db.session.commit()
         assert status == 400
         assert resp.get_json()['success'] is False
@@ -293,9 +294,6 @@ class TestLoginRouteCoverage:
     def test_login_session_expired_flag_explains_the_bounce(self, client, app):
         """The CSRF handler redirects here without flashing (it withholds the
         session cookie), so the notice has to be queued by the login page."""
-        # The suite shares one app context, so Flask-Login's cached user can
-        # survive an earlier test and make /login redirect instead of render.
-        g.pop('_login_user', None)
         with patch('app.routes.auth.render_template', return_value=('login', 200)):
             resp = client.get('/login?session_expired=1')
         assert resp.status_code == 200

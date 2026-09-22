@@ -649,6 +649,22 @@ class TestEmergencyOperationsMetadata:
             assert entry.disagg_type == 'emergency_operation'
             assert entry.disagg_data == {'name': 'Afghanistan - Floods', 'code': 'MDRAF015'}
 
+    def test_apply_emergency_operation_disagg_ignores_other_sentinel_metadata(self, app):
+        from app.models.forms import RepeatGroupData
+        from app.services.forms.data_service import FormDataService
+
+        with app.app_context():
+            entry = RepeatGroupData()
+            FormDataService._apply_emergency_operation_disagg(
+                entry,
+                'Bangladesh Population Movement (MDRBD018)',
+                {'name': '__other__', 'code': ''},
+            )
+            assert entry.disagg_data == {
+                'name': 'Bangladesh Population Movement',
+                'code': 'MDRBD018',
+            }
+
     def test_emergency_operation_values_equal_dict_vs_display(self, app):
         from app.models.forms import RepeatGroupData
         from app.services.forms.data_service import FormDataService

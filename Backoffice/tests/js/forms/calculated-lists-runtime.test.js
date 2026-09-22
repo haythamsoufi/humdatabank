@@ -293,6 +293,30 @@ describe('calculated-lists-runtime', () => {
                 code: '',
             });
         });
+
+        it('parses Other please-specify text including the MDR code', async () => {
+            const { syncEmergencyOperationMetadata } = await loadRuntime();
+            const select = createSelect({
+                id: 'repeat-title-select',
+                name: 'repeat_5_1_field_0',
+            });
+            addOption(select, { value: '__other__', selected: true });
+            const wrap = document.createElement('div');
+            wrap.className = 'repeat-entry__title-select-wrap';
+            select.parentElement.appendChild(wrap);
+            wrap.appendChild(select);
+            const other = document.createElement('input');
+            other.className = 'other-text-input';
+            other.value = 'Bangladesh Population Movement (MDRBD018)';
+            wrap.appendChild(other);
+
+            syncEmergencyOperationMetadata(select);
+
+            expect(JSON.parse(hiddenInputs()[0].value)).toEqual({
+                name: 'Bangladesh Population Movement',
+                code: 'MDRBD018',
+            });
+        });
     });
 
     describe('initCalculatedLists', () => {

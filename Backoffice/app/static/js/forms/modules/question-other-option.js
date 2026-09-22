@@ -74,6 +74,11 @@ function onDocumentInput(e) {
     // call unconditionally here.
     if (target.classList.contains('other-text-input')) {
         refreshMultiSelectButtonTextFromContext(target);
+        const entry = target.closest('.repeat-entry');
+        const sectionMatch = entry?.id?.match(/^repeat-entry-(\d+)-\d+$/);
+        if (sectionMatch && typeof window.syncRepeatEntryNavigation === 'function') {
+            window.syncRepeatEntryNavigation(sectionMatch[1]);
+        }
     }
 }
 
@@ -245,6 +250,12 @@ export function restoreOtherSelectionForCalculatedList(selectElement, savedValue
     if (otherInput) {
         otherInput.value = savedValue;
         otherInput.classList.remove('hidden');
+    }
+
+    const entry = selectElement.closest('.repeat-entry');
+    const sectionMatch = entry?.id?.match(/^repeat-entry-(\d+)-\d+$/);
+    if (sectionMatch && typeof window.syncRepeatEntryNavigation === 'function') {
+        window.syncRepeatEntryNavigation(sectionMatch[1]);
     }
 
     debugLog(MODULE, `Restored calculated-list Other value for field ${selectElement.dataset.fieldItemId || selectElement.id}`);

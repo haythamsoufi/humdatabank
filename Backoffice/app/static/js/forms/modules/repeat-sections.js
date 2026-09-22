@@ -151,6 +151,11 @@ function bindRepeatEntryLabelListeners(repeatEntry, sectionId, instanceNumber) {
     const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
     if (titleSelect) {
         titleSelect.addEventListener('change', () => syncRepeatEntryNavigation(sectionId));
+        const wrap = titleSelect.closest('.repeat-entry__title-select-wrap') || repeatEntry;
+        wrap.querySelectorAll('.other-text-input').forEach((el) => {
+            el.addEventListener('input', () => syncRepeatEntryNavigation(sectionId));
+            el.addEventListener('change', () => syncRepeatEntryNavigation(sectionId));
+        });
         return;
     }
     if (!labelItemId) return;

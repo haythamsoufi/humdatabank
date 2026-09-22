@@ -763,6 +763,65 @@ def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatc
 
 
 @pytest.mark.unit
+def test_report_emergencies_uses_other_text_code_from_stored_choice(monkeypatch):
+    from plugins.upr.indicators import _report_emergencies
+
+    section = SimpleNamespace(
+        id=9,
+        name="Emergency Appeal Indicators",
+        section_type="repeat",
+        parent_section_id=None,
+    )
+    entry = SimpleNamespace(
+        value="Bangladesh Population Movement (MDRBD018)",
+        disagg_type="emergency_operation",
+        disagg_data={"name": "__other__", "code": ""},
+        form_item=SimpleNamespace(lookup_list_id="emergency_operations"),
+    )
+    inst = SimpleNamespace(
+        instance_number=1,
+        instance_label="Bangladesh Population Movement",
+        data_entries=[entry],
+    )
+
+    class _Query:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [inst]
+
+    class _Col:
+        def __eq__(self, other):
+            return True
+
+        def in_(self, other):
+            return True
+
+        def is_(self, other):
+            return True
+
+    monkeypatch.setattr(
+        "plugins.upr.indicators.RepeatGroupInstance",
+        SimpleNamespace(
+            query=_Query(),
+            assignment_entity_status_id=_Col(),
+            section_id=_Col(),
+            is_hidden=_Col(),
+            instance_number=_Col(),
+        ),
+    )
+    monkeypatch.setattr("plugins.upr.indicators._load_dynamic_indicator_rows", lambda aes_id: [])
+
+    emergencies = _report_emergencies(1641, [SimpleNamespace(form_section=section)])
+    assert emergencies[0]["name"] == "Bangladesh Population Movement"
+    assert emergencies[0]["code"] == "MDRBD018"
+
+
+@pytest.mark.unit
 def test_max_people_by_area_keeps_highest_per_sp_and_ignores_cross_cutting():
     best = max_people_by_area(
         [

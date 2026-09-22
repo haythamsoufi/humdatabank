@@ -23,6 +23,7 @@ async function loadNav() {
 function mountTitleDropdownRepeat({
     sectionId = '12',
     selectedValue = '',
+    otherText = '',
     options = [
         { value: '', text: 'Select...' },
         { value: 'appeal-a', text: 'Appeal A' },
@@ -49,6 +50,7 @@ function mountTitleDropdownRepeat({
                             <select data-use-as-repeat-entry-title="true" data-field-item-id="77">
                                 ${optionHtml}
                             </select>
+                            ${otherText ? `<input class="other-text-input" value="${otherText}">` : ''}
                         </div>
                     </h5>
                 </div>
@@ -89,5 +91,20 @@ describe('repeat-entry-nav title dropdown labels', () => {
         syncRepeatEntryNavigation('12');
 
         expect(document.querySelector('.repeat-entry-nav-label').textContent).toBe('Appeal B');
+    });
+
+    it('uses the Other please-specify text instead of the sentinel option label', async () => {
+        mountTitleDropdownRepeat({
+            selectedValue: '__other__',
+            otherText: 'Bangladesh Population Movement (MDRBD018)',
+        });
+        const { syncRepeatEntryNavigation } = await loadNav();
+
+        syncRepeatEntryNavigation('12');
+
+        expect(document.querySelector('.repeat-entry-nav-label').textContent)
+            .toBe('Bangladesh Population Movement (MDRBD018)');
+        expect(document.querySelector('.repeat-entry-nav-label').textContent)
+            .not.toContain('Other (please specify)');
     });
 });

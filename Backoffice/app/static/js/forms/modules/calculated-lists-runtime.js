@@ -653,6 +653,17 @@ function extractEmergencyMetadataFromOption(option) {
     return parseEmergencyDisplayValue(option.value);
 }
 
+function findEmergencyOtherTextInput(selectElement) {
+    const titleWrap = selectElement.closest('.repeat-entry__title-select-wrap');
+    if (titleWrap) {
+        const fromWrap = titleWrap.querySelector('.other-text-input');
+        if (fromWrap) return fromWrap;
+    }
+    const block = selectElement.closest('.form-item-block, .repeat-entry, .repeat-entry__title-select-wrap')
+        || selectElement.parentElement;
+    return block?.querySelector('.other-text-input') || null;
+}
+
 export function syncEmergencyOperationMetadata(selectElement) {
     if (selectElement.dataset.lookupListId !== 'emergency_operations') return;
 
@@ -661,6 +672,15 @@ export function syncEmergencyOperationMetadata(selectElement) {
 
     if (!selectElement.value) {
         hidden.value = '';
+        return;
+    }
+
+    if (selectElement.value === '__other__') {
+        const otherInput = findEmergencyOtherTextInput(selectElement);
+        const meta = parseEmergencyDisplayValue(otherInput?.value || '');
+        hidden.value = meta && (meta.name || meta.code) && meta.name !== '__other__'
+            ? JSON.stringify(meta)
+            : '';
         return;
     }
 
@@ -673,6 +693,12 @@ function attachEmergencyMetadataListener(selectElement) {
     if (selectElement.dataset.emergencyMetadataListenerAttached === 'true') return;
     selectElement.dataset.emergencyMetadataListenerAttached = 'true';
     selectElement.addEventListener('change', () => syncEmergencyOperationMetadata(selectElement));
+    const otherInput = findEmergencyOtherTextInput(selectElement);
+    if (otherInput && otherInput.dataset.emergencyMetadataListenerAttached !== 'true') {
+        otherInput.dataset.emergencyMetadataListenerAttached = 'true';
+        otherInput.addEventListener('input', () => syncEmergencyOperationMetadata(selectElement));
+        otherInput.addEventListener('change', () => syncEmergencyOperationMetadata(selectElement));
+    }
 }
 
 const STALE_OPTION_SELECTOR = 'option[data-stale-saved-value="true"]';

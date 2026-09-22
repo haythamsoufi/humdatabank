@@ -20,7 +20,7 @@ import threading
 import time
 from typing import Optional
 
-from flask import current_app, has_app_context, request, session
+from flask import current_app, g, has_app_context, request, session
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,36 @@ def session_set_cookie_bytes(response) -> int:
         if header.startswith(prefix)
     ]
     return max(sizes) if sizes else 0
+
+
+class SuppressableSessionInterface:
+    """Proxy that can skip writing the session cookie for one request.
+
+    Flask saves the session *after* ``after_request`` handlers, so stripping
+    ``Set-Cookie`` in a hook is too early. CSRF failures on phones must not
+    emit a replacement anonymous cookie; set ``g.suppress_session_cookie``.
+    """
+
+    def __init__(self, wrapped):
+        object.__setattr__(self, "_wrapped", wrapped)
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+    def save_session(self, app, session_obj, response):
+        if getattr(g, "suppress_session_cookie", False):
+            return None
+        return self._wrapped.save_session(app, session_obj, response)
+
+
+def install_suppressable_session_interface(app):
+    """Wrap ``app.session_interface`` once so CSRF can suppress Set-Cookie."""
+    current = app.session_interface
+    if isinstance(current, SuppressableSessionInterface):
+        return current
+    wrapped = SuppressableSessionInterface(current)
+    app.session_interface = wrapped
+    return wrapped
 
 
 def strip_session_set_cookie(response):

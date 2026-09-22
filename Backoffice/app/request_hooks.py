@@ -5,6 +5,7 @@ from flask_login import current_user
 
 from app.i18n import persist_queued_language_cookie, update_session_activity
 from app.utils.session_persistence import (
+    install_suppressable_session_interface,
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
     strip_session_set_cookie,
@@ -22,6 +23,7 @@ from app.utils.request_utils import (
 
 def register_request_hooks(app):
     """Register all request lifecycle hooks on the application."""
+    install_suppressable_session_interface(app)
 
     @app.before_request
     def serve_root_health_probe_fast_path():

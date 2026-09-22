@@ -867,6 +867,99 @@ class TestShouldPreserveExistingOnEmptySave:
                 field_prefix='indicator_10',
             ) is True
 
+    def _disagg_indicator(self, item_id=10):
+        indicator = MagicMock()
+        indicator.id = item_id
+        indicator.allowed_disaggregation_options = ['total', 'sex_age']
+        indicator.indirect_reach = False
+        indicator.effective_sex_categories = ['Female', 'Male']
+        indicator.effective_age_groups = ['5-17', '18-49']
+        return indicator
+
+    def test_disagg_indicator_does_not_preserve_when_existing_is_data_not_available(self, app):
+        """Unchecking DNA and saving empty must clear, even on a disaggregated indicator."""
+        from app.services.forms.data_service import FormDataService
+        entry = _make_form_data_entry(data_not_available=True)
+        with app.test_request_context(
+            '/test',
+            method='POST',
+            data={'action': 'save', 'indicator_10_total_value': ''},
+        ):
+            assert FormDataService._should_preserve_existing_on_empty_save(
+                10,
+                entry,
+                is_presave=False,
+                field_cleared=False,
+                indicator=self._disagg_indicator(),
+                field_prefix='indicator_10',
+            ) is False
+
+    def test_disagg_indicator_does_not_preserve_when_existing_is_not_applicable(self, app):
+        from app.services.forms.data_service import FormDataService
+        entry = _make_form_data_entry(not_applicable=True)
+        with app.test_request_context(
+            '/test',
+            method='POST',
+            data={'action': 'save', 'indicator_10_total_value': ''},
+        ):
+            assert FormDataService._should_preserve_existing_on_empty_save(
+                10,
+                entry,
+                is_presave=False,
+                field_cleared=False,
+                indicator=self._disagg_indicator(),
+                field_prefix='indicator_10',
+            ) is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FormDataService._process_indicator_data
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProcessIndicatorDataEmptySave:
+    def test_unchecking_dna_on_disagg_indicator_clears_existing(self, app):
+        """Empty save after unticking DNA must persist (not keep the stored flag)."""
+        from app.services.forms.data_service import FormDataService
+
+        indicator = MagicMock()
+        indicator.id = 1368
+        indicator.is_indicator = True
+        indicator.is_question = False
+        indicator.is_document_field = False
+        indicator.field_type_for_js = 'number'
+        indicator.type = 'number'
+        indicator.label = 'People reached'
+        indicator.allowed_disaggregation_options = ['total', 'sex']
+        indicator.indirect_reach = False
+        indicator.allow_disability_questions = False
+        indicator.effective_sex_categories = ['Female', 'Male']
+        indicator.effective_age_groups = []
+
+        entry = _make_form_data_entry(data_not_available=True)
+        aes = _make_mock_oes()
+
+        with app.test_request_context(
+            '/test',
+            method='POST',
+            data={'action': 'save', 'indicator_1368_total_value': ''},
+        ):
+            with patch('app.services.forms.processors.indicator.db') as mock_db, \
+                 patch.object(FormDataService, '_get_data_model') as mock_model, \
+                 patch.object(FormDataService, '_get_data_query_filter', return_value={}), \
+                 patch.object(FormDataService, '_clear_ai_validation_for_form_data'):
+                mock_model_class = MagicMock()
+                mock_model_class.query.filter_by.return_value.first.return_value = entry
+                mock_model.return_value = mock_model_class
+
+                changes = FormDataService._process_indicator_data(indicator, aes, [])
+
+        entry.set_data_availability.assert_called_with(False, False)
+        entry.set_simple_value.assert_called_with(None)
+        mock_db.session.add.assert_called_once_with(entry)
+        assert changes
+        assert changes[0]['old_data_not_available'] is True
+        assert changes[0]['new_data_not_available'] is False
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FormDataService._clear_ai_validation_for_form_data

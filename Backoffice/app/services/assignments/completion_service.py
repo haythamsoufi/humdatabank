@@ -64,6 +64,112 @@ def _coalesce_disagg(disagg, prefilled_disagg, imputed_disagg):
     return None
 
 
+_EMPTY_SCALAR_SENTINELS = frozenset(('', 'None', 'null', 'undefined'))
+
+
+def _is_numeric_zero(raw: Any) -> bool:
+    """True for 0 / 0.0 / '0' / '0.00'. bool is not treated as a number."""
+    if isinstance(raw, bool) or raw is None:
+        return False
+    if isinstance(raw, (int, float)):
+        return raw == 0
+    if isinstance(raw, str):
+        s = raw.strip().replace(',', '').replace(' ', '').replace('\u00a0', '').replace('\u202f', '')
+        if not s:
+            return False
+        try:
+            return float(s) == 0.0
+        except (ValueError, TypeError):
+            return False
+    display = matrix_cell_display_value(raw)
+    if display is not None and display is not raw:
+        return _is_numeric_zero(display)
+    return False
+
+
+def _nested_values_have_reported_data(values: Any) -> bool:
+    """True when a disagg ``values`` object contains a non-zero reported figure.
+
+    Nested maps (e.g. ``{direct: {male: 5}}``) are walked. Empty dicts, blank
+    strings, and zeros do not count as reported.
+    """
+    if values is None:
+        return False
+    if isinstance(values, dict):
+        return any(_nested_values_have_reported_data(v) for v in values.values())
+    if isinstance(values, list):
+        return any(_nested_values_have_reported_data(v) for v in values)
+    if isinstance(values, bool):
+        return True
+    if _is_numeric_zero(values):
+        return False
+    if isinstance(values, (int, float)):
+        return True
+    if isinstance(values, str):
+        return values.strip() not in _EMPTY_SCALAR_SENTINELS
+    return bool(values)
+
+
+def disagg_payload_has_reported_value(disagg: Any) -> bool:
+    """True when disagg JSON contains a reported non-zero value, not just a mode.
+
+    Selecting age/sex/sex_age stores ``{"mode": "...", "values": {}}`` (or a
+    mode-only object) even when every table cell is empty or 0. That must not
+    count as filled for completion rate or "Show me what I missed".
+    """
+    if disagg is None:
+        return False
+    if not isinstance(disagg, dict):
+        return _scalar_value_is_filled(disagg)
+
+    if 'values' in disagg:
+        return _nested_values_have_reported_data(disagg.get('values'))
+
+    return any(
+        (not _is_numeric_zero(v)) and _matrix_cell_has_value(v)
+        for k, v in disagg.items()
+        if k != 'mode' and not str(k).startswith('_') and not _is_matrix_metadata_key(k)
+    )
+
+
+def _scalar_value_is_filled(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, dict):
+        return disagg_payload_has_reported_value(value)
+    if isinstance(value, list):
+        return any(_scalar_value_is_filled(v) for v in value)
+    if isinstance(value, bool):
+        return True
+    if _is_numeric_zero(value):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    return str(value).strip() not in _EMPTY_SCALAR_SENTINELS
+
+
+def form_data_entry_is_filled(entry) -> bool:
+    """True when a FormData / RepeatGroupData row counts as filled for completion."""
+    if not entry:
+        return False
+    if entry.not_applicable or entry.data_not_available:
+        return True
+    if disagg_payload_has_reported_value(
+        _coalesce_disagg(
+            entry.disagg_data,
+            getattr(entry, 'prefilled_disagg_data', None),
+            getattr(entry, 'imputed_disagg_data', None),
+        )
+    ):
+        return True
+    effective_value = entry.value
+    if effective_value is None and getattr(entry, 'prefilled_value', None) is not None:
+        effective_value = entry.prefilled_value
+    elif effective_value is None and getattr(entry, 'imputed_value', None) is not None:
+        effective_value = entry.imputed_value
+    return _scalar_value_is_filled(effective_value)
+
+
 def explain_matrix_entry_fill(
     disagg,
     prefilled_disagg,
@@ -123,11 +229,21 @@ def explain_matrix_entry_fill(
     }
 
 
-def _form_data_has_value_filter():
+def _form_data_might_have_value_filter():
+    """SQL prefilter: row *might* be filled. Confirm with form_data_entry_is_filled().
+
+    ``disagg_data IS NOT NULL`` is not sufficient on its own — a reporting-mode
+    payload with empty ``values`` must still be treated as missing.
+    """
     return or_(
         FormData.value.isnot(None),
         FormData.disagg_data.isnot(None),
+        FormData.prefilled_value.isnot(None),
+        FormData.prefilled_disagg_data.isnot(None),
+        FormData.imputed_value.isnot(None),
+        FormData.imputed_disagg_data.isnot(None),
         FormData.not_applicable == True,
+        FormData.data_not_available == True,
     )
 
 
@@ -401,37 +517,7 @@ def _metadata_relevant_relevance_rules(template_id: int, version_id: int) -> tup
 
 def _repeat_group_row_is_filled(row) -> bool:
     """True when a RepeatGroupData row counts as filled for completion."""
-    if not row:
-        return False
-    if row.not_applicable or row.data_not_available:
-        return True
-    effective_disagg = _coalesce_disagg(
-        row.disagg_data,
-        row.prefilled_disagg_data,
-        row.imputed_disagg_data,
-    )
-    if effective_disagg is not None:
-        if isinstance(effective_disagg, dict):
-            values = effective_disagg.get('values')
-            if isinstance(values, dict) and any(
-                v is not None and str(v).strip() != ''
-                for v in values.values()
-            ):
-                return True
-            if any(
-                _matrix_cell_has_value(v)
-                for k, v in effective_disagg.items()
-                if not str(k).startswith('_')
-            ):
-                return True
-        elif str(effective_disagg).strip():
-            return True
-    effective_value = row.value
-    if effective_value is None and row.prefilled_value is not None:
-        effective_value = row.prefilled_value
-    elif effective_value is None and row.imputed_value is not None:
-        effective_value = row.imputed_value
-    return effective_value is not None and str(effective_value).strip() != ''
+    return form_data_entry_is_filled(row)
 
 
 def _repeat_section_id_by_section_id(template_id: int, version_id: int) -> dict[int, int]:
@@ -661,7 +747,7 @@ class AssignmentCompletionService:
         repeat_section_ids = set(repeat_by_section.keys())
 
         query = (
-            db.session.query(FormItem.id)
+            db.session.query(FormItem.id, FormData)
             .join(FormData, FormData.form_item_id == FormItem.id)
             .join(FormSection, FormItem.section_id == FormSection.id)
             .filter(
@@ -670,13 +756,17 @@ class AssignmentCompletionService:
                 *visibility_filters,
                 FormItem.item_type != 'matrix',
                 _countable_form_item_filter(),
-                _form_data_has_value_filter(),
+                _form_data_might_have_value_filter(),
             )
         )
         if repeat_section_ids:
             query = query.filter(~FormItem.section_id.in_(list(repeat_section_ids)))
 
-        filled = {item_id for (item_id,) in query.all()}
+        filled = {
+            item_id
+            for item_id, form_data in query.all()
+            if form_data_entry_is_filled(form_data)
+        }
         filled |= AssignmentCompletionService._filled_repeat_non_matrix_item_ids(
             assignment_entity_status_id,
             template_id,

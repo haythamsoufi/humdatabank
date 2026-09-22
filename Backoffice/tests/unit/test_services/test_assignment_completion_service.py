@@ -12,7 +12,9 @@ from app.services.assignments.completion_service import (
     _countable_form_item_filter,
     _published_filters_single,
     completion_rate_percent,
+    disagg_payload_has_reported_value,
     emergency_operations_option_count,
+    form_data_entry_is_filled,
     matrix_entry_is_filled,
     matrix_has_manual_rows,
     matrix_is_list_backed,
@@ -477,9 +479,74 @@ def test_calculate_section_completion_skips_excluded_fields():
     assert statuses['Test section'] == 'Not Started'
 
 
-def test_repeat_group_row_is_filled_with_value():
-    from types import SimpleNamespace
+def test_disagg_payload_has_reported_value_ignores_empty_reporting_mode():
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'age', 'values': {}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex_age', 'values': {}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex'}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'male': None, 'female': ''}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'direct': {}}}) is False
 
+
+def test_disagg_payload_has_reported_value_ignores_zeros():
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'male': 0}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'male': 0, 'female': 0}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'male': '0', 'female': '0.00'}}) is False
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'direct': {'male': 0}}}) is False
+    assert disagg_payload_has_reported_value({'male': 0, 'female': 0}) is False
+
+
+def test_disagg_payload_has_reported_value_with_table_values():
+    assert disagg_payload_has_reported_value({'mode': 'age', 'values': {'0_17': 4}}) is True
+    assert disagg_payload_has_reported_value(
+        {'mode': 'sex', 'values': {'direct': {'male': 5}}}
+    ) is True
+    assert disagg_payload_has_reported_value({'mode': 'sex', 'values': {'male': 0, 'female': 3}}) is True
+
+
+def test_form_data_entry_is_filled_empty_reporting_mode():
+    row = SimpleNamespace(
+        not_applicable=False,
+        data_not_available=False,
+        disagg_data={'mode': 'sex', 'values': {}},
+        prefilled_disagg_data=None,
+        imputed_disagg_data=None,
+        value=None,
+        prefilled_value=None,
+        imputed_value=None,
+    )
+    assert form_data_entry_is_filled(row) is False
+
+
+def test_form_data_entry_is_filled_with_disagg_values():
+    row = SimpleNamespace(
+        not_applicable=False,
+        data_not_available=False,
+        disagg_data={'mode': 'sex', 'values': {'male': 10, 'female': 12}},
+        prefilled_disagg_data=None,
+        imputed_disagg_data=None,
+        value=None,
+        prefilled_value=None,
+        imputed_value=None,
+    )
+    assert form_data_entry_is_filled(row) is True
+
+
+def test_form_data_entry_is_filled_zeros_only_not_filled():
+    row = SimpleNamespace(
+        not_applicable=False,
+        data_not_available=False,
+        disagg_data={'mode': 'sex', 'values': {'male': 0, 'female': 0}},
+        prefilled_disagg_data=None,
+        imputed_disagg_data=None,
+        value='0',
+        prefilled_value=None,
+        imputed_value=None,
+    )
+    assert form_data_entry_is_filled(row) is False
+
+
+def test_repeat_group_row_is_filled_with_value():
     from app.services.assignments.completion_service import _repeat_group_row_is_filled
 
     row = SimpleNamespace(
@@ -493,6 +560,22 @@ def test_repeat_group_row_is_filled_with_value():
         imputed_value=None,
     )
     assert _repeat_group_row_is_filled(row) is True
+
+
+def test_repeat_group_row_is_filled_empty_reporting_mode():
+    from app.services.assignments.completion_service import _repeat_group_row_is_filled
+
+    row = SimpleNamespace(
+        not_applicable=False,
+        data_not_available=False,
+        disagg_data={'mode': 'sex_age', 'values': {}},
+        prefilled_disagg_data=None,
+        imputed_disagg_data=None,
+        value=None,
+        prefilled_value=None,
+        imputed_value=None,
+    )
+    assert _repeat_group_row_is_filled(row) is False
 
 
 def test_maybe_refresh_after_exclude_change_skips_draft_version():

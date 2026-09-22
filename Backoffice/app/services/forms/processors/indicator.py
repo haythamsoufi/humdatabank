@@ -35,12 +35,17 @@ class IndicatorProcessorMixin:
         """
         Avoid wiping stored values on action=save when the POST contains empty inputs
         for fields the user did not change (e.g. hidden disaggregation total_value inputs).
+
+        Data-availability flags are not in that category: unchecking DNA/NA omits the
+        checkbox from the POST, so an empty save must clear the stored flag.
         """
         if is_presave or field_cleared:
             return is_presave
         if request.form.get('action', 'save') != 'save':
             return False
         if not data_entry or not cls._has_meaningful_data(data_entry):
+            return False
+        if data_entry.data_not_available or data_entry.not_applicable:
             return False
         if cls._check_for_field_clearing_signals(form_item_id):
             return False

@@ -6,11 +6,12 @@ Do **not** commit the source `.xlsx` (repo-wide gitignore). Commit the JSON so i
 
 ## Current snapshot
 
-| File | Round | Assignment `period_name` | Source workbook | Excel table |
-|---|---|---|---|---|
-| `myr26_ifrc_secretariat_actuals.json` | `MYR26` | `Jan-Jun 2026` | `System Financial Figures 2026.xlsx` | `Final` |
+| File | Round | Assignment `period_name` | Assigned form | Source workbook | Excel table |
+|---|---|---|---|---|---|
+| `2026_ifrc_secretariat_actuals.json` | `MYR26`, `AR26` | `Jan-Jun 2026`, `2026` | mid-year exists; annual when created | `System Financial Figures 2026.xlsx` | `Final` on sheet `Final (2)` |
+| `2025_ifrc_secretariat_actuals.json` | `AR25`, `MYR25` | `2025`, `Jan-Jun 2025` | 29 and 30 | `System financial figures 2025.xlsx` | `Final` on sheet `Final` |
 
-The loader in `plugins/upr/data.py` only applies this file when `period_to_round(period_name, "report") == "MYR26"`. Other rounds stay **Not reported** until a new snapshot is added **and** the loader is extended.
+`ifrc_secretariat_actuals_for_report` in `plugins/upr/financial.py` loads the file registered for `period_to_round(period_name, "report")`. Each calendar year is one snapshot shared by the mid-year and annual reports. Other years stay **Not reported** until a snapshot is added **and** registered in `_IFRC_ACTUALS_SNAPSHOTS`.
 
 ## Source workbook
 
@@ -27,7 +28,9 @@ Sheets seen in the 2026 file:
 | `UPR Data` | Plan-side requirement totals — **do not** use for Funding/Expenditure |
 | `Raw Data` / `Filtered out` | Line-level finance — already rolled into `Final` |
 
-Confirm the table name in openpyxl (`ws.tables`) rather than the sheet tab. The 2026 file used sheet `Final (2)` + table `Final`.
+Confirm the table name in openpyxl (`ws.tables`) rather than the sheet tab. The 2026 file used sheet `Final (2)` + table `Final`. The 2025 file uses sheet `Final` + table `Final`, with the header on row 2 (row 1 is a banner). It has no ISO2 column and no `1_c_Country Map` sheet: ISO2 comes from `Raw data` (`CountryFinal` / `ISO2Final`), and ISO3 from the `country` table (name match when `iso2` is null, as for Namibia).
+
+The 2025 `Final` table also has **Regular Resources** funding and expenditure. Those columns are omitted. The Financial Overview visual only has Longer-term and Emergency Operations, same as the 2026 extract (where Regular Resources was empty).
 
 ### `Final` columns
 
@@ -48,8 +51,8 @@ Confirm the table name in openpyxl (`ws.tables`) rather than the sheet tab. The 
 {
   "source": "System Financial Figures 2026.xlsx",
   "table": "Final",
-  "round": "MYR26",
-  "period_name": "Jan-Jun 2026",
+  "rounds": ["MYR26", "AR26"],
+  "period_names": ["Jan-Jun 2026", "2026"],
   "currency": "CHF",
   "by_iso2": {
     "AF": {
@@ -80,7 +83,7 @@ from pathlib import Path
 import openpyxl
 
 src = Path(r"C:\path\to\System Financial Figures 2026.xlsx")
-out = Path("plugins/upr/snapshots/myr26_ifrc_secretariat_actuals.json")
+out = Path("plugins/upr/snapshots/2026_ifrc_secretariat_actuals.json")
 min_chf = 1000
 
 wb = openpyxl.load_workbook(src, data_only=True)
@@ -156,8 +159,8 @@ payload = {
     ),
     "source": src.name,
     "table": "Final",
-    "round": "MYR26",
-    "period_name": "Jan-Jun 2026",
+    "rounds": ["MYR26", "AR26"],
+    "period_names": ["Jan-Jun 2026", "2026"],
     "currency": "CHF",
     "by_iso2": dict(sorted(by_iso2.items())),
 }
@@ -175,8 +178,8 @@ Sanity checks after extract:
 
 This is **not** automatic. You must:
 
-1. Extract a new `*.json` next to this README (same schema, different `round` / `period_name`).
-2. Teach `ifrc_secretariat_actuals_for_report` in `data.py` to load it for that round. Today the path and `MYR26` check are hardcoded.
+1. Extract a new `*.json` next to this README. One file covers that year's mid-year and annual reports.
+2. Register both round codes in `_IFRC_ACTUALS_SNAPSHOTS` in `financial.py`.
 3. Extend `plugins/upr/tests/test_data_helpers.py`.
 
-Do not reuse the MYR26 file for AR / other mid-years.
+Do not reuse a year's snapshot for a different year.

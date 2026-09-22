@@ -74,5 +74,5 @@ Key cases: remapper moves emergency → `SP2` and drops long-term; report payloa
 
 ## Related
 
-- [`snapshots/README.md`](../snapshots/README.md) — separate temporary overlay (IFRC Secretariat finance actuals for MYR26)
+- [`snapshots/README.md`](../snapshots/README.md) — separate temporary overlay (IFRC Secretariat finance actuals for 2025 and 2026)
 - Form guidance still lists both indicators under Cross Cutting: [`Backoffice/docs/data-reporting/data-guidance-upr.md`](../../../docs/data-reporting/data-guidance-upr.md)

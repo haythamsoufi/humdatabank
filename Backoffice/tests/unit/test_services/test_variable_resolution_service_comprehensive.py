@@ -553,6 +553,18 @@ class TestReplaceVariablesInText:
         result = VariableResolutionService.replace_variables_in_text("[[period]+1]", {"period": 2024})
         assert result == "2025"
 
+    def test_upr_funding_subsection_placeholders(self):
+        resolved = {"assignment_period": "2027"}
+        assert VariableResolutionService.replace_variables_in_text(
+            "Funding Requirements for [assignment_period]", resolved
+        ) == "Funding Requirements for 2027"
+        assert VariableResolutionService.replace_variables_in_text(
+            "Funding Requirements for  [[assignment_period]+1]", resolved
+        ) == "Funding Requirements for  2028"
+        assert VariableResolutionService.replace_variables_in_text(
+            "Funding Requirements for  [[assignment_period]+2]", resolved
+        ) == "Funding Requirements for  2029"
+
     def test_formula_multiply(self):
         result = VariableResolutionService.replace_variables_in_text("[[count]*2]", {"count": 5})
         assert result == "10"

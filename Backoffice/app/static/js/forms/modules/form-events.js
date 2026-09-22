@@ -609,10 +609,16 @@ export function initFormEvents() {
     });
   }
 
-  // Wire chatbot FAB hover to show/hide the AI action popup above it
-  const chatbotFAB = document.getElementById('aiChatbotFAB');
-  const chatbotAiMenu = document.getElementById('chatbot-ai-hover-menu');
-  if (chatbotFAB && chatbotAiMenu) {
+  // Wire chatbot FAB hover to show/hide the AI action popup above it.
+  // The FAB can appear after deferred chatbot load, so retry until it exists.
+  const bindChatbotAiHoverMenu = () => {
+    const chatbotFAB = document.getElementById('aiChatbotFAB');
+    const chatbotAiMenu = document.getElementById('chatbot-ai-hover-menu');
+    if (!chatbotFAB || !chatbotAiMenu || chatbotAiMenu.dataset.hoverBound === '1') {
+      return !!(chatbotFAB && chatbotAiMenu && chatbotAiMenu.dataset.hoverBound === '1');
+    }
+    chatbotAiMenu.dataset.hoverBound = '1';
+
     let hideTimer = null;
     const menuGapFromFab = 16;
 
@@ -649,9 +655,18 @@ export function initFormEvents() {
     chatbotAiMenu.addEventListener('mouseleave', scheduleHide);
     window.addEventListener('resize', alignMenuToFab);
     alignMenuToFab();
+    return true;
+  };
+
+  if (!bindChatbotAiHoverMenu()) {
+    const observer = new MutationObserver(() => {
+      if (bindChatbotAiHoverMenu()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.setTimeout(() => observer.disconnect(), 30000);
   }
 
-  // Validation Summary button — directly initialised via initValidationSummaryExport (main.js)
+  // Summary + details chips — initialised via initValidationSummaryBanner / initValidationSummaryExport (main.js)
   // Run AI opinions button — directly initialised via initAiOpinions (main.js / ai-opinions.js)
   // Both buttons are identified by their own IDs so no click delegation needed here.
 }

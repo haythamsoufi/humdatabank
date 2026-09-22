@@ -26,6 +26,7 @@ import { initTooltips } from './modules/tooltips.js';
 import { initFormEvents } from './modules/form-events.js';
 import { cleanupInputValues, setupNumericInputJsonSupport } from './modules/form-item-utils.js';
 import { initAiOpinions } from './modules/ai-opinions.js';
+import { initValidationSummaryBanner } from './modules/validation-summary-banner.js';
 import { debugLog, debugWarn, debugError } from './modules/debug.js';
 import { initCompletionGapHighlight, initCompletionRateRefresh, refreshVisibleCompletionRate, applyCompletionRate } from './modules/entry-form-progress.js';
 // Heavy feature modules — dynamically imported based on window.__formFeatures flags.
@@ -236,11 +237,11 @@ async function initializeEntryForm() {
             safeInit('initPDFExport', () => initPDFExport('focalDataEntryForm', 'export-pdf-btn', document.title));
         }
 
-        // Initialize Validation Summary export functionality
-        // Button now lives in the chatbot-hover-menu popup (fab-validation-summary-btn)
+        // Initialize Validation details (full per-field page) and on-form summary banner
         if (initValidationSummaryExport) {
-            safeInit('initValidationSummaryExport', () => initValidationSummaryExport('focalDataEntryForm', 'fab-validation-summary-btn'));
+            safeInit('initValidationSummaryExport', () => initValidationSummaryExport('focalDataEntryForm', 'fab-validation-details-btn'));
         }
+        safeInit('initValidationSummaryBanner', () => initValidationSummaryBanner());
         safeInit('initAiOpinions', () => initAiOpinions());
 
         // Initialize Excel export functionality

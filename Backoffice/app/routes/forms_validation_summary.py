@@ -6,6 +6,8 @@ Keeps `forms.py` slimmer by registering these routes onto the existing `forms` b
 
 from __future__ import annotations
 
+from typing import Any
+
 import logging
 from contextlib import suppress
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
@@ -16,7 +18,7 @@ import threading
 import time
 import uuid
 
-from flask import Response, current_app, flash, redirect, render_template, request, send_file, url_for
+from flask import Response, current_app, flash, redirect, render_template, request, send_file, stream_with_context, url_for
 from flask_babel import _
 from flask_login import current_user, login_required
 from sqlalchemy.orm import aliased, contains_eager, joinedload
@@ -366,12 +368,34 @@ def register_validation_summary_routes(bp) -> None:
 
         return [e for e in all_entries if _is_eligible(e)]
 
-    def _localized_form_item_label(fi: FormItem, translation_key: str) -> str:
+    def _assignment_display_variables(aes: AssignmentEntityStatus):
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+        return VariableResolutionService.resolve_for_assignment_display(aes)
+
+    def _resolve_display_text(text, resolved_variables, variable_configs):
+        if not text:
+            return text
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+        try:
+            return VariableResolutionService.replace_variables_if_placeholders(
+                str(text), resolved_variables or {}, variable_configs or {}
+            )
+        except Exception as e:
+            logger.debug("display variable replace failed: %s", e)
+            return text
+
+    def _localized_form_item_label(
+        fi: FormItem,
+        translation_key: str,
+        resolved_variables=None,
+        variable_configs=None,
+    ) -> str:
         if not fi:
             return ""
         try:
             if getattr(fi, "is_indicator", False) and getattr(fi, "indicator_bank", None):
-                return get_localized_indicator_name(fi.indicator_bank) or (fi.label or "")
+                raw = get_localized_indicator_name(fi.indicator_bank) or (fi.label or "")
+                return _resolve_display_text(raw, resolved_variables, variable_configs)
         except Exception as e:
             logger.debug("label get failed: %s", e)
 
@@ -387,8 +411,8 @@ def register_validation_summary_routes(bp) -> None:
             for key in [translation_key, "en"]:
                 val = translations_dict.get(key)
                 if isinstance(val, str) and val.strip():
-                    return val.strip()
-        return (fi.label or "").strip()
+                    return _resolve_display_text(val.strip(), resolved_variables, variable_configs)
+        return _resolve_display_text((fi.label or "").strip(), resolved_variables, variable_configs)
 
     def _value_display(fd: FormData) -> str:
         if not fd:
@@ -451,6 +475,239 @@ def register_validation_summary_routes(bp) -> None:
             "updated_at": rec.updated_at.isoformat() if getattr(rec, "updated_at", None) else None,
         }
 
+    def _tally_existing_opinions(
+        assignment_entity_status: AssignmentEntityStatus,
+        *,
+        hidden_field_ids: set[int],
+        hidden_section_ids: set[int],
+        include_non_reported: bool,
+    ) -> dict:
+        """Phase 1 of the Validation summary: gather this assignment's entries and any
+        already-stored per-field AI opinions, and tally them into counts / a truncated
+        issues list / a heuristic headline. Pure DB reads + in-memory tallying, no new
+        AI calls — split out of ``_build_overview_payload`` so
+        ``validation_summary_overview_stream`` can emit a real "reading the assignment"
+        stage event right before this runs, instead of a client-side timer guess.
+        """
+        translation_key = get_translation_key()
+        resolved_variables, variable_configs = _assignment_display_variables(assignment_entity_status)
+        entries = _get_entries_for_summary(
+            assignment_entity_status,
+            hidden_field_ids=hidden_field_ids,
+            hidden_section_ids=hidden_section_ids,
+            include_non_reported=include_non_reported,
+        )
+        form_data_ids = [int(e.id) for e in entries if e and e.id]
+        from app.models.ai_validation import AIFormDataValidation
+
+        existing = {}
+        if form_data_ids:
+            rows = AIFormDataValidation.query.filter(AIFormDataValidation.form_data_id.in_(form_data_ids)).all()
+            existing = {int(v.form_data_id): v for v in rows if v and v.form_data_id}
+
+        missing_existing = {}
+        if include_non_reported:
+            try:
+                missing_item_ids = [
+                    int(fd.form_item_id)
+                    for fd in entries
+                    if fd and not getattr(fd, "id", None) and fd.form_item_id
+                ]
+                missing_item_ids = list(dict.fromkeys(missing_item_ids))
+                if missing_item_ids:
+                    rows = (
+                        AIFormDataValidation.query
+                        .filter(AIFormDataValidation.form_data_id.is_(None))
+                        .filter(AIFormDataValidation.assignment_entity_status_id == int(assignment_entity_status.id))
+                        .filter(AIFormDataValidation.form_item_id.in_(missing_item_ids))
+                        .all()
+                    )
+                    missing_existing = {int(v.form_item_id): v for v in rows if v and v.form_item_id}
+            except Exception as e:
+                logger.debug("overview missing_existing failed: %s", e)
+                missing_existing = {}
+
+        counts = {"good": 0, "discrepancy": 0, "uncertain": 0, "failed": 0, "missing": 0}
+        issues: list[dict] = []
+        field_opinions: list[dict] = []
+        rank = {"discrepancy": 0, "failed": 1, "uncertain": 2}
+
+        for fd in entries:
+            if not fd:
+                continue
+            fi = getattr(fd, "form_item", None)
+            rec = None
+            if getattr(fd, "id", None):
+                rec = existing.get(int(fd.id))
+            elif fd.form_item_id:
+                rec = missing_existing.get(int(fd.form_item_id))
+            serialized = _serialize_validation(rec) if rec else {}
+
+            def _token(value: Any) -> str:
+                if value is None:
+                    return ""
+                if hasattr(value, "value"):
+                    value = value.value
+                text = str(value).strip().lower()
+                if "." in text:
+                    text = text.rsplit(".", 1)[-1]
+                return text
+
+            status = _token((serialized or {}).get("status"))
+            verdict = _token((serialized or {}).get("verdict"))
+            summary = str((serialized or {}).get("opinion_summary") or "").strip()
+            if verdict:
+                field_opinions.append({
+                    "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
+                    "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
+                    "verdict": verdict if status != "failed" else "failed",
+                    "opinion_summary": summary[:400],
+                })
+            if not verdict:
+                counts["missing"] += 1
+                continue
+            if status == "failed":
+                counts["failed"] += 1
+                bucket = "failed"
+            elif verdict == "good":
+                counts["good"] += 1
+                continue
+            elif verdict == "discrepancy":
+                counts["discrepancy"] += 1
+                bucket = "discrepancy"
+            else:
+                counts["uncertain"] += 1
+                bucket = "uncertain"
+
+            if len(summary) > 220:
+                summary = summary[:217].rstrip() + "…"
+            issues.append({
+                "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
+                "form_data_id": int(fd.id) if getattr(fd, "id", None) else None,
+                "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
+                "verdict": bucket,
+                "confidence": (serialized or {}).get("confidence"),
+                "opinion_summary": summary,
+            })
+
+        issues.sort(key=lambda row: (rank.get(row.get("verdict"), 9), str(row.get("label") or "")))
+        issues = issues[:8]
+
+        reviewed = counts["good"] + counts["discrepancy"] + counts["uncertain"] + counts["failed"]
+        if reviewed == 0:
+            headline = _("No AI validation results yet. Run AI validation, or open details to generate them.")
+        elif counts["discrepancy"] == 1:
+            headline = _("AI found 1 discrepancy across %(total)s reviewed fields.") % {"total": reviewed}
+        elif counts["discrepancy"]:
+            headline = _("AI found %(n)s discrepancies across %(total)s reviewed fields.") % {
+                "n": counts["discrepancy"],
+                "total": reviewed,
+            }
+        elif counts["failed"] == 1:
+            headline = _("1 field failed validation across %(total)s reviewed fields.") % {"total": reviewed}
+        elif counts["failed"]:
+            headline = _("%(n)s fields failed validation across %(total)s reviewed fields.") % {
+                "n": counts["failed"],
+                "total": reviewed,
+            }
+        elif counts["uncertain"] == 1:
+            headline = _("No discrepancies; 1 field needs review.")
+        elif counts["uncertain"]:
+            headline = _("No discrepancies; %(n)s fields need review.") % {"n": counts["uncertain"]}
+        elif reviewed == 1:
+            headline = _("All 1 reviewed field looks consistent with available evidence.")
+        else:
+            headline = _("All %(n)s reviewed fields look consistent with available evidence.") % {"n": reviewed}
+
+        return {
+            "entries": entries,
+            "counts": counts,
+            "issues": issues,
+            "field_opinions": field_opinions,
+            "headline": headline,
+            "reviewed": reviewed,
+        }
+
+    def _finalize_overview_result(
+        assignment_entity_status: AssignmentEntityStatus,
+        base: dict,
+        review: dict,
+    ) -> dict:
+        """Phase 3: fold the assignment-review briefing (``review``) into the phase-1
+        tally (``base``) to build the final banner payload. Shared by the plain-JSON
+        and streaming overview routes so both return the exact same shape.
+        """
+        # Prefer assignment-review issues (flags/highlights) over truncated per-field opinions.
+        issues = base["issues"]
+        review_issues = []
+        for row in review.get("whats_not") or []:
+            if not isinstance(row, dict) or not row.get("text"):
+                continue
+            review_issues.append({
+                "form_item_id": row.get("form_item_id"),
+                "form_data_id": None,
+                "label": row.get("label") or "",
+                "verdict": "discrepancy" if row.get("severity") == "flag" else "uncertain",
+                "confidence": None,
+                "opinion_summary": row.get("text"),
+            })
+        if review_issues:
+            issues = review_issues[:10]
+
+        return {
+            "counts": base["counts"],
+            "reviewed": base["reviewed"],
+            "headline": str(review.get("headline") or base["headline"]),
+            "issues": issues,
+            "overview_figures": review.get("overview_figures") or [],
+            "whats_good": review.get("whats_good") or [],
+            "comment_note": review.get("comment_note"),
+            "narrative": review.get("narrative") or "",
+            "details_url": url_for(
+                "forms.validation_summary_progress_page",
+                aes_id=int(assignment_entity_status.id),
+                run="0",
+            ),
+        }
+
+    def _build_overview_payload(
+        assignment_entity_status: AssignmentEntityStatus,
+        *,
+        hidden_field_ids: set[int],
+        hidden_section_ids: set[int],
+        include_non_reported: bool,
+    ) -> dict:
+        """Compact counts + issue list for the on-form Validation summary banner, in a
+        single request/response. See ``validation_summary_overview_stream`` for the SSE
+        version that streams real progress events for the same underlying work."""
+        base = _tally_existing_opinions(
+            assignment_entity_status,
+            hidden_field_ids=hidden_field_ids,
+            hidden_section_ids=hidden_section_ids,
+            include_non_reported=include_non_reported,
+        )
+        review = {
+            "headline": base["headline"],
+            "overview_figures": [],
+            "whats_good": [],
+            "whats_not": [],
+            "comment_note": None,
+            "narrative": "",
+        }
+        try:
+            from app.services.ai.validation.assignment_review import generate_assignment_review
+            review = generate_assignment_review(
+                assignment_entity_status=assignment_entity_status,
+                counts=base["counts"],
+                field_opinions=base["field_opinions"],
+                fallback_headline=base["headline"],
+                entries=base["entries"],
+            ) or review
+        except Exception as e:
+            logger.debug("assignment review briefing failed: %s", e)
+
+        return _finalize_overview_result(assignment_entity_status, base, review)
+
     @bp.route("/assignment_status/<int:aes_id>/validation_summary", methods=["GET"])
     @login_required
     def validation_summary_progress_page(aes_id: int):
@@ -477,6 +734,7 @@ def register_validation_summary_routes(bp) -> None:
             include_non_reported=include_non_reported,
         )
         form_data_ids = [int(e.id) for e in entries if e and e.id]
+        resolved_variables, variable_configs = _assignment_display_variables(assignment_entity_status)
 
         from app.models.ai_validation import AIFormDataValidation
 
@@ -574,7 +832,11 @@ def register_validation_summary_routes(bp) -> None:
                     raw = (get_localized_page_name(p) or getattr(p, "name", None) or "").strip()
                     if not raw or raw.lower() == str(_page_label).strip().lower():
                         raw = f"{_page_label} {i + 1}"
-                    page_id_to_name[int(p.id)] = str(raw).strip() or f"{_page_label} {i + 1}"
+                    page_id_to_name[int(p.id)] = _resolve_display_text(
+                        str(raw).strip() or f"{_page_label} {i + 1}",
+                        resolved_variables,
+                        variable_configs,
+                    )
 
             # Build ordered_groups: (page_id, section_id, subsection_id, page_name, section_name, subsection_name)
             # Force strings so lazy translations evaluate and we have fallbacks for empty names
@@ -588,9 +850,11 @@ def register_validation_summary_routes(bp) -> None:
                 roots = sorted(roots, key=lambda r: (getattr(r, "order", 0) or 0))
                 for root in roots:
                     sec_name = str(get_localized_section_name(root) or getattr(root, "name", None) or _section_fallback).strip() or str(_section_fallback)
+                    sec_name = _resolve_display_text(sec_name, resolved_variables, variable_configs)
                     ordered_groups.append((page_id, int(root.id), None, page_name, sec_name, None))
                     for sub in children_by_parent.get(int(root.id), []):
                         sub_name = str(get_localized_section_name(sub) or getattr(sub, "name", None) or _subsection_fallback).strip() or str(_subsection_fallback)
+                        sub_name = _resolve_display_text(sub_name, resolved_variables, variable_configs)
                         ordered_groups.append((page_id, int(root.id), int(sub.id), page_name, sec_name, sub_name))
 
         def _group_key_for_entry(fd):
@@ -616,6 +880,8 @@ def register_validation_summary_routes(bp) -> None:
                     subsection_id = int(sec.id)
                     sec_name = str(get_localized_section_name(parent) or getattr(parent, "name", None) or _sec_fb).strip() or str(_sec_fb)
                     sub_name = str(get_localized_section_name(sec) or getattr(sec, "name", None) or _sub_fb).strip() or str(_sub_fb)
+                    sec_name = _resolve_display_text(sec_name, resolved_variables, variable_configs)
+                    sub_name = _resolve_display_text(sub_name, resolved_variables, variable_configs)
                     page_name = page_id_to_name.get(int(parent.page_id) if getattr(parent, "page_id", None) is not None else 0, _page_fb)
                     page_name = str(page_name or _page_fb).strip() or str(_page_fb)
                     for og in ordered_groups:
@@ -625,6 +891,7 @@ def register_validation_summary_routes(bp) -> None:
             # Non-subsection: page comes from the section itself.
             page_id = int(sec.page_id) if getattr(sec, "page_id", None) is not None else 0
             sec_name = str(get_localized_section_name(sec) or getattr(sec, "name", None) or _sec_fb).strip() or str(_sec_fb)
+            sec_name = _resolve_display_text(sec_name, resolved_variables, variable_configs)
             page_name = page_id_to_name.get(int(sec.page_id) if getattr(sec, "page_id", None) is not None else 0, _page_fb)
             page_name = str(page_name or _page_fb).strip() or str(_page_fb)
             for og in ordered_groups:
@@ -648,7 +915,7 @@ def register_validation_summary_routes(bp) -> None:
                 "form_data_id": key,
                 "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
                 "item_type": (getattr(fi, "item_type", None) or "").lower() if fi else "",
-                "label": _localized_form_item_label(fi, translation_key) if fi else "",
+                "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
                 "value_display": _value_display(fd),
                 "validation": (
                     _serialize_validation(existing.get(int(fd.id))) if getattr(fd, "id", None)
@@ -685,6 +952,28 @@ def register_validation_summary_routes(bp) -> None:
                 items_grouped.append({"headers": group_headers, "items": []})
                 prev_page, prev_section, prev_subsection = page_val, section_val, subsection_val
             items_grouped[-1]["items"].append(it)
+
+        initial_counts = {"good": 0, "discrepancy": 0, "uncertain": 0, "failed": 0, "missing": 0}
+        for it in items:
+            v = it.get("validation") or {}
+            status = str(v.get("status") or "").lower()
+            verdict = str(v.get("verdict") or "").lower()
+            if not verdict:
+                initial_counts["missing"] += 1
+            elif status == "failed":
+                initial_counts["failed"] += 1
+            elif verdict == "good":
+                initial_counts["good"] += 1
+            elif verdict == "discrepancy":
+                initial_counts["discrepancy"] += 1
+            else:
+                initial_counts["uncertain"] += 1
+        initial_existing = (
+            initial_counts["good"]
+            + initial_counts["discrepancy"]
+            + initial_counts["uncertain"]
+            + initial_counts["failed"]
+        )
 
         run_id = (request.args.get("run_id") or "").strip() or str(uuid.uuid4())
 
@@ -730,12 +1019,15 @@ def register_validation_summary_routes(bp) -> None:
         return render_template(
             "forms/entry_form/validation_summary_progress.html",
             aes=assignment_entity_status,
+            aes_id=int(aes_id),
             assignment=assignment,
             assignment_display_name=assignment_display_name,
             country=country,
             country_display_name=country_display_name,
             items=items,
             items_grouped=items_grouped,
+            initial_counts=initial_counts,
+            initial_existing=initial_existing,
             sse_url=sse_url,
             cancel_url=cancel_url,
             run_id=run_id,
@@ -785,6 +1077,7 @@ def register_validation_summary_routes(bp) -> None:
             include_non_reported=include_non_reported,
         )
         form_data_ids = [int(e.id) for e in entries if e and e.id]
+        resolved_variables, variable_configs = _assignment_display_variables(assignment_entity_status)
 
         from app.models.ai_validation import AIFormDataValidation
 
@@ -933,7 +1226,7 @@ def register_validation_summary_routes(bp) -> None:
                 key = str(int(fd.id)) if getattr(fd, "id", None) else f"m:{int(assignment_entity_status.id)}:{int(fd.form_item_id)}"
                 snapshot_items.append({
                     "form_data_id": key,
-                    "label": _localized_form_item_label(fi, translation_key) if fi else "",
+                    "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs) if fi else "",
                     "item_type": (getattr(fi, "item_type", None) or "").lower() if fi else "",
                     "value_display": _value_display(fd),
                     "validation": (
@@ -1101,6 +1394,8 @@ def register_validation_summary_routes(bp) -> None:
                 flash("Template not found for this assignment.", "warning")
                 return redirect(url_for("main.dashboard"))
 
+            resolved_variables, variable_configs = _assignment_display_variables(assignment_entity_status)
+
             # Build section tree (similar ordering to export_pdf)
             sections_by_page = {}
             default_page_id = 0
@@ -1122,6 +1417,7 @@ def register_validation_summary_routes(bp) -> None:
                     sec_name = get_localized_section_name(section_model)
                 if not sec_name:
                     sec_name = getattr(section_model, "display_name", None) or section_model.name
+                sec_name = _resolve_display_text(sec_name, resolved_variables, variable_configs)
 
                 node = {
                     "id": int(section_model.id),
@@ -1326,7 +1622,7 @@ def register_validation_summary_routes(bp) -> None:
                 node["fields_ordered"].append({
                     "form_item_id": int(fi.id),
                     "kind": _item_kind(fi),
-                    "label": _localized_form_item_label(fi, translation_key),
+                    "label": _localized_form_item_label(fi, translation_key, resolved_variables, variable_configs),
                     "model": fi,
                     "form_data_id": int(entry.id) if entry and entry.id else None,
                     "value": entry.disagg_data if (entry and entry.disagg_data is not None) else (entry.value if entry else None),
@@ -1560,7 +1856,7 @@ def register_validation_summary_routes(bp) -> None:
                 f"Error generating validation summary PDF for ACS {aes_id}: {e}",
                 exc_info=True,
             )
-            flash("Failed to generate validation summary.", "danger")
+            flash("Failed to generate validation details.", "danger")
             return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     @bp.route("/assignment_status/<int:aes_id>/validation_summary/opinions", methods=["GET"])
@@ -1655,6 +1951,134 @@ def register_validation_summary_routes(bp) -> None:
                 exc_info=True,
             )
             return json_server_error("Failed to load AI opinions")
+
+    @bp.route("/assignment_status/<int:aes_id>/validation_summary/overview", methods=["GET"])
+    @login_required
+    def validation_summary_overview(aes_id: int):
+        """Short Validation summary payload for the entry-form banner (not the details table)."""
+        try:
+            assignment_entity_status = _load_assignment_or_404(int(aes_id))
+            from app.services.organization.authorization_service import AuthorizationService
+
+            if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
+                return json_forbidden("Access denied")
+
+            payload = _build_overview_payload(
+                assignment_entity_status,
+                hidden_field_ids=_parse_hidden_ids_arg("hidden_fields"),
+                hidden_section_ids=_parse_hidden_ids_arg("hidden_sections"),
+                include_non_reported=str(request.args.get("include_non_reported") or "").strip().lower()
+                in ("1", "true", "yes", "y", "on"),
+            )
+            return json_ok(**payload)
+        except NotFound:
+            raise
+        except Exception as e:
+            current_app.logger.error(
+                "Error loading validation summary overview for ACS %s: %s",
+                aes_id,
+                e,
+                exc_info=True,
+            )
+            return json_server_error("Failed to load validation summary")
+
+    @bp.route("/assignment_status/<int:aes_id>/validation_summary/overview_stream", methods=["GET"])
+    @login_required
+    def validation_summary_overview_stream(aes_id: int):
+        """Server-Sent Events version of ``validation_summary_overview``.
+
+        Emits a real "stage" event right before each phase of the actual work begins —
+        reading the assignment's entries, checking the deterministic UPR figures/
+        funding/emergencies pack, then (only when an LLM call will actually happen)
+        writing the headline/narrative — so the on-form loading animation reflects
+        genuine backend progress instead of a blind client-side timer. Finishes with
+        one "result" event carrying the exact same JSON payload
+        ``validation_summary_overview`` returns, so the banner's rendering code is
+        unchanged — only how the loading state is driven changes.
+        """
+        assignment_entity_status = _load_assignment_or_404(int(aes_id))
+        from app.services.organization.authorization_service import AuthorizationService
+
+        if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
+            return Response(
+                "event: error\ndata: " + json.dumps({"error": "Access denied"}) + "\n\n",
+                mimetype="text/event-stream",
+            )
+
+        hidden_field_ids = _parse_hidden_ids_arg("hidden_fields")
+        hidden_section_ids = _parse_hidden_ids_arg("hidden_sections")
+        include_non_reported = str(request.args.get("include_non_reported") or "").strip().lower() in (
+            "1", "true", "yes", "y", "on",
+        )
+
+        def _send(event_name: str, payload: dict) -> str:
+            return f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+        def generate():
+            try:
+                yield _send("stage", {"key": "reading", "label": str(_("Reading the assignment…"))})
+                yield ": keepalive\n\n"
+                base = _tally_existing_opinions(
+                    assignment_entity_status,
+                    hidden_field_ids=hidden_field_ids,
+                    hidden_section_ids=hidden_section_ids,
+                    include_non_reported=include_non_reported,
+                )
+
+                yield _send("stage", {
+                    "key": "figures",
+                    "label": str(_("Checking the figures, funding & emergencies…")),
+                })
+                yield ": keepalive\n\n"
+                from app.services.ai.validation.assignment_review import (
+                    build_review_pack_and_fallback,
+                    finish_review_with_llm,
+                )
+                pack, review_base = build_review_pack_and_fallback(
+                    assignment_entity_status=assignment_entity_status,
+                    counts=base["counts"],
+                    fallback_headline=base["headline"],
+                    entries=base["entries"],
+                )
+
+                review = review_base
+                if pack:
+                    # A non-empty pack (UPR assignment) is the only case where an LLM
+                    # call will actually happen — the one real network round-trip in
+                    # this whole request — so only announce "writing the summary"
+                    # when it is genuinely about to happen.
+                    yield _send("stage", {"key": "summary", "label": str(_("Putting the summary together…"))})
+                    yield ": keepalive\n\n"
+                    try:
+                        review = finish_review_with_llm(
+                            pack, review_base,
+                            field_opinions=base["field_opinions"],
+                            counts=base["counts"],
+                        )
+                    except Exception as e:
+                        logger.debug("assignment review LLM finish failed: %s", e)
+                        review = review_base
+
+                result = _finalize_overview_result(assignment_entity_status, base, review)
+                yield _send("result", result)
+            except Exception as e:
+                current_app.logger.error(
+                    "Error streaming validation summary overview for ACS %s: %s",
+                    aes_id,
+                    e,
+                    exc_info=True,
+                )
+                yield _send("error", {"error": "Failed to load validation summary"})
+
+        # stream_with_context keeps the request/app context alive for the whole
+        # generator, not just until the view function returns — needed here because
+        # (unlike the sibling validation_summary_events stream) this generator does
+        # real DB queries / _() translations / url_for directly, not just JSON-izing
+        # values that were already computed before the first yield.
+        resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+        resp.headers["Cache-Control"] = "no-cache"
+        resp.headers["X-Accel-Buffering"] = "no"
+        return resp
 
     @bp.route("/assignment_status/<int:aes_id>/validation_summary/opinions/run", methods=["POST"])
     @login_required

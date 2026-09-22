@@ -4,9 +4,9 @@
   }
 
   // AI validation sources (persisted in browser; also mirrored to URL as ai_sources=...)
-  const AI_VALIDATION_SOURCES_STORAGE_KEY = 'ifrc_ai_validation_sources_v1';
+  const AI_VALIDATION_SOURCES_STORAGE_KEY = 'ifrc_ai_validation_sources_v2';
   const AI_VALIDATION_SOURCES_ALLOWED = ['historical', 'system_documents', 'upr_documents'];
-  const AI_VALIDATION_SOURCES_DEFAULT = ['historical', 'system_documents'];
+  const AI_VALIDATION_SOURCES_DEFAULT = ['historical', 'system_documents', 'upr_documents'];
 
   function uniq(arr) {
     const out = [];
@@ -107,6 +107,7 @@
       sseUrl: app.dataset.sseUrl || '',
       pdfUrl: app.dataset.pdfUrl || '',
       cancelUrl: app.dataset.cancelUrl || '',
+      overviewUrl: app.dataset.overviewUrl || '',
       runId: app.dataset.runId || '',
       csrfToken: app.dataset.csrfToken || '',
       labels: {
@@ -121,6 +122,9 @@
         cancelled: app.dataset.labelCancelled || 'Cancelled',
         cancelFailed: app.dataset.labelCancelFailed || 'Cancel failed',
         connectionLost: app.dataset.labelConnectionLost || 'Connection lost.',
+        runRemaining: app.dataset.labelRunRemaining || 'Run remaining',
+        rerunAll: app.dataset.labelRerunAll || 'Re-run all',
+        rerunConfirm: app.dataset.labelRerunConfirm || 'All items already have AI opinions. Re-run all validations and overwrite them?',
       },
     };
 
@@ -165,7 +169,7 @@
         if (!cbHist.checked && !cbSys.checked && !cbUpr.checked) {
           cbHist.checked = true;
           cbSys.checked = true;
-          cbUpr.checked = false;
+          cbUpr.checked = true;
         }
         const sel = sourcesFromUiOrStorage();
         saveAiValidationSources(sel);
@@ -258,6 +262,39 @@
       `.trim();
     }
 
+    function existingOpinionCount() {
+      return ['good', 'discrepancy', 'uncertain', 'failed']
+        .reduce((sum, key) => sum + Number(els[key] && els[key].textContent ? els[key].textContent : 0), 0);
+    }
+
+    function missingCount() {
+      return Number(els.missing && els.missing.textContent ? els.missing.textContent : 0);
+    }
+
+    function refreshRunButton() {
+      if (!els.runMissingBtn) return;
+      const missing = missingCount();
+      const existing = existingOpinionCount();
+      if (missing === 0 && existing > 0) {
+        els.runMissingBtn.textContent = cfg.labels.rerunAll;
+      } else {
+        els.runMissingBtn.textContent = cfg.labels.runRemaining;
+      }
+    }
+
+    function startRun(runMode) {
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('run', '1');
+        u.searchParams.set('run_mode', runMode);
+        u.searchParams.set('ai_sources', sourcesFromUiOrStorage().join(','));
+        u.searchParams.delete('run_id');
+        window.location.assign(u.toString());
+      } catch {
+        window.location.reload();
+      }
+    }
+
     function setCounts(counts) {
       if (!counts) return;
       if (els.good) els.good.textContent = String(counts.good ?? 0);
@@ -265,6 +302,7 @@
       if (els.uncertain) els.uncertain.textContent = String(counts.uncertain ?? 0);
       if (els.failed) els.failed.textContent = String(counts.failed ?? 0);
       if (els.missing) els.missing.textContent = String(counts.missing ?? 0);
+      refreshRunButton();
     }
 
     function renderBadge(fid, validation) {
@@ -339,17 +377,16 @@
     }
     if (els.runMissingBtn) {
       els.runMissingBtn.addEventListener('click', () => {
-        try {
-          const u = new URL(window.location.href);
-          u.searchParams.set('run', '1');
-          u.searchParams.set('run_mode', 'missing');
-          u.searchParams.set('ai_sources', sourcesFromUiOrStorage().join(','));
-          u.searchParams.delete('run_id');
-          window.location.assign(u.toString());
-        } catch (e) {
-          window.location.reload();
+        const missing = missingCount();
+        const existing = existingOpinionCount();
+        if (missing === 0 && existing > 0) {
+          if (!window.confirm(cfg.labels.rerunConfirm)) return;
+          startRun('all');
+          return;
         }
+        startRun('missing');
       });
+      refreshRunButton();
     }
     if (els.closeBtn) {
       els.closeBtn.addEventListener('click', () => window.close());
@@ -390,6 +427,7 @@
       const total = data.total_items != null ? data.total_items : (data.to_run || []).length;
       if (els.toRun) els.toRun.textContent = String(total);
       if (els.completed) els.completed.textContent = String(data.completed ?? 0);
+      refreshRunButton();
     });
 
     es.addEventListener('snapshot', (ev) => {
@@ -446,6 +484,100 @@
       if (els.statusDot) els.statusDot.classList.remove('running');
       if (els.statusText) els.statusText.textContent = cfg.labels.connectionLost;
     });
+
+    if (cfg.overviewUrl) {
+      fetch(cfg.overviewUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then((res) => res.json())
+        .then((data) => {
+          const panel = document.getElementById('assignment-review-panel');
+          if (!panel || !data || data.success === false) return;
+          const headline = document.getElementById('assignment-review-headline');
+          if (headline) headline.textContent = data.headline || '';
+          const figuresEl = document.getElementById('assignment-review-figures');
+          if (figuresEl) {
+            figuresEl.innerHTML = (data.overview_figures || []).map((row) => (
+              `<div class="fig"><div class="k">${escapeHtml(row.label || '')}</div><div class="v">${escapeHtml(row.value || '')}</div></div>`
+            )).join('');
+          }
+          const narrative = document.getElementById('assignment-review-narrative');
+          if (narrative) {
+            const narrativeText = String(data.narrative || '').trim();
+            // Deliberately empty (heuristic fallback, or an LLM with nothing to add
+            // beyond the figures/needs-attention/good-shape lists below) — hide the
+            // box instead of leaving a blank gap.
+            if (narrativeText && narrativeText !== String(data.headline || '').trim()) {
+              narrative.textContent = narrativeText;
+              narrative.hidden = false;
+            } else {
+              narrative.textContent = '';
+              narrative.hidden = true;
+            }
+          }
+
+          // Numbered "Needs attention" list — clickable when it maps to a form item,
+          // scrolls/flashes the matching table row below.
+          const bad = document.getElementById('assignment-review-not');
+          const badLabel = document.getElementById('assignment-review-not-label');
+          if (bad) {
+            const items = data.whats_not || data.issues || [];
+            bad.innerHTML = items.map((row, idx) => {
+              const text = typeof row === 'string' ? row : (row.text || row.opinion_summary || '');
+              const label = typeof row === 'string' ? '' : (row.label || '');
+              const itemId = typeof row === 'string' ? '' : (row.form_item_id ? String(row.form_item_id) : '');
+              const sevRaw = typeof row === 'string'
+                ? 'flag'
+                : (row.severity || (row.verdict === 'discrepancy' ? 'flag' : 'highlight'));
+              const sev = sevRaw === 'flag' ? 'flag' : 'highlight';
+              const bodyHtml = escapeHtml(label ? `${label}: ${text}` : text);
+              const inner = itemId
+                ? `<button type="button" class="issue-text-btn" data-item-id="${escapeHtml(itemId)}">${bodyHtml}</button>`
+                : `<span class="issue-text">${bodyHtml}</span>`;
+              return `<li><span class="issue-num ${sev}">${idx + 1}</span>${inner}</li>`;
+            }).join('');
+            if (badLabel) badLabel.hidden = !items.length;
+          }
+
+          // "In good shape" — collapsed by default (native <details>, no [open]);
+          // less attention needed than the numbered issues above it.
+          const goodWrap = document.getElementById('assignment-review-good-wrap');
+          const good = document.getElementById('assignment-review-good');
+          const goodCount = document.getElementById('assignment-review-good-count');
+          if (goodWrap && good) {
+            const items = data.whats_good || [];
+            good.innerHTML = items.map((t) => `<li>${escapeHtml(t)}</li>`).join('');
+            goodWrap.open = false;
+            goodWrap.hidden = !items.length;
+            if (goodCount) goodCount.textContent = `In good shape (${items.length})`;
+          }
+
+          const comment = document.getElementById('assignment-review-comment');
+          if (comment) comment.textContent = data.comment_note || '';
+          panel.hidden = false;
+        })
+        .catch(() => {});
+
+      // Delegated click handler for numbered issue text → scroll to + flash the matching row.
+      document.addEventListener('click', (ev) => {
+        const btn = ev.target && ev.target.closest ? ev.target.closest('.issue-text-btn') : null;
+        if (!btn) return;
+        ev.preventDefault();
+        const itemId = btn.getAttribute('data-item-id');
+        if (!itemId) return;
+        const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
+        if (!row) return;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('validation-row-flash');
+        window.setTimeout(() => row.classList.remove('validation-row-flash'), 1800);
+      });
+    }
+  }
+
+  function escapeHtml(input) {
+    return String(input ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
   }
 
   if (document.readyState === 'loading') {

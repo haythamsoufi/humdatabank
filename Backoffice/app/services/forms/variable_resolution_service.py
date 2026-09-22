@@ -1994,6 +1994,43 @@ class VariableResolutionService:
             return variable_value
 
     @classmethod
+    def resolve_for_assignment_display(
+        cls,
+        assignment_entity_status: Optional[AssignmentEntityStatus],
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Resolved tokens + template configs for replacing placeholders in labels.
+
+        Used by validation summary / PDF (no entry-form client JS). Includes built-in
+        metadata such as ``assignment_period`` / ``entity_name``, plus Emergency
+        Operations ``EO1``–``EO3`` when the plugin can resolve them.
+        """
+        resolved: Dict[str, Any] = {}
+        configs: Dict[str, Any] = {}
+        if not assignment_entity_status:
+            return resolved, configs
+        try:
+            assigned_form = getattr(assignment_entity_status, "assigned_form", None)
+            template = getattr(assigned_form, "template", None) if assigned_form else None
+            template_version = None
+            published_vid = getattr(template, "published_version_id", None) if template else None
+            if published_vid is not None:
+                template_version = FormTemplateVersion.query.get(int(published_vid))
+                if template_version and isinstance(getattr(template_version, "variables", None), dict):
+                    configs = template_version.variables or {}
+            resolved = cls.resolve_variables(template_version, assignment_entity_status) or {}
+            try:
+                from app.services.forms.emergency_section_binding import resolve_eo_variables
+                for key, value in (resolve_eo_variables(assignment_entity_status) or {}).items():
+                    if value:
+                        resolved[key] = value
+            except Exception as e:
+                logger.debug("EO display variables skipped: %s", e)
+        except Exception as e:
+            logger.debug("resolve_for_assignment_display failed: %s", e)
+            return {}, configs
+        return resolved, configs
+
+    @classmethod
     def replace_variables_if_placeholders(
         cls,
         text: str,

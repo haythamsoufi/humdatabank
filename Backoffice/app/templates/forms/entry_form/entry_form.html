@@ -708,6 +708,69 @@
 
             {# Main Form Area - Adjusts width based on sidebar state #}
             <div class="lg:flex-1 transition-all duration-300 min-w-0" id="main-form-area">
+                    {% if not is_public_submission and not is_preview_mode and is_admin_user and assignment_status %}
+                    <div id="validation-summary-banner"
+                         class="hidden mb-6 rounded-lg border border-purple-200 bg-white p-4 shadow-sm"
+                         data-i18n-loading="{{ _('Generating validation summary…')|forceescape }}"
+                         {# Same wording as the real "stage" events the backend streams while it
+                            actually reads the assignment / checks the figures / calls the LLM
+                            (see validation_summary_overview_stream) — used as the very first
+                            phrase shown before the stream connects, and as a fallback cycle if a
+                            stage genuinely stalls. Keep this in sync with those _() calls in
+                            app/routes/forms_validation_summary.py so real and fallback text match. #}
+                         data-i18n-loading-phrases="{{ [
+                             _('Reading the assignment…'),
+                             _('Checking the figures, funding & emergencies…'),
+                             _('Putting the summary together…'),
+                         ] | tojson | forceescape }}"
+                         data-i18n-error="{{ _('Could not load the validation summary.')|forceescape }}"
+                         data-i18n-details="{{ _('View details')|forceescape }}"
+                         data-i18n-dismiss="{{ _('Dismiss')|forceescape }}"
+                         data-i18n-good="{{ _('Good')|forceescape }}"
+                         data-i18n-discrepancy="{{ _('Discrepancy')|forceescape }}"
+                         data-i18n-uncertain="{{ _('Uncertain')|forceescape }}"
+                         data-i18n-failed="{{ _('Failed')|forceescape }}"
+                         data-i18n-not-run="{{ _('Not run')|forceescape }}"
+                         data-i18n-no-issues="{{ _('No issues to highlight. Open details for the full field list.')|forceescape }}"
+                         data-i18n-figures="{{ _('Overview figures')|forceescape }}"
+                         data-i18n-whats-good="{{ _('In good shape')|forceescape }}"
+                         data-i18n-whats-not="{{ _('Needs attention')|forceescape }}"
+                         data-i18n-comment="{{ _('Reporting-country comment')|forceescape }}"
+                         role="region"
+                         aria-live="polite"
+                         aria-label="{{ _('Validation summary')|forceescape }}">
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div class="min-w-0">
+                                <h2 class="text-base font-semibold text-gray-900">{{ _('Validation summary') }}</h2>
+                                <p id="validation-summary-headline" class="text-sm text-gray-600 mt-1"></p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <a id="validation-summary-details-link"
+                                   href="#"
+                                   class="inline-flex items-center gap-1 text-sm font-semibold text-purple-700 hover:text-purple-900 underline">{{ _('View details') }}</a>
+                                <button type="button"
+                                        id="validation-summary-dismiss"
+                                        class="btn btn-icon btn-sm btn-secondary"
+                                        aria-label="{{ _('Dismiss')|forceescape }}">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="validation-summary-counts" class="flex flex-wrap gap-2 mb-3"></div>
+                        <dl id="validation-summary-figures" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3"></dl>
+                        <div id="validation-summary-narrative" class="hidden text-sm text-gray-700 whitespace-pre-wrap mb-3"></div>
+                        <p id="validation-summary-issues-heading" class="hidden text-xs font-semibold uppercase tracking-wide text-orange-800 mb-1"></p>
+                        <ol id="validation-summary-issues" class="list-none space-y-2 mb-3"></ol>
+                        <details id="validation-summary-good-wrap" class="hidden mb-1 rounded-md border border-green-100 bg-green-50/60">
+                            <summary class="flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-green-800">
+                                <i class="fas fa-chevron-right validation-summary-chevron text-[10px]" aria-hidden="true"></i>
+                                <span data-good-heading></span>
+                            </summary>
+                            <ul id="validation-summary-good" class="space-y-1 text-sm text-gray-700 list-disc list-inside px-4 pb-3 pt-1"></ul>
+                        </details>
+                        <p id="validation-summary-comment" class="hidden mt-3 text-sm text-gray-600 border-t border-gray-100 pt-3"></p>
+                    </div>
+                    {% endif %}
                     {% set show_upr = show_upr_assets and assignment_status and assignment_status.id %}
                     {% if show_upr %}
                         {% include "plugins/upr/upr/assignment_panel.html" ignore missing %}
@@ -2670,16 +2733,6 @@
             <div id="chatbot-ai-hover-menu"
                  class="fixed z-[1059] flex flex-col items-end gap-3"
                  style="bottom: calc(var(--chat-fab-bottom-inset, 1.5rem) + 72px); right: calc(var(--chat-fab-offset, 1.5rem) + env(safe-area-inset-right, 0px));">
-                <div class="chatbot-ai-hover-row">
-                    <button type="button" id="fab-validation-summary-btn"
-                            class="fab-hover-pill"
-                            aria-label="{{ _('Validation Summary')|forceescape }}">
-                        <span class="fab-hover-pill-icon">
-                            <i class="fas fa-clipboard-check"></i>
-                        </span>
-                        <span class="fab-hover-pill-label">{{ _('Validation Summary') }}</span>
-                    </button>
-                </div>
                 {% if tmpl and tmpl.enable_ai_validation and user_has_ai_beta_access(current_user) %}
                 <div class="chatbot-ai-hover-row">
                     <button type="button" id="fab-run-ai-opinions-btn"
@@ -2692,6 +2745,26 @@
                     </button>
                 </div>
                 {% endif %}
+                <div class="chatbot-ai-hover-row">
+                    <button type="button" id="fab-validation-details-btn"
+                            class="fab-hover-pill"
+                            aria-label="{{ _('Validation details')|forceescape }}">
+                        <span class="fab-hover-pill-icon">
+                            <i class="fas fa-list-check"></i>
+                        </span>
+                        <span class="fab-hover-pill-label">{{ _('Details') }}</span>
+                    </button>
+                </div>
+                <div class="chatbot-ai-hover-row">
+                    <button type="button" id="fab-validation-summary-btn"
+                            class="fab-hover-pill"
+                            aria-label="{{ _('Validation summary')|forceescape }}">
+                        <span class="fab-hover-pill-icon">
+                            <i class="fas fa-clipboard-check"></i>
+                        </span>
+                        <span class="fab-hover-pill-label">{{ _('Summary') }}</span>
+                    </button>
+                </div>
             </div>
             {% endif %}
 

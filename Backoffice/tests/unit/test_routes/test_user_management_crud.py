@@ -147,6 +147,65 @@ class TestManageUsers:
         assert rows[legacy_user.id]["date_joined"] == ""
         assert "Date joined" in resp.text
 
+    def test_grid_payload_includes_last_login(self, logged_in_client, db_session):
+        from datetime import timedelta
+
+        from app.models.core import UserLoginLog
+        from app.utils.datetime_helpers import utcnow
+
+        last_login = utcnow().replace(microsecond=0)
+        older_login = last_login - timedelta(days=3)
+        user = create_test_user(db_session, email="has_login@example.com")
+        never_user = create_test_user(db_session, email="never_login@example.com")
+        failed_only_user = create_test_user(db_session, email="failed_only@example.com")
+        db_session.add_all(
+            [
+                UserLoginLog(
+                    user_id=user.id,
+                    email_attempted=user.email,
+                    event_type="login_success",
+                    timestamp=older_login,
+                    ip_address="127.0.0.1",
+                ),
+                UserLoginLog(
+                    user_id=user.id,
+                    email_attempted=user.email,
+                    event_type="login_success",
+                    timestamp=last_login,
+                    ip_address="127.0.0.1",
+                ),
+                UserLoginLog(
+                    user_id=user.id,
+                    email_attempted=user.email,
+                    event_type="login_failed",
+                    timestamp=utcnow(),
+                    ip_address="127.0.0.1",
+                ),
+                UserLoginLog(
+                    user_id=failed_only_user.id,
+                    email_attempted=failed_only_user.email,
+                    event_type="login_failed",
+                    timestamp=utcnow(),
+                    ip_address="127.0.0.1",
+                ),
+            ]
+        )
+        db_session.commit()
+
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        match = re.search(
+            r'<script type="application/json" id="users-grid-data">(.*?)</script>',
+            resp.text,
+            re.DOTALL,
+        )
+        assert match is not None
+        rows = {row["id"]: row for row in json.loads(match.group(1))}
+        assert rows[user.id]["last_login"] == last_login.replace(tzinfo=None).isoformat()
+        assert rows[never_user.id]["last_login"] == ""
+        assert rows[failed_only_user.id]["last_login"] == ""
+        assert "Last login" in resp.text
+
     def test_page_handles_rbac_roles_exception(self, logged_in_client, db_session, app):
         """Cover except branch for rbac_roles_by_user_id query."""
         with patch(

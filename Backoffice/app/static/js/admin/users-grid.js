@@ -224,6 +224,13 @@
         return DateTimeUtils.format(value, 'date');
     }
 
+    /** Local-timezone datetime for last login; "Never" when there is no successful login. */
+    function formatLastLogin(value) {
+        if (!value) return t.never_c8f0a12d || 'Never';
+        if (typeof DateTimeUtils === 'undefined') return String(value);
+        return DateTimeUtils.format(value, 'datetime');
+    }
+
     // Precompute searchable/exportable entities text and filterable entity names.
     usersData.forEach(function (user) {
         user.entities = getEntitiesPlainText(user);
@@ -331,6 +338,24 @@
             cellStyle: { 'white-space': 'nowrap' }
         },
         {
+            field: 'last_login',
+            headerName: t.last_login_9c1e4b70 || 'Last login',
+            width: 170, minWidth: 140, maxWidth: 240,
+            filter: 'agDateColumnFilter',
+            filterParams: AgGridRenderers.dateFilterParams,
+            sortable: true,
+            cellRenderer: function (params) {
+                if (!params.value) {
+                    return '<span class="text-gray-400">' + escapeHtml(t.never_c8f0a12d || 'Never') + '</span>';
+                }
+                return AgGridRenderers.dateTime(params);
+            },
+            exportValueGetter: function (params) {
+                return formatLastLogin(params.data && params.data.last_login);
+            },
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
             field: 'fds_member_names_text',
             headerName: t.fds_member_7a2c91e4,
             width: 220, minWidth: 160, maxWidth: 320,
@@ -400,7 +425,7 @@
     }
 
     function initializeGrid() {
-        var result = AgGridHelper.create('usersGrid', 'users-v5', columnDefs, usersData, {
+        var result = AgGridHelper.create('usersGrid', 'users-v6', columnDefs, usersData, {
             gridOptions: {
                 getRowClass: function (params) {
                     return (!params.data.active) ? 'inactive-user-row' : null;
@@ -431,6 +456,9 @@
                     }
                     if (colId === 'date_joined') {
                         return formatJoinedDate(params.node.data.date_joined);
+                    }
+                    if (colId === 'last_login') {
+                        return formatLastLogin(params.node.data.last_login);
                     }
                     return params.value != null ? params.value : '';
                 }

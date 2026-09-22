@@ -10,7 +10,7 @@ from flask_login import current_user
 from werkzeug.exceptions import HTTPException
 
 from app import db
-from app.models import User, Country, UserEntityPermission, CountryAccessRequest
+from app.models import User, Country, UserEntityPermission, CountryAccessRequest, UserLoginLog
 from app.services.organization.country_access_request_service import (
     count_pending_country_access_requests_needing_action,
     pending_country_access_requests_query,
@@ -153,6 +153,32 @@ def manage_users():
         entity_counts_by_user_id = {}
         user_countries_by_id = {}
         fds_members_by_user_id = {}
+
+    last_login_by_user_id = {}
+    try:
+        from sqlalchemy import func
+
+        user_ids = [u.id for u in users]
+        if user_ids:
+            last_login_rows = (
+                db.session.query(
+                    UserLoginLog.user_id,
+                    func.max(UserLoginLog.timestamp),
+                )
+                .filter(
+                    UserLoginLog.user_id.in_(user_ids),
+                    UserLoginLog.event_type == "login_success",
+                )
+                .group_by(UserLoginLog.user_id)
+                .all()
+            )
+            last_login_by_user_id = {
+                int(uid): ts for uid, ts in last_login_rows if uid is not None and ts is not None
+            }
+    except Exception as e:
+        current_app.logger.debug("last_login_by_user_id query failed: %s", e)
+        last_login_by_user_id = {}
+
     # Get all countries and group by region
     countries_by_region = defaultdict(list)
     all_countries = Country.query.order_by(Country.region, Country.name).all()
@@ -182,7 +208,8 @@ def manage_users():
                            rbac_roles_by_user_id=rbac_roles_by_user_id,
                            entity_counts_by_user_id=entity_counts_by_user_id,
                            user_countries_by_id=user_countries_by_id,
-                           fds_members_by_user_id=fds_members_by_user_id)
+                           fds_members_by_user_id=fds_members_by_user_id,
+                           last_login_by_user_id=last_login_by_user_id)
 
 @bp.route("/access-requests", methods=["GET"])
 @permission_required_any('admin.access_requests.view', 'admin.users.edit')

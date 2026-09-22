@@ -489,6 +489,8 @@ def test_reach_full_row_packs_when_all_icons_present():
     support = render_dashboard_html(_payload(), "support")
     assert "Netherlands Red Cross" in html or "Netherlands Red Cross" in support
     assert "Participating National Societies bilateral support" in support
+    assert "&amp;nbsp;" not in support
+    assert "upr-support-confirmed' dir='ltr'>&nbsp;</td>" in support
     assert "upr-dot--on" not in support
     assert "upr-support-fill--on" in support
     assert "upr-support-table--plan" in support
@@ -600,6 +602,7 @@ def test_plan_support_fills_cells_and_years():
     assert "1M" in html
     assert "400,000" in html
     assert "CHF 8.2M" in html
+    assert "&amp;nbsp;" not in html
     for color in SUPPORT_DOT_COLORS.values():
         assert f"background:{color}" in html
 

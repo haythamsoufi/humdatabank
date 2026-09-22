@@ -492,6 +492,127 @@ def _prepare_submitted_document_ai_import(
     }
 
 
+def _prepare_guidance_document_ai_import(
+    guidance_doc_id: int,
+    *,
+    user_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Resolve a guidance file and create/update the linked AIDocument (staff-only)."""
+    from app.models import AIDocument, GuidanceDocument
+    from app.services.platform import storage_service as _ai_storage
+    from app.services.ai.documents.processor import AIDocumentProcessor
+
+    guidance = GuidanceDocument.query.get(guidance_doc_id)
+    if not guidance:
+        return {
+            "ok": False,
+            "code": "guidance_document_not_found",
+            "message": "Guidance document not found",
+        }
+
+    rel = (guidance.storage_path or "").strip()
+    if not rel or not _ai_storage.exists(_ai_storage.ADMIN_DOCUMENTS, rel):
+        return {
+            "ok": False,
+            "code": "file_not_found",
+            "message": "Guidance file not found in storage",
+        }
+
+    file_path = _ai_storage.get_absolute_path(_ai_storage.ADMIN_DOCUMENTS, rel)
+    cleanup_temp = bool(_ai_storage.is_azure())
+    filename = guidance.filename or "document"
+
+    existing_ai_doc = AIDocument.query.filter_by(guidance_document_id=int(guidance_doc_id)).first()
+    if existing_ai_doc:
+        existing_ai_doc.processing_status = "pending"
+        existing_ai_doc.processing_error = None
+        existing_ai_doc.title = guidance.title or filename
+        existing_ai_doc.filename = filename
+        existing_ai_doc.is_public = False
+        db.session.commit()
+        return {
+            "ok": True,
+            "code": "reprocessing",
+            "message": "Processing started",
+            "ai_document_id": existing_ai_doc.id,
+            "file_path": file_path,
+            "filename": filename,
+            "cleanup_temp": cleanup_temp,
+        }
+
+    processor = AIDocumentProcessor()
+    if not processor.is_supported_file(filename):
+        if cleanup_temp and file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+        return {
+            "ok": False,
+            "code": "unsupported_file_type",
+            "message": f'Unsupported file type. Supported: {", ".join(processor.SUPPORTED_TYPES.keys())}',
+        }
+
+    content_hash = processor.calculate_content_hash(file_path)
+    file_type = processor.get_file_type(filename)
+    try:
+        file_size = os.path.getsize(file_path)
+    except OSError:
+        file_size = guidance.file_size_bytes
+
+    uid: Optional[int] = None
+    if user_id is not None:
+        try:
+            uid = int(user_id)
+        except (TypeError, ValueError):
+            uid = None
+        if uid is not None and uid <= 0:
+            uid = None
+    if uid is None:
+        try:
+            uid = int(getattr(guidance, "uploaded_by_user_id", 0) or 0) or None
+        except (TypeError, ValueError):
+            uid = None
+
+    extra_metadata = {
+        "source": "guidance_document",
+        "guidance_owner_key": guidance.owner_key,
+    }
+    ai_doc = AIDocument(
+        guidance_document_id=int(guidance_doc_id),
+        title=guidance.title or filename,
+        filename=filename,
+        file_type=file_type,
+        file_size_bytes=file_size,
+        storage_path=rel,
+        content_hash=content_hash,
+        processing_status="pending",
+        user_id=uid,
+        is_public=False,
+        searchable=True,
+        document_category="guideline",
+        extra_metadata=extra_metadata,
+    )
+    db.session.add(ai_doc)
+    db.session.commit()
+    logger.info(
+        "Prepared AI import for guidance document %s -> AI doc %s (user_id=%s, owner=%s)",
+        guidance_doc_id,
+        ai_doc.id,
+        uid,
+        guidance.owner_key,
+    )
+    return {
+        "ok": True,
+        "code": "processing",
+        "message": "Processing started",
+        "ai_document_id": ai_doc.id,
+        "file_path": file_path,
+        "filename": filename,
+        "cleanup_temp": cleanup_temp,
+    }
+
+
 def enqueue_submitted_document_ai_processing(
     submitted_doc_id: int,
     *,

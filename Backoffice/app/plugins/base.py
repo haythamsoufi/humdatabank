@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from flask import Blueprint
@@ -30,6 +31,23 @@ class CspOverride:
     endpoint: str
     path_predicate: Callable[[str], bool]
     policy: str
+
+
+@dataclass(frozen=True)
+class PluginDocsSource:
+    """Markdown documentation a plugin injects into the core docs UI.
+
+    Files live under ``root_dir / category / *.md``. ``category`` is the
+    top-level nav slug (e.g. ``upr``) and must match that folder name.
+    ``include_in_help`` controls whether the category also appears on
+    ``/help/docs``; admin ``/admin/docs`` always includes it.
+    """
+
+    category: str
+    root_dir: Path
+    display_name: str
+    icon: str = "fas fa-folder"
+    include_in_help: bool = False
 
 
 @dataclass(frozen=True)
@@ -254,6 +272,10 @@ class BasePlugin(ABC):
 
     def get_data_explorer_tab(self) -> Optional[DataExplorerTabConfig]:
         """Optional Data Explorer tab for org-specific admin features."""
+        return None
+
+    def get_documentation_source(self) -> Optional[PluginDocsSource]:
+        """Optional Markdown docs this plugin injects into the core docs UI."""
         return None
 
     def is_admin_feature(self) -> bool:

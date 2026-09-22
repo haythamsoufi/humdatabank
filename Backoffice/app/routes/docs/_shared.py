@@ -51,10 +51,53 @@ def register_docs_routes(
     header_title: str | None = None,
     prefer_user_landing: bool = False,
     asset_cache_max_age: int | None = None,
+    help_eligible_plugin_docs_only: bool = False,
 ) -> None:
     """Register index, view, asset, and PDF export routes on *bp*."""
     visible_dirs = set(visible_top_level_dirs)
     build_doc_url = make_build_doc_url(bp.name)
+
+    def _plugin_sources():
+        return docs.plugin_doc_sources(help_eligible_only=help_eligible_plugin_docs_only)
+
+    def _effective_visible_dirs() -> set[str]:
+        dirs = set(visible_dirs)
+        for source in _plugin_sources():
+            category = (source.category or "").strip()
+            if category:
+                dirs.add(category)
+        return dirs
+
+    def _content_root(doc_path: str) -> Path:
+        return docs.resolve_docs_root_for_path(
+            doc_path, help_eligible_only=help_eligible_plugin_docs_only
+        )
+
+    def _build_nav(user) -> list:
+        eligible = _plugin_sources()
+        core_visible = _effective_visible_dirs()
+        nav = docs.build_hierarchical_nav(
+            root=docs.docs_root(),
+            doc_url_builder=build_doc_url,
+            visible_top_level_dirs=core_visible,
+            user=user,
+        )
+        for source in eligible:
+            category = (source.category or "").strip()
+            if not category:
+                continue
+            plugin_root = Path(source.root_dir)
+            if not plugin_root.exists():
+                continue
+            nav.extend(
+                docs.build_hierarchical_nav(
+                    root=plugin_root,
+                    doc_url_builder=build_doc_url,
+                    visible_top_level_dirs={category},
+                    user=user,
+                )
+            )
+        return nav
 
     def _build_asset_url(rel_asset: str) -> str:
         return url_for(f"{bp.name}.asset", asset_path=rel_asset)
@@ -63,14 +106,9 @@ def register_docs_routes(
         docs.ensure_doc_page_access(
             current_user,
             current_rel,
-            visible_top_level_dirs=visible_dirs,
+            visible_top_level_dirs=_effective_visible_dirs(),
         )
-        nav_categories = docs.build_hierarchical_nav(
-            root=root,
-            doc_url_builder=build_doc_url,
-            visible_top_level_dirs=visible_dirs,
-            user=current_user,
-        )
+        nav_categories = _build_nav(current_user)
         content_html = docs.render_markdown_file(
             root=root,
             file_path=file_path,
@@ -108,7 +146,7 @@ def register_docs_routes(
             root=root,
             doc_path="",
             user=current_user,
-            visible_top_level_dirs=visible_dirs,
+            visible_top_level_dirs=_effective_visible_dirs(),
             doc_url_builder=build_doc_url,
             prefer_user_landing=prefer_user_landing,
         )
@@ -119,7 +157,7 @@ def register_docs_routes(
         """Download a documentation page as PDF."""
         if not docs.is_pdf_export_enabled():
             abort(404)
-        root = docs.docs_root()
+        root = _content_root(doc_path)
         if not root.exists():
             abort(404)
 
@@ -133,7 +171,7 @@ def register_docs_routes(
             root=root,
             doc_path=doc_path,
             user=current_user,
-            visible_top_level_dirs=visible_dirs,
+            visible_top_level_dirs=_effective_visible_dirs(),
             doc_url_builder=build_doc_url,
             prefer_user_landing=prefer_user_landing,
         )
@@ -155,7 +193,7 @@ def register_docs_routes(
     @auth_decorator
     def view_doc(doc_path: str):
         """View a specific documentation file."""
-        root = docs.docs_root()
+        root = _content_root(doc_path)
         if not root.exists():
             abort(404)
 
@@ -172,7 +210,7 @@ def register_docs_routes(
     @auth_decorator
     def asset(asset_path: str):
         """Serve static assets (images, etc.) from docs directory."""
-        root = docs.docs_root()
+        root = _content_root(asset_path)
         if not root.exists():
             abort(404)
 
@@ -188,7 +226,7 @@ def register_docs_routes(
         docs.ensure_docs_asset_access(
             current_user,
             candidate.relative_to(root).as_posix(),
-            visible_top_level_dirs=visible_dirs,
+            visible_top_level_dirs=_effective_visible_dirs(),
         )
 
         response = make_response(send_from_directory(root, candidate.relative_to(root).as_posix()))

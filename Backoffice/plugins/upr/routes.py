@@ -216,16 +216,32 @@ def upr_tools():
         sync_family="upr",
         page_heading="UPR Tools",
         page_icon="fas fa-cogs",
-        extra_tabs=[{
-            "id": "excel-import",
-            "label": _("Excel Import"),
-            "icon": "fas fa-file-excel",
-        }],
-        extra_panel_templates=[{
-            "id": "excel-import",
-            "template": "plugins/upr/admin/_upr_excel_import_panel.html",
-        }],
-        extra_script_templates=["plugins/upr/admin/_upr_excel_import_script.html"],
+        extra_tabs=[
+            {
+                "id": "excel-import",
+                "label": _("Excel Import"),
+                "icon": "fas fa-file-excel",
+            },
+            {
+                "id": "guidance",
+                "label": _("Guidance"),
+                "icon": "fas fa-book",
+            },
+        ],
+        extra_panel_templates=[
+            {
+                "id": "excel-import",
+                "template": "plugins/upr/admin/_upr_excel_import_panel.html",
+            },
+            {
+                "id": "guidance",
+                "template": "plugins/upr/admin/_upr_guidance_panel.html",
+            },
+        ],
+        extra_script_templates=[
+            "plugins/upr/admin/_upr_excel_import_script.html",
+            "plugins/upr/admin/_upr_guidance_script.html",
+        ],
         extra_context={"upr_template_choices": list(UPR_TEMPLATE_CHOICES)},
     )
 

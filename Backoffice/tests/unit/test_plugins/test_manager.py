@@ -1482,3 +1482,33 @@ class TestGetApiEndpoints:
         assert len(rows) == 1
         assert rows[0]["path"] == "/api/v1/fdrs/published-data"
         assert rows[0]["plugin_id"] == "fdrs"
+
+
+@pytest.mark.unit
+class TestGetDocumentationSources:
+    def test_collects_unique_sources_and_skips_failures(self, tmp_path):
+        from app.plugins.base import PluginDocsSource
+
+        pm, _ = _make_manager(tmp_path)
+        src = PluginDocsSource(
+            category="upr",
+            root_dir=tmp_path / "upr-docs",
+            display_name="UPR",
+        )
+        plugin_a = MagicMock()
+        plugin_a.get_documentation_source.return_value = src
+        plugin_dup = MagicMock()
+        plugin_dup.get_documentation_source.return_value = PluginDocsSource(
+            category="UPR",
+            root_dir=tmp_path / "other",
+            display_name="Duplicate",
+        )
+        plugin_b = MagicMock()
+        plugin_b.get_documentation_source.side_effect = RuntimeError("boom")
+        plugin_c = MagicMock()
+        plugin_c.get_documentation_source.return_value = None
+        pm.plugins = {"upr": plugin_a, "dup": plugin_dup, "broken": plugin_b, "empty": plugin_c}
+
+        sources = pm.get_documentation_sources()
+        assert len(sources) == 1
+        assert sources[0].category == "upr"

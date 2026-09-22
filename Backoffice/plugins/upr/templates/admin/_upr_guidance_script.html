@@ -1,0 +1,215 @@
+<script nonce="{{ csp_nonce() }}">
+(function() {
+  const listUrl = {{ url_for('upr.guidance_list')|tojson }};
+  const uploadUrl = {{ url_for('upr.guidance_upload')|tojson }};
+  const kbUrl = {{ url_for('ai_management.knowledge_base')|tojson }};
+  const t = {
+    uploaded: {{ _('Guidance document uploaded')|tojson }},
+    uploadedCount: {{ _('Uploaded {count} guidance documents')|tojson }},
+    uploadedPartial: {{ _('Uploaded {ok} of {total} files. Failed: {failed}')|tojson }},
+    deleted: {{ _('Guidance document deleted')|tojson }},
+    uploadFailed: {{ _('Upload failed')|tojson }},
+    deleteFailed: {{ _('Could not delete the document')|tojson }},
+    loadFailed: {{ _('Could not load guidance documents')|tojson }},
+    confirmDelete: {{ _('Delete this guidance document? Any Knowledge Base copy will also be removed.')|tojson }},
+    imported: {{ _('Imported')|tojson }},
+    notImported: {{ _('Not imported')|tojson }},
+    download: {{ _('Download')|tojson }},
+    deleteLabel: {{ _('Delete')|tojson }},
+    knowledgeBase: {{ _('Open Knowledge Base')|tojson }}
+  };
+
+  function csrfPost(url, options) {
+    if (typeof csrfFetch === 'function') {
+      return csrfFetch(url, options);
+    }
+    return fetch(url, options);
+  }
+
+  function setStatus(el, message, ok) {
+    if (!el) return;
+    el.textContent = message || '';
+    el.classList.toggle('hidden', !message);
+    el.className = 'mt-3 text-sm ' + (ok ? 'text-green-700' : 'text-red-700');
+  }
+
+  function downloadUrl(id) {
+    return {{ url_for('upr.guidance_download', doc_id=0)|tojson }}.replace('/0/download', '/' + id + '/download');
+  }
+  function deleteUrl(id) {
+    return {{ url_for('upr.guidance_delete', doc_id=0)|tojson }}.replace('/0/delete', '/' + id + '/delete');
+  }
+
+  function formatDate(value) {
+    if (!value) return '—';
+    try { return new Date(value).toLocaleString(); } catch (e) { return value; }
+  }
+
+  function renderRows(documents) {
+    const tbody = document.getElementById('upr-guidance-tbody');
+    const empty = document.getElementById('upr-guidance-empty');
+    const wrap = document.getElementById('upr-guidance-table-wrap');
+    if (!tbody || !empty || !wrap) return;
+    tbody.replaceChildren();
+    if (!documents || !documents.length) {
+      empty.classList.remove('hidden');
+      wrap.classList.add('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+    documents.forEach(function(doc) {
+      const tr = document.createElement('tr');
+      const title = document.createElement('td');
+      title.className = 'px-4 py-2 text-gray-900';
+      title.textContent = doc.title || doc.filename || '';
+      const file = document.createElement('td');
+      file.className = 'px-4 py-2 text-gray-600';
+      file.textContent = doc.filename || '';
+      const uploaded = document.createElement('td');
+      uploaded.className = 'px-4 py-2 text-gray-600';
+      uploaded.textContent = formatDate(doc.uploaded_at);
+      const kb = document.createElement('td');
+      kb.className = 'px-4 py-2';
+      if (doc.ai_processed) {
+        const link = document.createElement('a');
+        link.href = kbUrl;
+        link.className = 'text-green-700 hover:underline';
+        link.textContent = t.imported;
+        kb.appendChild(link);
+      } else {
+        kb.textContent = t.notImported;
+        kb.classList.add('text-gray-500');
+      }
+      const actions = document.createElement('td');
+      actions.className = 'px-4 py-2 text-right whitespace-nowrap';
+      const dl = document.createElement('a');
+      dl.href = downloadUrl(doc.id);
+      dl.className = 'text-blue-700 hover:underline mr-3';
+      dl.textContent = t.download;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'text-red-700 hover:underline bg-transparent border-0 p-0 cursor-pointer';
+      del.textContent = t.deleteLabel;
+      del.addEventListener('click', function() { deleteDoc(doc.id); });
+      actions.appendChild(dl);
+      actions.appendChild(del);
+      tr.append(title, file, uploaded, kb, actions);
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function loadList() {
+    try {
+      const res = await fetch(listUrl, { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data && (data.error || data.message)) || t.loadFailed);
+      renderRows(data.documents || []);
+    } catch (err) {
+      setStatus(document.getElementById('upr-guidance-upload-status'), t.loadFailed, false);
+    }
+  }
+
+  async function uploadDoc() {
+    const input = document.getElementById('upr_guidance_file');
+    const status = document.getElementById('upr-guidance-upload-status');
+    const btn = document.getElementById('upr-guidance-upload-btn');
+    const files = input && input.files ? Array.from(input.files) : [];
+    if (!files.length) return;
+    const title = (document.getElementById('upr-guidance-title') || {}).value || '';
+    const description = (document.getElementById('upr-guidance-description') || {}).value || '';
+    if (btn) btn.disabled = true;
+    const failures = [];
+    let uploaded = 0;
+    try {
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        if (files.length === 1 && title) form.append('title', title);
+        if (description) form.append('description', description);
+        const res = await csrfPost(uploadUrl, { method: 'POST', body: form });
+        const data = await res.json();
+        if (!res.ok) {
+          failures.push(file.name + ': ' + ((data && (data.error || data.message)) || t.uploadFailed));
+        } else {
+          uploaded += 1;
+        }
+      }
+      input.value = '';
+      const titleEl = document.getElementById('upr-guidance-title');
+      const descEl = document.getElementById('upr-guidance-description');
+      if (titleEl) titleEl.value = '';
+      if (descEl) descEl.value = '';
+      if (typeof input.dispatchEvent === 'function') {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      await loadList();
+      if (!uploaded) throw new Error(failures.join(' '));
+      if (failures.length) {
+        setStatus(status, t.uploadedPartial
+          .replace('{ok}', String(uploaded))
+          .replace('{total}', String(files.length))
+          .replace('{failed}', failures.join('; ')), false);
+      } else if (uploaded === 1) {
+        setStatus(status, t.uploaded, true);
+      } else {
+        setStatus(status, t.uploadedCount.replace('{count}', String(uploaded)), true);
+      }
+    } catch (err) {
+      setStatus(status, err.message || t.uploadFailed, false);
+    } finally {
+      if (btn) btn.disabled = !(input.files && input.files[0]);
+    }
+  }
+
+  async function deleteDoc(id) {
+    if (!window.confirm(t.confirmDelete)) return;
+    const status = document.getElementById('upr-guidance-upload-status');
+    try {
+      const res = await csrfPost(deleteUrl(id), { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data && (data.error || data.message)) || t.deleteFailed);
+      setStatus(status, data.message || t.deleted, true);
+      await loadList();
+    } catch (err) {
+      setStatus(status, err.message || t.deleteFailed, false);
+    }
+  }
+
+  function wire() {
+    const input = document.getElementById('upr_guidance_file');
+    const btn = document.getElementById('upr-guidance-upload-btn');
+    const refresh = document.getElementById('upr-guidance-refresh-btn');
+    const titleEl = document.getElementById('upr-guidance-title');
+    if (input && btn) {
+      const sync = function() {
+        const count = input.files ? input.files.length : 0;
+        btn.disabled = count === 0;
+        if (titleEl) titleEl.disabled = count > 1;
+      };
+      input.addEventListener('change', sync);
+      sync();
+      btn.addEventListener('click', uploadDoc);
+    }
+    if (refresh) refresh.addEventListener('click', loadList);
+    import({{ static_url('js/components/excel-import-dropzone.js') | tojson }})
+      .then(function(mod) {
+        mod.initExcelImportDropzone('#upr-guidance-dropzone', {
+          multiple: true,
+          acceptExtensions: ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.html', '.markdown', '.htm'],
+          submitBtn: btn,
+          requireValidation: false,
+          invalidFileTypeLabel: {{ _('Please upload a supported guidance file')|tojson }}
+        });
+      })
+      .catch(function() { /* native file input still works */ });
+    loadList();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
+</script>

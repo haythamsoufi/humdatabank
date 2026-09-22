@@ -80,6 +80,51 @@ def docs_root() -> Path:
     return (Path(current_app.root_path).parent / "docs").resolve()
 
 
+def plugin_doc_sources(*, help_eligible_only: bool = False):
+    """Return plugin documentation sources registered with PluginManager."""
+    try:
+        pm = getattr(current_app, "plugin_manager", None)
+        if pm is None:
+            return []
+        sources = pm.get_documentation_sources() or []
+    except RuntimeError:
+        return []
+    except Exception as e:
+        current_app.logger.debug("plugin_doc_sources failed: %s", e)
+        return []
+    if help_eligible_only:
+        return [s for s in sources if getattr(s, "include_in_help", False)]
+    return list(sources)
+
+
+def resolve_docs_root_for_path(
+    raw_doc_path: str,
+    *,
+    help_eligible_only: bool = False,
+) -> Path:
+    """Return the plugin docs root for *raw_doc_path*, or the core docs root."""
+    raw = (raw_doc_path or "").strip().lstrip("/").replace("\\", "/")
+    if raw.lower().endswith(".md"):
+        raw = raw[: -len(".md")]
+    parts = Path(raw).parts
+    top = parts[0] if parts else ""
+    if top:
+        for source in plugin_doc_sources(help_eligible_only=help_eligible_only):
+            if (source.category or "").strip().lower() == top.lower():
+                return Path(source.root_dir).resolve()
+    return docs_root()
+
+
+def _plugin_source_for_category(category_name: str):
+    slug = (category_name or "").strip().lower()
+    if not slug:
+        return None
+    for source in plugin_doc_sources():
+        if (source.category or "").strip().lower() == slug:
+            return source
+    return None
+
+
 def _is_within_root(root: Path, candidate: Path) -> bool:
     try:
         root_norm = os.path.normcase(str(root.resolve()))
@@ -251,7 +296,13 @@ def get_category_icon(category_name: str) -> str:
         "data-migration": "fas fa-database",
         "archive": "fas fa-archive",
     }
-    return icons.get(category_name.lower(), "fas fa-folder")
+    icon = icons.get(category_name.lower())
+    if icon:
+        return icon
+    source = _plugin_source_for_category(category_name)
+    if source and source.icon:
+        return source.icon
+    return "fas fa-folder"
 
 
 def get_category_display_name(category_name: str) -> str:
@@ -274,7 +325,13 @@ def get_category_display_name(category_name: str) -> str:
         "data-migration": _("Data Migration"),
         "archive": _("Archive"),
     }
-    return display_names.get(category_name.lower(), category_name.replace("-", " ").replace("_", " ").title())
+    name = display_names.get(category_name.lower())
+    if name:
+        return name
+    source = _plugin_source_for_category(category_name)
+    if source and source.display_name:
+        return source.display_name
+    return category_name.replace("-", " ").replace("_", " ").title()
 
 
 def _get_admin_subgroup(filename: str) -> Tuple[str, int]:

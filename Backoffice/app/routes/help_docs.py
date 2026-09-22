@@ -38,6 +38,7 @@ register_docs_routes(
     header_title=_("Help"),
     prefer_user_landing=True,
     asset_cache_max_age=3600,
+    help_eligible_plugin_docs_only=True,
     breadcrumbs=lambda: [
         {"name": _("Dashboard"), "url": url_for("main.dashboard")},
         {"name": _("Help")},

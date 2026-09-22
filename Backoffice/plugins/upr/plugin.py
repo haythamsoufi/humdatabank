@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from app.plugins.base import BasePlugin, CspOverride, DataExplorerTabConfig, SeedPermission, SeedRole
+from app.plugins.base import (
+    BasePlugin,
+    CspOverride,
+    DataExplorerTabConfig,
+    PluginDocsSource,
+    SeedPermission,
+    SeedRole,
+)
 
 _UPR_PDF_VIEWER_CSP = (
     "default-src 'self'; "
@@ -62,6 +70,15 @@ class UprPlugin(BasePlugin):
 
     def is_admin_feature(self) -> bool:
         return True
+
+    def get_documentation_source(self) -> PluginDocsSource:
+        return PluginDocsSource(
+            category="upr",
+            root_dir=Path(__file__).resolve().parent / "docs",
+            display_name="UPR",
+            icon="fas fa-chart-pie",
+            include_in_help=False,
+        )
 
     def get_data_explorer_tab(self) -> DataExplorerTabConfig:
         return DataExplorerTabConfig(

@@ -21,7 +21,7 @@
     var underscored = raw.replace(/\./g, '_');
     if (JOB_SPECS[underscored]) return underscored;
     if (raw === 'ifrc_api_bulk') return 'ifrc_api_bulk';
-    if (raw === 'docs.bulk_import_system') return 'docs_b_bulk_import_system';
+    if (raw === 'docs.bulk_import_system' || raw === 'docs.bulk_import_guidance') return 'docs_b_bulk_import_system';
     if (raw === 'docs.bulk_reprocess') return 'docs_bulk_reprocess';
     if (raw === 'docs.bulk_reprocess_metadata') return 'docs_bulk_reprocess_metadata';
     return raw;

@@ -50,6 +50,7 @@ _LOCK_KEEPALIVE_SECONDS = 60
 AI_DOCUMENTS_JOB_TYPES = frozenset(
     {
         "docs.bulk_import_system",
+        "docs.bulk_import_guidance",
         "docs.bulk_reprocess",
         "docs.bulk_reprocess_metadata",
         "ifrc_api_bulk",

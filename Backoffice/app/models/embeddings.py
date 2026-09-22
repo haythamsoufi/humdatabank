@@ -47,6 +47,8 @@ class AIDocument(db.Model):
     # Link to existing document system (optional)
     submitted_document_id = Column(Integer, ForeignKey('submitted_document.id', ondelete='CASCADE'), nullable=True, index=True)
     submitted_document = relationship('SubmittedDocument', backref='ai_document', foreign_keys=[submitted_document_id])
+    guidance_document_id = Column(Integer, ForeignKey('guidance_document.id', ondelete='CASCADE'), nullable=True, index=True)
+    guidance_document = relationship('GuidanceDocument', backref='ai_document', foreign_keys=[guidance_document_id])
 
     # Document metadata
     title = Column(String(500), nullable=False)

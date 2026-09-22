@@ -56,6 +56,7 @@ from config import Config
 
 from .helpers import (
     _load_existing_data_for_assignment,
+    assignment_shows_suggested_values,
     build_entry_form_features,
     build_submitted_documents_dict,
     calculate_section_completion_status,
@@ -521,87 +522,90 @@ def handle_assignment_form(aes_id):
             current_app.logger.warning("Carry-forward resolution failed for AES %s: %s", aes_id, e)
     _entry_lap("carry_forward")
 
-    for section in all_sections:
-        for field in getattr(section, 'fields_ordered', []):
-            if not field or not hasattr(field, 'id'):
-                continue
+    # Config default_value is a suggestion for a blank, never-saved assignment.
+    # After save/submit/etc., empty fields stay empty — only reported data is shown.
+    if assignment_shows_suggested_values(assignment_entity_status):
+        for section in all_sections:
+            for field in getattr(section, 'fields_ordered', []):
+                if not field or not hasattr(field, 'id'):
+                    continue
 
-            field_key = f'field_value[{field.id}]'
+                field_key = f'field_value[{field.id}]'
 
-            if field_key in existing_data_processed:
-                continue
+                if field_key in existing_data_processed:
+                    continue
 
-            def _is_numeric_type(t):
-                try:
-                    return str(t or '').strip().lower() in ('number', 'integer', 'float', 'currency', 'percentage')
-                except Exception as e:
-                    current_app.logger.debug("_is_numeric_type failed: %s", e)
-                    return False
-
-            is_number_field = False
-            if hasattr(field, 'is_indicator') and field.is_indicator:
-                is_number_field = _is_numeric_type(getattr(field, 'type', None))
-            elif hasattr(field, 'is_question') and field.is_question:
-                is_number_field = _is_numeric_type(getattr(field, 'type', None))
-
-            if is_number_field:
-                if getattr(field, 'is_indicator', False):
+                def _is_numeric_type(t):
                     try:
-                        cfg = getattr(field, 'config', None)
-                        dv_raw = None
-                        if isinstance(cfg, dict):
-                            dv_raw = cfg.get('default_value')
-                        dv_raw = str(dv_raw).strip() if dv_raw is not None else ''
-
-                        if dv_raw:
-                            if ('[' in dv_raw) and (not resolved_variables) and template_version:
-                                try:
-                                    resolved_variables = VariableResolutionService.resolve_variables(
-                                        template_version,
-                                        assignment_entity_status
-                                    )
-                                except Exception as e:
-                                    current_app.logger.debug("resolve_variables for default_value failed: %s", e)
-                                    resolved_variables = resolved_variables or {}
-
-                            dv_resolved = dv_raw
-                            if '[' in dv_raw:
-                                dv_resolved = VariableResolutionService.replace_variables_in_text(
-                                    dv_raw,
-                                    _resolved_vars_for_field(field, dv_raw),
-                                    variable_configs
-                                )
-                            dv_resolved_str = str(dv_resolved).strip()
-                            dv_resolved_str = dv_resolved_str.replace(',', '')
-
-                            if not dv_resolved_str:
-                                continue
-
-                            num_value = float(dv_resolved_str)
-                            if num_value.is_integer():
-                                num_value = int(num_value)
-
-                            allowed_opts = []
-                            try:
-                                allowed_opts = list(getattr(field, 'allowed_disaggregation_options', []) or [])
-                            except Exception as e:
-                                current_app.logger.debug("allowed_disaggregation_options failed: %s", e)
-                                allowed_opts = []
-
-                            if allowed_opts and len(allowed_opts) > 1:
-                                if 'total' not in allowed_opts:
-                                    continue
-                                if getattr(field, 'indirect_reach', False):
-                                    existing_data_processed[field_key] = {'mode': 'total', 'values': {'direct': num_value}}
-                                else:
-                                    existing_data_processed[field_key] = {'mode': 'total', 'values': {'total': num_value}}
-                            else:
-                                existing_data_processed[field_key] = num_value
-
-                            existing_data_processed[f'{field_key}_is_prefilled'] = True
-                            continue
+                        return str(t or '').strip().lower() in ('number', 'integer', 'float', 'currency', 'percentage')
                     except Exception as e:
-                        current_app.logger.debug("Default value parsing failed: %s", e)
+                        current_app.logger.debug("_is_numeric_type failed: %s", e)
+                        return False
+
+                is_number_field = False
+                if hasattr(field, 'is_indicator') and field.is_indicator:
+                    is_number_field = _is_numeric_type(getattr(field, 'type', None))
+                elif hasattr(field, 'is_question') and field.is_question:
+                    is_number_field = _is_numeric_type(getattr(field, 'type', None))
+
+                if is_number_field:
+                    if getattr(field, 'is_indicator', False):
+                        try:
+                            cfg = getattr(field, 'config', None)
+                            dv_raw = None
+                            if isinstance(cfg, dict):
+                                dv_raw = cfg.get('default_value')
+                            dv_raw = str(dv_raw).strip() if dv_raw is not None else ''
+
+                            if dv_raw:
+                                if ('[' in dv_raw) and (not resolved_variables) and template_version:
+                                    try:
+                                        resolved_variables = VariableResolutionService.resolve_variables(
+                                            template_version,
+                                            assignment_entity_status
+                                        )
+                                    except Exception as e:
+                                        current_app.logger.debug("resolve_variables for default_value failed: %s", e)
+                                        resolved_variables = resolved_variables or {}
+
+                                dv_resolved = dv_raw
+                                if '[' in dv_raw:
+                                    dv_resolved = VariableResolutionService.replace_variables_in_text(
+                                        dv_raw,
+                                        _resolved_vars_for_field(field, dv_raw),
+                                        variable_configs
+                                    )
+                                dv_resolved_str = str(dv_resolved).strip()
+                                dv_resolved_str = dv_resolved_str.replace(',', '')
+
+                                if not dv_resolved_str:
+                                    continue
+
+                                num_value = float(dv_resolved_str)
+                                if num_value.is_integer():
+                                    num_value = int(num_value)
+
+                                allowed_opts = []
+                                try:
+                                    allowed_opts = list(getattr(field, 'allowed_disaggregation_options', []) or [])
+                                except Exception as e:
+                                    current_app.logger.debug("allowed_disaggregation_options failed: %s", e)
+                                    allowed_opts = []
+
+                                if allowed_opts and len(allowed_opts) > 1:
+                                    if 'total' not in allowed_opts:
+                                        continue
+                                    if getattr(field, 'indirect_reach', False):
+                                        existing_data_processed[field_key] = {'mode': 'total', 'values': {'direct': num_value}}
+                                    else:
+                                        existing_data_processed[field_key] = {'mode': 'total', 'values': {'total': num_value}}
+                                else:
+                                    existing_data_processed[field_key] = num_value
+
+                                existing_data_processed[f'{field_key}_is_prefilled'] = True
+                                continue
+                        except Exception as e:
+                            current_app.logger.debug("Default value parsing failed: %s", e)
 
     _entry_lap("default_values")
 

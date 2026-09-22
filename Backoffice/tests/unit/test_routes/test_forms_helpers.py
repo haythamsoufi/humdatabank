@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from app.routes.forms.helpers import (
+    assignment_shows_suggested_values,
     build_entry_form_features,
     calculate_section_completion_status,
     debug_numeric_value,
@@ -46,6 +47,45 @@ class TestDebugNumericValue:
             with caplog.at_level(logging.DEBUG, logger="test"):
                 debug_numeric_value(logger, "ctx", 1, "number", "5", 5)
             assert "ctx" in caplog.text or True  # Logging may be captured differently
+
+
+# ---------------------------------------------------------------------------
+# assignment_shows_suggested_values
+# ---------------------------------------------------------------------------
+
+class TestAssignmentShowsSuggestedValues:
+    def test_pending_shows_suggestions(self):
+        aes = SimpleNamespace(status="pending")
+        assert assignment_shows_suggested_values(aes) is True
+
+    def test_pending_enum_shows_suggestions(self):
+        from app.models.enums import AssignmentEntityStatusValue
+        aes = SimpleNamespace(status=AssignmentEntityStatusValue.pending)
+        assert assignment_shows_suggested_values(aes) is True
+
+    def test_none_status_shows_suggestions(self):
+        aes = SimpleNamespace(status=None)
+        assert assignment_shows_suggested_values(aes) is True
+
+    def test_in_progress_hides_suggestions(self):
+        aes = SimpleNamespace(status="in_progress")
+        assert assignment_shows_suggested_values(aes) is False
+
+    def test_submitted_hides_suggestions(self):
+        aes = SimpleNamespace(status="submitted")
+        assert assignment_shows_suggested_values(aes) is False
+
+    def test_approved_hides_suggestions(self):
+        aes = SimpleNamespace(status="approved")
+        assert assignment_shows_suggested_values(aes) is False
+
+    def test_requires_revision_hides_suggestions(self):
+        aes = SimpleNamespace(status="requires_revision")
+        assert assignment_shows_suggested_values(aes) is False
+
+    def test_sent_for_review_hides_suggestions(self):
+        aes = SimpleNamespace(status="sent_for_review")
+        assert assignment_shows_suggested_values(aes) is False
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +231,22 @@ class TestProcessExistingDataForTemplate:
             pass
         assert process_existing_data_for_template(Bare()) == ""
 
+    def test_skips_prefilled_when_include_prefilled_false(self):
+        entry = self._entry(prefilled_value="prefilled")
+        assert process_existing_data_for_template(entry, include_prefilled=False) == ""
+
+    def test_skips_prefilled_disagg_when_include_prefilled_false(self):
+        entry = self._entry(prefilled_disagg_data={"values": {"b": 2}})
+        assert process_existing_data_for_template(entry, include_prefilled=False) == ""
+
+    def test_falls_back_to_imputed_when_prefilled_skipped(self):
+        entry = self._entry(prefilled_value="prefilled", imputed_value="imputed")
+        assert process_existing_data_for_template(entry, include_prefilled=False) == "imputed"
+
+    def test_reported_value_still_returned_when_prefilled_skipped(self):
+        entry = self._entry(value="saved", prefilled_value="prefilled")
+        assert process_existing_data_for_template(entry, include_prefilled=False) == "saved"
+
 
 # ---------------------------------------------------------------------------
 # _process_form_data_entry
@@ -304,6 +360,28 @@ class TestProcessFormDataEntry:
         fi = self._make_form_item(item_type="indicator", is_indicator=True)
         result = _process_form_data_entry(entry, fi)
         assert "field_value[1]" not in result
+
+    def test_omits_prefilled_indicator_when_include_prefilled_false(self):
+        entry = self._make_entry(prefilled_value="prefilled_42")
+        fi = self._make_form_item(item_type="indicator", is_indicator=True)
+        result = _process_form_data_entry(entry, fi, include_prefilled=False)
+        assert "field_value[1]" not in result
+        assert result.get("field_value[1]_is_prefilled") is None
+
+    def test_omits_prefilled_matrix_when_include_prefilled_false(self):
+        entry = self._make_entry(prefilled_disagg_data={"row1": 5})
+        fi = self._make_form_item(item_type="matrix", is_indicator=False)
+        fi.is_question = False
+        result = _process_form_data_entry(entry, fi, include_prefilled=False)
+        assert result.get("field_value[1]") == {}
+        assert result.get("field_value[1]_is_prefilled") is None
+
+    def test_reported_indicator_still_shown_when_include_prefilled_false(self):
+        entry = self._make_entry(value="42", prefilled_value="prefilled_42")
+        fi = self._make_form_item(item_type="indicator", is_indicator=True)
+        result = _process_form_data_entry(entry, fi, include_prefilled=False)
+        assert result.get("field_value[1]") == "42"
+        assert result.get("field_value[1]_is_prefilled") is None
 
 
 # ---------------------------------------------------------------------------
@@ -604,6 +682,74 @@ class TestLoadExistingDataForAssignment:
 
         assert "field_value[5]" in result
         assert "field_value[dynamic_10]" in result
+
+    def test_pending_includes_prefilled_value(self, app):
+        from app.routes.forms.helpers import _load_existing_data_for_assignment
+
+        mock_aes = SimpleNamespace(id=1, status="pending")
+        mock_form_item = MagicMock()
+        mock_form_item.item_type = "indicator"
+        mock_form_item.is_indicator = True
+        mock_form_item.is_question = False
+
+        mock_entry = MagicMock()
+        mock_entry.form_item_id = 5
+        mock_entry.form_item = mock_form_item
+        mock_entry.value = None
+        mock_entry.data_not_available = False
+        mock_entry.not_applicable = False
+        mock_entry.disagg_data = None
+        mock_entry.prefilled_disagg_data = None
+        mock_entry.imputed_disagg_data = None
+        mock_entry.prefilled_value = "99"
+        mock_entry.imputed_value = None
+
+        with app.app_context():
+            with patch(
+                "app.routes.forms.helpers.FormData.query"
+            ) as mock_fd_query, patch(
+                "app.routes.forms.helpers.DynamicIndicatorData.query"
+            ) as mock_did_query:
+                mock_fd_query.filter_by.return_value.options.return_value.all.return_value = [mock_entry]
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = []
+                result = _load_existing_data_for_assignment(mock_aes, MagicMock())
+
+        assert result.get("field_value[5]") == "99"
+        assert result.get("field_value[5]_is_prefilled") is True
+
+    def test_submitted_omits_prefilled_value(self, app):
+        from app.routes.forms.helpers import _load_existing_data_for_assignment
+
+        mock_aes = SimpleNamespace(id=1, status="submitted")
+        mock_form_item = MagicMock()
+        mock_form_item.item_type = "indicator"
+        mock_form_item.is_indicator = True
+        mock_form_item.is_question = False
+
+        mock_entry = MagicMock()
+        mock_entry.form_item_id = 5
+        mock_entry.form_item = mock_form_item
+        mock_entry.value = None
+        mock_entry.data_not_available = False
+        mock_entry.not_applicable = False
+        mock_entry.disagg_data = None
+        mock_entry.prefilled_disagg_data = None
+        mock_entry.imputed_disagg_data = None
+        mock_entry.prefilled_value = "99"
+        mock_entry.imputed_value = None
+
+        with app.app_context():
+            with patch(
+                "app.routes.forms.helpers.FormData.query"
+            ) as mock_fd_query, patch(
+                "app.routes.forms.helpers.DynamicIndicatorData.query"
+            ) as mock_did_query:
+                mock_fd_query.filter_by.return_value.options.return_value.all.return_value = [mock_entry]
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = []
+                result = _load_existing_data_for_assignment(mock_aes, MagicMock())
+
+        assert "field_value[5]" not in result
+        assert result.get("field_value[5]_is_prefilled") is None
 
     def test_missing_form_item_is_skipped(self, app):
         from app.routes.forms.helpers import _load_existing_data_for_assignment
@@ -995,6 +1141,30 @@ class TestCalculateSectionCompletionStatus:
         data = {"field_value[1]": {"values": {"male": None, "female": None}, "mode": "disagg"}}
         result = calculate_section_completion_status([section], data, {})
         assert result["Sec"] == "Not Started"
+
+    def test_reporting_mode_without_table_values_not_filled(self):
+        field = self._make_field(1, is_indicator=True)
+        field.field_type_for_js = "number"
+        field.is_matrix = False
+        section = self._make_section("Sec", [field])
+        for payload in (
+            {"mode": "sex", "values": {}},
+            {"mode": "age", "values": {}},
+            {"mode": "sex_age", "values": {}},
+            {"mode": "sex"},
+            {"mode": "sex", "values": {"male": 0, "female": 0}},
+            {"mode": "age", "values": {"0_17": "0"}},
+        ):
+            data = {"field_value[1]": payload}
+            result = calculate_section_completion_status([section], data, {})
+            assert result["Sec"] == "Not Started", payload
+
+    def test_scalar_zero_not_filled(self):
+        field = self._make_field(1)
+        section = self._make_section("Sec", [field])
+        for value in (0, "0", "0.0"):
+            result = calculate_section_completion_status([section], {"field_value[1]": value}, {})
+            assert result["Sec"] == "Not Started", value
 
     def test_section_without_fields_ordered_attr(self):
         section = MagicMock()

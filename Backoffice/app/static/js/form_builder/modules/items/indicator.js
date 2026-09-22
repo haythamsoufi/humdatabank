@@ -18,6 +18,7 @@ export const IndicatorItem = {
     },
 
     teardown(modalElement) {
+        this._lastDisaggIndicatorId = null;
         if (!modalElement) return;
         if (modalElement._indicatorChangeHandler) {
             document.removeEventListener('change', modalElement._indicatorChangeHandler);
@@ -39,19 +40,20 @@ export const IndicatorItem = {
                         // Update UI hint text (placeholders) for custom overrides when switching indicators.
                         // Do NOT overwrite any user-entered custom values.
                         this.updateCustomLabelAndDefinitionHints(modalElement, indicator);
+                        const indicatorChanged = String(this._lastDisaggIndicatorId || '') !== String(selectedIndicatorId);
+                        this._lastDisaggIndicatorId = String(selectedIndicatorId);
                         if (id === 'item-indicator-bank-select') {
                             this.updateFilterDropdownsFromIndicator(modalElement, indicator);
                         }
-                        // Preserve disaggregation selections when re-rendering options.
-                        // In the form builder item modal, the user may tick multiple options and then
-                        // other UI updates (select2/filter sync) can trigger re-render; we must not wipe checks.
-                        const preserveSelections = true;
-                        this.updateDisaggregationOptions(modalElement, indicator, preserveSelections);
+                        // New/changed indicator: select every disaggregation option by default.
+                        // Same indicator re-render (filter/select2 sync): keep the user's ticks.
+                        this.updateDisaggregationOptions(modalElement, indicator, !indicatorChanged);
                         this.updateAgeGroupsVisibility(modalElement, indicator);
                         this.updateIndirectReachVisibility(modalElement, indicator);
                     }
                 } else {
                     // Reset hint text when no indicator is selected.
+                    this._lastDisaggIndicatorId = null;
                     this.updateCustomLabelAndDefinitionHints(modalElement, null);
                     if (id === 'item-indicator-bank-select') {
                         this.resetFilterDropdowns(modalElement);
@@ -200,7 +202,7 @@ export const IndicatorItem = {
                     type: Array.isArray(sampleIndicator) ? sampleIndicator[2] : sampleIndicator.type,
                     unit: Array.isArray(sampleIndicator) ? sampleIndicator[3] : sampleIndicator.unit
                 };
-                this.updateDisaggregationOptions(modalElement, indicatorData, false);
+                this.updateDisaggregationOptions(modalElement, indicatorData, this.hasExistingDisaggregationCheckboxes());
                 this.updateAgeGroupsVisibility(modalElement, indicatorData);
                 this.updateIndirectReachVisibility(modalElement, indicatorData);
             }
@@ -313,11 +315,16 @@ export const IndicatorItem = {
                     type: Array.isArray(sampleIndicator) ? sampleIndicator[2] : sampleIndicator.type,
                     unit: Array.isArray(sampleIndicator) ? sampleIndicator[3] : sampleIndicator.unit
                 };
-                this.updateDisaggregationOptions(modalElement, indicatorData, false);
+                this.updateDisaggregationOptions(modalElement, indicatorData, this.hasExistingDisaggregationCheckboxes());
                 this.updateAgeGroupsVisibility(modalElement, indicatorData);
                 this.updateIndirectReachVisibility(modalElement, indicatorData);
             }
         }
+    },
+
+    hasExistingDisaggregationCheckboxes() {
+        const checkboxContainer = document.getElementById('add_item_indicator_allowed_disaggregation_options_container');
+        return !!(checkboxContainer && checkboxContainer.querySelector('input[type="checkbox"]'));
     },
 
     populateDisaggregationCheckboxes(container, disaggregationChoices, preserveSelections = false) {
@@ -341,9 +348,9 @@ export const IndicatorItem = {
             // even if the checkbox UI is re-rendered or temporarily disabled.
             checkbox.name = '';
             checkbox.className = 'form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500';
-            if (preserveSelections && currentSelections.includes(value)) {
-                checkbox.checked = true;
-            }
+            // Default: every option is selected when an indicator is chosen.
+            // Preserve path keeps whatever was already ticked (edit / same-indicator re-render).
+            checkbox.checked = preserveSelections ? currentSelections.includes(value) : true;
             const labelElement = document.createElement('label');
             labelElement.htmlFor = checkbox.id;
             labelElement.className = 'ml-2 text-sm text-gray-700';
@@ -486,6 +493,7 @@ export const IndicatorItem = {
             const ageGroupsInput = modalElement.querySelector('#add_item_modal_indicator_age_groups_input');
             const defaultValueInput = modalElement.querySelector('#item-indicator-default-value') || document.getElementById('item-indicator-default-value');
             if (bankSelect && itemData.indicator_bank_id) {
+                this._lastDisaggIndicatorId = String(itemData.indicator_bank_id);
                 let existingOption = Array.from(bankSelect.options || []).find((opt) => String(opt.value) === String(itemData.indicator_bank_id));
                 if (!existingOption) {
                     const indicatorObj = DataManager.getIndicatorById(parseInt(itemData.indicator_bank_id)) || {};
@@ -511,7 +519,7 @@ export const IndicatorItem = {
                     this.updateBankOptions(modalElement);
                     const disaggContainer = modalElement.querySelector('#add_item_indicator_allowed_disaggregation_options_container');
                     if (!disaggContainer || disaggContainer.children.length === 0) {
-                        this.updateDisaggregationOptions(modalElement, selectedIndicator, true);
+                        this.updateDisaggregationOptions(modalElement, selectedIndicator, false);
                     }
                     this.updateAgeGroupsVisibility(modalElement, selectedIndicator);
                     this.updateIndirectReachVisibility(modalElement, selectedIndicator);
@@ -572,18 +580,15 @@ export const IndicatorItem = {
                     : '';
                 defaultValueInput.value = (dv === null || dv === undefined) ? '' : String(dv);
             }
-            if (itemData.allowed_disaggregation_options && itemData.allowed_disaggregation_options.length > 0) {
+            if (Array.isArray(itemData.allowed_disaggregation_options)) {
                 setTimeout(() => {
                     const disaggContainer = modalElement.querySelector('#add_item_indicator_allowed_disaggregation_options_container');
                     if (disaggContainer) {
                         const checkboxes = disaggContainer.querySelectorAll('input[type="checkbox"]');
                         checkboxes.forEach(checkbox => {
-                            if (itemData.allowed_disaggregation_options.includes(checkbox.value)) {
-                                checkbox.checked = true;
-                            } else {
-                                checkbox.checked = false;
-                            }
+                            checkbox.checked = itemData.allowed_disaggregation_options.includes(checkbox.value);
                         });
+                        disaggContainer.dispatchEvent(new Event('change', { bubbles: true }));
                     }
                 }, 100);
             }

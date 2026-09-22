@@ -165,6 +165,19 @@ def session_set_cookie_bytes(response) -> int:
     return max(sizes) if sizes else 0
 
 
+SUPPRESS_SESSION_COOKIE_FLAG = "suppress_session_cookie"
+
+
+def suppress_session_cookie_for_request():
+    """Send this response without a session cookie.
+
+    Used when a request arrives with no usable session: writing a fresh
+    anonymous cookie would overwrite a login cookie the browser still holds
+    but did not send, turning a recoverable miss into a real logout.
+    """
+    setattr(g, SUPPRESS_SESSION_COOKIE_FLAG, True)
+
+
 class SuppressableSessionInterface:
     """Proxy that can skip writing the session cookie for one request.
 
@@ -180,7 +193,10 @@ class SuppressableSessionInterface:
         return getattr(self._wrapped, name)
 
     def save_session(self, app, session_obj, response):
-        if getattr(g, "suppress_session_cookie", False):
+        # Consume the flag here rather than leaving it on ``g``: a request
+        # served inside an app context that outlives it (test clients, worker
+        # threads) would otherwise keep suppressing later responses.
+        if g.pop(SUPPRESS_SESSION_COOKIE_FLAG, False):
             return None
         return self._wrapped.save_session(app, session_obj, response)
 

@@ -2,14 +2,16 @@
 
 from contextlib import suppress
 
-from flask import render_template, request, session, current_app, url_for, redirect, flash, jsonify, g
+from flask import render_template, request, session, current_app, url_for, redirect, flash, jsonify
 from flask_babel import _
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError, generate_csrf
 
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_server_error
 from app.utils.csp_nonce import get_style_nonce
+from app.utils.redirect_utils import get_current_relative_url
 from app.utils.request_utils import is_json_request
+from app.utils.session_persistence import suppress_session_cookie_for_request
 
 
 def _safe_csrf_reload_url():
@@ -30,7 +32,7 @@ def _is_context_switch_csrf_request():
 
 def _suppress_anonymous_session_cookie():
     """Do not emit a replacement session cookie for an unauthenticated CSRF failure."""
-    g.suppress_session_cookie = True
+    suppress_session_cookie_for_request()
 
 
 def register_error_handlers(app):
@@ -69,13 +71,20 @@ def register_error_handlers(app):
         # No usable login session on this request. Do not flash() or mint a
         # CSRF token — that would write a new anonymous session cookie and
         # overwrite a login cookie the browser still has but omitted from this
-        # POST (common on phones after OAuth / oversized cookies). Send the
-        # user to login without the misleading "changes were not saved" notice.
+        # POST (common on phones after OAuth / oversized cookies). Sending no
+        # cookie gives the browser one more chance to present the real one: if
+        # it does, /login sees an authenticated user and bounces straight back.
         if not getattr(current_user, "is_authenticated", False):
             _suppress_anonymous_session_cookie()
             with suppress(Exception):
-                return redirect(url_for("auth.login"))
-            return redirect("/login")
+                return redirect(
+                    url_for(
+                        "auth.login",
+                        next=get_current_relative_url(),
+                        session_expired=1,
+                    )
+                )
+            return redirect("/login?session_expired=1")
 
         # Still logged in: token/referer mismatch. Refresh the token and return
         # to the page they came from. Country/entity switching is navigation,

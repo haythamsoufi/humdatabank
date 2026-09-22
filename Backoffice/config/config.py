@@ -641,9 +641,7 @@ class Config:
     WTF_CSRF_ENABLED = True
     WTF_CSRF_CHECK_DEFAULT = True
     WTF_CSRF_TIME_LIMIT = 3600  # 1 hour
-    # Token + SameSite=Lax already protect POSTs. Requiring a matching HTTPS
-    # Referer breaks phones / in-app browsers that strip Referer (ITP, privacy).
-    WTF_CSRF_SSL_STRICT = False
+    WTF_CSRF_SSL_STRICT = True
 
     # Standard Disaggregation Categories
     DEFAULT_SEX_CATEGORIES = _load_sex_categories_from_settings(["Male", "Female", "Non-binary", "Unknown"])
@@ -1227,7 +1225,7 @@ class ProductionConfig(Config):
 
     # CSRF Configuration for production
     WTF_CSRF_ENABLED = True
-    WTF_CSRF_SSL_STRICT = False
+    WTF_CSRF_SSL_STRICT = True
 
     # Rate limiting: custom deque limiter should not be skipped in production.
     RATE_LIMIT_SKIP_DEBUG = False

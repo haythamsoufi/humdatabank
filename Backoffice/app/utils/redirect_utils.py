@@ -173,12 +173,14 @@ def get_safe_redirect_url(target_url: Optional[str], default_route: str = 'main.
 
 
 def first_party_login_continue(safe_url: str):
-    """Return a 200 HTML hop so mobile browsers persist the login session cookie.
+    """Return a 200 HTML hop that lands the session cookie in a first-party context.
 
-    Set-Cookie on a 302 after Azure B2C (or even a first-party login POST) is
-    often discarded by mobile Safari / Chrome ITP. The following GET in the
-    redirect chain can still look logged-in, then the next user action has no
-    cookie. Serving a same-origin 200 with the cookie, then navigating, sticks.
+    Only for the Azure B2C callback. That response ends a cross-site redirect
+    chain (app -> b2clogin.com -> app), and mobile browsers are least reliable
+    about storing cookies set mid-chain — Android WebView drops SameSite=Lax
+    cookies there, and Safari's bounce-tracking mitigation targets exactly this
+    shape. Stopping on a same-origin 200 first, then navigating, avoids both.
+    Same-site logins do not need this and keep plain POST/redirect/GET.
     """
     from flask import make_response, render_template
 
@@ -203,8 +205,9 @@ def safe_redirect(
     Args:
         target_url: The target URL to validate and redirect to
         default_route: The Flask route name to redirect to if target is unsafe
-        persist_session_cookie: After login, return a 200 continue page instead
-            of a 302 so mobile browsers keep the new session cookie.
+        persist_session_cookie: Return a 200 continue page instead of a 302 so
+            the session cookie is stored in a first-party context. Only for the
+            OAuth callback; see first_party_login_continue().
 
     Returns:
         Flask redirect response, or a 200 continue page after login.

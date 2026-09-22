@@ -1346,10 +1346,10 @@ class BackofficeUser(HttpUser):
             if cookie_name and cookie_value:
                 self.client.cookies.set(cookie_name.strip(), cookie_value.strip())
 
-        # Same-origin Referer on every HTTPS mutation so POSTs still succeed if
-        # a slot re-enables WTF_CSRF_SSL_STRICT (off by default: phones often
-        # omit Referer). Setting it once as a persistent session header covers
-        # all self.client calls without adding it to each task.
+        # WTF_CSRF_SSL_STRICT=True on staging requires a same-origin Referer on
+        # every HTTPS mutation (POST/PUT/PATCH/DELETE).  Setting it once as a
+        # persistent session header covers all self.client calls without having
+        # to add it individually to each task.
         self.client.headers.update({
             "Referer": self.host,
             "User-Agent": _LOADTEST_USER_AGENT,

@@ -121,6 +121,22 @@ class TestSessionCookieSize:
             interface.save_session(app, session, make_response("ok"))
             wrapped.save_session.assert_called_once()
 
+    def test_suppression_does_not_outlive_the_response(self, app):
+        """The flag lives on ``g``, which can outlive a single request when an
+        app context is pushed around it (test clients, worker threads). Saving
+        must consume it so the next response still gets its session cookie."""
+        from flask import g, make_response
+        from unittest.mock import MagicMock
+
+        wrapped = MagicMock()
+        interface = SuppressableSessionInterface(wrapped)
+        with app.test_request_context("/"):
+            g.suppress_session_cookie = True
+            interface.save_session(app, session, make_response("ok"))
+            interface.save_session(app, session, make_response("ok"))
+            wrapped.save_session.assert_called_once()
+            assert not getattr(g, "suppress_session_cookie", False)
+
     def test_install_suppressable_interface_is_idempotent(self, app):
         first = install_suppressable_session_interface(app)
         second = install_suppressable_session_interface(app)

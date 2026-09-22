@@ -315,7 +315,7 @@ def dev_act_as_login():
 
     _complete_dev_act_as_login(user)
     next_page = request.form.get('next') or request.args.get('next')
-    return safe_redirect(next_page, default_route='main.dashboard', persist_session_cookie=True)
+    return safe_redirect(next_page, default_route='main.dashboard')
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -327,6 +327,13 @@ def login():
         if next_page and is_safe_redirect_url(next_page):
             return redirect(next_page)
         return redirect(url_for("main.dashboard")) # Redirect if already logged in
+
+    # Sent here by the CSRF handler when a request arrived with no usable
+    # session. That path cannot flash (writing a session cookie there would
+    # clobber a login cookie the browser still holds), so it asks for the
+    # notice via the query string instead.
+    if request.method == "GET" and request.args.get('session_expired'):
+        flash(_("Your session has expired. Please sign in again."), "warning")
 
     form = LoginForm()
     register_form = RegisterForm()
@@ -466,7 +473,7 @@ def login():
                 current_app.logger.debug(f"Login redirect: next_page={next_page}")
 
             # Use safe redirect utility to prevent open redirect vulnerabilities
-            return safe_redirect(next_page, default_route='main.dashboard', persist_session_cookie=True)
+            return safe_redirect(next_page, default_route='main.dashboard')
 
         else:
             # Log failed login attempt with specific reason

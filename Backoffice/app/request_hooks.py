@@ -5,6 +5,7 @@ from flask_login import current_user
 
 from app.i18n import persist_queued_language_cookie, update_session_activity
 from app.utils.session_persistence import (
+    SUPPRESS_SESSION_COOKIE_FLAG,
     install_suppressable_session_interface,
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
@@ -154,7 +155,12 @@ def register_request_hooks(app):
 
     @app.after_request
     def _suppress_anonymous_session_cookie(response):
-        if not getattr(g, "suppress_session_cookie", False):
+        """Drop any session cookie another hook already wrote.
+
+        Flask's own save_session runs after this and is handled by
+        SuppressableSessionInterface, which also clears the flag.
+        """
+        if not getattr(g, SUPPRESS_SESSION_COOKIE_FLAG, False):
             return response
         try:
             return strip_session_set_cookie(response)

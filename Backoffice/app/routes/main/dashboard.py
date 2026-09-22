@@ -31,6 +31,7 @@ from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAYS
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.request_utils import is_top_level_navigation
 from app.utils.error_handling import handle_json_view_exception
 from app.services.platform.app_settings_service import is_organization_email
 from app.services.organization.authorization_service import AuthorizationService
@@ -314,19 +315,25 @@ def dashboard():
         if len(user_entities) > 1:
             show_entity_select = True
 
+    # Switching country/entity is navigation, so it is accepted over GET: a GET
+    # carries no CSRF token to go stale, which is what bounced phones to /login
+    # on their first action after login. GET has no CSRF check, so only honour a
+    # real navigation — never a cross-site <img>/prefetch of the same URL. POST
+    # still works for pages rendered before this change.
+    context_switch_allowed = request.method == "POST" or is_top_level_navigation()
     country_select_submitted = (
         countries_group_enabled
+        and context_switch_allowed
         and "country_select" in request.values
         and "self_report_template_id" not in request.form
     )
     entity_select_submitted = (
-        "entity_select" in request.values
+        context_switch_allowed
+        and "entity_select" in request.values
         and "self_report_template_id" not in request.form
     )
 
     if country_select_submitted or entity_select_submitted or request.method == "POST":
-        # Country/entity switching accepts GET or POST. GET avoids CSRF on phones
-        # (first navigation after login). POST remains for older clients/tests.
         if country_select_submitted:
             selected_country_id_str = request.values.get('country_select')
             current_app.logger.debug(f"Dashboard country selection. Selected country ID string: {selected_country_id_str}")

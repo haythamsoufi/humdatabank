@@ -101,7 +101,11 @@ class TestCsrfErrorHandler:
             follow_redirects=False,
         )
         assert resp.status_code == 302
-        assert "/login" in (resp.headers.get("Location") or "")
+        location = resp.headers.get("Location") or ""
+        assert "/login" in location
+        # The login page explains the bounce; the handler cannot flash without
+        # writing the session cookie it is deliberately withholding.
+        assert "session_expired" in location
         with client.session_transaction() as sess:
             assert not sess.get("_flashes")
         cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")

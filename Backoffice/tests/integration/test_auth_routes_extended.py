@@ -4,7 +4,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from flask import make_response
+from flask import g, make_response
 
 pytestmark = [pytest.mark.integration, pytest.mark.auth_security]
 
@@ -35,10 +35,7 @@ class TestLoginRouteExtended:
                 'email': 'login-ok@example.com',
                 'password': 'TestPass123!',
             }, follow_redirects=False)
-        assert resp.status_code in (200, 301, 302, 303, 307, 308)
-        if resp.status_code == 200:
-            assert b'id="login-continue"' in resp.data
-            assert b'href="/"' in resp.data or b"location.replace" in resp.data
+        assert resp.status_code in (301, 302, 303, 307, 308)
 
     def test_login_account_locked(self, client, db_session, app):
         from app.models.core import UserLoginLog
@@ -291,6 +288,22 @@ class TestLoginRouteCoverage:
             resp = client.get('/login')
         assert resp.status_code == 200
         mock_render.assert_called_once()
+
+    def test_login_session_expired_flag_explains_the_bounce(self, client, app):
+        """The CSRF handler redirects here without flashing (it withholds the
+        session cookie), so the notice has to be queued by the login page."""
+        # The suite shares one app context, so Flask-Login's cached user can
+        # survive an earlier test and make /login redirect instead of render.
+        g.pop('_login_user', None)
+        with patch('app.routes.auth.render_template', return_value=('login', 200)):
+            resp = client.get('/login?session_expired=1')
+        assert resp.status_code == 200
+        with client.session_transaction() as sess:
+            flashes = sess.get('_flashes', [])
+        assert len(flashes) == 1
+        _category, message = flashes[0]
+        assert 'expired' in message.lower()
+        assert 'not saved' not in message.lower()
 
     def test_login_wrong_password(self, client, db_session, app):
         with app.app_context():

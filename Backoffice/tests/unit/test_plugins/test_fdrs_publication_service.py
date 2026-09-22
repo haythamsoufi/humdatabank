@@ -42,6 +42,7 @@ def _set_form_data(
     *,
     value=None,
     published_value=None,
+    published_numeric_value=None,
     published_source=None,
     numeric_value=None,
     imputed_value=None,
@@ -54,6 +55,7 @@ def _set_form_data(
         value=value,
         numeric_value=numeric_value,
         published_value=published_value,
+        published_numeric_value=published_numeric_value,
         published_source=published_source,
         imputed_value=imputed_value,
         imputed_numeric_value=imputed_numeric_value,
@@ -167,12 +169,173 @@ class TestGetAssignmentPublicationSummary:
         for country in summary["countries"]:
             assert country["total_public_items"] == 3
 
-    def test_most_pending_country_sorted_first(self, db_session, fdrs_scenario):
+    def test_review_flags_sorted_before_pending_count(self, db_session, fdrs_scenario):
         summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
-        assert summary["countries"][0]["country_id"] == fdrs_scenario["country_a"].id
-        assert summary["countries"][0]["pending_count"] == 2
-        assert summary["countries"][1]["country_id"] == fdrs_scenario["country_b"].id
-        assert summary["countries"][1]["pending_count"] == 1
+        # Beta has a value that will be cleared (review flag); Alpha has more
+        # pending rows but only a 33% change, below the 50% variation threshold.
+        assert summary["countries"][0]["country_id"] == fdrs_scenario["country_b"].id
+        assert summary["countries"][0]["review_count"] == 1
+        assert summary["countries"][1]["country_id"] == fdrs_scenario["country_a"].id
+        assert summary["countries"][1]["pending_count"] == 2
+
+    def test_analysis_flags_cleared_value(self, db_session, fdrs_scenario):
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        flags = summary["analysis"]["flags"]
+        assert summary["analysis"]["flag_count"] == 1
+        assert flags[0]["country_id"] == fdrs_scenario["country_b"].id
+        assert flags[0]["kind"] == "removed"
+        assert any(r["code"] == "cleared" for r in flags[0]["reasons"])
+
+    def test_analysis_flags_large_change_vs_published(self, db_session, fdrs_scenario):
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_a"].id,
+            form_item_id=fdrs_scenario["item_pub2"].id,
+        ).one()
+        row.value = "45"
+        row.numeric_value = 45
+        row.published_numeric_value = 15
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        flags = [
+            f for f in summary["analysis"]["flags"]
+            if f["form_item_id"] == fdrs_scenario["item_pub2"].id
+            and f["country_id"] == fdrs_scenario["country_a"].id
+        ]
+        assert flags
+        assert flags[0]["severity"] == "high"
+        assert any(
+            r["code"] == "large_variation" and r["vs"] == "published"
+            for r in flags[0]["reasons"]
+        )
+
+    def test_analysis_flags_yoy_vs_prior_period(self, db_session, fdrs_scenario):
+        prior_aes = create_test_assignment_entity_status(
+            db_session,
+            country=fdrs_scenario["country_a"],
+            template=fdrs_scenario["template"],
+            period_name="2023",
+        )
+        _set_form_data(
+            db_session,
+            prior_aes,
+            fdrs_scenario["item_pub1"],
+            value="10",
+            numeric_value=10,
+            published_value="10",
+            published_numeric_value=10,
+            published_source=FormData.PUBLISHED_SOURCE_REPORTED,
+        )
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        assert summary["analysis"]["prior_period_name"] == "2023"
+        flags = [
+            f for f in summary["analysis"]["flags"]
+            if f["form_item_id"] == fdrs_scenario["item_pub1"].id
+            and f["country_id"] == fdrs_scenario["country_a"].id
+        ]
+        # Current new value 10 vs prior published 10 → no YoY flag.
+        assert flags == []
+
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_a"].id,
+            form_item_id=fdrs_scenario["item_pub1"].id,
+        ).one()
+        row.value = "30"
+        row.numeric_value = 30
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        flags = [
+            f for f in summary["analysis"]["flags"]
+            if f["form_item_id"] == fdrs_scenario["item_pub1"].id
+            and f["country_id"] == fdrs_scenario["country_a"].id
+        ]
+        assert flags
+        assert any(
+            r["code"] == "large_variation" and r["vs"] == "prior"
+            for r in flags[0]["reasons"]
+        )
+
+    def test_analysis_flags_already_published_value_vs_prior(self, db_session, fdrs_scenario):
+        prior_aes = create_test_assignment_entity_status(
+            db_session,
+            country=fdrs_scenario["country_b"],
+            template=fdrs_scenario["template"],
+            period_name="2023",
+        )
+        _set_form_data(
+            db_session,
+            prior_aes,
+            fdrs_scenario["item_pub1"],
+            value="2",
+            numeric_value=2,
+            published_value="2",
+            published_numeric_value=2,
+            published_source=FormData.PUBLISHED_SOURCE_REPORTED,
+        )
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        flags = [
+            f for f in summary["analysis"]["flags"]
+            if f["form_item_id"] == fdrs_scenario["item_pub1"].id
+            and f["country_id"] == fdrs_scenario["country_b"].id
+        ]
+        # Beta's published 5 vs prior 2 is a 150% YoY swing, even though this
+        # assignment row is already unchanged/published.
+        assert flags
+        assert flags[0]["kind"] == "unchanged"
+        assert any(
+            r["code"] == "large_variation" and r["vs"] == "prior"
+            for r in flags[0]["reasons"]
+        )
+
+    def test_analysis_uses_unpublished_prior_reported_value(self, db_session, fdrs_scenario):
+        prior_aes = create_test_assignment_entity_status(
+            db_session,
+            country=fdrs_scenario["country_a"],
+            template=fdrs_scenario["template"],
+            period_name="2023",
+        )
+        _set_form_data(
+            db_session,
+            prior_aes,
+            fdrs_scenario["item_pub1"],
+            value="8",
+            numeric_value=8,
+        )
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        flags = [
+            f for f in summary["analysis"]["flags"]
+            if f["form_item_id"] == fdrs_scenario["item_pub1"].id
+            and f["country_id"] == fdrs_scenario["country_a"].id
+        ]
+        # Current new value 10 vs unpublished prior 8 is only 25% — not flagged.
+        assert flags == []
+
+        row = FormData.query.filter_by(
+            assignment_entity_status_id=fdrs_scenario["aes_a"].id,
+            form_item_id=fdrs_scenario["item_pub1"].id,
+        ).one()
+        row.value = "20"
+        row.numeric_value = 20
+        db_session.commit()
+
+        summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])
+        flags = [
+            f for f in summary["analysis"]["flags"]
+            if f["form_item_id"] == fdrs_scenario["item_pub1"].id
+            and f["country_id"] == fdrs_scenario["country_a"].id
+        ]
+        assert flags
+        assert any(
+            r["code"] == "large_variation" and r["vs"] == "prior"
+            for r in flags[0]["reasons"]
+        )
 
     def test_never_published_country_has_no_published_at(self, db_session, fdrs_scenario):
         summary = svc.get_assignment_publication_summary(fdrs_scenario["assigned_form_id"])

@@ -31,6 +31,10 @@ from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData, 
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from app.utils.datetime_helpers import utcnow
+from plugins.fdrs.services.fdrs_publication_analysis import (
+    analyze_publication_rows,
+    coerce_numeric,
+)
 
 # 'empty' = nothing to publish (no reported, no imputed) and nothing published
 # (not actionable, but tallied for transparency so counts always add up to
@@ -96,13 +100,74 @@ def _public_form_data_query(assigned_form_id: int):
     )
 
 
+def _prior_fdrs_assignment(assigned_form: AssignedForm) -> Optional[AssignedForm]:
+    """Most recent earlier FDRS assignment, used as the year-over-year baseline."""
+    query = (
+        AssignedForm.query
+        .filter(AssignedForm.template_id == FDRS_TEMPLATE_ID)
+        .filter(AssignedForm.id != assigned_form.id)
+    )
+    if assigned_form.period_end is not None:
+        return (
+            query
+            .filter(
+                AssignedForm.period_end.isnot(None),
+                AssignedForm.period_end < assigned_form.period_end,
+            )
+            .order_by(AssignedForm.period_end.desc(), AssignedForm.id.desc())
+            .first()
+        )
+    name = (assigned_form.period_name or "").strip()
+    if name.isdigit() and len(name) == 4:
+        return query.filter(AssignedForm.period_name == str(int(name) - 1)).first()
+    return None
+
+
+def _prior_baseline_numerics(prior_assignment_id: int) -> Dict[tuple, float]:
+    """Map (country_id, form_item_id) → baseline numeric from the prior assignment.
+
+    Prefers that year's published snapshot (what the public site showed). If the
+    prior assignment was never published, falls back to the publishable current
+    value so a first-time publish still has a year-over-year comparison.
+    """
+    aes_to_country = {
+        aes.id: aes.entity_id
+        for aes in (
+            AssignmentEntityStatus.query
+            .filter_by(assigned_form_id=prior_assignment_id, entity_type="country")
+            .all()
+        )
+    }
+    out: Dict[tuple, float] = {}
+    if not aes_to_country:
+        return out
+    for row in _public_form_data_query(prior_assignment_id).all():
+        country_id = aes_to_country.get(row.assignment_entity_status_id)
+        if country_id is None:
+            continue
+        num = coerce_numeric(row.published_numeric_value)
+        if num is None:
+            num = coerce_numeric(row.published_value)
+        if num is None:
+            current_value, _disagg, current_numeric = row.publication_current_payload()
+            num = coerce_numeric(current_numeric)
+            if num is None:
+                num = coerce_numeric(current_value)
+        if num is None:
+            continue
+        out[(int(country_id), int(row.form_item_id))] = num
+    return out
+
+
 def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
     """
     Preview what publishing this assignment would change, without writing anything.
 
     Returns a dict with the assignment, one row per country (AssignmentEntityStatus),
-    and assignment-wide totals. Countries are sorted with the most "actionable" ones
-    (biggest pending change count) first.
+    assignment-wide totals, and an ``analysis`` payload of large variations / outliers
+    to review — including already-published (unchanged) values versus the previous
+    period and the assignment-wide total. Countries are sorted with review flags
+    first, then the most pending changes.
     """
     assigned_form = _get_fdrs_assigned_form_or_404(assigned_form_id)
 
@@ -112,12 +177,44 @@ def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
         .all()
     )
     counts_by_aes: Dict[int, Dict[str, int]] = {aes.id: _empty_counts() for aes in aes_rows}
+    aes_by_id = {aes.id: aes for aes in aes_rows}
 
-    for row in _public_form_data_query(assigned_form_id).all():
+    pending_rows: List[Dict[str, Any]] = []
+    item_global_totals: Dict[int, float] = {}
+    item_global_reporters: Dict[int, int] = {}
+    public_rows = (
+        _public_form_data_query(assigned_form_id)
+        .options(contains_eager(FormData.form_item))
+        .all()
+    )
+    for row in public_rows:
         counts = counts_by_aes.get(row.assignment_entity_status_id)
         if counts is None:
             continue
-        counts[row.publication_diff_kind()] += 1
+        kind = row.publication_diff_kind()
+        counts[kind] += 1
+        current_value, _current_disagg, current_numeric = row.publication_current_payload()
+        current_num = coerce_numeric(current_numeric)
+        if current_num is None:
+            current_num = coerce_numeric(current_value)
+        if current_num is not None and current_num > 0 and row.form_item_id is not None:
+            fid = int(row.form_item_id)
+            item_global_totals[fid] = item_global_totals.get(fid, 0.0) + current_num
+            item_global_reporters[fid] = item_global_reporters.get(fid, 0) + 1
+        if kind == "empty":
+            continue
+        aes = aes_by_id.get(row.assignment_entity_status_id)
+        pending_rows.append({
+            "assignment_entity_status_id": row.assignment_entity_status_id,
+            "country_id": aes.entity_id if aes else None,
+            "form_item_id": row.form_item_id,
+            "label": row.form_item.label if row.form_item else f"Item {row.form_item_id}",
+            "kind": kind,
+            "current_value": current_value,
+            "published_value": row.published_value,
+            "current_numeric": current_numeric,
+            "published_numeric": row.published_numeric_value,
+        })
 
     country_ids = {aes.entity_id for aes in aes_rows}
     countries_by_id = (
@@ -129,6 +226,21 @@ def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
         {u.id: u for u in User.query.filter(User.id.in_(publisher_ids)).all()}
         if publisher_ids else {}
     )
+
+    for pending in pending_rows:
+        country = countries_by_id.get(pending["country_id"])
+        pending["country_name"] = country.name if country else f'Country {pending["country_id"]}'
+        pending["country_iso3"] = country.iso3 if country else None
+
+    prior = _prior_fdrs_assignment(assigned_form)
+    analysis = analyze_publication_rows(
+        pending_rows,
+        prior_numeric_by_key=_prior_baseline_numerics(prior.id) if prior else {},
+        prior_period_name=prior.period_name if prior else None,
+        global_totals_by_item=item_global_totals,
+        global_reporters_by_item=item_global_reporters,
+    )
+    review_count_by_aes = analysis.pop("review_count_by_aes", {})
 
     countries: List[Dict[str, Any]] = []
     totals = _empty_counts()
@@ -148,13 +260,14 @@ def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
             'counts': counts,
             'pending_count': pending,
             'has_pending_changes': pending > 0,
+            'review_count': review_count_by_aes.get(aes.id, 0),
             'total_public_items': sum(counts.values()),
             'published_at': aes.published_at.isoformat() if aes.published_at else None,
             'published_by_name': publisher.name if publisher else None,
         })
 
-    # Most actionable first, then alphabetical for a stable secondary order.
-    countries.sort(key=lambda c: (-c['pending_count'], c['country_name'] or ''))
+    # Review flags first, then most pending, then alphabetical.
+    countries.sort(key=lambda c: (-c['review_count'], -c['pending_count'], c['country_name'] or ''))
 
     pending_total = sum(totals[kind] for kind in PENDING_DIFF_KINDS)
     return {
@@ -170,6 +283,7 @@ def get_assignment_publication_summary(assigned_form_id: int) -> Dict[str, Any]:
         'countries_with_pending_changes': sum(1 for c in countries if c['has_pending_changes']),
         'countries_total': len(countries),
         'countries': countries,
+        'analysis': analysis,
     }
 
 

@@ -675,10 +675,14 @@
         <div class="space-y-6">
             <!-- Base URL Selection -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Endpoint') }}</label>
+                <label for="baseEndpoint" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Endpoint') }}</label>
                 <select id="baseEndpoint" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 py-2.5 pl-2.5 pr-9">
-                    {% for endpoint in endpoints %}
-                    <option value="{{ endpoint.path }}">{{ endpoint.method }} {{ endpoint.path }}</option>
+                    {% for group in url_builder_endpoint_groups %}
+                    <optgroup label="{{ group.name }}">
+                        {% for endpoint in group.endpoints %}
+                        <option value="{{ endpoint.path }}">{{ endpoint.method }} {{ endpoint.path }}</option>
+                        {% endfor %}
+                    </optgroup>
                     {% endfor %}
                 </select>
             </div>
@@ -1629,10 +1633,39 @@ try {
 
         // Endpoint change listener (rebuild both path & query inputs)
         const baseEndpointSelect = document.getElementById('baseEndpoint');
-        baseEndpointSelect.addEventListener('change', () => {
+        function onBaseEndpointChange() {
             createQueryParamInputs();
             syncLayoutStarToggleVisibility();
+        }
+        baseEndpointSelect.addEventListener('change', onBaseEndpointChange);
+
+        function initBaseEndpointSelect() {
+            const panel = document.getElementById('panel-builder');
+            if (!panel || panel.classList.contains('hidden')) {
+                return;
+            }
+            if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+                setTimeout(initBaseEndpointSelect, 50);
+                return;
+            }
+            const $select = window.jQuery('#baseEndpoint');
+            if (!$select.length || $select.hasClass('select2-hidden-accessible')) {
+                return;
+            }
+            $select.select2({
+                width: '100%',
+                minimumResultsForSearch: 0,
+                dropdownParent: window.jQuery('#panel-builder'),
+            });
+            // Select2 notifies through jQuery, which does not reach addEventListener.
+            $select.on('change.apiBuilder', onBaseEndpointChange);
+        }
+        document.addEventListener('api-mgmt-tab-activated', function (e) {
+            if (!e.detail || e.detail.tab !== 'builder') return;
+            initBaseEndpointSelect();
         });
+        // Tab activation can run before this ready handler, so init now if the builder is already visible.
+        initBaseEndpointSelect();
 
         const layoutStarToggle = document.getElementById('powerQueryLayoutStar');
         if (layoutStarToggle) {

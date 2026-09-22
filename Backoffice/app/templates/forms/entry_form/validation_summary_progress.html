@@ -6,7 +6,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ _('Validation Summary') }} - {{ assignment_display_name or _('Assignment') }}</title>
+    <title>{{ _('Validation details') }} - {{ assignment_display_name or _('Assignment') }}</title>
     <style>
         :root { color-scheme: light; }
         body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif; margin: 0; background: #f8fafc; color: #0f172a; font-size: 14px; }
@@ -23,6 +23,48 @@
         .unc { border-left: 4px solid #9ca3af; }
         .fail { border-left: 4px solid #ef4444; }
         .miss { border-left: 4px solid #cbd5e1; }
+        .review { margin-top: 14px; background:#fff; border: 1px solid #e2e8f0; padding: 14px 16px; }
+        .review h2 { margin: 0 0 8px; font-size: 16px; }
+        .review .headline { font-size: 15px; color:#1e293b; line-height: 1.45; }
+        .review .figures { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:8px; margin: 10px 0; }
+        .review .fig { background:#f8fafc; border:1px solid #e2e8f0; padding:8px 10px; }
+        .review .fig .k { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#64748b; font-weight:700; }
+        .review .fig .v { font-size:14px; font-weight:700; margin-top:2px; }
+        .review .narrative { font-size:14px; color:#334155; white-space:pre-wrap; line-height:1.45; margin: 8px 0; }
+        .review ul { margin: 6px 0 0; padding-left: 18px; }
+        .review li { margin: 4px 0; }
+        .review .muted { margin-top: 10px; }
+
+        /* Numbered "Needs attention" list: clickable text scrolls to the row below. */
+        .review ol.not-list { list-style: none; margin: 6px 0 0; padding: 0; }
+        .review ol.not-list li { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; }
+        .review .issue-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 999px; font-size: 11px; font-weight: 800;
+            flex-shrink: 0; margin-top: 1px;
+        }
+        .review .issue-num.flag { background:#ffedd5; color:#9a3412; }
+        .review .issue-num.highlight { background:#fef9c3; color:#854d0e; }
+        .review .issue-text-btn {
+            background: none; border: none; padding: 0; text-align: left; cursor: pointer;
+            color: #1d4ed8; font-size: 14px; line-height: 1.4; font-family: inherit;
+        }
+        .review .issue-text-btn:hover { text-decoration: underline; }
+        .review .issue-text { font-size: 14px; color: #334155; line-height: 1.4; }
+
+        /* "In good shape" collapsed by default — needs less attention than flags/highlights. */
+        .review details.good-details { margin-top: 10px; }
+        .review details.good-details > summary {
+            cursor: pointer; list-style: none; font-weight: 700; color: #166534;
+            font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .review details.good-details > summary::-webkit-details-marker { display: none; }
+        .review details.good-details .chev { display: inline-block; transition: transform .15s ease; margin-right: 4px; }
+        .review details.good-details[open] .chev { transform: rotate(90deg); }
+        .review details.good-details ul { list-style: disc; }
+
+        tr.validation-row-flash td { animation: validation-row-flash 1.7s ease; }
+        @keyframes validation-row-flash { 0% { background: #ede9fe; } 100% { background: transparent; } }
 
         .toolbar { display:flex; align-items:center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
         .pill { display:inline-flex; align-items:center; gap:8px; padding: 6px 10px; border: 1px solid #e2e8f0; background:#fff; font-size: 14px; color:#334155; }
@@ -196,7 +238,7 @@
 <body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
     {% include 'components/_staging_environment_banner.html' %}
     <header>
-    <h1>{{ _('Validation Summary') }}</h1>
+    <h1>{{ _('Validation details') }}</h1>
     <div class="meta">
         <div><strong>{{ _('Assignment:') }}</strong> {{ assignment_display_name or (assignment.template.name if assignment and assignment.template else '-') }}</div>
         <div><strong>{{ _('Country:') }}</strong> {{ country_display_name if country_display_name else (country.name if country else '-') }}</div>
@@ -215,7 +257,7 @@
             <span>{{ _('Include non-reported items') }}</span>
         </label>
         <div class="btn-group" style="display:inline-flex; align-items: stretch;">
-            <button id="run-missing-btn" class="btn secondary" type="button" style="border-radius: 10px 0 0 10px;">{{ _('Run validations (not run)') }}</button>
+            <button id="run-missing-btn" class="btn secondary" type="button" style="border-radius: 10px 0 0 10px;">{% if initial_counts and initial_counts.missing == 0 and (initial_existing or 0) > 0 %}{{ _('Re-run all') }}{% else %}{{ _('Run remaining') }}{% endif %}</button>
             <details id="ai-validation-sources-details" style="position: relative; padding: 0; margin-left: -1px;">
                 <summary class="btn secondary"
                          title="{{ _('Configure AI validation sources')|forceescape }}"
@@ -250,11 +292,25 @@
 
 <div class="container">
     <div class="grid">
-        <div class="card good"><div class="label">{{ _('Good') }}</div><div class="value" id="count-good">0</div></div>
-        <div class="card disc"><div class="label">{{ _('Discrepancy') }}</div><div class="value" id="count-discrepancy">0</div></div>
-        <div class="card unc"><div class="label">{{ _('Uncertain') }}</div><div class="value" id="count-uncertain">0</div></div>
-        <div class="card fail"><div class="label">{{ _('Failed') }}</div><div class="value" id="count-failed">0</div></div>
-        <div class="card miss"><div class="label">{{ _('Not run') }}</div><div class="value" id="count-missing">0</div></div>
+        <div class="card good"><div class="label">{{ _('Good') }}</div><div class="value" id="count-good">{{ initial_counts.good if initial_counts else 0 }}</div></div>
+        <div class="card disc"><div class="label">{{ _('Discrepancy') }}</div><div class="value" id="count-discrepancy">{{ initial_counts.discrepancy if initial_counts else 0 }}</div></div>
+        <div class="card unc"><div class="label">{{ _('Uncertain') }}</div><div class="value" id="count-uncertain">{{ initial_counts.uncertain if initial_counts else 0 }}</div></div>
+        <div class="card fail"><div class="label">{{ _('Failed') }}</div><div class="value" id="count-failed">{{ initial_counts.failed if initial_counts else 0 }}</div></div>
+        <div class="card miss"><div class="label">{{ _('Not run') }}</div><div class="value" id="count-missing">{{ initial_counts.missing if initial_counts else 0 }}</div></div>
+    </div>
+
+    <div class="review" id="assignment-review-panel" hidden>
+        <h2>{{ _('Assignment review') }}</h2>
+        <p class="headline" id="assignment-review-headline"></p>
+        <div class="figures" id="assignment-review-figures"></div>
+        <div class="narrative" id="assignment-review-narrative"></div>
+        <p class="label" id="assignment-review-not-label" hidden>{{ _('Needs attention') }}</p>
+        <ol id="assignment-review-not" class="not-list"></ol>
+        <details class="good-details" id="assignment-review-good-wrap" hidden>
+            <summary><span class="chev" aria-hidden="true">&#9656;</span><span id="assignment-review-good-count"></span></summary>
+            <ul id="assignment-review-good"></ul>
+        </details>
+        <p class="muted" id="assignment-review-comment"></p>
     </div>
 
     <table>
@@ -276,7 +332,7 @@
             </tr>
             {% endfor %}
             {% for it in group['items'] %}
-            <tr id="row-{{ it.form_data_id }}" data-form-data-id="{{ it.form_data_id }}">
+            <tr id="row-{{ it.form_data_id }}" data-form-data-id="{{ it.form_data_id }}" data-item-id="{{ it.form_item_id or '' }}">
                 <td>
                     <div><strong>{{ it.label or '-' }}</strong></div>
                     <div class="muted">{{ _('FormData ID:') }} {{ it.form_data_id }}</div>
@@ -301,6 +357,7 @@
      data-sse-url="{{ sse_url }}"
      data-pdf-url="{{ pdf_url }}"
      data-cancel-url="{{ cancel_url }}"
+     data-overview-url="{{ url_for('forms.validation_summary_overview', aes_id=aes_id) }}"
      data-run-id="{{ run_id }}"
      data-csrf-token="{{ csrf_token() }}"
      data-label-not-run="{{ _('not run')|capitalize|forceescape }}"
@@ -313,7 +370,10 @@
      data-label-cancelling="{{ _('Cancelling…')|forceescape }}"
      data-label-cancelled="{{ _('Cancelled')|forceescape }}"
      data-label-cancel-failed="{{ _('Cancel failed (connection issue).')|forceescape }}"
-     data-label-connection-lost="{{ _('Connection lost. Please keep this window open and try again.')|forceescape }}">
+     data-label-connection-lost="{{ _('Connection lost. Please keep this window open and try again.')|forceescape }}"
+     data-label-run-remaining="{{ _('Run remaining')|forceescape }}"
+     data-label-rerun-all="{{ _('Re-run all')|forceescape }}"
+     data-label-rerun-confirm="{{ _('All items already have AI opinions. Re-run all validations and overwrite them?')|forceescape }}">
 </div>
 
 <script src="{{ url_for('static', filename='js/forms/validation-summary-progress.js') }}"></script>

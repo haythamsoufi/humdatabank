@@ -591,6 +591,16 @@ def build_opinion_ui(
     except Exception as e:
         logger.debug("llm_sum get failed: %s", e)
         llm_sum = ""
+    if decision == "flag_discrepancy" and llm_sum:
+        s_llm = llm_sum.lower()
+        contradicts = (
+            "aligns with the authoritative" in s_llm
+            or "accept the reported" in s_llm
+            or "programme flag" in s_llm
+            or ("is valid" in s_llm and "discrepan" not in s_llm)
+        )
+        if contradicts:
+            llm_sum = ""
     summary = _summarize(llm_sum or opinion_full_text)
 
     # If the summary is low-signal (common heuristic phrasing), generate a more useful one.
@@ -705,6 +715,14 @@ def build_opinion_ui(
     try:
         llm_details = _safe_str((llm_json or {}).get("opinion_details") if isinstance(llm_json, dict) else "")
         llm_details = llm_details.strip()
+        if llm_details and decision == "flag_discrepancy":
+            d_llm = llm_details.lower()
+            if (
+                "aligns with the authoritative" in d_llm
+                or "accept the reported" in d_llm
+                or ("programme flag" in d_llm and "discrepan" not in d_llm)
+            ):
+                llm_details = ""
         if llm_details:
             details_lines.append("")
             details_lines.append("LLM notes:")

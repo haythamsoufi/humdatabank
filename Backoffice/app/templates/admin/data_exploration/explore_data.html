@@ -3018,9 +3018,9 @@
 
     function setupEventHandlers() {
         // AI validation sources (persisted in browser)
-        const AI_VALIDATION_SOURCES_STORAGE_KEY = 'humdb_ai_validation_sources_v1';
+        const AI_VALIDATION_SOURCES_STORAGE_KEY = 'humdb_ai_validation_sources_v2';
         const AI_VALIDATION_SOURCES_ALLOWED = ['historical', 'system_documents', 'upr_documents'];
-        const AI_VALIDATION_SOURCES_DEFAULT = ['historical', 'system_documents'];
+        const AI_VALIDATION_SOURCES_DEFAULT = ['historical', 'system_documents', 'upr_documents'];
 
         function _uniq(arr) {
             const out = [];
@@ -3088,7 +3088,7 @@
                 if (!cbHist.checked && !cbSys.checked && !cbUpr.checked) {
                     cbHist.checked = true;
                     cbSys.checked = true;
-                    cbUpr.checked = false;
+                    cbUpr.checked = true;
                 }
                 saveAiValidationSources(sourcesFromUiOrStorage());
             }

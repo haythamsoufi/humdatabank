@@ -2516,16 +2516,16 @@ export function initPDFExport(formId, buttonId, title) {
 }
 
 /**
- * Initialize Validation Summary PDF export functionality.
+ * Initialize Validation details page (full per-field results).
  *
- * Mirrors the server-side PDF export click handler, but targets the validation summary endpoint.
+ * Opens the details progress UI; the short on-form summary is handled separately.
  */
 export function initValidationSummaryExport(formId, buttonId) {
-    debugLog(MODULE_NAME, '🔧 Initializing validation summary export...');
+    debugLog(MODULE_NAME, '🔧 Initializing validation details export...');
 
     const button = document.getElementById(buttonId);
     if (!button) {
-        debugLog(MODULE_NAME, '❌ Validation summary button not found:', buttonId);
+        debugLog(MODULE_NAME, '❌ Validation details button not found:', buttonId);
         return;
     }
 
@@ -2543,7 +2543,7 @@ export function initValidationSummaryExport(formId, buttonId) {
         const spinner = document.createElement('i');
         spinner.className = 'fas fa-spinner fa-spin mr-2';
         button.appendChild(spinner);
-        button.appendChild(document.createTextNode('Generating...'));
+        button.appendChild(document.createTextNode('Opening…'));
 
         try {
             const container = document.querySelector('[data-aes-id]');
@@ -2572,10 +2572,8 @@ export function initValidationSummaryExport(formId, buttonId) {
             if (hiddenFieldIds.length) {
                 params.set('hidden_fields', hiddenFieldIds.join(','));
             }
-            // Bulk run missing validations with progress UI
-            params.set('run', '1');
+            params.set('run', '0');
             params.set('run_mode', 'missing');
-            // Default tuned for PostgreSQL deployments; server applies a safety cap.
             params.set('concurrency', '8');
 
             const qs = params.toString();
@@ -2584,10 +2582,10 @@ export function initValidationSummaryExport(formId, buttonId) {
             openAssignmentExportUrl(url, 'noopener,noreferrer');
         } catch (err) {
             if (window.showAlert) {
-                window.showAlert('Failed to generate validation summary.', 'error');
+                window.showAlert('Failed to open validation details.', 'error');
             } else {
                 // eslint-disable-next-line no-console
-                (window.__clientWarn || console.warn)('Failed to generate validation summary.');
+                (window.__clientWarn || console.warn)('Failed to open validation details.');
             }
         } finally {
             button.disabled = false;
@@ -2598,5 +2596,5 @@ export function initValidationSummaryExport(formId, buttonId) {
         }
     });
 
-    debugLog(MODULE_NAME, '✅ Validation summary export initialized successfully');
+    debugLog(MODULE_NAME, '✅ Validation details export initialized successfully');
 }

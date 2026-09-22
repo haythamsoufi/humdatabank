@@ -486,3 +486,135 @@ Currency is always **CHF** unless otherwise stated.
 - **`get_upr_kpi_value(..., prefer_year=...)` `report_type` is not resolved** — the winning candidate's `source.report_type` in the response is sourced from `_parse_upr_extraction_meta(extraction)`, which parses `pe=`/`ype=`/`year=` tokens that no current extractor emits (see section 5), so it is effectively always `None`. This is purely informational (not part of the ranking key, unlike `year` — see next point), so it doesn't affect *which* candidate is returned, only a field on it. Fixing it would mean deriving `report_type` the same filename/`upr_context.doc_type` way `get_upr_kpi_timeseries` already does, via a shared helper.
 - ~~`get_upr_kpi_value(..., prefer_year=...)` does not actually prefer the requested year~~ — **fixed**: year for ranking now comes from the shared `_resolve_upr_block_year` helper (filename / `upr_context.year`), not from `_parse_upr_extraction_meta`.
 - UPR started in 2023 — documents before that year are not expected.
+
+---
+
+## 13. Form-data AI validation (Unified Plan/Report assignments)
+
+When staff run **AI validation summary** on a Unified Country Plan (template 24) or Unified Country Report (template 33), the UPR plugin injects extra instructions and structured visual-block evidence.
+
+Implementation: `plugins/upr/ai/form_validation.py` + `get_upr_formdata_validation_prompt()` in `prompts.py`. Core service: `AIFormDataValidationService`.
+
+### What is injected
+
+- Domain rules: plan vs report, 3-year funding horizon, HNS / IFRC Secretariat / PNS, Strategic Priorities / Enabling Functions, CHF.
+- Evidence priority: Unified Plan/Report visual blocks and PDFs first; historical submissions second; Annual Reports / Strategic Plans as **context only** (they are not a same-year SP×actor plan matrix).
+- Field kinds: people to be reached, bilateral PNS support, funding requirements, NS KPI cards, comments.
+- Comments are **not** numeric indicators — they are not compared to historical numbers or document totals.
+- **Matrix reading** (`plugins/upr/ai/matrix_reading.py`): decodes form cells into actor × programme (Resilience/Response) × Strategic Priority × year, with totals and like-for-like notes against PDF visual blocks. The arithmetic sum of cells is **not** treated as one indicator. The reading is a decode of the form (not independent confirmation). People-to-be-reached / people-reached cells are always **people targets or actuals** (including compact keys such as `2027_SP1`), even when the numbers are small; tiny counts are implausible people figures, not a different unit.
+- **Historical matrices**: the same field on prior submitted/approved assignments is decoded and compared cell-by-cell (matched via `stable_key` / template + label, including across UPR template ids, when `form_item_id` differs across years). A current people grid of 0–99 versus a prior people grid of thousands or millions is a **unit/scale change** (discrepancy) — never “good” just because the current grid is internally consistent or matches its own decode. Bilateral ticks are compared as PNS names, not CHF.
+
+### Visual blocks used as structured evidence
+
+| Form field | Blocks retrieved |
+|---|---|
+| People to be reached | `people_to_be_reached`, `people_reached` |
+| Bilateral support | `pns_bilateral_support`, `funding_requirements` |
+| Funding requirements | `funding_requirements`, `financial_overview` |
+| NS key figures | `in_support_kpis` (existing KPI path) |
+
+Enable **UPR documents** in the validation-sources picker so API-imported Unified Plan PDFs are searched (`is_api_import=true`). The UI default includes this source.
+
+---
+
+## 14. Assignment review (Validation summary)
+
+The on-form **Validation summary** and the **Validation details** page must review the assignment as a whole — not only count per-field verdicts. Implementation: `plugins/upr/ai/assignment_review.py` (deterministic pack) + `get_upr_assignment_review_prompt()` + `app/services/ai/validation/assignment_review.py` (LLM briefing).
+
+### Policy (always inject into field validation AND the assignment summary)
+
+1. **People to be reached — longer term (item 954)**  
+   Cells are **people targets**. Tiny integers (0–99) versus a prior assignment in the thousands or millions is a **flag**. Do not treat a self-consistent 0/1/5 grid as valid “programme flags”.
+
+2. **People to be reached — emergencies (item 960)**  
+   Rows are added from the country GO emergency-operations list. If an emergency is available and the focal point did not add it, or added it with no people value, **flag**.
+
+3. **National Society key figures**  
+   If the section is completely empty, **flag** the assignment (not “nothing to validate”).
+
+4. **Funding Requirements for the assignment year (item 967) — IFRC Secretariat**  
+   The IFRC Secretariat row must have a value in every static column (SP1–SP5, EFs), including selectable emergency-appeal columns once chosen.  
+   - Emergency **selected** (`col_header|EA1` / `EA2` / `EA3`) and IFRC Secretariat cell empty → **flag**.  
+   - No emergency selected, but one or more operations are available in the list → **highlight** (focal point did not select it).
+
+5. **Comments (item 956)**  
+   Free-text from the reporting country; may be a language other than English. The assignment review **must** read it, translate the meaning into English, and apply caveats to other fields (why an emergency was omitted, why people figures changed, why a year is blank).
+
+### Gotcha: `[variable]` placeholders in FormItem labels
+
+Some item labels carry template placeholders such as `[assignment_period]` (see
+`VariableResolutionService`) that the entry form resolves at render time. `build_upr_assignment_review_pack()`
+reads `FormItem.label` directly, so every audit function that builds an end-user-facing finding `label`
+must resolve it too — call `_item_label(item, resolved_variables, variable_configs)`, not `_item_label(item)`
+alone, or the literal bracket text (e.g. `"Emergency Appeals in [assignment_period]"`) leaks into the numbered
+issues list. `resolved_variables`/`variable_configs` are computed once per pack via
+`VariableResolutionService.resolve_for_assignment_display(aes)` and threaded into every `audit_*` call.
+
+### Gotcha: `list_available_emergencies()` must read *per-column* config, not just the matrix-level one
+
+A matrix can source `emergency_operations` rows/options two structurally different ways, and each stores its
+filters in a different place:
+
+- **Row-mode/hybrid** list-library rows (e.g. item 960, "Emergency Appeals in `[assignment_period]`" under
+  people-to-be-reached): one shared `matrix_config.plugin_config`.
+- ***Selectable header* columns** (e.g. item 967's `EA1`/`EA2`/`EA3` funding columns): each column has its own
+  `header_plugin_config`, and a matrix built entirely of selectable EA columns commonly has **no top-level
+  `plugin_config` key at all**. Columns can legitimately disagree with each other (one EA slot pinned to the
+  current assignment period, another using a static cutoff) — see
+  `app/static/js/forms/modules/matrix/selectable-headers.js`, which resolves each column's config as
+  `columnDef?.header_plugin_config || matrix?.config?.plugin_config || null` before calling the live
+  "search options" endpoint (`/forms/matrix/search-rows` → `get_emergency_operations_options_handler`).
+
+`list_available_emergencies()` in `plugins/upr/ai/assignment_review.py` mirrors that exact fallback via
+`_emops_config_sources()` and unions the results (deduped by code) across every source. Reading only the
+matrix-level `plugin_config` (the old behaviour) meant a selectable-header-only matrix like item 967 fell
+through to an **empty** config, which `_normalize_emops_config({})` turns into almost no filtering
+(`operation_types=['All']`, closed operations included, no date cutoff) — the opposite failure mode from "no
+options": it silently invented availability. That produced a real false positive on assignment 4301 ("No
+emergency appeal is selected for funding, but 2 operation(s) are available…") when every one of that item's
+real EA1/EA2/EA3 dropdowns legitimately resolved to zero options once their own (stricter) filters were
+applied. Regression tests: `TestListAvailableEmergencies` in `tests/unit/test_plugins/test_upr_ai.py`.
+
+### Division of labour: deterministic pack vs LLM (avoid repeating the same content 3x)
+
+`overview_figures`, `whats_good`, `whats_not` and `comment_note` are built **once**, deterministically, by
+`build_upr_assignment_review_pack()` / `_fallback_review()` — never regenerated by the LLM. They are cheap
+(no LLM call needed to produce them), reliable, and `whats_not` carries the real `form_item_id` so the UI
+can render a numbered, clickable "Needs attention" list that scrolls to the right field.
+
+**`overview_figures` only shows a tile for a check that is fully "ok"** — gated on the `status` each
+`pack["figures"][...]` sub-dict carries (`_with_status()`, set once from the same finding(s) that also feed
+`flags`/`highlights`/`ok`, so the pass/fail decision is never re-derived a second time and can't drift out of
+sync). A flagged or highlighted check is deliberately given **no** tile: it already has a full, friendly
+sentence in the numbered "Needs attention" list a few lines below, and a bare "0 of 4 completed"-style number
+restating that same issue is exactly the unhelpful-figure pattern (`"max cell 5, 8 non-zero of 15"`) this
+briefing was built to get away from. The only reason a tile exists at all is that "In good shape" is collapsed
+by default — without a tile, a passing check's sentence would be invisible until clicked.
+
+The assignment-level LLM (`get_upr_assignment_review_prompt()` in `prompts.py`, only called when an
+`OPENAI_API_KEY` is configured and the pack is non-empty) is asked for **only** two strings on top of that:
+
+- `headline` — one prioritised sentence (in the LLM's own words, not copied from a finding).
+- `narrative` — 0–3 short sentences of genuinely new synthesis: which issue to fix first and why, whether
+  findings compound, whether the item-956 comment explains/excuses a gap elsewhere. Empty string if there is
+  nothing to add beyond the lists.
+
+The LLM is explicitly told **not** to restate `overview_figures` / `whats_good` / `whats_not` — that content
+already exists and would otherwise be shown to the user three times (headline blob, narrative paragraph, and
+the lists themselves). If the LLM is unavailable or fails, `generate_assignment_review()` falls back to a
+short heuristic headline (issue count + top label, e.g. "2 issues need attention, starting with National
+Society key figures.") and an empty narrative — never a concatenation of the finding texts.
+
+### Same split also powers real (not just canned) loading-animation stages
+
+`generate_assignment_review()` in `app/services/ai/validation/assignment_review.py` is a thin wrapper around
+two phases — `build_review_pack_and_fallback()` (the deterministic pack above) then `finish_review_with_llm()`
+(the headline/narrative LLM call) — kept as separate public functions specifically so
+`forms_validation_summary.validation_summary_overview_stream` (SSE) can `yield` a real "stage" event
+*immediately before* each phase starts, instead of a client-side timer guessing what the backend might be
+doing. The on-form banner (`validation-summary-banner.js`) drives its loading phrase from these real events
+and only falls back to gently cycling canned text if a stage genuinely stalls (e.g. a slow LLM call) — see
+that route's docstring for the exact event sequence (`reading` → `figures` → `summary` only if a pack/LLM
+call will really happen → `result`). The plain, non-streamed `validation_summary_overview` JSON endpoint is
+kept side-by-side (same helpers, same output shape) for any caller that just wants one response.
+

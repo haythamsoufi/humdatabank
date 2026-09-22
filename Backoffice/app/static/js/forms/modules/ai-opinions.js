@@ -2,7 +2,7 @@ import { debugLog, debugWarn } from './debug.js';
 import { applyDisaggToBlock } from './disagg-dom-apply.js';
 
 const MODULE_NAME = 'ai-opinions';
-const AI_VALIDATION_SOURCES_STORAGE_KEY = 'ifrc_ai_validation_sources_v1';
+const AI_VALIDATION_SOURCES_STORAGE_KEY = 'ifrc_ai_validation_sources_v2';
 
 function escapeHtml(input) {
     const s = String(input ?? '');
@@ -211,7 +211,7 @@ function applyOpinions(opinionsByFormItemId) {
 }
 
 function getStoredSources() {
-    const fallback = ['historical', 'system_documents'];
+    const fallback = ['historical', 'system_documents', 'upr_documents'];
     try {
         const raw = localStorage.getItem(AI_VALIDATION_SOURCES_STORAGE_KEY);
         if (!raw) return fallback;

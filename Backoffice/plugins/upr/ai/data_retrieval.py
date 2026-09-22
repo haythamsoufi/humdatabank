@@ -9,6 +9,7 @@ Functions
 get_upr_kpi_value              – single country, best-match KPI
 get_upr_kpi_timeseries         – single country, year-over-year series
 get_upr_kpi_values_for_all_countries – all accessible countries, one metric
+get_upr_visual_blocks          – structured visual blocks (funding, people reached, PNS)
 """
 
 import json
@@ -678,6 +679,199 @@ def get_upr_kpi_values_for_all_countries(metric: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error("get_upr_kpi_values_for_all_countries error: %s", e, exc_info=True)
         return service_error(GENERIC_ERROR_MESSAGE, rows=[], count=0)
+
+
+_VALID_VISUAL_BLOCKS = frozenset({
+    "in_support_kpis",
+    "people_reached",
+    "people_to_be_reached",
+    "financial_overview",
+    "funding_requirements",
+    "hazards",
+    "pns_bilateral_support",
+})
+
+_VISUAL_PAYLOAD_KEYS = {
+    "in_support_kpis": ("kpis", "society"),
+    "people_reached": ("people_reached",),
+    "people_to_be_reached": ("people_to_be_reached", "people_reached"),
+    "financial_overview": ("financial_overview",),
+    "funding_requirements": ("funding_requirements",),
+    "hazards": ("hazards",),
+    "pns_bilateral_support": ("pns_bilateral_support",),
+}
+
+
+def get_upr_visual_blocks(
+    *,
+    country_identifier: Union[int, str],
+    block_types: List[str],
+    prefer_year: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Return the best matching UPR visual blocks for a country.
+
+    Used by form-data validation to compare plan/report matrices against
+    structured PDF extractions (people reached, funding, PNS bilateral).
+    """
+    try:
+        wanted = []
+        seen = set()
+        for raw in block_types or []:
+            key = str(raw or "").strip().lower()
+            if key in _VALID_VISUAL_BLOCKS and key not in seen:
+                seen.add(key)
+                wanted.append(key)
+        if not wanted:
+            return service_error("No supported UPR visual block types requested", blocks=[], count=0)
+
+        from app.services.data_retrieval.country import check_country_access, resolve_country
+        country = resolve_country(country_identifier)
+        if not country or not getattr(country, "id", None):
+            return service_error(f"Country not found: {country_identifier}", blocks=[], count=0)
+        if not check_country_access(int(country.id)):
+            return service_error("Access denied for this country", blocks=[], count=0)
+
+        ns_name = None
+        try:
+            ns = country.primary_national_society
+            ns_name = (getattr(ns, "name", None) or "").strip() or None
+        except Exception as e:
+            logger.debug("get_upr_visual_blocks: ns_name resolution failed: %s", e)
+            ns_name = None
+
+        ctx = _effective_user_role_and_id()
+        user_role = ctx["user_role"]
+        user_id = ctx["user_id"]
+        dialect = _dialect_name().lower()
+
+        q = (
+            db.session.query(AIDocumentChunk, AIDocument)
+            .join(AIDocument, AIDocumentChunk.document_id == AIDocument.id)
+            .filter(
+                AIDocument.searchable == True,  # noqa: E712
+                AIDocument.processing_status == "completed",
+                AIDocumentChunk.extra_metadata.isnot(None),
+            )
+        )
+
+        if user_role not in ["admin", "system_manager"]:
+            if user_id:
+                q = q.filter(db.or_(AIDocument.is_public == True, AIDocument.user_id == user_id))  # noqa: E712
+            else:
+                q = q.filter(AIDocument.is_public == True)  # noqa: E712
+            if dialect == "postgresql":
+                role = (user_role or "public").strip().lower()
+                role_json = json.dumps([role])
+                q = q.filter(
+                    db.or_(
+                        AIDocument.is_public == True,  # noqa: E712
+                        AIDocument.allowed_roles.is_(None),
+                        text("(ai_documents.allowed_roles::jsonb @> CAST(:role_json AS jsonb))").bindparams(role_json=role_json),
+                    )
+                )
+
+        if dialect == "postgresql":
+            q = q.filter(AIDocumentChunk.extra_metadata["upr"].isnot(None))
+            q = q.filter(AIDocumentChunk.extra_metadata["upr"]["block"].as_string().in_(wanted))
+            q = q.filter(
+                db.or_(
+                    AIDocument.country_id == int(country.id),
+                    AIDocument.country_name.ilike(safe_ilike_pattern(country.name)),
+                    AIDocumentChunk.extra_metadata["upr"]["society"].as_string().ilike(safe_ilike_pattern(ns_name)) if ns_name else literal(False),
+                    AIDocumentChunk.extra_metadata["upr"]["society"].as_string().ilike(safe_ilike_pattern(country.name)),
+                )
+            )
+        else:
+            q = q.filter(
+                db.or_(
+                    AIDocument.country_id == int(country.id),
+                    AIDocument.country_name.ilike(safe_ilike_pattern(country.name)),
+                )
+            )
+
+        q = q.order_by(
+            desc(AIDocument.processed_at),
+            desc(AIDocument.created_at),
+            AIDocumentChunk.page_number.asc().nullslast(),
+        ).limit(200)
+        rows = q.all()
+
+        best_by_block: Dict[str, Dict[str, Any]] = {}
+        best_key_by_block: Dict[str, tuple] = {}
+        role_lc = (user_role or "public").strip().lower()
+        for chunk, doc in rows:
+            md = chunk.extra_metadata or {}
+            upr = md.get("upr") if isinstance(md, dict) else None
+            if not isinstance(upr, dict):
+                continue
+            block = str(upr.get("block") or "").strip().lower()
+            if block not in wanted:
+                continue
+            if dialect != "postgresql" and user_role not in ["admin", "system_manager"]:
+                if not getattr(doc, "is_public", False):
+                    allowed_roles = getattr(doc, "allowed_roles", None)
+                    if allowed_roles is not None:
+                        try:
+                            if role_lc not in [str(r).strip().lower() for r in (allowed_roles or [])]:
+                                continue
+                        except Exception:
+                            continue
+
+            payload: Dict[str, Any] = {}
+            for key in _VISUAL_PAYLOAD_KEYS.get(block, ()):
+                if key in upr and upr.get(key) is not None:
+                    payload[key] = upr.get(key)
+            if isinstance(upr.get("upr_context"), dict):
+                payload["upr_context"] = upr.get("upr_context")
+            if not payload:
+                payload = {
+                    k: v for k, v in upr.items()
+                    if k not in ("extraction",) and v is not None
+                }
+
+            conf = upr.get("confidence")
+            try:
+                conf_f = float(conf) if conf is not None else None
+            except Exception:
+                conf_f = None
+            yr = _resolve_upr_block_year(upr, doc)
+            year_match = bool(prefer_year and yr and int(yr) == int(prefer_year))
+            try:
+                processed_ts = getattr(doc, "processed_at", None) or getattr(doc, "created_at", None)
+                processed_ord = processed_ts.timestamp() if processed_ts else 0.0
+            except Exception:
+                processed_ord = 0.0
+            key = (
+                1 if year_match else 0,
+                float(conf_f) if conf_f is not None else -1.0,
+                float(processed_ord),
+            )
+            candidate = {
+                "block": block,
+                "year": yr,
+                "confidence": conf_f,
+                "payload": payload,
+                "source": {
+                    "chunk_id": int(chunk.id) if getattr(chunk, "id", None) else None,
+                    "document_id": int(doc.id),
+                    "document_title": doc.title,
+                    "document_filename": doc.filename,
+                    "page_number": chunk.page_number,
+                    "document_url": f"/api/ai/documents/{int(doc.id)}/download",
+                    "extraction": (upr.get("extraction") or "").strip() or None,
+                },
+            }
+            prev_key = best_key_by_block.get(block)
+            if prev_key is None or key > prev_key:
+                best_by_block[block] = candidate
+                best_key_by_block[block] = key
+
+        # Preserve caller order of block_types.
+        blocks = [best_by_block[b] for b in wanted if b in best_by_block]
+        return {"success": True, "blocks": blocks, "count": len(blocks)}
+    except Exception as e:
+        logger.error("get_upr_visual_blocks error: %s", e, exc_info=True)
+        return service_error(GENERIC_ERROR_MESSAGE, blocks=[], count=0)
 
 
 # ---------------------------------------------------------------------------

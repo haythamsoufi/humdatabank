@@ -42,6 +42,30 @@ def _assert_status(resp, *allowed):
     )
 
 
+def _parse_sse(raw) -> list[tuple[str, dict]]:
+    """Parse `event: name\\ndata: {...}\\n\\n` frames into a list of (name, dict)."""
+    text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+    events: list[tuple[str, dict]] = []
+    for block in text.split("\n\n"):
+        block = block.strip()
+        if not block or block.startswith(":"):
+            continue
+        name = None
+        data_lines = []
+        for line in block.split("\n"):
+            if line.startswith("event:"):
+                name = line[len("event:"):].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[len("data:"):].strip())
+        if name and data_lines:
+            try:
+                payload = json.loads("\n".join(data_lines))
+            except Exception:
+                payload = {}
+            events.append((name, payload))
+    return events
+
+
 def _make_aes(db_session):
     """Create a minimal assignment entity status for tests."""
     return create_test_assignment_entity_status(db_session)
@@ -90,6 +114,11 @@ class TestValidationSummaryAuthGuard:
         resp = client.get(f"/forms/assignment_status/{aes.id}/validation_summary/opinions/events")
         _assert_status(resp, 302, 401, 403)
 
+    def test_overview_unauthenticated(self, client, db_session):
+        aes = _make_aes(db_session)
+        resp = client.get(f"/forms/assignment_status/{aes.id}/validation_summary/overview")
+        _assert_status(resp, 302, 401, 403)
+
 
 # ---------------------------------------------------------------------------
 # 404 – invalid AES IDs
@@ -130,6 +159,10 @@ class TestValidationSummary404:
         resp = logged_in_client.get("/forms/assignment_status/999999/validation_summary/opinions/events")
         _assert_status(resp, 404)
 
+    def test_overview_not_found(self, logged_in_client, db_session):
+        resp = logged_in_client.get("/forms/assignment_status/999999/validation_summary/overview")
+        _assert_status(resp, 404, 403)
+
 
 # ---------------------------------------------------------------------------
 # Progress page – authorized access
@@ -147,6 +180,46 @@ class TestValidationSummaryProgressPage:
                 f"/forms/assignment_status/{aes_id}/validation_summary"
             )
         _assert_status(resp, 200, 302)
+
+    def test_resolves_assignment_period_in_section_headers(self, logged_in_client, db_session, app):
+        from app.models import FormData
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            parent = create_test_section(
+                db_session, template, name="Funding requirements (CHF)", order=1
+            )
+            subsection = create_test_section(
+                db_session,
+                template,
+                name="Funding Requirements for [assignment_period]",
+                order=1,
+                parent_section_id=parent.id,
+            )
+            item = create_test_item(
+                db_session, subsection, template, item_type="question", label="Funding grid"
+            )
+            aes = create_test_assignment_entity_status(
+                db_session, template=template, period_name="2027"
+            )
+            db_session.add(FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                value="1",
+            ))
+            db_session.commit()
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary?run=0"
+            )
+        assert resp.status_code == 200, resp.data[:300]
+        body = resp.get_data(as_text=True)
+        assert "Funding Requirements for 2027" in body
+        assert "Funding Requirements for [assignment_period]" not in body
+        assert "Validation details" in body
+        assert "<h1>Validation Summary</h1>" not in body
 
     def test_with_hidden_fields_param(self, logged_in_client, db_session, app):
         with app.app_context():
@@ -478,6 +551,182 @@ class TestValidationSummaryOpinions:
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions"
             )
         _assert_status(resp, 403, 200)
+
+
+# ---------------------------------------------------------------------------
+# Overview (on-form Validation summary)
+# ---------------------------------------------------------------------------
+
+class TestValidationSummaryOverview:
+    def test_overview_access_denied(self, logged_in_client, db_session, app):
+        with app.app_context():
+            aes = _make_aes(db_session)
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary/overview"
+            )
+        _assert_status(resp, 403)
+
+    def test_overview_empty(self, logged_in_client, db_session, app):
+        with app.app_context():
+            aes = _make_aes(db_session)
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary/overview"
+            )
+        _assert_status(resp, 200)
+        data = _get_json(resp)
+        assert data.get("success") is True
+        assert data["counts"]["good"] == 0
+        assert data["counts"]["discrepancy"] == 0
+        assert data["reviewed"] == 0
+        assert data["issues"] == []
+        assert "details_url" in data
+        assert "No AI validation results yet" in (data.get("headline") or "")
+        assert "overview_figures" in data
+        assert "whats_good" in data
+        assert data.get("whats_not") in (None, []) or isinstance(data.get("issues"), list)
+
+    def test_overview_lists_discrepancy(self, logged_in_client, db_session, app):
+        from app.models import FormData
+        from app.models.ai_validation import AIFormDataValidation
+        from app.models.enums import AIFormDataValidationStatusValue, AIFormDataValidationVerdictValue
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template, name="People to be reached")
+            item = create_test_item(
+                db_session, section, template, item_type="question", label="Longer term programmes"
+            )
+            aes = create_test_assignment_entity_status(db_session, template=template, period_name="2027")
+            fd = FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                value="1",
+            )
+            db_session.add(fd)
+            db_session.flush()
+            db_session.add(AIFormDataValidation(
+                form_data_id=fd.id,
+                status=AIFormDataValidationStatusValue.completed,
+                verdict=AIFormDataValidationVerdictValue.discrepancy,
+                confidence=0.8,
+                opinion_text="Flags vs prior people counts.",
+            ))
+            db_session.commit()
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary/overview"
+            )
+        _assert_status(resp, 200)
+        data = _get_json(resp)
+        assert data["counts"]["discrepancy"] == 1
+        assert data["reviewed"] == 1
+        assert data["issues"]
+        assert data["issues"][0]["verdict"] == "discrepancy"
+        assert "Longer term programmes" in (data["issues"][0].get("label") or "")
+        assert "discrepancy" in (data.get("headline") or "").lower()
+
+
+class TestValidationSummaryOverviewStream:
+    """The SSE twin of TestValidationSummaryOverview — same underlying work, but
+    emits real "stage" events as each phase begins instead of one JSON response, so
+    the on-form loading animation can reflect genuine backend progress."""
+
+    def test_overview_stream_access_denied(self, logged_in_client, db_session, app):
+        with app.app_context():
+            aes = _make_aes(db_session)
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary/overview_stream"
+            )
+        assert resp.content_type.startswith("text/event-stream")
+        events = _parse_sse(resp.data)
+        assert events and events[0][0] == "error"
+
+    def test_overview_stream_emits_real_stages_then_result(self, logged_in_client, db_session, app):
+        with app.app_context():
+            aes = _make_aes(db_session)
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary/overview_stream"
+            )
+        _assert_status(resp, 200)
+        assert resp.content_type.startswith("text/event-stream")
+        events = _parse_sse(resp.data)
+        names = [n for n, _d in events]
+        # Real stages in the order the work actually happens: reading the assignment's
+        # entries, then checking the deterministic pack. This fixture's template isn't
+        # a UPR one, so there is no pack/LLM call and thus no "summary" stage — that
+        # stage must only ever be announced when it will really happen.
+        assert names[0] == "stage" and events[0][1]["key"] == "reading"
+        stage_keys = [d["key"] for n, d in events if n == "stage"]
+        assert "figures" in stage_keys
+        assert "summary" not in stage_keys
+        assert names[-1] == "result"
+        result = events[-1][1]
+        # Same payload shape/content as the non-streamed endpoint.
+        assert result["counts"]["good"] == 0
+        assert result["reviewed"] == 0
+        assert result["issues"] == []
+        assert "details_url" in result
+        assert "No AI validation results yet" in (result.get("headline") or "")
+
+    def test_overview_stream_matches_non_streamed_payload(self, logged_in_client, db_session, app):
+        """Same fixture as test_overview_lists_discrepancy — the streamed "result"
+        event must carry the exact same content as the plain JSON endpoint."""
+        from app.models import FormData
+        from app.models.ai_validation import AIFormDataValidation
+        from app.models.enums import AIFormDataValidationStatusValue, AIFormDataValidationVerdictValue
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template, name="People to be reached")
+            item = create_test_item(
+                db_session, section, template, item_type="question", label="Longer term programmes"
+            )
+            aes = create_test_assignment_entity_status(db_session, template=template, period_name="2027")
+            fd = FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                value="1",
+            )
+            db_session.add(fd)
+            db_session.flush()
+            db_session.add(AIFormDataValidation(
+                form_data_id=fd.id,
+                status=AIFormDataValidationStatusValue.completed,
+                verdict=AIFormDataValidationVerdictValue.discrepancy,
+                confidence=0.8,
+                opinion_text="Flags vs prior people counts.",
+            ))
+            db_session.commit()
+            aes_id = aes.id
+
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+            resp = logged_in_client.get(
+                f"/forms/assignment_status/{aes_id}/validation_summary/overview_stream"
+            )
+        _assert_status(resp, 200)
+        events = _parse_sse(resp.data)
+        assert events[-1][0] == "result"
+        result = events[-1][1]
+        assert result["counts"]["discrepancy"] == 1
+        assert result["reviewed"] == 1
+        assert result["issues"]
+        assert result["issues"][0]["verdict"] == "discrepancy"
+        assert "Longer term programmes" in (result["issues"][0].get("label") or "")
+        assert "discrepancy" in (result.get("headline") or "").lower()
 
 
 # ---------------------------------------------------------------------------

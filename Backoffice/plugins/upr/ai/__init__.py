@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import Optional
 
-from plugins.upr.ai.prompts import get_upr_knowledge
+from plugins.upr.ai.prompts import get_upr_knowledge, is_upr_form_template
 from plugins.upr.ai.query_detection import query_prefers_upr_documents
 
 __all__ = [
     "is_upr_active",
     "query_prefers_upr_documents",
     "get_upr_knowledge",
+    "is_upr_form_template",
 ]
 
 

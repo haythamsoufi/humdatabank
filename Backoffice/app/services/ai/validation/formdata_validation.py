@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+from contextlib import suppress
 from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import or_
 
 from flask import current_app
 
@@ -43,6 +46,25 @@ from plugins.upr.ai.upr_rules import (
     _upr_kpi_applicable,
     _upr_suggestion_reason,
     retrieve_upr_kpi_reference,
+)
+from plugins.upr.ai.form_validation import (
+    apply_upr_matrix_history_guardrail,
+    apply_upr_validation_context,
+    attach_upr_assignment_review_context,
+    attach_upr_historical_matrix_context,
+    effective_upr_item_label,
+    format_upr_assignment_review_for_prompt,
+    format_upr_historical_matrices_for_prompt,
+    format_upr_matrix_reading_for_prompt,
+    format_upr_visuals_for_prompt,
+    is_upr_comment_field,
+    is_upr_form_template,
+    upr_comment_heuristic,
+    upr_evidence_query_hint,
+    upr_matrix_history_heuristic,
+    upr_template_ids,
+    upr_validation_prompt_section,
+    upr_visuals_as_evidence_chunks,
 )
 from app.services.ai.validation.ui_payload import build_opinion_ui, compute_suggestion
 
@@ -99,6 +121,25 @@ class AIFormDataValidationService:
     def _empty_historical(self) -> Dict[str, Any]:
         return {"summary": {"count": 0}, "series": []}
 
+    def _historical_payload_for_llm(self, historical: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not isinstance(historical, dict):
+            return {}
+        hist_for_llm = historical.get("summary") or {}
+        hist_series = historical.get("series") or []
+        if not hist_series:
+            return hist_for_llm
+        compact = []
+        for row in hist_series:
+            if not isinstance(row, dict):
+                continue
+            item = {"period": row.get("period_name"), "value": row.get("value_int")}
+            reading = row.get("upr_matrix_reading") if isinstance(row.get("upr_matrix_reading"), dict) else None
+            if reading:
+                item["matrix_preview"] = reading.get("value_preview")
+                item["value_role"] = reading.get("value_role")
+                item["grand_total"] = reading.get("grand_total")
+            compact.append(item)
+        return {**hist_for_llm, "series": compact}
 
     def upsert_validation(
         self,
@@ -114,6 +155,11 @@ class AIFormDataValidationService:
 
         context = self._build_context(fd)
         sources_cfg = self._normalize_sources(sources)
+        context = apply_upr_validation_context(context, sources_cfg=sources_cfg)
+        try:
+            attach_upr_assignment_review_context(context, aes=getattr(fd, "assignment_entity_status", None))
+        except Exception:
+            logger.debug("upr assignment review context attach failed", exc_info=True)
 
         # Log disaggregation/matrix data if present
         if context.get("disagg_values"):
@@ -131,48 +177,56 @@ class AIFormDataValidationService:
 
         # IFRC/UPR KPI reference (structured evidence) where applicable.
         upr_kpi = None
-        if sources_cfg is None or sources_cfg.get("upr_documents", False):
-            upr_kpi = retrieve_upr_kpi_reference(context) or None
-        if upr_kpi:
-            context = {**context, "upr_kpi": upr_kpi}
-
-        evidence_chunks = self._retrieve_evidence(context, top_k=top_k, sources_cfg=sources_cfg)
-        if sources_cfg is None or sources_cfg.get("historical", False):
-            historical = self._retrieve_historical_values(context=context, exclude_form_data_id=int(fd.id), limit_periods=10)
-        else:
+        comment_field = is_upr_comment_field(context)
+        if comment_field:
+            evidence_chunks = []
             historical = self._empty_historical()
+            hist_for_llm = {}
+            provider, model, verdict_payload, raw_text, err = None, None, {}, "", None
+            heuristic = upr_comment_heuristic(context)
+        else:
+            if sources_cfg is None or sources_cfg.get("upr_documents", False):
+                upr_kpi = retrieve_upr_kpi_reference(context) or None
+            if upr_kpi:
+                context = {**context, "upr_kpi": upr_kpi}
 
-        # Log historical data retrieval results
-        hist_summary = historical.get("summary", {})
-        hist_series = historical.get("series", [])
-        logger.info(
-            "Historical data retrieval: count=%d periods=%s latest=%s value=%s",
-            hist_summary.get("count", 0),
-            [s.get("period_name") for s in hist_series],
-            hist_summary.get("latest_period_name"),
-            hist_summary.get("latest_value_int"),
-        )
+            evidence_chunks = self._retrieve_evidence(context, top_k=top_k, sources_cfg=sources_cfg)
+            visual_chunks = upr_visuals_as_evidence_chunks(context.get("upr_visuals"))
+            if visual_chunks:
+                seen_ids = {c.get("chunk_id") for c in visual_chunks if c.get("chunk_id") is not None}
+                rest = [c for c in (evidence_chunks or []) if c.get("chunk_id") not in seen_ids]
+                evidence_chunks = visual_chunks + rest
 
-        # Pass both summary and series to the LLM so it can reason about historical trends
-        hist_for_llm = historical.get("summary") or {}
-        hist_series_for_llm = historical.get("series") or []
-        if hist_series_for_llm:
-            # Include a compact series representation (period_name + value) for the LLM
-            hist_for_llm = {
-                **hist_for_llm,
-                "series": [
-                    {"period": s.get("period_name"), "value": s.get("value_int")}
-                    for s in hist_series_for_llm
-                ],
-            }
+            if context.get("upr_skip_historical"):
+                historical = self._empty_historical()
+            elif sources_cfg is None or sources_cfg.get("historical", False):
+                historical = self._retrieve_historical_values(context=context, exclude_form_data_id=int(fd.id), limit_periods=10)
+            else:
+                historical = self._empty_historical()
 
-        provider, model, verdict_payload, raw_text, err = self._run_llm_validation(
-            context={**context, "historical": hist_for_llm},
-            evidence_chunks=evidence_chunks,
-        )
+            historical = attach_upr_historical_matrix_context(context, historical)
+            context["historical"] = historical
 
-        # Heuristic fallback: always produce an explanation and a quality estimate
-        heuristic = self._heuristic_validate(context=context, evidence_chunks=evidence_chunks, historical=historical)
+            # Log historical data retrieval results
+            hist_summary = historical.get("summary", {})
+            hist_series = historical.get("series", [])
+            logger.info(
+                "Historical data retrieval: count=%d periods=%s latest=%s value=%s",
+                hist_summary.get("count", 0),
+                [s.get("period_name") for s in hist_series],
+                hist_summary.get("latest_period_name"),
+                hist_summary.get("latest_value_int"),
+            )
+
+            hist_for_llm = self._historical_payload_for_llm(historical)
+
+            provider, model, verdict_payload, raw_text, err = self._run_llm_validation(
+                context={**context, "historical": hist_for_llm},
+                evidence_chunks=evidence_chunks,
+            )
+
+            # Heuristic fallback: always produce an explanation and a quality estimate
+            heuristic = self._heuristic_validate(context=context, evidence_chunks=evidence_chunks, historical=historical)
 
         verdict = None
         confidence = None
@@ -188,8 +242,8 @@ class AIFormDataValidationService:
         llm_conf = (verdict_payload.get("confidence") if isinstance(verdict_payload, dict) else None) if verdict_payload else None
 
         # If provider failed OR returned empty/invalid payload, use heuristic results.
-        llm_is_useful = bool(llm_verdict or llm_opinion or (raw_text and raw_text.strip()))
-        if err or not llm_is_useful:
+        llm_is_useful = (not comment_field) and bool(llm_verdict or llm_opinion or (raw_text and raw_text.strip()))
+        if comment_field or err or not llm_is_useful:
             verdict = heuristic.get("verdict") or "uncertain"
             confidence = heuristic.get("quality")  # use DB confidence field as quality estimate
             opinion_text = heuristic.get("opinion")
@@ -320,6 +374,10 @@ class AIFormDataValidationService:
                             )
             except Exception as e:
                 logger.debug("Optional validation step failed: %s", e)
+
+        verdict, confidence, opinion_text = apply_upr_matrix_history_guardrail(
+            verdict, confidence, opinion_text, context, historical
+        )
 
         # When the reported value is missing, we only suggest — do not show a "good" validation verdict.
         reported_value_raw = context.get("value")
@@ -471,28 +529,33 @@ class AIFormDataValidationService:
 
         context = self._build_context(fd)
         sources_cfg = self._normalize_sources(sources)
+        context = apply_upr_validation_context(context, sources_cfg=sources_cfg)
+        try:
+            attach_upr_assignment_review_context(context, aes=getattr(fd, "assignment_entity_status", None) or aes)
+        except Exception:
+            logger.debug("upr assignment review context attach failed", exc_info=True)
         upr_kpi = None
         if sources_cfg is None or sources_cfg.get("upr_documents", False):
             upr_kpi = retrieve_upr_kpi_reference(context) or None
         if upr_kpi:
             context = {**context, "upr_kpi": upr_kpi}
         evidence_chunks = self._retrieve_evidence(context, top_k=top_k, sources_cfg=sources_cfg)
-        if sources_cfg is None or sources_cfg.get("historical", False):
+        visual_chunks = upr_visuals_as_evidence_chunks(context.get("upr_visuals"))
+        if visual_chunks:
+            seen_ids = {c.get("chunk_id") for c in visual_chunks if c.get("chunk_id") is not None}
+            rest = [c for c in (evidence_chunks or []) if c.get("chunk_id") not in seen_ids]
+            evidence_chunks = visual_chunks + rest
+        if context.get("upr_skip_historical"):
+            historical = self._empty_historical()
+        elif sources_cfg is None or sources_cfg.get("historical", False):
             historical = self._retrieve_historical_values(context=context, exclude_form_data_id=None, limit_periods=10)
         else:
             historical = self._empty_historical()
 
-        # Pass both summary and series to the LLM so it can reason about historical trends
-        hist_for_llm = historical.get("summary") or {}
-        hist_series_for_llm = historical.get("series") or []
-        if hist_series_for_llm:
-            hist_for_llm = {
-                **hist_for_llm,
-                "series": [
-                    {"period": s.get("period_name"), "value": s.get("value_int")}
-                    for s in hist_series_for_llm
-                ],
-            }
+        historical = attach_upr_historical_matrix_context(context, historical)
+        context["historical"] = historical
+
+        hist_for_llm = self._historical_payload_for_llm(historical)
 
         provider, model, verdict_payload, raw_text, err = self._run_llm_validation(
             context={**context, "historical": hist_for_llm},
@@ -654,6 +717,85 @@ class AIFormDataValidationService:
     def _compute_suggestion(self, **kwargs: Any) -> Optional[Dict[str, Any]]:
         return compute_suggestion(**kwargs)
 
+    def _replace_display_placeholders(self, aes: Optional[AssignmentEntityStatus], *texts: Optional[str]):
+        """Replace [assignment_period] / [entity_name] tokens in labels sent to the LLM."""
+        if not aes or not any(t and "[" in str(t) for t in texts):
+            return texts
+        cache = getattr(self, "_display_vars_cache", None)
+        if cache is None:
+            self._display_vars_cache = {}
+            cache = self._display_vars_cache
+        key = int(getattr(aes, "id", 0) or 0)
+        if key not in cache:
+            from app.services.forms.variable_resolution_service import VariableResolutionService
+            cache[key] = VariableResolutionService.resolve_for_assignment_display(aes)
+        resolved, configs = cache[key]
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+        out = []
+        for text in texts:
+            if text and "[" in str(text):
+                out.append(
+                    VariableResolutionService.replace_variables_if_placeholders(str(text), resolved, configs)
+                )
+            else:
+                out.append(text)
+        return tuple(out)
+
+    def _resolve_matrix_row_labels(
+        self,
+        form_item: Optional[FormItem],
+        matrix_config: Optional[Dict[str, Any]],
+        row_ids: List[str],
+    ) -> Dict[str, str]:
+        """Map matrix row keys (lookup ids) to National Society / country names."""
+        labels: Dict[str, str] = {}
+        unique = [str(r) for r in dict.fromkeys(row_ids or []) if str(r).strip()]
+        if not unique:
+            return labels
+        mc = matrix_config if isinstance(matrix_config, dict) else {}
+        lookup_id = str(
+            mc.get("lookup_list_id")
+            or (getattr(form_item, "lookup_list_id", None) if form_item else None)
+            or ""
+        ).strip()
+        display_col = str(
+            mc.get("list_display_column") or mc.get("display_column") or "name"
+        ).strip() or "name"
+
+        numeric_ids: List[int] = []
+        for rid in unique:
+            try:
+                numeric_ids.append(int(rid))
+            except (TypeError, ValueError):
+                labels[rid] = rid
+
+        if not numeric_ids:
+            return labels
+
+        try:
+            if lookup_id == "country_map":
+                from app.models import Country
+                rows = Country.query.filter(Country.id.in_(numeric_ids)).all()
+                for obj in rows:
+                    name = getattr(obj, "name", None) or str(obj.id)
+                    labels[str(obj.id)] = str(name)
+            elif lookup_id == "national_society":
+                from app.models.organization import NationalSociety
+                rows = NationalSociety.query.filter(NationalSociety.id.in_(numeric_ids)).all()
+                for obj in rows:
+                    name = getattr(obj, "name", None) or str(obj.id)
+                    labels[str(obj.id)] = str(name)
+            elif lookup_id.isdigit():
+                from app.models import LookupListRow
+                rows = LookupListRow.query.filter(LookupListRow.id.in_(numeric_ids)).all()
+                for obj in rows:
+                    data = obj.data if isinstance(getattr(obj, "data", None), dict) else {}
+                    name = data.get(display_col) or data.get("name") or data.get("title") or obj.id
+                    labels[str(obj.id)] = str(name)
+        except Exception as e:
+            logger.debug("matrix row label resolve failed: %s", e)
+        return labels
+
     def _resolve_disagg_labels(
         self,
         disagg_data: Any,
@@ -673,9 +815,11 @@ class AIFormDataValidationService:
 
         # Get matrix column definitions from form_item config
         column_labels: Dict[str, str] = {}
+        matrix_config: Dict[str, Any] = {}
         if form_item and isinstance(form_item.config, dict):
-            matrix_config = form_item.config.get("matrix_config", {})
-            if isinstance(matrix_config, dict):
+            raw_mc = form_item.config.get("matrix_config", {})
+            if isinstance(raw_mc, dict):
+                matrix_config = raw_mc
                 columns = matrix_config.get("columns", [])
                 if isinstance(columns, list):
                     for col in columns:
@@ -697,9 +841,10 @@ class AIFormDataValidationService:
         if not isinstance(data_to_resolve, dict):
             return None
 
-        resolved: Dict[str, Any] = {}
+        row_ids: List[str] = []
+        parsed_keys: List[Tuple[str, Optional[str], Any]] = []
         for key, value in data_to_resolve.items():
-            if key.startswith("_"):
+            if str(key).startswith("_"):
                 continue  # Skip metadata keys
 
             # Handle variable-column format: {"modified": ..., "original": ...}
@@ -710,10 +855,21 @@ class AIFormDataValidationService:
             parts = str(key).rsplit("_", 1)
             if len(parts) == 2:
                 row_part, col_code = parts
-                col_label = column_labels.get(col_code, col_code)
-                resolved_key = f"{row_part} - {col_label}"
+                row_ids.append(row_part)
+                parsed_keys.append((row_part, col_code, value))
             else:
-                resolved_key = key
+                parsed_keys.append((str(key), None, value))
+
+        row_labels = self._resolve_matrix_row_labels(form_item, matrix_config, row_ids)
+
+        resolved: Dict[str, Any] = {}
+        for row_part, col_code, value in parsed_keys:
+            if col_code is not None:
+                col_label = column_labels.get(col_code, col_code)
+                row_label = row_labels.get(str(row_part), row_part)
+                resolved_key = f"{row_label} - {col_label}"
+            else:
+                resolved_key = row_part
 
             # Format numeric values
             if isinstance(value, (int, float)):
@@ -763,6 +919,44 @@ class AIFormDataValidationService:
 
         template_id = getattr(assigned_form, "template_id", None) if assigned_form else None
         period_name = getattr(assigned_form, "period_name", None) if assigned_form else None
+
+        template_name = None
+        try:
+            tmpl = getattr(assigned_form, "template", None) if assigned_form else None
+            if tmpl is not None:
+                with suppress(Exception):
+                    from app.utils.form_localization import get_localized_template_name
+                    template_name = (get_localized_template_name(tmpl) or "").strip() or None
+                if not template_name:
+                    pub = getattr(tmpl, "published_version", None)
+                    template_name = (
+                        (getattr(pub, "name", None) or "").strip()
+                        or (getattr(tmpl, "name", None) or "").strip()
+                        or None
+                    )
+        except Exception as e:
+            logger.debug("template_name resolve failed: %s", e)
+            template_name = None
+
+        section_name = None
+        subsection_name = None
+        try:
+            section = getattr(item, "form_section", None) if item else None
+            if section is not None:
+                if getattr(section, "parent_section_id", None) and getattr(section, "parent_section", None):
+                    subsection_name = (getattr(section, "name", None) or "").strip() or None
+                    section_name = (getattr(section.parent_section, "name", None) or "").strip() or None
+                else:
+                    section_name = (getattr(section, "name", None) or "").strip() or None
+        except Exception as e:
+            logger.debug("section name resolve failed: %s", e)
+            section_name = None
+            subsection_name = None
+
+        if aes:
+            item_label, section_name, subsection_name = self._replace_display_placeholders(
+                aes, item_label, section_name, subsection_name
+            )
 
         # Value summary (keep small + stable)
         data_status = "available"
@@ -907,13 +1101,17 @@ class AIFormDataValidationService:
             "submission_type": submission_type,
             "submission_id": int(aes.id) if aes else (int(ps.id) if ps else None),
             "template_id": _safe_int(template_id),
+            "template_name": template_name,
             "period_name": (str(period_name).strip() if period_name else None),
             "period_year": _parse_year_from_period(period_name),
             "country_id": _safe_int(getattr(country, "id", None)),
             "country_name": (str(getattr(country, "name", "")).strip() or None) if country else None,
             "form_item_id": int(fd.form_item_id) if fd.form_item_id else None,
+            "form_item_stable_key": (str(getattr(item, "stable_key", "") or "").strip() or None) if item else None,
             "indicator_bank_id": indicator_bank_id,
             "form_item_label": (str(item_label).strip() if item_label else None),
+            "section_name": section_name,
+            "subsection_name": subsection_name,
             "form_item_type": (str(item_type).strip() if item_type else None),
             "field_type_for_js": (str(field_type_for_js).strip() if field_type_for_js else None),
             "allowed_disaggregation_modes": allowed_disagg_modes or None,
@@ -942,11 +1140,32 @@ class AIFormDataValidationService:
         country_name = context.get("country_name") or ""
         period_name = context.get("period_name") or ""
         item_label = context.get("form_item_label") or ""
+        if is_upr_form_template(context.get("template_id")):
+            item_label = effective_upr_item_label(context) or item_label
         value = context.get("value") or ""
 
         # For matrix data, build a more semantic query using category labels
         disagg_values = context.get("disagg_values")
-        if disagg_values and isinstance(disagg_values, dict):
+        if is_upr_form_template(context.get("template_id")):
+            hint = upr_evidence_query_hint(context)
+            category_terms = ""
+            reading = context.get("upr_matrix_reading") if isinstance(context.get("upr_matrix_reading"), dict) else {}
+            if reading.get("by_sp"):
+                category_terms = " ".join(str(k).replace("_", " ") for k in list(reading["by_sp"].keys())[:5])
+            elif disagg_values and isinstance(disagg_values, dict):
+                categories = set()
+                for key in disagg_values.keys():
+                    if " - " in str(key):
+                        _, category = str(key).rsplit(" - ", 1)
+                        categories.add(category)
+                if categories:
+                    category_terms = " ".join(list(categories)[:4])
+            # Do not append matrix totals / value previews — they pollute vector search.
+            query_text = " ".join(
+                str(x) for x in [country_name, period_name, hint, category_terms]
+                if x
+            ).strip()
+        elif disagg_values and isinstance(disagg_values, dict):
             # Extract unique category labels from the resolved disagg keys
             # Keys are like "IFRC Secretariat - Climate & environment"
             categories = set()
@@ -1114,6 +1333,20 @@ class AIFormDataValidationService:
 
         merged = _merge_and_dedup(results_general or [], results_api or [], results_system_relaxed or [], results_broad or [])
 
+        if is_upr_form_template(context.get("template_id")) and include_upr:
+            def _upr_doc_rank(r: Dict[str, Any]) -> float:
+                score = _score(r)
+                title = f"{r.get('document_title') or ''} {r.get('document_filename') or ''}".lower()
+                bonus = 0.0
+                if r.get("is_api_import"):
+                    bonus += 0.15
+                if any(tok in title for tok in ("unified plan", "unified report", "upl-", "inp-", "upr-")):
+                    bonus += 0.25
+                if "annual report" in title or "strategic plan" in title:
+                    bonus -= 0.12
+                return score + bonus
+            merged.sort(key=_upr_doc_rank, reverse=True)
+
         # Diversity: cap chunks per document for validation prompts (keeps sources varied).
         max_per_doc = int(current_app.config.get("AI_VALIDATION_MAX_CHUNKS_PER_DOC", 2))
         merged = _apply_per_doc_cap(merged, max_per_doc=max(0, max_per_doc))
@@ -1219,15 +1452,22 @@ class AIFormDataValidationService:
         base_max_completion_tokens = int(current_app.config.get("AI_FORMDATA_VALIDATION_MAX_COMPLETION_TOKENS", 3000))
         base_max_completion_tokens = max(800, min(base_max_completion_tokens, 8000))
 
+        system_content = (
+            "You are a strict data validation assistant.\n"
+            "Return ONLY valid JSON (no markdown, no backticks, no extra text).\n"
+            "Keep fields concise: opinion_summary <= 700 chars, max 6 bullet-like points if needed.\n"
+            "If uncertain, set verdict='uncertain' and explain briefly."
+        )
+        if context.get("upr_form"):
+            system_content += (
+                "\nThis is a Unified Planning and Reporting (UPR) form. "
+                "Follow the UPR FORM-DATA VALIDATION RULES in the user prompt. "
+                "Annual Reports and Strategic Plans are context only, not direct evidence for plan-year matrices."
+            )
         messages = [
             {
                 "role": "system",
-                "content": (
-                    "You are a strict data validation assistant.\n"
-                    "Return ONLY valid JSON (no markdown, no backticks, no extra text).\n"
-                    "Keep fields concise: opinion_summary <= 700 chars, max 6 bullet-like points if needed.\n"
-                    "If uncertain, set verdict='uncertain' and explain briefly."
-                ),
+                "content": system_content,
             },
             {"role": "user", "content": prompt},
         ]
@@ -1452,10 +1692,44 @@ class AIFormDataValidationService:
                     AssignmentEntityStatus.status.in_(included_statuses),
                 )
             )
-            if indicator_ids:
+            if indicator_ids and not context.get("upr_form"):
                 q = q.filter(FormItem.indicator_bank_id.in_(indicator_ids))
             else:
-                q = q.filter(FormData.form_item_id == int(form_item_id))
+                match_clauses = []
+                if indicator_ids:
+                    match_clauses.append(FormItem.indicator_bank_id.in_(indicator_ids))
+                if form_item_id:
+                    match_clauses.append(FormData.form_item_id == int(form_item_id))
+                stable_key = str(context.get("form_item_stable_key") or "").strip()
+                template_id = context.get("template_id")
+                if stable_key and template_id:
+                    match_clauses.append(
+                        (FormItem.stable_key == stable_key) & (FormItem.template_id == int(template_id))
+                    )
+                label = str(context.get("form_item_label") or "").strip()
+                item_type = str(context.get("form_item_type") or "").strip()
+                if template_id and label and item_type and label not in ("-", "—"):
+                    match_clauses.append(
+                        (FormItem.template_id == int(template_id))
+                        & (FormItem.label == label)
+                        & (FormItem.item_type == item_type)
+                    )
+                # Prior UPR planning rounds often reuse the label on a different template/item id.
+                if context.get("upr_form") and label and item_type and label not in ("-", "—"):
+                    match_clauses.append(
+                        (FormItem.label == label)
+                        & (FormItem.item_type == item_type)
+                        & (FormItem.template_id.in_(tuple(upr_template_ids())))
+                    )
+                if stable_key and context.get("upr_form"):
+                    match_clauses.append(
+                        (FormItem.stable_key == stable_key)
+                        & (FormItem.template_id.in_(tuple(upr_template_ids())))
+                    )
+                if match_clauses:
+                    q = q.filter(or_(*match_clauses))
+                else:
+                    q = q.filter(FormData.form_item_id == int(form_item_id))
             if exclude_form_data_id:
                 q = q.filter(FormData.id != int(exclude_form_data_id))
 
@@ -1525,18 +1799,45 @@ class AIFormDataValidationService:
                     logger.debug("imputed_value get failed: %s", e)
 
             v_int = _parse_int_number(raw_val)
-            if v_int is None:
+            disagg_resolved = None
+            if context.get("disagg_values") or context.get("upr_form"):
+                try:
+                    raw_disagg = None
+                    getter = getattr(fd, "get_display_disagg_data", None)
+                    if callable(getter):
+                        raw_disagg = getter()
+                    else:
+                        raw_disagg = getattr(fd, "disagg_data", None)
+                    disagg_clean = _normalize_disagg_for_presence(raw_disagg)
+                    if disagg_clean:
+                        disagg_resolved = self._resolve_disagg_labels(
+                            disagg_clean, getattr(fd, "form_item", None)
+                        )
+                except Exception as e:
+                    logger.debug("historical disagg resolve failed: %s", e)
+                    disagg_resolved = None
+            if v_int is None and isinstance(disagg_resolved, dict) and disagg_resolved:
+                try:
+                    v_int = int(sum(
+                        v for v in disagg_resolved.values()
+                        if isinstance(v, (int, float))
+                    ))
+                except Exception:
+                    v_int = 0
+            if v_int is None and not disagg_resolved:
                 continue
 
             best_per_period[key] = {
                 "period_name": key,
                 "period_year": _parse_year_from_period(key),
-                "value_int": int(v_int),
+                "value_int": int(v_int) if v_int is not None else None,
                 "status_timestamp": status_ts.isoformat() if status_ts else None,
                 "aes_status": str(aes_status) if aes_status is not None else None,
                 "assignment_entity_status_id": int(aes_id) if aes_id is not None else None,
                 "form_data_id": int(getattr(fd, "id", 0) or 0),
             }
+            if disagg_resolved:
+                best_per_period[key]["disagg_values"] = disagg_resolved
 
         # Normalize DynamicIndicatorData rows (only fill periods not already covered by FormData above)
         for dd, period_name, status_ts, aes_status, aes_id in rows_dynamic or []:
@@ -1565,19 +1866,44 @@ class AIFormDataValidationService:
                     logger.debug("total_value get failed: %s", e)
 
             v_int = _parse_int_number(raw_val)
-            if v_int is None:
+            disagg_resolved = None
+            if context.get("disagg_values") or context.get("upr_form"):
+                try:
+                    raw_disagg = None
+                    getter = getattr(dd, "get_display_disagg_data", None)
+                    if callable(getter):
+                        raw_disagg = getter()
+                    else:
+                        raw_disagg = getattr(dd, "disagg_data", None)
+                    disagg_clean = _normalize_disagg_for_presence(raw_disagg)
+                    if disagg_clean:
+                        disagg_resolved = self._resolve_disagg_labels(disagg_clean, None)
+                except Exception as e:
+                    logger.debug("historical dynamic disagg resolve failed: %s", e)
+                    disagg_resolved = None
+            if v_int is None and isinstance(disagg_resolved, dict) and disagg_resolved:
+                try:
+                    v_int = int(sum(
+                        v for v in disagg_resolved.values()
+                        if isinstance(v, (int, float))
+                    ))
+                except Exception:
+                    v_int = 0
+            if v_int is None and not disagg_resolved:
                 continue
 
             best_per_period[key] = {
                 "period_name": key,
                 "period_year": _parse_year_from_period(key),
-                "value_int": int(v_int),
+                "value_int": int(v_int) if v_int is not None else None,
                 "status_timestamp": status_ts.isoformat() if status_ts else None,
                 "aes_status": str(aes_status) if aes_status is not None else None,
                 "assignment_entity_status_id": int(aes_id) if aes_id is not None else None,
                 # Keep shape stable; dynamic rows don't have a FormData id.
                 "form_data_id": None,
             }
+            if disagg_resolved:
+                best_per_period[key]["disagg_values"] = disagg_resolved
 
         series = list(best_per_period.values())
         # Sort by period_year asc when available, else by timestamp asc.
@@ -1633,6 +1959,11 @@ class AIFormDataValidationService:
         - opinion (why)
         """
         label = context.get("form_item_label")
+        if is_upr_comment_field(context):
+            return upr_comment_heuristic(context)
+        history_h = upr_matrix_history_heuristic(context, historical)
+        if history_h:
+            return history_h
         keyword = _infer_primary_keyword(label) or ""
         reported_int = _parse_int_number(context.get("value"))
 
@@ -2123,9 +2454,10 @@ class AIFormDataValidationService:
         # Limit chunks to top 8 to prevent token overflow (finish_reason=length)
         limited_chunks = evidence_chunks[:8] if evidence_chunks else []
 
-        # Build matrix-specific guidance if disagg_values present
+        # Build matrix-specific guidance if disagg_values present.
+        # UPR forms get domain-specific matrix rules from upr_validation_prompt_section instead.
         matrix_guidance = ""
-        if context.get("disagg_values"):
+        if context.get("disagg_values") and not context.get("upr_form"):
             matrix_guidance = (
                 "\nMATRIX/DISAGGREGATION DATA VALIDATION:\n"
                 "The 'disagg_values' field contains individual breakdown values to validate.\n"
@@ -2175,8 +2507,16 @@ class AIFormDataValidationService:
                 "- Only flag a discrepancy from historical data if the change is large (>50%) AND unexplained.\n"
                 "- Do NOT say 'no evidence' when historical data exists — historical submissions ARE evidence.\n"
                 "- When no documents are available but historical data supports the value, use verdict='good' "
-                "with appropriate confidence (0.5–0.75 depending on how consistent the history is).\n\n"
+                "with appropriate confidence (0.5–0.75 depending on how consistent the history is).\n"
             )
+            if context.get("upr_form"):
+                historical_section += (
+                    "- For UPR matrices, compare cell units and magnitudes to HISTORICAL UPR MATRICES. "
+                    "Do not treat a matching arithmetic total of 0/1 flags as historical consistency "
+                    "when a prior assignment stored people counts or CHF amounts.\n\n"
+                )
+            else:
+                historical_section += "\n"
 
         # Build IFRC/UPR KPI reference section (structured evidence from imported documents metadata)
         upr_section = ""
@@ -2231,6 +2571,27 @@ class AIFormDataValidationService:
             "- When year alignment is unclear, lower confidence and prefer verdict='uncertain'.\n\n"
         )
 
+        upr_form_section = upr_validation_prompt_section(context) if context.get("upr_form") else ""
+        if upr_form_section:
+            upr_form_section = "\n" + upr_form_section + "\n"
+        upr_matrix_section = format_upr_matrix_reading_for_prompt(context) if context.get("upr_form") else ""
+        upr_hist_matrix_section = (
+            format_upr_historical_matrices_for_prompt(context) if context.get("upr_form") else ""
+        )
+        upr_visuals_section = format_upr_visuals_for_prompt(context)
+        upr_review_section = (
+            format_upr_assignment_review_for_prompt(context.get("upr_assignment_review"))
+            if context.get("upr_form") else ""
+        )
+
+        # Structured visuals/matrix reading are already rendered above; keep the JSON dump compact.
+        context_for_llm = {
+            k: v for k, v in (context or {}).items()
+            if k not in ("upr_visuals", "upr_historical_matrices", "upr_assignment_review")
+        }
+        if context.get("upr_value_preview"):
+            context_for_llm["value"] = context.get("upr_value_preview")
+
         return (
             "Validate the reported value against the provided evidence.\n\n"
             "IMPORTANT: Evidence documents may be in any language (French, Spanish, Portuguese, Arabic, etc.). "
@@ -2238,6 +2599,11 @@ class AIFormDataValidationService:
             + matrix_guidance
             + historical_section +
             upr_section +
+            upr_form_section +
+            upr_matrix_section +
+            upr_hist_matrix_section +
+            upr_visuals_section +
+            upr_review_section +
             alignment_rules +
             "Return ONLY a JSON object with this schema:\n"
             "{\n"
@@ -2272,7 +2638,7 @@ class AIFormDataValidationService:
             "- For citations, preserve quotes in their original language.\n"
             "- IMPORTANT: Include ONLY evidence chunks that directly support or contradict the value. "
             "If no evidence is relevant (wrong country, wrong indicator, or no matching concept), return citations: []\n\n"
-            f"Reported record context:\n{json.dumps(context, ensure_ascii=False)}\n\n"
+            f"Reported record context:\n{json.dumps(context_for_llm, ensure_ascii=False)}\n\n"
             f"Evidence chunks ({len(limited_chunks)} of {len(evidence_chunks or [])}):\n{json.dumps(limited_chunks, ensure_ascii=False)}\n"
         )
 

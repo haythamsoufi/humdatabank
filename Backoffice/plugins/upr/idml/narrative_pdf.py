@@ -7,7 +7,7 @@ from pathlib import Path
 
 from plugins.upr.errors import UprError
 from plugins.upr.idml.constants import _STYLE_RUNS
-from plugins.upr.idml.narrative_style import folio_label, folio_text
+from plugins.upr.idml.narrative_style import folio_label, folio_html
 from plugins.upr.raster import _PLUGIN_FONTS_DIR
 
 _APP_FONTS_DIR = Path(__file__).resolve().parents[3] / "app" / "static" / "fonts"
@@ -27,6 +27,8 @@ def _run_html(run: dict, *, style_name: str) -> str:
     cls = "upr-nar-run"
     if bold or base["style"] == "Bold":
         cls += " is-bold"
+    if run.get("italic") or base.get("style") in {"Italic", "Bold Italic"}:
+        cls += " is-italic"
     if href:
         return f'<a class="{cls} is-link" href="{escape(href, quote=True)}">{text}</a>'
     return f'<span class="{cls}">{text}</span>'
@@ -35,12 +37,38 @@ def _run_html(run: dict, *, style_name: str) -> str:
 def _para_html(para: dict) -> str:
     if para.get("kind") == "table":
         return _table_html(para.get("rows") or [])
+    if para.get("kind") == "image":
+        src = str(para.get("src") or "")
+        if not src.startswith("data:image/"):
+            return ""
+        width = para.get("width_pt")
+        size = f"width:{float(width):.1f}pt;max-width:100%;" if width else "max-width:100%;"
+        return (
+            '<p class="upr-nar-figure">'
+            f'<img class="upr-nar-img" src="{escape(src, quote=True)}" alt="" style="{size}height:auto"/>'
+            "</p>"
+        )
     style_name = para.get("style") or "Body"
     runs = para.get("runs") or [{"text": para.get("text") or "", "href": "", "bold": False}]
     inner = "".join(_run_html(run, style_name=style_name) for run in runs) or "&nbsp;"
     if style_name == "SourceItem" and not inner.startswith("•"):
         inner = f"• {inner}"
-    return f'<p class="upr-nar-p upr-nar-p--{style_name}">{inner}</p>'
+    extra = ""
+    bits: list[str] = []
+    if style_name == "Caption":
+        align = str(para.get("align") or "").strip().lower()
+        if align in {"left", "right", "center", "justify"}:
+            bits.append(f"text-align:{align}")
+    try:
+        size_val = float(para.get("size_pt") or 0)
+    except (TypeError, ValueError):
+        size_val = 0.0
+    if 6.0 <= size_val <= 22.0:
+        bits.append(f"font-size:{size_val:.1f}pt")
+        bits.append(f"line-height:{max(size_val + 2.0, size_val * 1.2):.1f}pt")
+    if bits:
+        extra = f' style="{";".join(bits)}"'
+    return f'<p class="upr-nar-p upr-nar-p--{style_name}"{extra}>{inner}</p>'
 
 
 def _cell_html(paras: list[dict], *, label: bool) -> str:
@@ -142,6 +170,24 @@ html, body {{
 .upr-nar-p--ContactName {{ font-weight: 700; font-size: 9.5pt; line-height: 13pt; margin: 10pt 0 1pt; }}
 .upr-nar-p--ContactDetail {{ font-size: 9.5pt; line-height: 13pt; margin: 0 0 1pt; }}
 .upr-nar-run.is-bold {{ font-weight: 700; }}
+.upr-nar-run.is-italic {{ font-style: italic; }}
+.upr-nar-p--Caption {{
+  font-style: italic;
+  font-size: 9pt;
+  line-height: 12pt;
+  text-align: center;
+  margin: 4pt 0 12pt;
+}}
+.upr-nar-figure {{
+  margin: 10pt 0 4pt;
+  text-align: center;
+}}
+.upr-nar-img {{
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}}
 .upr-nar-run.is-link {{ color: #ef3340; text-decoration: underline; }}
 .upr-nar-table-wrap {{
   break-inside: avoid;
@@ -263,21 +309,79 @@ def _folio_font_path(*, rtl: bool, arabic: bool = False) -> Path | None:
     return None
 
 
+def _folio_bold_font_path(*, rtl: bool, arabic: bool = False) -> Path | None:
+    import os
+
+    candidates: list[Path] = []
+    if rtl:
+        windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        if arabic:
+            candidates.extend(
+                [
+                    _PLUGIN_FONTS_DIR / "Tajawal-Bold.ttf",
+                    _APP_FONTS_DIR / "Tajawal-Bold.ttf",
+                    Path("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf"),
+                    Path("/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf"),
+                ]
+            )
+        candidates.extend(
+            [
+                windir / "Fonts" / "arialbd.ttf",
+                windir / "Fonts" / "segoeuib.ttf",
+                Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            ]
+        )
+    candidates.extend(
+        [
+            _PLUGIN_FONTS_DIR / "Montserrat-Bold.ttf",
+            _APP_FONTS_DIR / "Montserrat-Bold.ttf",
+        ]
+    )
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def _folio_css(*, rtl: bool, regular: Path | None, bold: Path | None) -> str:
+    faces = []
+    if regular is not None:
+        faces.append(
+            f"@font-face {{ font-family: FolioFont; src: url({regular.name}); font-weight: 400; }}"
+        )
+    if bold is not None:
+        faces.append(
+            f"@font-face {{ font-family: FolioFont; src: url({bold.name}); font-weight: 700; }}"
+        )
+    direction = " direction: rtl;" if rtl else ""
+    return (
+        "".join(faces)
+        + f"div {{ font-family: FolioFont, sans-serif; font-size: 8pt; text-align: center; "
+        f"color: #000;{direction} }}"
+        ".upr-folio-slash { color: #f5333f; font-weight: 700; }"
+        "strong { font-weight: 700; color: #000; }"
+    )
+
+
 def apply_report_folios(out, *, folio: str = "") -> None:
-    """Stamp ``{label}    /    {n}`` from page 2 onward. Page 1 is the cover."""
+    """Stamp ``{label}    /    {n}`` from page 2 onward. Page 1 is the cover.
+
+    The slash is IFRC red; the page number is bold.
+    """
     import fitz
 
     label = folio or folio_label({})
     rtl = _folio_has_rtl(label)
-    font_path = _folio_font_path(rtl=rtl, arabic=_folio_has_arabic(label))
-    archive = fitz.Archive(str(font_path.parent)) if rtl and font_path is not None else None
-    css = ""
-    if archive is not None and font_path is not None:
-        css = (
-            f"@font-face {{ font-family: FolioFont; src: url({font_path.name}); }}"
-            "div { font-family: FolioFont, sans-serif; font-size: 8pt; text-align: center; "
-            "direction: rtl; color: #000; }"
-        )
+    arabic = _folio_has_arabic(label)
+    regular = _folio_font_path(rtl=rtl, arabic=arabic)
+    bold = _folio_bold_font_path(rtl=rtl, arabic=arabic)
+    font_dir = None
+    if regular is not None:
+        font_dir = regular.parent
+    elif bold is not None:
+        font_dir = bold.parent
+    archive = fitz.Archive(str(font_dir)) if font_dir is not None else None
+    css = _folio_css(rtl=rtl, regular=regular, bold=bold)
     for index in range(1, out.page_count):
         page = out[index]
         rect = page.rect
@@ -287,23 +391,11 @@ def apply_report_folios(out, *, folio: str = "") -> None:
             float(rect.width) - 31.38,
             float(rect.height) - 24.19,
         )
-        text = folio_text(label, index + 1)
+        html = f"<div>{folio_html(label, index + 1)}</div>"
         if archive is not None:
-            page.insert_htmlbox(folio_rect, f"<div>{escape(text)}</div>", css=css, archive=archive)
+            page.insert_htmlbox(folio_rect, html, css=css, archive=archive)
             continue
-        if font_path is not None:
-            page.insert_font(fontname="mont", fontfile=str(font_path))
-            fontname = "mont"
-        else:
-            fontname = "helv"
-        page.insert_textbox(
-            folio_rect,
-            text,
-            fontname=fontname,
-            fontsize=8,
-            color=(0, 0, 0),
-            align=getattr(fitz, "TEXT_ALIGN_CENTER", 1),
-        )
+        page.insert_htmlbox(folio_rect, html, css=css)
 
 
 def merge_report_pdfs(visuals_pdf: bytes, narrative_pdf: bytes, *, folio: str = "") -> bytes:

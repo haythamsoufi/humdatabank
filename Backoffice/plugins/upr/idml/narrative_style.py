@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from html import escape
 
 from plugins.upr.idml.constants import NARRATIVE_H
 from plugins.upr.idml.xml_idml import _table_cell_height
@@ -16,7 +17,9 @@ _BANDS = {
 _MAJOR_H2 = {"context", "key achievements"}
 _SUBHEADS = {
     "progress by the national society against objectives",
+    "progress by national society against objectives",
     "ifrc network joint support",
+    "ifrc membership coordination",
     "short description of the emergency operational strategy",
     "emergency appeal name",
     "emergency appeal number",
@@ -44,7 +47,7 @@ _FLOW_METRICS = {
     "ContactHead": (16.0, 13.0, 10.0),
     "ContactName": (10.0, 13.0, 1.0),
     "ContactDetail": (0.0, 13.0, 1.0),
-    "Blank": (0.0, 12.0, 4.0),
+    "Caption": (4.0, 12.0, 10.0),
 }
 # Open Sans 10pt on a 530pt measure is ~100 characters, not 85.
 _BODY_CHARS_PER_LINE = 100
@@ -57,6 +60,11 @@ def _para_hrefs(row: dict) -> list[str]:
 def _para_is_bold(row: dict) -> bool:
     runs = [run for run in (row.get("runs") or []) if (run.get("text") or "").strip()]
     return bool(runs) and all(bool(run.get("bold")) for run in runs)
+
+
+def _para_is_italic(row: dict) -> bool:
+    runs = [run for run in (row.get("runs") or []) if (run.get("text") or "").strip()]
+    return bool(runs) and all(bool(run.get("italic")) for run in runs)
 
 
 def _looks_like_link_line(text: str) -> bool:
@@ -79,6 +87,7 @@ def _narrative_style(
     bullet: bool = False,
     has_href: bool = False,
     bold: bool = False,
+    size_pt: float | None = None,
 ) -> tuple[str | None, str]:
     raw = (text or "").strip()
     if not raw:
@@ -130,6 +139,8 @@ def _narrative_style(
         and not raw.endswith((".", ","))
         and not _looks_like_link_line(raw)
     ):
+        if size_pt is not None and float(size_pt) <= 12.0:
+            return "Subhead", state
         return "TopicHead", state
     _ = (bullet, has_href)
     return "Body", state
@@ -160,24 +171,56 @@ def _is_cover_table(row: dict) -> bool:
     return _is_leading_cover_line(text)
 
 
+def _last_nonblank_kind(styled: list[dict]) -> str:
+    for row in reversed(styled):
+        if row.get("style") == "Blank":
+            continue
+        return str(row.get("kind") or "")
+    return ""
+
+
 def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> list[dict]:
     styled: list[dict] = []
     state = ""
+    started = False
     country = (country_name or "").strip().lower()
     for row in blocks:
+        if row.get("kind") == "image":
+            if started:
+                styled.append(row)
+            continue
         if row.get("kind") == "table":
-            if not styled and _is_cover_table(row):
+            if not started and _is_cover_table(row):
                 continue
+            started = True
             styled.append(row)
             continue
         if row.get("role") == "empty":
-            if styled and styled[-1].get("style") != "Blank":
+            if started and styled and styled[-1].get("style") != "Blank" and styled[-1].get("kind") != "image":
                 styled.append({"style": "Blank", "text": "", "runs": [{"text": " ", "href": "", "bold": False}]})
             continue
         text = (row.get("text") or "").strip()
-        if not styled and (_is_leading_cover_line(text) or (country and text.lower() == country)):
+        if not started and (_is_leading_cover_line(text) or (country and text.lower() == country)):
             continue
         if country and text.lower() == country:
+            continue
+        word_style = (row.get("word_style") or "").lower()
+        if (
+            row.get("role") == "caption"
+            or word_style.startswith("caption")
+            or (_para_is_italic(row) and _last_nonblank_kind(styled) == "image")
+        ):
+            caption = {
+                "style": "Caption",
+                "text": text,
+                "runs": row.get("runs") or [{"text": text, "href": "", "bold": False, "italic": True}],
+            }
+            if row.get("align"):
+                caption["align"] = row["align"]
+            if row.get("size_pt"):
+                caption["size_pt"] = row["size_pt"]
+            started = True
+            styled.append(caption)
             continue
         style, state = _narrative_style(
             text,
@@ -186,6 +229,7 @@ def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> lis
             bullet=bool(row.get("bullet")),
             has_href=bool(_para_hrefs(row)),
             bold=_para_is_bold(row),
+            size_pt=row.get("size_pt"),
         )
         if not style:
             continue
@@ -196,13 +240,15 @@ def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> lis
             row = {"text": text, "runs": [{"text": text, "href": "", "bold": True}], "bullet": False}
         if style in {"QHeading", "BandHead"}:
             text = text.upper()
-        styled.append(
-            {
-                "style": style,
-                "text": text,
-                "runs": row.get("runs") or [{"text": text, "href": "", "bold": False}],
-            }
-        )
+        started = True
+        block = {
+            "style": style,
+            "text": text,
+            "runs": row.get("runs") or [{"text": text, "href": "", "bold": False}],
+        }
+        if row.get("size_pt"):
+            block["size_pt"] = row["size_pt"]
+        styled.append(block)
     return styled
 
 
@@ -221,7 +267,46 @@ def folio_text(label: str, page_number: int) -> str:
     return f"{label}    /    {page_number}"
 
 
+def folio_html(label: str, page_number: int) -> str:
+    """Cover-style folio: label, IFRC-red slash, bold slash and page number."""
+    pad = "&nbsp;" * 4
+    return (
+        f"{escape(label)}{pad}"
+        f'<span class="upr-folio-slash">/</span>'
+        f"{pad}<strong>{int(page_number)}</strong>"
+    )
+
+
+def folio_runs(label: str, page_number: int) -> list[dict[str, str]]:
+    """IDML character runs for the same folio styling."""
+    return [
+        {
+            "text": f"{label}    ",
+            "font": "Montserrat",
+            "style": "Regular",
+            "size": "8",
+            "color": "Color/Black",
+        },
+        {
+            "text": "/",
+            "font": "Montserrat",
+            "style": "Bold",
+            "size": "8",
+            "color": "Color/IFRCRed",
+        },
+        {
+            "text": f"    {int(page_number)}",
+            "font": "Montserrat",
+            "style": "Bold",
+            "size": "8",
+            "color": "Color/Black",
+        },
+    ]
+
+
 def _block_flow_height(para: dict) -> float:
+    if para.get("kind") == "image":
+        return float(para.get("height_pt") or 220.0) + 16.0
     if para.get("kind") == "table":
         rows = para.get("rows") or []
         return 10.0 + sum(max((_table_cell_height(cell) for cell in row), default=16.0) for row in rows)

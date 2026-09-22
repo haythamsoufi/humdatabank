@@ -68,6 +68,10 @@ _FONT_CUTS: tuple[tuple[str, str, int], ...] = (
     (NUMBER_FAMILY, "Montserrat-Medium.ttf", 500),
     (NUMBER_FAMILY, "Montserrat-Bold.ttf", 700),
 )
+_ITALIC_FILES = {
+    (LATIN_FAMILY, 400): "OpenSans-Italic.ttf",
+    (LATIN_FAMILY, 700): "OpenSans-BoldItalic.ttf",
+}
 
 # File hashes + these modules: any print/font/HTML change busts export reuse.
 _STYLE_SOURCE_FILES = (
@@ -112,12 +116,16 @@ def _font_face(family: str, src: str, weight: int, *, style: str = "normal") -> 
     )
 
 
-def _faces_for_cut(family: str, src: str, weight: int) -> list[str]:
-    """Normal + italic. Missing italic TTFs reuse roman so engines do not fall to Times."""
-    return [
-        _font_face(family, src, weight),
-        _font_face(family, src, weight, style="italic"),
-    ]
+def _faces_for_cut(
+    family: str, src: str, weight: int, src_for: Callable[[Path], str | None]
+) -> list[str]:
+    """Normal + italic. Prefer a real italic TTF so captions are not upright roman."""
+    faces = [_font_face(family, src, weight)]
+    italic_name = _ITALIC_FILES.get((family, weight))
+    italic_path = resolve_font_file(italic_name) if italic_name else None
+    italic_src = src_for(italic_path) if italic_path is not None else None
+    faces.append(_font_face(family, italic_src or src, weight, style="italic"))
+    return faces
 
 
 def font_face_css(src_for: Callable[[Path], str | None]) -> str:
@@ -125,7 +133,7 @@ def font_face_css(src_for: Callable[[Path], str | None]) -> str:
     for family, path, weight in iter_resolved_fonts():
         src = src_for(path)
         if src:
-            faces.extend(_faces_for_cut(family, src, weight))
+            faces.extend(_faces_for_cut(family, src, weight, src_for))
     return "\n".join(faces)
 
 

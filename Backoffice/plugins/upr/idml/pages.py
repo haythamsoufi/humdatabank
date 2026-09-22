@@ -20,7 +20,7 @@ from plugins.upr.idml.constants import (
     NARRATIVE_Y,
     _COVER_LAYOUT,
 )
-from plugins.upr.idml.narrative_style import _narrative_page_count, folio_label, folio_text
+from plugins.upr.idml.narrative_style import _narrative_page_count, folio_label, folio_runs
 from plugins.upr.idml.pdf_extract import (
     _ensure_payload,
     _hydrate_reach_icons,
@@ -240,15 +240,7 @@ def _folio_frame(doc: Idml, folio: str, page_number: int) -> str:
         NARRATIVE_W,
         14.0,
         doc.story(
-            [
-                {
-                    "text": folio_text(folio, page_number),
-                    "font": "Montserrat",
-                    "style": "Regular",
-                    "size": "8",
-                    "color": "Color/Black",
-                }
-            ],
+            folio_runs(folio, page_number),
             align="CenterAlign",
         ),
     )

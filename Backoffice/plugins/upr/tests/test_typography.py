@@ -69,6 +69,7 @@ def test_browser_and_export_faces_share_families():
     assert "Tajawal" in export
     assert "Open Sans" in export
     assert "font-style: italic" in export
+    assert "OpenSans-Italic" in export
 
 
 @pytest.mark.unit

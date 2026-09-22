@@ -45,8 +45,8 @@
   display: flex;
   align-items: stretch;
   gap: 1.25rem;
-  min-height: 8.75rem;
-  padding: 1.45rem 1.5rem 1.2rem;
+  min-height: 9.15rem;
+  padding: 1.2rem 1.5rem 1.15rem;
   box-sizing: border-box;
 }
 
@@ -70,14 +70,14 @@
 
 .upr-doc-header__brand,
 .upr-doc-header__meta {
-  flex: 0 0 6.5rem;
-  width: 6.5rem;
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
 }
 
 .upr-doc-header__logo {
   display: block;
-  width: 6.5rem;
-  height: 6.5rem;
+  width: 5.5rem;
+  height: 5.5rem;
   object-fit: contain;
   background: #fff;
 }
@@ -147,8 +147,8 @@
   justify-content: center;
   box-sizing: border-box;
   flex: 0 0 auto;
-  width: 6.5rem;
-  height: 6.5rem;
+  width: 5.5rem;
+  height: 5.5rem;
   padding: 0.3rem;
   background: #fff;
 }
@@ -165,6 +165,7 @@
   flex: 0 0 auto;
   margin: 0;
   padding-top: 0.15rem;
+  min-height: 0.95rem;
   font-size: 0.72rem;
   font-style: italic;
   color: #fff;
@@ -383,7 +384,19 @@
 }
 
 .upr-block--emergency .upr-block__title {
+  font-family: "Open Sans", "Segoe UI", sans-serif;
+  font-size: 9pt;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
   text-transform: none;
+}
+
+.upr-block--emergency .upr-code {
+  font-family: inherit;
+  font-size: inherit;
+  font-style: italic;
+  font-weight: 700;
 }
 
 .upr-block--support .upr-block__title,

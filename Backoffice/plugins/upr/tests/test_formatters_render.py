@@ -399,9 +399,9 @@ def test_render_report_in_support_header():
     }
     html = render_dashboard_html(payload, "in_support")
     assert "IN SUPPORT OF THE UGANDA RED CROSS SOCIETY" in html
-    assert html.find("National Society branches") < html.find("National Society local units")
-    assert html.find("National Society local units") < html.find("National Society volunteers")
-    assert html.find("National Society volunteers") < html.find("National Society staff")
+    assert html.find("National Society<br>branches") < html.find("National Society<br>local units")
+    assert html.find("National Society<br>local units") < html.find("National Society<br>volunteers")
+    assert html.find("National Society<br>volunteers") < html.find("National Society<br>staff")
     already_the = _payload()
     already_the["meta"]["kind"] = "report"
     already_the["meta"]["header_prefix"] = "IN SUPPORT OF"
@@ -483,7 +483,7 @@ def test_reach_full_row_packs_when_all_icons_present():
     catalog_html = render_dashboard_html(catalog, "reach")
     assert "upr-reach-icon--img" in catalog_html
     assert "<image href=" in catalog_html
-    assert 'x="4" y="4" width="32" height="32"' in catalog_html
+    assert 'x="6.5" y="6.5" width="27" height="27"' in catalog_html
     assert 'width="64" height="64"' in catalog_html
     assert "https://example.test/sp1.png" in catalog_html
     support = render_dashboard_html(_payload(), "support")
@@ -619,7 +619,7 @@ def test_render_plan_combined_matches_inp_cover():
     assert "dir='ltr'" in html
     assert "2026-2028 IFRC network country plan" in html
     assert "2 July 2026" not in html
-    assert "upr-doc-header__date" not in html
+    assert "upr-doc-header__date" in html
     assert "In support of Uganda Red Cross Society" in html
     assert "People to be reached in 2026" in html
     assert "IFRC network Funding Requirements" in html
@@ -725,7 +725,7 @@ def test_render_report_combined_keeps_tableau_overview():
     html = render_dashboard_html(payload, "combined")
     assert "IN SUPPORT OF THE UGANDA RED CROSS SOCIETY" in html
     assert "2 July 2026" not in html
-    assert "upr-doc-header__date" not in html
+    assert "upr-doc-header__date" in html
     assert "upr-doc-header" in html
     assert "AFGHANISTAN" not in html
     assert "UGANDA" in html
@@ -1197,6 +1197,13 @@ def test_emergency_title_is_code_slash_name():
     assert 'font-family: "Open Sans"' in name_block
     assert "font-size: 9pt" in name_block
     assert "font-style: italic" in name_block
+    title_block = css.split(".upr-block--emergency .upr-block__title {", 1)[1].split("}", 1)[0]
+    assert "font-size: 9pt" in title_block
+    assert "font-style: italic" in title_block
+    code_block = css.split(".upr-block--emergency .upr-code {", 1)[1].split("}", 1)[0]
+    assert "font-size: inherit" in code_block
+    date_block = css.split(".upr-doc-header__date {", 1)[1].split("}", 1)[0]
+    assert "min-height: 0.95rem" in date_block
     th_span = css.split(".upr-support-th span {", 1)[1].split("}", 1)[0]
     assert "white-space: nowrap" in th_span
     country_block = css.split(".upr-doc-header__country {", 1)[1].split("}", 1)[0]

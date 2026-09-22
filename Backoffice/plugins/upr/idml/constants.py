@@ -92,7 +92,7 @@ _STYLE_RUNS = {
     "ContactHead": {"font": "Open Sans", "style": "Bold", "size": "10", "color": "Color/QRed"},
     "ContactName": {"font": "Open Sans", "style": "Bold", "size": "9.5", "color": "Color/Black"},
     "ContactDetail": {"font": "Open Sans", "style": "Regular", "size": "9.5", "color": "Color/Black"},
-    "Blank": {"font": "Open Sans", "style": "Regular", "size": "10", "color": "Color/Black"},
+    "Caption": {"font": "Open Sans", "style": "Italic", "size": "9", "color": "Color/Black"},
 }
 
 NARRATIVE_X = 34.0

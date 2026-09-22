@@ -29,8 +29,29 @@ function readDataOptions(root) {
         fileFieldName: dataset.fileFieldName || null,
         maxSizeBytes: dataset.maxSizeBytes ? parseInt(dataset.maxSizeBytes, 10) : null,
         autoSubmit: dataset.autoSubmit === 'true',
+        multiple: dataset.multiple === 'true',
         variant: dataset.variant || 'excel',
     };
+}
+
+function selectedFiles(fileInput) {
+    return fileInput && fileInput.files ? Array.from(fileInput.files) : [];
+}
+
+function formatSelectedFilenames(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return '';
+    if (files.length === 1) return files[0].name || '';
+    return files.map((file) => file.name || '').filter(Boolean).join(', ');
+}
+
+function assignFilesToInput(fileInput, files) {
+    if (!fileInput) return;
+    const incoming = Array.from(files || []).filter(Boolean);
+    const take = fileInput.multiple ? incoming : incoming.slice(0, 1);
+    const dataTransfer = new DataTransfer();
+    take.forEach((file) => dataTransfer.items.add(file));
+    fileInput.files = dataTransfer.files;
 }
 
 function getDropzoneStatusEl(dropzone) {
@@ -76,7 +97,7 @@ function updateImportDropzone(dropzone, fileInput, validationState) {
 
     if (emptyContent) emptyContent.hidden = true;
     if (selectedContent) selectedContent.hidden = false;
-    if (filenameEl) filenameEl.textContent = fileInput.files[0].name;
+    if (filenameEl) filenameEl.textContent = formatSelectedFilenames(fileInput.files);
     dropzone.classList.add(`${CLASS_PREFIX}--has-file`);
     if (validationState) {
         dropzone.classList.add(`${CLASS_PREFIX}--${validationState}`);
@@ -160,13 +181,12 @@ function bindDragDrop(dropzone, fileInput, activeClass) {
     });
 
     dropzone.addEventListener('drop', (e) => {
-        const file = e.dataTransfer?.files?.[0];
-        if (!file) return;
+        const dropped = Array.from(e.dataTransfer?.files || []);
+        if (!dropped.length) return;
         const acceptExtensions = dropzone._excelIoAccept || DEFAULT_ACCEPT;
-        if (!isAcceptedFile(file, acceptExtensions)) return;
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        fileInput.files = dataTransfer.files;
+        const accepted = dropped.filter((file) => isAcceptedFile(file, acceptExtensions));
+        if (!accepted.length) return;
+        assignFilesToInput(fileInput, accepted);
         fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     });
 }
@@ -184,6 +204,8 @@ export function initExcelImportDropzone(root, options = {}) {
     const fileInput = dropzone.querySelector('input[type="file"]');
     const variant = options.variant || dataOpts.variant || 'excel';
     const acceptExtensions = options.acceptExtensions || DEFAULT_ACCEPT;
+    const allowMultiple = options.multiple ?? dataOpts.multiple ?? Boolean(fileInput && fileInput.multiple);
+    if (fileInput && allowMultiple) fileInput.multiple = true;
     const activeClass = variant === 'kobo'
         ? `${CLASS_PREFIX}--active-kobo`
         : (variant === 'neutral' ? `${CLASS_PREFIX}--active-neutral` : `${CLASS_PREFIX}--active`);
@@ -246,9 +268,10 @@ export function initExcelImportDropzone(root, options = {}) {
             return;
         }
 
-        const file = fileInput.files[0];
+        const files = selectedFiles(fileInput);
+        const file = files[0];
 
-        if (maxSizeBytes && file.size > maxSizeBytes) {
+        if (maxSizeBytes && files.some((item) => item.size > maxSizeBytes)) {
             renderValidationStatus({
                 valid: false,
                 message: labels.maxSizeLabel,
@@ -260,7 +283,8 @@ export function initExcelImportDropzone(root, options = {}) {
             return;
         }
 
-        if (!isAcceptedFile(file, acceptExtensions)) {
+        const rejectedType = files.find((item) => !isAcceptedFile(item, acceptExtensions));
+        if (rejectedType) {
             renderValidationStatus({
                 valid: false,
                 message: labels.invalidFileTypeLabel,
@@ -275,7 +299,7 @@ export function initExcelImportDropzone(root, options = {}) {
         }
 
         if (typeof options.onFileSelected === 'function') {
-            options.onFileSelected(file, { dropzone, fileInput, reset, renderValidationStatus });
+            options.onFileSelected(file, { dropzone, fileInput, reset, renderValidationStatus, files });
             updateImportDropzone(dropzone, fileInput, 'valid');
             if (submitBtn && !requireValidation) submitBtn.disabled = false;
             return;
@@ -392,4 +416,11 @@ export function resetExcelImportDropzones(container) {
     });
 }
 
-export { escapeHtml, updateImportDropzone, isAcceptedFile, CLASS_PREFIX };
+export {
+    escapeHtml,
+    updateImportDropzone,
+    isAcceptedFile,
+    assignFilesToInput,
+    formatSelectedFilenames,
+    CLASS_PREFIX,
+};

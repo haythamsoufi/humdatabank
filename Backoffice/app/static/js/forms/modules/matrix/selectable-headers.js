@@ -33,6 +33,7 @@ const OTHER_INPUT_SAVE_DELAY_MS = 250;
 
 /** Resolved lazily: window.t is installed by layout.html after this module loads. */
 const goUnmatchedTooltip = () => _t('Not matched in GO API — imported from Excel');
+const filterMismatchTooltip = () => _t('This saved value no longer matches the filters for this column.');
 
 let headerPickerMenuSeq = 0;
 
@@ -118,11 +119,32 @@ _setHeaderGoUnmatchedUI(selectEl, isUnmatched) {
         const label = picker.querySelector('.matrix-header-picker-label');
         if (label) {
             if (isUnmatched) {
+                delete label.dataset.filterMismatchTitle;
                 label.setAttribute('title', goUnmatchedTooltip());
-            } else {
+            } else if (!label.dataset.filterMismatchTitle) {
                 label.removeAttribute('title');
             }
         }
+    }
+},
+
+/**
+ * Amber highlight for a saved header that the current option list no longer
+ * contains (timeframe, operation type, country, or closed-status filters).
+ * Distinct from the Excel GO-unmatched flag, which has its own tooltip.
+ */
+_setHeaderFilterMismatchUI(selectEl, isMismatch) {
+    const picker = selectEl?.closest('.matrix-header-picker');
+    if (!picker) return;
+    picker.classList.toggle('matrix-header-picker--filter-mismatch', !!isMismatch);
+    const label = picker.querySelector('.matrix-header-picker-label');
+    if (!label || picker.classList.contains('matrix-header-picker--go-unmatched')) return;
+    if (isMismatch) {
+        label.dataset.filterMismatchTitle = 'true';
+        label.setAttribute('title', filterMismatchTooltip());
+    } else if (label.dataset.filterMismatchTitle) {
+        delete label.dataset.filterMismatchTitle;
+        label.removeAttribute('title');
     }
 },
 
@@ -153,6 +175,9 @@ _injectStoredHeaderOption(selectEl, value, { goUnmatched = false } = {}) {
     if (goUnmatched) {
         opt.dataset.goUnmatched = 'true';
         opt.title = goUnmatchedTooltip();
+    } else {
+        opt.dataset.filterMismatch = 'true';
+        opt.title = filterMismatchTooltip();
     }
     selectEl.appendChild(opt);
     selectEl.value = value;
@@ -173,6 +198,7 @@ _clearHeaderSelectUI(selectEl) {
         otherInput.classList.add('hidden');
     }
     this._setHeaderGoUnmatchedUI(selectEl, false);
+    this._setHeaderFilterMismatchUI(selectEl, false);
 },
 
 /**
@@ -448,6 +474,10 @@ _syncHeaderPickerUI(selectEl) {
     }
 
     this._setHeaderGoUnmatchedUI(selectEl, isUnmatched);
+    const selectedIsFilterMismatch = hasValue
+        && !isUnmatched
+        && selectedOpt?.dataset?.filterMismatch === 'true';
+    this._setHeaderFilterMismatchUI(selectEl, selectedIsFilterMismatch);
 
     const isOpen = picker.classList.contains('is-open');
     if (trigger) {
@@ -464,6 +494,9 @@ _syncHeaderPickerUI(selectEl) {
         if (opt.dataset.goUnmatched === 'true') {
             li.classList.add('matrix-header-picker-option--go-unmatched');
             li.title = goUnmatchedTooltip();
+        } else if (opt.dataset.filterMismatch === 'true') {
+            li.classList.add('matrix-header-picker-option--filter-mismatch');
+            li.title = filterMismatchTooltip();
         }
         li.setAttribute('role', 'option');
         li.dataset.value = opt.value;

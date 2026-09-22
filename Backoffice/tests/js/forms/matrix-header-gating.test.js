@@ -447,8 +447,11 @@ describe('selectable header picker: values, option lists and keyboard', () => {
 
     expect(selectEl.value).toBe('Renamed region');
     expect(selectEl.querySelector('option[data-stored-header-value="true"]')).not.toBeNull();
+    expect(selectEl.querySelector('option[data-filter-mismatch="true"]')).not.toBeNull();
     expect(label.textContent).toBe('Renamed region');
     expect(label.classList.contains('matrix-header-picker-label--placeholder')).toBe(false);
+    expect(document.querySelector('.matrix-header-picker--filter-mismatch')).not.toBeNull();
+    expect(label.getAttribute('title')).toBe('This saved value no longer matches the filters for this column.');
   });
 
   it('restoring after an import that cleared the header resets the dropdown', async () => {

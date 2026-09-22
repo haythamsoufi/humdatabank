@@ -32,6 +32,22 @@ def _xml_text(value: str) -> str:
     return "".join(ch for ch in (value or "") if ch == "\t" or ch == "\n" or ord(ch) >= 32)
 
 
+def _idml_font_style(run: dict, base_style: str, *, force_bold: bool = False) -> str:
+    italic = bool(run.get("italic")) or base_style in {"Italic", "Bold Italic"}
+    bold = (
+        force_bold
+        or bool(run.get("bold"))
+        or base_style in {"Bold", "Bold Italic"}
+    )
+    if bold and italic:
+        return "Bold Italic"
+    if italic:
+        return "Italic"
+    if bold:
+        return "Bold"
+    return "Regular"
+
+
 def _applied_font_xml(font: str) -> str:
     return f"<Properties><AppliedFont type='string'>{escape(_xml_text(font))}</AppliedFont></Properties>"
 
@@ -154,6 +170,8 @@ class Idml:
         sid = self.uid()
         ranges: list[str] = []
         for para in paragraphs:
+            if para.get("kind") == "image":
+                continue
             if para.get("kind") == "table":
                 ranges.append(self._story_table(para.get("rows") or []))
                 continue
@@ -172,7 +190,9 @@ class Idml:
                 if not text:
                     continue
                 href = safe_export_href(run.get("href"))
-                font_style = "Bold" if run.get("bold") and style_name != "AdditionalHead" else base["style"]
+                font_style = _idml_font_style(run, base["style"])
+                if style_name == "AdditionalHead":
+                    font_style = "Bold"
                 if style_name == "ContactName":
                     font_style = "Bold"
                 color = base["color"]
@@ -182,10 +202,17 @@ class Idml:
                     inner = self._hyperlink_source(href, inner)
                     color = "Color/QRed"
                     extra = _HYPERLINK_UNDERLINE_ATTRS
+                point = base["size"]
+                try:
+                    size_val = float(para.get("size_pt") or 0)
+                except (TypeError, ValueError):
+                    size_val = 0.0
+                if 6.0 <= size_val <= 22.0:
+                    point = f"{size_val:.1f}"
                 parts.append(
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
-                    f'FillColor="{color}" PointSize="{base["size"]}" FontStyle="{font_style}"{extra}>'
+                    f'FillColor="{color}" PointSize="{point}" FontStyle="{font_style}"{extra}>'
                     f"{_applied_font_xml(_rtl_font(base['font'], arabic_font=self.arabic_font))}"
                     f"{inner}</CharacterStyleRange>"
                 )
@@ -271,7 +298,7 @@ class Idml:
                 if not text:
                     continue
                 href = safe_export_href(run.get("href"))
-                style = "Bold" if force_bold or run.get("bold") else font_style
+                style = _idml_font_style(run, font_style, force_bold=force_bold)
                 color = "Color/QRed" if href and not force_bold else text_color
                 inner = f"<Content>{escape(_xml_text(text)).replace(chr(10), ' ')}</Content>"
                 extra = ""
@@ -683,6 +710,10 @@ def _fonts_xml() -> str:
         'FontStyleName="Regular" FontType="TrueType" WritingScript="0" PostScriptName="OpenSans-Regular"/>'
         '<Font Self="fOsBold" FontFamily="Open Sans" Name="Open Sans Bold" FullName="Open Sans Bold" '
         'FontStyleName="Bold" FontType="TrueType" WritingScript="0" PostScriptName="OpenSans-Bold"/>'
+        '<Font Self="fOsItalic" FontFamily="Open Sans" Name="Open Sans Italic" FullName="Open Sans Italic" '
+        'FontStyleName="Italic" FontType="TrueType" WritingScript="0" PostScriptName="OpenSans-Italic"/>'
+        '<Font Self="fOsBoldItalic" FontFamily="Open Sans" Name="Open Sans Bold Italic" FullName="Open Sans Bold Italic" '
+        'FontStyleName="Bold Italic" FontType="TrueType" WritingScript="0" PostScriptName="OpenSans-BoldItalic"/>'
         "</FontFamily>"
         '<FontFamily Self="ffArial" Name="Arial">'
         '<Font Self="fArialReg" FontFamily="Arial" Name="Arial Regular" FullName="Arial" '
@@ -766,6 +797,7 @@ def _styles_xml(*, rtl: bool = False, arabic_font: bool = False) -> str:
         + _para_style("ContactHead", "Contact heading", size="10", style="Bold", color="Color/QRed", font=body, leading="13", space_before="16", space_after="10", align=start)
         + _para_style("ContactName", "Contact name", size="9.5", style="Bold", color="Color/Black", font=body, leading="13", space_before="10", space_after="1", align=start)
         + _para_style("ContactDetail", "Contact detail", size="9.5", style="Regular", color="Color/Black", font=body, leading="13", space_before="0", space_after="1", align=start)
+        + _para_style("Caption", "Caption", size="9", style="Italic", color="Color/Black", font=body, leading="12", space_before="4", space_after="10", align="CenterAlign")
         + _para_style("Blank", "Blank line", size="10", style="Regular", color="Color/Black", font=body, leading="12", space_before="0", space_after="4", align=start)
         + "</RootParagraphStyleGroup>"
         '<RootTableStyleGroup Self="uTableStyleGroup">'

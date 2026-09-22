@@ -148,7 +148,7 @@ def _sp_icon(code: str, icon_src: str | None = None, *, size: int = 64) -> str:
             f'<span class="upr-reach-icon upr-reach-icon--img" aria-hidden="true">'
             f'<svg viewBox="0 0 40 40" width="{dim}" height="{dim}">'
             f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="0.75"/>'
-            f'<image href="{href}" x="4" y="4" width="32" height="32" '
+            f'<image href="{href}" x="6.5" y="6.5" width="27" height="27" '
             f'preserveAspectRatio="xMidYMid meet"/>'
             f"</svg></span>"
         )
@@ -158,7 +158,7 @@ def _sp_icon(code: str, icon_src: str | None = None, *, size: int = 64) -> str:
         f'<span class="upr-reach-icon" aria-hidden="true">'
         f'<svg viewBox="0 0 40 40" width="{dim}" height="{dim}">'
         f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="0.75"/>'
-        f'<g transform="translate(4 4) scale(1.333)" fill="none" stroke="{color}" stroke-width="1.7" '
+        f'<g transform="translate(6.5 6.5) scale(1.125)" fill="none" stroke="{color}" stroke-width="1.7" '
         f'stroke-linecap="round" stroke-linejoin="round">{inner}</g></svg></span>'
     )
 
@@ -168,6 +168,16 @@ def _reach_label_html(code: str, label: str) -> str:
     if lines and current_export_language() == "en":
         return "<br>".join(escape(line) for line in lines)
     return escape(label or "")
+
+
+def _kpi_label_html(label: str) -> str:
+    text = (label or "").strip()
+    prefix = "National Society "
+    if current_export_language() == "en" and text.lower().startswith(prefix.lower()):
+        rest = text[len(prefix) :].strip()
+        if rest:
+            return f"{escape('National Society')}<br>{escape(rest)}"
+    return escape(text)
 
 
 def render_dashboard_html(payload: dict[str, Any], dashboard_id: str) -> str:
@@ -313,7 +323,7 @@ def _in_support(payload: dict[str, Any]) -> str:
         cards.append(
             "<div class='upr-kpi'>"
             f"{_kpi_icon(key)}"
-            f"<div class='upr-kpi__label'>{escape(kpi.get('label') or key)}</div>"
+            f"<div class='upr-kpi__label'>{_kpi_label_html(kpi.get('label') or key)}</div>"
             f"<div class='upr-kpi__value'>{_metric_html(kpi.get('display'))}</div>"
             "</div>"
         )
@@ -442,6 +452,7 @@ def _doc_header(payload: dict[str, Any]) -> str:
         "</div>"
         "<div class='upr-doc-header__meta'>"
         f"{ns_logo_html}"
+        "<time class='upr-doc-header__date' aria-hidden='true'>&nbsp;</time>"
         "</div>"
         "</div>"
         "</header>"

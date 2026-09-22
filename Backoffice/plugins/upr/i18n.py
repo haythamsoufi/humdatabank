@@ -710,7 +710,7 @@ def _collect_block_texts(block: dict[str, Any], bag: list[tuple[dict, str]]) -> 
     (``narrative_pdf.py``, ``xml_idml.py``) read ``runs``, and the paragraph's
     own ``text`` is used only for a length-based flow-height estimate.
     """
-    if block.get("style") == "Blank":
+    if block.get("style") == "Blank" or block.get("kind") == "image":
         return
     if block.get("kind") == "table":
         for row in block.get("rows") or []:
@@ -729,7 +729,7 @@ def _rebuild_block_text(block: dict[str, Any]) -> None:
     join in ``word_reader._parse_word_para``, so the height estimate reflects
     translated content without a dedicated MT call for the paragraph text.
     """
-    if block.get("style") == "Blank":
+    if block.get("style") == "Blank" or block.get("kind") == "image":
         return
     if block.get("kind") == "table":
         for row in block.get("rows") or []:

@@ -28,11 +28,13 @@ from plugins.upr.idml.xml_idml import Idml, _xml_text
 from plugins.upr.service import visual_export_filename
 
 
-def _docx_bytes(*body_xml: str) -> bytes:
+def _docx_bytes(*body_xml: str, extra_rels: str = "", extra_files: dict[str, bytes] | None = None) -> bytes:
     document = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
-        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+        'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
         f"<w:body>{''.join(body_xml)}</w:body></w:document>"
     )
     rels = (
@@ -41,12 +43,15 @@ def _docx_bytes(*body_xml: str) -> bytes:
         '<Relationship Id="rId1" '
         'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
         'Target="https://example.test/appeal" TargetMode="External"/>'
+        f"{extra_rels}"
         "</Relationships>"
     )
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as zf:
         zf.writestr("word/document.xml", document)
         zf.writestr("word/_rels/document.xml.rels", rels)
+        for name, data in (extra_files or {}).items():
+            zf.writestr(name, data)
     return out.getvalue()
 
 
@@ -231,12 +236,204 @@ def test_style_skips_word_cover_title_when_country_differs():
     assert [row["text"] for row in styled] == ["Context"]
 
 
+_PNG_1PX = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00"
+    b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def _drawing_p() -> str:
+    return (
+        "<w:p><w:r><w:drawing><wp:inline>"
+        '<wp:extent cx="2667000" cy="1600200"/>'
+        "<a:graphic><a:graphicData>"
+        '<a:blip r:embed="rIdImg"/>'
+        "</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"
+    )
+
+
+def _italic_caption_p(text: str = "Photo: IFRC") -> str:
+    return (
+        "<w:p><w:pPr><w:jc w:val=\"left\"/><w:rPr><w:i/><w:sz w:val=\"18\"/></w:rPr></w:pPr>"
+        f'<w:r><w:rPr><w:i/><w:sz w:val="18"/></w:rPr><w:t>{text}</w:t></w:r></w:p>'
+    )
+
+
+def _docx_with_photo() -> bytes:
+    extra_rels = (
+        '<Relationship Id="rIdImg" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
+        'Target="media/image1.png"/>'
+    )
+    return _docx_bytes(
+        _p("Context"),
+        _drawing_p(),
+        _p(),
+        _italic_caption_p(),
+        _p("In 2016, a crisis unfolded."),
+        extra_rels=extra_rels,
+        extra_files={"word/media/image1.png": _PNG_1PX},
+    )
+
+
+@pytest.mark.unit
+def test_load_word_keeps_embedded_image_and_italic_caption():
+    blocks = load_word_paragraphs(_docx_with_photo())
+    photo = next(row for row in blocks if row.get("kind") == "image")
+    assert photo["src"].startswith("data:image/png;base64,")
+    assert photo.get("width_pt") == pytest.approx(210.0, rel=0.01)
+    caption = next(row for row in blocks if "Photo:" in (row.get("text") or ""))
+    assert caption.get("align") == "left"
+    assert caption.get("size_pt") == 9.0
+    assert all(run.get("italic") for run in caption["runs"])
+    styled = style_narrative_blocks(blocks, country_name="Bangladesh")
+    assert styled[0]["style"] == "SectionHead"
+    assert styled[1]["kind"] == "image"
+    assert styled[2]["style"] == "Caption"
+    assert styled[2]["text"] == "Photo: IFRC"
+    assert styled[2]["align"] == "left"
+
+
+@pytest.mark.unit
+def test_style_skips_word_cover_logos():
+    extra_rels = (
+        '<Relationship Id="rIdImg" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
+        'Target="media/image1.png"/>'
+    )
+    blocks = load_word_paragraphs(
+        _docx_bytes(
+            _drawing_p(),
+            _p("Bangladesh"),
+            _p("IFRC network annual report 2025, Jan-Dec"),
+            _p("Context"),
+            _drawing_p(),
+            _italic_caption_p(),
+            extra_rels=extra_rels,
+            extra_files={"word/media/image1.png": _PNG_1PX},
+        )
+    )
+    styled = style_narrative_blocks(blocks, country_name="Bangladesh")
+    assert styled[0]["style"] == "SectionHead"
+    assert styled[1]["kind"] == "image"
+    assert styled[2]["style"] == "Caption"
+
+
+@pytest.mark.unit
+def test_narrative_pdf_embeds_image_and_italic_caption(monkeypatch):
+    captured = {}
+    _patch_weasyprint(monkeypatch, captured)
+    from plugins.upr.idml.narrative_pdf import render_narrative_pdf_bytes
+
+    blocks = load_word_paragraphs(_docx_with_photo())
+    styled = style_narrative_blocks(blocks, country_name="Bangladesh")
+    render_narrative_pdf_bytes(styled)
+    html = captured.get("html") or ""
+    css = captured.get("css") or ""
+    assert 'class="upr-nar-img"' in html
+    assert "data:image/png;base64," in html
+    assert "upr-nar-p--Caption" in html
+    assert "is-italic" in html
+    assert "text-align:left" in html
+    assert "font-size:9.0pt" in html
+    assert "font-style: italic" in css
+
+
+@pytest.mark.unit
+def test_idml_story_skips_narrative_images():
+    doc = Idml()
+    add_narrative_pages(
+        doc,
+        [
+            {"kind": "image", "src": "data:image/png;base64,xxxx", "width_pt": 200, "height_pt": 100},
+            {
+                "style": "Caption",
+                "text": "Photo: IFRC",
+                "runs": [{"text": "Photo: IFRC", "href": "", "bold": False, "italic": True}],
+            },
+        ],
+        folio="2025 IFRC network annual report",
+    )
+    stories = "".join(doc.stories.values())
+    assert "data:image" not in stories
+    assert "Photo: IFRC" in stories
+    assert 'FontStyle="Italic"' in stories
+    assert "ParagraphStyle/Caption" in stories
+
+
+@pytest.mark.unit
+def test_style_keeps_word_heading_sizes_for_same_style_cluster():
+    def _sized(text: str, half_points: int) -> str:
+        return (
+            "<w:p><w:pPr><w:rPr>"
+            f'<w:sz w:val="{half_points}"/></w:rPr></w:pPr>'
+            f'<w:r><w:rPr><w:b/><w:sz w:val="{half_points}"/></w:rPr><w:t>{text}</w:t></w:r></w:p>'
+        )
+
+    blocks = load_word_paragraphs(
+        _docx_bytes(
+            _sized("ENABLING LOCAL ACTORS", 36),
+            _sized("Strategic and operational coordination", 28),
+            _sized("Progress by National Society against objectives", 20),
+            _sized("IFRC membership coordination", 22),
+            _p("IFRC membership coordination involves working with National Societies to assess needs."),
+        )
+    )
+    styled = style_narrative_blocks(blocks, country_name="Bangladesh")
+    by_text = {row["text"]: row for row in styled if row.get("text")}
+    assert by_text["ENABLING LOCAL ACTORS"]["style"] == "BandHead"
+    assert by_text["ENABLING LOCAL ACTORS"]["size_pt"] == 18.0
+    assert by_text["Strategic and operational coordination"]["style"] == "TopicHead"
+    assert by_text["Strategic and operational coordination"]["size_pt"] == 14.0
+    assert by_text["Progress by National Society against objectives"]["style"] == "Subhead"
+    assert by_text["IFRC membership coordination"]["style"] == "Subhead"
+    assert by_text["IFRC membership coordination"]["size_pt"] == 11.0
+
+
+@pytest.mark.unit
+def test_narrative_pdf_uses_word_heading_sizes(monkeypatch):
+    captured = {}
+    _patch_weasyprint(monkeypatch, captured)
+    from plugins.upr.idml.narrative_pdf import render_narrative_pdf_bytes
+
+    render_narrative_pdf_bytes(
+        [
+            {"style": "BandHead", "text": "ENABLING LOCAL ACTORS", "size_pt": 18.0,
+             "runs": [{"text": "ENABLING LOCAL ACTORS", "href": "", "bold": True}]},
+            {"style": "TopicHead", "text": "Strategic and operational coordination", "size_pt": 14.0,
+             "runs": [{"text": "Strategic and operational coordination", "href": "", "bold": True}]},
+            {"style": "Subhead", "text": "Progress by National Society against objectives", "size_pt": 10.0,
+             "runs": [{"text": "Progress by National Society against objectives", "href": "", "bold": True}]},
+            {"style": "Subhead", "text": "IFRC membership coordination", "size_pt": 11.0,
+             "runs": [{"text": "IFRC membership coordination", "href": "", "bold": True}]},
+        ]
+    )
+    html = captured.get("html") or ""
+    assert "font-size:18.0pt" in html
+    assert "font-size:14.0pt" in html
+    assert "font-size:10.0pt" in html
+    assert "font-size:11.0pt" in html
+
+
 @pytest.mark.unit
 def test_folio_label_uses_year_and_kind():
     assert folio_label({"year": 2026, "kind": "report"}) == "2026 IFRC network annual report"
     assert folio_label({"year": 2026, "kind": "plan"}) == "2026 IFRC network unified plan"
     assert folio_label({}) == "IFRC network annual report"
     assert folio_text("2026 IFRC network annual report", 2) == "2026 IFRC network annual report    /    2"
+    from plugins.upr.idml.narrative_style import folio_html, folio_runs
+
+    html = folio_html("2026 IFRC network annual report", 2)
+    assert "upr-folio-slash" in html
+    assert "<strong>2</strong>" in html
+    assert "/" in html
+    runs = folio_runs("2026 IFRC network annual report", 2)
+    assert runs[1]["text"] == "/"
+    assert runs[1]["color"] == "Color/IFRCRed"
+    assert runs[1]["style"] == "Bold"
+    assert runs[2]["style"] == "Bold"
+    assert runs[2]["text"].strip() == "2"
 
 
 def _blank_pdf(pages: int) -> bytes:
@@ -264,10 +461,27 @@ def test_merge_report_pdfs_folios_from_page_two():
     finally:
         out.close()
     assert label not in texts[0]
-    assert folio_text(label, 2) in texts[1]
-    assert folio_text(label, 3) in texts[2]
-    assert folio_text(label, 4) in texts[3]
-    assert folio_text(label, 5) in texts[4]
+    for page_no, text in enumerate(texts[1:], start=2):
+        assert " ".join(text.split()) == f"{label} / {page_no}"
+    spans = []
+    doc = fitz.open(stream=merged, filetype="pdf")
+    try:
+        for block in doc[1].get_text("dict")["blocks"]:
+            for line in block.get("lines", []):
+                spans.extend(line.get("spans") or [])
+    finally:
+        doc.close()
+    slash = next((s for s in spans if (s.get("text") or "").strip() == "/"), None)
+    page_no = next((s for s in spans if (s.get("text") or "").strip() == "2"), None)
+    assert slash is not None
+    assert page_no is not None
+    slash_color = slash.get("color")
+    if isinstance(slash_color, int):
+        assert slash_color == 0xF5333F
+    else:
+        assert slash_color in {(245, 51, 63), (0.9607843137254902, 0.2, 0.24705882352941178)}
+    assert slash.get("flags", 0) & 16 or "Bold" in (slash.get("font") or "")
+    assert page_no.get("flags", 0) & 16 or "Bold" in (page_no.get("font") or "")
 
 
 @pytest.mark.unit
@@ -305,7 +519,11 @@ def test_idml_narrative_folio_continues_after_visual_pages():
     )
     assert doc.page_count == 4
     stories = "".join(doc.stories.values())
-    assert folio_text("2026 IFRC network annual report", 4) in stories
+    assert "2026 IFRC network annual report    " in stories
+    assert 'FillColor="Color/IFRCRed"' in stories
+    assert 'FontStyle="Bold"' in stories
+    assert "<Content>/</Content>" in stories
+    assert "    4</Content>" in stories
     assert folio_text("2026 IFRC network annual report", 1) not in stories
 
 

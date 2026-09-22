@@ -19,7 +19,7 @@ PDF_MAX_BYTES = DOCX_MAX_BYTES
 PDF_MAX_PAGES = 200
 # Compressed uploads can still explode; cap the XML members we actually parse.
 DOCX_MAX_UNCOMPRESSED_BYTES = 80 * 1024 * 1024
-DOCX_XML_MEMBERS = ("word/document.xml", "word/_rels/document.xml.rels")
+DOCX_XML_MEMBERS = ("word/document.xml", "word/_rels/document.xml.rels", "word/styles.xml")
 
 __all__ = [
     "DOCX_MAX_BYTES",

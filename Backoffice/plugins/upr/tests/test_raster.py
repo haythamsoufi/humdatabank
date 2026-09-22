@@ -44,7 +44,7 @@ def test_export_open_sans_files_are_real_ttf():
 
     from plugins.upr.raster import _APP_FONTS_DIR
 
-    for name in ("OpenSans-Regular.ttf", "OpenSans-Bold.ttf"):
+    for name in ("OpenSans-Regular.ttf", "OpenSans-Bold.ttf", "OpenSans-Italic.ttf", "OpenSans-BoldItalic.ttf"):
         path = Path(_APP_FONTS_DIR) / name
         header = path.read_bytes()[:4]
         assert header in {b"\x00\x01\x00\x00", b"OTTO"}, f"{name} is not a TTF/OTF (got {header!r})"

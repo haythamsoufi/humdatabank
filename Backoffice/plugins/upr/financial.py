@@ -48,9 +48,24 @@ from app.utils.api_serialization import _resolve_matrix_cell
 logger = logging.getLogger(__name__)
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
-_MYR26_IFRC_ACTUALS_PATH = _PLUGIN_DIR / "snapshots" / "myr26_ifrc_secretariat_actuals.json"
+_SNAPSHOTS_DIR = _PLUGIN_DIR / "snapshots"
+# Round code -> (cross_submission source slug, snapshot path).
+# Each calendar year is one snapshot, shared by the annual report and the mid-year report.
+_2025_IFRC_ACTUALS = (
+    "2025_ifrc_secretariat_actuals",
+    _SNAPSHOTS_DIR / "2025_ifrc_secretariat_actuals.json",
+)
+_2026_IFRC_ACTUALS = (
+    "2026_ifrc_secretariat_actuals",
+    _SNAPSHOTS_DIR / "2026_ifrc_secretariat_actuals.json",
+)
+_IFRC_ACTUALS_SNAPSHOTS: dict[str, tuple[str, Path]] = {
+    "AR26": _2026_IFRC_ACTUALS,
+    "MYR26": _2026_IFRC_ACTUALS,
+    "AR25": _2025_IFRC_ACTUALS,
+    "MYR25": _2025_IFRC_ACTUALS,
+}
 _IFRC_ACTUALS_MIN_CHF = 1000.0
-_MYR26_ROUND_CODE = "MYR26"
 
 def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
     years = planning_years(period_name)
@@ -145,8 +160,8 @@ def _report_financial(
     Main IFRC-network visual (cross-submission):
     - Funding requirement → Unified Country Plan (template 24) for the same calendar year
     - PNS funding / expenditure → published T23 funding matrix, keyed by this host NS
-    - IFRC Secretariat Funding/Expenditure → MYR26 snapshot (System Financial Figures
-      table Final); other rounds stay unreported until a live IFRC actuals source exists
+    - IFRC Secretariat Funding/Expenditure → the shipped snapshot for that calendar year
+      (System Financial Figures table Final); other rounds stay unreported until a snapshot exists
 
     National Society visual (same assignment): HNS funding sources, expenditure, SP breakdown.
     """
@@ -256,7 +271,7 @@ def _report_financial(
             "plan_aes_id": plan_meta.get("aes_id"),
             "plan_period": plan_meta.get("period_name"),
             "pns_assignments": pns_reported.get("assignments") or 0,
-            "ifrc_actuals_source": "myr26_ifrc_secretariat_actuals" if ifrc_actuals else None,
+            "ifrc_actuals_source": _ifrc_actuals_source_slug(period_name) if ifrc_actuals else None,
         },
     }
 
@@ -272,8 +287,9 @@ def build_report_network_entities(
     """Tableau Financial Overview (3) row groups.
 
     Country = full T24 requirement. IFRC Secretariat splits Longer-term / Emergency
-    Operations from the plan matrix. MYR26 Funding/Expenditure come from the
-    System Financial Figures snapshot; other rounds leave actuals unreported.
+    Operations from the plan matrix. Funding/Expenditure for rounds that have a
+    shipped System Financial Figures snapshot come from that file; other rounds
+    leave actuals unreported.
     PNS actuals come from template 23. HNS other uses T24 HNS requirement + T33
     other sources.
     """
@@ -359,16 +375,26 @@ def _ifrc_network_buckets(
     ]
 
 
+def _ifrc_actuals_snapshot(period_name: str) -> tuple[str, Path] | None:
+    return _IFRC_ACTUALS_SNAPSHOTS.get(period_to_round(period_name, "report"))
+
+
+def _ifrc_actuals_source_slug(period_name: str) -> str | None:
+    spec = _ifrc_actuals_snapshot(period_name)
+    return spec[0] if spec else None
+
+
 def ifrc_secretariat_actuals_for_report(
     *,
     period_name: str,
     iso2: str | None = None,
     iso3: str | None = None,
 ) -> dict[str, dict[str, float]] | None:
-    """MYR26-only IFRC Secretariat Funding/Expenditure from the shipped snapshot."""
-    if period_to_round(period_name, "report") != _MYR26_ROUND_CODE:
+    """IFRC Secretariat Funding/Expenditure from a shipped round snapshot, if one exists."""
+    spec = _ifrc_actuals_snapshot(period_name)
+    if spec is None:
         return None
-    rec = _myr26_ifrc_actuals_record(iso2=iso2, iso3=iso3)
+    rec = _ifrc_actuals_record(spec[1], iso2=iso2, iso3=iso3)
     if not rec:
         return None
     out: dict[str, dict[str, float]] = {}
@@ -394,14 +420,15 @@ def _usable_ifrc_actual(value: Any) -> float | None:
     return number
 
 
-@lru_cache(maxsize=1)
-def _myr26_ifrc_actuals_by_iso2() -> dict[str, dict[str, Any]]:
-    if not _MYR26_IFRC_ACTUALS_PATH.is_file():
+@lru_cache(maxsize=4)
+def _ifrc_actuals_by_iso2(path_str: str) -> dict[str, dict[str, Any]]:
+    path = Path(path_str)
+    if not path.is_file():
         return {}
     try:
-        payload = json.loads(_MYR26_IFRC_ACTUALS_PATH.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        logger.exception("UPR: failed to load MYR26 IFRC Secretariat actuals snapshot")
+        logger.exception("UPR: failed to load IFRC Secretariat actuals snapshot %s", path.name)
         return {}
     by_iso2 = payload.get("by_iso2") if isinstance(payload, dict) else None
     if not isinstance(by_iso2, dict):
@@ -409,8 +436,8 @@ def _myr26_ifrc_actuals_by_iso2() -> dict[str, dict[str, Any]]:
     return {str(key).strip().upper(): rec for key, rec in by_iso2.items() if rec}
 
 
-def _myr26_ifrc_actuals_record(*, iso2: str | None, iso3: str | None) -> dict[str, Any] | None:
-    catalog = _myr26_ifrc_actuals_by_iso2()
+def _ifrc_actuals_record(path: Path, *, iso2: str | None, iso3: str | None) -> dict[str, Any] | None:
+    catalog = _ifrc_actuals_by_iso2(str(path))
     if not catalog:
         return None
     code2 = (iso2 or "").strip().upper()

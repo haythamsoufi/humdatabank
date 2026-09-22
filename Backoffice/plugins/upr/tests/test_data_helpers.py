@@ -493,15 +493,24 @@ def test_ifrc_secretariat_always_splits_longer_term_and_emergency():
 
 
 @pytest.mark.unit
-def test_ifrc_secretariat_actuals_only_for_myr26():
-    assert ifrc_secretariat_actuals_for_report(period_name="2025", iso2="AF") is None
-    assert ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2025", iso2="AF") is None
+def test_ifrc_secretariat_actuals_for_shipped_rounds():
+    assert ifrc_secretariat_actuals_for_report(period_name="2024", iso2="AF") is None
+    assert ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2024", iso2="AF") is None
+    afg25 = ifrc_secretariat_actuals_for_report(period_name="2025", iso2="AF")
+    assert afg25 is not None
+    assert afg25["longer_term"]["funding"] == 21_221_314
+    assert afg25["longer_term"]["expenditure"] == 18_462_993
+    assert afg25["emergency"]["funding"] == 13_540_742
+    assert afg25["emergency"]["expenditure"] == 4_574_407
+    assert ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2025", iso2="AF") == afg25
+    assert ifrc_secretariat_actuals_for_report(period_name="2025", iso3="AFG") == afg25
     afg = ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso2="AF")
     assert afg is not None
     assert afg["longer_term"]["funding"] == 10_621_043
     assert afg["longer_term"]["expenditure"] == 3_461_570
     assert afg["emergency"]["funding"] == 1_938_683
     assert afg["emergency"]["expenditure"] == 2_929_339
+    assert ifrc_secretariat_actuals_for_report(period_name="2026", iso2="AF") == afg
     by_iso3 = ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso3="AFG")
     assert by_iso3 == afg
     missing = ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso2="ZZ")

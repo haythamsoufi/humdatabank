@@ -1710,13 +1710,9 @@ class TestFormAuthorization:
             db_session.add(assignment_status)
             db_session.commit()
 
-            # Admin should be able to edit even submitted assignments
-            # (AuthorizationService checks RBAC permissions; verify the admin pathway)
+            # Admins can edit a submitted assignment without reopening it.
             can_edit = AuthorizationService.can_edit_assignment(assignment_status, admin_user)
-            # Admin with admin.assignments.edit should be able to edit
-            # If the RBAC role does not have that permission, the result is False;
-            # verify the service is callable and returns a boolean.
-            assert isinstance(can_edit, bool)
+            assert can_edit is True
 
 
 @pytest.mark.integration

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from flask import g, make_response
+from werkzeug.exceptions import NotFound
 
 pytestmark = [pytest.mark.integration, pytest.mark.auth_security]
 
@@ -426,8 +427,9 @@ class TestLoginRouteCoverage:
 
         with app.test_request_context('/account-settings/devices/999999/kickout', method='POST'):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(999999)
-        assert status == 500
+            # first_or_404() aborts; dispatching would turn this into a 404 page.
+            with pytest.raises(NotFound):
+                kickout_own_device(999999)
 
     def test_remove_device_error_returns_500(self, app, admin_user, db_session):
         from flask_login import login_user
@@ -454,5 +456,5 @@ class TestLoginRouteCoverage:
         ):
             login_user(User.query.get(user_id))
             with patch.object(db.session, 'flush', side_effect=RuntimeError('db down')):
-                resp, status = remove_own_device(device_id)
+                _resp, status = _view_result(remove_own_device(device_id))
         assert status == 500

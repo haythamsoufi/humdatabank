@@ -209,7 +209,7 @@ class TestDashboardSingleEntity:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>dashboard</html>") as mock_rt:
@@ -234,7 +234,7 @@ class TestDashboardSingleEntity:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=True), \
              patch("app.routes.main.dashboard.list_data_quality_templates_for_entity", return_value=[]), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
@@ -255,7 +255,7 @@ class TestDashboardSingleEntity:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=True), \
              patch("app.routes.main.dashboard.list_data_quality_templates_for_entity", side_effect=Exception("DQ error")), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
@@ -286,7 +286,7 @@ class TestDashboardSessionEntity:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>ok</html>"):
@@ -323,7 +323,7 @@ class TestDashboardSessionEntity:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>ok</html>"):
@@ -364,7 +364,7 @@ class TestDashboardMultipleEntities:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>ok</html>") as mock_rt:
@@ -692,7 +692,7 @@ class TestDashboardActivityProcessing:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=activities), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=activities), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>ok</html>") as mock_rt:
@@ -747,7 +747,7 @@ class TestDashboardActivityProcessing:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.render_template", return_value="<html>ok</html>"):
@@ -779,7 +779,7 @@ class TestDashboardActivityProcessing:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.helpers.AssignmentEntityStatus.query") as mock_aes_query, \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
@@ -832,7 +832,7 @@ class TestDashboardAssignmentCategorization:
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
              patch("app.routes.main.dashboard.AssignmentEntityStatus.query") as mock_aes_q, \
-             patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
+             patch("app.services.notification.core.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \
              patch("app.routes.main.dashboard.AssignmentCompletionService.prefetch") as mock_prefetch, \
              patch("app.routes.main.dashboard.PublicSubmission.query") as mock_ps_q, \
@@ -963,7 +963,7 @@ class TestLoadMoreActivities:
         activity.summary_params = {"template": "T"}
         activity.assignment_id = None
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value="<li>activity</li>"):
@@ -988,7 +988,7 @@ class TestLoadMoreActivities:
         }
         activity.assignment_id = None
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value="<li>activity</li>"):
@@ -1010,7 +1010,7 @@ class TestLoadMoreActivities:
         }
         activity.assignment_id = None
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value="<li>activity</li>"):
@@ -1025,7 +1025,7 @@ class TestLoadMoreActivities:
         _grant_entity_permission(db_session, admin_user, "country", country.id)
         db_session.commit()
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", side_effect=Exception("crash")), \
+        with patch("app.services.notification.core.get_country_recent_activities", side_effect=Exception("crash")), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]):
             resp = logged_in_client.post(
@@ -1042,7 +1042,7 @@ class TestLoadMoreActivities:
         # Return exactly fetch_limit items so has_more = True
         activities = [MagicMock(summary_key=None, summary_params={}, assignment_id=None) for _ in range(11)]
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=activities), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=activities), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value=""):
@@ -1102,7 +1102,7 @@ class TestMarkNotificationsRead:
         assert resp.status_code == 400
 
     def test_success_marks_notifications(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.return_value = True
             resp = logged_in_client.post(
                 "/mark_notifications_read",
@@ -1110,10 +1110,10 @@ class TestMarkNotificationsRead:
             )
         assert resp.status_code == 200
         data = json.loads(resp.data)
-        assert data.get("status") == "ok"
+        assert data.get("success") is True
 
     def test_failure_returns_500(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.return_value = False
             resp = logged_in_client.post(
                 "/mark_notifications_read",
@@ -1122,7 +1122,7 @@ class TestMarkNotificationsRead:
         assert resp.status_code == 500
 
     def test_exception_returns_500(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.side_effect = Exception("mark failed")
             resp = logged_in_client.post(
                 "/mark_notifications_read",
@@ -1131,7 +1131,7 @@ class TestMarkNotificationsRead:
         assert resp.status_code == 500
 
     def test_string_notification_ids_parsed(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.return_value = True
             resp = logged_in_client.post(
                 "/mark_notifications_read",

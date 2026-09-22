@@ -422,30 +422,31 @@ def dashboard():
                      ).first()
 
                      if template_to_assign and selected_country in user_countries:
-                             assigned_form = AssignedForm(
-                                 template_id=template_to_assign.id,
-                                 period_name=SELF_REPORT_PERIOD_NAME,
-                                 assigned_at=utcnow() # Use current time for uniqueness
-                             )
-                             sync_assigned_form_reporting_period(assigned_form)
-                             db.session.add(assigned_form)
-                             db.session.flush() # Flush to get the assigned_form.id
-                             current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")
-
-                             # Create the new AssignmentEntityStatus entry
-                             new_acs = AssignmentEntityStatus(
-                                 assigned_form_id=assigned_form.id,
-                                 entity_type='country',
-                                 entity_id=selected_country.id,
-                                 status='pending', # Default status
-                                 due_date=None # No default due date for self-reported forms
-                             )
-                             db.session.add(new_acs)
-
-                             current_app.logger.debug(f"Country {selected_country.id} linked to AssignedForm {assigned_form.id} via AssignmentEntityStatus {new_acs.id}.")
-
-
+                             # Both flushes are inside the try: a failure on the
+                             # first one used to escape the route as a 500.
                              try:
+                                 assigned_form = AssignedForm(
+                                     template_id=template_to_assign.id,
+                                     period_name=SELF_REPORT_PERIOD_NAME,
+                                     assigned_at=utcnow() # Use current time for uniqueness
+                                 )
+                                 sync_assigned_form_reporting_period(assigned_form)
+                                 db.session.add(assigned_form)
+                                 db.session.flush() # Flush to get the assigned_form.id
+                                 current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")
+
+                                 # Create the new AssignmentEntityStatus entry
+                                 new_acs = AssignmentEntityStatus(
+                                     assigned_form_id=assigned_form.id,
+                                     entity_type='country',
+                                     entity_id=selected_country.id,
+                                     status='pending', # Default status
+                                     due_date=None # No default due date for self-reported forms
+                                 )
+                                 db.session.add(new_acs)
+
+                                 current_app.logger.debug(f"Country {selected_country.id} linked to AssignedForm {assigned_form.id} via AssignmentEntityStatus {new_acs.id}.")
+
                                  db.session.flush()
 
                                  # Send notification about self-report creation

@@ -169,10 +169,14 @@ class TestUnauthorizedHandler:
         assert data["success"] is False
         assert "Authentication required" in data.get("message", "") or "Unauthorized" in str(data)
 
-    def test_html_response(self, client):
+    def test_html_response_redirects_to_login(self, client):
+        """A browser hitting a 401 gets sent to the login form, keeping its
+        destination in `next`, rather than a dead-end error page."""
         resp = _html(client, 401)
-        assert resp.status_code == 401
-        assert b"401" in resp.data or b"Unauthorized" in resp.data
+        assert resp.status_code == 302
+        location = resp.headers.get("Location") or ""
+        assert "/login" in location
+        assert "test-error" in location
 
 
 # ===========================================================================

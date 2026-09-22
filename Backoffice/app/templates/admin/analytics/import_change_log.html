@@ -99,8 +99,16 @@
             <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ row.op or '—' }}</td>
             <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ row.iso3 or '—' }}{% if row.year %} {{ row.year }}{% endif %}</td>
             <td class="px-3 py-2 text-gray-800">{{ row.label or row.kpi or row.item_id or '—' }}</td>
-            <td class="px-3 py-2 text-gray-600 break-all max-w-xs">{{ row.old_value if row.old_value is not none else row.old_disagg if row.old_disagg is not none else '—' }}</td>
-            <td class="px-3 py-2 text-gray-900 break-all max-w-xs">{{ row.new_value if row.new_value is not none else row.new_disagg if row.new_disagg is not none else '—' }}</td>
+            <td class="px-3 py-2 text-gray-600 break-all max-w-xs">
+              {{ row.old_value if row.old_value is not none else row.old_disagg if row.old_disagg is not none else '—' }}
+              {% if row.old_data_not_available %}<div class="text-amber-800">{{ _('Data not available') }}</div>{% endif %}
+              {% if row.old_not_applicable %}<div class="text-amber-800">{{ _('Not applicable') }}</div>{% endif %}
+            </td>
+            <td class="px-3 py-2 text-gray-900 break-all max-w-xs">
+              {{ row.new_value if row.new_value is not none else row.new_disagg if row.new_disagg is not none else '—' }}
+              {% if row.new_data_not_available %}<div class="text-amber-800">{{ _('Data not available') }}</div>{% endif %}
+              {% if row.new_not_applicable %}<div class="text-amber-800">{{ _('Not applicable') }}</div>{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>

@@ -58,8 +58,51 @@ class TestIsNoopImportChange:
             "new_value": "2",
         })
 
-    def test_insert_is_never_noop(self):
-        assert not is_noop_import_change({"op": "insert", "new_value": None})
+    def test_insert_with_value_is_not_noop(self):
+        assert not is_noop_import_change({"op": "insert", "new_value": 5})
+
+    def test_blank_insert_is_noop(self):
+        assert is_noop_import_change({"op": "insert", "new_value": None, "new_disagg": None})
+
+    def test_data_not_available_insert_is_not_noop(self):
+        assert not is_noop_import_change({
+            "op": "insert",
+            "new_value": None,
+            "new_data_not_available": True,
+        })
+
+    def test_default_disability_marker_is_noop(self):
+        assert is_noop_import_change({
+            "op": "update",
+            "old_value": "5323433",
+            "new_value": "5323433",
+            "old_disagg": {"mode": "total", "values": {"direct": {}, "indirect": 1835569}},
+            "new_disagg": {
+                "mode": "total",
+                "values": {
+                    "direct": {},
+                    "indirect": 1835569,
+                    "disability": {"disaggregated_by_disability": False},
+                },
+            },
+        })
+
+    def test_real_disability_disaggregation_is_not_noop(self):
+        assert not is_noop_import_change({
+            "op": "update",
+            "old_value": "72306",
+            "new_value": "72306",
+            "old_disagg": None,
+            "new_disagg": {
+                "mode": "total",
+                "values": {
+                    "disability": {
+                        "disaggregated_by_disability": True,
+                        "washington_group_compliant": True,
+                    }
+                },
+            },
+        })
 
     def test_same_disagg_different_key_order_is_noop(self):
         assert is_noop_import_change({

@@ -578,6 +578,9 @@ def upsert_form_data_rows(
             # the DB write and the ORM attribute-history bookkeeping that would
             # otherwise mark every touched row "dirty" regardless of whether
             # SQLAlchemy ends up emitting a no-op UPDATE for it.
+            # submitted_at is not part of this check. FDRS stamps every row with
+            # the sync clock, so comparing it would rewrite every existing row
+            # and overwrite the previous submitted_at.
             unchanged = bool(existing) and (
                 existing.value == payload["value"]
                 and existing.disagg_data == disagg_new
@@ -586,7 +589,6 @@ def upsert_form_data_rows(
                 and bool(existing.not_applicable) == bool(payload["not_applicable"])
                 and existing.prefilled_value == prefilled_for_db
                 and existing.imputed_value == imputed_for_db
-                and (new_submitted_at is None or existing.submitted_at == new_submitted_at)
             )
 
             if change_recorder and not unchanged:
@@ -602,6 +604,10 @@ def upsert_form_data_rows(
                         "old_disagg": getattr(existing, "disagg_data", None) if existing else None,
                         "new_value": payload.get("value"),
                         "new_disagg": payload.get("disagg_data"),
+                        "old_data_not_available": bool(existing.data_not_available) if existing else False,
+                        "new_data_not_available": bool(payload["data_not_available"]),
+                        "old_not_applicable": bool(existing.not_applicable) if existing else False,
+                        "new_not_applicable": bool(payload["not_applicable"]),
                     })
                 except Exception:
                     logger.debug("import change recorder failed", exc_info=True)

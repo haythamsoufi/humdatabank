@@ -326,13 +326,29 @@ class IndicatorProcessorMixin:
         return {'name': name, 'code': code}
 
     @classmethod
+    def _usable_emergency_operation_metadata(cls, display_value, metadata=None):
+        """Prefer parsed Name (CODE) text over an Other-sentinel hidden payload."""
+        parsed = cls._parse_emergency_metadata_from_display(display_value)
+        if not metadata:
+            return parsed
+        name = str(metadata.get('name') or '').strip()
+        code = str(metadata.get('code') or '').strip()
+        if name in {'', '__other__'} or name.lower().startswith('other (please specify)'):
+            if parsed:
+                if not parsed.get('code') and code:
+                    parsed = {**parsed, 'code': code}
+                return parsed
+            return {'name': name, 'code': code} if (name and name != '__other__') or code else None
+        return {'name': name, 'code': code}
+
+    @classmethod
     def _apply_emergency_operation_disagg(cls, entry, display_value, metadata=None):
         """Persist emergency operation name/code alongside the selected display value."""
         text = str(display_value or '').strip()
         if not text:
             return
 
-        meta = metadata or cls._parse_emergency_metadata_from_display(text)
+        meta = cls._usable_emergency_operation_metadata(text, metadata)
         if not meta:
             return
 

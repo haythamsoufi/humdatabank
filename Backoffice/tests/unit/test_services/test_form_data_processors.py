@@ -1,6 +1,7 @@
 """Unit tests for form data processor mixins split from data_service."""
 import base64
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -222,6 +223,37 @@ class TestRepeatGroupProcessorMixin:
         assert FormDataService._format_repeat_entry_label_text(wrapped) == raw
         assert FormDataService._format_repeat_entry_label_text([wrapped]) == raw
         assert FormDataService._format_repeat_entry_label_text("b64:not-valid!!!") == "b64:not-valid!!!"
+
+    def test_repeat_instance_label_uses_other_text(self):
+        from app.services.forms.data_service import FormDataService
+
+        section = SimpleNamespace(entry_label_item_id=12)
+        fields = [SimpleNamespace(id=12)]
+        label = FormDataService._compute_repeat_instance_label(
+            section,
+            {
+                "field_0": "__other__",
+                "field_0_other_text": "Bangladesh Population Movement (MDRBD018)",
+            },
+            fields,
+            1,
+        )
+        assert label == "Bangladesh Population Movement (MDRBD018)"
+
+    def test_repeat_instance_label_uses_b64_other_text(self):
+        from app.services.forms.data_service import FormDataService
+
+        raw = "Bangladesh Population Movement (MDRBD018)"
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        section = SimpleNamespace(entry_label_item_id=12)
+        fields = [SimpleNamespace(id=12)]
+        label = FormDataService._compute_repeat_instance_label(
+            section,
+            {"field_0": "__other__", "field_0_other_text": wrapped},
+            fields,
+            1,
+        )
+        assert label == raw
 
     def test_find_field_value_skips_availability_flags(self):
         from app.services.forms.data_service import FormDataService

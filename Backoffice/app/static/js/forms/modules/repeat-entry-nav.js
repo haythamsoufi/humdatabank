@@ -68,11 +68,22 @@ function defaultRepeatEntryLabel(repeatEntry) {
     return (window.REPEAT_SECTION_LABELS?.entry || 'Entry') + ' #' + instanceNumber;
 }
 
+function titleOtherText(repeatEntry, titleSelect) {
+    const wrap = titleSelect.closest('.repeat-entry__title-select-wrap') || repeatEntry;
+    const otherInput = wrap.querySelector('.other-text-input')
+        || repeatEntry.querySelector('.other-text-input');
+    return (otherInput?.value || '').trim();
+}
+
 function getRepeatEntryLabelText(repeatEntry) {
     const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
     if (titleSelect) {
         // The title <select> lives inside .repeat-entry__label, so label textContent
         // concatenates every <option>. Only the selected choice is the nav title.
+        if (titleSelect.value === '__other__') {
+            const typed = titleOtherText(repeatEntry, titleSelect);
+            if (typed) return typed;
+        }
         if (titleSelect.value) {
             const selected = titleSelect.options[titleSelect.selectedIndex];
             const selectedText = selected ? selected.text.trim() : '';

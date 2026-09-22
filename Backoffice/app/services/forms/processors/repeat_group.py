@@ -58,6 +58,31 @@ class RepeatGroupProcessorMixin:
         return text[:255]
 
     @classmethod
+    def _is_other_sentinel(cls, raw) -> bool:
+        if raw in (None, ''):
+            return False
+        return cls._decode_repeat_label_fragment(raw).strip() == '__other__'
+
+    @classmethod
+    def _repeat_label_raw_value(cls, instance_data, field_index):
+        """Title dropdown value, or the Other (please specify) companion text."""
+        raw = instance_data.get(f'field_{field_index}')
+        if cls._is_other_sentinel(raw) or raw in (None, ''):
+            other = instance_data.get(f'field_{field_index}_other_text')
+            if other not in (None, ''):
+                return other
+        if raw not in (None, '') and not cls._is_other_sentinel(raw):
+            return raw
+        for key, value in instance_data.items():
+            if value in (None, '') or cls._is_other_sentinel(value):
+                continue
+            if key.endswith(('_emergency_metadata', '_data_not_available', '_not_applicable')):
+                continue
+            if key == f'field_{field_index}' or key.startswith(f'field_{field_index}_'):
+                return value
+        return None
+
+    @classmethod
     def _compute_repeat_instance_label(cls, section, instance_data, all_fields, instance_number):
         item_id = section.entry_label_item_id
         if not item_id:
@@ -65,13 +90,9 @@ class RepeatGroupProcessorMixin:
         for field_index, field in enumerate(all_fields):
             if getattr(field, 'id', None) != item_id:
                 continue
-            raw = instance_data.get(f'field_{field_index}')
-            if raw in (None, ''):
-                for key, value in instance_data.items():
-                    if key == f'field_{field_index}' or key.startswith(f'field_{field_index}_'):
-                        raw = value
-                        break
-            return cls._format_repeat_entry_label_text(raw)
+            return cls._format_repeat_entry_label_text(
+                cls._repeat_label_raw_value(instance_data, field_index)
+            )
         return None
 
     @classmethod

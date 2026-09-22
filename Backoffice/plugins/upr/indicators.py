@@ -139,6 +139,73 @@ def _yes_no(entry) -> bool | None:
     return bool(number)
 
 
+_OTHER_APPEAL_SENTINELS = frozenset({"__other__", "other (please specify)...", "other"})
+
+
+def _instance_data_entries(inst) -> list[Any]:
+    entries = getattr(inst, "data_entries", None)
+    if entries is None:
+        return []
+    if hasattr(entries, "all"):
+        try:
+            return list(entries.all())
+        except Exception:
+            return []
+    if isinstance(entries, (list, tuple)):
+        return list(entries)
+    return []
+
+
+def _is_other_appeal_text(text: str) -> bool:
+    return (text or "").strip().lower() in _OTHER_APPEAL_SENTINELS
+
+
+def _appeal_text_from_entry(entry) -> str:
+    item = getattr(entry, "form_item", None)
+    lookup = str(getattr(item, "lookup_list_id", "") or "") if item is not None else ""
+    is_eo = lookup == "emergency_operations" or getattr(entry, "disagg_type", None) == "emergency_operation"
+    if not is_eo:
+        return ""
+    texts: list[str] = []
+    display = _decode_waf_b64_label(str(getattr(entry, "value", None) or ""))
+    if display and not _is_other_appeal_text(display):
+        texts.append(display)
+    meta = getattr(entry, "disagg_data", None)
+    if isinstance(meta, dict):
+        name = _decode_waf_b64_label(str(meta.get("name") or ""))
+        code = str(meta.get("code") or "").strip()
+        if _is_other_appeal_text(name):
+            name = ""
+        if name and code:
+            texts.append(f"{name} ({code})")
+        elif name:
+            texts.append(name)
+        elif code:
+            texts.append(code)
+    for text in texts:
+        _name, code = _split_appeal_label(text)
+        if code:
+            return text
+    return texts[0] if texts else ""
+
+
+def _appeal_label_from_instance(inst) -> str:
+    """Prefer the stored emergency-operations choice (Other text + MDR code)."""
+    candidates: list[str] = []
+    for entry in _instance_data_entries(inst):
+        text = _appeal_text_from_entry(entry)
+        if text and not _is_other_appeal_text(text):
+            candidates.append(text)
+    label = _decode_waf_b64_label(inst.instance_label or "")
+    if label and not _is_other_appeal_text(label):
+        candidates.append(label)
+    for text in candidates:
+        _name, code = _split_appeal_label(text)
+        if code:
+            return text
+    return candidates[0] if candidates else label
+
+
 def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, Any]]:
     repeat_sections = [
         item.form_section
@@ -169,7 +236,7 @@ def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, An
     emergencies = []
     for inst in instances:
         slot = int(inst.instance_number)
-        label = _decode_waf_b64_label(inst.instance_label or "")
+        label = _appeal_label_from_instance(inst)
         name, code = _split_appeal_label(label)
         people = None
         indicators = []

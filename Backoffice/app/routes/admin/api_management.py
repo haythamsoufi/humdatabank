@@ -23,6 +23,45 @@ from app.services.forms.reporting_period_service import period_chronology_sort_k
 from sqlalchemy.orm import joinedload
 
 
+_URL_BUILDER_METHOD_RANK = {
+    'GET': 0,
+    'POST': 1,
+    'PUT': 2,
+    'PATCH': 3,
+    'DELETE': 4,
+}
+
+
+def _url_builder_endpoint_sort_key(endpoint: dict):
+    """Path, then HTTP method, so list routes sit above their detail routes."""
+    method = str(endpoint.get('method') or '')
+    primary = method.split('/')[0].strip().upper()
+    return (
+        str(endpoint.get('path') or '').casefold(),
+        _URL_BUILDER_METHOD_RANK.get(primary, 50),
+        method.casefold(),
+    )
+
+
+def _url_builder_endpoint_groups(endpoints: list[dict]) -> list[dict]:
+    """Keep registry group order; sort paths alphabetically inside each group."""
+    order = []
+    grouped: dict[str, list] = {}
+    for ep in endpoints or []:
+        name = (ep.get('group') or 'Other').strip() or 'Other'
+        if name not in grouped:
+            order.append(name)
+            grouped[name] = []
+        grouped[name].append(ep)
+    return [
+        {
+            'name': name,
+            'endpoints': sorted(grouped[name], key=_url_builder_endpoint_sort_key),
+        }
+        for name in order
+    ]
+
+
 def _assignment_label_for_url_builder(assignment: AssignedForm) -> str:
     """Label for URL-builder assignment dropdown (custom name, else template – period)."""
     template_name = (
@@ -1050,6 +1089,7 @@ def api_management():
         {**ep, 'method': '/'.join(ep['methods'])}
         for ep in all_endpoints if ep['surface'] == 'v1'
     ]
+    url_builder_endpoint_groups = _url_builder_endpoint_groups(v1_endpoints)
 
     # ── Legacy `api_endpoints` list kept for the chart / URL-builder selectors ─
     # Featured (endorsed) endpoints stay pinned at the top; then busiest first.
@@ -1110,6 +1150,7 @@ def api_management():
         surface_summary=surface_summary,
         # Backward-compat for URL builder + chart selector
         endpoints=api_endpoints,
+        url_builder_endpoint_groups=url_builder_endpoint_groups,
         # Overview stats (v1 / APIUsage)
         total_requests=total_requests,
         avg_response_time=avg_response_time,

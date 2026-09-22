@@ -40,7 +40,7 @@ from app.utils.api_serialization import (
     format_country_info,
     format_form_item_info,
     format_national_society_info,
-    format_dim_submission_assigned,
+    format_assignment_statuses,
     build_star_schema_tables,
     build_matrix_cells_from_data_rows,
     enrich_matrix_cells,
@@ -225,13 +225,16 @@ _DATA_ARRAY_CATALOG = {
         'description': (
             'Workflow status rows for assigned submissions (AssignmentEntityStatus), '
             'including pending assignments that have no FormData yet. '
+            'last_modified_at is the latest of the workflow timestamps (status, '
+            'submission, review, publication) and the newest saved answer '
+            '(static, dynamic, repeat, or page status). '
             'Join via submission_id on data[] / dynamic_data[] / repeat_data[] when '
             'submission_type is assigned. Equivalent to dim_submission (assigned) in layout=star.'
         ),
         'grain': 'assignment_entity_status',
         'key_fields': [
             'id', 'type', 'status', 'entity_type', 'entity_id',
-            'submitted_at', 'due_date', 'assigned_form_id',
+            'submitted_at', 'due_date', 'assigned_form_id', 'last_modified_at',
         ],
     },
 }
@@ -401,11 +404,7 @@ def _load_assignment_statuses_table(aes_ids) -> list:
         AssignmentEntityStatus.id,
         list(aes_ids),
     )
-    table = [
-        format_dim_submission_assigned(aes)
-        for aes in aes_rows
-        if aes
-    ]
+    table = format_assignment_statuses(aes_rows)
     table.sort(key=lambda row: row.get('id') or 0)
     return table
 

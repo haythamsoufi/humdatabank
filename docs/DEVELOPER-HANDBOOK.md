@@ -932,7 +932,7 @@ Unified submission data endpoint. Returns fact arrays plus dimension tables in o
 | `form_items[]` | Form items referenced by facts (`related=page` or `all`). `[assignment_year]` placeholders in labels/matrix column names are substituted when the request is scoped to a single assignment. |
 | `countries[]` / `national_societies[]` / `indicator_bank[]` | Full dimension tables (~860 rows combined). Included by default for authenticated callers, omitted by default for public callers — see `include_dimensions`. |
 | `matrix_cells[]` | Normalized matrix cells; matrix-specific fields grouped under `matrix` (`row`, `column`, `entity`). Includes calculated row/column/grand totals flagged via top-level `is_calculated_total`/`total_kind` (`row`\|`column`\|`grand`) — check before summing `value`, or pass `include_calculated_totals=false` to omit them. Some matrix items are configured (Form Builder → matrix item → Display → "Include Calculated Totals in API") to never emit `is_calculated_total` rows regardless of this flag — see `include_calculated_totals` below. |
-| `assignment_statuses[]` | AssignmentEntityStatus rows for assigned `submission_id`s (workflow status / due date); join when `submission_type` is `assigned` |
+| `assignment_statuses[]` | AssignmentEntityStatus rows for assigned `submission_id`s (workflow status, due date, `last_modified_at`); join when `submission_type` is `assigned` |
 | `arrays` | Catalog describing each top-level array (included/excluded, grain, key fields) |
 
 **Legacy:** `GET /api/v1/data/tables` returns HTTP 308 redirect to `/api/v1/data` (same query string).

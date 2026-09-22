@@ -220,6 +220,30 @@ class TestApiManagementHelpers:
             "label": "FDRS \u2013 2024",
         }]
 
+    def test_url_builder_endpoint_groups_keep_registry_order_and_sort_paths(self):
+        from app.routes.admin.api_management import _url_builder_endpoint_groups
+        groups = _url_builder_endpoint_groups([
+            {'group': 'Form Data', 'path': '/api/v1/data/tables', 'method': 'GET'},
+            {'group': 'Submissions', 'path': '/api/v1/submissions/<submission_id>', 'method': 'GET'},
+            {'group': 'Form Data', 'path': '/api/v1/countries/<country_id>/data', 'method': 'POST'},
+            {'group': 'Form Data', 'path': '/api/v1/data', 'method': 'GET'},
+            {'group': 'Submissions', 'path': '/api/v1/submissions', 'method': 'GET'},
+            {'group': 'Form Data', 'path': '/api/v1/countries/<country_id>/data', 'method': 'GET'},
+            {'group': '', 'path': '/api/v1/other', 'method': 'DELETE'},
+        ])
+        assert [g['name'] for g in groups] == ['Form Data', 'Submissions', 'Other']
+        assert [e['path'] for e in groups[0]['endpoints']] == [
+            '/api/v1/countries/<country_id>/data',
+            '/api/v1/countries/<country_id>/data',
+            '/api/v1/data',
+            '/api/v1/data/tables',
+        ]
+        assert [e['method'] for e in groups[0]['endpoints'][:2]] == ['GET', 'POST']
+        assert [e['path'] for e in groups[1]['endpoints']] == [
+            '/api/v1/submissions',
+            '/api/v1/submissions/<submission_id>',
+        ]
+
     def test_normalize_path_strips_type_annotations(self):
         from app.routes.admin.api_management import _normalize_path
         assert _normalize_path("/api/v1/items/<int:item_id>") == "/api/v1/items/<item_id>"

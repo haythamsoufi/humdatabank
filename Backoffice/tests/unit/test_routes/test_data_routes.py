@@ -938,4 +938,5 @@ class TestDataHelpers:
         catalog = _build_data_array_catalog(include_dynamic=True, include_repeat=False)
         assert catalog['assignment_statuses']['included'] is True
         assert 'status' in catalog['assignment_statuses']['key_fields']
+        assert 'last_modified_at' in catalog['assignment_statuses']['key_fields']
         assert 'pending' in catalog['assignment_statuses']['description'].lower()

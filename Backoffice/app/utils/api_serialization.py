@@ -5,7 +5,7 @@ Extracted from routes/api.py for better organization and reusability.
 """
 
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Optional
 
 from app.services.forms.reporting_period_service import period_chronology_sort_key
@@ -13,11 +13,15 @@ from app.services.forms.reporting_period_service import period_chronology_sort_k
 from app.utils.form_localization import get_localized_indicator_name, get_localized_validation_message
 from app.utils.api_formatting import format_answer_value
 from app.utils.api_helpers import extract_numeric_value
+from app.utils.api_pagination import SQL_IN_BATCH_SIZE
 from app.utils.api_percentage import apply_api_percentage_scale
 from flask import current_app
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload as _joinedload_impl
+from app import db
 from app.models import FormTemplate, AssignedForm
-from app.models.assignments import AssignmentEntityStatus, PublicSubmission
+from app.models.assignments import AssignmentEntityStatus, AssignmentPageStatus, PublicSubmission
+from app.models.forms import DynamicIndicatorData, FormData, RepeatGroupData, RepeatGroupInstance
 from app.models.organization import resolve_ns_status
 
 logger = logging.getLogger(__name__)
@@ -1939,11 +1943,122 @@ def format_dim_period(assigned_form):
     }
 
 
-def format_dim_submission_assigned(aes):
+def _later_timestamp(current, candidate):
+    """Return the later of two timestamps, ignoring values that are not datetimes."""
+    if not isinstance(candidate, datetime):
+        return current
+    if current is None:
+        return candidate
+    try:
+        candidate_is_later = candidate > current
+    except TypeError:
+        # Workflow stamps may be timezone-aware while saved-answer stamps read
+        # back from the database are naive. Both represent UTC.
+        candidate_is_later = (
+            candidate.replace(tzinfo=None) > current.replace(tzinfo=None)
+        )
+    return candidate if candidate_is_later else current
+
+
+def _workflow_last_modified(aes):
+    """Latest workflow timestamp stored on the assignment itself."""
+    latest = None
+    for attr in ('status_timestamp', 'submitted_at', 'sent_for_review_at', 'published_at'):
+        latest = _later_timestamp(latest, getattr(aes, attr, None))
+    return latest
+
+
+def assignment_data_last_modified_map(aes_ids) -> dict:
+    """
+    Latest saved-answer or page-workflow timestamp per AssignmentEntityStatus id.
+
+    Covers static form data, dynamic indicators, repeat-group fields, and
+    per-page status changes that do not rewrite the assignment row.
+    """
+    ids = []
+    for aes_id in aes_ids or []:
+        try:
+            ids.append(int(aes_id))
+        except (TypeError, ValueError):
+            continue
+    if not ids:
+        return {}
+
+    latest = {}
+
+    def _absorb(rows, *ts_indexes):
+        for row in rows:
+            aes_id = row[0]
+            if aes_id is None:
+                continue
+            key = int(aes_id)
+            stamp = latest.get(key)
+            for index in ts_indexes:
+                stamp = _later_timestamp(stamp, row[index])
+            if stamp is not None:
+                latest[key] = stamp
+
+    for offset in range(0, len(ids), SQL_IN_BATCH_SIZE):
+        batch = ids[offset:offset + SQL_IN_BATCH_SIZE]
+        _absorb(
+            db.session.query(
+                FormData.assignment_entity_status_id,
+                func.max(FormData.submitted_at),
+            )
+            .filter(FormData.assignment_entity_status_id.in_(batch))
+            .group_by(FormData.assignment_entity_status_id)
+            .all(),
+            1,
+        )
+        _absorb(
+            db.session.query(
+                DynamicIndicatorData.assignment_entity_status_id,
+                func.max(DynamicIndicatorData.submitted_at),
+            )
+            .filter(DynamicIndicatorData.assignment_entity_status_id.in_(batch))
+            .group_by(DynamicIndicatorData.assignment_entity_status_id)
+            .all(),
+            1,
+        )
+        _absorb(
+            db.session.query(
+                RepeatGroupInstance.assignment_entity_status_id,
+                func.max(RepeatGroupData.submitted_at),
+            )
+            .join(
+                RepeatGroupData,
+                RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id,
+            )
+            .filter(RepeatGroupInstance.assignment_entity_status_id.in_(batch))
+            .group_by(RepeatGroupInstance.assignment_entity_status_id)
+            .all(),
+            1,
+        )
+        _absorb(
+            db.session.query(
+                AssignmentPageStatus.assignment_entity_status_id,
+                func.max(AssignmentPageStatus.status_timestamp),
+                func.max(AssignmentPageStatus.submitted_at),
+            )
+            .filter(AssignmentPageStatus.assignment_entity_status_id.in_(batch))
+            .group_by(AssignmentPageStatus.assignment_entity_status_id)
+            .all(),
+            1,
+            2,
+        )
+    return latest
+
+
+def format_dim_submission_assigned(aes, last_modified_at=None):
     """Dimension row for assigned submissions (AssignmentEntityStatus)."""
     if not aes:
         return None
     status_val = aes.status.value if hasattr(aes.status, 'value') else aes.status
+    modified = (
+        last_modified_at
+        if isinstance(last_modified_at, datetime)
+        else _workflow_last_modified(aes)
+    )
     return {
         'id': aes.id,
         'type': 'assigned',
@@ -1953,7 +2068,30 @@ def format_dim_submission_assigned(aes):
         'submitted_at': aes.submitted_at.isoformat() if aes.submitted_at else None,
         'due_date': aes.due_date.isoformat() if aes.due_date else None,
         'assigned_form_id': aes.assigned_form_id,
+        'last_modified_at': modified.isoformat() if isinstance(modified, datetime) else None,
     }
+
+
+def format_assignment_statuses(aes_rows):
+    """Serialize assignment rows, including the latest data or workflow change."""
+    rows = [aes for aes in (aes_rows or []) if aes]
+    if not rows:
+        return []
+    data_latest = assignment_data_last_modified_map(aes.id for aes in rows)
+    formatted = []
+    for aes in rows:
+        try:
+            aes_key = int(aes.id)
+        except (TypeError, ValueError):
+            aes_key = None
+        latest = _later_timestamp(
+            _workflow_last_modified(aes),
+            data_latest.get(aes_key) if aes_key is not None else None,
+        )
+        row = format_dim_submission_assigned(aes, last_modified_at=latest)
+        if row:
+            formatted.append(row)
+    return formatted
 
 
 def format_dim_submission_public(public_submission):
@@ -2292,9 +2430,7 @@ def build_star_schema_tables(
             aes_rows = AssignmentEntityStatus.query.filter(
                 AssignmentEntityStatus.id.in_(assigned_submission_ids)
             ).all()
-            dim_submission.extend(
-                format_dim_submission_assigned(aes) for aes in aes_rows if aes
-            )
+            dim_submission.extend(format_assignment_statuses(aes_rows))
     if public_submission_ids:
         ps_rows = PublicSubmission.query.filter(
             PublicSubmission.id.in_(public_submission_ids)

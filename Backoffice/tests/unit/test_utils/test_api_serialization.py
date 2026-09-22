@@ -6,6 +6,7 @@ format_indicator_details, serialize_assigned_data_item, serialize_public_data_it
 serialize_dynamic_data_item, serialize_repeat_data_item, serialize_dynamic_section_context,
 resolve_dynamic_repeat_instance_id,
 format_dim_template, format_dim_period, format_dim_submission_assigned,
+format_assignment_statuses,
 format_dim_submission_public, format_fact_form_value_row, format_bridge_disagg_rows,
 build_bridge_disagg_from_flat_rows, build_star_schema_tables.
 """
@@ -28,6 +29,7 @@ from app.utils.api_serialization import (
     format_dim_template,
     format_dim_period,
     format_dim_submission_assigned,
+    format_assignment_statuses,
     format_dim_submission_public,
     format_fact_form_value_row,
     format_bridge_disagg_rows,
@@ -983,11 +985,15 @@ class TestFormatDimSubmissionAssigned:
         aes.submitted_at = datetime(2024, 1, 10)
         aes.due_date = datetime(2024, 2, 1)
         aes.assigned_form_id = 99
+        aes.status_timestamp = datetime(2024, 1, 12)
+        aes.sent_for_review_at = None
+        aes.published_at = None
         result = format_dim_submission_assigned(aes)
         assert result['id'] == 1
         assert result['type'] == 'assigned'
         assert result['status'] == 'submitted'
         assert result['submitted_at'] == '2024-01-10T00:00:00'
+        assert result['last_modified_at'] == '2024-01-12T00:00:00'
 
     def test_with_string_status(self):
         aes = MagicMock()
@@ -1013,6 +1019,62 @@ class TestFormatDimSubmissionAssigned:
         result = format_dim_submission_assigned(aes)
         assert result['submitted_at'] is None
         assert result['due_date'] is None
+        assert result['last_modified_at'] is None
+
+    def test_explicit_last_modified_overrides_workflow_timestamps(self):
+        aes = MagicMock()
+        aes.id = 4
+        aes.status = 'in_progress'
+        aes.entity_type = 'country'
+        aes.entity_id = 1
+        aes.submitted_at = datetime(2024, 1, 1)
+        aes.due_date = None
+        aes.assigned_form_id = 8
+        aes.status_timestamp = datetime(2024, 1, 2)
+        aes.sent_for_review_at = None
+        aes.published_at = None
+        result = format_dim_submission_assigned(
+            aes, last_modified_at=datetime(2024, 3, 1),
+        )
+        assert result['last_modified_at'] == '2024-03-01T00:00:00'
+
+    def test_format_assignment_statuses_uses_latest_data_write(self):
+        aes = MagicMock()
+        aes.id = 4
+        aes.status = 'in_progress'
+        aes.entity_type = 'country'
+        aes.entity_id = 1
+        aes.submitted_at = None
+        aes.due_date = None
+        aes.assigned_form_id = 8
+        aes.status_timestamp = datetime(2024, 1, 2)
+        aes.sent_for_review_at = None
+        aes.published_at = None
+        with patch(
+            'app.utils.api_serialization.assignment_data_last_modified_map',
+            return_value={4: datetime(2024, 3, 1)},
+        ):
+            rows = format_assignment_statuses([aes])
+        assert rows[0]['last_modified_at'] == '2024-03-01T00:00:00'
+
+    def test_format_assignment_statuses_keeps_later_workflow_timestamp(self):
+        aes = MagicMock()
+        aes.id = 5
+        aes.status = 'approved'
+        aes.entity_type = 'country'
+        aes.entity_id = 2
+        aes.submitted_at = datetime(2024, 1, 1)
+        aes.due_date = None
+        aes.assigned_form_id = 9
+        aes.status_timestamp = datetime(2024, 4, 1)
+        aes.sent_for_review_at = None
+        aes.published_at = None
+        with patch(
+            'app.utils.api_serialization.assignment_data_last_modified_map',
+            return_value={5: datetime(2024, 2, 1)},
+        ):
+            rows = format_assignment_statuses([aes])
+        assert rows[0]['last_modified_at'] == '2024-04-01T00:00:00'
 
 
 # ---------------------------------------------------------------------------

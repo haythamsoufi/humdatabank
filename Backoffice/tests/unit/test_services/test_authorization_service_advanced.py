@@ -331,6 +331,17 @@ class TestAssignmentNeedsReopen:
 # ---------------------------------------------------------------------------
 
 class TestCanEditAssignment:
+    def test_admin_can_edit_submitted_without_reopen(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session, can_manage_assignments=False)
+            aes = create_test_assignment_entity_status(
+                db_session, status=AssignmentEntityStatusValue.submitted.value
+            )
+            with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
+                 patch.object(AuthorizationService, '_assignment_is_effectively_closed', return_value=False):
+                result = AuthorizationService.can_edit_assignment(aes, admin)
+        assert result is True
+
     def test_submitted_status_is_locked(self, db_session, app):
         with app.app_context():
             user, country, aes = create_focal_point_with_country(db_session)

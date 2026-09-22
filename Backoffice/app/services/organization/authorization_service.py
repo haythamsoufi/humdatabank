@@ -955,8 +955,13 @@ class AuthorizationService:
         if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
             return AuthorizationService.can_manage_closed_assignment(user)
 
-        # System managers can edit any assignment
+        # System managers can edit any open assignment, including after submit.
         if AuthorizationService.is_system_manager(user):
+            return True
+
+        # Admins can change submitted, validated, and cancelled assignments
+        # without reopening them. Focal points and approvers stay locked.
+        if AuthorizationService.is_admin(user):
             return True
 
         # RBAC gate: require assignment.enter

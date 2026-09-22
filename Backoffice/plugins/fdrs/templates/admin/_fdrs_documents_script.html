@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const stopBtn = document.getElementById('fdrs-docs-stop-btn');
     const stopBtnText = document.getElementById('fdrs-docs-stop-btn-text');
     const runAgainBtn = document.getElementById('fdrs-docs-run-again-btn');
-    const downloadBtn = document.getElementById('fdrs-docs-download-btn');
+    const downloadBtn = document.getElementById('fdrs-docs-last-run-download');
     const progress = document.getElementById('fdrs-docs-progress');
     const progressStage = document.getElementById('fdrs-docs-progress-stage');
     const progressBar = document.getElementById('fdrs-docs-progress-bar');
@@ -107,7 +107,18 @@ document.addEventListener('DOMContentLoaded', function () {
         return msg;
     }
 
-    function setUIMode(mode) {
+    function setDocsRunDetailsOpen(open) {
+        const el = document.getElementById('fdrs-docs-run-details');
+        if (el) el.open = !!open;
+    }
+
+    function setDocsEmptyVisible(visible) {
+        const empty = document.getElementById('fdrs-docs-empty');
+        if (empty) empty.classList.toggle('hidden', !visible);
+    }
+
+    function setUIMode(mode, opts) {
+        opts = opts || {};
         const isSettings = mode === 'settings';
         const isRunning = mode === 'running';
         const isDone = mode === 'done';
@@ -115,6 +126,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (footerSettings) footerSettings.classList.toggle('hidden', !isSettings);
         if (footerRunning) footerRunning.classList.toggle('hidden', !isRunning);
         if (footerDone) footerDone.classList.toggle('hidden', !isDone);
+        if (isSettings || isRunning || opts.keepDetailsOpen) {
+            setDocsRunDetailsOpen(true);
+        } else if (isDone) {
+            setDocsRunDetailsOpen(false);
+        }
     }
 
     function resetRunButton() {
@@ -167,18 +183,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (dateEl && meta.completed_at) {
             dateEl.textContent = ' · ' + formatLastRunDate(meta.completed_at);
         }
-        const statsEl = document.getElementById('fdrs-docs-last-run-stats');
-        if (statsEl && meta.stats) {
-            statsEl.textContent = formatDocsStats(meta.stats);
-        }
-        const dl = document.getElementById('fdrs-docs-last-run-download');
-        if (dl) {
-            dl.classList.remove('hidden');
-            dl.setAttribute('href', URLS.download);
-        }
         if (downloadBtn) {
             downloadBtn.classList.remove('hidden');
-            downloadBtn.setAttribute('href', URLS.download);
+            if (isSafeHref(URLS.download)) downloadBtn.setAttribute('href', URLS.download);
         }
     }
 
@@ -327,6 +334,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const wrap = document.getElementById('fdrs-docs-table-wrap');
         if (!wrap) return;
         wrap.classList.remove('hidden');
+        setDocsEmptyVisible(false);
         showDocsGridError('');
         renderStatsCards(data.stats);
         setActiveSheet(data.sheet || tableState.sheet);
@@ -348,6 +356,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(function (err) {
                 const wrap = document.getElementById('fdrs-docs-table-wrap');
                 if (wrap) wrap.classList.remove('hidden');
+                setDocsEmptyVisible(false);
                 showDocsGridError(err.message || {{ _("Failed to load document table")|tojson|safe }});
             });
     }
@@ -411,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         ? {{ _("Document scan cancelled.")|tojson|safe }}
                         : {{ _("Document scan failed")|tojson|safe }});
                     resultText.className = job.status === 'cancelled' ? 'text-sm text-amber-700' : 'text-sm text-red-700';
-                    setUIMode('done');
+                    setUIMode('done', { keepDetailsOpen: true });
                     return;
                 }
                 if (job.status === 'cancel_requested') {
@@ -427,17 +436,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 result.classList.remove('hidden');
                 resultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
                 resultText.className = 'text-sm text-red-700';
-                setUIMode('done');
+                setUIMode('done', { keepDetailsOpen: true });
             });
     }
 
+    function returnToSettings() {
+        result.classList.add('hidden');
+        if (progress) progress.classList.add('hidden');
+        resetRunButton();
+        resetStopButton();
+        setUIMode('settings');
+    }
     if (runAgainBtn) {
-        runAgainBtn.addEventListener('click', function () {
-            result.classList.add('hidden');
-            if (progress) progress.classList.add('hidden');
-            resetRunButton();
-            resetStopButton();
-            setUIMode('settings');
+        runAgainBtn.addEventListener('click', returnToSettings);
+    }
+    const headerScanAgain = document.getElementById('fdrs-docs-header-scan-again');
+    if (headerScanAgain) {
+        headerScanAgain.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            returnToSettings();
+        });
+    }
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
         });
     }
     if (stopBtn) {
@@ -460,6 +483,7 @@ document.addEventListener('DOMContentLoaded', function () {
             result.classList.add('hidden');
             const tableWrap = document.getElementById('fdrs-docs-table-wrap');
             if (tableWrap) tableWrap.classList.add('hidden');
+            setDocsEmptyVisible(false);
             setUIMode('running');
             if (progress) progress.classList.remove('hidden');
             setProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
@@ -489,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 result.classList.remove('hidden');
                 resultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
                 resultText.className = 'text-sm text-red-700';
-                setUIMode('done');
+                setUIMode('done', { keepDetailsOpen: true });
             });
         });
     }
@@ -517,6 +541,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (window.AdminUnderlineTabs) {
             window.AdminUnderlineTabs.activateStripTab('#data-sync-tabs', 'documents', { panelSelector: '.data-panel' });
         }
+        setDocsEmptyVisible(false);
         setUIMode('running');
         if (progress) progress.classList.remove('hidden');
         setProgress(0, 'resuming', {{ _("Resuming scan...")|tojson|safe }}, 0, null, { resetProgress: true });
@@ -529,8 +554,12 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(URLS.latest, { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
-                if (!data || data.success === false || !data.exists) return;
+                if (!data || data.success === false || !data.exists) {
+                    setDocsEmptyVisible(true);
+                    return;
+                }
                 renderLastRun(data);
+                setDocsEmptyVisible(false);
                 fetchResultsPage();
             })
             .catch(function () { /* keep page usable */ });

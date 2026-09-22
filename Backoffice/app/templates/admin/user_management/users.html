@@ -320,6 +320,8 @@
             "role_tooltip": {{ role_tooltip_text|tojson }},
             "active": {{ user.active|tojson }},
             "date_joined": {{ (user.created_at.isoformat() if user.created_at else '')|tojson }},
+            {% set last_login_at = last_login_by_user_id.get(user.id) if last_login_by_user_id is defined else none %}
+            "last_login": {{ (last_login_at.isoformat() if last_login_at else '')|tojson }},
             "profile_color": {{ (user.profile_color if user.profile_color and user.profile_color != '#3B82F6' else user.generate_profile_color())|tojson }},
             "is_system_manager": {{ is_system_manager|tojson }},
             "is_admin_user": {{ is_admin_user|tojson }},
@@ -369,6 +371,8 @@ window.usersGridConfig.t = {
     role_2e083440: {{ _('Role')|tojson }},
     status_ec53a8c4: {{ _('Status')|tojson }},
     date_joined_32816422: {{ _('Date joined')|tojson }},
+    last_login_9c1e4b70: {{ _('Last login')|tojson }},
+    never_c8f0a12d: {{ _('Never')|tojson }},
     fds_member_7a2c91e4: {{ _('FDS Member')|tojson }},
     entities_3b4d9c2e: {{ _('Entities')|tojson }},
     global_f2a89e71: {{ _('Global')|tojson }},

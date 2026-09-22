@@ -303,6 +303,7 @@ class TestLoginRouteCoverage:
         assert len(flashes) == 1
         _category, message = flashes[0]
         assert 'expired' in message.lower()
+        # The old handler claimed unsaved work on a plain navigation.
         assert 'not saved' not in message.lower()
 
     def test_login_wrong_password(self, client, db_session, app):

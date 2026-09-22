@@ -90,7 +90,7 @@ def register_error_handlers(app):
         # to the page they came from. Country/entity switching is navigation,
         # not a data save — do not claim their submission was discarded.
         if _is_context_switch_csrf_request():
-            flash_message = _("Please try that again.")
+            flash_message = _("We could not switch your selection. Please try again.")
         else:
             flash_message = _(
                 "Your session needed a refresh, so your last submission was not saved. Please try again."

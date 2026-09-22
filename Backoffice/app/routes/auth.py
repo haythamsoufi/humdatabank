@@ -333,7 +333,7 @@ def login():
     # clobber a login cookie the browser still holds), so it asks for the
     # notice via the query string instead.
     if request.method == "GET" and request.args.get('session_expired'):
-        flash(_("Your session has expired. Please sign in again."), "warning")
+        flash(_("Your session has expired."), "warning")
 
     form = LoginForm()
     register_form = RegisterForm()

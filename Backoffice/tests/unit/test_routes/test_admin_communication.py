@@ -50,3 +50,44 @@ class TestAdminCommunicationRoutes:
         assert data['success'] is True
         mock_log_attempt.assert_called_once_with(501, recipient_id, 'comm_user@test.com', 'Email only test')
         mock_mark_sent.assert_called_once_with(9001)
+
+    def test_insights_api_requires_login(self, client):
+        resp = client.get("/admin/api/communications/insights", follow_redirects=False)
+        assert resp.status_code in (401, 301, 302, 303, 307, 308)
+
+    def test_insights_api_returns_payload(self, logged_in_client):
+        payload = {
+            'success': True,
+            'period_days': 7,
+            'totals': {'communications': 3},
+        }
+        with patch(
+            'app.routes.admin.communication.build_communications_insights',
+            return_value=payload,
+        ) as mock_insights:
+            resp = logged_in_client.get("/admin/api/communications/insights?days=7")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['success'] is True
+        assert data['period_days'] == 7
+        assert data['totals']['communications'] == 3
+        mock_insights.assert_called_once_with(7)
+
+    def test_insights_api_clamps_invalid_days(self, logged_in_client):
+        with patch(
+            'app.routes.admin.communication.build_communications_insights',
+            return_value={'success': True, 'period_days': 30},
+        ) as mock_insights:
+            resp = logged_in_client.get("/admin/api/communications/insights?days=12")
+
+        assert resp.status_code == 200
+        mock_insights.assert_called_once_with(30)
+
+    def test_communication_center_includes_insights_tab(self, logged_in_client):
+        resp = logged_in_client.get("/admin/communication/center")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'panel-insights' in html
+        assert 'data-tab="insights"' in html
+        assert 'comms-insights-daily-chart' in html

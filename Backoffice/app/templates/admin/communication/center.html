@@ -29,7 +29,7 @@
             'classes': 'professional-action-btn professional-action-btn-blue',
         }
     ],
-    info_tooltip=_('View every notification and linked email delivery in the system, send email and mobile push messages to selected users or entities, and manage scheduled or draft communication campaigns.')
+    info_tooltip=_('View every notification and linked email delivery in the system, review volume and type insights, send email and mobile push messages to selected users or entities, and manage scheduled or draft communication campaigns.')
 ) }}
 
 {# Tab strip + panels: same pattern as admin/settings/manage_settings.html — data-tab ↔ panel-{id}, JS uses AdminUnderlineTabs.activateStripTab #}
@@ -38,6 +38,10 @@
         <button type="button" role="tab" id="tab-view-all" data-tab="view-all" aria-selected="true"
                 class="{{ admin_underline_tab_btn_classes(true) }}">
             <i class="fas fa-list-ul mr-1.5"></i>{{ _('View All Communications') }}
+        </button>
+        <button type="button" role="tab" id="tab-insights" data-tab="insights" aria-selected="false"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-chart-line mr-1.5"></i>{{ _('Insights') }}
         </button>
         <button type="button" role="tab" id="tab-send" data-tab="send" aria-selected="false"
                 class="{{ admin_underline_tab_btn_classes(false) }}">
@@ -108,6 +112,10 @@
                 <h3 class="text-sm font-medium text-gray-900 m-0 mb-4">{{ _('Notifications and email delivery') }}</h3>
                 <p class="text-sm text-gray-700">{{ _('No communications found.') }}</p>
             {% endif %}
+        </div>
+
+        <div id="panel-insights" class="communication-center-panel hidden">
+            {% include "admin/communication/_insights.html" %}
         </div>
 
         <!-- Tab Content: Send Notifications -->
@@ -1443,6 +1451,16 @@
         'emailSubjectNormalNote': {{ _('Normal priority emails prepend “New Notification:”.')|tojson }},
         'previewUntitled': {{ _('(No title)')|tojson }},
         'previewNoMessage': {{ _('(No message)')|tojson }},
+        'insightsPeriodLabel': {{ _('Volume, types, and delivery for %(start)s to %(end)s.', start='%(start)s', end='%(end)s')|tojson }},
+        'insightsLoadError': {{ _('Could not load insights. Please try again.')|tojson }},
+        'insightsNoComms': {{ _('No communications in this period.')|tojson }},
+        'insightsNoEmail': {{ _('No email deliveries in this period.')|tojson }},
+        'insightsNoNotifications': {{ _('No notifications in this period.')|tojson }},
+        'insightsDailyTotal': {{ _('Communications')|tojson }},
+        'insightsDailyNotifications': {{ _('Notifications')|tojson }},
+        'insightsDailyEmails': {{ _('Emails')|tojson }},
+        'insightsReadRateNa': {{ _('—')|tojson }},
+        'insightsNotApplicable': {{ _('N/A')|tojson }},
     };
     window.NOTIFICATION_TRANSLATIONS = window.COMMUNICATION_TRANSLATIONS;
     window.agGridTranslations = Object.assign({}, window.agGridTranslations || {}, {
@@ -1455,6 +1473,7 @@
     // Pass data to JavaScript - backend already formatted it
     window.notificationsData = {{ notifications|tojson|safe }};
     window.campaignsData = {{ campaigns|tojson|safe }};
+    window.communicationInsights = {{ (communications_insights or {})|tojson|safe }};
 
     window.communicationPageConfig = {
         notificationsPushEnabled: {{ notifications_push_enabled|tojson }},
@@ -1468,6 +1487,7 @@
         campaignEmailTemplates: {{ campaign_email_templates|tojson|safe }},
         urls: {
             campaignEmailComposePreview: {{ url_for('admin_communication.api_campaign_email_compose_preview')|tojson }},
+            communicationsInsights: {{ url_for('admin_communication.api_communications_insights')|tojson }},
             tinymceBase: {{ url_for('static', filename='libs/tinymce')|tojson }},
         },
         t: {
@@ -1529,8 +1549,10 @@
             window.ORG_SHORT_NAME = {{ ORG_SHORT_NAME | tojson }};
         }
     </script>
+    <script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
     <script src="{{ static_url('js/admin/email-template-editor-core.js') }}"></script>
     <script src="{{ static_url('js/admin/communication-campaign-email.js') }}"></script>
     <script src="{{ static_url('js/admin/campaign-audience-common.js') }}"></script>
+    <script src="{{ static_url('js/admin/communication-insights.js') }}"></script>
     <script src="{{ static_url('js/admin/communication.js') }}"></script>
 {% endblock %}

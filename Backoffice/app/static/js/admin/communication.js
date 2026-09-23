@@ -578,7 +578,7 @@ class AdminNotifications {
         // Initialize bulk selection features
         this.initBulkSelectionFeatures();
 
-        // Tabs + deep link hash (#view-all | #send | #campaigns), same pattern as manage_settings.html
+        // Tabs + deep link hash (#view-all | #insights | #send | #campaigns), same pattern as manage_settings.html
         this._initNotificationsCenterTabs();
     }
 
@@ -599,7 +599,7 @@ class AdminNotifications {
             });
         });
         const hash = (window.location.hash || '').replace('#', '');
-        if (hash && ['view-all', 'send', 'campaigns'].includes(hash) && document.getElementById(`panel-${hash}`)) {
+        if (hash && ['view-all', 'insights', 'send', 'campaigns'].includes(hash) && document.getElementById(`panel-${hash}`)) {
             this.switchTab(hash);
         }
         document.querySelectorAll('.communication-tab-link').forEach((link) => {
@@ -2810,7 +2810,7 @@ class AdminNotifications {
      * Tab UI: AdminUnderlineTabs.activateStripTab (shared with manage_settings.html).
      */
     switchTab(tab) {
-        const validTabs = ['view-all', 'send', 'campaigns'];
+        const validTabs = ['view-all', 'insights', 'send', 'campaigns'];
         if (!validTabs.includes(tab)) return;
 
         const A = window.AdminUnderlineTabs;
@@ -2829,6 +2829,10 @@ class AdminNotifications {
         if (tab === 'view-all') {
             if (window.initializeNotificationsGridIfNeeded) {
                 setTimeout(() => window.initializeNotificationsGridIfNeeded(), 300);
+            }
+        } else if (tab === 'insights') {
+            if (window.CommunicationInsights && typeof window.CommunicationInsights.onTabActivated === 'function') {
+                setTimeout(() => window.CommunicationInsights.onTabActivated(), 50);
             }
         } else if (tab === 'campaigns') {
             this.loadCampaigns();

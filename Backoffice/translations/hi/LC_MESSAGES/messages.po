@@ -29769,6 +29769,177 @@ msgstr ""
 msgid "✓"
 msgstr ""
 
+#: app/templates/admin/communication/_insights.html:55
+msgid "Avg"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:102
+msgid "Busiest day:"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:153
+msgid "By channel"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:191
+msgid "By priority"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:120
+msgid "By type"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:1459
+msgid "Communications"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:156
+msgid "Communications by channel chart"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:194
+msgid "Communications by priority chart"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:123
+msgid "Communications by type chart"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:109
+msgid "Communications per day"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:113
+msgid "Communications per day chart"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:1455
+msgid "Could not load insights. Please try again."
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:64
+msgid "Distinct users reached"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:79
+msgid "Email delivery"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:175
+msgid "Email delivery status chart"
+msgstr ""
+
+#: app/services/communication/insights_service.py:86
+msgid "Email only"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:172
+msgid "Email status"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:111
+msgid ""
+"In-app notifications plus email-only deliveries, matching the communications"
+" grid."
+msgstr ""
+
+#: app/services/communication/insights_service.py:89
+msgid "In-app only"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:44
+msgid "Insights"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:11
+msgid "Insights and analysis"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:143
+#: app/templates/admin/communication/center.html:1456
+msgid "No communications in this period."
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:184
+#: app/templates/admin/communication/center.html:1457
+msgid "No email deliveries in this period."
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:203
+#: app/templates/admin/communication/center.html:1458
+msgid "No notifications in this period."
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:68
+#: app/templates/admin/communication/_insights.html:131
+msgid "Read rate"
+msgstr ""
+
+#: app/services/communication/insights_service.py:97
+msgid "Retrying"
+msgstr ""
+
+#: app/services/communication/insights_service.py:102
+msgid "Scheduled"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:50
+msgid "Today"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:39
+msgid "Total communications"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:32
+msgid "Updating insights…"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:32
+msgid ""
+"View every notification and linked email delivery in the system, review "
+"volume and type insights, send email and mobile push messages to selected "
+"users or entities, and manage scheduled or draft communication campaigns."
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:13
+#: app/templates/admin/communication/center.html:1454
+#, python-format
+msgid "Volume, types, and delivery for %(start)s to %(end)s."
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:95
+msgid "campaign sends"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:45
+msgid "email-only"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:85
+msgid "need attention"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:44
+msgid "notifications"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:55
+msgid "per day"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:74
+msgid "read"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:84
+msgid "sent"
+msgstr ""
+
+#: app/templates/admin/communication/_insights.html:73
+msgid "unread"
+msgstr ""
+
 # [Removed] was: app/templates/admin/settings/manage_settings.html:429
 #~ msgid ""
 #~ "Templates are used for both system emails and the Notifications Center. Each"

@@ -486,6 +486,123 @@ class TestEditAssignment:
         )
         assert resp.status_code in (200, 302)
 
+    def test_get_shows_assignment_due_date_when_no_entity_has_one(
+        self, logged_in_client, db_session, app
+    ):
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assert aes.due_date is None
+            assignment_id = aes.assigned_form_id
+        resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="assignment_due_date"' in html
+        assert "Applies to all entities on this assignment." in html
+        assert "Managed per entity below." not in html
+
+    def test_get_locks_due_date_when_any_entity_has_one(
+        self, logged_in_client, db_session, app
+    ):
+        from datetime import datetime, timezone
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            aes.due_date = datetime(2026, 6, 1, tzinfo=timezone.utc)
+            db_session.commit()
+            assignment_id = aes.assigned_form_id
+        resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="assignment_due_date"' not in html
+        assert "Managed per entity below." in html
+
+    def test_post_sets_due_date_on_all_entities_when_none_are_set(
+        self, logged_in_client, db_session, app
+    ):
+        from datetime import date, datetime
+
+        from app.models import AssignmentEntityStatus, EntityType
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            country = create_test_country(db_session)
+            other_country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            other = AssignmentEntityStatus(
+                assigned_form_id=aes.assigned_form_id,
+                entity_type=EntityType.country.value,
+                entity_id=other_country.id,
+                status="pending",
+            )
+            db_session.add(other)
+            db_session.commit()
+            assignment_id = aes.assigned_form_id
+            template_id = template.id
+            aes_ids = [aes.id, other.id]
+        resp = logged_in_client.post(
+            f"/admin/assignments/edit/{assignment_id}",
+            data={
+                "template_id": str(template_id),
+                "period_name": "2024",
+                "due_date": "2026-06-15",
+                "submit": "1",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (200, 302)
+        with app.app_context():
+            db_session.expire_all()
+            rows = AssignmentEntityStatus.query.filter(
+                AssignmentEntityStatus.id.in_(aes_ids)
+            ).all()
+            assert len(rows) == 2
+            for row in rows:
+                stored = row.due_date
+                if isinstance(stored, datetime):
+                    stored = stored.date()
+                assert stored == date(2026, 6, 15)
+
+    def test_post_does_not_overwrite_existing_entity_due_dates(
+        self, logged_in_client, db_session, app
+    ):
+        from datetime import datetime, timezone
+
+        from app.models import AssignmentEntityStatus
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            aes.due_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+            db_session.commit()
+            assignment_id = aes.assigned_form_id
+            template_id = template.id
+            aes_id = aes.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/edit/{assignment_id}",
+            data={
+                "template_id": str(template_id),
+                "period_name": "2024",
+                "due_date": "2026-12-31",
+                "submit": "1",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (200, 302)
+        with app.app_context():
+            db_session.expire_all()
+            row = db_session.get(AssignmentEntityStatus, aes_id)
+            assert row.due_date is not None
+            assert row.due_date.year == 2026
+            assert row.due_date.month == 1
+            assert row.due_date.day == 1
+
 
 class TestParseCustomNameTranslationsFromForm:
     def test_reads_explicit_fields(self, app):

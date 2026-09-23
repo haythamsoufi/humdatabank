@@ -1237,13 +1237,27 @@ def edit_assignment(assignment_id):
             if assignment.is_active and not assignment.data_owner_id:
                 flash(_("This active assignment has no data owner. Consider assigning one for governance accountability."), "warning")
 
-            # Update due dates for all countries in this assignment
+            # Assignment-level due date is only editable while no entity has one.
+            # Once any entity has a due date, those stay managed per entity.
             audit_due_date_after = None
             if form.due_date.data:
-                for aes in assignment.country_statuses:
-                    aes.due_date = form.due_date.data
-                with suppress(Exception):
-                    audit_due_date_after = country_due_dates_snapshot(assignment)
+                if assignment.earliest_due_date is not None:
+                    flash(
+                        _("Due date was not changed because some entities already have their own due dates."),
+                        "warning",
+                    )
+                else:
+                    entity_statuses = assignment.entity_statuses.all()
+                    if entity_statuses:
+                        for aes in entity_statuses:
+                            aes.due_date = form.due_date.data
+                        with suppress(Exception):
+                            audit_due_date_after = country_due_dates_snapshot(assignment)
+                    else:
+                        flash(
+                            _("Due date was not saved because this assignment has no entities yet."),
+                            "warning",
+                        )
 
             db.session.flush()
             with suppress(Exception):

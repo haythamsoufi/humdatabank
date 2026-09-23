@@ -309,18 +309,22 @@
                         <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                     {% endfor %}
                 </div>
-                {% if has_countries %}
+                {% if not assignment.earliest_due_date %}
+                <div>
+                    <label for="assignment_due_date" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Due Date') }}</label>
+                    {{ form.due_date(id="assignment_due_date", class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                    <p class="mt-1 text-xs text-gray-500">{{ _('Applies to all entities on this assignment.') }}</p>
+                    {% for error in form.due_date.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% elif has_countries %}
                 <div>
                     <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Due Date') }}</label>
-                    {% if assignment.earliest_due_date %}
-                        <p class="text-sm text-gray-700"><span class="text-xs text-gray-500">{{ _('Earliest:') }}</span> <span class="font-medium">{{ assignment.earliest_due_date|datetime_local('date') }}</span></p>
-                        <p class="text-xs text-gray-500 mt-1">{{ _('Managed per entity below.') }}</p>
-                        {% if assignment.has_multiple_due_dates %}
-                        <p class="text-xs text-amber-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Multiple different due dates set across entities.') }}</p>
-                        {% endif %}
-                    {% else %}
-                        <p class="text-sm text-gray-400 italic">{{ _('Not set') }}</p>
-                        <p class="text-xs text-gray-500 mt-1">{{ _('Managed per entity below.') }}</p>
+                    <p class="text-sm text-gray-700"><span class="text-xs text-gray-500">{{ _('Earliest:') }}</span> <span class="font-medium">{{ assignment.earliest_due_date|datetime_local('date') }}</span></p>
+                    <p class="text-xs text-gray-500 mt-1">{{ _('Managed per entity below.') }}</p>
+                    {% if assignment.has_multiple_due_dates %}
+                    <p class="text-xs text-amber-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Multiple different due dates set across entities.') }}</p>
                     {% endif %}
                 </div>
                 {% endif %}

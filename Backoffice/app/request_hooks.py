@@ -1,12 +1,15 @@
 """Flask before_request and after_request hooks."""
 
-from flask import current_app, redirect, request, session, url_for
+from flask import current_app, g, redirect, request, session, url_for
 from flask_login import current_user
 
 from app.i18n import persist_queued_language_cookie, update_session_activity
 from app.utils.session_persistence import (
+    SUPPRESS_SESSION_COOKIE_FLAG,
+    install_suppressable_session_interface,
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
+    strip_session_set_cookie,
 )
 from app.utils.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
 from app.utils.api_responses import json_ok
@@ -21,6 +24,7 @@ from app.utils.request_utils import (
 
 def register_request_hooks(app):
     """Register all request lifecycle hooks on the application."""
+    install_suppressable_session_interface(app)
 
     @app.before_request
     def serve_root_health_probe_fast_path():
@@ -148,6 +152,21 @@ def register_request_hooks(app):
             migrate_oauth_logout_hint_from_session()
         except Exception as e:
             current_app.logger.debug("migrate_oauth_logout_hint_from_session failed: %s", e)
+
+    @app.after_request
+    def _suppress_anonymous_session_cookie(response):
+        """Drop any session cookie another hook already wrote.
+
+        Flask's own save_session runs after this and is handled by
+        SuppressableSessionInterface, which also clears the flag.
+        """
+        if not getattr(g, SUPPRESS_SESSION_COOKIE_FLAG, False):
+            return response
+        try:
+            return strip_session_set_cookie(response)
+        except Exception as e:
+            current_app.logger.debug("strip_session_set_cookie failed: %s", e)
+            return response
 
     @app.after_request
     def _log_oversized_session_cookie(response):

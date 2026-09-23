@@ -24173,6 +24173,11 @@ msgstr ""
 msgid "Signing in…"
 msgstr "En se connectant..."
 
+#: app/templates/auth/login_continue.html:7
+#: app/templates/auth/login_continue.html:10
+msgid "Signing you in…"
+msgstr ""
+
 #: app/templates/admin/translations/manage_translations.html:392
 msgid "Single PO"
 msgstr "Unique PO"
@@ -29408,6 +29413,10 @@ msgid ""
 msgstr ""
 "Nous n’avons pas pu envoyer l’email de réinitialisation pour le moment. "
 "Merci de contacter le support."
+
+#: app/error_handlers.py:93
+msgid "We could not switch your selection. Please try again."
+msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:1300
 msgid "We ran into an issue while loading. Please reload the page."

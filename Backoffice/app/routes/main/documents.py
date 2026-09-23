@@ -11,6 +11,7 @@ from datetime import datetime
 from flask_babel import _
 from config import Config
 from app.utils.entity_groups import get_enabled_entity_groups
+from app.utils.request_utils import is_top_level_navigation
 from contextlib import suppress
 
 from app.routes.main import bp
@@ -57,8 +58,11 @@ def documents_submit():
     enabled_entity_groups = get_enabled_entity_groups()
     countries_group_enabled = "countries" in enabled_entity_groups
 
-    if request.method == "POST" and "entity_select" in request.form:
-        entity_select_value = request.form.get("entity_select", "")
+    # GET is accepted so the switch carries no CSRF token that can go stale on
+    # mobile; see the matching block in the dashboard route. GET has no CSRF
+    # check, so require a real navigation rather than a cross-site subresource.
+    if "entity_select" in request.values and (request.method == "POST" or is_top_level_navigation()):
+        entity_select_value = request.values.get("entity_select", "")
         if entity_select_value and ":" in entity_select_value:
             try:
                 selected_type, selected_id_str = entity_select_value.split(":", 1)

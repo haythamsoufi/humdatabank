@@ -23500,6 +23500,11 @@ msgstr "سجل الدخول بدون كلمة مرور لاختبار إعداد
 msgid "Signing in…"
 msgstr "تسجيل الدخول..."
 
+#: app/templates/auth/login_continue.html:7
+#: app/templates/auth/login_continue.html:10
+msgid "Signing you in…"
+msgstr ""
+
 #: app/templates/admin/translations/manage_translations.html:392
 msgid "Single PO"
 msgstr "م ف"
@@ -28556,6 +28561,10 @@ msgid ""
 msgstr ""
 "خطأ: لم أتمكن من استخراج معرفات المؤشرات. يرجى المحاولة مرة أخرى أو التواصل "
 "مع الدعم."
+
+#: app/error_handlers.py:93
+msgid "We could not switch your selection. Please try again."
+msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:1300
 msgid "We ran into an issue while loading. Please reload the page."

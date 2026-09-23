@@ -82,7 +82,6 @@
                             <div class="control-wrapper">
                     {% with
                         form_action=url_for('main.dashboard'),
-                        csrf_token=csrf_token(),
                         user_entities=user_entities,
                         selected_entity=selected_entity,
                         selected_entity_type=selected_entity_type,
@@ -97,8 +96,7 @@
                         <div class="control-group">
                             <div class="control-wrapper">
                     {% with
-                        form_action=url_for('main.dashboard'),
-                        csrf_token=csrf_token()
+                        form_action=url_for('main.dashboard')
                     %}
                         {% include 'components/country_dropdown.html' %}
                     {% endwith %}

@@ -27,20 +27,46 @@
         });
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text == null ? '' : String(text);
-        return div.innerHTML;
+    function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text != null) node.textContent = text;
+        return node;
     }
 
-    function renderList(id, rows, emptyMessage, itemHtml) {
+    function clearNode(node) {
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+    }
+
+    function renderList(id, rows, emptyMessage, buildItem) {
         const list = document.getElementById(id);
         if (!list) return;
+        clearNode(list);
         if (!rows || !rows.length) {
-            list.innerHTML = `<li class="text-gray-500">${escapeHtml(emptyMessage)}</li>`;
+            list.appendChild(el('li', 'text-gray-500', emptyMessage));
             return;
         }
-        list.innerHTML = rows.map(itemHtml).join('');
+        rows.forEach((row) => {
+            list.appendChild(buildItem(row));
+        });
+    }
+
+    function labeledCountItem(label, countText) {
+        const item = el('li', 'flex items-center justify-between gap-3');
+        item.appendChild(el('span', 'text-gray-700', label));
+        item.appendChild(el('span', 'font-medium text-gray-900', countText));
+        return item;
+    }
+
+    function priorityItem(row) {
+        const item = el('li', 'flex items-center justify-between gap-3');
+        item.appendChild(el('span', 'text-gray-700', row.label));
+        const value = el('span', 'font-medium text-gray-900', `${formatNumber(row.count)} `);
+        value.appendChild(el('span', 'text-gray-500 font-normal', `(${formatNumber(row.read_rate)}%)`));
+        item.appendChild(value);
+        return item;
     }
 
     function destroyChart(charts, key) {
@@ -125,19 +151,24 @@
     function renderTypeTable(data) {
         const body = document.getElementById('comms-insights-type-body');
         if (!body) return;
+        clearNode(body);
         const rows = data.by_type || [];
         if (!rows.length) {
-            body.innerHTML = `<tr><td colspan="3" class="py-3 text-gray-500 text-center">${escapeHtml(t().insightsNoComms || 'No communications in this period.')}</td></tr>`;
+            const tr = document.createElement('tr');
+            const td = el('td', 'py-3 text-gray-500 text-center', t().insightsNoComms || 'No communications in this period.');
+            td.colSpan = 3;
+            tr.appendChild(td);
+            body.appendChild(tr);
             return;
         }
-        body.innerHTML = rows.map((row) => {
+        rows.forEach((row) => {
             const rate = row.type === 'email' ? (t().insightsReadRateNa || '—') : `${row.read_rate}%`;
-            return `<tr class="border-t border-gray-100">
-                <td class="py-1.5 pr-3 text-gray-800">${escapeHtml(row.label)}</td>
-                <td class="py-1.5 pr-3 text-right text-gray-700">${formatNumber(row.count)}</td>
-                <td class="py-1.5 text-right text-gray-700">${escapeHtml(rate)}</td>
-            </tr>`;
-        }).join('');
+            const tr = el('tr', 'border-t border-gray-100');
+            tr.appendChild(el('td', 'py-1.5 pr-3 text-gray-800', row.label));
+            tr.appendChild(el('td', 'py-1.5 pr-3 text-right text-gray-700', formatNumber(row.count)));
+            tr.appendChild(el('td', 'py-1.5 text-right text-gray-700', rate));
+            body.appendChild(tr);
+        });
     }
 
     function renderKpis(data) {
@@ -187,19 +218,19 @@
             'comms-insights-channel-list',
             data.by_channel,
             t().insightsNoComms || 'No communications in this period.',
-            (row) => `<li class="flex items-center justify-between gap-3"><span class="text-gray-700">${escapeHtml(row.label)}</span><span class="font-medium text-gray-900">${formatNumber(row.count)}</span></li>`
+            (row) => labeledCountItem(row.label, formatNumber(row.count))
         );
         renderList(
             'comms-insights-email-list',
             (data.email && data.email.by_status) || [],
             t().insightsNoEmail || 'No email deliveries in this period.',
-            (row) => `<li class="flex items-center justify-between gap-3"><span class="text-gray-700">${escapeHtml(row.label)}</span><span class="font-medium text-gray-900">${formatNumber(row.count)}</span></li>`
+            (row) => labeledCountItem(row.label, formatNumber(row.count))
         );
         renderList(
             'comms-insights-priority-list',
             data.by_priority,
             t().insightsNoNotifications || 'No notifications in this period.',
-            (row) => `<li class="flex items-center justify-between gap-3"><span class="text-gray-700">${escapeHtml(row.label)}</span><span class="font-medium text-gray-900">${formatNumber(row.count)} <span class="text-gray-500 font-normal">(${formatNumber(row.read_rate)}%)</span></span></li>`
+            priorityItem
         );
         renderDailyChart(charts, data);
         renderDoughnut(charts, 'type', 'comms-insights-type-chart', data.by_type, 'label', 'count');

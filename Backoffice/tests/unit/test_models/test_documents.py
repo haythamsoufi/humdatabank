@@ -7,6 +7,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 from datetime import date
 
+from sqlalchemy.orm.attributes import set_committed_value
+
 from app.models.documents import (
     SubmittedDocument,
     ResourceSubcategory,
@@ -165,7 +167,10 @@ class TestSubmittedDocument:
             # Mock form_item
             mock_item = MagicMock()
             mock_item.label = 'My Field Label'
-            doc.form_item = mock_item
+            # The document is persistent. Assigning an unmapped mock through the
+            # relationship cascades it into the session, and SQLAlchemy then
+            # crashes formatting that error because MagicMock has no __name__.
+            set_committed_value(doc, 'form_item', mock_item)
             assert doc.document_label == 'My Field Label'
 
     def test_document_label_from_document_type(self, db_session, app):

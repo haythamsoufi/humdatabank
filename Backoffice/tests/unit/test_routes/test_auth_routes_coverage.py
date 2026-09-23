@@ -1018,9 +1018,8 @@ class TestAzureCallbackCoverage:
                 assert B2C_ID_TOKEN_SESSION_KEY not in session
                 assert session.get("session_id") == "sid-oauth"
 
-        assert result.status_code == 200
-        assert b'id="login-continue"' in result.data
-        assert b'href="/admin/"' in result.data
+        assert result.status_code == 302
+        assert result.headers["Location"].endswith("/admin/")
         assert pop_oauth_logout_hint("sid-oauth") == "header.payload.sig"
         reset_oauth_logout_hint_cache_for_tests()
 
@@ -1031,7 +1030,7 @@ class TestAzureCallbackCoverage:
 
 
 class TestLogoutB2c:
-    def test_logout_non_localhost_with_b2c_config(self, app, admin_user, db_session):
+    def test_logout_without_id_token_hint_stays_local(self, app, admin_user, db_session):
         from app.routes.auth import logout
         from app.models import User
 
@@ -1049,7 +1048,7 @@ class TestLogoutB2c:
             with patch("app.routes.auth.log_user_activity"), \
                  patch("app.routes.auth.log_logout"), \
                  patch("app.routes.auth._b2c_get_required_config", return_value=cfg), \
-                 patch("app.routes.auth._b2c_metadata", return_value=meta), \
+                 patch("app.routes.auth._b2c_metadata", return_value=meta) as mock_metadata, \
                  patch("app.routes.auth.clear_mobile_app_embed_cookie", side_effect=lambda r: r), \
                  patch("app.routes.auth.current_app") as mock_capp:
                 mock_capp.config = {
@@ -1059,6 +1058,8 @@ class TestLogoutB2c:
                 mock_capp.logger = MagicMock()
                 resp = logout()
         assert resp.status_code in (301, 302, 303, 307, 308)
+        assert (resp.headers.get("Location") or "").endswith("/login")
+        mock_metadata.assert_not_called()
 
     def test_logout_uses_server_side_id_token_hint(self, app):
         from app.routes.auth import logout

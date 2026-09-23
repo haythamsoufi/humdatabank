@@ -22891,6 +22891,11 @@ msgstr ""
 msgid "Signing in…"
 msgstr ""
 
+#: app/templates/auth/login_continue.html:7
+#: app/templates/auth/login_continue.html:10
+msgid "Signing you in…"
+msgstr ""
+
 #: app/templates/admin/translations/manage_translations.html:392
 msgid "Single PO"
 msgstr ""
@@ -27747,6 +27752,10 @@ msgstr ""
 
 #: app/routes/auth.py:1423
 msgid "We could not send the reset email at this time. Please contact support."
+msgstr ""
+
+#: app/error_handlers.py:93
+msgid "We could not switch your selection. Please try again."
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:1300

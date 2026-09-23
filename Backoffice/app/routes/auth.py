@@ -328,6 +328,13 @@ def login():
             return redirect(next_page)
         return redirect(url_for("main.dashboard")) # Redirect if already logged in
 
+    # Sent here by the CSRF handler when a request arrived with no usable
+    # session. That path cannot flash (writing a session cookie there would
+    # clobber a login cookie the browser still holds), so it asks for the
+    # notice via the query string instead.
+    if request.method == "GET" and request.args.get('session_expired'):
+        flash(_("Your session has expired."), "warning")
+
     form = LoginForm()
     register_form = RegisterForm()
     forgot_form = ForgotPasswordForm()
@@ -1080,7 +1087,7 @@ def azure_callback():
             current_app.logger.error("Mobile OAuth: failed to issue JWT tokens: %s", e, exc_info=True)
             # Fall through to normal web redirect as a best-effort fallback
 
-    return safe_redirect(next_page_from_state, default_route='main.dashboard')
+    return safe_redirect(next_page_from_state, default_route='main.dashboard', persist_session_cookie=True)
 
 @bp.route("/logout")
 @login_required # Ensure user is logged in before logging out

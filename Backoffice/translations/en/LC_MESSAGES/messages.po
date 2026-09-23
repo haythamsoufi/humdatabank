@@ -23809,6 +23809,11 @@ msgstr ""
 msgid "Signing in…"
 msgstr "Signing in…"
 
+#: app/templates/auth/login_continue.html:7
+#: app/templates/auth/login_continue.html:10
+msgid "Signing you in…"
+msgstr "Signing you in…"
+
 #: app/templates/admin/translations/manage_translations.html:392
 msgid "Single PO"
 msgstr "Single PO"
@@ -28973,6 +28978,10 @@ msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
 "We could not send the reset email at this time. Please contact support."
+
+#: app/error_handlers.py:93
+msgid "We could not switch your selection. Please try again."
+msgstr "We could not switch your selection. Please try again."
 
 #: app/templates/forms/form_builder/form_builder.html:1300
 msgid "We ran into an issue while loading. Please reload the page."

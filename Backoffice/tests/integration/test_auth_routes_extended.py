@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from flask import make_response
+from werkzeug.exceptions import NotFound
 
 pytestmark = [pytest.mark.integration, pytest.mark.auth_security]
 
@@ -133,6 +134,7 @@ class TestAccountSettingsAndDevices:
                 form.name.data = 'Updated Name'
                 form.title.data = 'Analyst'
                 form.chatbot_enabled.data = True
+                form.translation_review_tool_enabled.data = False
                 form.profile_color.data = '#3B82F6'
                 resp = account_settings()
             db.session.commit()
@@ -178,7 +180,7 @@ class TestAccountSettingsAndDevices:
             method='POST',
         ):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            resp, status = _view_result(kickout_own_device(device_id))
             db.session.commit()
         assert status == 200
         assert resp.get_json()['success'] is True
@@ -210,7 +212,7 @@ class TestAccountSettingsAndDevices:
             method='DELETE',
         ):
             login_user(User.query.get(user_id))
-            resp, status = remove_own_device(device_id)
+            resp, status = _view_result(remove_own_device(device_id))
             db.session.commit()
         assert status == 200
         assert resp.get_json()['success'] is True
@@ -243,7 +245,7 @@ class TestAccountSettingsAndDevices:
             method='POST',
         ):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            resp, status = _view_result(kickout_own_device(device_id))
             db.session.commit()
         assert status == 400
         assert resp.get_json()['success'] is False
@@ -288,6 +290,20 @@ class TestLoginRouteCoverage:
             resp = client.get('/login')
         assert resp.status_code == 200
         mock_render.assert_called_once()
+
+    def test_login_session_expired_flag_explains_the_bounce(self, client, app):
+        """The CSRF handler redirects here without flashing (it withholds the
+        session cookie), so the notice has to be queued by the login page."""
+        with patch('app.routes.auth.render_template', return_value=('login', 200)):
+            resp = client.get('/login?session_expired=1')
+        assert resp.status_code == 200
+        with client.session_transaction() as sess:
+            flashes = sess.get('_flashes', [])
+        assert len(flashes) == 1
+        _category, message = flashes[0]
+        assert 'expired' in message.lower()
+        # The old handler claimed unsaved work on a plain navigation.
+        assert 'not saved' not in message.lower()
 
     def test_login_wrong_password(self, client, db_session, app):
         with app.app_context():
@@ -409,8 +425,9 @@ class TestLoginRouteCoverage:
 
         with app.test_request_context('/account-settings/devices/999999/kickout', method='POST'):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(999999)
-        assert status == 500
+            # first_or_404() aborts; dispatching would turn this into a 404 page.
+            with pytest.raises(NotFound):
+                kickout_own_device(999999)
 
     def test_remove_device_error_returns_500(self, app, admin_user, db_session):
         from flask_login import login_user
@@ -437,5 +454,5 @@ class TestLoginRouteCoverage:
         ):
             login_user(User.query.get(user_id))
             with patch.object(db.session, 'flush', side_effect=RuntimeError('db down')):
-                resp, status = remove_own_device(device_id)
+                _resp, status = _view_result(remove_own_device(device_id))
         assert status == 500

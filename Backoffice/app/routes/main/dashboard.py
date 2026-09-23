@@ -31,6 +31,7 @@ from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAYS
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.request_utils import is_top_level_navigation
 from app.utils.error_handling import handle_json_view_exception
 from app.services.platform.app_settings_service import is_organization_email
 from app.services.organization.authorization_service import AuthorizationService
@@ -314,11 +315,28 @@ def dashboard():
         if len(user_entities) > 1:
             show_entity_select = True
 
-    if request.method == "POST":
-        # Check if the POST is for country selection
-        if countries_group_enabled and 'country_select' in request.form:
-            selected_country_id_str = request.form.get('country_select')
-            current_app.logger.debug(f"Dashboard POST request: Country Selection. Selected country ID string from form: {selected_country_id_str}")
+    # Switching country/entity is navigation, so it is accepted over GET: a GET
+    # carries no CSRF token to go stale, which is what bounced phones to /login
+    # on their first action after login. GET has no CSRF check, so only honour a
+    # real navigation — never a cross-site <img>/prefetch of the same URL. POST
+    # still works for pages rendered before this change.
+    context_switch_allowed = request.method == "POST" or is_top_level_navigation()
+    country_select_submitted = (
+        countries_group_enabled
+        and context_switch_allowed
+        and "country_select" in request.values
+        and "self_report_template_id" not in request.form
+    )
+    entity_select_submitted = (
+        context_switch_allowed
+        and "entity_select" in request.values
+        and "self_report_template_id" not in request.form
+    )
+
+    if country_select_submitted or entity_select_submitted or request.method == "POST":
+        if country_select_submitted:
+            selected_country_id_str = request.values.get('country_select')
+            current_app.logger.debug(f"Dashboard country selection. Selected country ID string: {selected_country_id_str}")
             if selected_country_id_str:
                 try:
                     selected_country_id = int(selected_country_id_str)
@@ -346,10 +364,9 @@ def dashboard():
                  selected_country = None # Will be set to a default below
                  current_app.logger.warning(f"User {current_user.email} submitted POST without a country selection.")
 
-        # NEW: Handle POST for entity selection (multi-entity support)
-        elif 'entity_select' in request.form:
-            entity_select_value = request.form.get('entity_select', '')
-            current_app.logger.debug(f"Dashboard POST request: Entity Selection. Raw value: '{entity_select_value}'")
+        elif entity_select_submitted:
+            entity_select_value = request.values.get('entity_select', '')
+            current_app.logger.debug(f"Dashboard entity selection. Raw value: '{entity_select_value}'")
             if entity_select_value and ':' in entity_select_value:
                 try:
                     selected_type, selected_id_str = entity_select_value.split(':', 1)
@@ -405,30 +422,31 @@ def dashboard():
                      ).first()
 
                      if template_to_assign and selected_country in user_countries:
-                             assigned_form = AssignedForm(
-                                 template_id=template_to_assign.id,
-                                 period_name=SELF_REPORT_PERIOD_NAME,
-                                 assigned_at=utcnow() # Use current time for uniqueness
-                             )
-                             sync_assigned_form_reporting_period(assigned_form)
-                             db.session.add(assigned_form)
-                             db.session.flush() # Flush to get the assigned_form.id
-                             current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")
-
-                             # Create the new AssignmentEntityStatus entry
-                             new_acs = AssignmentEntityStatus(
-                                 assigned_form_id=assigned_form.id,
-                                 entity_type='country',
-                                 entity_id=selected_country.id,
-                                 status='pending', # Default status
-                                 due_date=None # No default due date for self-reported forms
-                             )
-                             db.session.add(new_acs)
-
-                             current_app.logger.debug(f"Country {selected_country.id} linked to AssignedForm {assigned_form.id} via AssignmentEntityStatus {new_acs.id}.")
-
-
+                             # Both flushes are inside the try: a failure on the
+                             # first one used to escape the route as a 500.
                              try:
+                                 assigned_form = AssignedForm(
+                                     template_id=template_to_assign.id,
+                                     period_name=SELF_REPORT_PERIOD_NAME,
+                                     assigned_at=utcnow() # Use current time for uniqueness
+                                 )
+                                 sync_assigned_form_reporting_period(assigned_form)
+                                 db.session.add(assigned_form)
+                                 db.session.flush() # Flush to get the assigned_form.id
+                                 current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")
+
+                                 # Create the new AssignmentEntityStatus entry
+                                 new_acs = AssignmentEntityStatus(
+                                     assigned_form_id=assigned_form.id,
+                                     entity_type='country',
+                                     entity_id=selected_country.id,
+                                     status='pending', # Default status
+                                     due_date=None # No default due date for self-reported forms
+                                 )
+                                 db.session.add(new_acs)
+
+                                 current_app.logger.debug(f"Country {selected_country.id} linked to AssignedForm {assigned_form.id} via AssignmentEntityStatus {new_acs.id}.")
+
                                  db.session.flush()
 
                                  # Send notification about self-report creation

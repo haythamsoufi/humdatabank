@@ -204,6 +204,32 @@ def is_static_asset_request(req=None):
     return False
 
 
+def is_top_level_navigation(req=None):
+    """True for a same-origin document navigation.
+
+    Country/entity switching is a GET, so it has no CSRF token. Honour it only
+    when the browser says this is the user opening the page on this origin.
+    A cross-site link, image, iframe, or prefetch must not change their
+    context. Requests with no Sec-Fetch headers are allowed, so this only
+    tightens behaviour.
+    """
+    req = req or request
+    site = req.headers.get("Sec-Fetch-Site")
+    if site and site not in ("same-origin", "none"):
+        return False
+    mode = req.headers.get("Sec-Fetch-Mode")
+    if mode and mode != "navigate":
+        return False
+    dest = req.headers.get("Sec-Fetch-Dest")
+    if dest and dest != "document":
+        return False
+    # Speculative loads are navigations too; a prefetched URL must not switch
+    # the user's context before they click.
+    if req.headers.get("Sec-Purpose", "").startswith("prefetch"):
+        return False
+    return True
+
+
 def is_json_request():
     """True if the current request expects a JSON response (API/AJAX)."""
     accept = request.headers.get("Accept", "")

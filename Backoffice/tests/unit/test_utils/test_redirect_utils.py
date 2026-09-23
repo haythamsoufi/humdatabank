@@ -259,13 +259,3 @@ class TestSafeRedirect:
                 response = safe_redirect(None, default_route="auth.login")
                 mock_url_for.assert_called_once_with("auth.login")
                 assert response.status_code == 302
-
-    def test_persist_session_cookie_returns_continue_page(self, app):
-        from app.utils.redirect_utils import safe_redirect
-        with app.test_request_context("/"):
-            response = safe_redirect("/admin/", persist_session_cookie=True)
-            assert response.status_code == 200
-            assert response.headers.get("Cache-Control", "").startswith("no-store")
-            assert b'id="login-continue"' in response.data
-            assert b'href="/admin/"' in response.data
-            assert b"location.replace" in response.data

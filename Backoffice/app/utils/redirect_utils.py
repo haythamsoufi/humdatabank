@@ -172,31 +172,7 @@ def get_safe_redirect_url(target_url: Optional[str], default_route: str = 'main.
         return url_for(default_route)
 
 
-def first_party_login_continue(safe_url: str):
-    """Return a 200 HTML hop that lands the session cookie in a first-party context.
-
-    Only for the Azure B2C callback. That response ends a cross-site redirect
-    chain (app -> b2clogin.com -> app), and mobile browsers are least reliable
-    about storing cookies set mid-chain — Android WebView drops SameSite=Lax
-    cookies there, and Safari's bounce-tracking mitigation targets exactly this
-    shape. Stopping on a same-origin 200 first, then navigating, avoids both.
-    Same-site logins do not need this and keep plain POST/redirect/GET.
-    """
-    from flask import make_response, render_template
-
-    html = render_template("auth/login_continue.html", next_url=safe_url)
-    response = make_response(html)
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    return response
-
-
-def safe_redirect(
-    target_url: Optional[str],
-    default_route: str = 'main.dashboard',
-    *,
-    persist_session_cookie: bool = False,
-):
+def safe_redirect(target_url: Optional[str], default_route: str = 'main.dashboard'):
     """
     Safely redirect to a URL, falling back to a default route if the target is unsafe.
 
@@ -205,15 +181,9 @@ def safe_redirect(
     Args:
         target_url: The target URL to validate and redirect to
         default_route: The Flask route name to redirect to if target is unsafe
-        persist_session_cookie: Return a 200 continue page instead of a 302 so
-            the session cookie is stored in a first-party context. Only for the
-            OAuth callback; see first_party_login_continue().
-
     Returns:
-        Flask redirect response, or a 200 continue page after login.
+        Flask redirect response
     """
     from flask import redirect
     safe_url = get_safe_redirect_url(target_url, default_route)
-    if persist_session_cookie:
-        return first_party_login_continue(safe_url)
     return redirect(safe_url)

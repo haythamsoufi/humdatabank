@@ -1087,7 +1087,10 @@ def azure_callback():
             current_app.logger.error("Mobile OAuth: failed to issue JWT tokens: %s", e, exc_info=True)
             # Fall through to normal web redirect as a best-effort fallback
 
-    return safe_redirect(next_page_from_state, default_route='main.dashboard', persist_session_cookie=True)
+    # Keep the established server-side redirect flow. A 200 "Signing you in"
+    # interstitial was previously tried here and reverted because it could
+    # bounce users back to /login after an otherwise successful B2C callback.
+    return safe_redirect(next_page_from_state, default_route='main.dashboard')
 
 @bp.route("/logout")
 @login_required # Ensure user is logged in before logging out
@@ -1142,17 +1145,21 @@ def logout():
     if "localhost" in post_logout_uri or "127.0.0.1" in post_logout_uri:
         return _logout_redirect(url_for("auth.login"))
 
-    # End the Azure B2C SSO session so the user must re-authenticate with B2C
-    # on next login (prevents silent re-login after logout).
+    # End the Azure B2C SSO session only when we can identify the session being
+    # ended. Production custom policies may enforce id_token_hint on logout;
+    # sending a bare post_logout_redirect_uri produces a B2C error page. The
+    # local session is already cleared, so fall back to /login when the hint
+    # was unavailable (for example, after a worker restart without Redis).
     cfg = _b2c_get_required_config()
-    if cfg:
+    if cfg and b2c_id_token:
         with suppress(Exception):
             meta = _b2c_metadata(cfg["tenant"], cfg["policy"])
             end_session_endpoint = meta.get("end_session_endpoint")
             if end_session_endpoint:
-                params = {'post_logout_redirect_uri': post_logout_uri}
-                if b2c_id_token:
-                    params['id_token_hint'] = b2c_id_token
+                params = {
+                    'post_logout_redirect_uri': post_logout_uri,
+                    'id_token_hint': b2c_id_token,
+                }
                 logout_url = f"{end_session_endpoint}?{urlencode(params)}"
                 return _logout_redirect(logout_url)
 

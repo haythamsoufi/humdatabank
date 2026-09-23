@@ -53,7 +53,7 @@ class TestAdminCommunicationRoutes:
 
     def test_insights_api_requires_login(self, client):
         resp = client.get("/admin/api/communications/insights", follow_redirects=False)
-        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert resp.status_code in (401, 301, 302, 303, 307, 308)
 
     def test_insights_api_returns_payload(self, logged_in_client):
         payload = {

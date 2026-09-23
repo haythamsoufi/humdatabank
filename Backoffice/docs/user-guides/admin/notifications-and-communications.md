@@ -2,6 +2,17 @@
 
 Use this guide to communicate clearly during a data collection cycle (reminders, instructions, and handling questions).
 
+## Communication Center insights
+
+On **Communication Center → Insights**, review volume and mix for the last 7, 30, 90, or 365 days:
+
+- total communications per day (in-app notifications plus email-only deliveries)
+- breakdown by notification type, channel (in-app / email / both), and priority
+- read rate, unique recipients, and email delivery status
+- campaigns created in the same window
+
+Use the grid on **View All Communications** when you need the individual rows behind a spike or type.
+
 ## Before you start
 
 - Agree internally on one “source of truth” message (period, deadline, contact person).

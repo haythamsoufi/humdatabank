@@ -9,7 +9,7 @@ from werkzeug.exceptions import NotFound
 
 from flask_login import current_user
 
-from plugins.pb_progress import bp, _PLUGIN_DIR
+from plugins.pb_progress import bp, settings_bp, _PLUGIN_DIR
 from plugins.pb_progress.db_source import (
     DbSourceError,
     get_editable_translations_config,
@@ -29,6 +29,21 @@ from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 logger = logging.getLogger(__name__)
 
 _ADMIN_SUBTABS = frozenset({"build", "mapping", "translations"})
+
+
+@settings_bp.route("/settings", methods=["GET"])
+@permission_required("admin.plugins.manage")
+def settings_page():
+    from app.plugins.plugin_utils import settings_plugin_info
+
+    return render_template(
+        "plugins/pb_progress/settings.html",
+        settings={
+            "default_version": DEFAULT_VERSION,
+            "versions": list(VERSION_ORDER),
+        },
+        plugin_info=settings_plugin_info("pb_progress"),
+    )
 
 
 @bp.route("/pb-progress/static/<path:filename>", methods=["GET"])

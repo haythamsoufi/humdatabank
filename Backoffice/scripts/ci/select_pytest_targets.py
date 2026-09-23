@@ -157,11 +157,46 @@ def _name_candidates(rel: str) -> set[str]:
     return names
 
 
+# plugin.py / routes.py / metadata are setup + settings wiring. Mapping those
+# to plugins/<id>/tests or visuals/tests pulls Excel/render suites that need
+# fixtures the Actions checkout does not ship.
+CORE_PLUGIN_FILENAMES = frozenset({"plugin.py", "routes.py", "__init__.py", "metadata.py"})
+
+
+def _existing_rel(root: Path, rel: str) -> str | None:
+    return rel if (root / rel).is_file() else None
+
+
+def _plugin_unit_targets(plugin: str, filename: str, root: Path) -> set[str]:
+    """Unit tests for first-party plugin metadata, plugin class, and HTTP routes."""
+    targets: set[str] = set()
+    meta = _existing_rel(root, "tests/unit/test_plugins/test_plugin_metadata.py")
+    if meta and filename in CORE_PLUGIN_FILENAMES:
+        targets.add(meta)
+
+    if filename in {"plugin.py", "__init__.py"}:
+        match = _existing_rel(root, f"tests/unit/test_plugins/test_{plugin}_plugin.py")
+        if match:
+            targets.add(match)
+    return targets
+
+
 def _plugin_targets(rel: str, root: Path, test_files: list[Path]) -> set[str]:
     parts = Path(rel).parts
     if len(parts) < 2 or parts[0] != "plugins":
         return set()
+
+    filename = parts[-1]
+    if len(parts) == 2 and filename == "metadata.py":
+        return _plugin_unit_targets("metadata", filename, root)
+
     plugin = parts[1]
+    if plugin.endswith(".py"):
+        return set()
+
+    if filename in CORE_PLUGIN_FILENAMES:
+        return _plugin_unit_targets(plugin, filename, root)
+
     names = _name_candidates(rel)
     prefix = ("plugins", plugin)
     hits = {
@@ -169,6 +204,7 @@ def _plugin_targets(rel: str, root: Path, test_files: list[Path]) -> set[str]:
         for path in test_files
         if path.relative_to(root).parts[:2] == prefix and path.name in names
     }
+
     if hits:
         return hits
     targets: set[str] = set()
@@ -194,12 +230,16 @@ def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
     if is_pytest_file(rel):
         return {_posix(rel)} if full.is_file() else set()
 
-    names = _name_candidates(rel)
-    hits = {
-        _posix(path.relative_to(root))
-        for path in test_files
-        if path.name in names
-    }
+    hits: set[str] = set()
+    # Plugin paths use plugin-scoped mapping only. A global stem match would
+    # pair every routes.py with plugins/upr/tests/test_routes.py.
+    if not rel.startswith("plugins/"):
+        names = _name_candidates(rel)
+        hits = {
+            _posix(path.relative_to(root))
+            for path in test_files
+            if path.name in names
+        }
     hits.update(_plugin_targets(rel, root, test_files))
     if rel.startswith("scripts/") and not rel.startswith("scripts/ci/"):
         layout = root / "tests" / "unit" / "test_scripts_layout.py"

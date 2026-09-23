@@ -11,6 +11,7 @@ from app.plugins.base import (
     SeedPermission,
     SeedRole,
 )
+from plugins.metadata import FirstPartyPluginMetadata
 from plugins.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, resolve_requested_version
 
 _PB_REPORT_CSP = (
@@ -27,7 +28,7 @@ _PB_REPORT_CSP = (
 )
 
 
-class PBProgressPlugin(BasePlugin):
+class PBProgressPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
     def plugin_id(self) -> str:
         return "pb_progress"
@@ -40,6 +41,19 @@ class PBProgressPlugin(BasePlugin):
     def version(self) -> str:
         return "1.0.0"
 
+    @property
+    def description(self) -> str:
+        return (
+            "Plan and Budget visuals: Quarto/Playwright report pipeline, "
+            "indicator mapping, and Data Explorer outputs."
+        )
+
+    def get_settings(self):
+        return {
+            "default_version": DEFAULT_VERSION,
+            "versions": list(VERSION_ORDER),
+        }
+
     def get_field_types(self):
         return []
 
@@ -47,6 +61,11 @@ class PBProgressPlugin(BasePlugin):
         from plugins.pb_progress import bp
 
         return bp
+
+    def get_additional_blueprints(self):
+        from plugins.pb_progress import settings_bp
+
+        return [settings_bp]
 
     def get_data_explorer_tab(self) -> DataExplorerTabConfig:
         return DataExplorerTabConfig(

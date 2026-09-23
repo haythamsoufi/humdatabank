@@ -1381,12 +1381,16 @@ class TestDynamicPluginAllProperties:
             "version": "2.0.0",
             "description": "A dynamic plugin",
             "author": "Tester",
+            "homepage": "https://example.com/plugin",
+            "license": "Apache-2.0",
         })
         inst = cls()
         # Cover lines 459, 463, 467
         assert inst.version == "2.0.0"
         assert inst.description == "A dynamic plugin"
         assert inst.author == "Tester"
+        assert inst.homepage == "https://example.com/plugin"
+        assert inst.license == "Apache-2.0"
 
     def test_dynamic_plugin_field_types_append_path(self, tmp_path):
         """Cover line 475: field_types.append when _create_field_type_from_json returns non-None."""

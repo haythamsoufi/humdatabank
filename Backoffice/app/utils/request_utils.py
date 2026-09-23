@@ -205,14 +205,18 @@ def is_static_asset_request(req=None):
 
 
 def is_top_level_navigation(req=None):
-    """True unless Sec-Fetch headers show the request is a subresource load.
+    """True for a same-origin document navigation.
 
-    Lets a GET carry a context switch (country/entity) without CSRF while still
-    ignoring the same URL pulled in by an ``<img>``/``<iframe>`` on another
-    site. Browsers that send no Sec-Fetch headers are treated as navigations,
-    so this only ever tightens behaviour.
+    Country/entity switching is a GET, so it has no CSRF token. Honour it only
+    when the browser says this is the user opening the page on this origin.
+    A cross-site link, image, iframe, or prefetch must not change their
+    context. Requests with no Sec-Fetch headers are allowed, so this only
+    tightens behaviour.
     """
     req = req or request
+    site = req.headers.get("Sec-Fetch-Site")
+    if site and site not in ("same-origin", "none"):
+        return False
     mode = req.headers.get("Sec-Fetch-Mode")
     if mode and mode != "navigate":
         return False

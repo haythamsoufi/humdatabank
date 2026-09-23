@@ -439,6 +439,35 @@ class TestDashboardPostCountrySelect:
         with logged_in_client.session_transaction() as sess:
             assert sess.get("selected_country_id") == current.id
 
+    def test_cross_site_link_does_not_switch_country(self, logged_in_client, db_session, app, admin_user):
+        """A top-level link from another site is a navigation, but it is not
+        the user choosing a country. It must not change their session."""
+        current = create_test_country(db_session)
+        other = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", current.id)
+        _grant_entity_permission(db_session, admin_user, "country", other.id)
+        db_session.commit()
+
+        with logged_in_client.session_transaction() as sess:
+            sess["selected_entity_type"] = "country"
+            sess["selected_entity_id"] = current.id
+            sess["selected_country_id"] = current.id
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query:
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            logged_in_client.get(
+                f"/?country_select={other.id}",
+                headers={
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Site": "cross-site",
+                },
+            )
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_country_id") == current.id
+
     def test_invalid_country_selection_shows_warning(self, logged_in_client, db_session, app, admin_user):
         country = create_test_country(db_session)
         _grant_entity_permission(db_session, admin_user, "country", country.id)

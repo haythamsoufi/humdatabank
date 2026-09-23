@@ -86,10 +86,35 @@ class TestIsTopLevelNavigation:
 
     def test_form_get_submission(self, app):
         with app.test_request_context(path='/', headers={
+            'Sec-Fetch-Site': 'same-origin',
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Dest': 'document',
         }):
             assert is_top_level_navigation() is True
+
+    def test_typed_url_has_no_site(self, app):
+        with app.test_request_context(path='/', headers={
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Dest': 'document',
+        }):
+            assert is_top_level_navigation() is True
+
+    def test_cross_site_top_level_link(self, app):
+        with app.test_request_context(path='/', headers={
+            'Sec-Fetch-Site': 'cross-site',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Dest': 'document',
+        }):
+            assert is_top_level_navigation() is False
+
+    def test_sibling_site_navigation(self, app):
+        with app.test_request_context(path='/', headers={
+            'Sec-Fetch-Site': 'same-site',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Dest': 'document',
+        }):
+            assert is_top_level_navigation() is False
 
     def test_cross_site_image_load(self, app):
         with app.test_request_context(path='/', headers={

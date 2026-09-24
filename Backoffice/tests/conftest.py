@@ -486,22 +486,27 @@ def client(app):
 
 @pytest.fixture(autouse=True)
 def reset_flask_request_globals(app):
-    """Clear leaked Flask ``g`` transaction/mobile state between tests."""
+    """Drop request state that survives on the session-scoped app context.
+
+    The ``app`` fixture pushes one application context for the whole run.
+    Flask stores ``g`` on that context, so ending a request does not discard
+    it. Flask-Login caches the loaded user on ``g._login_user`` and trusts the
+    cache for the next request, which makes a later test look logged in and
+    turns an anonymous page render into a redirect.
+    """
     def _clear():
         try:
-            from flask import g, has_request_context
-            if has_request_context():
-                for key in (
-                    '_auto_txn_managed',
-                    '_auto_txn_force_rollback',
-                    '_mobile_jwt_sid',
-                    '_post_commit_callbacks',
-                ):
-                    with suppress(Exception):
-                        if hasattr(g, key):
-                            delattr(g, key)
+            from flask import g, has_app_context
+            if has_app_context():
+                # Flask-Login's cached user lives here and would authenticate
+                # the next test.
+                g._get_current_object().__dict__.clear()
         except Exception:
             pass
+        # The scoped session lives on the same long-lived app context. A test
+        # that calls a view directly (no after_request cleanup) can leave it in
+        # a failed transaction, and the next request then dies in commit().
+        _disengage_db_connections()
 
     _clear()
     yield

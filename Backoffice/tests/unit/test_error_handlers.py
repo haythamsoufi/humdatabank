@@ -87,20 +87,43 @@ class TestCsrfErrorHandler:
             follow_redirects=False,
         )
         assert resp.status_code == 302
-        assert resp.headers["Location"] == "http://localhost/form-page"
+        assert "/login" in (resp.headers.get("Location") or "")
         assert b"Page Needs Refresh" not in resp.data
         assert b"csrf-retry-form" not in resp.data
 
-    def test_html_response_flashes_warning_before_redirect(self, client):
-        """A silent redirect with no explanation would drop the user's form data
-        with zero feedback — a flash message must be queued before the redirect."""
+    def test_unauthenticated_html_csrf_does_not_flash_or_set_session_cookie(self, client, app):
+        """Anonymous CSRF must not write a replacement session cookie or the
+        misleading 'changes were not saved' flash (phones omit the login cookie
+        from the POST, then a new cookie would overwrite it)."""
         resp = client.post(
             "/test-error/csrf",
             headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
             follow_redirects=False,
         )
         assert resp.status_code == 302
+        location = resp.headers.get("Location") or ""
+        assert "/login" in location
+        # The login page explains the bounce; the handler cannot flash without
+        # writing the session cookie it is deliberately withholding.
+        assert "session_expired" in location
         with client.session_transaction() as sess:
+            assert not sess.get("_flashes")
+        cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
+        prefix = f"{cookie_name}="
+        for header in resp.headers.getlist("Set-Cookie"):
+            assert not header.startswith(prefix)
+
+    def test_authenticated_html_csrf_flashes_warning_before_redirect(self, logged_in_client):
+        """A silent redirect with no explanation would drop the user's form data
+        with zero feedback — a flash message must be queued before the redirect."""
+        resp = logged_in_client.post(
+            "/test-error/csrf",
+            headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "http://localhost/form-page"
+        with logged_in_client.session_transaction() as sess:
             flashes = sess.get("_flashes", [])
         assert len(flashes) == 1
         category, message = flashes[0]
@@ -108,11 +131,25 @@ class TestCsrfErrorHandler:
         assert "refresh" in message.lower()
         assert "not saved" in message.lower()
 
-    def test_html_response_flash_failure_is_suppressed(self, client):
+    def test_authenticated_context_switch_csrf_does_not_claim_unsaved_work(self, logged_in_client):
+        resp = logged_in_client.post(
+            "/test-error/csrf",
+            data={"country_select": "1"},
+            headers={**HTML_HEADERS, "Referer": "http://localhost/"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        with logged_in_client.session_transaction() as sess:
+            flashes = sess.get("_flashes", [])
+        assert len(flashes) == 1
+        _category, message = flashes[0]
+        assert "not saved" not in message.lower()
+
+    def test_html_response_flash_failure_is_suppressed(self, logged_in_client):
         """If flash() itself raises (e.g. no request context edge case), the
         redirect must still succeed rather than turning into a 500."""
         with patch("app.error_handlers.flash", side_effect=RuntimeError("flash failed")):
-            resp = client.post(
+            resp = logged_in_client.post(
                 "/test-error/csrf",
                 headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
                 follow_redirects=False,
@@ -132,10 +169,14 @@ class TestUnauthorizedHandler:
         assert data["success"] is False
         assert "Authentication required" in data.get("message", "") or "Unauthorized" in str(data)
 
-    def test_html_response(self, client):
+    def test_html_response_redirects_to_login(self, client):
+        """A browser hitting a 401 gets sent to the login form, keeping its
+        destination in `next`, rather than a dead-end error page."""
         resp = _html(client, 401)
-        assert resp.status_code == 401
-        assert b"401" in resp.data or b"Unauthorized" in resp.data
+        assert resp.status_code == 302
+        location = resp.headers.get("Location") or ""
+        assert "/login" in location
+        assert "test-error" in location
 
 
 # ===========================================================================

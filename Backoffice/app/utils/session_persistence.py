@@ -20,7 +20,7 @@ import threading
 import time
 from typing import Optional
 
-from flask import current_app, has_app_context, request, session
+from flask import current_app, g, has_app_context, request, session
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,79 @@ def session_set_cookie_bytes(response) -> int:
         if header.startswith(prefix)
     ]
     return max(sizes) if sizes else 0
+
+
+SUPPRESS_SESSION_COOKIE_FLAG = "suppress_session_cookie"
+
+
+def suppress_session_cookie_for_request():
+    """Send this response without a session cookie.
+
+    Used when a request arrives with no usable session: writing a fresh
+    anonymous cookie would overwrite a login cookie the browser still holds
+    but did not send, turning a recoverable miss into a real logout.
+    """
+    setattr(g, SUPPRESS_SESSION_COOKIE_FLAG, True)
+
+
+class SuppressableSessionInterface:
+    """Proxy that can skip writing the session cookie for one request.
+
+    Flask saves the session *after* ``after_request`` handlers, so stripping
+    ``Set-Cookie`` in a hook is too early. CSRF failures on phones must not
+    emit a replacement anonymous cookie; set ``g.suppress_session_cookie``.
+    """
+
+    def __init__(self, wrapped):
+        object.__setattr__(self, "_wrapped", wrapped)
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+    def save_session(self, app, session_obj, response):
+        # Consume the flag here rather than leaving it on ``g``: a request
+        # served inside an app context that outlives it (test clients, worker
+        # threads) would otherwise keep suppressing later responses.
+        if g.pop(SUPPRESS_SESSION_COOKIE_FLAG, False):
+            return None
+        return self._wrapped.save_session(app, session_obj, response)
+
+
+def install_suppressable_session_interface(app):
+    """Wrap ``app.session_interface`` once so CSRF can suppress Set-Cookie."""
+    current = app.session_interface
+    if isinstance(current, SuppressableSessionInterface):
+        return current
+    wrapped = SuppressableSessionInterface(current)
+    app.session_interface = wrapped
+    return wrapped
+
+
+def strip_session_set_cookie(response):
+    """Remove session Set-Cookie headers so this response cannot replace a login cookie.
+
+    Mobile browsers sometimes omit an existing session cookie from a POST
+    (oversized cookie, ITP, SameSite after an OAuth redirect). If we then
+    flash() or mint a CSRF token, Flask writes a *new* anonymous session
+    cookie that overwrites the still-valid login cookie and boots the user
+    to /login.
+    """
+    cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+    prefix = f"{cookie_name}="
+    headers = response.headers
+    existing = headers.getlist("Set-Cookie")
+    if not existing:
+        return response
+    kept = [header for header in existing if not header.startswith(prefix)]
+    if len(kept) == len(existing):
+        return response
+    try:
+        del headers["Set-Cookie"]
+    except Exception:
+        headers.remove("Set-Cookie")
+    for header in kept:
+        headers.add("Set-Cookie", header)
+    return response
 
 
 def log_oversized_session_cookie(response):

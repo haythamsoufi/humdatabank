@@ -1,0 +1,207 @@
+{# Communication Center insights tab — KPI cards, daily volume, types, channels #}
+{% set insights = communications_insights or {} %}
+{% set totals = insights.totals or {} %}
+{% set notif_stats = insights.notifications or {} %}
+{% set email_stats = insights.email or {} %}
+{% set campaigns_stats = insights.campaigns or {} %}
+{% set selected_days = insights_days or insights.period_days or 30 %}
+
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    <div class="min-w-0">
+        <h3 class="text-sm font-medium text-gray-900 m-0">{{ _('Insights and analysis') }}</h3>
+        <p id="comms-insights-period-label" class="text-xs text-gray-500 mt-1">
+            {{ _('Volume, types, and delivery for %(start)s to %(end)s.', start=insights.period_start or '—', end=insights.period_end or '—') }}
+        </p>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+        <label for="comms-insights-days" class="text-sm font-medium text-gray-700">{{ _('Time range') }}</label>
+        <select id="comms-insights-days" class="form-input text-sm py-1.5 pl-3 pr-8" data-insights-days="{{ selected_days }}">
+            {% for option in insights_day_options or [7, 30, 90, 365] %}
+            <option value="{{ option }}" {% if selected_days == option %}selected{% endif %}>
+                {% if option == 7 %}{{ _('Last 7 days') }}
+                {% elif option == 30 %}{{ _('Last 30 days') }}
+                {% elif option == 90 %}{{ _('Last 90 days') }}
+                {% else %}{{ _('Last year') }}{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div id="comms-insights-loading" class="hidden mb-4 text-sm text-gray-600" role="status" aria-live="polite">
+    <i class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>{{ _('Updating insights…') }}
+</div>
+<p id="comms-insights-error" class="hidden mb-4 text-sm text-red-700" role="alert"></p>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" id="comms-insights-kpis">
+    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold text-gray-700">{{ _('Total communications') }}</h4>
+            <i class="fas fa-comments text-blue-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-blue-600" data-insight-kpi="communications">{{ totals.communications or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+            <span data-insight-kpi="notifications">{{ totals.notifications or 0 }}</span> {{ _('notifications') }}
+            · <span data-insight-kpi="orphan-emails">{{ totals.orphan_emails or 0 }}</span> {{ _('email-only') }}
+        </p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold text-gray-700">{{ _('Today') }}</h4>
+            <i class="fas fa-calendar-day text-indigo-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-indigo-600" data-insight-kpi="today">{{ totals.today or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+            {{ _('Avg') }} <span data-insight-kpi="avg-per-day">{{ totals.avg_per_day or 0 }}</span> {{ _('per day') }}
+        </p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold text-gray-700">{{ _('Recipients') }}</h4>
+            <i class="fas fa-users text-green-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-green-600" data-insight-kpi="unique-recipients">{{ totals.unique_recipients or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Distinct users reached') }}</p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold text-gray-700">{{ _('Read rate') }}</h4>
+            <i class="fas fa-envelope-open text-purple-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-purple-600"><span data-insight-kpi="read-rate">{{ notif_stats.read_rate or 0 }}</span>%</p>
+        <p class="text-xs text-gray-500 mt-1">
+            <span data-insight-kpi="unread">{{ notif_stats.unread or 0 }}</span> {{ _('unread') }}
+            · <span data-insight-kpi="read">{{ notif_stats.read or 0 }}</span> {{ _('read') }}
+        </p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold text-gray-700">{{ _('Email delivery') }}</h4>
+            <i class="fas fa-paper-plane text-amber-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-amber-600" data-insight-kpi="emails">{{ email_stats.total or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+            <span data-insight-kpi="email-sent">{{ email_stats.sent or 0 }}</span> {{ _('sent') }}
+            · <span data-insight-kpi="email-attention">{{ email_stats.attention_needed or 0 }}</span> {{ _('need attention') }}
+        </p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-semibold text-gray-700">{{ _('Campaigns') }}</h4>
+            <i class="fas fa-bullhorn text-red-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold text-red-600" data-insight-kpi="campaigns">{{ campaigns_stats.total or 0 }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+            <span data-insight-kpi="campaign-recipients">{{ campaigns_stats.sent_recipients or 0 }}</span> {{ _('campaign sends') }}
+        </p>
+    </div>
+</div>
+
+<p id="comms-insights-busiest" class="text-xs text-gray-500 mb-6{% if not totals.busiest_day %} hidden{% endif %}">
+    <i class="fas fa-chart-line mr-1" aria-hidden="true"></i>
+    {{ _('Busiest day:') }}
+    <span data-insight-busiest-date>{{ totals.busiest_day.date if totals.busiest_day else '' }}</span>
+    (<span data-insight-busiest-count>{{ totals.busiest_day.count if totals.busiest_day else 0 }}</span>)
+</p>
+
+<div class="border border-gray-200 rounded-lg p-4 mb-6">
+    <h4 class="text-sm font-semibold text-gray-800 mb-3">
+        <i class="fas fa-chart-bar mr-2 text-blue-500" aria-hidden="true"></i>{{ _('Communications per day') }}
+    </h4>
+    <p class="text-xs text-gray-500 mb-3">{{ _('In-app notifications plus email-only deliveries, matching the communications grid.') }}</p>
+    <div class="relative" style="height: 280px">
+        <canvas id="comms-insights-daily-chart" aria-label="{{ _('Communications per day chart')|forceescape }}"></canvas>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="border border-gray-200 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-gray-800 mb-3">
+            <i class="fas fa-tags mr-2 text-purple-500" aria-hidden="true"></i>{{ _('By type') }}
+        </h4>
+        <div class="relative mb-4" style="height: 240px">
+            <canvas id="comms-insights-type-chart" aria-label="{{ _('Communications by type chart')|forceescape }}"></canvas>
+        </div>
+        <div class="overflow-x-auto max-h-64 overflow-y-auto border-t border-gray-100 pt-3">
+            <table class="min-w-full text-sm" id="comms-insights-type-table">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500">
+                        <th class="py-1 pr-3 font-medium">{{ _('Type') }}</th>
+                        <th class="py-1 pr-3 font-medium text-right">{{ _('Count') }}</th>
+                        <th class="py-1 font-medium text-right">{{ _('Read rate') }}</th>
+                    </tr>
+                </thead>
+                <tbody id="comms-insights-type-body">
+                    {% for row in insights.by_type or [] %}
+                    <tr class="border-t border-gray-100">
+                        <td class="py-1.5 pr-3 text-gray-800">{{ row.label }}</td>
+                        <td class="py-1.5 pr-3 text-right text-gray-700">{{ row.count }}</td>
+                        <td class="py-1.5 text-right text-gray-700">{% if row.type == 'email' %}—{% else %}{{ row.read_rate }}%{% endif %}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="py-3 text-gray-500 text-center">{{ _('No communications in this period.') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="border border-gray-200 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-gray-800 mb-3">
+            <i class="fas fa-layer-group mr-2 text-indigo-500" aria-hidden="true"></i>{{ _('By channel') }}
+        </h4>
+        <div class="relative mb-4" style="height: 240px">
+            <canvas id="comms-insights-channel-chart" aria-label="{{ _('Communications by channel chart')|forceescape }}"></canvas>
+        </div>
+        <ul id="comms-insights-channel-list" class="space-y-2 text-sm">
+            {% for row in insights.by_channel or [] %}
+            <li class="flex items-center justify-between gap-3">
+                <span class="text-gray-700">{{ row.label }}</span>
+                <span class="font-medium text-gray-900">{{ row.count }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="border border-gray-200 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-gray-800 mb-3">
+            <i class="fas fa-envelope mr-2 text-amber-500" aria-hidden="true"></i>{{ _('Email status') }}
+        </h4>
+        <div class="relative mb-4" style="height: 240px">
+            <canvas id="comms-insights-email-chart" aria-label="{{ _('Email delivery status chart')|forceescape }}"></canvas>
+        </div>
+        <ul id="comms-insights-email-list" class="space-y-2 text-sm">
+            {% for row in email_stats.by_status or [] %}
+            <li class="flex items-center justify-between gap-3">
+                <span class="text-gray-700">{{ row.label }}</span>
+                <span class="font-medium text-gray-900">{{ row.count }}</span>
+            </li>
+            {% else %}
+            <li class="text-gray-500">{{ _('No email deliveries in this period.') }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="border border-gray-200 rounded-lg p-4">
+        <h4 class="text-sm font-semibold text-gray-800 mb-3">
+            <i class="fas fa-flag mr-2 text-red-500" aria-hidden="true"></i>{{ _('By priority') }}
+        </h4>
+        <div class="relative mb-4" style="height: 240px">
+            <canvas id="comms-insights-priority-chart" aria-label="{{ _('Communications by priority chart')|forceescape }}"></canvas>
+        </div>
+        <ul id="comms-insights-priority-list" class="space-y-2 text-sm">
+            {% for row in insights.by_priority or [] %}
+            <li class="flex items-center justify-between gap-3">
+                <span class="text-gray-700">{{ row.label }}</span>
+                <span class="font-medium text-gray-900">{{ row.count }} <span class="text-gray-500 font-normal">({{ row.read_rate }}%)</span></span>
+            </li>
+            {% else %}
+            <li class="text-gray-500">{{ _('No notifications in this period.') }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>

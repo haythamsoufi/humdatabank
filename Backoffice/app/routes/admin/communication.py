@@ -22,6 +22,12 @@ from app.services.communication.center_service import (
     MAX_CENTER_PAGE_SIZE,
     fetch_communications_center_page,
 )
+from app.services.communication.insights_service import (
+    ALLOWED_INSIGHTS_DAYS,
+    build_communications_insights,
+    clamp_insights_days,
+    empty_communications_insights,
+)
 from app.utils.api_pagination import validate_pagination_params
 from app.services.email.delivery import (
     log_email_attempt,
@@ -189,6 +195,13 @@ def communication_center():
     campaign_compose_templates = get_campaign_compose_templates()
     campaign_email_templates = get_all_campaign_email_templates()
 
+    insights_days = clamp_insights_days(request.args.get('insights_days', type=int))
+    try:
+        communications_insights = build_communications_insights(insights_days)
+    except Exception:
+        current_app.logger.exception('Failed to build Communication Center insights')
+        communications_insights = empty_communications_insights(insights_days)
+
     return render_template(
         "admin/communication/center.html",
         notification_types=notification_types,
@@ -202,6 +215,9 @@ def communication_center():
         failed_email_delivery_count=failed_email_delivery_count,
         campaign_compose_templates=campaign_compose_templates,
         campaign_email_templates=campaign_email_templates,
+        communications_insights=communications_insights,
+        insights_days=insights_days,
+        insights_day_options=ALLOWED_INSIGHTS_DAYS,
     )
 
 
@@ -711,6 +727,18 @@ def api_search_users():
         ]
 
         return json_ok(users=results)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/insights", methods=["GET"])
+@permission_required("admin.communication.manage")
+def api_communications_insights():
+    """JSON insights for the Communication Center analysis tab."""
+    try:
+        insights_days = clamp_insights_days(request.args.get('days', type=int))
+        payload = build_communications_insights(insights_days)
+        return json_ok(**payload)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 

@@ -60,7 +60,7 @@
         <div class="docs-grid-toolbar flex flex-wrap items-start sm:items-center justify-between gap-3 mb-4">
             <div class="min-w-0 flex-1 docs-entity-toolbar">
                 {% if show_entity_select is defined and show_entity_select and user_entities %}
-                    {% with form_action=url_for('main.documents_submit'), csrf_token=csrf_token() %}
+                    {% with form_action=url_for('main.documents_submit') %}
                         {% include 'components/entity_dropdown.html' %}
                     {% endwith %}
                 {% elif documents_entity_repo_label is defined and documents_entity_repo_label %}

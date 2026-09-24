@@ -181,7 +181,6 @@ def safe_redirect(target_url: Optional[str], default_route: str = 'main.dashboar
     Args:
         target_url: The target URL to validate and redirect to
         default_route: The Flask route name to redirect to if target is unsafe
-
     Returns:
         Flask redirect response
     """

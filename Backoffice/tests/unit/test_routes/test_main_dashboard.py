@@ -396,6 +396,78 @@ class TestDashboardPostCountrySelect:
             resp = logged_in_client.post("/", data={"country_select": str(country.id)})
         assert resp.status_code == 302
 
+    def test_valid_country_selection_via_get_updates_session(self, logged_in_client, db_session, app, admin_user):
+        country = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", country.id)
+        db_session.commit()
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query:
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            resp = logged_in_client.get(f"/?country_select={country.id}")
+        assert resp.status_code == 302
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_country_id") == country.id
+
+    def test_cross_site_subresource_get_does_not_switch_country(self, logged_in_client, db_session, app, admin_user):
+        """GET carries no CSRF token, so an <img src="/?country_select=..."> on
+        another site must not be able to switch the user's context."""
+        current = create_test_country(db_session)
+        other = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", current.id)
+        _grant_entity_permission(db_session, admin_user, "country", other.id)
+        db_session.commit()
+
+        with logged_in_client.session_transaction() as sess:
+            sess["selected_entity_type"] = "country"
+            sess["selected_entity_id"] = current.id
+            sess["selected_country_id"] = current.id
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query:
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            logged_in_client.get(
+                f"/?country_select={other.id}",
+                headers={
+                    "Sec-Fetch-Mode": "no-cors",
+                    "Sec-Fetch-Dest": "image",
+                    "Sec-Fetch-Site": "cross-site",
+                },
+            )
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_country_id") == current.id
+
+    def test_cross_site_link_does_not_switch_country(self, logged_in_client, db_session, app, admin_user):
+        """A top-level link from another site is a navigation, but it is not
+        the user choosing a country. It must not change their session."""
+        current = create_test_country(db_session)
+        other = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", current.id)
+        _grant_entity_permission(db_session, admin_user, "country", other.id)
+        db_session.commit()
+
+        with logged_in_client.session_transaction() as sess:
+            sess["selected_entity_type"] = "country"
+            sess["selected_entity_id"] = current.id
+            sess["selected_country_id"] = current.id
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query:
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            logged_in_client.get(
+                f"/?country_select={other.id}",
+                headers={
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Site": "cross-site",
+                },
+            )
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_country_id") == current.id
+
     def test_invalid_country_selection_shows_warning(self, logged_in_client, db_session, app, admin_user):
         country = create_test_country(db_session)
         _grant_entity_permission(db_session, admin_user, "country", country.id)
@@ -455,6 +527,22 @@ class TestDashboardPostEntitySelect:
             mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
             resp = logged_in_client.post("/", data={"entity_select": f"country:{country.id}"})
         assert resp.status_code == 302
+
+    def test_valid_entity_selection_via_get(self, logged_in_client, db_session, app, admin_user):
+        country = create_test_country(db_session)
+        _grant_entity_permission(db_session, admin_user, "country", country.id)
+        db_session.commit()
+
+        with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
+             patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
+             patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
+             patch("app.routes.main.dashboard.EntityService.get_country_for_entity", return_value=country):
+            mock_req_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            resp = logged_in_client.get(f"/?entity_select=country:{country.id}")
+        assert resp.status_code == 302
+        with logged_in_client.session_transaction() as sess:
+            assert sess.get("selected_entity_type") == "country"
+            assert sess.get("selected_entity_id") == country.id
 
     def test_invalid_entity_selection_not_in_user_pairs(self, logged_in_client, db_session, app, admin_user):
         """Entity not belonging to user shows warning and redirects."""
@@ -904,7 +992,7 @@ class TestLoadMoreActivities:
         activity.summary_params = {"template": "T"}
         activity.assignment_id = None
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value="<li>activity</li>"):
@@ -929,7 +1017,7 @@ class TestLoadMoreActivities:
         }
         activity.assignment_id = None
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value="<li>activity</li>"):
@@ -951,7 +1039,7 @@ class TestLoadMoreActivities:
         }
         activity.assignment_id = None
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[activity]), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=[activity]), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value="<li>activity</li>"):
@@ -966,7 +1054,7 @@ class TestLoadMoreActivities:
         _grant_entity_permission(db_session, admin_user, "country", country.id)
         db_session.commit()
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", side_effect=Exception("crash")), \
+        with patch("app.services.notification.core.get_country_recent_activities", side_effect=Exception("crash")), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]):
             resp = logged_in_client.post(
@@ -983,7 +1071,7 @@ class TestLoadMoreActivities:
         # Return exactly fetch_limit items so has_more = True
         activities = [MagicMock(summary_key=None, summary_params={}, assignment_id=None) for _ in range(11)]
 
-        with patch("app.routes.main.dashboard.get_country_recent_activities", return_value=activities), \
+        with patch("app.services.notification.core.get_country_recent_activities", return_value=activities), \
              patch("app.routes.main.dashboard.AuthorizationService.has_country_access", return_value=True), \
              patch("app.routes.main.dashboard.get_user_countries", return_value=[{"id": country.id}]), \
              patch("app.routes.main.dashboard.render_template", return_value=""):
@@ -1043,7 +1131,7 @@ class TestMarkNotificationsRead:
         assert resp.status_code == 400
 
     def test_success_marks_notifications(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.return_value = True
             resp = logged_in_client.post(
                 "/mark_notifications_read",
@@ -1051,10 +1139,10 @@ class TestMarkNotificationsRead:
             )
         assert resp.status_code == 200
         data = json.loads(resp.data)
-        assert data.get("status") == "ok"
+        assert data.get("success") is True
 
     def test_failure_returns_500(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.return_value = False
             resp = logged_in_client.post(
                 "/mark_notifications_read",
@@ -1063,7 +1151,7 @@ class TestMarkNotificationsRead:
         assert resp.status_code == 500
 
     def test_exception_returns_500(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.side_effect = Exception("mark failed")
             resp = logged_in_client.post(
                 "/mark_notifications_read",
@@ -1072,7 +1160,7 @@ class TestMarkNotificationsRead:
         assert resp.status_code == 500
 
     def test_string_notification_ids_parsed(self, logged_in_client):
-        with patch("app.routes.main.dashboard.NotificationService") as mock_ns:
+        with patch("app.services.notification.service.NotificationService") as mock_ns:
             mock_ns.mark_as_read.return_value = True
             resp = logged_in_client.post(
                 "/mark_notifications_read",

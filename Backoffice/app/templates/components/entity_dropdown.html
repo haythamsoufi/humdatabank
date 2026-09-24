@@ -91,12 +91,9 @@
         </div>
     </div>
 
-    {# Hidden form for submission #}
-    <form id="entity_search_form" method="POST" action="{{ form_action }}" class="hidden">
+    {# GET: context switch is navigation, not a data save. Avoid CSRF on phones. #}
+    <form id="entity_search_form" method="GET" action="{{ form_action }}" class="hidden">
         <input type="hidden" id="entity_search_select" name="entity_select" value="">
-        {% if csrf_token %}
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        {% endif %}
     </form>
 
     {# Dropdown with search results #}

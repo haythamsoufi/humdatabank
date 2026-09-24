@@ -8,12 +8,15 @@ from flask import session
 from app.utils.session_persistence import (
     B2C_ID_TOKEN_SESSION_KEY,
     BROWSER_COOKIE_MAX_BYTES,
+    SuppressableSessionInterface,
+    install_suppressable_session_interface,
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
     pop_oauth_logout_hint,
     reset_oauth_logout_hint_cache_for_tests,
     session_set_cookie_bytes,
     store_oauth_logout_hint,
+    strip_session_set_cookie,
 )
 
 
@@ -103,6 +106,53 @@ class TestSessionCookieSize:
         size = session_set_cookie_bytes(resp)
         if size:
             assert size < BROWSER_COOKIE_MAX_BYTES
+
+    def test_suppressable_interface_skips_save(self, app):
+        from flask import g, make_response
+        from unittest.mock import MagicMock
+
+        wrapped = MagicMock()
+        interface = SuppressableSessionInterface(wrapped)
+        with app.test_request_context("/"):
+            g.suppress_session_cookie = True
+            interface.save_session(app, session, make_response("ok"))
+            wrapped.save_session.assert_not_called()
+            g.suppress_session_cookie = False
+            interface.save_session(app, session, make_response("ok"))
+            wrapped.save_session.assert_called_once()
+
+    def test_suppression_does_not_outlive_the_response(self, app):
+        """The flag lives on ``g``, which can outlive a single request when an
+        app context is pushed around it (test clients, worker threads). Saving
+        must consume it so the next response still gets its session cookie."""
+        from flask import g, make_response
+        from unittest.mock import MagicMock
+
+        wrapped = MagicMock()
+        interface = SuppressableSessionInterface(wrapped)
+        with app.test_request_context("/"):
+            g.suppress_session_cookie = True
+            interface.save_session(app, session, make_response("ok"))
+            interface.save_session(app, session, make_response("ok"))
+            wrapped.save_session.assert_called_once()
+            assert not getattr(g, "suppress_session_cookie", False)
+
+    def test_install_suppressable_interface_is_idempotent(self, app):
+        first = install_suppressable_session_interface(app)
+        second = install_suppressable_session_interface(app)
+        assert first is second
+        assert isinstance(app.session_interface, SuppressableSessionInterface)
+
+    def test_strip_session_set_cookie_keeps_other_cookies(self, app):
+        from flask import make_response
+
+        with app.test_request_context("/"):
+            resp = make_response("ok")
+            resp.headers.add("Set-Cookie", "session=abc; Path=/")
+            resp.headers.add("Set-Cookie", "ui_language=en; Path=/")
+            strip_session_set_cookie(resp)
+            cookies = resp.headers.getlist("Set-Cookie")
+        assert cookies == ["ui_language=en; Path=/"]
 
     def test_log_oversized_cookie_warns(self, app, caplog):
         from flask import make_response

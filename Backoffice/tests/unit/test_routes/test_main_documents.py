@@ -32,6 +32,12 @@ _ROW_WITH_FOCAL = "app.routes.admin.content_management._row_with_focal_entity_ac
 # Helpers
 # ===========================================================================
 
+def _focal_permissions(_user, permission, **_kwargs):
+    """Permissions of a focal user: everything the route asks for except the
+    admin one, which diverts /documents to the admin library."""
+    return permission != "admin.documents.manage"
+
+
 def _login(client, user):
     login_session(client, user.id)
 
@@ -110,7 +116,7 @@ class TestDocumentsSubmitNoEntities:
         """User has upload permission but no entity assignments → redirect."""
         _login(client, test_user)
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities", return_value=([], [], [])), \
              patch(_DOC_TYPES, return_value=["pdf"]):
             resp = client.get("/documents", follow_redirects=False)
@@ -128,7 +134,7 @@ class TestDocumentsSubmitNoSelectedEntity:
         mock_entity_list = [_make_mock_entity(country.id)]
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=(mock_entity_list, [], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -149,7 +155,7 @@ class TestDocumentsSubmitRender:
         from contextlib import ExitStack
         return [
             patch(f"{_AUTH_SVC}.is_system_manager", return_value=False),
-            patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True),
+            patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions),
             patch("app.routes.main.documents._build_user_nav_entities",
                   return_value=(entity_list, [country], ["country"])),
             patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -174,7 +180,7 @@ class TestDocumentsSubmitRender:
         resolved = (mock_entity, "country", country.id, country)
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -210,7 +216,7 @@ class TestDocumentsSubmitRender:
         resolved = (mock_resolved_entity, "country", country1.id, country1)
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=(entity_list, [country1, country2], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -243,7 +249,7 @@ class TestDocumentsSubmitRender:
         resolved = (mock_entity_dict["entity"], "country", country.id, country)
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -275,7 +281,7 @@ class TestDocumentsSubmitRender:
         resolved = (mock_entity_dict["entity"], "country", country.id, country)
 
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch("app.routes.main.documents._resolve_selected_entity_for_focal_nav",
@@ -306,7 +312,7 @@ class TestDocumentsSubmitPost:
     def _post_with_patches(self, client, country, mock_entity_dict, data, get_country_for_entity=None):
         """Helper: applies auth + nav patches and POSTs to /documents."""
         with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
-             patch(f"{_AUTH_SVC}.has_rbac_permission", return_value=True), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
              patch("app.routes.main.documents._build_user_nav_entities",
                    return_value=([mock_entity_dict], [country], ["country"])), \
              patch(_DOC_TYPES, return_value=["pdf"]), \
@@ -328,6 +334,27 @@ class TestDocumentsSubmitPost:
             get_country_for_entity=country,
         )
         assert_redirect(resp, "documents")
+
+    def test_get_valid_entity_select_sets_session(self, client, db_session, app, test_user):
+        country = create_test_country(db_session)
+        _grant_entity_permission(db_session, test_user, "country", country.id)
+        db_session.commit()
+        _login(client, test_user)
+
+        mock_entity_dict = _make_mock_entity(country.id)
+        with patch(f"{_AUTH_SVC}.is_system_manager", return_value=False), \
+             patch(f"{_AUTH_SVC}.has_rbac_permission", side_effect=_focal_permissions), \
+             patch("app.routes.main.documents._build_user_nav_entities",
+                   return_value=([mock_entity_dict], [country], ["country"])), \
+             patch(_DOC_TYPES, return_value=["pdf"]), \
+             patch("app.routes.main.documents.get_enabled_entity_groups", return_value={"countries"}), \
+             patch("app.routes.main.documents.EntityService.get_country_for_entity",
+                   return_value=country):
+            resp = client.get(f"/documents?entity_select=country:{country.id}", follow_redirects=False)
+        assert_redirect(resp, "documents")
+        with client.session_transaction() as sess:
+            assert sess.get("selected_entity_type") == "country"
+            assert sess.get("selected_entity_id") == country.id
 
     def test_post_entity_select_not_in_permissions_clears_session(self, client, db_session, app, test_user):
         """Selecting an entity not in user's permissions clears the session key."""

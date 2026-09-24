@@ -364,8 +364,18 @@ def _json_number(number: float) -> int | float:
 
 
 def assignment_year(place: dict[str, Any]) -> int | None:
-    """Return the reporting year encoded in an assignment period."""
-    return _year_token(str(place.get("period_name") or ""))
+    """Return an integer year for every supported UPR round."""
+    period_year = _year_token(str(place.get("period_name") or ""))
+    if period_year is not None:
+        return period_year
+    match = re.fullmatch(
+        r"(?:P|AR|MYR)(\d{2}|\d{4})",
+        str(place.get("round") or "").strip().upper(),
+    )
+    if not match:
+        return None
+    digits = match.group(1)
+    return int(digits) if len(digits) == 4 else 2000 + int(digits)
 
 
 def blank_fact(place: dict[str, Any]) -> dict[str, Any]:

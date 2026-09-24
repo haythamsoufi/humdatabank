@@ -38,7 +38,12 @@ _SOURCE_TABLES = (
 def upgrade():
     op.create_table(
         "upr_api_cache_change",
-        sa.Column("transaction_id", sa.BigInteger(), nullable=False),
+        sa.Column(
+            "transaction_id",
+            sa.BigInteger(),
+            autoincrement=False,
+            nullable=False,
+        ),
         sa.Column(
             "changed_at",
             sa.DateTime(timezone=True),

@@ -30,7 +30,7 @@ _SOURCE_TABLES = (
     "form_section",
     "indicator_bank",
     "country",
-    "national_society",
+    "national_societies",
 )
 
 

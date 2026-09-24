@@ -311,6 +311,20 @@ class BasePlugin(ABC):
         ``featured``). ``PluginManager.get_api_endpoints()`` merges these into
         the live registry so plugin routes are documented rather than flagged
         undocumented.
+
+        Optional URL-builder contract (core reads these; it does not special-case
+        plugin paths):
+
+        - ``paginated``: when ``False``, the builder does not add ``page`` /
+          ``per_page``. When omitted, unlisted routes still get the default
+          pagination pair.
+        - ``query_params``: list of ``{name, type, description, placeholder?,
+          options?, labels?, option_source?}``. ``option_source`` ``country_iso3``
+          is filled by the builder from the country list. Declared params replace
+          the built-in parameter list for that path.
+        - ``auth`` already selects the Power Query credential: ``api_key`` and
+          ``api_key_or_session`` send ``Authorization: Bearer``. ``public`` and
+          ``session`` do not.
         """
         return []
 

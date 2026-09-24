@@ -220,6 +220,20 @@ class TestApiManagementHelpers:
             "label": "FDRS \u2013 2024",
         }]
 
+    def test_url_builder_param_contracts_keep_declared_params_only(self):
+        from app.routes.admin.api_management import _url_builder_param_contracts
+        contracts = _url_builder_param_contracts([
+            {'path': '/api/v1/data', 'paginated': True},
+            {
+                'path': '/api/v1/extract',
+                'paginated': False,
+                'query_params': [{'name': 'round', 'type': 'text'}],
+            },
+            {'path': '', 'query_params': [{'name': 'ignored'}]},
+        ])
+        assert list(contracts) == ['/api/v1/extract']
+        assert contracts['/api/v1/extract'][0]['name'] == 'round'
+
     def test_url_builder_endpoint_groups_keep_registry_order_and_sort_paths(self):
         from app.routes.admin.api_management import _url_builder_endpoint_groups
         groups = _url_builder_endpoint_groups([

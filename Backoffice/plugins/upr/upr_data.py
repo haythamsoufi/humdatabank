@@ -23,7 +23,14 @@ from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.core import Country
 from app.models.enums import AssignmentEntityStatusValue
 from app.models.form_items import FormItem
-from app.models.forms import DynamicIndicatorData, DynamicSectionContext, FormData, FormSection
+from app.models.forms import (
+    DynamicIndicatorData,
+    DynamicSectionContext,
+    FormData,
+    FormSection,
+    RepeatGroupData,
+    RepeatGroupInstance,
+)
 from app.models.indicator_bank import IndicatorBank
 from app.models.organization import NationalSociety
 from plugins.upr.catalog import (
@@ -41,6 +48,7 @@ from plugins.upr.catalog import (
 )
 from plugins.upr.financial import _IFRC_ACTUALS_SNAPSHOTS, _usable_ifrc_actual
 from plugins.upr.formatters import _year_token, period_to_round, planning_years, strip_trailing_period, to_number
+from plugins.upr.indicators import _decode_waf_b64_label, _is_other_appeal_text, _split_appeal_label
 from plugins.upr.matrix import (
     _area_code,
     _funding_column_bucket,
@@ -70,6 +78,7 @@ _MATRIX_ROLES = frozenset(
     {"support", "funding", "activity", "reach", "emergency", "plan_funding", "pns_funding"}
 )
 _EA_CODE_RE = re.compile(r"\(([^)]+)\)")
+_APPEAL_CODE_RE = re.compile(r"\b(MDR[A-Z0-9]{2,})\b", re.IGNORECASE)
 _ID_CHUNK = 2000
 
 _DISAGG_LABELS = {
@@ -134,7 +143,7 @@ FACT_COLUMNS = (
     "Country",
     "NS",
     "Region",
-    "Table",
+    "Section",
     "SectionB",
     "Source",
     "Entity",
@@ -315,6 +324,66 @@ def ea_code_from_text(text: str | None) -> str | None:
     return code or None
 
 
+def appeal_code_from_text(text: str | None) -> str | None:
+    """MDR appeal code from a stored label, context key, or repeat-field value."""
+    decoded = _decode_waf_b64_label(text or "")
+    if not decoded or _is_other_appeal_text(decoded):
+        return None
+    _name, paren = _split_appeal_label(decoded)
+    match = _APPEAL_CODE_RE.search(paren or decoded)
+    if not match:
+        return None
+    return match.group(1).upper()
+
+
+def appeal_code_from_payload(value: Any, disagg: Any) -> str | None:
+    if isinstance(disagg, dict):
+        for key in ("code", "context_key", "appeal_code"):
+            found = appeal_code_from_text(str(disagg.get(key) or ""))
+            if found:
+                return found
+        values = disagg.get("values")
+        if isinstance(values, dict):
+            for raw in values.values():
+                if isinstance(raw, str):
+                    found = appeal_code_from_text(raw)
+                    if found:
+                        return found
+                elif isinstance(raw, dict):
+                    found = appeal_code_from_text(str(raw.get("code") or ""))
+                    if found:
+                        return found
+    if isinstance(value, str):
+        return appeal_code_from_text(value)
+    return None
+
+
+def resolve_emergency_appeal(
+    contexts_by_section: dict[tuple[int, int], dict[str, Any]],
+    contexts_by_slot: dict[tuple[int, int], str],
+    codes_by_instance: dict[tuple[int, int], str],
+    *,
+    aes_id: int,
+    section_id: int,
+    instance_number: int | None,
+) -> tuple[str | None, int | None]:
+    """Appeal code and slot for a dynamic emergency indicator.
+
+    The section title is not an appeal code. Prefer the bound context, then
+    the repeat instance that holds the emergency operation.
+    """
+    ctx = contexts_by_section.get((int(aes_id), int(section_id))) or {}
+    slot = ctx.get("slot")
+    if slot is None and instance_number is not None:
+        slot = int(instance_number)
+    code = appeal_code_from_text(str(ctx.get("code") or "")) if ctx else None
+    if not code and slot is not None:
+        code = contexts_by_slot.get((int(aes_id), int(slot)))
+    if not code and instance_number is not None:
+        code = codes_by_instance.get((int(aes_id), int(instance_number)))
+    return code, (int(slot) if slot is not None else None)
+
+
 def iter_measure_points(
     value: Any,
     disagg: Any,
@@ -396,7 +465,7 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "Country": place.get("country"),
         "NS": place.get("ns"),
         "Region": place.get("region"),
-        "Table": None,
+        "Section": None,
         "SectionB": None,
         "Source": place.get("source") or "Country Data",
         "Entity": None,
@@ -444,7 +513,7 @@ def measure_facts(
         row = blank_fact(place)
         row.update(
             {
-                "Table": table,
+                "Section": table,
                 "SectionB": section,
                 "Indicator": indicator,
                 "Attribute": "Total",
@@ -460,7 +529,7 @@ def measure_facts(
         row = blank_fact(place)
         row.update(
             {
-                "Table": table,
+                "Section": table,
                 "SectionB": section,
                 "Indicator": indicator,
                 "Attribute": attribute,
@@ -607,7 +676,7 @@ def _support_facts(
         fact = blank_fact(place)
         fact.update(
             {
-                "Table": table,
+                "Section": table,
                 "SectionB": section,
                 "Entity": "PNS",
                 "NS": ns_name or place.get("ns"),
@@ -656,7 +725,7 @@ def _report_funding_facts(place: dict[str, Any], cells: dict[str, Any]) -> list[
         fact = blank_fact(place)
         fact.update(
             {
-                "Table": "Funding",
+                "Section": "Funding",
                 "SectionB": "Funding",
                 "Source": "Country Data",
                 "Entity": entity_name,
@@ -694,7 +763,7 @@ def _plan_funding_facts(
         fact = blank_fact(place)
         fact.update(
             {
-                "Table": "FR_Country",
+                "Section": "Funding",
                 "SectionB": None,
                 "Entity": entity or (row_key or None),
                 "NS": place.get("ns"),
@@ -737,7 +806,7 @@ def _pns_funding_facts(
         fact = blank_fact(place)
         fact.update(
             {
-                "Table": "Funding",
+                "Section": "Funding",
                 "SectionB": "Funding",
                 "Source": "PNS Data",
                 "Entity": host,
@@ -768,7 +837,7 @@ def _reach_facts(
         fact = blank_fact(place)
         fact.update(
             {
-                "Table": "Emergencies" if emergencies else "Reach",
+                "Section": "Emergencies" if emergencies else "Reach",
                 "SectionB": None,
                 "Entity": entity,
                 "NS": place.get("ns"),
@@ -806,8 +875,8 @@ def dynamic_facts(
 ) -> list[dict[str, Any]]:
     if appeal_code or slot:
         table = f"Emergency {slot}" if slot else "Emergencies"
-        section = appeal_code or section_name
-        ea_code = appeal_code
+        section = appeal_code or appeal_code_from_text(section_name)
+        ea_code = section
     else:
         table = "Other indicators"
         section = "Other indicators"
@@ -877,7 +946,7 @@ def system_facts_from_snapshot(
                     )
                     fact.update(
                         {
-                            "Table": "Funding",
+                            "Section": "Funding",
                             "SectionB": "Funding",
                             "Entity": "IFRC Secretariat",
                             "Attribute": attribute,
@@ -1348,7 +1417,7 @@ def build_upr_data(
 
     if table:
         wanted = table.strip().lower()
-        facts = [row for row in facts if str(row.get("Table") or "").strip().lower() == wanted]
+        facts = [row for row in facts if str(row.get("Section") or "").strip().lower() == wanted]
     if iso3:
         code = iso3.strip().upper()
         facts = [row for row in facts if str(row.get("ISO3") or "").upper() == code]
@@ -1628,7 +1697,8 @@ def _dynamic_facts(
     report_ids = [place["submission_id"] for place in places if place.get("template") == "report"]
     if not report_ids:
         return []
-    contexts = _load_contexts(report_ids)
+    contexts, contexts_by_slot = _load_contexts(report_ids)
+    appeal_codes = _load_repeat_appeal_codes(report_ids)
     section_ids: set[int] = set()
     raw_rows = []
     for chunk in _chunks(report_ids):
@@ -1657,11 +1727,14 @@ def _dynamic_facts(
         place = by_submission.get(row[0])
         if place is None:
             continue
-        ctx = contexts.get((row[0], int(row[1])))
-        appeal = ctx.get("code") if ctx else None
-        slot = ctx.get("slot") if ctx else None
-        if appeal is None and row[2] is not None:
-            slot = int(row[2])
+        appeal, slot = resolve_emergency_appeal(
+            contexts,
+            contexts_by_slot,
+            appeal_codes,
+            aes_id=int(row[0]),
+            section_id=int(row[1]),
+            instance_number=row[2],
+        )
         if master:
             facts.extend(
                 master_dynamic_rows(
@@ -1695,8 +1768,11 @@ def _dynamic_facts(
     return facts
 
 
-def _load_contexts(aes_ids: list[int]) -> dict[tuple[int, int], dict[str, Any]]:
+def _load_contexts(
+    aes_ids: list[int],
+) -> tuple[dict[tuple[int, int], dict[str, Any]], dict[tuple[int, int], str]]:
     found: dict[tuple[int, int], dict[str, Any]] = {}
+    by_slot: dict[tuple[int, int], str] = {}
     for chunk in _chunks(aes_ids):
         rows = (
             db.session.query(
@@ -1715,7 +1791,42 @@ def _load_contexts(aes_ids: list[int]) -> dict[tuple[int, int], dict[str, Any]]:
             current = found.get(key)
             if current and current.get("provider") == "emergency_operations" and provider_id != "emergency_operations":
                 continue
-            found[key] = {"slot": slot, "code": context_key, "provider": provider_id}
+            code = appeal_code_from_text(context_key)
+            found[key] = {"slot": slot, "code": code or context_key, "provider": provider_id}
+            if code and slot is not None:
+                by_slot[(int(aes_id), int(slot))] = code
+    return found, by_slot
+
+
+def _load_repeat_appeal_codes(aes_ids: list[int]) -> dict[tuple[int, int], str]:
+    """Appeal code stored on the emergency repeat instance, keyed by slot."""
+    found: dict[tuple[int, int], str] = {}
+    if not aes_ids:
+        return found
+    for chunk in _chunks(aes_ids):
+        rows = (
+            db.session.query(
+                RepeatGroupInstance.assignment_entity_status_id,
+                RepeatGroupInstance.instance_number,
+                RepeatGroupInstance.instance_label,
+                RepeatGroupData.value,
+                RepeatGroupData.disagg_data,
+            )
+            .outerjoin(RepeatGroupData, RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id)
+            .filter(RepeatGroupInstance.assignment_entity_status_id.in_(chunk))
+            .filter(RepeatGroupInstance.is_hidden.is_(False))
+            .all()
+        )
+        for aes_id, number, label, value, disagg in rows:
+            key = (int(aes_id), int(number))
+            from_field = appeal_code_from_payload(value, disagg)
+            if from_field:
+                found[key] = from_field
+                continue
+            if key not in found:
+                from_label = appeal_code_from_text(label)
+                if from_label:
+                    found[key] = from_label
     return found
 
 

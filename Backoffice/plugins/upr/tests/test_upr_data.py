@@ -10,6 +10,7 @@ from plugins.upr.catalog import (
 )
 from plugins.upr.upr_data import (
     ItemView,
+    appeal_code_from_text,
     assignment_year,
     attribute_label,
     classify_item,
@@ -19,6 +20,7 @@ from plugins.upr.upr_data import (
     master_comment_row,
     master_dynamic_rows,
     master_rows_for_item,
+    resolve_emergency_appeal,
     spef_label,
     submission_row,
     system_facts_from_snapshot,
@@ -155,7 +157,7 @@ def test_other_indicator_yes_becomes_one_and_no_is_dropped():
         appeal_code=None,
         slot=None,
     )
-    assert yes[0]["Table"] == "Other indicators"
+    assert yes[0]["Section"] == "Other indicators"
     assert yes[0]["Value"] == 1
     assert yes[0]["SP/EF"] == "Cross-cutting"
     assert yes[0]["Indicator"] == "A custom indicator"
@@ -172,14 +174,47 @@ def test_emergency_dynamic_uses_appeal_code_not_section_order_guess():
         disagg=None,
         data_not_available=False,
         not_applicable=False,
-        section_name="Emergency operations",
+        section_name="Emergency Appeal Indicators",
         appeal_code="MDRAF015",
         slot=2,
     )
-    assert rows[0]["Table"] == "Emergency 2"
+    assert rows[0]["Section"] == "Emergency 2"
     assert rows[0]["SectionB"] == "MDRAF015"
     assert rows[0]["EA Code"] == "MDRAF015"
     assert rows[0]["SP/EF"] == "SP2"
+
+
+def test_section_title_is_not_used_as_the_appeal_code():
+    rows = dynamic_facts(
+        _PLACE,
+        indicator="People reached",
+        area="SP2",
+        value="4",
+        disagg=None,
+        data_not_available=False,
+        not_applicable=False,
+        section_name="Emergency Appeal Indicators",
+        appeal_code=None,
+        slot=1,
+    )
+    assert rows[0]["Section"] == "Emergency 1"
+    assert rows[0]["SectionB"] is None
+    assert rows[0]["EA Code"] is None
+
+
+def test_appeal_code_comes_from_the_repeat_instance_when_context_is_missing():
+    code, slot = resolve_emergency_appeal(
+        {},
+        {},
+        {(99, 1): "MDRAF007"},
+        aes_id=99,
+        section_id=50,
+        instance_number=1,
+    )
+    assert code == "MDRAF007"
+    assert slot == 1
+    assert appeal_code_from_text("Quake (MDRAF007)") == "MDRAF007"
+    assert appeal_code_from_text("Emergency Appeal Indicators") is None
 
 
 def test_not_applicable_emits_a_status_row_without_a_value():
@@ -194,7 +229,7 @@ def test_not_applicable_emits_a_status_row_without_a_value():
     assert len(rows) == 1
     assert rows[0]["Applicable/Data not available"] == "Not Applicable"
     assert rows[0]["Value"] is None
-    assert rows[0]["Table"] == "Core indicators"
+    assert rows[0]["Section"] == "Core indicators"
     assert rows[0]["Indicator"] == "People reached"
     assert rows[0]["Year"] == 2026
 
@@ -213,7 +248,7 @@ def test_support_matrix_splits_column_and_skips_total():
     assert rows[0]["Entity"] == "PNS"
     assert rows[0]["SP/EF"] == "SP1"
     assert rows[0]["Attribute"] == "Supported"
-    assert rows[0]["Table"] == "Support"
+    assert rows[0]["Section"] == "Support"
     assert rows[0]["Value"] == 1
 
 
@@ -258,7 +293,7 @@ def test_plan_funding_year_follows_the_item_when_the_label_has_no_offset():
         value=None,
         disagg={"mode": "matrix", "values": {"HNS_SP1": 80}},
     )
-    assert rows[0]["Table"] == "FR_Country"
+    assert rows[0]["Section"] == "Funding"
     assert rows[0]["Year"] == 2027
     assert rows[0]["Entity"] == "HNS"
     assert rows[0]["NS"] == "Afghan Red Crescent Society"
@@ -285,7 +320,7 @@ def test_planning_emergency_numbers_and_ea_code():
     rows = facts_for_item(item, "emergency", place, value=None, disagg=disagg, emergency_index=index)
     assert [row["Attribute"] for row in rows] == ["E1", "E2"]
     assert [row["EA Code"] for row in rows] == ["MDRAF015", "MDRAF016"]
-    assert rows[0]["Table"] == "Emergencies"
+    assert rows[0]["Section"] == "Emergencies"
     assert rows[0]["Year"] == 2026
     assert rows[0]["SectionB"] is None
 

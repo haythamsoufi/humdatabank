@@ -43,6 +43,22 @@ def _url_builder_endpoint_sort_key(endpoint: dict):
     )
 
 
+def _url_builder_param_contracts(endpoints: list[dict]) -> dict:
+    """Query-parameter contracts declared by endpoints, keyed by path.
+
+    Only endpoints that set ``query_params`` are included. The URL builder uses
+    this instead of a path-specific list in the core template.
+    """
+    contracts: dict = {}
+    for ep in endpoints or []:
+        params = ep.get('query_params')
+        path = str(ep.get('path') or '').strip()
+        if not path or not params:
+            continue
+        contracts[path] = list(params)
+    return contracts
+
+
 def _url_builder_endpoint_groups(endpoints: list[dict]) -> list[dict]:
     """Keep registry group order; sort paths alphabetically inside each group."""
     order = []
@@ -1090,6 +1106,7 @@ def api_management():
         for ep in all_endpoints if ep['surface'] == 'v1'
     ]
     url_builder_endpoint_groups = _url_builder_endpoint_groups(v1_endpoints)
+    url_builder_contracts = _url_builder_param_contracts(v1_endpoints)
 
     # ── Legacy `api_endpoints` list kept for the chart / URL-builder selectors ─
     # Featured (endorsed) endpoints stay pinned at the top; then busiest first.
@@ -1151,6 +1168,7 @@ def api_management():
         # Backward-compat for URL builder + chart selector
         endpoints=api_endpoints,
         url_builder_endpoint_groups=url_builder_endpoint_groups,
+        url_builder_contracts=url_builder_contracts,
         # Overview stats (v1 / APIUsage)
         total_requests=total_requests,
         avg_response_time=avg_response_time,

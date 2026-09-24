@@ -361,3 +361,25 @@ class TestRequireApiKeyOrSession:
         assert result is error_response
         assert result.status_code == 401
         mock_auth.assert_called_once()
+
+    def test_browser_request_with_query_api_key_does_not_redirect(self, app):
+        mock_user = MagicMock()
+        mock_user.is_authenticated = False
+
+        @require_api_key_or_session(browser_login_redirect=True)
+        def protected():
+            return {'authenticated': True}
+
+        with app.test_request_context(
+            '/api/v1/upr/data?api_key=query-key',
+            headers={'Accept': 'text/html'},
+        ):
+            with patch('app.utils.auth.current_user', mock_user):
+                with patch(
+                    'app.utils.auth.authenticate_db_api_key_only',
+                    return_value=True,
+                ) as mock_auth:
+                    result = protected()
+
+        assert result == {'authenticated': True}
+        mock_auth.assert_called_once()

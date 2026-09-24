@@ -7,8 +7,9 @@ loaded, already shaped:
 - ``submissions`` — assignment status, round, and FDS validation
 - ``comments`` — narrative answers
 
-Round is taken from the assignment period. Bearer API key or a Backoffice
-session. Register the route in Admin → API Management via ``API_ENDPOINTS``.
+Round is taken from the assignment period. Authenticate with a Bearer token,
+``X-API-Key``, ``?api_key=`` (Power Query / Power BI), or a Backoffice session.
+Register the route in Admin → API Management via ``API_ENDPOINTS``.
 """
 
 from __future__ import annotations
@@ -34,6 +35,29 @@ from plugins.upr.upr_data import (
     build_upr_submissions,
 )
 
+# URL-builder contract. Core renders these; it does not know this plugin's paths.
+_UPR_QUERY_PARAMS = [
+    {
+        "name": "template",
+        "type": "select",
+        "options": ["report", "plan", "pns"],
+        "labels": ["Report", "Plan", "PNS"],
+        "description": "Unified Report, Unified Plan, or PNS report",
+    },
+    {
+        "name": "round",
+        "type": "text",
+        "placeholder": "MYR26",
+        "description": "Reporting round code, for example MYR26",
+    },
+    {
+        "name": "iso3",
+        "type": "select",
+        "option_source": "country_iso3",
+        "description": "Filter by ISO 3166-1 alpha-3",
+    },
+]
+
 API_ENDPOINTS = [
     {
         "group": "UPR",
@@ -45,10 +69,19 @@ API_ENDPOINTS = [
         "description": (
             "Unified Plan and Report facts for Power BI (templates 33, 24, and 23). "
             "Returns data, submissions, and comments already shaped like the UPR dataflow. "
-            "Filters: template (report|plan|pns), round (for example MYR26), iso3, table. "
+            "Filters: template (report|plan|pns), round (for example MYR26), iso3, section. "
             "Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": _UPR_QUERY_PARAMS + [
+            {
+                "name": "section",
+                "type": "text",
+                "placeholder": "Funding",
+                "description": "Limit facts to one Section value. Omit to return every section.",
+            },
+        ],
     },
     {
         "group": "UPR",
@@ -63,6 +96,8 @@ API_ENDPOINTS = [
             "Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": list(_UPR_QUERY_PARAMS),
     },
     {
         "group": "UPR",
@@ -79,6 +114,15 @@ API_ENDPOINTS = [
             "Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": _UPR_QUERY_PARAMS + [
+            {
+                "name": "section",
+                "type": "text",
+                "placeholder": "Section name",
+                "description": "Limit rows to one Section value. Omit to return every section.",
+            },
+        ],
     },
 ]
 
@@ -105,12 +149,12 @@ def get_upr_data():
 
         round_code = (request.args.get("round") or "").strip().upper() or None
         iso3 = (request.args.get("iso3") or "").strip().upper() or None
-        table = (request.args.get("table") or "").strip().lower() or None
+        section = (request.args.get("section") or request.args.get("table") or "").strip().lower() or None
         params = {
             "template": template,
             "round": round_code,
             "iso3": iso3,
-            "table": table,
+            "section": section,
         }
         payload, cache_hit = get_or_build_upr_payload(
             "data",
@@ -119,7 +163,7 @@ def get_upr_data():
                 template=template,
                 round_code=round_code,
                 iso3=iso3,
-                table=table,
+                table=section,
             ),
         )
         facts = payload["data"]

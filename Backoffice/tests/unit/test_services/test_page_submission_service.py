@@ -1,4 +1,4 @@
-"""Unit tests for per-page save/submit helpers."""
+"""Unit tests for per-page submit helpers."""
 from unittest.mock import MagicMock
 
 import pytest

@@ -60,6 +60,11 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         return bp
 
+    def get_api_endpoints(self):
+        from plugins.upr.upr_data_routes import API_ENDPOINTS
+
+        return list(API_ENDPOINTS)
+
     def get_additional_blueprints(self):
         from plugins.upr.excel.import_routes import bp as excel_import_bp, legacy_bp as excel_import_legacy_bp
 

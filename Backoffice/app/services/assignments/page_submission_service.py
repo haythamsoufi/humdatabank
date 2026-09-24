@@ -1,4 +1,4 @@
-"""Helpers for optional per-page save/submit on an assignment."""
+"""Helpers for optional per-page submit on an assignment."""
 from __future__ import annotations
 
 from typing import Any, Iterable
@@ -21,7 +21,7 @@ from app.services.assignments.scoped_status import (
 from app.utils.datetime_helpers import utcnow
 
 PARTICIPATING_SECTION_TYPES = frozenset({'standard', 'repeat', 'dynamic_indicators'})
-PAGE_ACTIONS = frozenset({'save_page', 'submit_page'})
+PAGE_ACTIONS = frozenset({'submit_page'})
 
 
 def is_participating_section(section) -> bool:

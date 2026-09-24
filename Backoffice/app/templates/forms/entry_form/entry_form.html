@@ -400,7 +400,8 @@
         <form method="POST" id="focalDataEntryForm" enctype="multipart/form-data" action="{{ form_action }}"
               {% if form_type == 'assignment' and _draft_restore_assignment_status %}data-assignment-status="{{ _draft_restore_assignment_status }}"{% endif %}
               {% if review_enabled is defined %}data-review-enabled="{{ 'true' if review_enabled else 'false' }}"{% endif %}
-              {% if is_delegation_user is defined %}data-is-delegation-user="{{ 'true' if is_delegation_user else 'false' }}"{% endif %}>
+              {% if is_delegation_user is defined %}data-is-delegation-user="{{ 'true' if is_delegation_user else 'false' }}"{% endif %}
+              {% if enable_page_submission %}data-page-submission="true"{% endif %}>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="submit_form" value="1">
             {% if template_id is defined %}
@@ -611,16 +612,8 @@
                             </button>
                         </div>
                     {% else %}
-                        {% if enable_page_submission and not is_public_submission %}
-                        <button type="submit" name="action" value="save"
-                                style="display:none;"
-                                aria-hidden="true"
-                                tabindex="-1">
-                            {{ _('Save') }}
-                        </button>
-                        {% endif %}
                         <div class="flex flex-wrap gap-2">
-                            {% if not is_public_submission and not enable_page_submission %}
+                            {% if not is_public_submission %}
                             <button type="submit" name="action" value="save"
                                     class="btn btn-primary flex-1">
                                 <i class="fas fa-save w-4 h-4 mr-2"></i>
@@ -910,11 +903,6 @@
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
                                         {% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
                                         {{ section_display_name }}
-                                        {% if _is_page_first %}
-                                        <span class="page-workflow-pill ml-2" data-page-id="{{ _page_id_for_section }}" data-status="{{ _page_wf }}">
-                                            {{ status_label_for_assignment(_page_wf) }}
-                                        </span>
-                                        {% endif %}
                                         <button type="button" class="collapse-toggle btn btn-icon btn-sm ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
@@ -2985,41 +2973,41 @@
                     </div>
 
                     {% if can_edit %}
+                        <div>
+                            <label for="modal-document-file" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Document:') }}</label>
+                            <div class="file-upload-wrapper relative border-2 border-dashed border-gray-300 rounded-lg cursor-pointer" role="button" tabindex="0">
+                                <input type="file" id="modal-document-file"
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                                       class="modal-document-file-input"
+                                       tabindex="-1"/>
+                                <div class="file-upload-box relative p-4">
+                                    <div id="modal-file-empty" class="text-center py-4">
+                                        <div class="file-upload-box__glyph mb-2">
+                                            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400"></i>
+                                        </div>
+                                        <p id="modal-file-prompt" class="text-sm text-gray-500">{{ _('Click or drag document here to upload') }}</p>
+                                    </div>
+                                    <div id="current-document-info" class="hidden">
+                                        <div class="entry-form-doc-card__body">
+                                            <div id="current-document-icon" class="entry-form-doc-card__icon entry-form-doc-card__icon--generic" aria-hidden="true">
+                                                <i class="fas fa-file"></i>
+                                            </div>
+                                            <p id="current-document-label" class="entry-form-doc-card__upload-info">{{ _('Current Document:') }}</p>
+                                            <p id="current-document-filename" class="entry-form-doc-card__filename"></p>
+                                            <p id="current-document-help" class="entry-form-doc-card__upload-info hidden"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="mt-2 text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                {{ _('Allowed types: PDF, Word, Excel, PowerPoint, Text') }} • {{ _('Maximum file size: 25MB') }}<span id="modal-max-documents-info" class="max-documents-info"></span>
+                            </p>
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {# Left Column #}
                             <div class="space-y-4">
-                                <div>
-                                    <label for="modal-document-file" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Document:') }}</label>
-
-                                    {# Current Document Info - Only shown in edit mode #}
-                                    <div id="current-document-info" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md hidden">
-                                        <div class="flex items-start gap-2">
-                                            <i class="fas fa-file-alt text-blue-600 mt-0.5 flex-shrink-0"></i>
-                                            <div class="flex-1 min-w-0">
-                                                <p class="text-sm font-medium text-blue-900">{{ _('Current Document:') }}</p>
-                                                <p id="current-document-filename" class="text-sm text-blue-700 break-words"></p>
-                                                <p class="text-xs text-blue-600 mt-1">{{ _('Leave file selection empty to keep current document, or upload a new file to replace it.') }}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="file-upload-wrapper relative h-40 border-2 border-dashed border-gray-300 rounded-lg">
-                                        <input type="file" id="modal-document-file"
-                                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-                                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
-                                        <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
-                                            <div class="text-center">
-                                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
-                                                <p class="text-sm text-gray-500">{{ _('Click or drag document here to upload') }}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <p class="mt-2 text-sm text-gray-500">
-                                        <i class="fas fa-info-circle mr-1"></i>
-                                        {{ _('Allowed types: PDF, Word, Excel, PowerPoint, Text') }} • {{ _('Maximum file size: 25MB') }}<span id="modal-max-documents-info" class="max-documents-info"></span>
-                                    </p>
-                                </div>
-
                                 <div>
                                     <label for="modal-document-language" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Language:') }}</label>
                                     <div class="document-language-wrapper relative">

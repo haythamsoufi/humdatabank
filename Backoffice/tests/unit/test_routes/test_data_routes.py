@@ -408,7 +408,7 @@ class TestGetDataDynamicFields:
 
     REQUIRED_DYNAMIC_KEYS = {
         'id', 'field_type', 'data_type', 'submission_type', 'submission_id',
-        'template_id', 'period_name', 'country_id', 'iso2', 'iso3',
+        'assigned_form_id', 'template_id', 'period_name', 'country_id', 'iso2', 'iso3',
         'section_id', 'section_stable_key', 'indicator_bank_id', 'custom_label',
         'form_item_id', 'form_item_stable_key',
         'repeat_instance_number', 'repeat_instance_id',
@@ -435,6 +435,7 @@ class TestGetDataDynamicFields:
 
         aes = MagicMock()
         aes.id = 88
+        aes.assigned_form_id = 42
         aes.entity_type = 'country'
         aes.entity_id = 7
         af = MagicMock()
@@ -489,6 +490,9 @@ class TestGetDataDynamicFields:
         context_row.label_snapshot = 'Bangladesh Floods'
         context_row.status = 'active'
         context_row.resolved_at = dynamic_row.submitted_at
+        aes_parent = MagicMock()
+        aes_parent.assigned_form_id = 42
+        context_row.assignment_entity_status = aes_parent
 
         with app.app_context():
             with patch("app.routes.api.data.query_dynamic_indicator_data",
@@ -516,6 +520,7 @@ class TestGetDataDynamicFields:
                     item_id=None,
                     country_id=None,
                     period_name=None,
+                    assignment_ids=None,
                     indicator_bank_id=None,
                     submission_type=None,
                     include_dynamic=True,
@@ -536,6 +541,8 @@ class TestGetDataDynamicFields:
         assert row['form_item_stable_key'] is None
         assert len(result['dynamic_context']) == 1
         assert result['dynamic_context'][0]['context_key'] == 'MDRBD018'
+        assert result['dynamic_context'][0]['assigned_form_id'] == 42
+        assert row['assigned_form_id'] == 42
 
     def test_get_data_response_includes_dynamic_data_fields(self, client, app):
         dynamic_row = self._make_dynamic_orm_row()
@@ -687,6 +694,7 @@ class TestDataHelpers:
             'form_item_id': 9,
             'submission_type': 'assigned',
             'submission_id': 1,
+            'assigned_form_id': 77,
             'country_id': 7,
             'disaggregation_data': {
                 'mode': 'matrix',
@@ -702,6 +710,7 @@ class TestDataHelpers:
         assert cells[0]['matrix']['column']['key'] == 'SP2'
         assert cells[0]['matrix']['row']['join_dimension'] == 'countries'
         assert cells[0]['value'] == 4107000
+        assert cells[0]['assigned_form_id'] == 77
         assert cells[0]['matrix']['row']['label'] == 'Kenya'
         assert cells[0]['matrix']['entity']['iso2'] == 'KE'
 

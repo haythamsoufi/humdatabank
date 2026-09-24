@@ -55,7 +55,7 @@ class AssignedFormForm(BaseForm):
     )
 
     enable_page_submission = BooleanField(
-        "Allow save and submit per page",
+        "Allow submit per page",
         default=False,
     )
 

@@ -114,7 +114,7 @@ _DATA_ARRAY_CATALOG = {
         'grain': 'submission × static form_item',
         'key_fields': [
             'id', 'form_item_id', 'country_id', 'submission_id', 'submission_type',
-            'template_id',             'period_name', 'value', 'num_value', 'data_status',
+            'assigned_form_id', 'template_id', 'period_name', 'value', 'num_value', 'data_status',
         ],
         'notes': (
             'Percentage-type indicators and questions return value/num_value on a '
@@ -132,7 +132,8 @@ _DATA_ARRAY_CATALOG = {
         'grain': 'submission × section × indicator_bank (+ repeat slot when applicable)',
         'key_fields': [
             'id', 'indicator_bank_id', 'section_id', 'country_id', 'submission_id',
-            'repeat_instance_number', 'repeat_instance_id', 'value', 'custom_label',
+            'assigned_form_id', 'repeat_instance_number', 'repeat_instance_id', 'value',
+            'custom_label',
         ],
     },
     'repeat_data': {
@@ -145,7 +146,7 @@ _DATA_ARRAY_CATALOG = {
         'grain': 'submission × repeat instance × form_item',
         'key_fields': [
             'id', 'form_item_id', 'repeat_instance_id', 'section_id', 'country_id',
-            'submission_id', 'value', 'num_value',
+            'submission_id', 'assigned_form_id', 'value', 'num_value',
         ],
     },
     'dynamic_context': {
@@ -157,7 +158,7 @@ _DATA_ARRAY_CATALOG = {
         'grain': 'submission × section × repeat instance',
         'key_fields': [
             'id', 'section_id', 'repeat_instance_id', 'label_snapshot', 'context_data',
-            'submission_id', 'submission_type',
+            'submission_id', 'submission_type', 'assigned_form_id',
         ],
     },
     'form_items': {
@@ -213,7 +214,8 @@ _DATA_ARRAY_CATALOG = {
         ),
         'grain': 'form_data × matrix row entity × column × source',
         'key_fields': [
-            'form_data_id', 'form_item_id', 'value', 'is_calculated_total', 'total_kind',
+            'form_data_id', 'form_item_id', 'assigned_form_id', 'value',
+            'is_calculated_total', 'total_kind',
             'matrix.source',
             'matrix.row.entity_id', 'matrix.row.label',
             'matrix.column.key', 'matrix.column.label',
@@ -1735,6 +1737,9 @@ def get_all_data():
                     'data_type': 'static',
                     'submission_type': 'assigned',
                     'submission_id': status_info.id if status_info else None,
+                    'assigned_form_id': (
+                        status_info.assigned_form_id if status_info else None
+                    ),
                     'form_item_id': data_item.form_item_id,
                     'template_id': assigned_form.template_id if assigned_form else None,
                     'period_name': assigned_form.period_name if assigned_form else None,
@@ -1803,6 +1808,9 @@ def get_all_data():
                     'data_type': 'static',
                     'submission_type': 'public',
                     'submission_id': submission.id if submission else None,
+                    'assigned_form_id': (
+                        submission.assigned_form_id if submission else None
+                    ),
                     'assignment_id': public_assignment.id if public_assignment else None,
                     'form_item_id': data_item.form_item_id,
                     'template_id': public_assignment.template_id if public_assignment else None,
@@ -1980,6 +1988,9 @@ def get_all_data():
                                     'data_type': 'static',
                                     'submission_type': 'assigned',
                                     'submission_id': aes_id,
+                                    'assigned_form_id': (
+                                        af.id if af else getattr(aes, 'assigned_form_id', None)
+                                    ),
                                     'form_item_id': int(fid),
                                     'template_id': int(template_id),
                                     'period_name': af.period_name if (af and getattr(af, 'period_name', None)) else period_name,

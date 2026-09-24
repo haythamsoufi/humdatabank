@@ -22,6 +22,7 @@ PUBLIC_DATA_SLIM_ROW_FIELDS = frozenset(
         'data_type',
         'submission_type',
         'submission_id',
+        'assigned_form_id',
         'form_item_id',
         'template_id',
         'period_name',

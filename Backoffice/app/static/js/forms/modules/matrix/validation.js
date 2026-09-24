@@ -88,6 +88,12 @@ collectMatrixValidationErrors() {
 
         const container = matrix.container;
         const formItemBlock = container.closest('.form-item-block');
+        if (
+            (formItemBlock && formItemBlock.closest('.relevance-hidden'))
+            || container.closest('.relevance-hidden')
+        ) {
+            return;
+        }
         const inputs = container.querySelectorAll('input[type="number"], input[data-numeric="true"]');
 
         inputs.forEach((input) => {

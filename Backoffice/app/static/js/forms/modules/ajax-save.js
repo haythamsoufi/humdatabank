@@ -42,39 +42,6 @@ export function initAjaxSave() {
     mobileNavToggle = document.getElementById('mobile-nav-toggle-button');
 
     debugLog(MODULE_NAME, '✅ AJAX Save initialized');
-    initPageAjaxSave();
-}
-
-/**
- * Bind per-page Save buttons to the same AJAX save path.
- */
-export function initPageAjaxSave() {
-    if (!form) {
-        form = document.getElementById('focalDataEntryForm');
-    }
-    if (!form) return;
-
-    document.querySelectorAll('button[name="action"][value="save_page"]').forEach((button) => {
-        if (button.dataset.pageSaveBound === 'true') return;
-        button.dataset.pageSaveBound = 'true';
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            if (isSaving) return;
-            if (window.collectHiddenFieldsForSubmission) {
-                window.collectHiddenFieldsForSubmission();
-            }
-            const pageId = button.dataset.pageId || '';
-            const pageInput = form.querySelector('input[name="page_id"]');
-            if (pageInput) pageInput.value = pageId;
-            updateSaveButtonState(true);
-            queueSave({
-                toast: true,
-                buttonState: true,
-                action: 'save_page',
-                pageId,
-            });
-        });
-    });
 }
 
 /**
@@ -545,10 +512,7 @@ function updateFabSaveState(saving) {
  * Update save button state
  */
 function updateSaveButtonState(saving) {
-    const scopedSaveButtons = [
-        ...document.querySelectorAll('.page-save-btn'),
-    ];
-    const buttonsToUpdate = [saveButton, ...scopedSaveButtons].filter(Boolean);
+    const buttonsToUpdate = [saveButton].filter(Boolean);
     buttonsToUpdate.forEach((saveButton) => {
         const icon = saveButton.querySelector('i');
         const text = saveButton.querySelector('span') || saveButton;

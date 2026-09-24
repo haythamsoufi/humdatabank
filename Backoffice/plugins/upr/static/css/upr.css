@@ -1259,23 +1259,27 @@
   justify-content: center;
 }
 
-.upr-support-th {
-  font-size: 0.62rem;
+.upr-support-table th.upr-support-th {
+  font-size: 0.58rem;
   font-weight: 600;
   line-height: 1.15;
   text-align: center;
   vertical-align: bottom;
-  padding: 0.35rem 0.15rem 0.4rem;
+  padding: 0.4rem 0.5rem 0.45rem;
   min-width: 0;
-  overflow-wrap: normal;
+  overflow-wrap: break-word;
   word-break: normal;
   hyphens: none;
+  box-sizing: border-box;
 }
 
-.upr-support-th span {
+.upr-support-table th.upr-support-th span {
   display: block;
-  white-space: nowrap;
-  overflow-wrap: normal;
+  box-sizing: border-box;
+  width: 100%;
+  padding-inline: 0.12rem;
+  white-space: normal;
+  overflow-wrap: break-word;
   word-break: normal;
   hyphens: none;
 }
@@ -1323,9 +1327,9 @@
   color: #6d6e71;
 }
 
-.upr-support-th--plan {
+.upr-support-table th.upr-support-th--plan {
   height: auto;
-  padding: 0.3rem 0.08rem 0.35rem;
+  padding: 0.35rem 0.45rem 0.4rem;
   vertical-align: bottom;
 }
 

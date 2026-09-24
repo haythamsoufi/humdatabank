@@ -240,10 +240,17 @@
 
   .hero-footer{
     position:absolute; z-index:4; inset-inline-start:7vw; bottom:26px;
+    display:flex; flex-direction:row; align-items:center; gap:16px; white-space:nowrap;
     color: rgba(255,255,255,.38); font-size:.72rem; letter-spacing:.02em;
     opacity:0;
   }
   .hero-footer.in{ animation: fadeUp .6s var(--ease-expo) forwards; }
+  .hero-footer a{
+    color: #93c5fd; text-decoration: underline; text-underline-offset: 2px;
+    transition: color .15s ease;
+  }
+  .hero-footer a:hover{ color: #bfdbfe; }
+  .hero-footer i{ font-size:.85rem; margin-inline-end:5px; }
 
   /* ------------------------------------------------------------------ */
   /* Right: login panel                                                  */
@@ -622,7 +629,9 @@
       </div>
     </main>
 
-    <div class="hero-footer" id="heroFooter">&copy; {{ (ORGANIZATION_BRANDING or {}).get('organization_copyright_year') or '2026' }} {{ ORG_SHORT_NAME or ORG_NAME }}</div>
+    <div class="hero-footer" id="heroFooter">
+      <span>{{ _('Powered by') }} <a href="https://github.com/haythamsoufi/humdatabank" target="_blank" rel="noopener noreferrer"><i class="fab fa-github" aria-hidden="true"></i>{{ _('Humanitarian Databank') }}</a></span>
+    </div>
   </section>
 
   <!-- ===================== RIGHT: login panel ===================== -->

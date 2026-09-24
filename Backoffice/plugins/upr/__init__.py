@@ -15,5 +15,6 @@ bp = Blueprint(
 
 from plugins.upr import routes  # noqa: E402, F401
 from plugins.upr import guidance  # noqa: E402, F401
+from plugins.upr import upr_data_routes  # noqa: E402, F401
 
 __all__ = ["bp", "_PLUGIN_DIR"]

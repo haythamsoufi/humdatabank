@@ -745,6 +745,7 @@ def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip
             'form_item_id': form_item_id,
             'submission_type': row.get('submission_type'),
             'submission_id': row.get('submission_id'),
+            'assigned_form_id': row.get('assigned_form_id'),
             'template_id': row.get('template_id'),
             'period_name': row.get('period_name'),
             'country_id': row.get('country_id'),
@@ -1314,21 +1315,37 @@ def _wrap_disagg_dict(dd):
     return {'mode': mode, 'values': values}
 
 
-def serialize_dynamic_section_context(context_row):
+def serialize_dynamic_section_context(context_row, assigned_form_ids=None):
     """Serialize a DynamicSectionContext row for API output."""
     if not context_row:
         return None
     if getattr(context_row, 'assignment_entity_status_id', None):
         submission_type = 'assigned'
         submission_id = context_row.assignment_entity_status_id
+        parent_attr = 'assignment_entity_status'
     else:
         submission_type = 'public'
         submission_id = context_row.public_submission_id
+        parent_attr = 'public_submission'
+    lookup_key = None
+    if submission_id is not None:
+        try:
+            lookup_key = (submission_type, int(submission_id))
+        except (TypeError, ValueError):
+            lookup_key = None
+    if assigned_form_ids is not None and lookup_key in assigned_form_ids:
+        assigned_form_id = assigned_form_ids[lookup_key]
+    else:
+        parent = getattr(context_row, parent_attr, None)
+        assigned_form_id = (
+            getattr(parent, 'assigned_form_id', None) if parent is not None else None
+        )
     resolved_at = getattr(context_row, 'resolved_at', None)
     return {
         'id': context_row.id,
         'submission_type': submission_type,
         'submission_id': submission_id,
+        'assigned_form_id': assigned_form_id,
         'section_id': context_row.section_id,
         'provider_id': context_row.provider_id,
         'slot': context_row.slot,
@@ -1479,19 +1496,47 @@ def fetch_dynamic_section_contexts(dynamic_orm_rows):
     if not section_ids or (not aes_ids and not pub_ids):
         return []
 
+    assigned_form_ids = {}
+    if aes_ids:
+        for aes_id, form_id in (
+            db.session.query(
+                AssignmentEntityStatus.id,
+                AssignmentEntityStatus.assigned_form_id,
+            )
+            .filter(AssignmentEntityStatus.id.in_(list(aes_ids)))
+            .all()
+        ):
+            if aes_id is not None:
+                assigned_form_ids[('assigned', int(aes_id))] = form_id
+    if pub_ids:
+        for pub_id, form_id in (
+            db.session.query(
+                PublicSubmission.id,
+                PublicSubmission.assigned_form_id,
+            )
+            .filter(PublicSubmission.id.in_(list(pub_ids)))
+            .all()
+        ):
+            if pub_id is not None:
+                assigned_form_ids[('public', int(pub_id))] = form_id
+
     contexts = []
     if aes_ids:
         rows = DynamicSectionContext.query.filter(
             DynamicSectionContext.assignment_entity_status_id.in_(aes_ids),
             DynamicSectionContext.section_id.in_(section_ids),
         ).all()
-        contexts.extend(serialize_dynamic_section_context(r) for r in rows if r)
+        contexts.extend(
+            serialize_dynamic_section_context(r, assigned_form_ids) for r in rows if r
+        )
     if pub_ids:
         rows = DynamicSectionContext.query.filter(
             DynamicSectionContext.public_submission_id.in_(pub_ids),
             DynamicSectionContext.section_id.in_(section_ids),
         ).all()
-        contexts.extend(serialize_dynamic_section_context(r) for r in rows if r)
+        contexts.extend(
+            serialize_dynamic_section_context(r, assigned_form_ids) for r in rows if r
+        )
     return contexts
 
 
@@ -1541,6 +1586,7 @@ def serialize_assigned_data_item(
         'data_type': 'static',
         'submission_type': 'assigned',
         'submission_id': status_info.id if status_info else None,
+        'assigned_form_id': status_info.assigned_form_id if status_info else None,
         'template_id': assigned_form.template_id if assigned_form else None,
         'template_name': template_name,
         'form_item_id': data_item.form_item_id,
@@ -1631,6 +1677,7 @@ def serialize_public_data_item(data_item, include_full_info=True, minimal_countr
         'data_type': 'static',
         'submission_type': 'public',
         'submission_id': submission.id if submission else None,
+        'assigned_form_id': submission.assigned_form_id if submission else None,
         'assignment_id': public_assignment.id if public_assignment else None,
         'template_id': public_assignment.template_id if public_assignment else None,
         'template_name': template_name,
@@ -1701,6 +1748,7 @@ def serialize_dynamic_data_item(
         submission_type = 'assigned'
         submission_id = aes.id
         assigned_form = aes.assigned_form
+        assigned_form_id = aes.assigned_form_id
         template_id = assigned_form.template_id if assigned_form else None
         period_name = assigned_form.period_name if assigned_form else None
         country_id = aes.entity_id if aes.entity_type == 'country' else None
@@ -1709,6 +1757,7 @@ def serialize_dynamic_data_item(
         submission_type = 'public'
         submission_id = pub.id if pub else None
         assigned_form = pub.assigned_form if pub else None
+        assigned_form_id = pub.assigned_form_id if pub else None
         template_id = assigned_form.template_id if assigned_form else None
         period_name = assigned_form.period_name if assigned_form else None
         country_id = pub.country_id if pub else None
@@ -1747,6 +1796,7 @@ def serialize_dynamic_data_item(
         'data_type': 'dynamic',
         'submission_type': submission_type,
         'submission_id': submission_id,
+        'assigned_form_id': assigned_form_id,
         'template_id': template_id,
         'period_name': period_name,
         'country_id': country_id,
@@ -1809,6 +1859,7 @@ def serialize_repeat_data_item(
         submission_type = 'assigned'
         submission_id = aes.id
         assigned_form = aes.assigned_form
+        assigned_form_id = aes.assigned_form_id
         template_id = assigned_form.template_id if assigned_form else None
         period_name = assigned_form.period_name if assigned_form else None
         country_id = aes.entity_id if aes.entity_type == 'country' else None
@@ -1817,6 +1868,7 @@ def serialize_repeat_data_item(
         submission_type = 'public'
         submission_id = pub.id if pub else None
         assigned_form = pub.assigned_form if pub else None
+        assigned_form_id = pub.assigned_form_id if pub else None
         template_id = assigned_form.template_id if assigned_form else None
         period_name = assigned_form.period_name if assigned_form else None
         country_id = pub.country_id if pub else None
@@ -1848,6 +1900,7 @@ def serialize_repeat_data_item(
         'data_type': 'repeat',
         'submission_type': submission_type,
         'submission_id': submission_id,
+        'assigned_form_id': assigned_form_id,
         'template_id': template_id,
         'period_name': period_name,
         'country_id': country_id,
@@ -2141,6 +2194,7 @@ def format_fact_submission_value_row(flat_row):
         'period_name': flat_row.get('period_name'),
         'submission_id': flat_row.get('submission_id'),
         'submission_type': flat_row.get('submission_type'),
+        'assigned_form_id': flat_row.get('assigned_form_id'),
         'section_id': flat_row.get('section_id'),
         'section_stable_key': flat_row.get('section_stable_key'),
         'repeat_instance_id': flat_row.get('repeat_instance_id'),
@@ -2206,6 +2260,7 @@ def format_bridge_disagg_rows(
     *,
     form_item_id=None,
     form_items_index=None,
+    assigned_form_id=None,
 ):
     """
     Flatten a normalized disaggregation payload into bridge rows.
@@ -2236,6 +2291,7 @@ def format_bridge_disagg_rows(
         for cell in _build_matrix_long_rows_from_values(values, matrix_config):
             rows.append({
                 'form_data_id': form_data_id,
+                'assigned_form_id': assigned_form_id,
                 'source': source,
                 'mode': mode,
                 'row_entity_id': cell.get('row_entity_id'),
@@ -2256,6 +2312,7 @@ def format_bridge_disagg_rows(
             continue
         rows.append({
             'form_data_id': form_data_id,
+            'assigned_form_id': assigned_form_id,
             'source': source,
             'mode': mode,
             'key': str(key),
@@ -2283,6 +2340,7 @@ def build_bridge_disagg_from_flat_rows(data_rows, *, form_items_index=None):
                 format_bridge_disagg_rows(
                     form_data_id, row.get(field), source=source,
                     form_item_id=form_item_id, form_items_index=form_items_index,
+                    assigned_form_id=row.get('assigned_form_id'),
                 )
             )
     return bridge

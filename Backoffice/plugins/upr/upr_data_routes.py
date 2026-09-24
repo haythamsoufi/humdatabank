@@ -95,7 +95,7 @@ def _extract_response(body, *, cache_hit: bool):
 
 
 @bp.route("/api/v1/upr/data", methods=["GET"])
-@require_api_key_or_session
+@require_api_key_or_session(browser_login_redirect=True)
 def get_upr_data():
     """Long-form UPR facts, submissions, and comments."""
     try:
@@ -142,7 +142,7 @@ def get_upr_data():
 
 
 @bp.route("/api/v1/upr/submissions", methods=["GET"])
-@require_api_key_or_session
+@require_api_key_or_session(browser_login_redirect=True)
 def get_upr_submissions():
     """Country assignment statuses across all UPR rounds."""
     try:
@@ -182,7 +182,7 @@ def get_upr_submissions():
 
 
 @bp.route("/api/v1/upr/master", methods=["GET"])
-@require_api_key_or_session
+@require_api_key_or_session(browser_login_redirect=True)
 def get_upr_master():
     """Flat rows matching the UPR Master workbook sheet ``UPR Data``."""
     try:

@@ -25,6 +25,8 @@ _SOURCE_TABLES = (
     "form_data",
     "dynamic_indicator_data",
     "dynamic_section_context",
+    "repeat_group_instance",
+    "repeat_group_data",
     "assignment_entity_status",
     "assigned_form",
     "form_item",

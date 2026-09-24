@@ -14,6 +14,7 @@ from plugins.upr.upr_data import (
     attribute_label,
     classify_item,
     dynamic_facts,
+    emergency_code_from_selection,
     facts_for_item,
     iter_measure_points,
     master_comment_row,
@@ -180,6 +181,36 @@ def test_emergency_dynamic_uses_appeal_code_not_section_order_guess():
     assert rows[0]["SectionB"] == "MDRAF015"
     assert rows[0]["EA Code"] == "MDRAF015"
     assert rows[0]["SP/EF"] == "SP2"
+
+
+def test_emergency_code_uses_saved_metadata_and_legacy_display_value():
+    assert emergency_code_from_selection(
+        "Afghanistan - Earthquake (ignored)",
+        {"name": "Afghanistan - Earthquake", "code": "mdraf015"},
+    ) == "MDRAF015"
+    assert emergency_code_from_selection(
+        "Afghanistan - Earthquake (mdraf016)",
+        None,
+    ) == "MDRAF016"
+
+
+def test_master_emergency_dynamic_sets_section_b_to_mdr_code():
+    rows = master_dynamic_rows(
+        _PLACE,
+        indicator="People reached",
+        indicator_id=619,
+        area="SP2",
+        value="4",
+        disagg=None,
+        data_not_available=False,
+        not_applicable=False,
+        appeal_code="MDRAF015",
+        slot=1,
+    )
+
+    assert rows[0]["Section"] == "Emergency 1"
+    assert rows[0]["SectionB"] == "MDRAF015"
+    assert rows[0]["EA Code"] == "MDRAF015"
 
 
 def test_not_applicable_emits_a_status_row_without_a_value():

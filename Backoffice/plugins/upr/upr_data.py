@@ -23,7 +23,14 @@ from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.core import Country
 from app.models.enums import AssignmentEntityStatusValue
 from app.models.form_items import FormItem
-from app.models.forms import DynamicIndicatorData, DynamicSectionContext, FormData, FormSection
+from app.models.forms import (
+    DynamicIndicatorData,
+    DynamicSectionContext,
+    FormData,
+    FormSection,
+    RepeatGroupData,
+    RepeatGroupInstance,
+)
 from app.models.indicator_bank import IndicatorBank
 from app.models.organization import NationalSociety
 from plugins.upr.catalog import (
@@ -313,6 +320,16 @@ def ea_code_from_text(text: str | None) -> str | None:
         return None
     code = match.group(1).strip()
     return code or None
+
+
+def emergency_code_from_selection(value: Any, disagg: Any) -> str | None:
+    """Resolve an MDR code from a saved repeat-group emergency selection."""
+    if isinstance(disagg, dict):
+        code = str(disagg.get("code") or "").strip()
+        if code:
+            return code.upper()
+    code = ea_code_from_text(str(value or ""))
+    return code.upper() if code else None
 
 
 def iter_measure_points(
@@ -1629,6 +1646,7 @@ def _dynamic_facts(
     if not report_ids:
         return []
     contexts = _load_contexts(report_ids)
+    emergency_codes = _load_emergency_codes(report_ids)
     section_ids: set[int] = set()
     raw_rows = []
     for chunk in _chunks(report_ids):
@@ -1662,6 +1680,8 @@ def _dynamic_facts(
         slot = ctx.get("slot") if ctx else None
         if appeal is None and row[2] is not None:
             slot = int(row[2])
+        if appeal is None and slot is not None:
+            appeal = emergency_codes.get((int(row[0]), int(slot)))
         if master:
             facts.extend(
                 master_dynamic_rows(
@@ -1716,6 +1736,40 @@ def _load_contexts(aes_ids: list[int]) -> dict[tuple[int, int], dict[str, Any]]:
             if current and current.get("provider") == "emergency_operations" and provider_id != "emergency_operations":
                 continue
             found[key] = {"slot": slot, "code": context_key, "provider": provider_id}
+    return found
+
+
+def _load_emergency_codes(aes_ids: list[int]) -> dict[tuple[int, int], str]:
+    """Return MDR codes keyed by ``(submission_id, emergency slot)``."""
+    found: dict[tuple[int, int], str] = {}
+    for chunk in _chunks(aes_ids):
+        rows = (
+            db.session.query(
+                RepeatGroupInstance.assignment_entity_status_id,
+                RepeatGroupInstance.instance_number,
+                RepeatGroupData.value,
+                RepeatGroupData.disagg_data,
+                RepeatGroupInstance.instance_label,
+            )
+            .join(
+                RepeatGroupData,
+                RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id,
+            )
+            .join(FormItem, FormItem.id == RepeatGroupData.form_item_id)
+            .filter(RepeatGroupInstance.assignment_entity_status_id.in_(chunk))
+            .filter(RepeatGroupInstance.is_hidden.is_(False))
+            .filter(
+                (RepeatGroupData.disagg_type == "emergency_operation")
+                | (FormItem.lookup_list_id == "emergency_operations")
+            )
+            .all()
+        )
+        for aes_id, slot, value, disagg, instance_label in rows:
+            code = emergency_code_from_selection(value, disagg)
+            if not code:
+                code = emergency_code_from_selection(instance_label, None)
+            if aes_id is not None and slot is not None and code:
+                found[(int(aes_id), int(slot))] = code
     return found
 
 

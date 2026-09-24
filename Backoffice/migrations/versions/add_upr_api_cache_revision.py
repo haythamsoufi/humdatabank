@@ -4,10 +4,11 @@ Revision ID: add_upr_api_cache_revision
 Revises: add_guidance_document
 Create Date: 2026-09-24
 
-Every statement that can change either UPR endpoint advances one shared
-revision in the same transaction. API cache keys include this revision, which
-lets workers reuse expensive extracts without serving a pre-commit payload
-after the commit becomes visible.
+Every transaction that can change either UPR endpoint inserts one change-log
+row in the same transaction. API cache keys include the committed row count,
+which lets workers reuse expensive extracts without serving a pre-commit
+payload after the commit becomes visible. The append-only design avoids a
+singleton revision-row lock serializing concurrent form saves and imports.
 """
 
 from alembic import op
@@ -36,20 +37,15 @@ _SOURCE_TABLES = (
 
 def upgrade():
     op.create_table(
-        "upr_api_cache_version",
-        sa.Column("id", sa.SmallInteger(), nullable=False),
-        sa.Column("version", sa.BigInteger(), nullable=False, server_default="1"),
+        "upr_api_cache_change",
+        sa.Column("transaction_id", sa.BigInteger(), nullable=False),
         sa.Column(
-            "updated_at",
+            "changed_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
-        sa.CheckConstraint("id = 1", name="ck_upr_api_cache_version_singleton"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.execute(
-        "INSERT INTO upr_api_cache_version (id, version) VALUES (1, 1)"
+        sa.PrimaryKeyConstraint("transaction_id"),
     )
     op.execute(
         """
@@ -58,10 +54,9 @@ def upgrade():
         LANGUAGE plpgsql
         AS $$
         BEGIN
-            UPDATE upr_api_cache_version
-            SET version = version + 1,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = 1;
+            INSERT INTO upr_api_cache_change (transaction_id)
+            VALUES (txid_current())
+            ON CONFLICT (transaction_id) DO NOTHING;
             RETURN NULL;
         END;
         $$
@@ -84,4 +79,4 @@ def downgrade():
             f"DROP TRIGGER IF EXISTS trg_{table_name}_upr_api_cache_revision ON {table_name}"
         )
     op.execute("DROP FUNCTION IF EXISTS bump_upr_api_cache_version()")
-    op.drop_table("upr_api_cache_version")
+    op.drop_table("upr_api_cache_change")

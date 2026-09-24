@@ -45,15 +45,15 @@ _redis_init_lock = threading.Lock()
 
 
 def get_upr_cache_revision() -> int | None:
-    """Return the transactionally maintained UPR source-data revision."""
+    """Return the number of committed UPR source-data change transactions."""
     try:
         value = db.session.execute(
-            text("SELECT version FROM upr_api_cache_version WHERE id = 1")
+            text("SELECT count(*) FROM upr_api_cache_change")
         ).scalar_one()
         return int(value)
     except Exception:
         logger.warning(
-            "UPR API cache disabled: could not read upr_api_cache_version",
+            "UPR API cache disabled: could not read upr_api_cache_change",
             exc_info=True,
         )
         return None

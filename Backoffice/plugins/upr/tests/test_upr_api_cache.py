@@ -113,3 +113,46 @@ def test_master_endpoint_returns_complete_extract_without_pagination(monkeypatch
     assert body["meta"]["total"] == 2
     assert set(body["meta"]) == {"total", "columns"}
     assert response.headers["X-UPR-Cache"] == "HIT"
+
+
+def test_submissions_endpoint_returns_all_rounds_and_normalizes_filters(monkeypatch):
+    app = Flask(__name__)
+    rows = [
+        {"Round": "AR25", "ISO3": "AFG", "status": "approved"},
+        {"Round": "MYR26", "ISO3": "AFG", "status": "submitted"},
+    ]
+    captured = {}
+
+    def fake_cache(namespace, params, loader):
+        captured.update({"namespace": namespace, "params": params})
+        return loader(), False
+
+    monkeypatch.setattr(upr_data_routes, "get_or_build_upr_payload", fake_cache)
+    monkeypatch.setattr(
+        upr_data_routes,
+        "build_upr_submissions",
+        lambda **kwargs: {"data": rows},
+    )
+
+    with app.test_request_context(
+        "/api/v1/upr/submissions?template=report&round=myr26&iso3=afg"
+    ):
+        response = upr_data_routes.get_upr_submissions.__wrapped__()
+
+    body = json.loads(response.get_data(as_text=True))
+    assert body["data"] == rows
+    assert body["meta"]["total"] == 2
+    assert "page" not in body["meta"]
+    assert captured == {
+        "namespace": "submissions",
+        "params": {
+            "template": "report",
+            "round": "MYR26",
+            "iso3": "AFG",
+        },
+    }
+    assert response.headers["Cache-Control"] == "no-store"
+    assert any(
+        endpoint["path"] == "/api/v1/upr/submissions"
+        for endpoint in upr_data_routes.API_ENDPOINTS
+    )

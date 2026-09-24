@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from plugins.upr import upr_data
 from plugins.upr.catalog import (
     PLAN_TEMPLATE_ID,
     PNS_REPORT_TEMPLATE_ID,
@@ -295,6 +296,40 @@ def test_submission_round_comes_from_period_and_approved_is_validated():
     assert approved["Round"] == "MYR26"
     assert approved["fds_validated"] == "Validated"
     assert pending["fds_validated"] is None
+
+
+def test_build_submissions_returns_sorted_country_statuses_for_all_rounds(monkeypatch):
+    places = [
+        {
+            **_PLACE,
+            "round": "MYR26",
+            "status": "submitted",
+            "country_id": 1,
+            "ns": None,
+        },
+        {
+            **_PLACE,
+            "round": "AR25",
+            "status": "approved",
+            "assigned_form_id": 9,
+            "submission_id": 98,
+            "country_id": 1,
+            "ns": None,
+        },
+    ]
+    monkeypatch.setattr(upr_data, "_load_places", lambda *args, **kwargs: places)
+    monkeypatch.setattr(
+        upr_data,
+        "_load_national_societies",
+        lambda: ({}, {1: "Afghan Red Crescent Society"}, {}),
+    )
+
+    rows = upr_data.build_upr_submissions()["data"]
+
+    assert [row["Round"] for row in rows] == ["AR25", "MYR26"]
+    assert [row["status"] for row in rows] == ["approved", "submitted"]
+    assert rows[0]["fds_validated"] == "Validated"
+    assert all(row["NS"] == "Afghan Red Crescent Society" for row in rows)
 
 
 def test_system_snapshot_skips_small_amounts_and_repeats_each_round():

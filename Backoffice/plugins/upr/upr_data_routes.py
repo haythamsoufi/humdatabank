@@ -24,7 +24,15 @@ from app.utils.auth import require_api_key_or_session
 from app.utils.error_handling import handle_json_view_exception
 from plugins.upr import bp
 from plugins.upr.api_cache import get_or_build_upr_payload
-from plugins.upr.upr_data import FACT_COLUMNS, MASTER_COLUMNS, TEMPLATE_KIND, build_upr_data, build_upr_master
+from plugins.upr.upr_data import (
+    FACT_COLUMNS,
+    MASTER_COLUMNS,
+    SUBMISSION_COLUMNS,
+    TEMPLATE_KIND,
+    build_upr_data,
+    build_upr_master,
+    build_upr_submissions,
+)
 
 API_ENDPOINTS = [
     {
@@ -38,6 +46,20 @@ API_ENDPOINTS = [
             "Unified Plan and Report facts for Power BI (templates 33, 24, and 23). "
             "Returns data, submissions, and comments already shaped like the UPR dataflow. "
             "Filters: template (report|plan|pns), round (for example MYR26), iso3, table. "
+            "Returns the complete filtered extract; this endpoint is not paginated."
+        ),
+        "consumers": "Power BI, Backoffice session",
+    },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/submissions",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Country submission statuses for all Unified Plan and Report rounds. "
+            "Filters: template (report|plan|pns), round (for example MYR26), iso3. "
             "Returns the complete filtered extract; this endpoint is not paginated."
         ),
         "consumers": "Power BI, Backoffice session",
@@ -111,6 +133,46 @@ def get_upr_data():
                     "submissions": len(payload["submissions"]),
                     "comments": len(payload["comments"]),
                     "columns": list(FACT_COLUMNS),
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/api/v1/upr/submissions", methods=["GET"])
+@require_api_key_or_session
+def get_upr_submissions():
+    """Country assignment statuses across all UPR rounds."""
+    try:
+        template = (request.args.get("template") or "").strip().lower() or None
+        if template and template not in _TEMPLATE_FILTERS:
+            return api_error("template must be report, plan, or pns", 400)
+
+        round_code = (request.args.get("round") or "").strip().upper() or None
+        iso3 = (request.args.get("iso3") or "").strip().upper() or None
+        params = {
+            "template": template,
+            "round": round_code,
+            "iso3": iso3,
+        }
+        payload, cache_hit = get_or_build_upr_payload(
+            "submissions",
+            params,
+            lambda: build_upr_submissions(
+                template=template,
+                round_code=round_code,
+                iso3=iso3,
+            ),
+        )
+        rows = payload["data"]
+        return _extract_response(
+            {
+                "data": rows,
+                "meta": {
+                    "total": len(rows),
+                    "columns": list(SUBMISSION_COLUMNS),
                 },
             },
             cache_hit=cache_hit,

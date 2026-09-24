@@ -151,6 +151,21 @@ FACT_COLUMNS = (
     "template",
 )
 
+SUBMISSION_COLUMNS = (
+    "Round",
+    "Country",
+    "Region",
+    "NS",
+    "ISO3",
+    "status",
+    "fds_validated",
+    "submitted_at",
+    "due_date",
+    "assigned_form_id",
+    "submission_id",
+    "template",
+)
+
 
 @dataclass
 class _Entry:
@@ -1349,6 +1364,40 @@ def build_upr_data(
         for place in places
     ]
     return {"data": facts, "submissions": submissions, "comments": comments}
+
+
+def build_upr_submissions(
+    *,
+    template: str | None = None,
+    round_code: str | None = None,
+    iso3: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Return country assignment statuses across all matching UPR rounds."""
+    places = _load_places(_template_ids(template), iso3=iso3, round_code=round_code)
+    _ns_by_id, ns_by_country, _ns_country = _load_national_societies()
+    for place in places:
+        if not place.get("ns") and place.get("country_id"):
+            place["ns"] = ns_by_country.get(place["country_id"])
+
+    rows = [
+        submission_row(
+            place,
+            status=_status_text(place.get("status")),
+            submitted_at=place.get("submitted_at"),
+            due_date=place.get("due_date"),
+        )
+        for place in places
+    ]
+    rows.sort(
+        key=lambda row: (
+            str(row.get("Round") or ""),
+            str(row.get("ISO3") or ""),
+            str(row.get("template") or ""),
+            int(row.get("assigned_form_id") or 0),
+            int(row.get("submission_id") or 0),
+        )
+    )
+    return {"data": rows}
 
 
 def build_upr_master(

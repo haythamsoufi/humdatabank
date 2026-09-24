@@ -368,14 +368,10 @@ def assignment_year(place: dict[str, Any]) -> int | None:
     period_year = _year_token(str(place.get("period_name") or ""))
     if period_year is not None:
         return period_year
-    match = re.fullmatch(
-        r"(?:P|AR|MYR)(\d{2}|\d{4})",
-        str(place.get("round") or "").strip().upper(),
-    )
+    match = re.fullmatch(r"(?:P|AR|MYR)(\d{2})", str(place.get("round") or "").strip().upper())
     if not match:
         return None
-    digits = match.group(1)
-    return int(digits) if len(digits) == 4 else 2000 + int(digits)
+    return 2000 + int(match.group(1))
 
 
 def blank_fact(place: dict[str, Any]) -> dict[str, Any]:

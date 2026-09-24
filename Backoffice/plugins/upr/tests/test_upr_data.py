@@ -52,14 +52,14 @@ def _item(**overrides) -> ItemView:
     return ItemView(**fields)
 
 
-def test_assignment_year_is_an_integer_for_all_round_formats():
+def test_assignment_year_is_an_integer_for_all_rounds():
     assert assignment_year({"period_name": "Jan-Jun 2026", "round": "MYR26"}) == 2026
     assert assignment_year({"period_name": "2025", "round": "AR25"}) == 2025
     assert assignment_year({"period_name": "2026", "round": "P26"}) == 2026
-    assert assignment_year({"round": "MYR2026"}) == 2026
-    assert assignment_year({"round": "AR2025"}) == 2025
-    assert assignment_year({"round": "P2026"}) == 2026
-    assert isinstance(assignment_year({"round": "MYR2026"}), int)
+    assert assignment_year({"round": "MYR26"}) == 2026
+    assert assignment_year({"round": "AR25"}) == 2025
+    assert assignment_year({"round": "P26"}) == 2026
+    assert isinstance(assignment_year({"round": "MYR26"}), int)
 
 
 def test_classify_report_roles():

@@ -71,6 +71,17 @@ class TestExtractBearerOrXApiKey:
         with app.test_request_context():
             assert _extract_bearer_or_x_api_key() == ""
 
+    def test_query_param(self, app):
+        with app.test_request_context("/api/v1/foo?api_key=query-key"):
+            assert _extract_bearer_or_x_api_key() == "query-key"
+
+    def test_header_wins_over_query_param(self, app):
+        with app.test_request_context(
+            "/api/v1/foo?api_key=query-key",
+            headers={"X-API-Key": "header-key"},
+        ):
+            assert _extract_bearer_or_x_api_key() == "header-key"
+
 
 @pytest.mark.unit
 class TestEnvMobileApiKey:
@@ -154,6 +165,14 @@ class TestAuthenticateDbApiKeyOnly:
         with app.test_request_context("/api/v1/foo", headers={"X-API-Key": full_key}):
             result = authenticate_db_api_key_only()
         assert hasattr(result, "client_name")
+
+    def test_query_param_api_key(self, app, db_session, api_key):
+        _obj, full_key = api_key
+        with app.test_request_context(f"/api/v1/upr/data?api_key={full_key}"):
+            result = authenticate_db_api_key_only()
+        assert hasattr(result, "client_name")
+        assert g.api_key_record is not None
+        assert g.api_key_usage_id == _obj.id
 
     def test_invalid_db_key_returns_401(self, app, db_session):
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers("not-a-real-key")):

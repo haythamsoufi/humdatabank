@@ -55,6 +55,8 @@ def _is_browser_navigation_without_api_key() -> bool:
         or request.headers.get("X-API-KEY", "").strip()
     ):
         return False
+    if (request.args.get("api_key") or "").strip():
+        return False
     return "text/html" in request.headers.get("Accept", "").lower()
 
 
@@ -65,9 +67,9 @@ def require_api_key_or_session(f=None, *, browser_login_redirect: bool = False):
     2. Active session (logged-in user)
 
     Routes intended for direct browser navigation may opt into
-    ``browser_login_redirect=True``. Anonymous HTML requests without an API-key
-    header are then redirected to login, while API clients and invalid-key
-    attempts retain the normal JSON 401 response.
+    ``browser_login_redirect=True``. Anonymous HTML requests without an API key
+    (Bearer, X-API-Key, or ``?api_key=``) are then redirected to login, while
+    API clients and invalid-key attempts retain the normal JSON 401 response.
 
     SECURITY: Use for endpoints that are accessed from both external API clients
     and the admin web interface.
@@ -85,7 +87,8 @@ def require_api_key_or_session(f=None, *, browser_login_redirect: bool = False):
                     url_for("auth.login", next=get_current_relative_url())
                 )
 
-            # Otherwise, require Bearer API key (DB api_keys or MOBILE_APP_API_KEY env fallback)
+            # Otherwise, require an API key (DB api_keys or MOBILE_APP_API_KEY env fallback).
+            # Bearer, X-API-Key, and ?api_key= (Power Query) are all accepted.
             auth_result = authenticate_db_api_key_only()
             if hasattr(auth_result, "status_code"):
                 return auth_result

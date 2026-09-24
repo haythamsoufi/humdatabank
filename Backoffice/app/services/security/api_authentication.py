@@ -96,19 +96,29 @@ def _best_effort_touch_api_key_last_used(db_api_key) -> None:
 
 
 def _extract_bearer_or_x_api_key() -> str:
-    """Return API key from Authorization Bearer or legacy X-API-Key header."""
+    """Return API key from Bearer, X-API-Key, or the ``api_key`` query parameter.
+
+    Headers win over the query string. ``?api_key=`` is the Power Query / Power BI
+    fallback already accepted by ``authenticate_api_request``: those clients often
+    cannot send a custom header.
+    """
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
         return auth_header[7:].strip()
-    return (request.headers.get('X-API-Key') or request.headers.get('X-API-KEY') or '').strip()
+    header_key = (request.headers.get('X-API-Key') or request.headers.get('X-API-KEY') or '').strip()
+    if header_key:
+        return header_key
+    return (request.args.get('api_key') or '').strip()
 
 
 def authenticate_db_api_key_only():
     """
-    Authenticate request using an API key from Authorization: Bearer.
+    Authenticate request using an API key.
 
-    Accepts a database-managed key (``api_keys``) or, when no matching row exists,
-    the optional ``MOBILE_APP_API_KEY`` environment value (same plaintext as the Flutter app).
+    Accepted locations, in order: ``Authorization: Bearer``, ``X-API-Key``, then
+    ``?api_key=`` (Power Query / Power BI). Accepts a database-managed key
+    (``api_keys``) or, when no matching row exists, the optional
+    ``MOBILE_APP_API_KEY`` environment value (same plaintext as the Flutter app).
 
     Returns:
       APIKey ORM instance on DB success, True on env-key success, or a JSON Response on failure.
@@ -121,13 +131,18 @@ def authenticate_db_api_key_only():
     provided_key = _extract_bearer_or_x_api_key()
     if not provided_key:
         current_app.logger.warning(
-            "[API auth] 401 %s: missing API key (expected Bearer or X-API-Key). path=%s",
+            "[API auth] 401 %s: missing API key (expected Bearer, X-API-Key, or ?api_key=). path=%s",
             endpoint, request.path
         )
         return api_error(
             "Authentication required",
             401,
-            extra={"hint": "Use Authorization: Bearer YOUR_API_KEY or X-API-Key header"},
+            extra={
+                "hint": (
+                    "Use Authorization: Bearer YOUR_API_KEY, X-API-Key header, "
+                    "or ?api_key= (Power Query)"
+                )
+            },
         )
 
     try:

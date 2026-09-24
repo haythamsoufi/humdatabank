@@ -680,7 +680,7 @@
                     {% for group in url_builder_endpoint_groups %}
                     <optgroup label="{{ group.name }}">
                         {% for endpoint in group.endpoints %}
-                        <option value="{{ endpoint.path }}">{{ endpoint.method }} {{ endpoint.path }}</option>
+                        <option value="{{ endpoint.path }}" data-auth="{{ endpoint.auth|default('', true) }}"{% if 'paginated' in endpoint %} data-paginated="{{ '1' if endpoint.paginated else '0' }}"{% endif %}>{{ endpoint.method }} {{ endpoint.path }}</option>
                         {% endfor %}
                     </optgroup>
                     {% endfor %}
@@ -727,7 +727,7 @@
                         {{ _('Copy into Advanced Editor (Get Data → Blank Query). Use this as a source query, then reference it to expand each array (data, form_items, countries, …).') }}
                     </p>
                     <p class="text-sm text-gray-500 mb-2">
-                        {{ _('API key is sent as api_key in the query string. Choose Anonymous when prompted.') }}
+                        {{ _('API-key endpoints send Authorization: Bearer. Public and session endpoints do not. Choose Anonymous when prompted.') }}
                     </p>
                     <div id="powerQueryLayoutStarWrap" class="mb-3 hidden">
                         <label class="inline-flex items-center gap-2 cursor-pointer select-none">
@@ -867,6 +867,8 @@ const templateOptions = JSON.parse('{{ templates|map(attribute="id")|list|tojson
 const templateLabels = JSON.parse('{{ templates|map(attribute="name")|list|tojson|safe }}');
 const countryOptions = JSON.parse('{{ countries|map(attribute="id")|list|tojson|safe }}');
 const countryLabels = JSON.parse('{{ countries|map(attribute="name")|list|tojson|safe }}');
+const countryIso3Options = JSON.parse('{{ countries|map(attribute="iso3")|list|tojson|safe }}');
+const urlBuilderContracts = JSON.parse('{{ url_builder_contracts|tojson|safe }}');
 const assignmentOptions = JSON.parse('{{ assignment_options|tojson|safe }}');
 const assignmentOptionsById = Object.fromEntries(
     (assignmentOptions || []).map(function(item) {
@@ -1210,6 +1212,50 @@ try {
             return String(path || '').replace(/<[^>]+>/g, '').replace(/\{[^}]+\}/g, '');
         }
 
+        function selectedEndpointOption() {
+            const sel = document.getElementById('baseEndpoint');
+            return sel && sel.selectedOptions ? sel.selectedOptions[0] : null;
+        }
+
+        function selectedEndpointContract() {
+            const opt = selectedEndpointOption();
+            const path = endpointMapKey(opt ? opt.value : '');
+            const declared = (urlBuilderContracts && urlBuilderContracts[path]) || null;
+            let paginated = null;
+            if (opt && opt.hasAttribute('data-paginated')) {
+                paginated = opt.getAttribute('data-paginated') === '1';
+            }
+            return {
+                auth: opt ? (opt.getAttribute('data-auth') || '') : '',
+                paginated: paginated,
+                queryParams: declared,
+            };
+        }
+
+        function endpointSendsApiKey(auth) {
+            return auth === 'api_key' || auth === 'api_key_or_session' || auth === '';
+        }
+
+        function resolveDeclaredParams(params) {
+            return (params || []).map(function(param) {
+                if (param.option_source === 'country_iso3') {
+                    return Object.assign({}, param, {
+                        type: 'select',
+                        options: [''].concat(countryIso3Options),
+                        labels: [''].concat(countryLabels),
+                    });
+                }
+                if (param.type === 'select' && Array.isArray(param.options) && param.options[0] !== '') {
+                    const labels = Array.isArray(param.labels) ? [''].concat(param.labels) : param.labels;
+                    return Object.assign({}, param, {
+                        options: [''].concat(param.options),
+                        labels: labels,
+                    });
+                }
+                return param;
+            });
+        }
+
         function getSelectedParamValues(inputEl, param) {
             if (!inputEl) {
                 return [];
@@ -1252,7 +1298,10 @@ try {
             const selectedEndpoint = document.getElementById('baseEndpoint').value;
             const endpointKey = endpointMapKey(selectedEndpoint);
 
-            currentParamDefinitions = endpointParamMap[endpointKey] || defaultParams;
+            const contract = selectedEndpointContract();
+            currentParamDefinitions = contract.queryParams
+                ? resolveDeclaredParams(contract.queryParams)
+                : (endpointParamMap[endpointKey] || defaultParams);
 
             const countEl = document.getElementById('queryParamsCount');
             if (countEl) {
@@ -1503,6 +1552,12 @@ try {
             const params = collectEnabledQueryParams();
             const baseEndpoint = document.getElementById('baseEndpoint')?.value || '';
             const endpointKey = endpointMapKey(baseEndpoint);
+            const contract = selectedEndpointContract();
+            if (contract.paginated === false) {
+                params.delete('page');
+                params.delete('per_page');
+                return params;
+            }
             const paramNames = new Set(currentParamDefinitions.map(p => p.name));
             if (paramNames.has('page') && !params.has('page')) {
                 params.append('page', '1');
@@ -1516,8 +1571,8 @@ try {
             return params;
         }
 
-        function formatMQueryRecord(params, apiKeyLiteral) {
-            const entries = [`        api_key = "${apiKeyLiteral}"`];
+        function formatMQueryRecord(params) {
+            const entries = [];
             params.forEach((value, key) => {
                 entries.push(`        ${key} = "${escapeMString(value)}"`);
             });
@@ -1530,27 +1585,42 @@ try {
             const host = String(window.location.origin || '').replace(/\/?$/, '/');
             const relativePath = String(baseEndpoint || '').replace(/^\/+/, '');
             const params = collectMQueryParams();
-            return [
+            const queryBody = formatMQueryRecord(params);
+            const sendsApiKey = endpointSendsApiKey(selectedEndpointContract().auth);
+            const lines = [
                 'let',
-                `    ApiKey = "${apiKeyLiteral}",`,
+            ];
+            if (sendsApiKey) {
+                lines.push(`    ApiKey = "${apiKeyLiteral}",`);
+            }
+            lines.push(
                 `    Host = "${escapeMString(host)}",`,
                 `    RelativePath = "${escapeMString(relativePath)}",`,
-                '    Query = [',
-                formatMQueryRecord(params, apiKeyLiteral),
-                '    ],',
+            );
+            if (queryBody) {
+                lines.push('    Query = [', queryBody, '    ],');
+            }
+            const options = ['                RelativePath = RelativePath,'];
+            if (queryBody) {
+                options.push('                Query = Query,');
+            }
+            if (sendsApiKey) {
+                options.push('                Headers = [Authorization = "Bearer " & ApiKey],');
+            }
+            options.push('                ManualStatusHandling = {400, 401, 403, 404, 429, 500}',);
+            lines.push(
                 '    Source = Json.Document(',
                 '        Web.Contents(',
                 '            Host,',
                 '            [',
-                '                RelativePath = RelativePath,',
-                '                Query = Query,',
-                '                ManualStatusHandling = {400, 401, 403, 404, 429, 500}',
+                ...options,
                 '            ]',
                 '        )',
                 '    )',
                 'in',
                 '    Source',
-            ].join('\n');
+            );
+            return lines.join('\n');
         }
 
         function updatePowerQueryM() {

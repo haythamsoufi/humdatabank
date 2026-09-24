@@ -63,7 +63,7 @@ def test_data_endpoint_returns_complete_extract_without_pagination(monkeypatch):
     monkeypatch.setattr(
         upr_data_routes,
         "build_upr_data",
-        lambda **kwargs: {"data": facts, "submissions": [{"id": 1}], "comments": []},
+        lambda **kwargs: {"data": facts, "submissions": [{"id": 1}]},
     )
 
     with app.test_request_context(
@@ -83,7 +83,7 @@ def test_data_endpoint_returns_complete_extract_without_pagination(monkeypatch):
             "template": None,
             "round": "MYR26",
             "iso3": "AFG",
-            "table": None,
+            "section": None,
         },
     }
     assert response.headers["X-UPR-Cache"] == "MISS"
@@ -156,3 +156,44 @@ def test_submissions_endpoint_returns_all_rounds_and_normalizes_filters(monkeypa
         endpoint["path"] == "/api/v1/upr/submissions"
         for endpoint in upr_data_routes.API_ENDPOINTS
     )
+
+
+def test_docs_endpoint_lists_parameters():
+    app = Flask(__name__)
+
+    with app.test_request_context("/api/v1/upr"):
+        response = upr_data_routes.get_upr_docs.__wrapped__()
+
+    body = json.loads(response.get_data(as_text=True))
+    by_path = {endpoint["path"]: endpoint for endpoint in body["endpoints"]}
+    data_params = {param["name"]: param for param in by_path["/api/v1/upr/data"]["parameters"]}
+    assert data_params["template"]["values"] == ["report", "plan", "pns"]
+    assert data_params["round"]["multiple"] is True
+    assert data_params["round"]["example"] == "MYR26,P27"
+    assert "Funding" in data_params["section"]["values"]
+    assert "Round" in by_path["/api/v1/upr/data"]["columns"]["data"]
+    assert by_path["/api/v1/upr/submissions"]["parameters"]
+    assert "section" not in {param["name"] for param in by_path["/api/v1/upr/submissions"]["parameters"]}
+    assert by_path["/api/v1/upr"]["parameters"] == []
+
+
+def test_round_filter_accepts_several_codes(monkeypatch):
+    app = Flask(__name__)
+    captured = {}
+
+    def fake_cache(namespace, params, loader):
+        captured.update({"namespace": namespace, "params": params, "kwargs": {}})
+        return loader(), False
+
+    def fake_build(**kwargs):
+        captured["kwargs"] = kwargs
+        return {"data": [], "submissions": []}
+
+    monkeypatch.setattr(upr_data_routes, "get_or_build_upr_payload", fake_cache)
+    monkeypatch.setattr(upr_data_routes, "build_upr_data", fake_build)
+
+    with app.test_request_context("/api/v1/upr/data?round=P27&round=myr26,P27"):
+        upr_data_routes.get_upr_data.__wrapped__()
+
+    assert captured["params"]["round"] == "MYR26,P27"
+    assert captured["kwargs"]["round_code"] == "MYR26,P27"

@@ -1,7 +1,8 @@
 from functools import wraps
-from flask import request, g, current_app
+from flask import request, g, current_app, redirect, url_for
 from flask_login import current_user
 from app.services.security.api_authentication import authenticate_db_api_key_only
+from app.utils.redirect_utils import get_current_relative_url
 
 
 def _extract_api_key():
@@ -43,30 +44,59 @@ def require_api_key(f):
     return decorated_function
 
 
-def require_api_key_or_session(f):
+def _is_browser_navigation_without_api_key() -> bool:
+    """True for an HTML document request with no attempted API credentials."""
+    if request.method not in {"GET", "HEAD"}:
+        return False
+    if request.headers.get("Authorization", "").strip():
+        return False
+    if (
+        request.headers.get("X-API-Key", "").strip()
+        or request.headers.get("X-API-KEY", "").strip()
+    ):
+        return False
+    return "text/html" in request.headers.get("Accept", "").lower()
+
+
+def require_api_key_or_session(f=None, *, browser_login_redirect: bool = False):
     """
     Decorator that allows authentication via either:
     1. Valid API key in Authorization header (Bearer token)
     2. Active session (logged-in user)
 
+    Routes intended for direct browser navigation may opt into
+    ``browser_login_redirect=True``. Anonymous HTML requests without an API-key
+    header are then redirected to login, while API clients and invalid-key
+    attempts retain the normal JSON 401 response.
+
     SECURITY: Use for endpoints that are accessed from both external API clients
     and the admin web interface.
     """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # First check if user is logged in via session
-        if current_user and current_user.is_authenticated:
+    def decorator(view):
+        @wraps(view)
+        def decorated_function(*args, **kwargs):
+            # First check if user is logged in via session
+            if current_user and current_user.is_authenticated:
+                g.skip_auth = True
+                return view(*args, **kwargs)
+
+            if browser_login_redirect and _is_browser_navigation_without_api_key():
+                return redirect(
+                    url_for("auth.login", next=get_current_relative_url())
+                )
+
+            # Otherwise, require Bearer API key (DB api_keys or MOBILE_APP_API_KEY env fallback)
+            auth_result = authenticate_db_api_key_only()
+            if hasattr(auth_result, "status_code"):
+                return auth_result
+
             g.skip_auth = True
-            return f(*args, **kwargs)
+            return view(*args, **kwargs)
 
-        # Otherwise, require Bearer API key (DB api_keys or MOBILE_APP_API_KEY env fallback)
-        auth_result = authenticate_db_api_key_only()
-        if hasattr(auth_result, "status_code"):
-            return auth_result
+        # Endpoint-registry metadata — read by scan_flask_routes()
+        decorated_function._ep_auth = 'api_key_or_session'
+        return decorated_function
 
-        g.skip_auth = True
-        return f(*args, **kwargs)
-
-    # Endpoint-registry metadata — read by scan_flask_routes()
-    decorated_function._ep_auth = 'api_key_or_session'
-    return decorated_function
+    if f is None:
+        return decorator
+    return decorator(f)

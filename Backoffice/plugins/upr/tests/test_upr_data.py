@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from plugins.upr import upr_data
 from plugins.upr.catalog import (
     PLAN_TEMPLATE_ID,
     PNS_REPORT_TEMPLATE_ID,
@@ -9,6 +10,7 @@ from plugins.upr.catalog import (
 )
 from plugins.upr.upr_data import (
     ItemView,
+    assignment_year,
     attribute_label,
     classify_item,
     dynamic_facts,
@@ -49,6 +51,16 @@ def _item(**overrides) -> ItemView:
     )
     fields.update(overrides)
     return ItemView(**fields)
+
+
+def test_assignment_year_is_an_integer_for_all_rounds():
+    assert assignment_year({"period_name": "Jan-Jun 2026", "round": "MYR26"}) == 2026
+    assert assignment_year({"period_name": "2025", "round": "AR25"}) == 2025
+    assert assignment_year({"period_name": "2026", "round": "P26"}) == 2026
+    assert assignment_year({"round": "MYR26"}) == 2026
+    assert assignment_year({"round": "AR25"}) == 2025
+    assert assignment_year({"round": "P26"}) == 2026
+    assert isinstance(assignment_year({"round": "MYR26"}), int)
 
 
 def test_classify_report_roles():
@@ -184,6 +196,7 @@ def test_not_applicable_emits_a_status_row_without_a_value():
     assert rows[0]["Value"] is None
     assert rows[0]["Table"] == "Core indicators"
     assert rows[0]["Indicator"] == "People reached"
+    assert rows[0]["Year"] == 2026
 
 
 def test_support_matrix_splits_column_and_skips_total():
@@ -285,6 +298,40 @@ def test_submission_round_comes_from_period_and_approved_is_validated():
     assert pending["fds_validated"] is None
 
 
+def test_build_submissions_returns_sorted_country_statuses_for_all_rounds(monkeypatch):
+    places = [
+        {
+            **_PLACE,
+            "round": "MYR26",
+            "status": "submitted",
+            "country_id": 1,
+            "ns": None,
+        },
+        {
+            **_PLACE,
+            "round": "AR25",
+            "status": "approved",
+            "assigned_form_id": 9,
+            "submission_id": 98,
+            "country_id": 1,
+            "ns": None,
+        },
+    ]
+    monkeypatch.setattr(upr_data, "_load_places", lambda *args, **kwargs: places)
+    monkeypatch.setattr(
+        upr_data,
+        "_load_national_societies",
+        lambda: ({}, {1: "Afghan Red Crescent Society"}, {}),
+    )
+
+    rows = upr_data.build_upr_submissions()["data"]
+
+    assert [row["Round"] for row in rows] == ["AR25", "MYR26"]
+    assert [row["status"] for row in rows] == ["approved", "submitted"]
+    assert rows[0]["fds_validated"] == "Validated"
+    assert all(row["NS"] == "Afghan Red Crescent Society" for row in rows)
+
+
 def test_system_snapshot_skips_small_amounts_and_repeats_each_round():
     payload = {
         "rounds": ["MYR26", "AR26"],
@@ -329,6 +376,7 @@ def test_master_sheet_keeps_one_total_and_uses_area():
     assert rows[0]["ValueNum"] == 12
     assert rows[0]["indicatorId"] == 619
     assert rows[0]["Country Value"] is None
+    assert rows[0]["Year"] == 2026
     assert "SP/EF" not in rows[0]
 
 
@@ -395,6 +443,7 @@ def test_master_comment_and_other_indicator_and_pns_host():
     assert comment["Value"] == "Noted"
     assert comment["UPR Value"] == "Noted"
     assert comment["ValueNum"] is None
+    assert comment["Year"] == 2026
 
     other = master_dynamic_rows(
         _PLACE,
@@ -413,6 +462,7 @@ def test_master_comment_and_other_indicator_and_pns_host():
     assert other[0]["Area"] == "Cross-cutting"
     assert other[0]["indicatorId"] == 500
     assert other[0]["ValueNum"] == 1
+    assert other[0]["Year"] == 2026
 
     pns_place = {**_PLACE, "template": "pns", "iso3": "GBR", "country": "United Kingdom", "ns": "British Red Cross", "status": "approved", "source": "PNS Data"}
     pns = master_rows_for_item(

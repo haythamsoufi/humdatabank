@@ -151,6 +151,21 @@ FACT_COLUMNS = (
     "template",
 )
 
+SUBMISSION_COLUMNS = (
+    "Round",
+    "Country",
+    "Region",
+    "NS",
+    "ISO3",
+    "status",
+    "fds_validated",
+    "submitted_at",
+    "due_date",
+    "assigned_form_id",
+    "submission_id",
+    "template",
+)
+
 
 @dataclass
 class _Entry:
@@ -363,6 +378,17 @@ def _json_number(number: float) -> int | float:
     return float(number)
 
 
+def assignment_year(place: dict[str, Any]) -> int | None:
+    """Return an integer year for every supported UPR round."""
+    period_year = _year_token(str(place.get("period_name") or ""))
+    if period_year is not None:
+        return period_year
+    match = re.fullmatch(r"(?:P|AR|MYR)(\d{2})", str(place.get("round") or "").strip().upper())
+    if not match:
+        return None
+    return 2000 + int(match.group(1))
+
+
 def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
     return {
         "Round": place.get("round") or None,
@@ -380,7 +406,7 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "Indicator": None,
         "Value": None,
         "ValueNum": None,
-        "Year": None,
+        "Year": assignment_year(place),
         "EA Code": None,
         "assigned_form_id": place.get("assigned_form_id"),
         "submission_id": place.get("submission_id"),
@@ -423,7 +449,7 @@ def measure_facts(
                 "Indicator": indicator,
                 "Attribute": "Total",
                 "SP/EF": spef,
-                "Year": year,
+                "Year": year if year is not None else assignment_year(place),
                 "EA Code": ea_code,
                 "Applicable/Data not available": status,
             }
@@ -439,7 +465,7 @@ def measure_facts(
                 "Indicator": indicator,
                 "Attribute": attribute,
                 "SP/EF": spef,
-                "Year": year,
+                "Year": year if year is not None else assignment_year(place),
                 "EA Code": ea_code,
                 "Applicable/Data not available": status,
             }
@@ -871,7 +897,7 @@ def blank_master(place: dict[str, Any]) -> dict[str, Any]:
         "ISO3": place.get("iso3"),
         "Country": place.get("country"),
         "Round": place.get("round") or None,
-        "Year": None,
+        "Year": assignment_year(place),
         "Section": None,
         "SectionB": None,
         "Entity": "HNS",
@@ -960,7 +986,11 @@ def master_rows_for_item(
             "Indicator": "Expenditure" if role == "expenditure" else indicator_name(item),
             "indicatorId": _sheet_indicator_id(item, "Expenditure" if role == "expenditure" else indicator_name(item)),
             "Applicable/Data not available": status,
-            "Year": horizon_year(place.get("period_name"), item.label, item.id) if place.get("template") == "plan" else None,
+            "Year": (
+                horizon_year(place.get("period_name"), item.label, item.id)
+                if place.get("template") == "plan"
+                else assignment_year(place)
+            ),
         }
     )
     if total is None:
@@ -1334,6 +1364,40 @@ def build_upr_data(
         for place in places
     ]
     return {"data": facts, "submissions": submissions, "comments": comments}
+
+
+def build_upr_submissions(
+    *,
+    template: str | None = None,
+    round_code: str | None = None,
+    iso3: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Return country assignment statuses across all matching UPR rounds."""
+    places = _load_places(_template_ids(template), iso3=iso3, round_code=round_code)
+    _ns_by_id, ns_by_country, _ns_country = _load_national_societies()
+    for place in places:
+        if not place.get("ns") and place.get("country_id"):
+            place["ns"] = ns_by_country.get(place["country_id"])
+
+    rows = [
+        submission_row(
+            place,
+            status=_status_text(place.get("status")),
+            submitted_at=place.get("submitted_at"),
+            due_date=place.get("due_date"),
+        )
+        for place in places
+    ]
+    rows.sort(
+        key=lambda row: (
+            str(row.get("Round") or ""),
+            str(row.get("ISO3") or ""),
+            str(row.get("template") or ""),
+            int(row.get("assigned_form_id") or 0),
+            int(row.get("submission_id") or 0),
+        )
+    )
+    return {"data": rows}
 
 
 def build_upr_master(

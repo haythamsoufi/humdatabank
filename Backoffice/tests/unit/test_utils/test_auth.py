@@ -2,6 +2,7 @@
 Unit tests for app.utils.auth (API key and session decorators).
 """
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from flask import g
@@ -286,3 +287,77 @@ class TestRequireApiKeyOrSession:
         with app.test_request_context('/api/test'):
             result = protected()
         assert result.status_code == 401
+
+    def test_browser_navigation_can_redirect_to_login(self, app):
+        mock_user = MagicMock()
+        mock_user.is_authenticated = False
+
+        @require_api_key_or_session(browser_login_redirect=True)
+        def protected():
+            pytest.fail('view must not run without session or API key')
+
+        with app.test_request_context(
+            '/api/test?round=MYR26',
+            headers={'Accept': 'text/html,application/xhtml+xml'},
+        ):
+            with patch('app.utils.auth.current_user', mock_user):
+                with patch(
+                    'app.utils.auth.authenticate_db_api_key_only'
+                ) as mock_auth:
+                    result = protected()
+
+        assert result.status_code == 302
+        location = urlparse(result.headers['Location'])
+        assert location.path == '/login'
+        assert parse_qs(location.query)['next'] == ['/api/test?round=MYR26']
+        mock_auth.assert_not_called()
+
+    def test_browser_redirect_option_keeps_json_401_for_api_clients(self, app):
+        mock_user = MagicMock()
+        mock_user.is_authenticated = False
+        error_response = api_error('Authentication required', 401)
+
+        @require_api_key_or_session(browser_login_redirect=True)
+        def protected():
+            pytest.fail('view must not run without session or API key')
+
+        with app.test_request_context(
+            '/api/test',
+            headers={'Accept': 'application/json'},
+        ):
+            with patch('app.utils.auth.current_user', mock_user):
+                with patch(
+                    'app.utils.auth.authenticate_db_api_key_only',
+                    return_value=error_response,
+                ) as mock_auth:
+                    result = protected()
+
+        assert result is error_response
+        mock_auth.assert_called_once()
+
+    def test_browser_request_with_invalid_key_does_not_redirect(self, app):
+        mock_user = MagicMock()
+        mock_user.is_authenticated = False
+        error_response = api_error('Invalid API key', 401)
+
+        @require_api_key_or_session(browser_login_redirect=True)
+        def protected():
+            pytest.fail('view must not run with an invalid API key')
+
+        with app.test_request_context(
+            '/api/test',
+            headers={
+                'Accept': 'text/html',
+                'Authorization': 'Bearer invalid',
+            },
+        ):
+            with patch('app.utils.auth.current_user', mock_user):
+                with patch(
+                    'app.utils.auth.authenticate_db_api_key_only',
+                    return_value=error_response,
+                ) as mock_auth:
+                    result = protected()
+
+        assert result is error_response
+        assert result.status_code == 401
+        mock_auth.assert_called_once()

@@ -363,6 +363,11 @@ def _json_number(number: float) -> int | float:
     return float(number)
 
 
+def assignment_year(place: dict[str, Any]) -> int | None:
+    """Return the reporting year encoded in an assignment period."""
+    return _year_token(str(place.get("period_name") or ""))
+
+
 def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
     return {
         "Round": place.get("round") or None,
@@ -380,7 +385,7 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "Indicator": None,
         "Value": None,
         "ValueNum": None,
-        "Year": None,
+        "Year": assignment_year(place),
         "EA Code": None,
         "assigned_form_id": place.get("assigned_form_id"),
         "submission_id": place.get("submission_id"),
@@ -423,7 +428,7 @@ def measure_facts(
                 "Indicator": indicator,
                 "Attribute": "Total",
                 "SP/EF": spef,
-                "Year": year,
+                "Year": year if year is not None else assignment_year(place),
                 "EA Code": ea_code,
                 "Applicable/Data not available": status,
             }
@@ -439,7 +444,7 @@ def measure_facts(
                 "Indicator": indicator,
                 "Attribute": attribute,
                 "SP/EF": spef,
-                "Year": year,
+                "Year": year if year is not None else assignment_year(place),
                 "EA Code": ea_code,
                 "Applicable/Data not available": status,
             }
@@ -871,7 +876,7 @@ def blank_master(place: dict[str, Any]) -> dict[str, Any]:
         "ISO3": place.get("iso3"),
         "Country": place.get("country"),
         "Round": place.get("round") or None,
-        "Year": None,
+        "Year": assignment_year(place),
         "Section": None,
         "SectionB": None,
         "Entity": "HNS",
@@ -960,7 +965,11 @@ def master_rows_for_item(
             "Indicator": "Expenditure" if role == "expenditure" else indicator_name(item),
             "indicatorId": _sheet_indicator_id(item, "Expenditure" if role == "expenditure" else indicator_name(item)),
             "Applicable/Data not available": status,
-            "Year": horizon_year(place.get("period_name"), item.label, item.id) if place.get("template") == "plan" else None,
+            "Year": (
+                horizon_year(place.get("period_name"), item.label, item.id)
+                if place.get("template") == "plan"
+                else assignment_year(place)
+            ),
         }
     )
     if total is None:

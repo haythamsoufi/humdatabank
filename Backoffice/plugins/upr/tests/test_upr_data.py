@@ -184,6 +184,7 @@ def test_not_applicable_emits_a_status_row_without_a_value():
     assert rows[0]["Value"] is None
     assert rows[0]["Table"] == "Core indicators"
     assert rows[0]["Indicator"] == "People reached"
+    assert rows[0]["Year"] == 2026
 
 
 def test_support_matrix_splits_column_and_skips_total():
@@ -329,6 +330,7 @@ def test_master_sheet_keeps_one_total_and_uses_area():
     assert rows[0]["ValueNum"] == 12
     assert rows[0]["indicatorId"] == 619
     assert rows[0]["Country Value"] is None
+    assert rows[0]["Year"] == 2026
     assert "SP/EF" not in rows[0]
 
 
@@ -395,6 +397,7 @@ def test_master_comment_and_other_indicator_and_pns_host():
     assert comment["Value"] == "Noted"
     assert comment["UPR Value"] == "Noted"
     assert comment["ValueNum"] is None
+    assert comment["Year"] == 2026
 
     other = master_dynamic_rows(
         _PLACE,
@@ -413,6 +416,7 @@ def test_master_comment_and_other_indicator_and_pns_host():
     assert other[0]["Area"] == "Cross-cutting"
     assert other[0]["indicatorId"] == 500
     assert other[0]["ValueNum"] == 1
+    assert other[0]["Year"] == 2026
 
     pns_place = {**_PLACE, "template": "pns", "iso3": "GBR", "country": "United Kingdom", "ns": "British Red Cross", "status": "approved", "source": "PNS Data"}
     pns = master_rows_for_item(

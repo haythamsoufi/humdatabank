@@ -155,9 +155,7 @@ FACT_COLUMNS = (
     "ValueNum",
     "Year",
     "EA Code",
-    "assigned_form_id",
     "submission_id",
-    "template",
 )
 
 SUBMISSION_COLUMNS = (
@@ -170,9 +168,7 @@ SUBMISSION_COLUMNS = (
     "fds_validated",
     "submitted_at",
     "due_date",
-    "assigned_form_id",
     "submission_id",
-    "template",
 )
 
 
@@ -477,9 +473,7 @@ def blank_fact(place: dict[str, Any]) -> dict[str, Any]:
         "ValueNum": None,
         "Year": assignment_year(place),
         "EA Code": None,
-        "assigned_form_id": place.get("assigned_form_id"),
         "submission_id": place.get("submission_id"),
-        "template": place.get("template"),
     }
 
 
@@ -1331,23 +1325,22 @@ def submission_row(place: dict[str, Any], *, status: str, submitted_at: Any, due
         "fds_validated": validated,
         "submitted_at": _iso(submitted_at),
         "due_date": _iso(due_date),
-        "assigned_form_id": place.get("assigned_form_id"),
         "submission_id": place.get("submission_id"),
-        "template": place.get("template"),
     }
 
 
-def comment_row(place: dict[str, Any], text: str) -> dict[str, Any]:
-    return {
-        "Round": place.get("round") or None,
-        "Country": place.get("country"),
-        "ISO3": place.get("iso3"),
-        "NS": place.get("ns"),
-        "Value": text,
-        "template": place.get("template"),
-        "assigned_form_id": place.get("assigned_form_id"),
-        "submission_id": place.get("submission_id"),
-    }
+def comment_fact(place: dict[str, Any], item: ItemView, text: str) -> dict[str, Any]:
+    """A comment is one fact row: Section Comments, Indicator is the question."""
+    row = blank_fact(place)
+    row.update(
+        {
+            "Section": "Comments",
+            "Attribute": "Total",
+            "Indicator": indicator_name(item) or "Comments",
+            "Value": text,
+        }
+    )
+    return row
 
 
 def _iso(value: Any) -> str | None:
@@ -1370,7 +1363,7 @@ def build_upr_data(
     iso3: str | None = None,
     table: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Load UPR assignments and return facts, submissions, and comments."""
+    """Load UPR assignments and return facts and submissions."""
     template_ids = _template_ids(template)
     places = _load_places(template_ids, iso3=iso3, round_code=round_code)
     ns_by_id, ns_by_country, _ns_country = _load_national_societies()
@@ -1383,7 +1376,6 @@ def build_upr_data(
     items = _load_items({entry.form_item_id for entry in entries})
     emergency_index: dict[tuple[int, str], int] = {}
     facts: list[dict[str, Any]] = []
-    comments: list[dict[str, Any]] = []
     by_submission = {place["submission_id"]: place for place in places}
 
     for entry in entries:
@@ -1395,7 +1387,7 @@ def build_upr_data(
         if role == "comment":
             text = (entry.value or "").strip()
             if text:
-                comments.append(comment_row(place, text))
+                facts.append(comment_fact(place, item, text))
             continue
         facts.extend(
             facts_for_item(
@@ -1421,7 +1413,6 @@ def build_upr_data(
     if iso3:
         code = iso3.strip().upper()
         facts = [row for row in facts if str(row.get("ISO3") or "").upper() == code]
-        comments = [row for row in comments if str(row.get("ISO3") or "").upper() == code]
 
     submissions = [
         submission_row(
@@ -1432,7 +1423,7 @@ def build_upr_data(
         )
         for place in places
     ]
-    return {"data": facts, "submissions": submissions, "comments": comments}
+    return {"data": facts, "submissions": submissions}
 
 
 def build_upr_submissions(
@@ -1461,8 +1452,6 @@ def build_upr_submissions(
         key=lambda row: (
             str(row.get("Round") or ""),
             str(row.get("ISO3") or ""),
-            str(row.get("template") or ""),
-            int(row.get("assigned_form_id") or 0),
             int(row.get("submission_id") or 0),
         )
     )
@@ -1543,6 +1532,14 @@ def _status_text(status: Any) -> str:
     return "" if value is None else str(value)
 
 
+def parse_round_codes(value: str | None) -> tuple[str, ...]:
+    """Unique uppercase round codes from a comma-separated filter, sorted for a stable cache key."""
+    if not value:
+        return ()
+    codes = {part.strip().upper() for part in str(value).split(",") if part.strip()}
+    return tuple(sorted(codes))
+
+
 def _load_places(template_ids: set[int], *, iso3: str | None, round_code: str | None) -> list[dict[str, Any]]:
     if not template_ids:
         return []
@@ -1575,7 +1572,7 @@ def _load_places(template_ids: set[int], *, iso3: str | None, round_code: str | 
         .filter(AssignmentEntityStatus.entity_type == "country")
         .all()
     )
-    wanted_round = (round_code or "").strip().upper()
+    wanted_rounds = set(parse_round_codes(round_code))
     wanted_iso = (iso3 or "").strip().upper()
     places = []
     for row in rows:
@@ -1588,7 +1585,7 @@ def _load_places(template_ids: set[int], *, iso3: str | None, round_code: str | 
         template_id = int(row[7])
         kind = "plan" if template_id == PLAN_TEMPLATE_ID else "report"
         code = period_to_round(row[8], kind)
-        if wanted_round and code.upper() != wanted_round:
+        if wanted_rounds and code.upper() not in wanted_rounds:
             continue
         feed = TEMPLATE_KIND.get(template_id, "report")
         places.append(
@@ -1841,7 +1838,7 @@ def _section_names(section_ids: set[int]) -> dict[int, str]:
 
 
 def _system_facts(*, round_code: str | None, iso3: str | None) -> list[dict[str, Any]]:
-    wanted = [round_code] if round_code else None
+    wanted = list(parse_round_codes(round_code)) or None
     seen_paths: set[str] = set()
     facts: list[dict[str, Any]] = []
     iso3s: set[str] = set()

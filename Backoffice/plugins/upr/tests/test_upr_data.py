@@ -12,11 +12,13 @@ from plugins.upr.upr_data import (
     ItemView,
     appeal_code_from_text,
     assignment_year,
+    parse_round_codes,
     attribute_label,
     classify_item,
     dynamic_facts,
     facts_for_item,
     iter_measure_points,
+    comment_fact,
     master_comment_row,
     master_dynamic_rows,
     master_rows_for_item,
@@ -53,6 +55,13 @@ def _item(**overrides) -> ItemView:
     )
     fields.update(overrides)
     return ItemView(**fields)
+
+
+def test_parse_round_codes_accepts_one_or_several():
+    assert parse_round_codes(None) == ()
+    assert parse_round_codes("  ") == ()
+    assert parse_round_codes("p27") == ("P27",)
+    assert parse_round_codes("P27, myr26,P27") == ("MYR26", "P27")
 
 
 def test_assignment_year_is_an_integer_for_all_rounds():
@@ -470,6 +479,19 @@ def test_master_plan_funding_and_reach_emergency():
     assert reach[0]["Area"] == "EA1"
     assert reach[0]["EA Code"] == "MDRAF015"
     assert reach[0]["ValueNum"] == 10
+
+
+def test_comment_is_a_fact_row():
+    row = comment_fact(
+        _PLACE,
+        _item(item_type="question", label="Comments_reach", bank_id=None, bank_name=None),
+        "Noted",
+    )
+    assert row["Section"] == "Comments"
+    assert row["Indicator"] == "Comments_reach"
+    assert row["Value"] == "Noted"
+    assert row["ValueNum"] is None
+    assert row["Round"] == "MYR26"
 
 
 def test_master_comment_and_other_indicator_and_pns_host():

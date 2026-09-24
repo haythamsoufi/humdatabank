@@ -52,7 +52,7 @@ _ASSIGNMENT_FIELD_LABELS: Dict[str, str] = {
     "enable_export_excel": "Excel export",
     "enable_import_excel": "Excel import",
     "enable_export_pdf": "PDF export",
-    "enable_page_submission": "Per-page save and submit",
+    "enable_page_submission": "Per-page submit",
     "submission_review_mode": "Submission review notification",
     "submission_review_recipients": "Submission review recipients",
 }

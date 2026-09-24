@@ -8,56 +8,52 @@
     {% set is_repo = doc.id in entity_repo_document_ids %}
     {% set doc_lang_base = (doc.language or '').split('_')[0].split('-')[0] %}
     {% set doc_lang_label = language_endonym(doc_lang_base) or LANGUAGE_DISPLAY_NAMES.get(doc_lang_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(doc_lang_base) or (doc.language or _('N/A')) %}
+    {% set doc_lang_code = doc_lang_base|upper if doc_lang_base else _('N/A') %}
+    {% set _doc_fname = doc.filename or '' %}
+    {% set doc_ext = (_doc_fname.rsplit('.', 1)[-1]|lower) if '.' in _doc_fname else '' %}
+    {% set _doc_icon_map = {
+        'pdf': ('fa-file-pdf', 'pdf'),
+        'doc': ('fa-file-word', 'word'),
+        'docx': ('fa-file-word', 'word'),
+        'xls': ('fa-file-excel', 'excel'),
+        'xlsx': ('fa-file-excel', 'excel'),
+        'xlsm': ('fa-file-excel', 'excel'),
+        'csv': ('fa-file-csv', 'excel'),
+        'ppt': ('fa-file-powerpoint', 'powerpoint'),
+        'pptx': ('fa-file-powerpoint', 'powerpoint'),
+        'png': ('fa-file-image', 'image'),
+        'jpg': ('fa-file-image', 'image'),
+        'jpeg': ('fa-file-image', 'image'),
+        'gif': ('fa-file-image', 'image'),
+        'webp': ('fa-file-image', 'image'),
+        'svg': ('fa-file-image', 'image'),
+        'zip': ('fa-file-zipper', 'archive'),
+        'rar': ('fa-file-zipper', 'archive'),
+        '7z': ('fa-file-zipper', 'archive'),
+        'txt': ('fa-file-lines', 'text'),
+        'rtf': ('fa-file-lines', 'text'),
+        'md': ('fa-file-lines', 'text'),
+    } %}
+    {% set _doc_icon = _doc_icon_map.get(doc_ext, ('fa-file', 'generic')) %}
     <div class="entry-form-doc-card {% if is_repo %}entry-form-doc-card--repository{% else %}entry-form-doc-card--submitted{% endif %}"
          data-entry-form-document="{% if is_repo %}repository{% else %}submitted{% endif %}">
         <div class="entry-form-doc-card__main">
-            <div class="entry-form-doc-card__icon" aria-hidden="true">
-                <i class="fas fa-file-alt"></i>
-            </div>
             <div class="entry-form-doc-card__body">
-                <div class="entry-form-doc-card__header">
-                    <a href="{{ url_for('forms.download_document', submitted_document_id=doc.id) }}"
-                       class="entry-form-doc-card__filename"
-                       download="{{ doc.filename }}"
-                       title="{{ doc.filename }}">
-                        {{ doc.filename }}
-                    </a>
-                    {% if can_edit and not is_repo %}
-                    <div class="entry-form-doc-card__actions">
-                        <button type="button" class="btn btn-ghost btn-icon btn-sm edit-document-btn"
-                                data-doc-id="{{ doc.id }}"
-                                data-field-id="{{ field.id }}"
-                                data-field-label="{{ field_label_with_period | e }}"
-                                data-filename="{{ doc.filename }}"
-                                data-language="{{ doc.language }}"
-                                data-document-type="{{ doc.document_label or '' }}"
-                                data-year="{{ doc.year or '' }}"
-                                data-is-public="{{ doc.is_public|lower }}"
-                                {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
-                                title="{{ _('Edit Document')|forceescape }}"
-                                aria-label="{{ _('Edit Document')|forceescape }}">
-                            <i class="fas fa-pen" aria-hidden="true"></i>
-                        </button>
-                        <input type="hidden" name="delete_document_{{ doc.id }}" id="delete_document_hidden_{{ doc.id }}" value="false">
-                        <button type="button" class="btn btn-ghost-danger btn-icon btn-sm delete-document-btn"
-                                data-doc-id="{{ doc.id }}"
-                                title="{{ _('Delete Document')|forceescape }}"
-                                aria-label="{{ _('Delete Document')|forceescape }}"
-                                {% if not can_edit %}disabled{% endif %}>
-                            <i class="fas fa-trash-alt" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    {% endif %}
+                <div class="entry-form-doc-card__icon entry-form-doc-card__icon--{{ _doc_icon[1] }}" aria-hidden="true">
+                    <i class="fas {{ _doc_icon[0] }}"></i>
                 </div>
+                <a href="{{ url_for('forms.download_document', submitted_document_id=doc.id) }}"
+                   class="entry-form-doc-card__filename"
+                   download="{{ doc.filename }}"
+                   title="{{ doc.filename }}">
+                    {{ doc.filename }}
+                </a>
                 <div class="entry-form-doc-card__meta">
-                    <span class="entry-form-doc-language-tag {% if is_repo %}entry-form-doc-language-tag--repository{% else %}entry-form-doc-language-tag--submitted{% endif %}" title="{{ _('Language') }}">
-                        <i class="fas fa-language" aria-hidden="true"></i>
-                        {{ doc_lang_label }}
-                    </span>
                     <span class="entry-form-doc-card__upload-info">
                         <i class="fas fa-user" aria-hidden="true"></i>
                         {{ doc.uploaded_by_user.name if doc.uploaded_by_user else _('Unknown') }}
-                        <span aria-hidden="true">·</span>
+                    </span>
+                    <span class="entry-form-doc-card__upload-info">
                         <i class="fas fa-calendar-alt" aria-hidden="true"></i>
                         {{ doc.uploaded_at|format_date_localized('medium') }}
                     </span>
@@ -74,6 +70,40 @@
                 </div>
                 {% endif %}
             </div>
+        </div>
+        <div class="entry-form-doc-card__actions">
+            <span class="entry-form-doc-language-tag {% if is_repo %}entry-form-doc-language-tag--repository{% else %}entry-form-doc-language-tag--submitted{% endif %}"
+                  title="{{ doc_lang_label }}"
+                  aria-label="{{ doc_lang_label }}">
+                <i class="fas fa-language" aria-hidden="true"></i>
+                {{ doc_lang_code }}
+            </span>
+            {% if can_edit and not is_repo %}
+            <div class="entry-form-doc-card__action-btns">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm edit-document-btn"
+                        data-doc-id="{{ doc.id }}"
+                        data-field-id="{{ field.id }}"
+                        data-field-label="{{ field_label_with_period | e }}"
+                        data-filename="{{ doc.filename }}"
+                        data-language="{{ doc.language }}"
+                        data-document-type="{{ doc.document_label or '' }}"
+                        data-year="{{ doc.year or '' }}"
+                        data-is-public="{{ doc.is_public|lower }}"
+                        {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
+                        title="{{ _('Edit Document')|forceescape }}"
+                        aria-label="{{ _('Edit Document')|forceescape }}">
+                    <i class="fas fa-pen" aria-hidden="true"></i>
+                </button>
+                <input type="hidden" name="delete_document_{{ doc.id }}" id="delete_document_hidden_{{ doc.id }}" value="false">
+                <button type="button" class="btn btn-ghost-danger btn-icon btn-sm delete-document-btn"
+                        data-doc-id="{{ doc.id }}"
+                        title="{{ _('Delete Document')|forceescape }}"
+                        aria-label="{{ _('Delete Document')|forceescape }}"
+                        {% if not can_edit %}disabled{% endif %}>
+                    <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                </button>
+            </div>
+            {% endif %}
         </div>
     </div>
 {% endmacro %}

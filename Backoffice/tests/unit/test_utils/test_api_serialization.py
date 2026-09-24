@@ -732,6 +732,7 @@ class TestSerializeDynamicDataItem:
 
         aes = MagicMock()
         aes.id = 88
+        aes.assigned_form_id = 42
         aes.entity_type = 'country'
         aes.entity_id = 7
         af = MagicMock()
@@ -759,6 +760,7 @@ class TestSerializeDynamicDataItem:
         assert result['repeat_instance_number'] is None
         assert result['repeat_instance_id'] is None
         assert result['iso2'] == 'AF'
+        assert result['assigned_form_id'] == 42
 
     def test_percentage_indicator_returns_decimal(self, app):
         item = self._make_dynamic_item()
@@ -823,6 +825,7 @@ class TestSerializeRepeatDataItem:
         instance.section = section
         aes = MagicMock()
         aes.id = 88
+        aes.assigned_form_id = 42
         aes.entity_type = 'country'
         aes.entity_id = 7
         af = MagicMock()
@@ -841,6 +844,7 @@ class TestSerializeRepeatDataItem:
         assert result['section_stable_key'] == 'repeat-section-uuid'
         assert result['form_item_stable_key'] == 'item-uuid'
         assert result['instance_number'] == 2
+        assert result['assigned_form_id'] == 42
 
 
 @pytest.mark.unit
@@ -857,9 +861,13 @@ class TestSerializeDynamicSectionContext:
         ctx.label_snapshot = 'Bangladesh Floods'
         ctx.status = 'active'
         ctx.resolved_at = datetime(2024, 6, 1, 10, 0, 0)
+        aes = MagicMock()
+        aes.assigned_form_id = 42
+        ctx.assignment_entity_status = aes
         result = serialize_dynamic_section_context(ctx)
         assert result['submission_type'] == 'assigned'
         assert result['submission_id'] == 88
+        assert result['assigned_form_id'] == 42
         assert result['context_key'] == 'MDRBD018'
         assert result['slot'] == 2
 

@@ -1,4 +1,4 @@
-{# Save / submit / reopen / return for one page in the navigation pane. #}
+{# Submit / reopen / return for one page. Save stays whole-form in the nav pane. #}
 {% set _scope_id = scope_id %}
 {% set _wf = wf_status or 'not_started' %}
 {% set _locked = _wf in scoped_locked_statuses %}
@@ -9,15 +9,6 @@
      data-scope-id="{{ _scope_id }}"
      data-status="{{ _wf }}">
     <div class="sidebar-scope-actions__edit{% if _locked %} hidden{% endif %}">
-        <button type="submit" name="action" value="save_page"
-                class="btn btn-primary btn-sm page-save-btn"
-                form="focalDataEntryForm"
-                data-page-id="{{ _scope_id }}"
-                title="{{ _('Save this page')|forceescape }}"
-                aria-label="{{ _('Save this page')|forceescape }}">
-            <i class="fas fa-save" aria-hidden="true"></i>
-            <span>{{ _('Save') }}</span>
-        </button>
         {% if _can_submit %}
         <button type="submit" name="action" value="submit_page"
                 class="btn btn-success btn-sm page-submit-btn"

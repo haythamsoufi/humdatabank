@@ -64,7 +64,6 @@ export function initDocumentUpload() {
     // Edit-mode document info labels
     labelWillReplace: modal.dataset.labelWillReplace || 'Will Replace:',
     labelCurrentDocument: modal.dataset.labelCurrentDocument || 'Current Document:',
-    msgReplaceHelpText: modal.dataset.msgReplaceHelpText || 'Leave file selection empty to keep current document, or upload a new file to replace it.',
     msgWillReplaceCurrent: modal.dataset.msgWillReplaceCurrent || 'The current document will be replaced with the new file when you save.',
   };
 
@@ -133,17 +132,68 @@ export function initDocumentUpload() {
     return effective.length <= 8 ? effective.toUpperCase() : effective;
   }
 
+  const DOC_FILE_ICONS = {
+    pdf: { icon: 'fa-file-pdf', kind: 'pdf' },
+    doc: { icon: 'fa-file-word', kind: 'word' },
+    docx: { icon: 'fa-file-word', kind: 'word' },
+    xls: { icon: 'fa-file-excel', kind: 'excel' },
+    xlsx: { icon: 'fa-file-excel', kind: 'excel' },
+    xlsm: { icon: 'fa-file-excel', kind: 'excel' },
+    csv: { icon: 'fa-file-csv', kind: 'excel' },
+    ppt: { icon: 'fa-file-powerpoint', kind: 'powerpoint' },
+    pptx: { icon: 'fa-file-powerpoint', kind: 'powerpoint' },
+    png: { icon: 'fa-file-image', kind: 'image' },
+    jpg: { icon: 'fa-file-image', kind: 'image' },
+    jpeg: { icon: 'fa-file-image', kind: 'image' },
+    gif: { icon: 'fa-file-image', kind: 'image' },
+    webp: { icon: 'fa-file-image', kind: 'image' },
+    svg: { icon: 'fa-file-image', kind: 'image' },
+    zip: { icon: 'fa-file-zipper', kind: 'archive' },
+    rar: { icon: 'fa-file-zipper', kind: 'archive' },
+    '7z': { icon: 'fa-file-zipper', kind: 'archive' },
+    txt: { icon: 'fa-file-lines', kind: 'text' },
+    rtf: { icon: 'fa-file-lines', kind: 'text' },
+    md: { icon: 'fa-file-lines', kind: 'text' },
+  };
+
+  function documentFileIcon(filename) {
+    const name = (filename || '').toString();
+    const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+    return DOC_FILE_ICONS[ext] || { icon: 'fa-file', kind: 'generic' };
+  }
+
+  function paintDocumentIcon(wrap, filename) {
+    if (!wrap) return;
+    const spec = documentFileIcon(filename);
+    wrap.className = `entry-form-doc-card__icon entry-form-doc-card__icon--${spec.kind}`;
+    const icon = wrap.querySelector('i');
+    if (icon) icon.className = `fas ${spec.icon}`;
+  }
+
+  /** Visible language pill uses the code (EN); title/aria keep the full name. */
+  function languageCodeLabel(code) {
+    const raw = (code || '').toString().trim();
+    if (!raw) return '';
+    const base = raw.toLowerCase().replace(/-/g, '_').split('_')[0];
+    return (base || raw).toUpperCase();
+  }
+
   /** Pill-style language tag matching server-rendered document cards. */
-  function createLanguageTagElement(label, variant) {
+  function createLanguageTagElement(code, displayName, variant) {
     const tag = document.createElement('span');
     const v = variant || 'submitted';
     tag.className = `entry-form-doc-language-tag entry-form-doc-language-tag--${v}`;
-    tag.setAttribute('title', t.labelLanguage || 'Language');
+    const name = (displayName || '').toString().trim();
+    const visible = languageCodeLabel(code) || name;
+    if (name) {
+      tag.setAttribute('title', name);
+      tag.setAttribute('aria-label', name);
+    }
     const icon = document.createElement('i');
     icon.className = 'fas fa-language';
     icon.setAttribute('aria-hidden', 'true');
     tag.appendChild(icon);
-    tag.appendChild(document.createTextNode(label || ''));
+    tag.appendChild(document.createTextNode(visible));
     return tag;
   }
 
@@ -1402,60 +1452,110 @@ export function initDocumentUpload() {
     }
   })) || { openModal: () => modal.classList.remove('hidden'), closeModal: () => modal.classList.add('hidden') };
 
-  // Store original text on initialization
-  const fileUploadBox = modal.querySelector('.file-upload-box');
-  const originalTextElement = fileUploadBox?.querySelector('p');
-  const originalText = originalTextElement ? originalTextElement.textContent : 'Click or drag document here to upload';
-  if (originalTextElement) {
-    originalTextElement.dataset.originalText = originalText;
+  const filePrompt = document.getElementById('modal-file-prompt');
+  const originalText = filePrompt ? filePrompt.textContent : 'Click or drag document here to upload';
+  if (filePrompt) filePrompt.dataset.originalText = originalText;
+
+  let editingFilename = null;
+
+  function setDropZoneMode(mode) {
+    const dropZone = modal.querySelector('.file-upload-wrapper');
+    if (!dropZone) return;
+    dropZone.classList.remove('modal-file-drop--selected', 'modal-file-drop--replacing', 'border-green-500', 'bg-green-50');
+    if (mode === 'selected') dropZone.classList.add('modal-file-drop--selected');
+    else if (mode === 'replacing') dropZone.classList.add('modal-file-drop--replacing');
   }
 
-  // Update file upload box UI when file is selected
-  function updateFileUploadBox(file) {
-    const fileUploadBox = modal.querySelector('.file-upload-box');
-    if (!fileUploadBox) return;
-
-    const icon = fileUploadBox.querySelector('i');
-    const text = fileUploadBox.querySelector('p');
+  function showEmptyDrop() {
+    const empty = document.getElementById('modal-file-empty');
+    const info = document.getElementById('current-document-info');
+    if (empty) empty.classList.remove('hidden');
+    if (info) {
+      info.classList.add('hidden');
+      const extra = info.querySelector('.new-file-info');
+      if (extra) extra.remove();
+    }
+    const glyph = empty && empty.querySelector('.file-upload-box__glyph');
+    const icon = glyph && glyph.querySelector('i');
+    if (glyph) glyph.className = 'file-upload-box__glyph mb-2';
+    if (icon) icon.className = 'fas fa-cloud-upload-alt text-3xl text-gray-400';
+    const prompt = document.getElementById('modal-file-prompt');
+    if (prompt) {
+      prompt.textContent = prompt.dataset.originalText || originalText;
+      prompt.classList.remove('text-green-700', 'font-medium');
+      prompt.classList.add('text-gray-500');
+    }
     const dropZone = modal.querySelector('.file-upload-wrapper');
+    if (dropZone) dropZone.title = originalText;
+    if (modalFileInput) modalFileInput.title = originalText;
+  }
 
-    if (file) {
-      // Update icon to file icon
-      if (icon) {
-        icon.classList.remove('fa-cloud-upload-alt', 'text-gray-400');
-        icon.classList.add('fa-file-alt', 'text-green-600');
+  function showFileDetails(filename, options) {
+    const opts = options || {};
+    const empty = document.getElementById('modal-file-empty');
+    const info = document.getElementById('current-document-info');
+    const nameEl = document.getElementById('current-document-filename');
+    const labelEl = document.getElementById('current-document-label');
+    const helpEl = document.getElementById('current-document-help');
+    if (empty) empty.classList.add('hidden');
+    if (info) info.classList.remove('hidden');
+    paintDocumentIcon(document.getElementById('current-document-icon'), opts.newName || filename);
+    if (labelEl) labelEl.textContent = opts.label || '';
+    if (nameEl) {
+      nameEl.textContent = filename || '';
+      nameEl.title = filename || '';
+      nameEl.classList.toggle('entry-form-doc-card__filename--replaced', !!opts.replaced);
+    }
+    if (helpEl) {
+      helpEl.textContent = opts.help || '';
+      helpEl.classList.toggle('hidden', !opts.help);
+    }
+    const dropZone = modal.querySelector('.file-upload-wrapper');
+    const hoverName = opts.newName || filename || '';
+    if (dropZone && hoverName) dropZone.title = hoverName;
+    if (modalFileInput && hoverName) modalFileInput.title = hoverName;
+    if (!info) return;
+    let newFileDiv = info.querySelector('.new-file-info');
+    if (opts.newName) {
+      if (!newFileDiv) {
+        newFileDiv = document.createElement('p');
+        newFileDiv.className = 'new-file-info';
+        nameEl.parentElement.appendChild(newFileDiv);
       }
+      newFileDiv.replaceChildren();
+      const arrowIcon = document.createElement('i');
+      arrowIcon.className = 'fas fa-arrow-right mr-1';
+      newFileDiv.appendChild(arrowIcon);
+      newFileDiv.appendChild(document.createTextNode(opts.newName));
+    } else if (newFileDiv) {
+      newFileDiv.remove();
+    }
+  }
 
-      // Update text to show filename
-      if (text) {
-        text.textContent = file.name;
-        text.classList.remove('text-gray-500');
-        text.classList.add('text-green-700', 'font-medium');
-      }
-
-      // Update border to indicate file selected
-      if (dropZone) {
-        dropZone.classList.remove('border-gray-300');
-        dropZone.classList.add('border-green-500', 'bg-green-50');
-      }
+  function updateFileUploadBox(file) {
+    if (file && editingFilename) {
+      setDropZoneMode('replacing');
+      showFileDetails(editingFilename, {
+        label: t.labelWillReplace,
+        help: t.msgWillReplaceCurrent,
+        replaced: true,
+        newName: file.name,
+      });
+    } else if (file) {
+      setDropZoneMode('selected');
+      showFileDetails(file.name, {
+        label: t.documentSelected,
+        help: originalText,
+      });
+    } else if (editingFilename) {
+      setDropZoneMode('current');
+      showFileDetails(editingFilename, {
+        label: t.labelCurrentDocument,
+        help: '',
+      });
     } else {
-      // Reset to default state
-      if (icon) {
-        icon.classList.remove('fa-file-alt', 'text-green-600');
-        icon.classList.add('fa-cloud-upload-alt', 'text-gray-400');
-      }
-
-      if (text) {
-        // Restore original text
-        text.textContent = text.dataset.originalText || originalText;
-        text.classList.remove('text-green-700', 'font-medium');
-        text.classList.add('text-gray-500');
-      }
-
-      if (dropZone) {
-        dropZone.classList.remove('border-green-500', 'bg-green-50');
-        dropZone.classList.add('border-gray-300');
-      }
+      setDropZoneMode('empty');
+      showEmptyDrop();
     }
   }
 
@@ -1470,6 +1570,16 @@ export function initDocumentUpload() {
     // Drag and drop handling
     const dropZone = modal.querySelector('.file-upload-wrapper');
     if (dropZone) {
+      dropZone.addEventListener('click', (e) => {
+        if (e.target === modalFileInput) return;
+        modalFileInput.click();
+      });
+      dropZone.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        modalFileInput.click();
+      });
+
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, function(e) {
           e.preventDefault();
@@ -2040,7 +2150,7 @@ export function initDocumentUpload() {
       const langLabel =
         doc.languageDisplayName ||
         getLanguageDisplayName(document.getElementById('modal-document-language'), doc.language || 'en');
-      badgesDiv.appendChild(createLanguageTagElement(langLabel, 'pending'));
+      badgesDiv.appendChild(createLanguageTagElement(doc.language || 'en', langLabel, 'pending'));
 
       if (doc.documentType) {
         const typeBadge = document.createElement('span');
@@ -2140,7 +2250,7 @@ export function initDocumentUpload() {
       strong.textContent = t.labelDocumentQueued;
       const filenameSpan = document.createElement('span');
       filenameSpan.className = 'filename';
-      const langBadge = createLanguageTagElement('', 'pending');
+      const langBadge = createLanguageTagElement('', '', 'pending');
       langBadge.classList.add('language-badge', 'ml-2');
 
       contentSpan.appendChild(strong);
@@ -2169,9 +2279,10 @@ export function initDocumentUpload() {
     const languageBadge = feedbackDiv.querySelector('.language-badge');
     if (filenameSpan) filenameSpan.textContent = filename || 'Document';
     if (languageBadge) {
+      const code = languageCode || 'en';
       const display =
         languageDisplayName ||
-        getLanguageDisplayName(document.getElementById('modal-document-language'), languageCode || 'en');
+        getLanguageDisplayName(document.getElementById('modal-document-language'), code);
       const icon = languageBadge.querySelector('i');
       languageBadge.replaceChildren();
       if (icon) {
@@ -2182,7 +2293,11 @@ export function initDocumentUpload() {
         newIcon.setAttribute('aria-hidden', 'true');
         languageBadge.appendChild(newIcon);
       }
-      languageBadge.appendChild(document.createTextNode(display));
+      if (display) {
+        languageBadge.setAttribute('title', display);
+        languageBadge.setAttribute('aria-label', display);
+      }
+      languageBadge.appendChild(document.createTextNode(languageCodeLabel(code) || display));
     }
   }
 
@@ -2197,151 +2312,14 @@ export function initDocumentUpload() {
 
   // Show current document info (for edit mode)
   function showCurrentDocumentInfo(filename) {
-    const currentDocInfo = document.getElementById('current-document-info');
-    const currentDocFilename = document.getElementById('current-document-filename');
-
-    if (currentDocInfo && currentDocFilename && filename) {
-      currentDocFilename.textContent = filename;
-      currentDocInfo.classList.remove('hidden');
-
-      // Add listener to file input to show replacement feedback
-      if (modalFileInput && !modalFileInput.dataset.changeListenerAttached) {
-        modalFileInput.addEventListener('change', function() {
-          if (this.files && this.files[0]) {
-            // Update the current document info to show replacement
-            currentDocInfo.classList.remove('bg-blue-50', 'border-blue-200');
-            currentDocInfo.classList.add('bg-amber-50', 'border-amber-300');
-
-            const iconEl = currentDocInfo.querySelector('i');
-            if (iconEl) {
-              iconEl.classList.remove('text-blue-600');
-              iconEl.classList.add('text-amber-600');
-            }
-
-            const titleEl = currentDocInfo.querySelector('.text-blue-900');
-            if (titleEl) {
-              titleEl.classList.remove('text-blue-900');
-              titleEl.classList.add('text-amber-900');
-              titleEl.textContent = t.labelWillReplace;
-            }
-
-            currentDocFilename.classList.remove('text-blue-700');
-            currentDocFilename.classList.add('text-amber-700', 'line-through');
-
-            // Add new file info
-            const newFileDiv = currentDocInfo.querySelector('.new-file-info');
-            if (!newFileDiv) {
-              const newFileInfo = document.createElement('p');
-              newFileInfo.className = 'text-sm text-amber-900 font-medium mt-1 new-file-info';
-              newFileInfo.replaceChildren();
-              const arrowIcon = document.createElement('i');
-              arrowIcon.className = 'fas fa-arrow-right mr-1';
-              newFileInfo.appendChild(arrowIcon);
-              newFileInfo.appendChild(document.createTextNode(this.files[0].name));
-              currentDocFilename.parentElement.appendChild(newFileInfo);
-            } else {
-              newFileDiv.replaceChildren();
-              const arrowIcon = document.createElement('i');
-              arrowIcon.className = 'fas fa-arrow-right mr-1';
-              newFileDiv.appendChild(arrowIcon);
-              newFileDiv.appendChild(document.createTextNode(this.files[0].name));
-            }
-
-            const helpText = currentDocInfo.querySelector('.text-xs.text-blue-600');
-            if (helpText) {
-              helpText.classList.remove('text-blue-600');
-              helpText.classList.add('text-amber-600');
-              helpText.textContent = t.msgWillReplaceCurrent;
-            }
-          } else {
-            // Reset to original state if file is deselected
-            resetCurrentDocumentInfoStyle(filename);
-          }
-        });
-        modalFileInput.dataset.changeListenerAttached = 'true';
-      }
-    }
+    editingFilename = filename || '';
+    updateFileUploadBox(null);
   }
 
-  // Reset current document info to original style
-  function resetCurrentDocumentInfoStyle(filename) {
-    const currentDocInfo = document.getElementById('current-document-info');
-    const currentDocFilename = document.getElementById('current-document-filename');
-
-    if (currentDocInfo && currentDocFilename) {
-      currentDocInfo.classList.remove('bg-amber-50', 'border-amber-300');
-      currentDocInfo.classList.add('bg-blue-50', 'border-blue-200');
-
-      const iconEl = currentDocInfo.querySelector('i');
-      if (iconEl) {
-        iconEl.classList.remove('text-amber-600');
-        iconEl.classList.add('text-blue-600');
-      }
-
-      const titleEl = currentDocInfo.querySelector('.text-amber-900, .text-blue-900');
-      if (titleEl) {
-        titleEl.classList.remove('text-amber-900');
-        titleEl.classList.add('text-blue-900');
-        titleEl.textContent = t.labelCurrentDocument;
-      }
-
-      currentDocFilename.classList.remove('text-amber-700', 'line-through');
-      currentDocFilename.classList.add('text-blue-700');
-      currentDocFilename.textContent = filename;
-
-      // Remove new file info
-      const newFileInfo = currentDocInfo.querySelector('.new-file-info');
-      if (newFileInfo) newFileInfo.remove();
-
-      const helpText = currentDocInfo.querySelector('.text-xs.text-amber-600, .text-xs.text-blue-600');
-      if (helpText) {
-        helpText.classList.remove('text-amber-600');
-        helpText.classList.add('text-blue-600');
-        helpText.textContent = t.msgReplaceHelpText;
-      }
-    }
-  }
-
-  // Hide current document info (for upload mode)
   function hideCurrentDocumentInfo() {
-    const currentDocInfo = document.getElementById('current-document-info');
-    const currentDocFilename = document.getElementById('current-document-filename');
-
-    if (currentDocInfo) {
-      currentDocInfo.classList.add('hidden');
-
-      // Reset to original blue styling
-      currentDocInfo.classList.remove('bg-amber-50', 'border-amber-300');
-      currentDocInfo.classList.add('bg-blue-50', 'border-blue-200');
-
-      const iconEl = currentDocInfo.querySelector('i');
-      if (iconEl) {
-        iconEl.classList.remove('text-amber-600');
-        iconEl.classList.add('text-blue-600');
-      }
-
-      const titleEl = currentDocInfo.querySelector('.text-amber-900, .text-blue-900');
-      if (titleEl) {
-        titleEl.classList.remove('text-amber-900');
-        titleEl.classList.add('text-blue-900');
-        titleEl.textContent = t.labelCurrentDocument;
-      }
-
-      if (currentDocFilename) {
-        currentDocFilename.classList.remove('text-amber-700', 'line-through');
-        currentDocFilename.classList.add('text-blue-700');
-      }
-
-      // Remove new file info
-      const newFileInfo = currentDocInfo.querySelector('.new-file-info');
-      if (newFileInfo) newFileInfo.remove();
-
-      const helpText = currentDocInfo.querySelector('.text-xs');
-      if (helpText) {
-        helpText.classList.remove('text-amber-600');
-        helpText.classList.add('text-blue-600');
-      }
-    }
+    editingFilename = null;
+    const pending = modalFileInput && modalFileInput.files && modalFileInput.files[0];
+    updateFileUploadBox(pending || null);
   }
 
   // Helper function to create uploaded document display element
@@ -2353,18 +2331,16 @@ export function initDocumentUpload() {
     const main = document.createElement('div');
     main.className = 'entry-form-doc-card__main';
 
-    const iconWrap = document.createElement('div');
-    iconWrap.className = 'entry-form-doc-card__icon';
-    iconWrap.setAttribute('aria-hidden', 'true');
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-file-alt';
-    iconWrap.appendChild(icon);
-
     const body = document.createElement('div');
     body.className = 'entry-form-doc-card__body';
 
-    const header = document.createElement('div');
-    header.className = 'entry-form-doc-card__header';
+    const fileIcon = documentFileIcon(doc.fileName);
+    const iconWrap = document.createElement('div');
+    iconWrap.className = `entry-form-doc-card__icon entry-form-doc-card__icon--${fileIcon.kind}`;
+    iconWrap.setAttribute('aria-hidden', 'true');
+    const icon = document.createElement('i');
+    icon.className = `fas ${fileIcon.icon}`;
+    iconWrap.appendChild(icon);
 
     const filenameLink = document.createElement('a');
     filenameLink.className = 'entry-form-doc-card__filename';
@@ -2372,13 +2348,18 @@ export function initDocumentUpload() {
     filenameLink.title = doc.fileName;
     filenameLink.href = '#';
 
+    const languageCode = doc.language || 'en';
     const languageLabel =
       doc.languageDisplayName ||
-      getLanguageDisplayName(document.getElementById('modal-document-language'), doc.language || 'en');
-    const languageTag = createLanguageTagElement(languageLabel, 'submitted');
+      getLanguageDisplayName(document.getElementById('modal-document-language'), languageCode);
+    const languageTag = createLanguageTagElement(languageCode, languageLabel, 'submitted');
 
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'entry-form-doc-card__actions';
+    actionsDiv.appendChild(languageTag);
+
+    const actionBtns = document.createElement('div');
+    actionBtns.className = 'entry-form-doc-card__action-btns';
 
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
@@ -2412,39 +2393,40 @@ export function initDocumentUpload() {
     deleteIcon.setAttribute('aria-hidden', 'true');
     deleteBtn.appendChild(deleteIcon);
 
-    actionsDiv.appendChild(editBtn);
-    actionsDiv.appendChild(deleteBtn);
-
-    header.appendChild(filenameLink);
-    header.appendChild(actionsDiv);
+    actionBtns.appendChild(editBtn);
+    actionBtns.appendChild(deleteBtn);
+    actionsDiv.appendChild(actionBtns);
 
     const meta = document.createElement('div');
     meta.className = 'entry-form-doc-card__meta';
 
-    const uploadInfo = document.createElement('span');
-    uploadInfo.className = 'entry-form-doc-card__upload-info';
+    const uploaderLine = document.createElement('span');
+    uploaderLine.className = 'entry-form-doc-card__upload-info';
     const userIcon = document.createElement('i');
     userIcon.className = 'fas fa-user';
     userIcon.setAttribute('aria-hidden', 'true');
+    uploaderLine.appendChild(userIcon);
+    uploaderLine.appendChild(document.createTextNode('You'));
+
+    const dateLine = document.createElement('span');
+    dateLine.className = 'entry-form-doc-card__upload-info';
     const calIcon = document.createElement('i');
     calIcon.className = 'fas fa-calendar-alt';
     calIcon.setAttribute('aria-hidden', 'true');
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
-    uploadInfo.appendChild(userIcon);
-    uploadInfo.appendChild(document.createTextNode('You'));
-    uploadInfo.appendChild(document.createTextNode(' · '));
-    uploadInfo.appendChild(calIcon);
-    uploadInfo.appendChild(document.createTextNode(` ${dateStr}`));
+    dateLine.appendChild(calIcon);
+    dateLine.appendChild(document.createTextNode(` ${dateStr}`));
 
-    meta.appendChild(languageTag);
-    meta.appendChild(uploadInfo);
+    meta.appendChild(uploaderLine);
+    meta.appendChild(dateLine);
 
-    body.appendChild(header);
+    body.appendChild(iconWrap);
+    body.appendChild(filenameLink);
     body.appendChild(meta);
-    main.appendChild(iconWrap);
     main.appendChild(body);
     docContainer.appendChild(main);
+    docContainer.appendChild(actionsDiv);
 
     return { container: docContainer, editBtn: editBtn, deleteBtn: deleteBtn, filenameLink: filenameLink };
   }

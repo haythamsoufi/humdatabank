@@ -106,18 +106,18 @@ def _flash_page_mode_change(summary: dict, *, template_changed: bool = False) ->
         seeded = int(summary.get('seeded_pages') or 0)
         if seeded:
             flash(
-                _("Per-page save and submit is on. %(count)s page status(es) were created or aligned from each entity's current assignment status. Existing submitted pages were kept.",
+                _("Per-page submit is on. %(count)s page status(es) were created or aligned from each entity's current assignment status. Existing submitted pages were kept.",
                   count=seeded),
                 "info",
             )
         else:
             flash(
-                _("Per-page save and submit is on. Existing page statuses were kept; new pages inherit each entity's assignment status when first saved."),
+                _("Per-page submit is on. Existing page statuses were kept; new pages inherit each entity's assignment status when first saved."),
                 "info",
             )
         return
     parts = [
-        _("Per-page save and submit is off. The assignment now uses whole-form save and submit."),
+        _("Per-page submit is off. The assignment now uses whole-form submit."),
     ]
     rolled_up = int(summary.get('rolled_up') or 0)
     partial = int(summary.get('partial_unlocked') or 0)

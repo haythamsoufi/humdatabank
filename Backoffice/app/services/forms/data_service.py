@@ -203,6 +203,8 @@ class FormDataService(
                 }
 
         action = request.form.get('action')
+        if action == 'save_page':
+            action = 'save'
         from app.services.assignments.page_submission_service import (
             PAGE_ACTIONS,
             all_participating_pages_submitted,
@@ -237,7 +239,7 @@ class FormDataService(
             if not target_page_id:
                 return {
                     'success': False,
-                    'validation_errors': ['Select a valid page to save or submit.'],
+                    'validation_errors': ['Select a valid page to submit.'],
                     'field_changes': [],
                 }
 
@@ -250,8 +252,8 @@ class FormDataService(
                 'field_changes': [],
             }
 
-        # When action is 'save' / 'save_page', do not block on required fields
-        skip_required_validation = action in ('save', 'save_page')
+        # When action is 'save', do not block on required fields
+        skip_required_validation = action == 'save'
         field_changes_tracker = []
         validation_errors = []
         locked_ids = set()
@@ -349,11 +351,7 @@ class FormDataService(
                     )
                 except Exception:
                     progress_user_id = None
-                if target_page_id and action == 'save_page':
-                    mark_page_in_progress(
-                        assignment_entity_status.id, target_page_id, progress_user_id
-                    )
-                elif action == 'save' and page_mode:
+                if action == 'save' and page_mode:
                     for page_id in participating_page_ids(all_sections):
                         page_scope = resolve_requested_page(all_sections, page_id)[1]
                         if page_scope and page_scope <= locked_ids:

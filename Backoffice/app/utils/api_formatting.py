@@ -209,6 +209,7 @@ def serialize_form_data_item(data_item, submission_type: str, aes_countries=None
         base_data.update({
             'submission_id': status_info.id if status_info else None,
             'submission_type': 'assigned',
+            'assigned_form_id': status_info.assigned_form_id if status_info else None,
             'period_name': assigned_form.period_name if assigned_form else None,
             'country_info': format_country_info(country),
             'form_item_info': form_item_info,
@@ -238,6 +239,7 @@ def serialize_form_data_item(data_item, submission_type: str, aes_countries=None
         base_data.update({
             'submission_id': submission.id if submission else None,
             'submission_type': 'public',
+            'assigned_form_id': submission.assigned_form_id if submission else None,
             'assignment_id': public_assignment.id if public_assignment else None,
             'assignment_name': public_assignment.period_name if public_assignment else None,
             'period_name': public_assignment.period_name if public_assignment else None,

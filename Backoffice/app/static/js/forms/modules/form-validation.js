@@ -110,28 +110,37 @@ class FormValidator {
                 window.collectHiddenFieldsForSubmission();
             }
 
-            // Determine which action triggered the submission
+            // Determine which action triggered the submission.
+            // After save-before-submit, the native submitter can be missing; fall
+            // back to the hidden action / page_id fields written by form-events.
             const submitter = e.submitter;
-            const actionValue = submitter ? submitter.value : null;
-            const actionName = submitter ? submitter.name : null;
+            const hiddenAction = form.querySelector('input[name="action"][type="hidden"]')?.value || null;
+            const actionValue = (submitter && submitter.name === 'action' && submitter.value)
+                ? submitter.value
+                : hiddenAction;
+            const actionName = (submitter && submitter.name === 'action')
+                ? 'action'
+                : (hiddenAction ? 'action' : (submitter ? submitter.name : null));
 
             debugLog(MODULE_NAME, `📝 FORM VALIDATION: Action detected - name: "${actionName}", value: "${actionValue}"`);
 
-            // Only validate for submit actions, not save / save_page
-            if (actionName === 'action' && (actionValue === 'save' || actionValue === 'save_page')) {
+            // Only validate for submit actions, not save
+            if (actionValue === 'save' || actionValue === 'save_page') {
                 debugLog(MODULE_NAME, '💾 FORM VALIDATION: Save action detected - skipping validation (allowing save)');
                 return true;
             }
 
-            if (actionName === 'action' && (actionValue === 'submit' || actionValue === 'submit_page')) {
+            if (actionValue === 'submit' || actionValue === 'submit_page') {
                 debugLog(MODULE_NAME, '📤 FORM VALIDATION: Submit action detected - running validation');
             } else {
                 debugLog(MODULE_NAME, '🔍 FORM VALIDATION: Unknown or missing action - running validation as default');
             }
 
             let restoreSectionScope = null;
-            if (actionName === 'action' && actionValue === 'submit_page') {
-                const pageId = submitter?.dataset?.pageId;
+            if (actionValue === 'submit_page') {
+                const pageId = submitter?.dataset?.pageId
+                    || form.querySelector('input[name="page_id"]')?.value
+                    || '';
                 restoreSectionScope = this.scopeValidationToPage(pageId);
             }
 
@@ -1015,14 +1024,18 @@ class FormValidator {
         if (!pageId) return null;
         const pageKey = String(pageId);
         const marked = [];
-        document.querySelectorAll('#sections-container > [id^="section-container-"]').forEach((el) => {
+        const scoped = document.querySelectorAll('#sections-container [id^="section-container-"][data-page-id]');
+        const candidates = scoped.length
+            ? scoped
+            : document.querySelectorAll('#sections-container > [id^="section-container-"]');
+        candidates.forEach((el) => {
+            if (el.dataset.ifrcPageValidateScope === '1') return;
             if (el.classList.contains('relevance-hidden')) return;
             if (String(el.dataset.pageId || '') === pageKey) return;
             el.classList.add('relevance-hidden');
             el.dataset.ifrcPageValidateScope = '1';
             marked.push(el);
         });
-        if (!marked.length) return null;
         return () => {
             marked.forEach((el) => {
                 el.classList.remove('relevance-hidden');

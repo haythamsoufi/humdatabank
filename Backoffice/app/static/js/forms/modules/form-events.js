@@ -65,6 +65,12 @@ export function initFormEvents() {
     window.refreshCsrfFromCurrentPage();
   }
 
+  // Page submit uses custom scoped validation. Native constraint checks would
+  // still see required fields on other pages and block requestSubmit().
+  if (form.dataset.pageSubmission === 'true') {
+    form.noValidate = true;
+  }
+
   // Save-before-submit (draft save) to prevent data loss:
   // - Save via AJAX (action=save) WITHOUT showing "Progress saved successfully!"
   // - Then re-trigger a real submit (action=submit) so validation + backend submission runs
@@ -73,14 +79,24 @@ export function initFormEvents() {
   form.addEventListener('submit', async function (event) {
     // Only handle the submit action (not save)
     const submitter = event.submitter;
-    const submitBtn =
-      (submitter && submitter.name === 'action' && submitter.value === 'submit') ? submitter :
-      form.querySelector('button[type="submit"][name="action"][value="submit"]');
+    const hiddenAction = form.querySelector('input[name="action"][type="hidden"]')?.value || null;
     const actionValue =
-      (submitter && submitter.name === 'action') ? submitter.value :
-      (form.querySelector('input[name="action"][type="hidden"]')?.value || null);
+      (submitter && submitter.name === 'action') ? submitter.value : hiddenAction;
 
     if (actionValue !== 'submit' && actionValue !== 'submit_page') return;
+
+    // Keep page submit and whole-form submit on separate buttons. After
+    // presave we must requestSubmit the same kind of button the user clicked.
+    const hiddenPageId = form.querySelector('input[name="page_id"]')?.value || '';
+    const pageSubmitter = (submitter && submitter.value === 'submit_page')
+      ? submitter
+      : (actionValue === 'submit_page' && hiddenPageId
+        ? form.querySelector(`button[type="submit"][name="action"][value="submit_page"][data-page-id="${hiddenPageId}"]`)
+        : null);
+    const wholeSubmitBtn = (submitter && submitter.value === 'submit')
+      ? submitter
+      : form.querySelector('button[type="submit"][name="action"][value="submit"]');
+    const submitBtn = actionValue === 'submit_page' ? pageSubmitter : wholeSubmitBtn;
 
     // If this submit was triggered programmatically by our own flow (presave -> requestSubmit,
     // or CSRF refresh -> requestSubmit), do NOT presave again (prevents loops / duplicate saves).
@@ -149,12 +165,10 @@ export function initFormEvents() {
 
     try {
       debugLog(MODULE_NAME, '🧩 presave: starting ajax save-before-submit');
-      // Save draft silently (no "Progress saved successfully!" toast)
-      const presaveAction = actionValue === 'submit_page' ? 'save_page' : 'save';
+      // Save the whole form silently, then submit only the intended action.
       await saveFormBeforeSubmit({
         toast: false,
-        action: presaveAction,
-        pageId: submitter?.dataset?.pageId || submitBtn?.dataset?.pageId || '',
+        action: 'save',
       });
       debugLog(MODULE_NAME, '🧩 presave: ajax save-before-submit complete');
       showSavedBeforeSubmitMessage();
@@ -200,6 +214,10 @@ export function initFormEvents() {
           submitBtn.disabled = false;
           delete submitBtn.dataset.submitGuardActive;
         }
+        document.querySelectorAll('.page-submit-btn').forEach((button) => {
+          button.disabled = false;
+          delete button.dataset.submitGuardActive;
+        });
       } catch (_) { /* no-op */ }
 
       debugLog(MODULE_NAME, '🧩 presave: triggering final submit', {
@@ -496,14 +514,7 @@ export function initFormEvents() {
 
       // Use the same AJAX save function as the main save button
       // First try to trigger click on the original save button (which has the AJAX handler)
-      const activeLink = document.querySelector('#sidebar-nav-scroll a.section-link.is-active');
-      const activeSectionId = (activeLink?.dataset?.sectionId || '').replace('section-container-', '');
-      const activePageId = activeLink?.closest('[data-page-id]')?.dataset?.pageId || '';
-      const scopedSave = (activePageId && document.querySelector(`.page-save-btn[data-page-id="${activePageId}"]`))
-        || document.querySelector('.page-save-btn:not(.hidden)');
-      const saveSubmitter = (scopedSave && !scopedSave.closest('.hidden') && !scopedSave.disabled)
-        ? scopedSave
-        : form.querySelector('button[type="submit"][name="action"][value="save"]');
+      const saveSubmitter = form.querySelector('button[type="submit"][name="action"][value="save"]');
       if (saveSubmitter) {
         // Simulate a click on the original save button to trigger its AJAX save handler
         // This ensures the FAB button uses the exact same function as the main save button
@@ -529,18 +540,24 @@ export function initFormEvents() {
       e.preventDefault();
       e.stopPropagation();
 
-      // Prefer the explicit submit button; fall back to send_for_review when submit is absent
-      // (e.g. when delegation review is enabled and the current user is a focal point).
+      // Page mode: submit only the active page. Whole-form mode: submit or send-for-review.
+      const pageMode = form.dataset.pageSubmission === 'true';
       const activeLink = document.querySelector('#sidebar-nav-scroll a.section-link.is-active');
-      const activeSectionId = (activeLink?.dataset?.sectionId || '').replace('section-container-', '');
       const activePageId = activeLink?.closest('[data-page-id]')?.dataset?.pageId || '';
-      const scopedSubmit = (activePageId && document.querySelector(`.page-submit-btn[data-page-id="${activePageId}"]`))
-        || document.querySelector('.page-submit-btn');
+      const scopedSubmit = activePageId
+        ? document.querySelector(`.page-submit-btn[data-page-id="${activePageId}"]`)
+        : null;
       const submitSubmitter = form.querySelector('button[type="submit"][name="action"][value="submit"]');
       const sendForReviewSubmitter = form.querySelector('button[type="submit"][name="action"][value="send_for_review"]');
-      const activeSubmitter = (scopedSubmit && !scopedSubmit.closest('.hidden') && !scopedSubmit.disabled)
-        ? scopedSubmit
+      const pageSubmitterVisible = scopedSubmit
+        && !scopedSubmit.closest('.hidden')
+        && !scopedSubmit.disabled;
+      const activeSubmitter = pageMode
+        ? (pageSubmitterVisible ? scopedSubmit : null)
         : (submitSubmitter || sendForReviewSubmitter);
+      if (pageMode && !activeSubmitter) {
+        return;
+      }
       const activeOptions = getConfirmDialogOptions(activeSubmitter);
       const activeAction = activeOptions.action;
 

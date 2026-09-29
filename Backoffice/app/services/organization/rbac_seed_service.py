@@ -62,6 +62,17 @@ class RbacSeedLockMode(str, Enum):
     NONE = "none"
 
 
+# System-level capabilities that stay out of the admin_full bundle and are granted
+# through their dedicated roles (admin_settings_manager, admin_plugins_manager,
+# admin_system_maintainer) so that "Full" never silently includes platform-wide
+# configuration, plugin management or destructive housekeeping.
+_ADMIN_FULL_EXCLUDED_PERMISSION_CODES = (
+    "admin.settings.manage",
+    "admin.plugins.manage",
+    "admin.system.maintain",
+)
+
+
 def _permission_catalog() -> List[Tuple[str, str, str]]:
     # Keep this list stable: permission codes are referenced across code and DB
     return [
@@ -115,6 +126,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         # Countries / organization
         ("admin.countries.view", "View countries", "View countries"),
         ("admin.countries.edit", "Edit countries", "Edit countries"),
+        ("admin.countries.delete", "Delete countries", "Hard delete country records (destructive; cascades to dependent data)"),
         ("admin.organization.manage", "Manage organization", "Manage organization structure"),
 
         # Indicator bank
@@ -141,9 +153,19 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         # System / API / plugins
         ("admin.settings.manage", "Manage settings", "Manage system settings"),
         ("admin.api.manage", "Manage API", "Manage API keys and API settings"),
-        ("admin.plugins.manage", "Manage plugins", "Manage plugins"),
+        (
+            "admin.plugins.manage",
+            "Manage plugins",
+            "View, configure, activate and deactivate plugins. Installing, uploading and uninstalling plugin code is System Manager only.",
+        ),
+        (
+            "admin.system.maintain",
+            "Maintain system",
+            "Destructive housekeeping: end user sessions, clean up stale sessions, clear monitoring logs",
+        ),
         # Data Explorer - granular permissions per tab
         ("admin.data_explore.data_table", "Data Explorer: Data Table", "Access the Data Table tab in Data Explorer"),
+        ("admin.data_explore.impute", "Data Explorer: Apply imputed values", "Write accepted imputed values into submission data from the Data Table tab (requires Data Table access and template/country scope)"),
         ("admin.data_explore.analysis", "Data Explorer: Analysis", "Access the Analysis tab in Data Explorer"),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
         ("admin.data_explore.reports", "Data Explorer: Reports", "Access published reports in Data Explorer"),
@@ -205,7 +227,7 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 code
                 for code, _, _ in permission_catalog
                 if code.startswith("admin.")
-                and code not in ("admin.settings.manage", "admin.plugins.manage")
+                and code not in _ADMIN_FULL_EXCLUDED_PERMISSION_CODES
             ],
         },
         # ----------------------------------------------------------------
@@ -301,6 +323,7 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "permission_codes": [
                 "admin.countries.view",
                 "admin.countries.edit",
+                "admin.countries.delete",
                 "admin.organization.manage",
             ],
         },
@@ -357,14 +380,20 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         {
             "code": "admin_plugins_manager",
             "name": "Admin: Plugins (Manage)",
-            "description": "Manage plugins.",
+            "description": "View, configure, activate and deactivate plugins (installing, uploading and uninstalling plugin code is System Manager only).",
             "permission_codes": ["admin.plugins.manage"],
+        },
+        {
+            "code": "admin_system_maintainer",
+            "name": "Admin: System Maintenance",
+            "description": "End user sessions, clean up stale sessions and clear monitoring logs (destructive housekeeping; not part of Admin: Full).",
+            "permission_codes": ["admin.analytics.view", "admin.system.maintain"],
         },
         {
             "code": "admin_data_explorer_data_table",
             "name": "Admin: Data Explorer (Data Table)",
-            "description": "Access the Data Table tab in Data Explorer.",
-            "permission_codes": ["admin.data_explore.data_table"],
+            "description": "Access the Data Table tab in Data Explorer, including applying accepted imputed values within template/country scope.",
+            "permission_codes": ["admin.data_explore.data_table", "admin.data_explore.impute"],
         },
         {
             "code": "admin_data_explorer_analysis",

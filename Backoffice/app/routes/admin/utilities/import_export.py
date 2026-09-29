@@ -8,7 +8,7 @@ import uuid as _uuid_mod
 from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_babel import _
 from flask_login import current_user
-from openpyxl import load_workbook
+from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -311,7 +311,7 @@ def _to_json_dict(v):
 
 
 def _sheet_rows_as_dicts(ws):
-    rows = list(ws.iter_rows(values_only=True))
+    rows = list(safe_iter_rows(ws, values_only=True))
     if not rows:
         return []
     raw_headers = list(rows[0])
@@ -361,7 +361,7 @@ def _tags_str_to_list(raw):
 
 def _preview_indicator_import(file_path):
     """Parse the import file and return a change-summary dict without touching the DB."""
-    wb = load_workbook(file_path, read_only=True, data_only=True)
+    wb = load_workbook_safe(file_path, read_only=True, data_only=True)
     sheetnames = set(wb.sheetnames or [])
 
     summary = {
@@ -687,7 +687,7 @@ def _preview_indicator_import(file_path):
                     summary["indicators"]["sample"].append({"name": name or f"ID:{rid}", "action": "create"})
     else:
         ws_ind = wb.active
-        rows_raw = list(ws_ind.iter_rows(values_only=True))
+        rows_raw = list(safe_iter_rows(ws_ind, values_only=True))
         if rows_raw:
             headers  = [_norm_header(h) for h in rows_raw[0]]
             hmap     = {h: i for i, h in enumerate(headers) if h}
@@ -726,7 +726,7 @@ def _process_indicator_import(file_path):
     """Process Excel file for indicator import – writes to the DB."""
     try:
         current_app.logger.info("Loading workbook from: %s", file_path)
-        wb = load_workbook(file_path, read_only=True, data_only=True)
+        wb = load_workbook_safe(file_path, read_only=True, data_only=True)
 
         result = {
             'success': True,
@@ -1442,7 +1442,7 @@ def _import_indicators_main_sheet(wb, result):
             header_to_col[key] = idx
     current_app.logger.info("Indicators sheet headers: %s", headers)
 
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    rows = list(safe_iter_rows(ws, min_row=2, values_only=True))
 
     def _val(row, idx):
         if row is None or idx is None or idx < 0 or idx >= len(row):

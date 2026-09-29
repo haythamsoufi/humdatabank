@@ -440,7 +440,7 @@ def security_events():
 
 
 @bp.route('/security-events/<int:event_id>/resolve', methods=['POST'])
-@permission_required('admin.analytics.view')
+@permission_required('admin.security.respond')
 def resolve_security_event(event_id):
     """Resolve a security event."""
     event = SecurityEvent.query.get_or_404(event_id)
@@ -642,7 +642,7 @@ def get_session_statistics(days=30):
 
 
 @bp.route('/cleanup-sessions', methods=['POST'])
-@permission_required('admin.analytics.view')
+@permission_required('admin.system.maintain')
 def cleanup_sessions():
     """Manual cleanup of inactive sessions."""
     from app.services.platform.user_analytics_service import cleanup_inactive_sessions
@@ -676,7 +676,7 @@ def cleanup_sessions():
 
 
 @bp.route('/end-session/<session_id>', methods=['POST'])
-@permission_required('admin.analytics.view')
+@permission_required('admin.system.maintain')
 def end_session(session_id):
     """End a specific user session manually and force logout the user."""
     from app.services.platform.user_analytics_service import end_user_session
@@ -1290,7 +1290,9 @@ def activity_endpoint_catalog():
 
     if request.args.get("export") == "csv":
         buf = io.StringIO()
-        writer = csv.writer(buf)
+        from app.utils.export_safety import safe_csv_writer
+
+        writer = safe_csv_writer(buf)
         writer.writerow(
             [
                 _("Method"),

@@ -4,7 +4,7 @@ from app.extensions import limiter
 from app.routes.admin.shared import admin_required, permission_required_any
 from app.services.translation.auto_translator import get_auto_translator
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_ok
+from app.utils.api_responses import json_forbidden, json_ok
 from app.utils.error_handling import handle_json_view_exception
 
 from app.routes.admin.utilities import bp
@@ -29,9 +29,19 @@ def refresh_csrf_token():
 @admin_required
 @limiter.limit("30 per minute")
 def refresh_csrf_token_get():
+    """Token bootstrap for same-origin fetches.
+
+    GET is kept because clients call it when a POST already failed on an expired token. It only
+    returns a token bound to the caller's own session, is never cacheable and is refused for
+    browser-declared cross-site requests.
+    """
+    if (request.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
+        return json_forbidden('Cross-site requests are not allowed.')
     try:
         token = csrf.generate_csrf()
-        return json_ok(csrf_token=token, status='success')
+        response = json_ok(csrf_token=token, status='success')
+        response.headers['Cache-Control'] = 'no-store'
+        return response
     except Exception as e:
         return handle_json_view_exception(e, 'Error refreshing CSRF token', status_code=500)
 

@@ -5,7 +5,7 @@ System Monitoring Module - Memory logs and system monitoring
 
 from flask import Blueprint, render_template, request, current_app, send_file, abort, redirect, url_for, flash
 from flask_login import current_user, login_required
-from app.routes.admin.shared import admin_required, admin_permission_required
+from app.routes.admin.shared import admin_required, admin_permission_required, system_manager_required
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_error, json_error_handler, json_not_found, json_ok, json_server_error
 from app.utils.constants import MAX_LOG_ROTATION_KEEP_LINES, MAX_LOG_TAIL_LINES
@@ -430,7 +430,7 @@ def download_monitoring_logs():
 
 
 @bp.route("/monitoring/logs/clear", methods=["POST"])
-@admin_permission_required('admin.analytics.view')
+@admin_permission_required('admin.system.maintain')
 @json_error_handler('Clear monitoring logs')
 def clear_monitoring_logs():
     """Clear all monitoring log files (memory + system + application)."""
@@ -551,8 +551,9 @@ def get_system_logs():
     )
 
 
-@bp.route("/monitoring/test-error", methods=["GET", "POST"])
-@admin_permission_required('admin.analytics.view')
+@bp.route("/monitoring/test-error", methods=["POST"])
+@admin_required
+@system_manager_required
 def test_error_notification():
     """
     Test endpoint to trigger error notification and verify system manager alerts.

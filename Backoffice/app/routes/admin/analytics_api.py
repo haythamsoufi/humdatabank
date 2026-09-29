@@ -94,7 +94,7 @@ def session_log_page_view_paths_api(session_id):
 
 @bp.route("/analytics/end-session/<session_id>", methods=["POST"])
 @csrf.exempt  # Mobile app POSTs without a Referer header; auth/permission checks below are sufficient
-@permission_required('admin.analytics.view')
+@permission_required('admin.system.maintain')
 def end_session_api(session_id):
     """End a user session and blacklist it (JSON for admin clients)."""
     from app.services.platform.user_analytics_service import log_admin_action

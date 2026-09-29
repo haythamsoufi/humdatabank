@@ -35,6 +35,8 @@ from app.routes.admin.shared import (
     admin_permission_required_any,
     permission_required,
     permission_required_any,
+    user_has_country_permission,
+    country_has_dependents,
 )
 from app.utils.request_utils import is_json_request
 from app.utils.entity_groups import get_enabled_entity_groups
@@ -377,6 +379,9 @@ def new_country():
 def edit_country(country_id):
     """Edit an existing country."""
     country = Country.query.get_or_404(country_id)
+    if not user_has_country_permission(country.id, 'admin.countries.edit', 'admin.organization.manage'):
+        flash("You do not have permission to edit this country.", "warning")
+        return redirect(url_for('organization.index', tab='countries'))
     form = CountryForm()
 
     if request.method == 'GET':
@@ -433,14 +438,23 @@ def edit_country(country_id):
 
 
 @bp.route('/countries/<int:country_id>/delete', methods=['POST'])
-@admin_permission_required_any('admin.countries.edit', 'admin.organization.manage')
+@admin_permission_required('admin.countries.delete')
 def delete_country(country_id):
     """Delete a country."""
     country = Country.query.get_or_404(country_id)
+    if not user_has_country_permission(country.id, 'admin.countries.delete'):
+        flash("You do not have permission to delete this country.", "warning")
+        return redirect(url_for('organization.index', tab='countries'))
     csrf_form = FlaskForm()
 
     if csrf_form.validate_on_submit():
         try:
+            if country_has_dependents(country):
+                flash(
+                    f'Cannot delete country "{country.name}" as it is associated with users or assignments.',
+                    'danger',
+                )
+                return redirect(url_for('organization.index', tab='countries'))
             name = country.name
             db.session.delete(country)
             db.session.flush()

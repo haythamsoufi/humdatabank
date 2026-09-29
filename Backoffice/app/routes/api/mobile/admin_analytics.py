@@ -157,14 +157,9 @@ def session_logs():
 
 
 @mobile_bp.route('/admin/analytics/sessions/<session_id>/end', methods=['POST'])
-# 'admin.analytics.manage' does not exist in the RBAC seed catalog (only
-# 'admin.analytics.view') -- using it here made this endpoint inaccessible to
-# every non-System-Manager (no role can ever hold a permission that isn't in
-# the catalog; System Manager alone still got in via has_rbac_permission()'s
-# superuser shortcut). Match the HTML (analytics.end_session) and JSON
-# (analytics_api.end_session_api) routes, which both gate the same action on
-# 'admin.analytics.view'.
-@mobile_auth_required(permission='admin.analytics.view')
+# Ending a session is destructive housekeeping, gated on 'admin.system.maintain' like the HTML
+# (analytics.end_session) and JSON (admin_analytics_api.end_session_api) routes.
+@mobile_auth_required(permission='admin.system.maintain')
 def end_session(session_id):
     """End a user session and blacklist it (admin)."""
     from app.utils.transactions import request_transaction_rollback

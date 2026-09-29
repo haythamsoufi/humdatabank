@@ -40,6 +40,30 @@ def _make_mock_session(user=None, last_activity=None, started_at=None):
 class TestCleanupSessions:
     """Tests for cleanup_sessions (POST /admin/utilities/sessions/cleanup)."""
 
+    @pytest.fixture(autouse=True)
+    def _grant_maintain(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.system.maintain")
+        db_session.commit()
+
+    def test_admin_without_maintain_permission_is_denied(self, logged_in_client, db_session):
+        from app.models.rbac import RbacPermission, RbacRolePermission, RbacRole
+
+        role = RbacRole.query.filter_by(code="admin_core").first()
+        perm = RbacPermission.query.filter_by(code="admin.system.maintain").first()
+        RbacRolePermission.query.filter_by(role_id=role.id, permission_id=perm.id).delete()
+        db_session.commit()
+        with patch("app.routes.admin.utilities.sessions.inspect") as mock_inspect:
+            resp = logged_in_client.post(
+                "/admin/utilities/sessions/cleanup", headers={"Accept": "application/json"}
+            )
+        assert resp.status_code == 403
+        mock_inspect.assert_not_called()
+
+    def test_get_is_not_allowed(self, logged_in_client):
+        assert logged_in_client.get("/admin/utilities/sessions/cleanup").status_code == 405
+
     def test_redirects_when_table_does_not_exist(self, logged_in_client, db_session):
         """When the session table doesn't exist, flash warning and redirect."""
         mock_inspect = MagicMock()

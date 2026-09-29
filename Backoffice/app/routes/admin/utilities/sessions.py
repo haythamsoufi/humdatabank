@@ -13,7 +13,7 @@ from app.routes.admin.utilities import bp
 
 # === Session Management Routes ===
 @bp.route("/utilities/sessions/cleanup", methods=["POST"])
-@permission_required('admin.analytics.view')
+@permission_required('admin.system.maintain')
 def cleanup_sessions():
     """Cleanup expired sessions"""
     try:

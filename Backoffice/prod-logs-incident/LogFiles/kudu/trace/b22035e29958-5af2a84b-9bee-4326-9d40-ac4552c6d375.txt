@@ -1,1 +1,0 @@
-2025-10-16T10:47:20  Startup Request, url: /api/logs/docker, method: POST, type: request, pid: 771,1,5, ScmType: None

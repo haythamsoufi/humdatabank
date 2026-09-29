@@ -69,9 +69,10 @@ def main() -> None:
     with app.app_context():
         from app.models import User, UserSessionLog, UserLoginLog
         from app.utils.datetime_helpers import utcnow, ensure_utc
+        from app.utils.sql_utils import ilike_equals
 
         email = args.email.strip().lower()
-        user = User.query.filter(User.email.ilike(email)).first()
+        user = User.query.filter(ilike_equals(User.email, email)).first()
         if not user:
             print(f"No user found for email={email}")
             return

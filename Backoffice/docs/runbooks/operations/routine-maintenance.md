@@ -215,7 +215,7 @@ Omit `--form-item-id` to scan every matrix item at once (still `--dry-run` first
    ```
    Use `cd /app` (not `Backoffice/`) — that's the deployed app root inside the container (see `entrypoint.sh`). Omit `--form-item-id` to scan every matrix item. `--force` is preferred over the interactive confirmation prompt here since the SSH tunnel is a one-shot non-interactive command.
 
-   Fallback with no local Azure CLI/OpenSSH: Azure Portal → App Service → **Development Tools → SSH** (browser-based Kudu console, no password needed) and run the same two commands from `/app`.
+   Fallback with no local Azure CLI/OpenSSH: Azure Portal → App Service → **Development Tools → SSH** (browser-based Kudu console). The container's sshd is opt-in: set `ENABLE_SSH=true` first and remove it afterwards — see [Container SSH access](container-ssh-access.md) and run the same two commands from `/app`.
 3. Re-run the `--dry-run` command — it should report "No stale matrix cell keys found" once cleanup is complete.
 
 ### After a Code Deployment

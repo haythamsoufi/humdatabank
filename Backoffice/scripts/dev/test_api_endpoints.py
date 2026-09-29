@@ -14,6 +14,7 @@ Usage:
 import argparse
 import logging
 import os
+import secrets
 import sys
 
 logger = logging.getLogger(__name__)
@@ -171,7 +172,7 @@ class APITester:
                                 name='Test Admin',
                                 role='admin'
                             )
-                            user.set_password('test123')
+                            user.set_password(os.environ.get('TEST_ADMIN_PASSWORD') or secrets.token_urlsafe(16))
                             db.session.add(user)
                             db.session.commit()
 

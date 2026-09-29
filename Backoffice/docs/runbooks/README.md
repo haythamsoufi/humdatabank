@@ -12,6 +12,7 @@
 | Add a new user or change their role | [User & role management](operations/user-and-role-management.md) |
 | Create or manage a form | [Form operations](operations/form-operations.md) |
 | Run routine maintenance tasks | [Routine maintenance](operations/routine-maintenance.md) |
+| Get a shell in the production/staging container | [Container SSH access](operations/container-ssh-access.md) |
 | Deploy a code change or release | [Release process](development/release-process.md) + [Azure App Service](deployment/azure-app-service.md) |
 | Understand application logs | [Logging & health](observability/logging-and-health.md) |
 | Investigate a WAF 403 in production | [WAF 403 guide](incidents/waf-403-form-payload-refactor-guide.md) |
@@ -33,6 +34,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 | [User & role management](operations/user-and-role-management.md) | Creating accounts, assigning roles and countries, approving self-service access requests, deactivating leavers |
 | [Form operations](operations/form-operations.md) | Building templates, assigning forms to countries, reviewing and exporting submissions |
 | [Routine maintenance](operations/routine-maintenance.md) | Weekly/monthly checks: session cleanup, DB health, AI trace review, translation sync |
+| [Container SSH access](operations/container-ssh-access.md) | Opt-in break-glass shell in the App Service container (`ENABLE_SSH`, key vs platform mode) |
 
 ---
 
@@ -83,7 +85,8 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 | Runbook | When to use |
 |---------|-------------|
 | [RBAC audit exemptions](security/rbac-admin-route-audit-exemptions.md) | When adding or reviewing admin routes exempt from the startup RBAC guard |
-| [Security setup](../setup/security.md) | Secrets, CORS, rate limiting, CSRF baseline |
+| [Security setup](../setup/security.md) | Secrets, CORS, rate limiting, CSRF baseline, CSP/headers, log redaction, seeding guard |
+| [Committed artifacts: history purge & rotation](security/committed-artifacts-history-purge.md) | Prod logs / data samples / instance files that were committed: purge history, rotate credentials |
 
 ---
 

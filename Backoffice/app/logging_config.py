@@ -4,6 +4,8 @@ import logging
 import re
 from logging import Filter
 
+from app.utils.logging_security import redact_query_params_in_text
+
 # Gunicorn access log request-line fragments for probe/health endpoints.
 _NOISY_ACCESS_REQUEST_FRAGMENTS = (
     '"GET /health ',
@@ -99,6 +101,31 @@ class StaticFileFilter(Filter):
         return True
 
 
+class SensitiveQueryFilter(Filter):
+    """Mask sensitive query-parameter values (tokens, keys, passwords) in access-log request lines and referers.
+
+    Gunicorn passes its atoms as a dict in ``record.args``; werkzeug passes a tuple. Only argument values
+    are rewritten (never a ``%``-format template), so the record still formats correctly.
+    """
+
+    _ATOM_KEYS = ('r', 'f', 'U', 'q')
+
+    def filter(self, record):
+        args = record.args
+        if isinstance(args, dict):
+            for key in self._ATOM_KEYS:
+                value = args.get(key)
+                if isinstance(value, str):
+                    args[key] = redact_query_params_in_text(value)
+        elif isinstance(args, tuple) and args:
+            record.args = tuple(
+                redact_query_params_in_text(a) if isinstance(a, str) else a for a in args
+            )
+        elif not args and isinstance(record.msg, str):
+            record.msg = redact_query_params_in_text(record.msg)
+        return True
+
+
 class SQLAlchemyRelationshipFilter(Filter):
     """Filter out verbose SQLAlchemy relationship setup logs."""
 
@@ -134,10 +161,14 @@ def _apply_access_log_filters():
         sqlalchemy_logger.addFilter(SQLAlchemyRelationshipFilter())
 
     access_logger = logging.getLogger('gunicorn.access')
+    if not any(isinstance(f, SensitiveQueryFilter) for f in access_logger.filters):
+        access_logger.addFilter(SensitiveQueryFilter())
     if not any(isinstance(f, StaticFileFilter) for f in access_logger.filters):
         access_logger.addFilter(StaticFileFilter())
 
     werkzeug_logger = logging.getLogger('werkzeug')
+    if not any(isinstance(f, SensitiveQueryFilter) for f in werkzeug_logger.filters):
+        werkzeug_logger.addFilter(SensitiveQueryFilter())
     if not any(isinstance(f, StaticFileFilter) for f in werkzeug_logger.filters):
         werkzeug_logger.addFilter(StaticFileFilter())
 

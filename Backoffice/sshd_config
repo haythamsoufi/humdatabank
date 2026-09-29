@@ -1,12 +1,54 @@
-Port 			2222
-ListenAddress 		0.0.0.0
-LoginGraceTime 		180
-X11Forwarding 		yes
-Ciphers aes128-cbc,3des-cbc,aes256-cbc,aes128-ctr,aes192-ctr,aes256-ctr
-MACs hmac-sha1,hmac-sha1-96
-StrictModes 		yes
-SyslogFacility 		DAEMON
-PasswordAuthentication 	yes
-PermitEmptyPasswords 	no
-PermitRootLogin 	yes
+# Hardened sshd for Azure App Service custom-container SSH (break-glass access only).
+# sshd is NOT started unless ENABLE_SSH=true (see docker/start-ssh.sh). Runtime-only settings
+# (listen address, password vs key auth, legacy crypto fallback) are passed by start-ssh.sh as
+# `sshd -o` overrides, which take precedence over this file.
+#
+# Azure requires: port 2222, root login, and (for Portal/`az webapp ssh`) password auth.
+# Reference: https://learn.microsoft.com/azure/app-service/configure-linux-open-ssh-session
+
+Port 2222
+ListenAddress 0.0.0.0
+
+# Host keys are generated at container start (never baked into the image).
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+LoginGraceTime 30
+MaxAuthTries 3
+MaxSessions 4
+MaxStartups 3:50:10
+StrictModes yes
+
+AllowUsers root
+PermitRootLogin yes
+PasswordAuthentication yes
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+UsePAM no
+
+# No tunnelling, forwarding or environment injection from a session.
+AllowTcpForwarding no
+AllowStreamLocalForwarding no
+GatewayPorts no
+X11Forwarding no
+AllowAgentForwarding no
+PermitTunnel no
+PermitUserEnvironment no
+PermitUserRC no
+Compression no
+PrintMotd no
+UseDNS no
+
+ClientAliveInterval 60
+ClientAliveCountMax 3
+
+# Auth attempts and session opens are written to stderr (-e), i.e. the container log stream.
+LogLevel VERBOSE
+
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
+
 Subsystem sftp internal-sftp

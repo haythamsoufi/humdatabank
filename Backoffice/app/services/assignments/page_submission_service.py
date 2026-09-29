@@ -575,7 +575,12 @@ def apply_page_submission_mode_change(assignment, enabled: bool, user_id: int | 
         return summary
 
     all_sections = load_published_sections(assignment)
-    entities = list(assignment.entity_statuses.all())
+    from app.utils.form_authorization import lock_aes_rows_for_update
+
+    entities = lock_aes_rows_for_update(
+        [aes.id for aes in assignment.entity_statuses.all()],
+        assigned_form_id=assignment.id,
+    )
     summary['entities'] = len(entities)
 
     if enabled:

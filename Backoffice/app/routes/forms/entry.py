@@ -777,6 +777,20 @@ def handle_assignment_form(aes_id):
              return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
 
         if csrf_form.validate_on_submit():
+            from app.utils.form_authorization import lock_aes_for_update
+
+            if lock_aes_for_update(assignment_entity_status):
+                can_edit = AuthorizationService.can_edit_assignment(
+                    assignment_entity_status, current_user
+                )
+                if not can_edit:
+                    flash(_("This assignment was changed by someone else and can no longer be edited."), "warning")
+                    if is_ajax:
+                        return json_bad_request(
+                            _("This assignment was changed by someone else and can no longer be edited."),
+                            success=False,
+                        )
+                    return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
             try:
                 submission_result = FormDataService.process_form_submission(
                     assignment_entity_status, all_sections, csrf_form

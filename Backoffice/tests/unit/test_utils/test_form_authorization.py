@@ -381,7 +381,8 @@ class TestCheckDocumentAccessDecorator:
         decorated = check_document_access(self._view)
         with app.test_request_context():
             with patch('app.models.SubmittedDocument.query') as mock_q, \
-                 patch('app.utils.form_authorization.has_country_access', return_value=False), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment',
+                       return_value=False), \
                  patch('app.utils.form_authorization.current_user', MagicMock()):
                 mock_q.get.return_value = doc
                 result = decorated(10)
@@ -397,6 +398,8 @@ class TestCheckDocumentAccessDecorator:
         decorated = check_document_access(self._view)
         with app.test_request_context():
             with patch('app.models.SubmittedDocument.query') as mock_q, \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment',
+                       return_value=False), \
                  patch('app.utils.form_authorization.current_user', MagicMock()):
                 mock_q.get.return_value = doc
                 result = decorated(10)

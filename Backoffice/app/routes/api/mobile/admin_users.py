@@ -18,6 +18,7 @@ from app.utils.mobile_responses import (
     mobile_paginated,
     mobile_forbidden,
 )
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.sql_utils import safe_ilike_pattern
 from app.routes.api.mobile import mobile_bp
 
@@ -286,11 +287,23 @@ def activate_user(user_id):
     if user.id == current_user.id:
         return mobile_bad_request('You cannot activate your own account')
     if not AuthorizationService.is_system_manager(current_user) and AuthorizationService.is_admin(user):
-        return mobile_bad_request('Only a System Manager can modify an admin user')
+        return mobile_forbidden('Only a System Manager can modify an admin user')
 
+    old_active = bool(getattr(user, 'active', True))
     user.active = True
     user.deactivated_at = None
     try:
+        db.session.flush()
+        log_admin_action(
+            action_type='user_update',
+            description=f'Activated user (mobile API): {user.email}',
+            target_type='user',
+            target_id=user.id,
+            target_description=f'{user.name or user.email}',
+            old_values={'active': old_active},
+            new_values={'active': True},
+            risk_level='medium',
+        )
         db.session.flush()
         return mobile_ok(message='User activated')
     except Exception as e:
@@ -313,11 +326,23 @@ def deactivate_user(user_id):
     if user.id == current_user.id:
         return mobile_bad_request('You cannot deactivate your own account')
     if not AuthorizationService.is_system_manager(current_user) and AuthorizationService.is_admin(user):
-        return mobile_bad_request('Only a System Manager can modify an admin user')
+        return mobile_forbidden('Only a System Manager can modify an admin user')
 
+    old_active = bool(getattr(user, 'active', True))
     user.active = False
     user.deactivated_at = db.func.now()
     try:
+        db.session.flush()
+        log_admin_action(
+            action_type='user_update',
+            description=f'Deactivated user (mobile API): {user.email}',
+            target_type='user',
+            target_id=user.id,
+            target_description=f'{user.name or user.email}',
+            old_values={'active': old_active},
+            new_values={'active': False},
+            risk_level='medium',
+        )
         db.session.flush()
         return mobile_ok(message='User deactivated')
     except Exception as e:

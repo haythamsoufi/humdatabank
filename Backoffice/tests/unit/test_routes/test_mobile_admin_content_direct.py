@@ -3,6 +3,7 @@
 Uses route_admin fixture from local conftest.py.
 """
 import json
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -258,7 +259,9 @@ class TestTogglePublicAccess:
         from app.models import AssignedForm
 
         template = create_test_template(db_session)
-        af = AssignedForm(template_id=template.id, period_name='2024-toggle', is_public_active=False)
+        af = AssignedForm(
+            template_id=template.id, period_name='2024-toggle', is_public_active=False, unique_token=str(uuid.uuid4())
+        )
         db_session.add(af)
         db_session.commit()
         db_session.refresh(af)

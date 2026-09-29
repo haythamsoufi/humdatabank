@@ -5,19 +5,20 @@ from contextlib import suppress
 import re
 
 from flask import current_app, request, session
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 from app import get_locale
-from app.models import Country, LookupList, LookupListRow
+from app.models import Country, LookupList, LookupListRow, db
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error, require_json_keys
 from app.utils.constants import DEFAULT_LOOKUP_ROW_LIMIT
+from app.utils.form_authorization import AES_ACTION_VIEW, load_aes_for_user, user_can_read_lookup_list
 from app.utils.form_localization import get_localized_country_name
 from app.utils.request_validation import enforce_csrf_json
 from app.utils.sql_utils import safe_ilike_pattern
-from app.routes.forms_api import get_plugin_lookup_list_options
+from app.routes.forms_api import MAX_LOOKUP_OPTIONS_ROWS, get_plugin_lookup_list_options
 
 
 def register_matrix_api_routes(bp):
@@ -144,12 +145,10 @@ def register_matrix_api_routes(bp):
             def _detect_country_iso_from_matrix_context():
                 """Detect country ISO from matrix search request context."""
                 try:
-                    from app.models.assignments import AssignmentEntityStatus
-
                     assignment_entity_status_id = data.get('assignment_entity_status_id')
                     if assignment_entity_status_id:
                         with suppress((ValueError, TypeError)):
-                            aes = AssignmentEntityStatus.query.get(int(assignment_entity_status_id))
+                            aes = load_aes_for_user(assignment_entity_status_id, current_user, AES_ACTION_VIEW)
                             if aes:
                                 from app.utils.api_serialization import _country_for_aes
                                 country = _country_for_aes(aes)
@@ -160,8 +159,7 @@ def register_matrix_api_routes(bp):
                     m = re.search(r"/forms/(?:assignment|entry)/(\d+)", referer)
                     if m:
                         with suppress((ValueError, TypeError)):
-                            aes_id = int(m.group(1))
-                            aes = AssignmentEntityStatus.query.get(aes_id)
+                            aes = load_aes_for_user(int(m.group(1)), current_user, AES_ACTION_VIEW)
                             if aes:
                                 from app.utils.api_serialization import _country_for_aes
                                 country = _country_for_aes(aes)
@@ -268,8 +266,8 @@ def register_matrix_api_routes(bp):
 
                 options = _build_options_from_rows(rows_data)
             else:
-                lookup_list = LookupList.query.get(int(lookup_list_id))
-                if not lookup_list:
+                lookup_list = db.session.get(LookupList, int(lookup_list_id))
+                if not lookup_list or not user_can_read_lookup_list(current_user, lookup_list.id):
                     return json_not_found('Lookup list not found')
 
                 query = lookup_list.rows.order_by(LookupListRow.order)
@@ -301,6 +299,7 @@ def register_matrix_api_routes(bp):
                     limit = DEFAULT_LOOKUP_ROW_LIMIT
             except (ValueError, TypeError):
                 limit = DEFAULT_LOOKUP_ROW_LIMIT
+            limit = min(limit, MAX_LOOKUP_OPTIONS_ROWS)
 
             if len(options) > limit:
                 options = options[:limit]

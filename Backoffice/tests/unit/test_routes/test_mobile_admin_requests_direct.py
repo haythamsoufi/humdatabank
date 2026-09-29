@@ -350,9 +350,9 @@ class TestRejectAccessRequest:
             login_user(admin)
             with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
-                 patch('app.db.session') as mock_sess, \
+                 patch('app.routes.api.mobile.admin_requests.log_admin_action',
+                       side_effect=RuntimeError('audit error')), \
                  patch('app.utils.transactions.request_transaction_rollback'):
-                mock_sess.flush.side_effect = RuntimeError('flush error')
                 resp = reject_access_request(car.id)
 
         _, status = _unpack(resp)
@@ -470,9 +470,9 @@ class TestApproveAllAccessRequests:
             login_user(admin)
             with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.routes.admin.shared.user_has_permission', return_value=True), \
-                 patch('app.models.User.query') as mock_uq, \
+                 patch('app.routes.api.mobile.admin_requests.log_admin_action',
+                       side_effect=RuntimeError('bulk failure')), \
                  patch('app.utils.transactions.request_transaction_rollback'):
-                mock_uq.get.side_effect = RuntimeError('bulk failure')
                 resp = approve_all_access_requests()
 
         _, status = _unpack(resp)

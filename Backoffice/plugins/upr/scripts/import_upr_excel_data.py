@@ -749,7 +749,12 @@ def apply_pns_pending_status_resets(
         return stats
 
     aes_ids = [int(row["assignment_entity_status_id"]) for row in plan]
-    aes_rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
+    if dry_run:
+        aes_rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
+    else:
+        from app.utils.form_authorization import lock_aes_rows_for_update
+
+        aes_rows = lock_aes_rows_for_update(aes_ids)
     aes_by_id = {int(row.id): row for row in aes_rows}
     assigned_form_ids = {int(aes.assigned_form_id) for aes in aes_rows if aes.assigned_form_id}
     assigned_at_by_form = {
@@ -1328,7 +1333,9 @@ def load_upr_data_sheet(path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
     except ImportError as exc:
         raise RuntimeError("Excel support requires openpyxl: pip install openpyxl") from exc
 
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    from app.utils.safe_workbook import load_workbook_safe
+
+    wb = load_workbook_safe(path, read_only=True, data_only=True)
     if UPR_DATA_SHEET not in wb.sheetnames:
         wb.close()
         raise ValueError(f"Sheet {UPR_DATA_SHEET!r} not found in workbook")
@@ -2228,6 +2235,8 @@ def _published_funding_matrix_item(template_id: int):
     pub_vid = getattr(template, "published_version_id", None) if template else None
     if not pub_vid:
         return None
+    from app.utils.sql_utils import ilike_contains
+
     labels = REPORTING_SPECIAL_ITEM_LABELS.get("funding") or ()
     query = FormItem.query.filter(
         FormItem.template_id == int(template_id),
@@ -2236,7 +2245,7 @@ def _published_funding_matrix_item(template_id: int):
         FormItem.archived == False,
     )
     for needle in labels:
-        item = query.filter(FormItem.label.ilike(f"%{needle}%")).first()
+        item = query.filter(ilike_contains(FormItem.label, needle)).first()
         if item:
             return item
     return None

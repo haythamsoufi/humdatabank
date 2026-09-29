@@ -1808,6 +1808,8 @@ def _export_excel_impl(aes_id):
                 data_sheet.column_dimensions[get_column_letter(col_idx)].autosize = True
 
     output = io.BytesIO()
+    from app.utils.export_safety import sanitize_workbook
+    sanitize_workbook(workbook)
     workbook.save(output)
     output.seek(0)
     filename = f"data_entry_{country.iso3}_{str(assignment.period_name).replace(' ', '_')}.xlsx"

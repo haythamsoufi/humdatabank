@@ -71,11 +71,11 @@ class UnifiedCountryPlanExcelService:
             _load_assignment_meta,
         )
 
-        import openpyxl
+        from app.utils.safe_workbook import load_workbook_safe
 
         _, country_name, _iso3, period = _load_assignment_meta(int(aes.id))
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+            wb = load_workbook_safe(file_bytes, read_only=False, data_only=True)
         except Exception as exc:
             current_app.logger.error("%s validate: failed to load workbook: %s", UNIFIED_COUNTRY_PLAN_LABEL, exc)
             return {

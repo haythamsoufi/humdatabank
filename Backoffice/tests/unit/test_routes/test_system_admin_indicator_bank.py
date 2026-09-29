@@ -329,6 +329,57 @@ class TestAddIndicatorBank:
         assert resp.status_code == 200
         mock_rt.assert_called()
 
+    _AJAX = {"X-Requested-With": "XMLHttpRequest"}
+
+    def test_ajax_invalid_form_returns_json_errors_not_html(self, logged_in_create_client, db_session):
+        resp = logged_in_create_client.post(
+            "/admin/indicator_bank/add", data={"name": ""}, headers=self._AJAX
+        )
+        assert resp.status_code in (400, 422)
+        assert resp.is_json
+        body = resp.get_json()
+        assert body.get("success") is False
+        assert "<html" not in resp.get_data(as_text=True).lower()
+
+    def test_ajax_success_returns_redirect_url_json(self, logged_in_create_client, db_session):
+        from unittest.mock import patch
+
+        from app.forms.system.indicator_bank_forms import IndicatorBankForm
+
+        with patch.object(IndicatorBankForm, "validate_on_submit", new=lambda self, *a, **k: True), patch.object(
+            IndicatorBankForm, "populate_indicator_bank", new=lambda self, *a, **k: None
+        ):
+            resp = logged_in_create_client.post(
+                "/admin/indicator_bank/add",
+                data={"name": "AJAX created indicator", "definition": "d"},
+                headers=self._AJAX,
+            )
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["success"] is True
+        assert body["redirect_url"].startswith("/admin/")
+        assert isinstance(body["indicator_id"], int)
+
+    def test_ajax_exception_returns_generic_json_500(self, logged_in_create_client, db_session):
+        from unittest.mock import patch
+
+        from app.forms.system.indicator_bank_forms import IndicatorBankForm
+
+        def _boom(self, *a, **k):
+            raise RuntimeError("db exploded at /srv/x.py")
+
+        with patch.object(IndicatorBankForm, "validate_on_submit", new=lambda self, *a, **k: True), patch.object(
+            IndicatorBankForm, "populate_indicator_bank", new=_boom
+        ):
+            resp = logged_in_create_client.post(
+                "/admin/indicator_bank/add",
+                data={"name": "n", "definition": "d"},
+                headers=self._AJAX,
+            )
+        assert resp.status_code == 500
+        assert resp.is_json
+        assert "exploded" not in resp.get_data(as_text=True)
+
 
 # ---------------------------------------------------------------------------
 # GET/POST /admin/indicator_bank/edit/<id>

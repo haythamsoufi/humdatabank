@@ -125,7 +125,13 @@ class ChipPicker {
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'rb-chip';
-            chip.innerHTML = '<span>' + value + '</span><i class="fas fa-times" aria-hidden="true"></i>';
+            const label = document.createElement('span');
+            label.textContent = value;
+            const closeIcon = document.createElement('i');
+            closeIcon.className = 'fas fa-times';
+            closeIcon.setAttribute('aria-hidden', 'true');
+            chip.appendChild(label);
+            chip.appendChild(closeIcon);
             chip.addEventListener('click', () => this.removeValue(value));
             this.chipsEl.appendChild(chip);
         });

@@ -222,13 +222,13 @@
       const items = srcs.slice(0, 5).map((s) => {
         if (!s || typeof s !== 'object') return '';
         const title = normalizeText(s.document_title) || (s.document_id ? `Document ${String(s.document_id)}` : 'Document');
-        const url = normalizeText(s.document_url);
+        const url = window.SafeDom ? window.SafeDom.safeUrl(normalizeText(s.document_url), { allowSameOrigin: false }) : '';
         const page = (s.page_number !== null && s.page_number !== undefined && Number.isFinite(Number(s.page_number))) ? Number(s.page_number) : null;
         const quote = normalizeText(s.quote);
         const pageTxt = (page !== null && page > 0) ? ` (p. ${page})` : '';
         const quoteTxt = quote ? ` — “${quote}”` : '';
         const titleHtml = url
-          ? `<a class="src-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
+          ? `<a class="src-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
           : `<span class="src-link">${escapeHtml(title)}</span>`;
         return `<li>${titleHtml}${escapeHtml(pageTxt)}${quoteTxt ? `<span>${escapeHtml(quoteTxt)}</span>` : ''}</li>`;
       }).filter(Boolean).join('');
@@ -338,8 +338,12 @@
       }
       const opEl = $(`op-${fid}`);
       if (opEl) {
-        const _sanitize = (window.SafeDom?.sanitizeHtml) || window.sanitizeHtml || (h => h);
-        opEl.innerHTML = _sanitize(formatOpinionHtml(validation));
+        const opinionHtml = formatOpinionHtml(validation);
+        if (window.SafeDom && window.SafeDom.sanitizeHtml) {
+          opEl.innerHTML = window.SafeDom.sanitizeHtml(opinionHtml);
+        } else {
+          opEl.textContent = opinionHtml;
+        }
       }
     }
 

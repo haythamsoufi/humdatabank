@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func, or_
 
 from app.extensions import db
+from app.utils.sql_utils import ilike_contains
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +81,10 @@ def list_glossary_terms(
         q = q.filter_by(target_lang=lang)
     needle = " ".join((search or "").split())
     if needle:
-        like = f"%{needle}%"
         q = q.filter(
             or_(
-                TranslationGlossaryTerm.source_term.ilike(like),
-                TranslationGlossaryTerm.target_term.ilike(like),
+                ilike_contains(TranslationGlossaryTerm.source_term, needle),
+                ilike_contains(TranslationGlossaryTerm.target_term, needle),
             )
         )
     total = q.count()

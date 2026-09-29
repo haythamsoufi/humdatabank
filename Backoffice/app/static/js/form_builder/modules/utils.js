@@ -116,50 +116,19 @@ const Utils = {
 
     // Sanitize HTML (text-only escape for plain strings)
     sanitizeHtml: function(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
-    // Safe DOM insertion for server-rendered HTML fragments.
-    // Strips scripts, iframes, on* handlers, and dangerous href/src protocols.
+    // Safe DOM insertion for server-rendered HTML fragments (delegates to SafeDom.sanitizeHtml).
     setSanitizedHtml: function(container, html) {
         if (!container) return;
         container.replaceChildren();
         if (typeof html !== 'string' || !html.trim()) return;
-
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const root = doc.body;
-        if (!root) return;
-
-        root.querySelectorAll('script, iframe, object, embed, style, meta, link, base, form').forEach((el) => el.remove());
-        root.querySelectorAll('*').forEach((el) => {
-            [...el.attributes].forEach((attr) => {
-                const name = String(attr.name || '').toLowerCase();
-                const value = String(attr.value || '').trim().toLowerCase().replace(/[\s\x00-\x1f]/g, '');
-
-                if (name.startsWith('on')) {
-                    el.removeAttribute(attr.name);
-                    return;
-                }
-
-                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
-                    if (
-                        value.startsWith('javascript:') ||
-                        value.startsWith('data:') ||
-                        value.startsWith('vbscript:') ||
-                        value.startsWith('file:') ||
-                        value.startsWith('about:')
-                    ) {
-                        el.removeAttribute(attr.name);
-                    }
-                }
-            });
-        });
-
-        const fragment = document.createDocumentFragment();
-        while (root.firstChild) fragment.appendChild(root.firstChild);
-        container.appendChild(fragment);
+        if (window.SafeDom && window.SafeDom.sanitizeHtml) {
+            container.innerHTML = window.SafeDom.sanitizeHtml(html, { allowControls: true });
+        } else {
+            container.textContent = html;
+        }
     }
 };
 

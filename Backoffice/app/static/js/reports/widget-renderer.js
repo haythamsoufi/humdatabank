@@ -63,14 +63,18 @@ export async function renderWidget(container, payload) {
         if (payload.embed_url) {
             const iframe = document.createElement('iframe');
             iframe.className = 'report-widget-embed';
-            iframe.src = payload.embed_url;
             iframe.loading = 'lazy';
-            card.appendChild(iframe);
+            iframe.setAttribute('referrerpolicy', 'no-referrer');
+            if (window.SafeDom && window.SafeDom.setSrc(iframe, payload.embed_url, { allowSameOrigin: false })) {
+                card.appendChild(iframe);
+            }
         } else if (payload.embed_html) {
             const wrap = document.createElement('div');
             wrap.className = 'report-widget-embed-html';
-            wrap.innerHTML = payload.embed_html;
-            card.appendChild(wrap);
+            if (window.SafeDom) {
+                window.SafeDom.setHtml(wrap, payload.embed_html);
+                card.appendChild(wrap);
+            }
         }
         mountCard(container, card, payload);
         return { chart: null };
@@ -79,7 +83,11 @@ export async function renderWidget(container, payload) {
     if (payload.type === 'text') {
         const body = document.createElement('div');
         body.className = 'report-widget-text';
-        body.innerHTML = payload.content || '';
+        if (window.SafeDom) {
+            window.SafeDom.setHtml(body, payload.content || '');
+        } else {
+            body.textContent = payload.content || '';
+        }
         card.appendChild(body);
         mountCard(container, card, payload);
         return { chart: null };

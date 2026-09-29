@@ -10,6 +10,7 @@ from flask import current_app
 from markupsafe import escape
 
 from app.extensions import db
+from app.utils.sql_utils import escape_like_wildcards
 from app.models import EmailDeliveryLog, User
 from app.services.platform.app_settings_service import (
     get_auto_approve_access_requests,
@@ -83,7 +84,10 @@ def get_fds_access_request_digest_last_sent_summary() -> dict[str, Any]:
     latest = (
         EmailDeliveryLog.query.filter(
             EmailDeliveryLog.status == "sent",
-            EmailDeliveryLog.subject.like(f"{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}% pending request(s)"),
+            EmailDeliveryLog.subject.like(
+                f"{escape_like_wildcards(FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX)}% pending request(s)",
+                escape="\\",
+            ),
         )
         .order_by(EmailDeliveryLog.sent_at.desc().nullslast())
         .first()
@@ -102,7 +106,10 @@ def get_fds_access_request_digest_last_sent_summary() -> dict[str, Any]:
     logs = (
         EmailDeliveryLog.query.filter(
             EmailDeliveryLog.status == "sent",
-            EmailDeliveryLog.subject.like(f"{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}% pending request(s)"),
+            EmailDeliveryLog.subject.like(
+                f"{escape_like_wildcards(FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX)}% pending request(s)",
+                escape="\\",
+            ),
             EmailDeliveryLog.sent_at >= day_start,
             EmailDeliveryLog.sent_at < day_end,
         )
@@ -155,7 +162,7 @@ def _digest_already_sent_today(user_id: int) -> bool:
     return (
         EmailDeliveryLog.query.filter(
             EmailDeliveryLog.user_id == user_id,
-            EmailDeliveryLog.subject.like(f"{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}%"),
+            EmailDeliveryLog.subject.startswith(FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX, autoescape=True),
             EmailDeliveryLog.status == 'sent',
             EmailDeliveryLog.sent_at >= today_start,
         )

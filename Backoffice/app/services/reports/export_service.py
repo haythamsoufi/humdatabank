@@ -73,6 +73,8 @@ class ReportExportService:
                 sheet.column_dimensions[get_column_letter(col_idx)].width = 18
 
         buf = io.BytesIO()
+        from app.utils.export_safety import sanitize_workbook
+        sanitize_workbook(wb)
         wb.save(buf)
         return buf.getvalue()
 

@@ -198,7 +198,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const url = params.data.indicator_url || '#';
-                return '<a href="' + url + '" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">' + params.value + '</a>';
+                return '<a href="' + SafeDom.safeHrefAttr(url) + '" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">' + SafeDom.escapeHtml(params.value) + '</a>';
             },
             wrapText: false,
             autoHeight: false,

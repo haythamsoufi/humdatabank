@@ -14,7 +14,7 @@ from sqlalchemy import cast, func, or_, text, Text
 
 from app.models import User, Country, FormItem, IndicatorBank
 from app.extensions import db
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.sql_utils import escape_like_wildcards, safe_ilike_pattern
 from app.utils.constants import DEFAULT_INDICATOR_CANDIDATES_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -85,9 +85,7 @@ def escape_like_pattern(s: Optional[str]) -> str:
     Escape SQL LIKE/ILIKE special characters (% and _) so user-supplied
     period/search strings do not change match semantics.
     """
-    if not s:
-        return ""
-    return str(s).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return escape_like_wildcards(s)
 
 
 _RELEVANCE_STOP_WORDS = frozenset({
@@ -186,14 +184,14 @@ def score_indicator_relevance(ind_name: str, query: str) -> float:
     return score
 
 
-def user_allowed_country_ids() -> Optional[set]:
+def user_allowed_country_ids(user=None) -> Optional[set]:
     """
-    Return set of country IDs the current user may access.
+    Return set of country IDs the given (default: effective request) user may access.
     None for unrestricted; set of IDs for scoped users; empty set if no access.
     """
     try:
         from app.services.organization.authorization_service import AuthorizationService
-        user_obj = get_effective_request_user() or current_user
+        user_obj = user or get_effective_request_user() or current_user
 
         if AuthorizationService.is_system_manager(user_obj):
             return None

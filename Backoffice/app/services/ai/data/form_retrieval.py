@@ -38,6 +38,7 @@ from app.services.data_retrieval.shared import (
     get_indicator_candidates_by_keyword,
     score_indicator_relevance,
 )
+from app.services.data_retrieval.access import resolve_data_access_policy
 from app.services.data_retrieval.country import check_country_access, resolve_country, get_country_info
 from app.services.data_retrieval.form_helpers import (
     extract_numeric_from_formdata,
@@ -110,11 +111,10 @@ def get_indicator_timeseries(
             _disp_progress = _disp_progress[:197] + "…"
         _progress(_("Selected indicator: %(name)s", name=_disp_progress))
 
-        # RBAC: ensure the caller can access this country (same rule as other tools)
-        try:
-            check_country_access(int(country_id))
-        except Exception as e_access:
-            return service_error(str(e_access), series=[])
+        data_policy = resolve_data_access_policy()
+        has_country_access = data_policy.can_read_country(int(country_id))
+        if not has_country_access:
+            include_saved = False
 
         country = db.session.get(Country, int(country_id))
         country_display = get_localized_country_name(country) if country else ""
@@ -146,7 +146,8 @@ def get_indicator_timeseries(
             is_point_indicator = False
 
         _progress(_("Querying form data…"))
-        item_ids = [int(fi.id) for fi in FormItem.query.filter(FormItem.indicator_bank_id == int(primary_id)).all()]
+        linked_items = FormItem.query.filter(FormItem.indicator_bank_id == int(primary_id)).all()
+        item_ids = [int(fi.id) for fi in data_policy.visible_items(linked_items, int(country_id))]
         if not item_ids:
             return {
                 "success": True,
@@ -585,7 +586,8 @@ def get_value_breakdown(
     """
     query_start_time = utcnow()
 
-    has_assigned_access = bool(check_country_access(country_id))
+    data_policy = resolve_data_access_policy()
+    has_assigned_access = data_policy.can_read_country(country_id)
     alternative_indicators_result: List[Dict[str, Any]] = []
 
     # Resolve indicator
@@ -849,12 +851,9 @@ def get_value_breakdown(
         # - No assigned access: same join (AssignmentEntityStatus); visibility is by FormItem.privacy only.
         records: list[FormData] = []
         data_status = 'submitted'  # 'submitted' | 'saved'
-        # Visibility: FormItem.privacy 'public' → everyone; 'ifrc_network' → same-org / RBAC only.
-        viewer = get_effective_request_user()
-        if can_view_non_public_form_items(viewer):
-            visible_item_ids = item_ids
-        else:
-            visible_item_ids = [fi.id for fi in items if (getattr(fi, "privacy", None) or "").strip().lower() == "public"]
+        # Visibility (app.services.data_retrieval.access): privacy 'public' → everyone;
+        # non-public → only for countries the principal may access.
+        visible_item_ids = [fi.id for fi in data_policy.visible_items(items, country_id)]
         data_scope = "assigned" if has_assigned_access else "public"
 
         # Track applied filters for provenance
@@ -907,7 +906,7 @@ def get_value_breakdown(
                 len(records),
             )
         else:
-            # No assigned country access: visibility by FormItem.privacy only (public or IFRC if same-org).
+            # No country access: public items only; submitted/approved values only.
             # Only show submitted/approved values (no drafts/saved).
             if not visible_item_ids:
                 return {
@@ -920,7 +919,7 @@ def get_value_breakdown(
                     'period': period,
                     'data_status': 'submitted',
                     'filters_applied': {'country_id': country_id, 'period': period, 'custom_filters': filters or {}},
-                    'notes': 'No data visible for this indicator (form items are IFRC-only and you are not in the same organization).',
+                    'notes': 'No data visible for this indicator (form items are not public and you do not have access to this country).',
                     'provenance': {
                         'source': get_organization_name(),
                         'query_time': query_start_time.isoformat(),
@@ -1499,8 +1498,7 @@ def get_indicator_values_for_all_countries(
         # Normalize period: treat "" / whitespace as not provided.
         period = ((period or "").strip() or None)
 
-        viewer = get_effective_request_user()
-        can_see_ifrc = can_view_non_public_form_items(viewer)
+        can_see_ifrc = resolve_data_access_policy().may_read_any_non_public
 
         _progress("Loading countries…")
         allowed_country_ids = resolve_bulk_allowed_country_ids(max_countries)
@@ -2121,17 +2119,12 @@ def get_form_field_value(
         # Prefer matrix items for "people to be reached" style queries
         matrix_items = [i for i in items if (i.item_type or '').lower() == 'matrix']
         chosen = matrix_items if matrix_items else items
-        has_country_access = bool(check_country_access(country_id))
-        # Without country access: visibility by FormItem.privacy (public or IFRC if same-org).
+        data_policy = resolve_data_access_policy()
+        has_country_access = data_policy.can_read_country(country_id)
         if not has_country_access:
-            viewer = get_effective_request_user()
-            can_see_ifrc = can_view_non_public_form_items(viewer)
-            chosen = [
-                i for i in chosen
-                if (getattr(i, "privacy", None) or "").strip().lower() == "public" or can_see_ifrc
-            ]
+            chosen = data_policy.visible_items(chosen, country_id)
             if not chosen:
-                return service_error('Access denied: the requested field is not visible (public or same-org).')
+                return service_error('Access denied: the requested field is not public and you do not have access to this country.')
         item_ids = [i.id for i in chosen]
         effective_label = chosen[0].label
         section_label = chosen[0].form_section.name if chosen[0].form_section else None
@@ -2386,8 +2379,7 @@ def get_form_field_values_for_all_countries(
         field_label_resolved = primary_item.label
         section_label_resolved = primary_item.form_section.name if primary_item.form_section else None
 
-        viewer = get_effective_request_user()
-        can_see_ifrc = can_view_non_public_form_items(viewer)
+        can_see_ifrc = resolve_data_access_policy().may_read_any_non_public
         allowed_country_ids = resolve_bulk_allowed_country_ids(max_countries)
 
         _progress("Loading form field data…")

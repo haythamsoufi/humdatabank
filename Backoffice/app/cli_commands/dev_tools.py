@@ -95,9 +95,16 @@ def register_dev_tools_commands(app):
         """Create the first admin user."""
         from app.models import Country, User
 
+        from app.utils.password_validator import validate_password_strength
+
         email = click.prompt("Admin email")
-        password = click.prompt("Admin password", hide_input=True)
+        password = click.prompt("Admin password", hide_input=True, confirmation_prompt=True)
         name = click.prompt("Admin name", default="Administrator")
+
+        is_strong, problems = validate_password_strength(password, user_email=email, user_name=name)
+        if not is_strong:
+            click.echo("Password rejected:\n  - " + "\n  - ".join(problems))
+            raise SystemExit(1)
 
         if User.query.filter_by(email=email).first():
             click.echo(f"User with email {email} already exists!")
@@ -136,14 +143,14 @@ def register_dev_tools_commands(app):
         TEST_FOCAL_PASSWORD env vars (or are generated randomly).
         Set these in your .env so the quick-login buttons work on the login page.
 
-        Refuses to run in production or staging environments.
+        Refuses to run unless FLASK_CONFIG=development and the database host is local.
         """
-        flask_cfg = os.environ.get("FLASK_CONFIG", "").lower()
-        if flask_cfg in ("production", "staging"):
-            click.echo(f"ERROR: Cannot seed test data in {flask_cfg} environment.")
-            raise SystemExit(1)
+        from app.seeding import _database_url_for, create_default_data, dev_seeding_refusal_reason
 
-        from app.seeding import create_default_data
+        refusal = dev_seeding_refusal_reason(_database_url_for(current_app))
+        if refusal:
+            click.echo(f"ERROR: Cannot seed test data: {refusal}")
+            raise SystemExit(1)
 
         click.echo("Seeding test data ...")
         try:
@@ -445,6 +452,17 @@ def register_dev_tools_commands(app):
         click.echo(f"  purged_conversations:   {stats.purged_conversations}")
         click.echo(f"  deleted_archives:       {stats.deleted_archive_objects}")
         click.echo(f"  errors:                 {stats.errors}")
+
+    @app.cli.command()
+    @click.option("--dry-run", is_flag=True, default=False, help="Report what would be scrubbed without writing")
+    @with_appcontext
+    def ai_trace_purge(dry_run):
+        """Scrub AI reasoning-trace and tool-usage content older than the configured retention."""
+        from app.services.ai.quality.trace_privacy import purge_expired_trace_content
+
+        stats = purge_expired_trace_content(dry_run=bool(dry_run))
+        click.echo(f"traces_scrubbed:     {stats['traces_scrubbed']}")
+        click.echo(f"tool_usage_scrubbed: {stats['tool_usage_scrubbed']}")
 
     @app.cli.command()
     @with_appcontext

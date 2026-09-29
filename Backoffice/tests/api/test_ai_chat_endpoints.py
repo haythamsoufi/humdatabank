@@ -13,15 +13,24 @@ from tests.factories import create_test_user
 
 
 @pytest.mark.api
-def test_ai_health_returns_checks_and_agent_available(client, app):
-    """Health endpoint returns 200 and includes config checks and agent_available."""
-    resp = client.get("/api/ai/v2/health")
-    assert resp.status_code == 200
+def test_ai_health_anonymous_gets_generic_status_only(client, app):
+    """Unauthenticated health callers see only the overall status, never per-check detail."""
+    resp = client.get("/api/ai/v2/health?probe=embedding")
+    assert resp.status_code in (200, 503)
+    data = resp.get_json()
+    assert set(data) == {"ok"}
+    assert isinstance(data["ok"], bool)
+
+
+@pytest.mark.api
+def test_ai_health_manager_gets_checks_and_agent_available(logged_in_sm_client):
+    """AI managers get config checks and agent_available."""
+    resp = logged_in_sm_client.get("/api/ai/v2/health")
+    assert resp.status_code in (200, 503)
     data = resp.get_json()
     assert "checks" in data
     assert "openai_key" in data["checks"]
     assert "embedding_provider" in data["checks"]
-    assert "agent_available" in data["checks"]
     assert isinstance(data["checks"]["agent_available"], bool)
 
 

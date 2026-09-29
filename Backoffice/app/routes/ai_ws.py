@@ -44,6 +44,7 @@ from app.utils.ws_helpers import (
 from app.services.platform.user_analytics_service import get_client_ip
 
 from app.routes.ai import (
+    _bind_ai_request_policy,
     _build_access_context,
     _build_initial_conversation_title,
     _is_allowed_public_proxy_request,
@@ -52,6 +53,8 @@ from app.routes.ai import (
 
 logger = logging.getLogger(__name__)
 from app.services.ai.chat.dlp import evaluate_ai_message, log_dlp_audit_event
+from app.services.ai.policies.access_policy import record_form_builder_authorization, set_request_policy
+from app.services.ai.policies.usage_budget import budget_exceeded_payload, check_daily_cost_budget
 from app.services.ai.chat.request import (
     parse_chat_request,
     resolve_conversation_and_history,
@@ -115,12 +118,19 @@ def _global_ws_allow_memory(*, key: str, window_seconds: float, max_events: int)
     return None
 
 
-def _global_ws_allow_redis(*, key: str, window_seconds: float, max_events: int) -> Optional[float]:
-    """Redis-backed rate limiter (cross-worker). Returns retry_delay if limited, else None. Fail-open on error."""
+_REDIS_UNAVAILABLE = object()
+
+
+def _global_ws_allow_redis(*, key: str, window_seconds: float, max_events: int):
+    """Redis-backed rate limiter (cross-worker).
+
+    Returns retry_delay if limited, ``None`` if allowed, or ``_REDIS_UNAVAILABLE`` when Redis cannot be
+    used (the caller then applies the stricter in-memory fallback instead of failing open).
+    """
     try:
         r = get_ws_redis_client()
         if r is None:
-            return None
+            return _REDIS_UNAVAILABLE
         redis_key = f"ai_ws_rate:{key}"
         now = time.time()
         r.zadd(redis_key, {str(now): now})
@@ -132,22 +142,83 @@ def _global_ws_allow_redis(*, key: str, window_seconds: float, max_events: int) 
             if oldest:
                 retry = max(1.0, window_seconds - (now - oldest[0][1]))
                 return float(retry)
+            return float(max(1.0, window_seconds))
         return None
     except Exception as e:
-        log_ws(logging.WARNING, "ai_chat", "Redis rate limiter failed (fail-open)", error=str(e), exc_info=True)
-        return None  # fail open
+        log_ws(logging.WARNING, "ai_chat", "Redis rate limiter failed (strict fallback)", error=str(e), exc_info=True)
+        return _REDIS_UNAVAILABLE
 
 
 def _global_ws_allow(*, key: str, window_seconds: float, max_events: int) -> Optional[float]:
     """
-    Global rate limiter. Uses Redis if REDIS_URL is set (and redis package installed), else in-memory.
-    Returns retry_delay seconds if limited, else None.
+    Global rate limiter. Uses Redis if REDIS_URL is set (and reachable), else in-memory.
+    When Redis is configured but unavailable the limiter fails closed to a per-worker in-memory
+    budget of half the normal rate. Returns retry_delay seconds if limited, else None.
     """
     if current_app.config.get("REDIS_URL"):
         ret = _global_ws_allow_redis(key=key, window_seconds=window_seconds, max_events=max_events)
-        # If Redis failed, ret is None (fail open); otherwise ret is None or retry_delay
+        if ret is _REDIS_UNAVAILABLE:
+            return _global_ws_allow_memory(
+                key=f"fallback:{key}", window_seconds=window_seconds, max_events=max(1, int(max_events) // 2)
+            )
         return ret
     return _global_ws_allow_memory(key=key, window_seconds=window_seconds, max_events=max_events)
+
+
+def _ws_reauthorize(identity) -> Optional[dict]:
+    """Re-check, before every user message, that the connection's principal is still allowed to use AI.
+
+    A WebSocket outlives the HTTP request that authenticated it, so account deactivation, AI-beta
+    removal and the daily cost budget are re-evaluated per message. Returns an error envelope (the
+    connection should then be closed) or ``None``.
+    """
+    try:
+        user = getattr(identity, "user", None) if getattr(identity, "is_authenticated", False) else None
+        uid = None
+        if user is not None:
+            from app.models import User
+
+            uid = int(user.id)
+            fresh = db.session.get(User, uid)
+            if fresh is None or getattr(fresh, "active", True) is False:
+                return {"type": "error", "message": "Authentication required", "error_type": "auth_required"}
+            try:
+                db.session.refresh(fresh)
+            except Exception as e:
+                logger.debug("ws re-auth refresh failed: %s", e)
+            from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+
+            if is_ai_beta_restricted() and not user_has_ai_beta_access(fresh):
+                return {"type": "error", "message": "AI beta access is limited to selected users.", "error_type": "forbidden"}
+        verdict = check_daily_cost_budget(uid)
+        if not verdict.allowed:
+            payload = budget_exceeded_payload(verdict)
+            return {"type": "error", "message": payload["error"], "error_type": "rate_limited", "scope": verdict.scope}
+    except Exception as e:
+        log_ws(logging.WARNING, "ai_chat", "ws re-authorization failed (denying)", error=str(e), exc_info=True)
+        return {"type": "error", "message": "Authentication required", "error_type": "auth_required"}
+    return None
+
+
+def _docs_ws_still_authorized(user_id: Optional[int]) -> bool:
+    """Per-action RBAC re-check for the long-lived admin document WebSocket (fresh user, fresh roles)."""
+    try:
+        if not user_id:
+            return False
+        from app.models import User
+        from app.services.organization.authorization_service import AuthorizationService
+
+        user = db.session.get(User, int(user_id))
+        if user is None or getattr(user, "active", True) is False:
+            return False
+        try:
+            db.session.refresh(user)
+        except Exception as e:
+            logger.debug("docs ws re-auth refresh failed: %s", e)
+        return bool(AuthorizationService.has_rbac_permission(user, "admin.ai.manage"))
+    except Exception as e:
+        log_ws(logging.WARNING, "ai_docs", "ws re-authorization failed (denying)", error=str(e))
+        return False
 
 
 def _ws_send_json(ws, obj: dict) -> bool:
@@ -755,6 +826,11 @@ def register_ai_ws(app) -> None:
                         break
                     continue
 
+                reauth_error = _ws_reauthorize(identity)
+                if reauth_error is not None:
+                    _ws_send_json(ws, reauth_error)
+                    break
+
                 parsed, err_msg, _ = parse_chat_request(payload)
                 if err_msg:
                     try:
@@ -762,6 +838,10 @@ def register_ai_ws(app) -> None:
                     except Exception as e:
                         logger.debug("ws.send validation error failed: %s", e)
                         break
+                    continue
+                ws_policy, policy_err = _bind_ai_request_policy(identity, parsed)
+                if policy_err is not None:
+                    _ws_send_json(ws, {"type": "error", "message": policy_err, "error_type": "validation"})
                     continue
 
                 # DLP guard (must run BEFORE any persistence). When allowed through with
@@ -1199,6 +1279,10 @@ def register_ai_ws(app) -> None:
                                 g.ai_sources_cfg = sources_cfg
                             except Exception as e:
                                 logger.debug("g.ai_sources_cfg in WS worker failed: %s", e)
+                            set_request_policy(ws_policy)
+                            record_form_builder_authorization(
+                                page_context.get("formBuilder") if isinstance(page_context, dict) else None
+                            )
                             # Pass conversation_id so agent traces can log it
                             run_platform_context = {**platform_context, "conversation_id": conversation_id} if conversation_id else platform_context
                             engine = AIChatEngine()
@@ -1536,6 +1620,10 @@ def register_ai_ws(app) -> None:
                 if not _allow():
                     _send({"type": "error", "error_type": "rate_limited", "message": "Too many requests. Please wait."})
                     continue
+
+                if not _docs_ws_still_authorized(user_id_log):
+                    _send({"type": "error", "message": "Unauthorized", "error_type": "forbidden"})
+                    break
 
                 query = (payload.get("query") or payload.get("message") or "").strip()
                 if not query:

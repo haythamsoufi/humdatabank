@@ -394,7 +394,9 @@ def formdata_has_value_filters():
 
 
 def resolve_bulk_allowed_country_ids(max_countries: int) -> Optional[List[int]]:
-    allowed_country_ids_raw = user_allowed_country_ids()
+    from .access import resolve_data_access_policy
+
+    allowed_country_ids_raw = resolve_data_access_policy().allowed_country_ids()
     if allowed_country_ids_raw is None:
         return None
     allowed = [int(x) for x in allowed_country_ids_raw if x is not None]

@@ -1011,7 +1011,11 @@ class AIChatEngine:
 
         safe_page_context = scrub_pii_context(page_context or {})
         fb_page = safe_page_context.get("formBuilder") if isinstance(safe_page_context, dict) else None
-        form_builder_assistant = is_form_builder_assistant_context(safe_page_context)
+        from app.services.ai.policies.access_policy import trusted_form_builder_context
+
+        form_builder_assistant = (
+            is_form_builder_assistant_context(safe_page_context) and trusted_form_builder_context() is not None
+        )
         safe_message = _scrub_message_for_llm(message, form_builder_assistant=form_builder_assistant)
         locale_code = (preferred_language or "en").split("-")[0]
 
@@ -1238,7 +1242,9 @@ class AIChatEngine:
                         try:
                             from flask import g
 
-                            g.ai_form_builder_ctx = {**fb_page, "enabled": True}
+                            from app.services.ai.policies.access_policy import trusted_form_builder_context
+
+                            g.ai_form_builder_ctx = trusted_form_builder_context()
                         except Exception as e:
                             logger.debug("g.ai_form_builder_ctx pre-agent failed: %s", e)
                     # Planning step (with plan detail) is emitted by the executor after plan_simple()

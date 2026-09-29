@@ -13,14 +13,14 @@ from io import BytesIO
 from app import db
 from app.models import (
     FormTemplate, AssignedForm, Country, FormItem, FormData, AIFormDataValidation,
-    AssignmentEntityStatus, SubmittedDocument, FormSection, FormPage
+    AssignmentEntityStatus, SubmittedDocument, FormSection, FormPage, PublicSubmission
 )
 from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.redirect_utils import get_current_relative_url
 from app.utils.request_utils import is_json_request
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
-from app.services.security.api_authentication import get_user_allowed_template_ids
+from app.services.security.api_authentication import get_user_allowed_template_ids, _get_user_allowed_country_ids
 from app.utils.datetime_helpers import utcnow
 from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import (
@@ -42,6 +42,7 @@ from app.services.data_quality.helpers import (
     list_exploration_period_names,
 )
 from flask_babel import gettext as _
+from markupsafe import Markup
 import json
 import logging
 
@@ -129,7 +130,7 @@ def _explore_active_tab(flags: dict[str, bool], requested_tab: str | None = None
 def _explorer_extension_tabs_render(
     flags: dict[str, bool],
     first_tab: str,
-    panels: dict[str, str],
+    panels: dict[str, Markup],
 ) -> list[dict[str, Any]]:
     rendered: list[dict[str, Any]] = []
     try:
@@ -152,8 +153,30 @@ def _explorer_extension_tabs_render(
     return rendered
 
 
-def _render_extension_panels(flags: dict[str, bool], first_tab: str) -> dict[str, str]:
-    panels: dict[str, str] = {}
+_PANEL_TEMPLATE_SUFFIXES = (".html", ".htm")
+
+
+def _render_panel_template(panel_template: str, context: dict[str, Any]) -> Markup:
+    """Render a plugin panel template and mark the result as trusted markup.
+
+    This is the single trust boundary for plugin-contributed panels: the output is
+    ``Markup`` only because it came from a Jinja template rendered with autoescaping
+    (enforced here via the file suffix), so every ``{{ value }}`` inside the panel was
+    already escaped. Panel templates must therefore never use ``|safe`` / ``Markup`` on
+    request- or user-controlled data (see docs/DEVELOPER-HANDBOOK.md, plugin panels).
+    """
+    name = str(panel_template or "")
+    if (
+        not name.lower().endswith(_PANEL_TEMPLATE_SUFFIXES)
+        or ".." in name.replace("\\", "/").split("/")
+        or name.startswith(("/", "\\"))
+    ):
+        raise ValueError("Plugin panel_template must be a relative .html template path")
+    return Markup(render_template(name, **context))
+
+
+def _render_extension_panels(flags: dict[str, bool], first_tab: str) -> dict[str, Markup]:
+    panels: dict[str, Markup] = {}
     try:
         plugin_manager = _plugin_manager()
     except Exception as exc:
@@ -171,10 +194,10 @@ def _render_extension_panels(flags: dict[str, bool], first_tab: str) -> dict[str
         if tab.manage_requires_system_manager:
             context[manage_flag_key(tab.tab_id)] = flags.get(manage_flag_key(tab.tab_id), False)
         try:
-            panels[tab.tab_id] = render_template(tab.panel_template, **context)
+            panels[tab.tab_id] = _render_panel_template(tab.panel_template, context)
         except Exception as exc:
             logger.error("Failed to render extension panel %s: %s", tab.tab_id, exc, exc_info=True)
-            panels[tab.tab_id] = ''
+            panels[tab.tab_id] = Markup("")
     return panels
 
 
@@ -507,6 +530,86 @@ def _parse_ai_opinion_ids(raw_ids: str | List[str]) -> tuple[List[int], List[tup
     return form_data_ids, dedup_pairs, dedup_keys
 
 
+def _explorer_scope():
+    """(unrestricted, allowed_template_ids, allowed_country_ids) for the current user.
+
+    ``allowed_country_ids`` is None when country access is unrestricted; mirrors
+    ``apply_user_template_scoping`` so row-level actions match what the Data Table can list.
+    """
+    if AuthorizationService.is_system_manager(current_user):
+        return True, set(), None
+    return (
+        False,
+        set(get_user_allowed_template_ids(current_user.id)),
+        _get_user_allowed_country_ids(current_user),
+    )
+
+
+def _accessible_aes_ids(aes_ids) -> set:
+    """Subset of assignment-entity-status ids the current user may explore/modify."""
+    ids = {int(a) for a in (aes_ids or []) if a is not None}
+    if not ids:
+        return set()
+    unrestricted, allowed_templates, allowed_countries = _explorer_scope()
+    rows = (
+        db.session.query(
+            AssignmentEntityStatus.id,
+            AssignmentEntityStatus.entity_type,
+            AssignmentEntityStatus.entity_id,
+            AssignedForm.template_id,
+        )
+        .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+        .filter(AssignmentEntityStatus.id.in_(ids))
+        .all()
+    )
+    if unrestricted:
+        return {int(r[0]) for r in rows}
+    ok = set()
+    for aes_id, entity_type, entity_id, template_id in rows:
+        if template_id not in allowed_templates:
+            continue
+        if allowed_countries is not None and not (entity_type == "country" and entity_id in allowed_countries):
+            continue
+        ok.add(int(aes_id))
+    return ok
+
+
+def _accessible_form_data_ids(form_data_ids) -> set:
+    """Subset of FormData ids (assigned or public) the current user may explore/modify."""
+    ids = {int(f) for f in (form_data_ids or []) if f is not None}
+    if not ids:
+        return set()
+    rows = (
+        db.session.query(FormData.id, FormData.assignment_entity_status_id, FormData.public_submission_id)
+        .filter(FormData.id.in_(ids))
+        .all()
+    )
+    assigned_ok = _accessible_aes_ids([r[1] for r in rows if r[1] is not None])
+
+    public_ids = {int(r[2]) for r in rows if r[2] is not None}
+    public_ok = set()
+    if public_ids:
+        unrestricted, allowed_templates, allowed_countries = _explorer_scope()
+        pub_rows = (
+            db.session.query(PublicSubmission.id, PublicSubmission.country_id, AssignedForm.template_id)
+            .join(AssignedForm, AssignedForm.id == PublicSubmission.assigned_form_id)
+            .filter(PublicSubmission.id.in_(public_ids))
+            .all()
+        )
+        for pub_id, country_id, template_id in pub_rows:
+            if unrestricted or (
+                template_id in allowed_templates
+                and (allowed_countries is None or country_id in allowed_countries)
+            ):
+                public_ok.add(int(pub_id))
+
+    return {
+        int(fd_id)
+        for fd_id, aes_id, pub_id in rows
+        if (aes_id is not None and int(aes_id) in assigned_ok) or (pub_id is not None and int(pub_id) in public_ok)
+    }
+
+
 @bp.route("/data-exploration/ai-opinions", methods=["GET", "POST"])
 @permission_required('admin.data_explore.data_table')
 def get_ai_opinions_for_rows():
@@ -535,6 +638,13 @@ def get_ai_opinions_for_rows():
 
         if not form_data_ids and not missing_pairs:
             return json_ok(opinionsByFormDataId={})
+
+        accessible_fd = _accessible_form_data_ids(form_data_ids)
+        form_data_ids = [fid for fid in form_data_ids if fid in accessible_fd]
+        accessible_aes = _accessible_aes_ids([pair[0] for pair in missing_pairs])
+        kept = [(k, pair) for k, pair in zip(missing_keys, missing_pairs) if pair[0] in accessible_aes]
+        missing_keys = [k for k, _pair in kept]
+        missing_pairs = [pair for _k, pair in kept]
 
         opinions: List[AIFormDataValidation] = []
         if form_data_ids:
@@ -640,6 +750,20 @@ def run_ai_validation_for_rows():
         svc = AIFormDataValidationService()
         results: Dict[str, Any] = {}
 
+        requested_fd_ids, requested_aes_ids = set(), set()
+        for _row in rows:
+            if not isinstance(_row, dict):
+                continue
+            try:
+                if _row.get("form_data_id") is not None:
+                    requested_fd_ids.add(int(_row["form_data_id"]))
+                elif _row.get("submission_id") is not None:
+                    requested_aes_ids.add(int(_row["submission_id"]))
+            except (TypeError, ValueError):
+                continue
+        accessible_fd = _accessible_form_data_ids(requested_fd_ids)
+        accessible_aes = _accessible_aes_ids(requested_aes_ids)
+
         def _serialize_rec(rec: AIFormDataValidation) -> Dict[str, Any]:
             suggestion = None
             opinion_ui = None
@@ -684,6 +808,11 @@ def run_ai_validation_for_rows():
                 except Exception as e:
                     logger.debug("fd_id_int parse failed: %s", e)
                     fd_id_int = None
+
+                if fd_id_int and fd_id_int not in accessible_fd:
+                    raise PermissionError("You do not have access to this submission row.")
+                if not fd_id_int and int(row.get("submission_id") or 0) not in accessible_aes:
+                    raise PermissionError("You do not have access to this submission row.")
 
                 if not fd_id_int:
                     # Missing/virtual row: do NOT create placeholder FormData rows.
@@ -745,6 +874,7 @@ def run_ai_validation_for_rows():
 
 @bp.route("/data-exploration/apply-imputed-value", methods=["POST"])
 @permission_required('admin.data_explore.data_table')
+@permission_required('admin.data_explore.impute')
 def apply_imputed_value():
     """
     Apply an accepted AI-suggested value into FormData.imputed_value.
@@ -777,7 +907,7 @@ def apply_imputed_value():
             if form_data_id <= 0:
                 return json_bad_request("form_data_id must be positive")
             fd = FormData.query.get(int(form_data_id))
-            if not fd:
+            if not fd or int(fd.id) not in _accessible_form_data_ids([fd.id]):
                 return json_not_found("FormData not found")
         else:
             try:
@@ -788,6 +918,18 @@ def apply_imputed_value():
                 return json_bad_request("submission_id and form_item_id must be integers")
             if not submission_id or not form_item_id:
                 return json_bad_request("form_data_id or (submission_id and form_item_id) is required")
+
+            if int(submission_id) not in _accessible_aes_ids([submission_id]):
+                return json_not_found("Submission not found")
+            target_template_id = (
+                db.session.query(AssignedForm.template_id)
+                .join(AssignmentEntityStatus, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+                .filter(AssignmentEntityStatus.id == int(submission_id))
+                .scalar()
+            )
+            item_template_id = db.session.query(FormItem.template_id).filter(FormItem.id == int(form_item_id)).scalar()
+            if item_template_id is None or item_template_id != target_template_id:
+                return json_bad_request("form_item_id does not belong to this submission's template")
 
             fd = (
                 FormData.query
@@ -1433,6 +1575,8 @@ def download_compliance_excel():
 
         # Save to BytesIO
         output = BytesIO()
+        from app.utils.export_safety import sanitize_workbook
+        sanitize_workbook(wb)
         wb.save(output)
         output.seek(0)
 

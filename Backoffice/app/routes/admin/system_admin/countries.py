@@ -4,10 +4,10 @@ from flask_login import current_user
 from app import db
 from app.models import Country
 from app.forms.system import CountryForm
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import country_has_dependents, permission_required, user_has_country_permission
 from app.utils.request_utils import is_json_request
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error, json_form_errors, json_bad_request
+from app.utils.api_responses import json_ok, json_server_error, json_form_errors, json_bad_request, json_forbidden
 from app.services.organization.country_service import (
     assign_country_fds_member_user,
     fds_member_user_display_name,
@@ -95,6 +95,11 @@ def get_country_data(country_id):
 @permission_required('admin.countries.edit')
 def edit_country(country_id):
     country = Country.query.get_or_404(country_id)
+    if not user_has_country_permission(country.id, 'admin.countries.edit'):
+        if is_json_request():
+            return json_forbidden("You do not have permission to edit this country.")
+        flash("You do not have permission to edit this country.", "warning")
+        return redirect(url_for("system_admin.manage_countries"))
     form = CountryForm(request.form, obj=country)
     form.original_country_id = country.id
 
@@ -162,12 +167,15 @@ def edit_country(country_id):
                          title=f"Edit Country: {country.name}")
 
 @bp.route("/countries/delete/<int:country_id>", methods=["POST"])
-@permission_required('admin.countries.edit')
+@permission_required('admin.countries.delete')
 def delete_country(country_id):
     country = Country.query.get_or_404(country_id)
+    if not user_has_country_permission(country.id, 'admin.countries.delete'):
+        flash("You do not have permission to delete this country.", "warning")
+        return redirect(url_for("system_admin.manage_countries"))
 
     try:
-        if country.users.first() or country.assignment_statuses.first():
+        if country_has_dependents(country):
             flash(f"Cannot delete country '{country.name}' as it is associated with users or assignments.", "danger")
             return redirect(url_for("system_admin.manage_countries"))
 

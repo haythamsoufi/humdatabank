@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from flask import Blueprint, abort, render_template
+from flask_login import current_user
 
-from app.routes.admin.shared import permission_required_any
+from app.models.core import UserActivityLog
+from app.routes.admin.shared import admin_required, user_has_permission
+from app.services.organization.authorization_service import AuthorizationService
 from app.services.imports.import_change_log import (
     VIEWER_CHANGE_LIMIT,
     count_import_log_changes,
@@ -19,14 +22,34 @@ from app.services.imports.import_change_log import (
 bp = Blueprint("import_change_log", __name__, url_prefix="/admin/import-logs")
 
 
+def _user_initiated_import_log(user_id: int, log_id: str) -> bool:
+    return (
+        UserActivityLog.query.filter(
+            UserActivityLog.user_id == int(user_id),
+            UserActivityLog.context_data["job_id"].as_string() == str(log_id),
+        ).first()
+        is not None
+    )
+
+
 def _require_log_id(log_id: str) -> str:
+    """Validate the id and authorize the caller for this specific log.
+
+    Logs hold row-level before/after values, so a route-level admin permission is not enough:
+    only System Managers, audit-trail viewers, or the user who started the import may read one.
+    Everyone else gets 404 so log ids cannot be probed.
+    """
     if not is_valid_import_log_id(log_id):
+        abort(404)
+    if AuthorizationService.is_system_manager(current_user) or user_has_permission("admin.audit.view"):
+        return log_id
+    if not _user_initiated_import_log(current_user.id, log_id):
         abort(404)
     return log_id
 
 
 @bp.route("/<log_id>", methods=["GET"])
-@permission_required_any("admin.audit.view", "admin.templates.view")
+@admin_required
 def view_log(log_id: str):
     log_id = _require_log_id(log_id)
     summary = load_import_log_summary(log_id) or {}
@@ -57,7 +80,7 @@ def view_log(log_id: str):
 
 
 @bp.route("/<log_id>/summary.json", methods=["GET"])
-@permission_required_any("admin.audit.view", "admin.templates.view")
+@admin_required
 def download_summary(log_id: str):
     log_id = _require_log_id(log_id)
     return stream_import_log_file(
@@ -69,7 +92,7 @@ def download_summary(log_id: str):
 
 
 @bp.route("/<log_id>/changes.jsonl", methods=["GET"])
-@permission_required_any("admin.audit.view", "admin.templates.view")
+@admin_required
 def download_changes(log_id: str):
     log_id = _require_log_id(log_id)
     return stream_import_log_file(

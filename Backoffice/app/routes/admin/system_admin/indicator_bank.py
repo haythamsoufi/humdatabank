@@ -1,6 +1,8 @@
 from app.utils.transactions import request_transaction_rollback
 from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
+from app.utils.sql_utils import ilike_contains, like_contains
+from app.utils.safe_workbook import read_excel_safe
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
@@ -181,9 +183,9 @@ def manage_indicator_bank():
     if search:
         query = query.filter(
             or_(
-                IndicatorBank.name.contains(search),
-                IndicatorBank.definition.contains(search),
-                IndicatorBank.type.contains(search)
+                IndicatorBank.name.contains(search, autoescape=True),
+                IndicatorBank.definition.contains(search, autoescape=True),
+                IndicatorBank.type.contains(search, autoescape=True)
             )
         )
 
@@ -191,7 +193,7 @@ def manage_indicator_bank():
         sector_ids = [
             row[0]
             for row in db.session.query(Sector.id)
-            .filter(Sector.name.ilike(f"%{sector_filter}%"))
+            .filter(ilike_contains(Sector.name, sector_filter))
             .all()
         ]
         if sector_ids:
@@ -339,7 +341,7 @@ def manage_indicator_bank():
         cw_search = request.args.get('search', '')
         if cw_search:
             cw_query = cw_query.filter(
-                or_(CommonWord.term.contains(cw_search), CommonWord.meaning.contains(cw_search))
+                or_(CommonWord.term.contains(cw_search, autoescape=True), CommonWord.meaning.contains(cw_search, autoescape=True))
             )
         template_ctx['common_words'] = cw_query.order_by(CommonWord.term).all()
         template_ctx['search'] = cw_search
@@ -509,13 +511,23 @@ def add_indicator_bank():
 
             db.session.flush()
 
-            flash(f"Indicator '{new_indicator.name}' added successfully.", "success")
-            return redirect(url_for("system_admin.manage_indicator_bank"))
+            success_message = f"Indicator '{new_indicator.name}' added successfully."
+            manage_url = url_for("system_admin.manage_indicator_bank")
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                flash(success_message, "success")
+                return json_ok(message=success_message, indicator_id=new_indicator.id, redirect_url=manage_url)
+            flash(success_message, "success")
+            return redirect(manage_url)
 
         except Exception as e:
             request_transaction_rollback()
-            flash("Error adding indicator.", "danger")
             current_app.logger.error(f"Error adding indicator: {e}", exc_info=True)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return json_server_error(GENERIC_ERROR_MESSAGE)
+            flash("Error adding indicator.", "danger")
+
+    if request.method == "POST" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return json_form_errors(form, _("Please correct the errors in the form."))
 
     return render_template("admin/indicator_bank/add_indicator_bank.html",
                          form=form,
@@ -852,7 +864,7 @@ def update_indicator_translations(id):
 
 # === Session Management Routes ===
 @bp.route("/sessions/cleanup", methods=["POST"])
-@permission_required('admin.analytics.view')
+@permission_required('admin.system.maintain')
 def cleanup_sessions():
     """Cleanup inactive sessions"""
     try:
@@ -1159,6 +1171,8 @@ def export_indicators():
         _autofit(ws_cw)
 
         output = BytesIO()
+        from app.utils.export_safety import sanitize_workbook
+        sanitize_workbook(wb)
         wb.save(output)
         output.seek(0)
 
@@ -1240,7 +1254,7 @@ def get_filtered_indicator_count():
         query = db.session.query(IndicatorBank)
 
         if top_level_search:
-            query = query.filter(IndicatorBank.name.ilike(f'%{top_level_search}%'))
+            query = query.filter(ilike_contains(IndicatorBank.name, top_level_search))
 
         if section_id:
             from app.models import FormSection
@@ -1259,7 +1273,7 @@ def get_filtered_indicator_count():
                 if field == 'search':
                     search_term = (values[0] if values else filter_obj.get('value') or '').strip()
                     if search_term:
-                        query = query.filter(IndicatorBank.name.ilike(f'%{search_term}%'))
+                        query = query.filter(ilike_contains(IndicatorBank.name, search_term))
                     continue
 
                 if not values:
@@ -1279,7 +1293,7 @@ def get_filtered_indicator_count():
                     conditions = []
                     for value in values:
                         conditions.append(
-                            cast(IndicatorBank._related_programs_list, String).ilike(f'%{value}%')
+                            ilike_contains(cast(IndicatorBank._related_programs_list, String), value)
                         )
                     if conditions:
                         query = query.filter(db.or_(*conditions))
@@ -1291,11 +1305,11 @@ def get_filtered_indicator_count():
 
                     for value in values:
                         if primary_only:
-                            conditions.append(IndicatorBank.sector.cast(db.Text).like(f'%"primary": "{value}"%'))
+                            conditions.append(like_contains(IndicatorBank.sector.cast(db.Text), f'"primary": "{value}"'))
                         else:
-                            conditions.append(IndicatorBank.sector.cast(db.Text).like(f'%"primary": "{value}"%'))
-                            conditions.append(IndicatorBank.sector.cast(db.Text).like(f'%"secondary": "{value}"%'))
-                            conditions.append(IndicatorBank.sector.cast(db.Text).like(f'%"tertiary": "{value}"%'))
+                            conditions.append(like_contains(IndicatorBank.sector.cast(db.Text), f'"primary": "{value}"'))
+                            conditions.append(like_contains(IndicatorBank.sector.cast(db.Text), f'"secondary": "{value}"'))
+                            conditions.append(like_contains(IndicatorBank.sector.cast(db.Text), f'"tertiary": "{value}"'))
                     if conditions:
                         query = query.filter(db.or_(*conditions))
                 elif field == 'subsector':
@@ -1304,11 +1318,11 @@ def get_filtered_indicator_count():
 
                     for value in values:
                         if primary_only:
-                            conditions.append(IndicatorBank.sub_sector.cast(db.Text).like(f'%"primary": "{value}"%'))
+                            conditions.append(like_contains(IndicatorBank.sub_sector.cast(db.Text), f'"primary": "{value}"'))
                         else:
-                            conditions.append(IndicatorBank.sub_sector.cast(db.Text).like(f'%"primary": "{value}"%'))
-                            conditions.append(IndicatorBank.sub_sector.cast(db.Text).like(f'%"secondary": "{value}"%'))
-                            conditions.append(IndicatorBank.sub_sector.cast(db.Text).like(f'%"tertiary": "{value}"%'))
+                            conditions.append(like_contains(IndicatorBank.sub_sector.cast(db.Text), f'"primary": "{value}"'))
+                            conditions.append(like_contains(IndicatorBank.sub_sector.cast(db.Text), f'"secondary": "{value}"'))
+                            conditions.append(like_contains(IndicatorBank.sub_sector.cast(db.Text), f'"tertiary": "{value}"'))
                     if conditions:
                         query = query.filter(db.or_(*conditions))
             except Exception as filter_error:
@@ -1486,7 +1500,8 @@ def export_common_words():
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Common Words', index=False)
+            from app.utils.export_safety import sanitize_dataframe
+            sanitize_dataframe(df).to_excel(writer, sheet_name='Common Words', index=False)
 
             worksheet = writer.sheets['Common Words']
             for column in worksheet.columns:
@@ -1536,7 +1551,7 @@ def import_common_words():
             flash(error_msg or 'Invalid file format. Please upload an Excel file (.xlsx or .xls).', 'danger')
             return redirect(url_for('system_admin.manage_common_words'))
 
-        df = pd.read_excel(file, engine='openpyxl')
+        df = read_excel_safe(file)
 
         required_columns = ['Term', 'Meaning']
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -1663,7 +1678,8 @@ def download_common_words_template():
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Common Words Template', index=False)
+            from app.utils.export_safety import sanitize_dataframe
+            sanitize_dataframe(df).to_excel(writer, sheet_name='Common Words Template', index=False)
 
             worksheet = writer.sheets['Common Words Template']
             for column in worksheet.columns:

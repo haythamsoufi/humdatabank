@@ -38,6 +38,7 @@ from app.routes.admin.shared import (
     admin_permission_required_any,
     permission_required,
     permission_required_any,
+    user_has_country_permission,
 )
 from app.utils.request_utils import is_json_request
 from app.utils.entity_groups import get_enabled_entity_groups
@@ -54,6 +55,7 @@ from app.utils.api_responses import (
     require_json_keys,
 )
 from app.utils.error_handling import handle_json_view_exception
+from app.utils.safe_workbook import read_excel_safe
 from config.config import Config
 from app.forms.organization import (
     CountryForm,
@@ -239,7 +241,7 @@ def import_countries():
             flash('Unable to validate file type. Please try again.', 'danger')
             return redirect(url_for('organization.index', tab='countries'))
 
-        df = pd.read_excel(file, engine='openpyxl')
+        df = read_excel_safe(file)
         required = ['Name', 'ISO3']
         missing = [c for c in required if c not in df.columns]
         if missing:
@@ -291,6 +293,11 @@ def import_countries():
                 currency = str(row['Currency Code']).strip().upper() if 'Currency Code' in df.columns and pd.notna(row.get('Currency Code')) else None
                 currency = currency or None
                 target_country = existing
+                if existing and not user_has_country_permission(
+                    existing.id, 'admin.countries.edit', 'admin.organization.manage'
+                ):
+                    errors.append(f'Row {idx + 2}: not permitted to modify this country.')
+                    continue
                 if existing:
                     existing.name = name
                     existing.iso3 = iso3
@@ -463,7 +470,7 @@ def import_national_societies():
         if not file.filename.lower().endswith(('.xlsx', '.xls')):
             flash('Invalid file format. Please upload an Excel file (.xlsx or .xls).', 'danger')
             return redirect(url_for('organization.index', tab='nss'))
-        df = pd.read_excel(file, engine='openpyxl')
+        df = read_excel_safe(file)
         required = ['Name', 'Country ISO3']
         missing = [c for c in required if c not in df.columns]
         if missing:

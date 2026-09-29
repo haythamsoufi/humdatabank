@@ -235,6 +235,13 @@ class TestEditCountry:
 
 
 class TestDeleteCountry:
+    @pytest.fixture(autouse=True)
+    def _grant_country_delete(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.countries.delete")
+        db_session.commit()
+
     def test_delete_existing_country_redirects(self, logged_in_client, db_session, app):
         country = create_test_country(db_session, name="Delete Country", iso3="DEL", iso2="DL")
         resp = logged_in_client.post(

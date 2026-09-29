@@ -15,6 +15,8 @@ from app.plugins.plugin_utils import (
     clear_plugin_cache,
 )
 from app.utils.api_helpers import get_json_safe
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
 
 from pathlib import Path
@@ -229,7 +231,7 @@ def create_blueprint():
             return json_ok(success=True, cleared_count=cleared_count, message=f'Cleared {cleared_count} cached entries')
         except Exception as e:
             current_app.logger.error(f"Error clearing cache: {e}")
-            return json_server_error(str(e), success=False, error=str(e))
+            return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/stats', methods=['GET'])
     @plugin_route_wrapper('Emergency Operations Plugin')
@@ -613,7 +615,7 @@ def create_blueprint():
         return json_ok(success=True, status=status)
 
     @bp.route('/api/data-cache/refresh', methods=['POST'])
-    @plugin_route_wrapper('Emergency Operations Plugin')
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def data_cache_refresh():
         """Admin-triggered synchronous refresh from GO API."""
         cfg = plugin_config.get_all_config()
@@ -639,7 +641,7 @@ def create_blueprint():
         return json_error(result.get('error', 'Unknown error'), 502, success=False, error=result.get('error', 'Unknown error'))
 
     @bp.route('/api/data-cache/schedule', methods=['POST'])
-    @plugin_route_wrapper('Emergency Operations Plugin')
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def data_cache_schedule():
         """Save the auto-refresh schedule setting."""
         payload = get_json_safe()
@@ -653,7 +655,7 @@ def create_blueprint():
         return json_server_error('Failed to save schedule', success=False, error='Failed to save schedule')
 
     @bp.route('/api/data-cache/source', methods=['POST'])
-    @plugin_route_wrapper('Emergency Operations Plugin')
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def data_cache_source():
         """Toggle between file cache and live API."""
         payload = get_json_safe()

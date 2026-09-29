@@ -233,6 +233,12 @@ class TestSessionLogs:
 # ---------------------------------------------------------------------------
 
 class TestEndSession:
+    @pytest.fixture(autouse=True)
+    def _grant_maintain(self, db_session, route_admin):
+        from tests.factories import _grant_role_permission
+        _grant_role_permission(db_session, 'admin_core', 'admin.system.maintain')
+        db_session.expire_all()
+
     def test_session_not_found(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_analytics import end_session
         from app.services.platform.user_analytics_query_service import EndSessionResult

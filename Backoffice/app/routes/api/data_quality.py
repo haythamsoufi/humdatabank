@@ -5,6 +5,7 @@ from flask_login import login_required, current_user
 
 from app.routes.api import api_bp
 from app.services.data_quality.service import compute_data_quality, list_data_quality_templates_for_entity
+from app.utils.api_errors import client_error_message
 from app.utils.api_helpers import json_response, api_error
 from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
 
@@ -57,9 +58,9 @@ def get_data_quality_score():
         payload["enabled"] = True
         return json_response(payload)
     except ValueError as exc:
-        return api_error(str(exc), 400)
+        return api_error(client_error_message(exc, context="data_quality"), 400)
     except Exception as exc:
         from flask import current_app
 
         current_app.logger.exception("Data quality score failed for template %s period %s", template_id, period)
-        return api_error("Failed to compute data quality score", 500, debug_message=str(exc))
+        return api_error("Failed to compute data quality score", 500)

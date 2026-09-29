@@ -30,6 +30,12 @@ from app.models import (
     SubSector,
 )
 from app.utils.auth import require_api_key
+from app.services.security.api_authentication import redact_request_params
+from app.services.security.api_key_permissions import (
+    INDICATORS_MANAGE,
+    INDICATORS_SUGGEST,
+    REFERENCE_READ,
+)
 from app.utils.rate_limiting import api_rate_limit
 from app import db
 
@@ -96,7 +102,7 @@ def get_indicator_bank():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching indicator bank: {e}",
             exc_info=True,
-            extra={'endpoint': '/indicators', 'params': dict(request.args)}
+            extra={'endpoint': '/indicators', 'params': redact_request_params()}
         )
         return api_error("Could not fetch indicator bank data", 500, error_id, None)
 
@@ -123,7 +129,7 @@ def get_indicator_bank_details(indicator_id):
 
 
 @api_bp.route('/indicator-suggestions', methods=['POST'])
-@require_api_key
+@require_api_key(capability=INDICATORS_SUGGEST)
 @api_rate_limit()
 def submit_indicator_suggestion():
     """Submit a new indicator suggestion."""
@@ -231,7 +237,7 @@ def submit_indicator_suggestion():
 
 
 @api_bp.route('/indicator-suggestions', methods=['GET'])
-@require_api_key
+@require_api_key(capability=INDICATORS_MANAGE)
 @api_rate_limit()
 def get_indicator_suggestions():
     """Get all indicator suggestions (admin only)."""
@@ -240,7 +246,7 @@ def get_indicator_suggestions():
         from app.utils.api_pagination import validate_pagination_params
         status = request.args.get('status')
         suggestion_type = request.args.get('suggestion_type')
-        page, per_page = validate_pagination_params(request.args, default_per_page=20)
+        page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=500)
 
         # Build query
         query = IndicatorSuggestion.query
@@ -305,7 +311,7 @@ def get_indicator_suggestions():
 
 
 @api_bp.route('/indicator-suggestions/<int:suggestion_id>', methods=['GET'])
-@require_api_key
+@require_api_key(capability=INDICATORS_MANAGE)
 @api_rate_limit()
 def get_indicator_suggestion(suggestion_id):
     """Get a specific indicator suggestion by ID."""
@@ -346,7 +352,7 @@ def get_indicator_suggestion(suggestion_id):
 
 
 @api_bp.route('/indicator-suggestions/<int:suggestion_id>/status', methods=['PUT'])
-@require_api_key
+@require_api_key(capability=INDICATORS_MANAGE)
 @api_rate_limit()
 def update_indicator_suggestion_status(suggestion_id):
     """Update the status of an indicator suggestion (admin only)."""
@@ -387,7 +393,7 @@ def update_indicator_suggestion_status(suggestion_id):
 
 
 @api_bp.route('/sectors', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_sectors():
     """Get all sectors with their hierarchical structure."""
@@ -445,7 +451,7 @@ def get_sectors():
 
 
 @api_bp.route('/subsectors', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_subsectors():
     """Get all subsectors with their parent sector information."""
@@ -495,7 +501,7 @@ def get_subsectors():
 
 
 @api_bp.route('/sectors-subsectors', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_sectors_subsectors():
     """Get all sectors and subsectors with their logos and hierarchical structure for the frontend."""

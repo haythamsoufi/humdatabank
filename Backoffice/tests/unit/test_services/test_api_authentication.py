@@ -26,6 +26,7 @@ from app.services.security.api_authentication import (
     get_user_allowed_template_ids,
     validate_plaintext_db_api_key_for_mobile_auth,
 )
+from app.services.security.api_key_permissions import DATA_READ, REFERENCE_READ, build_permissions_document
 from app.utils.datetime_helpers import utcnow
 from tests.factories import (
     _grant_entity_permission,
@@ -47,10 +48,15 @@ def _bearer_headers(key: str) -> dict:
 
 
 @pytest.fixture(autouse=True)
-def _clear_api_key_rate_limits():
+def _clear_api_key_rate_limits(app):
+    saved = {
+        key: app.config.get(key)
+        for key in ("MOBILE_APP_API_KEY", "MOBILE_APP_API_KEY_RATE_LIMIT_PER_MINUTE")
+    }
     auth_mod._api_key_rate_limit_storage.clear()
     yield
     auth_mod._api_key_rate_limit_storage.clear()
+    app.config.update(saved)
 
 
 @pytest.mark.unit
@@ -139,13 +145,13 @@ class TestEnvMobileApiKey:
 class TestAuthenticateDbApiKeyOnly:
     def test_missing_key_returns_401(self, app):
         with app.test_request_context("/api/v1/foo"):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 401
 
     def test_valid_db_key(self, app, db_session, api_key):
         _obj, full_key = api_key
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert hasattr(result, "client_name")
         assert g.api_key_record is not None
         assert g.api_key_usage_id == _obj.id
@@ -156,27 +162,40 @@ class TestAuthenticateDbApiKeyOnly:
             "/api/v1/foo",
             headers=_bearer_headers("env-mobile-key-12345"),
         ):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result is True
         assert g.api_key_record is None
 
     def test_x_api_key_header(self, app, db_session, api_key):
         _obj, full_key = api_key
         with app.test_request_context("/api/v1/foo", headers={"X-API-Key": full_key}):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert hasattr(result, "client_name")
 
-    def test_query_param_api_key(self, app, db_session, api_key):
+    def test_query_param_api_key_refused_unless_key_opted_in(self, app, db_session, api_key):
         _obj, full_key = api_key
         with app.test_request_context(f"/api/v1/upr/data?api_key={full_key}"):
-            result = authenticate_db_api_key_only()
-        assert hasattr(result, "client_name")
-        assert g.api_key_record is not None
-        assert g.api_key_usage_id == _obj.id
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
+        assert result.status_code == 403
+        assert "Authorization" in result.get_json()["hint"]
+
+    def test_query_param_api_key_accepted_when_key_opted_in(self, app, db_session):
+        with app.app_context():
+            obj, full_key = create_test_api_key(
+                db_session,
+                permissions=build_permissions_document([REFERENCE_READ], allow_query_api_key=True),
+            )
+            key_id = obj.id
+        with app.test_request_context(f"/api/v1/upr/data?api_key={full_key}"):
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
+            assert hasattr(result, "client_name")
+            assert g.api_key_record is not None
+            assert g.api_key_usage_id == key_id
+            assert g.api_key_via_query is True
 
     def test_invalid_db_key_returns_401(self, app, db_session):
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers("not-a-real-key")):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 401
 
     def test_revoked_key_returns_401(self, app, db_session, api_key):
@@ -184,7 +203,7 @@ class TestAuthenticateDbApiKeyOnly:
         obj.revoke(reason="test")
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert result.get_json()["error"] == "API key has been revoked"
 
@@ -193,7 +212,7 @@ class TestAuthenticateDbApiKeyOnly:
         obj.expires_at = utcnow() - timedelta(days=1)
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert result.get_json()["error"] == "API key has expired"
 
@@ -202,7 +221,7 @@ class TestAuthenticateDbApiKeyOnly:
         obj.disable(reason="paused")
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert result.get_json()["error"] == "API key is not active"
 
@@ -211,8 +230,8 @@ class TestAuthenticateDbApiKeyOnly:
         obj.rate_limit_per_minute = 1
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            assert authenticate_db_api_key_only() is not None
-            result = authenticate_db_api_key_only()
+            assert authenticate_db_api_key_only(capability=REFERENCE_READ) is not None
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 429
 
     def test_rate_limit_prunes_stale_entries(self, app, db_session, api_key):
@@ -221,7 +240,7 @@ class TestAuthenticateDbApiKeyOnly:
         db_session.commit()
         auth_mod._api_key_rate_limit_storage[f"api_key_{obj.id}"] = deque([time.time() - 120])
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert hasattr(result, "client_name")
 
     def test_update_last_used_failure_is_non_fatal(self, app, db_session, api_key):
@@ -232,7 +251,7 @@ class TestAuthenticateDbApiKeyOnly:
                 side_effect=RuntimeError("db down"),
             ):
                 with patch.object(app.logger, "warning") as mock_warning:
-                    result = authenticate_db_api_key_only()
+                    result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert hasattr(result, "client_name")
         mock_warning.assert_called()
 
@@ -241,7 +260,7 @@ class TestAuthenticateDbApiKeyOnly:
         app.config["LOG_API_KEY_USAGE"] = True
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
             with patch.object(app.logger, "info") as mock_info:
-                authenticate_db_api_key_only()
+                authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert mock_info.called
 
     def test_env_key_logs_when_enabled(self, app, db_session):
@@ -252,7 +271,7 @@ class TestAuthenticateDbApiKeyOnly:
             headers=_bearer_headers("log-test-key-12345"),
         ):
             with patch.object(app.logger, "info") as mock_info:
-                result = authenticate_db_api_key_only()
+                result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result is True
         assert mock_info.called
 
@@ -263,7 +282,7 @@ class TestAuthenticateDbApiKeyOnly:
             [time.time()]
         )
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers("env-limited-key")):
-            result = authenticate_db_api_key_only()
+            result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 401
 
     def test_authentication_error_returns_500(self, app, db_session):
@@ -273,7 +292,7 @@ class TestAuthenticateDbApiKeyOnly:
                 side_effect=RuntimeError("hash failed"),
             ):
                 with patch.object(app.logger, "error") as mock_error:
-                    result = authenticate_db_api_key_only()
+                    result = authenticate_db_api_key_only(capability=REFERENCE_READ)
         assert result.status_code == 500
         mock_error.assert_called()
 
@@ -370,7 +389,7 @@ class TestAuthenticateApiRequest:
     def test_session_auth(self, app, db_session, test_user):
         with app.test_request_context("/api/v1/foo"):
             login_user(test_user)
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         elevated, user, key = result
         assert elevated is False
         assert user.id == test_user.id
@@ -382,7 +401,7 @@ class TestAuthenticateApiRequest:
             "/api/v1/foo",
             headers={"Authorization": f"Basic {creds}"},
         ):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result[1].email == "test_user@example.com"
 
     def test_basic_auth_invalid(self, app, db_session, test_user):
@@ -391,25 +410,35 @@ class TestAuthenticateApiRequest:
             "/api/v1/foo",
             headers={"Authorization": f"Basic {creds}"},
         ):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert "WWW-Authenticate" in result.headers
 
-    def test_query_api_key(self, app, db_session, api_key):
+    def test_query_api_key(self, app, db_session):
+        with app.app_context():
+            _obj, full_key = create_test_api_key(
+                db_session,
+                permissions=build_permissions_document([REFERENCE_READ], allow_query_api_key=True),
+            )
+        with app.test_request_context(f"/api/v1/foo?api_key={full_key}"):
+            result = authenticate_api_request(capability=REFERENCE_READ)
+        assert result[2] is not None
+
+    def test_query_api_key_refused_by_default(self, app, db_session, api_key):
         _obj, full_key = api_key
         with app.test_request_context(f"/api/v1/foo?api_key={full_key}"):
-            result = authenticate_api_request()
-        assert result[2] is not None
+            result = authenticate_api_request(capability=REFERENCE_READ)
+        assert result.status_code == 403
 
     def test_no_credentials_returns_401_with_challenge(self, app):
         with app.test_request_context("/api/v1/foo"):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert "WWW-Authenticate" in result.headers
 
     def test_invalid_key(self, app, db_session):
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers("bogus-key")):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
 
     def test_revoked_key(self, app, db_session, api_key):
@@ -417,7 +446,7 @@ class TestAuthenticateApiRequest:
         obj.revoke()
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert result.get_json()["error"] == "API key has been revoked"
 
@@ -426,7 +455,7 @@ class TestAuthenticateApiRequest:
         obj.expires_at = utcnow() - timedelta(days=1)
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert result.get_json()["error"] == "API key has expired"
 
@@ -435,7 +464,7 @@ class TestAuthenticateApiRequest:
         obj.disable()
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
         assert result.get_json()["error"] == "API key is not active"
 
@@ -444,8 +473,8 @@ class TestAuthenticateApiRequest:
         obj.rate_limit_per_minute = 1
         db_session.commit()
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            assert isinstance(authenticate_api_request(), tuple)
-            result = authenticate_api_request()
+            assert isinstance(authenticate_api_request(capability=REFERENCE_READ), tuple)
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 429
 
     def test_rate_limit_prunes_stale_entries(self, app, db_session, api_key):
@@ -454,13 +483,13 @@ class TestAuthenticateApiRequest:
         db_session.commit()
         auth_mod._api_key_rate_limit_storage[f"api_key_{obj.id}"] = deque([time.time() - 120])
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert isinstance(result, tuple)
 
     def test_read_all_grants_elevated_access(self, app, db_session, api_key):
         _obj, full_key = api_key
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            elevated, user, key = authenticate_api_request()
+            elevated, user, key = authenticate_api_request(capability=REFERENCE_READ)
         assert elevated is True
         assert user is None
         assert key is not None
@@ -481,7 +510,7 @@ class TestAuthenticateApiRequest:
                 },
             )
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            elevated, user, key = authenticate_api_request()
+            elevated, user, key = authenticate_api_request(capability=REFERENCE_READ)
         assert elevated is False
         assert key is not None
         assert g.api_key_data_scope == {
@@ -493,7 +522,7 @@ class TestAuthenticateApiRequest:
         with app.app_context():
             _obj, full_key = create_test_api_key(db_session, permissions={"data": "none"})
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=DATA_READ)
         assert result.status_code == 403
 
     def test_env_mobile_key_success(self, app, db_session):
@@ -502,7 +531,7 @@ class TestAuthenticateApiRequest:
             "/api/v1/foo",
             headers=_bearer_headers("env-api-request-key"),
         ):
-            elevated, user, key = authenticate_api_request()
+            elevated, user, key = authenticate_api_request(capability=REFERENCE_READ)
         assert elevated is True
         assert user is None
         assert key is None
@@ -518,7 +547,7 @@ class TestAuthenticateApiRequest:
             "/api/v1/foo",
             headers=_bearer_headers("env-limited-api-key"),
         ):
-            result = authenticate_api_request()
+            result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 401
 
     def test_logs_db_key_usage_when_enabled(self, app, db_session, api_key):
@@ -526,7 +555,7 @@ class TestAuthenticateApiRequest:
         app.config["LOG_API_KEY_USAGE"] = True
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
             with patch.object(app.logger, "info") as mock_info:
-                authenticate_api_request()
+                authenticate_api_request(capability=REFERENCE_READ)
         assert mock_info.called
 
     def test_update_last_used_failure_is_non_fatal(self, app, db_session, api_key):
@@ -537,7 +566,7 @@ class TestAuthenticateApiRequest:
                 side_effect=RuntimeError("db down"),
             ):
                 with patch.object(app.logger, "warning") as mock_warning:
-                    result = authenticate_api_request()
+                    result = authenticate_api_request(capability=REFERENCE_READ)
         assert isinstance(result, tuple)
         mock_warning.assert_called()
 
@@ -548,7 +577,7 @@ class TestAuthenticateApiRequest:
                 side_effect=RuntimeError("hash failed"),
             ):
                 with patch.object(app.logger, "error") as mock_error:
-                    result = authenticate_api_request()
+                    result = authenticate_api_request(capability=REFERENCE_READ)
         assert result.status_code == 500
         mock_error.assert_called()
 

@@ -5,43 +5,66 @@ from app.services.security.api_authentication import authenticate_db_api_key_onl
 from app.utils.redirect_utils import get_current_relative_url
 
 
-def _extract_api_key():
+def _stamp_capability(view, capability, scope_aware):
+    """Record the declared capability where the enforcement point and the route scan read it."""
+    view._ep_capability = capability
+    view._ep_scope_aware = bool(scope_aware)
+    return view
+
+
+def api_capability(capability, *, scope_aware=False):
     """
-    Extract API key from request.
-    Standard method: Authorization header only (Bearer token).
-    Query parameters are not accepted for security (keys must not appear in URLs/logs).
+    Declare the API-key capability a route needs, without adding an auth wrapper.
 
-    Returns:
-        tuple: (api_key: str or None, source: str) where source is 'header'
+    For routes that authenticate inside the view with ``authenticate_api_request()``
+    (API key *or* user session/Basic auth). Enforcement happens in that call; this only
+    declares what it must enforce. ``scope_aware=True`` asserts the view filters every
+    query with the key's data scope (``get_api_key_data_scope()``); otherwise data-scoped
+    keys are refused.
     """
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        api_key = auth_header[7:].strip()  # Remove 'Bearer ' prefix
-        return api_key, 'header'
-    return None, None
+    def decorator(view):
+        _stamp_capability(view, capability, scope_aware)
+        if getattr(view, '_ep_auth', None) is None:
+            view._ep_auth = 'api_key_or_session'
+        return view
+    return decorator
 
-def require_api_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        auth_result = authenticate_db_api_key_only()
-        if hasattr(auth_result, "status_code"):
-            return auth_result
 
-        # Skip user authentication for API routes
-        g.skip_auth = True
+def require_api_key(f=None, *, capability=None, scope_aware=False):
+    """
+    Require an API key that holds ``capability``.
 
-        # Log successful API key usage (optional, can be disabled in production)
-        if current_app.config.get('LOG_API_KEY_USAGE', False):
-            current_app.logger.info(
-                f"API key authenticated from {request.remote_addr} "
-                f"(endpoint: {request.endpoint})"
-            )
+    Usage: ``@require_api_key(capability=DATA_READ, scope_aware=True)``. Keys are read from
+    ``Authorization: Bearer`` or ``X-API-Key``; ``?api_key=`` only works for keys that opted
+    in (see ``allow_query_api_key``). A route that declares no capability is denied.
+    """
+    def decorator(view):
+        @wraps(view)
+        def decorated_function(*args, **kwargs):
+            auth_result = authenticate_db_api_key_only(capability=capability, scope_aware=scope_aware)
+            if hasattr(auth_result, "status_code"):
+                return auth_result
 
-        return f(*args, **kwargs)
+            # Skip user authentication for API routes
+            g.skip_auth = True
 
-    # Endpoint-registry metadata — read by scan_flask_routes()
-    decorated_function._ep_auth = 'api_key'
-    return decorated_function
+            # Log successful API key usage (optional, can be disabled in production)
+            if current_app.config.get('LOG_API_KEY_USAGE', False):
+                current_app.logger.info(
+                    f"API key authenticated from {request.remote_addr} "
+                    f"(endpoint: {request.endpoint})"
+                )
+
+            return view(*args, **kwargs)
+
+        # Endpoint-registry metadata — read by scan_flask_routes()
+        decorated_function._ep_auth = 'api_key'
+        _stamp_capability(decorated_function, capability, scope_aware)
+        return decorated_function
+
+    if f is None:
+        return decorator
+    return decorator(f)
 
 
 def _is_browser_navigation_without_api_key() -> bool:
@@ -60,19 +83,20 @@ def _is_browser_navigation_without_api_key() -> bool:
     return "text/html" in request.headers.get("Accept", "").lower()
 
 
-def require_api_key_or_session(f=None, *, browser_login_redirect: bool = False):
+def require_api_key_or_session(f=None, *, capability=None, scope_aware=False, browser_login_redirect: bool = False):
     """
     Decorator that allows authentication via either:
-    1. Valid API key in Authorization header (Bearer token)
-    2. Active session (logged-in user)
+    1. Active session (logged-in user): governed by the user's RBAC, not key capabilities
+    2. API key holding ``capability`` (Bearer or X-API-Key; ``?api_key=`` only for keys
+       that opted in)
 
     Routes intended for direct browser navigation may opt into
     ``browser_login_redirect=True``. Anonymous HTML requests without an API key
-    (Bearer, X-API-Key, or ``?api_key=``) are then redirected to login, while
-    API clients and invalid-key attempts retain the normal JSON 401 response.
+    are then redirected to login, while API clients and invalid-key attempts retain
+    the normal JSON 401 response.
 
     SECURITY: Use for endpoints that are accessed from both external API clients
-    and the admin web interface.
+    and the admin web interface. A route that declares no capability is denied to keys.
     """
     def decorator(view):
         @wraps(view)
@@ -87,9 +111,7 @@ def require_api_key_or_session(f=None, *, browser_login_redirect: bool = False):
                     url_for("auth.login", next=get_current_relative_url())
                 )
 
-            # Otherwise, require an API key (DB api_keys or MOBILE_APP_API_KEY env fallback).
-            # Bearer, X-API-Key, and ?api_key= (Power Query) are all accepted.
-            auth_result = authenticate_db_api_key_only()
+            auth_result = authenticate_db_api_key_only(capability=capability, scope_aware=scope_aware)
             if hasattr(auth_result, "status_code"):
                 return auth_result
 
@@ -98,6 +120,7 @@ def require_api_key_or_session(f=None, *, browser_login_redirect: bool = False):
 
         # Endpoint-registry metadata — read by scan_flask_routes()
         decorated_function._ep_auth = 'api_key_or_session'
+        _stamp_capability(decorated_function, capability, scope_aware)
         return decorated_function
 
     if f is None:

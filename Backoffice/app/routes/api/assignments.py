@@ -7,6 +7,7 @@ Part of the /api/v1 blueprint.
 from flask import request, current_app
 from flask_login import login_required, current_user
 import uuid
+from sqlalchemy import literal, select
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
@@ -16,32 +17,41 @@ from app.utils.sql_utils import safe_ilike_pattern
 from app.models import AssignedForm, FormData, FormItem
 from app.models.assignments import AssignmentEntityStatus
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.auth import require_api_key
+from app.utils.auth import api_capability, require_api_key
+from app.services.security.api_key_permissions import SUBMISSIONS_READ
 from app.utils.rate_limiting import api_rate_limit
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error, get_json_safe
 from app.utils.api_responses import require_json_keys
-from app.services.security.api_authentication import authenticate_api_request, get_user_allowed_template_ids
+from app.services.security.api_authentication import (
+    api_key_max_per_page,
+    authenticate_api_request,
+    get_api_key_data_scope,
+    get_user_allowed_template_ids,
+    redact_request_params,
+)
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.request_validation import enforce_csrf_json
 from app import db
 
 
 @api_bp.route('/assigned-forms', methods=['GET'])
+@api_capability(SUBMISSIONS_READ, scope_aware=True)
 @api_rate_limit()
 def get_assigned_forms():
     """
     API endpoint to retrieve assigned form IDs and their associated country IDs.
     Authentication (one of):
-      - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
+      - Authorization: Bearer YOUR_API_KEY with ``submissions:read`` (paginated response;
+        limited to the key's templates/countries when scoped)
       - HTTP Basic auth or session (user-scoped access, no pagination)
     Power BI: use Bearer in Web.Contents Headers and set data source credential to Anonymous so the header is not overridden.
     Query Parameters:
         - template_id: Filter by template ID
         - period_name: Filter by period name
         - page: Page number (default: 1, only used with API key auth)
-        - per_page: Items per page (default: 20, max 100000, only used with API key auth)
+        - per_page: Items per page (default: 20, capped by API_KEY_MAX_PER_PAGE, only used with API key auth)
     """
     try:
         # Authenticate request
@@ -50,12 +60,12 @@ def get_assigned_forms():
             return auth_result
         elevated_access, auth_user, api_key_record = auth_result
 
-        # Determine if we should paginate
-        should_paginate = elevated_access
+        # Key-authenticated callers (scoped or not) always get a bounded, paginated response
+        should_paginate = elevated_access or api_key_record is not None
 
         # Validate pagination parameters
         if should_paginate:
-            page, per_page = validate_pagination_params(request.args)
+            page, per_page = validate_pagination_params(request.args, max_per_page=api_key_max_per_page())
         else:
             page = 1
             per_page = None
@@ -72,6 +82,24 @@ def get_assigned_forms():
 
         # Build base query
         query = AssignedForm.query
+
+        key_scope = get_api_key_data_scope() if api_key_record is not None else None
+        key_country_ids = None
+        if key_scope is not None:
+            if not key_scope['template_ids'] and not key_scope['country_ids']:
+                query = query.filter(literal(False))
+            if key_scope['template_ids']:
+                query = query.filter(AssignedForm.template_id.in_(key_scope['template_ids']))
+            if key_scope['country_ids']:
+                key_country_ids = set(key_scope['country_ids'])
+                query = query.filter(
+                    AssignedForm.id.in_(
+                        select(AssignmentEntityStatus.assigned_form_id).where(
+                            AssignmentEntityStatus.entity_type == 'country',
+                            AssignmentEntityStatus.entity_id.in_(key_country_ids),
+                        )
+                    )
+                )
 
         # Apply RBAC filtering for user auth
         if not elevated_access and auth_user is not None:
@@ -131,6 +159,8 @@ def get_assigned_forms():
             # Get assignment country status information for this assigned form
             country_assignments = []
             for status in assigned_form.country_statuses:
+                if key_country_ids is not None and status.country_id not in key_country_ids:
+                    continue
                 country_assignments.append({
                     'assignment_entity_status_id': status.id,
                     'country_id': status.country_id,
@@ -191,7 +221,7 @@ def get_assigned_forms():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching assigned forms: {e}",
             exc_info=True,
-            extra={'endpoint': '/assigned-forms', 'params': dict(request.args)}
+            extra={'endpoint': '/assigned-forms', 'params': redact_request_params()}
         )
         return api_error("Could not fetch assigned forms", 500, error_id, None)
 

@@ -15,6 +15,8 @@ from app.models.api_key_management import (
     API_KEY_DATA_READ_SCOPED,
     API_KEY_DATA_NONE,
 )
+from app import db
+from app.services.security.api_key_permissions import DATA_READ, USERS_READ, build_permissions_document
 from app.utils.datetime_helpers import utcnow
 from tests.factories import create_test_user, create_test_api_key
 
@@ -23,37 +25,25 @@ from tests.factories import create_test_user, create_test_api_key
 class TestResolveApiKeyDataAccess:
     """Tests for resolve_api_key_data_access function."""
 
-    def test_none_permissions_returns_read_all(self):
-        """None permissions returns read_all."""
-        mode, scope = resolve_api_key_data_access(None)
-        assert mode == API_KEY_DATA_READ_ALL
-        assert scope is None
+    def test_none_permissions_grants_no_data(self):
+        """NULL permissions fail closed (they used to mean read_all)."""
+        assert resolve_api_key_data_access(None) == (API_KEY_DATA_NONE, None)
 
-    def test_non_dict_permissions_returns_read_all(self):
-        """Non-dict permissions returns read_all."""
-        mode, scope = resolve_api_key_data_access('read_all')
-        assert mode == API_KEY_DATA_READ_ALL
-        assert scope is None
+    def test_non_dict_permissions_grants_no_data(self):
+        assert resolve_api_key_data_access('read_all') == (API_KEY_DATA_NONE, None)
 
-    def test_empty_dict_returns_read_all(self):
-        """Empty dict permissions returns read_all."""
-        mode, scope = resolve_api_key_data_access({})
-        assert mode == API_KEY_DATA_READ_ALL
-        assert scope is None
+    def test_empty_dict_grants_no_data(self):
+        assert resolve_api_key_data_access({}) == (API_KEY_DATA_NONE, None)
 
-    def test_explicit_read_all(self):
-        """Explicit read_all returns read_all."""
+    def test_explicit_legacy_read_all(self):
         mode, scope = resolve_api_key_data_access({'data': 'read_all'})
         assert mode == API_KEY_DATA_READ_ALL
         assert scope is None
 
-    def test_data_none_in_dict(self):
-        """data=None in dict returns read_all."""
-        mode, scope = resolve_api_key_data_access({'data': None})
-        assert mode == API_KEY_DATA_READ_ALL
+    def test_data_null_in_dict_grants_no_data(self):
+        assert resolve_api_key_data_access({'data': None})[0] == API_KEY_DATA_NONE
 
-    def test_read_scoped_with_ids(self):
-        """read_scoped with template_ids and country_ids."""
+    def test_legacy_read_scoped_with_ids(self):
         permissions = {
             'data': 'read_scoped',
             'template_ids': [1, 2, 3],
@@ -61,41 +51,35 @@ class TestResolveApiKeyDataAccess:
         }
         mode, scope = resolve_api_key_data_access(permissions)
         assert mode == API_KEY_DATA_READ_SCOPED
-        assert scope is not None
-        assert scope['template_ids'] == [1, 2, 3]
-        assert scope['country_ids'] == [10, 20]
+        assert scope == {'template_ids': [1, 2, 3], 'country_ids': [10, 20]}
 
-    def test_read_scoped_with_none_ids(self):
-        """read_scoped with None values in id lists - filters out None."""
-        permissions = {
-            'data': 'read_scoped',
-            'template_ids': [1, None, 2],
-            'country_ids': None,
-        }
-        mode, scope = resolve_api_key_data_access(permissions)
+    def test_legacy_read_scoped_with_invalid_ids_grants_nothing(self):
+        permissions = {'data': 'read_scoped', 'template_ids': [1, None, 2], 'country_ids': None}
+        assert resolve_api_key_data_access(permissions) == (API_KEY_DATA_NONE, None)
+
+    def test_legacy_read_scoped_without_ids_is_deny_all_scope(self):
+        mode, scope = resolve_api_key_data_access({'data': 'read_scoped'})
         assert mode == API_KEY_DATA_READ_SCOPED
-        assert 1 in scope['template_ids']
-        assert 2 in scope['template_ids']
-        assert scope['country_ids'] == []
+        assert scope == {'template_ids': [], 'country_ids': []}
 
-    def test_read_scoped_empty_lists(self):
-        """read_scoped with empty lists."""
-        permissions = {'data': 'read_scoped'}
-        mode, scope = resolve_api_key_data_access(permissions)
+    def test_legacy_data_none(self):
+        assert resolve_api_key_data_access({'data': 'none'}) == (API_KEY_DATA_NONE, None)
+
+    def test_unknown_legacy_value_fails_closed(self):
+        assert resolve_api_key_data_access({'data': 'unknown_perm'}) == (API_KEY_DATA_NONE, None)
+
+    def test_v2_document_with_data_read(self):
+        doc = build_permissions_document([DATA_READ])
+        assert resolve_api_key_data_access(doc) == (API_KEY_DATA_READ_ALL, None)
+
+    def test_v2_document_scoped(self):
+        doc = build_permissions_document([DATA_READ], restrict_data=True, template_ids=[4])
+        mode, scope = resolve_api_key_data_access(doc)
         assert mode == API_KEY_DATA_READ_SCOPED
-        assert scope['template_ids'] == []
-        assert scope['country_ids'] == []
+        assert scope == {'template_ids': [4], 'country_ids': []}
 
-    def test_data_none_perm_returns_none(self):
-        """data='none' returns none access."""
-        mode, scope = resolve_api_key_data_access({'data': 'none'})
-        assert mode == API_KEY_DATA_NONE
-        assert scope is None
-
-    def test_unknown_perm_returns_read_all(self):
-        """Unknown data permission returns read_all."""
-        mode, scope = resolve_api_key_data_access({'data': 'unknown_perm'})
-        assert mode == API_KEY_DATA_READ_ALL
+    def test_v2_document_without_data_read(self):
+        assert resolve_api_key_data_access(build_permissions_document([USERS_READ]))[0] == API_KEY_DATA_NONE
 
 
 @pytest.mark.unit

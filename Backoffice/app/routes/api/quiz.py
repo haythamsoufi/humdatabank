@@ -15,6 +15,7 @@ from app.routes.api import api_bp
 # Import models
 from app.models import User
 from app.utils.auth import require_api_key
+from app.services.security.api_key_permissions import USERS_READ
 from app.utils.rate_limiting import api_rate_limit
 
 # Import utility functions
@@ -69,7 +70,7 @@ def submit_quiz_score():
 
 
 @api_bp.route('/quiz/leaderboard', methods=['GET'])
-@require_api_key
+@require_api_key(capability=USERS_READ)
 @api_rate_limit()
 def get_quiz_leaderboard():
     """Get top users on the quiz leaderboard.

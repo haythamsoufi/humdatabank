@@ -31,6 +31,7 @@ from app.utils.api_helpers import (
     json_data_response,
 )
 from app.utils.auth import require_api_key_or_session
+from app.services.security.api_key_permissions import CONTENT_READ
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from app.utils.error_handling import handle_json_view_exception
 from plugins.fdrs import bp
@@ -57,7 +58,7 @@ API_ENDPOINTS = [
 
 
 @bp.route("/api/v1/fdrs/published-data", methods=["GET"])
-@require_api_key_or_session
+@require_api_key_or_session(capability=CONTENT_READ)
 def get_fdrs_published_data():
     """
     Published FDRS figures for the public website integration.
@@ -72,7 +73,7 @@ def get_fdrs_published_data():
       - ``assignment_id``: ``AssignedForm.id`` (one FDRS reporting round)
       - ``country_id`` / ``country_iso2`` / ``country_iso3``
       - ``form_item_id``
-      - ``page``, ``per_page`` (default 20, max 100000)
+      - ``page``, ``per_page`` (default 20, max 10000)
     """
     try:
         # NOTE: no `or DEFAULT_*` fallback here — `request.args.get(..., type=int)` already

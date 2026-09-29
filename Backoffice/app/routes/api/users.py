@@ -27,6 +27,8 @@ from app.models.enums import EntityType
 from app.models.documents import SubmittedDocument
 from app.services.assignments.completion_service import AssignmentCompletionService
 from app.utils.auth import require_api_key
+from app.services.security.api_authentication import redact_request_params
+from app.services.security.api_key_permissions import USERS_READ
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from app.utils.form_localization import get_localized_template_name
@@ -40,7 +42,7 @@ from app import db
 
 
 @api_bp.route('/users', methods=['GET'])
-@require_api_key
+@require_api_key(capability=USERS_READ)
 @api_rate_limit()
 def get_users():
     """
@@ -64,7 +66,7 @@ def get_users():
 
         # Get filter parameters
         from app.utils.api_pagination import validate_pagination_params
-        page, per_page = validate_pagination_params(request.args, default_per_page=20)
+        page, per_page = validate_pagination_params(request.args, default_per_page=20, max_per_page=500)
         search_query = request.args.get('search', default='', type=str).strip()
 
         # Build base query
@@ -137,13 +139,13 @@ def get_users():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching users: {e}",
             exc_info=True,
-            extra={'endpoint': '/users', 'params': dict(request.args)}
+            extra={'endpoint': '/users', 'params': redact_request_params()}
         )
         return api_error("Could not fetch users", 500, error_id, None)
 
 
 @api_bp.route('/users/<int:user_id>', methods=['GET'])
-@require_api_key
+@require_api_key(capability=USERS_READ)
 @api_rate_limit()
 def get_user_details(user_id):
     """

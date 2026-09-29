@@ -1,5 +1,0 @@
-<step title="Incoming Request" date="2026-04-17T10:54:41.081" instance="bd8f90" url="/logstream" method="GET" type="request" pid="768,1,56" Host="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" User-Agent="AZURECLI/2.77.0 (MSI)" Accept-Encoding="identity" Authorization="Bas..." x-ms-client-request-id="d15bfcb5-3a4b-11f1-a603-010101010000" X-ARR-LOG-ID="d15bfcb5-3a4b-11f1-a603-010101010000" CLIENT-IP="88.185.235.63:18165" X-SITE-DEPLOYMENT-ID="ifrc-databank-app" WAS-DEFAULT-HOSTNAME="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="88.185.235.63" X-Client-Port="18165" >
-  <step title="Cleanup Xml Logs" date="2026-04-17T10:54:41.129" >
-    <step title="Cleanup Infos" date="2026-04-17T10:54:42.280" totalFiles="278" totalCleanup="118" /><!-- duration: 2ms -->
-  </step><!-- duration: 1158ms -->
-  <step title="LogStreamHandlerMiddleware.Invoke" date="2026-04-17T10:54:42.298" /><!-- duration: 190ms -->

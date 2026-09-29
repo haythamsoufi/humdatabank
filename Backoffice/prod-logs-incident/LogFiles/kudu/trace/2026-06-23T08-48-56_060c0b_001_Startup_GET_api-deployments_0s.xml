@@ -1,1 +1,0 @@
-<step title="Startup Request" date="2026-06-23T08:48:56.256" instance="060c0b" url="/api/deployments/?api-version=2023-12-01&amp;warmup=true" method="GET" type="request" pid="831,1,26" ScmType="None" SCM_DO_BUILD_DURING_DEPLOYMENT="true" /><!-- duration: 3ms -->

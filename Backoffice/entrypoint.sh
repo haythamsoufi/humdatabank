@@ -14,15 +14,13 @@ echo "PORT: ${PORT:-5000}"
 echo "SKIP_MIGRATIONS: ${SKIP_MIGRATIONS:-<not set>}"
 echo "SEED_UPLOADS_ON_DEPLOY: ${SEED_UPLOADS_ON_DEPLOY:-<not set>}"
 echo "DATABASE_URL: ${DATABASE_URL:+<set>}"
+echo "ENABLE_SSH: ${ENABLE_SSH:-<not set>}"
 echo "=========================================="
 
-# Azure App Service SSH (Kudu WebSocket tunnel -> container port 2222).
-start_app_service_ssh() {
-  if command -v sshd >/dev/null 2>&1; then
-    echo "Starting OpenSSH daemon on port 2222 (Azure App Service SSH)..."
-    /usr/sbin/sshd
-  fi
-}
+# Azure App Service SSH (Kudu WebSocket tunnel -> container port 2222). Opt-in: sshd only starts
+# when ENABLE_SSH=true. See docker/start-ssh.sh and docs/runbooks/operations/container-ssh-access.md.
+# shellcheck source=docker/start-ssh.sh
+. /app/docker/start-ssh.sh
 start_app_service_ssh
 
 # Seed persistent uploads from an archive on first boot when enabled.
@@ -326,9 +324,9 @@ else
     TIMEOUT=${GUNICORN_TIMEOUT:-60}
     echo "Workers: ${WORKERS}, Threads: ${THREADS}, Worker Class: ${WORKER_CLASS}, Timeout: ${TIMEOUT}s"
 
-    exec gunicorn --workers ${WORKERS} --threads ${THREADS} --worker-class ${WORKER_CLASS} \
+    exec gunicorn --workers "${WORKERS}" --threads "${THREADS}" --worker-class "${WORKER_CLASS}" \
       --max-requests 1000 --max-requests-jitter 100 \
-      --timeout ${TIMEOUT} --keep-alive 75 \
+      --timeout "${TIMEOUT}" --keep-alive 75 \
       --bind "0.0.0.0:${PORT}" \
       --access-logfile - --error-logfile - --log-level info \
       --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"' \

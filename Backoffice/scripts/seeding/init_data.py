@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-Default data initialization script
+Default data initialization script (local development only).
+
+Creates well-known test accounts, so it refuses to run unless ``FLASK_CONFIG=development`` is set
+explicitly and the database host is local (see ``app.seeding.dev_seeding_refusal_reason``).
+
+Passwords come from ``TEST_ADMIN_PASSWORD``, ``TEST_FOCAL_PASSWORD`` and ``TEST_SYS_MANAGER_PASSWORD``.
+Any that are unset get a random password, printed once at the end of the run.
 """
 
 import logging
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -17,23 +24,42 @@ setup_cli_paths(__file__)
 
 logger = logging.getLogger(__name__)
 
-# Set up environment
-# Note: DATABASE_URL should be provided via environment variable, not hardcoded
-# Only set FLASK_CONFIG if not already set
-if 'FLASK_CONFIG' not in os.environ:
-    os.environ['FLASK_CONFIG'] = 'production'
-
 from sqlalchemy.exc import IntegrityError
 
+_PASSWORD_ENV_BY_ROLE = {
+    'admin': 'TEST_ADMIN_PASSWORD',
+    'focal': 'TEST_FOCAL_PASSWORD',
+    'sys_manager': 'TEST_SYS_MANAGER_PASSWORD',
+}
+
+
+def _password_for(role: str, generated: dict) -> str:
+    """Password from the role's env var, else a random one remembered in ``generated`` (printed once)."""
+    configured = (os.environ.get(_PASSWORD_ENV_BY_ROLE[role]) or '').strip()
+    if configured:
+        return configured
+    if role not in generated:
+        generated[role] = secrets.token_urlsafe(16)
+    return generated[role]
+
+
 def main():
+    generated_passwords: dict = {}
     try:
         flask_config = (os.environ.get('FLASK_CONFIG') or '').strip().lower()
-        if flask_config in ('production', 'staging'):
+        if flask_config != 'development':
             logger.error(
-                "Refusing to seed test data in %s environment. "
+                "Refusing to seed test data: FLASK_CONFIG must be set to 'development' (got '%s'). "
                 "This script is for local development only.",
-                flask_config,
+                flask_config or '<unset>',
             )
+            return 1
+
+        from app.seeding import dev_seeding_refusal_reason
+
+        refusal = dev_seeding_refusal_reason(os.environ.get('DATABASE_URL') or '')
+        if refusal:
+            logger.error("Refusing to seed test data: %s", refusal)
             return 1
 
         from app import create_app
@@ -168,7 +194,7 @@ def main():
                     admin_exists = User.query.filter_by(email='test_admin@humdatabank.org').first()
                     if not admin_exists:
                         admin = User(email='test_admin@humdatabank.org', name='Test Admin')
-                        admin.set_password('test123')
+                        admin.set_password(_password_for('admin', generated_passwords))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(admin)
@@ -186,7 +212,7 @@ def main():
                     second_admin_exists = User.query.filter_by(email='test_admin2@humdatabank.org').first()
                     if not second_admin_exists:
                         admin2 = User(email='test_admin2@humdatabank.org', name='Test Admin 2')
-                        admin2.set_password('test123')
+                        admin2.set_password(_password_for('admin', generated_passwords))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(admin2)
@@ -204,7 +230,7 @@ def main():
                     focal_point_exists = User.query.filter_by(email='test_focal@humdatabank.org').first()
                     if not focal_point_exists:
                         focal_point = User(email='test_focal@humdatabank.org', name='Test Focal Point')
-                        focal_point.set_password('test123')
+                        focal_point.set_password(_password_for('focal', generated_passwords))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(focal_point)
@@ -222,7 +248,7 @@ def main():
                     second_focal_exists = User.query.filter_by(email='test_focal2@humdatabank.org').first()
                     if not second_focal_exists:
                         focal_point2 = User(email='test_focal2@humdatabank.org', name='Test Focal Point 2')
-                        focal_point2.set_password('test123')
+                        focal_point2.set_password(_password_for('focal', generated_passwords))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(focal_point2)
@@ -245,7 +271,7 @@ def main():
                     sys_manager_exists = User.query.filter_by(email='test_sys@humdatabank.org').first()
                     if not sys_manager_exists:
                         sys_manager = User(email='test_sys@humdatabank.org', name='Test System Manager')
-                        sys_manager.set_password('test123')
+                        sys_manager.set_password(_password_for('sys_manager', generated_passwords))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(sys_manager)
@@ -256,6 +282,10 @@ def main():
                             logger.info('Default system manager user already exists (skipped)')
 
                     logger.info('Default data creation complete!')
+                    if generated_passwords:
+                        print("Generated passwords (shown once; set TEST_*_PASSWORD to choose your own):")
+                        for role, password in generated_passwords.items():
+                            print(f"  {role}: {password}")
                 else:
                     logger.info('Found %d existing users, skipping default data creation', user_count)
             else:
@@ -267,4 +297,4 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    main()
+    sys.exit(main() or 0)

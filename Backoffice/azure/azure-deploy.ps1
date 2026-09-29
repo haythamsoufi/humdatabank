@@ -357,7 +357,7 @@ Write-Info "2. Migrate your database using pg_restore"
 Write-Info "3. Deploy your application from Backoffice directory:"
 Write-Info "   cd .. (to Backoffice root)"
 Write-Info "   git push azure main:master"
-Write-Info "4. Create admin user: az webapp ssh and run 'flask create-admin'"
+Write-Info "4. Create admin user: set ENABLE_SSH=true on the app, then 'az webapp ssh' and run 'flask create-admin' (see docs/runbooks/operations/container-ssh-access.md); unset ENABLE_SSH afterwards"
 Write-Info ""
 Write-Info "For detailed instructions, see azure/AZURE_DEPLOYMENT_GUIDE.md"
 Write-Info ""
@@ -393,6 +393,7 @@ Storage Account: $storageAccount
 KEEP THIS FILE SECURE AND PRIVATE!
 ========================================
 "@ | Out-File -FilePath $credsFile -Encoding UTF8
+icacls $credsFile /inheritance:r /grant:r "$($env:USERNAME):(R,W)" | Out-Null
 
 Write-Success "Credentials saved to: $credsFile"
 Write-Warning "Delete this file after saving credentials to a secure location!"

@@ -4,6 +4,7 @@ import os
 import secrets
 
 from sqlalchemy import inspect
+from sqlalchemy.engine import make_url
 
 from app.extensions import db
 
@@ -196,13 +197,51 @@ def _clear_dev_test_sys_manager_entity_permissions(user, app_instance) -> None:
         )
 
 
+_LOCAL_DB_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "host.docker.internal"})
+
+
+def _database_url_for(app_instance=None) -> str:
+    url = (os.environ.get("DATABASE_URL") or "").strip()
+    if url:
+        return url
+    try:
+        configured = app_instance.config.get("SQLALCHEMY_DATABASE_URI") if app_instance is not None else None
+    except Exception:
+        configured = None
+    return str(configured).strip() if isinstance(configured, str) else ""
+
+
+def dev_seeding_refusal_reason(database_url: str = "", flask_config: str | None = None) -> str | None:
+    """
+    Return why test-account seeding must not run here, or ``None`` when it is safe.
+
+    Seeding creates well-known accounts with elevated roles, so it is an allowlist, not a denylist:
+    ``FLASK_CONFIG`` must be exactly ``development`` (unset/unknown/typo'd values fail closed) and the
+    database host must be local (loopback, ``host.docker.internal``, a unix socket, or a host named in
+    ``SEED_ALLOWED_DB_HOSTS``). A restored production dump on a remote server therefore cannot be seeded.
+    """
+    flask_config = (os.environ.get("FLASK_CONFIG", "") if flask_config is None else flask_config).strip().lower()
+    if flask_config != "development":
+        return f"FLASK_CONFIG must be 'development' to seed test accounts (got '{flask_config or '<unset>'}')."
+
+    if not database_url:
+        return "DATABASE_URL is not known, so the database host cannot be verified as local."
+    try:
+        host = (make_url(database_url).host or "").strip().lower()
+    except Exception:
+        return "DATABASE_URL could not be parsed, so the database host cannot be verified as local."
+    allowed = set(_LOCAL_DB_HOSTS)
+    allowed.update(h.strip().lower() for h in (os.environ.get("SEED_ALLOWED_DB_HOSTS") or "").split(",") if h.strip())
+    if host and host not in allowed and not host.startswith("/"):
+        return f"Database host '{host}' is not local; refusing to seed test accounts."
+    return None
+
+
 def create_default_data(app_instance):
-    """Seed test country, RBAC roles, and test users. Development only."""
-    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-    if flask_config in ('production', 'staging'):
-        app_instance.logger.warning(
-            "Refusing to create test data in %s environment.", flask_config
-        )
+    """Seed test country, RBAC roles, and test users. Development only, local database only."""
+    refusal = dev_seeding_refusal_reason(_database_url_for(app_instance))
+    if refusal:
+        app_instance.logger.warning("Refusing to create test data: %s", refusal)
         return
 
     with app_instance.app_context():

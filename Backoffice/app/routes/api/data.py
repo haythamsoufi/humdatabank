@@ -29,7 +29,8 @@ from app.models import (
     FormTemplateVersion,
 )
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.auth import require_api_key
+from app.utils.auth import api_capability, require_api_key
+from app.services.security.api_key_permissions import DATA_READ
 from app.utils.rate_limiting import api_rate_limit
 from app import db
 
@@ -55,6 +56,10 @@ from app.utils.api_serialization import (
 )
 from app.services.security.api_authentication import (
     authenticate_api_request,
+    api_key_max_per_page,
+    api_key_dimension_allows,
+    get_api_key_data_scope,
+    redact_request_params,
     get_user_allowed_template_ids,
     _get_user_allowed_country_ids,
     apply_user_template_scoping,
@@ -692,6 +697,7 @@ def _fetch_extended_data(
     minimal_country_info,
     elevated_access, auth_user,
     date_from=None, date_to=None,
+    key_scope=None,
 ):
     """
     Fetch DynamicIndicatorData and/or RepeatGroupData rows for the current request filters.
@@ -702,6 +708,7 @@ def _fetch_extended_data(
 
     RBAC:
     - API-key (elevated_access): no template restriction, fetch all matching rows.
+    - Scoped API key (``key_scope``): restricted to the key's template_ids / country_ids.
     - User auth (not elevated_access): restrict to templates the user owns/shares, and to
       countries the user has permission for.  Uses the same ``get_user_allowed_template_ids``
       logic as the main /data query.
@@ -724,7 +731,28 @@ def _fetch_extended_data(
     assigned_submission_ids = set()
 
     def _apply_user_scoping(q_dict, needs_af_join):
-        """Apply user-level template + country RBAC to a dynamic/repeat query dict."""
+        """Apply key scope or user-level template + country RBAC to a dynamic/repeat query dict."""
+        if key_scope is not None:
+            key_tids = list(key_scope.get('template_ids') or [])
+            key_cids = list(key_scope.get('country_ids') or [])
+            if not key_tids and not key_cids:
+                return {'assigned': None, 'public': None}
+            k_a = q_dict.get('assigned')
+            k_p = q_dict.get('public')
+            if key_tids:
+                if k_a is not None:
+                    k_a = k_a.filter(AssignedForm.template_id.in_(key_tids))
+                if k_p is not None:
+                    k_p = k_p.filter(AssignedForm.template_id.in_(key_tids))
+            if key_cids:
+                if k_a is not None:
+                    k_a = k_a.filter(
+                        AssignmentEntityStatus.entity_type == 'country',
+                        AssignmentEntityStatus.entity_id.in_(key_cids),
+                    )
+                if k_p is not None:
+                    k_p = k_p.filter(PublicSubmission.country_id.in_(key_cids))
+            return {'assigned': k_a, 'public': k_p}
         if elevated_access or auth_user is None:
             return q_dict
 
@@ -873,7 +901,7 @@ def _fetch_extended_data(
 
 
 @api_bp.route('/templates/<int:template_id>/data', methods=['GET'])
-@require_api_key
+@require_api_key(capability=DATA_READ, scope_aware=True)
 @api_rate_limit()
 def get_data_by_template(template_id):
     """
@@ -883,12 +911,21 @@ def get_data_by_template(template_id):
     if not template:
         return api_error('Template not found', 404)
 
+    key_scope = get_api_key_data_scope()
+    if key_scope is not None and not api_key_dimension_allows(key_scope, template_id=template_id):
+        return api_error('Template not found', 404)
+
     queries = query_form_data(template_id=template_id, preload=True)
     assigned_form_data_query, public_form_data_query = get_form_data_queries(queries)
+    if key_scope is not None:
+        assigned_form_data_query, public_form_data_query = get_form_data_queries(
+            apply_api_key_data_scoping(queries, key_scope, template_id, None, None)
+        )
 
     # Optional DB-level pagination using centralized helpers
     page = request.args.get('page', type=int)
     per_page = request.args.get('per_page', type=int)
+    per_page = min(per_page, api_key_max_per_page()) if per_page else per_page
 
     if page and per_page:
         # Build pagination queries using helper
@@ -930,7 +967,7 @@ def get_data_by_template(template_id):
 
 
 @api_bp.route('/countries/<int:country_id>/data', methods=['GET'])
-@require_api_key
+@require_api_key(capability=DATA_READ, scope_aware=True)
 @api_rate_limit()
 def get_data_by_country(country_id):
     """
@@ -941,12 +978,21 @@ def get_data_by_country(country_id):
     if not country:
         return api_error('Country not found', 404)
 
+    key_scope = get_api_key_data_scope()
+    if key_scope is not None and not api_key_dimension_allows(key_scope, country_id=country_id):
+        return api_error('Country not found', 404)
+
     queries = query_form_data(country_id=country_id, preload=True)
     assigned_form_data_query, public_form_data_query = get_form_data_queries(queries)
+    if key_scope is not None:
+        assigned_form_data_query, public_form_data_query = get_form_data_queries(
+            apply_api_key_data_scoping(queries, key_scope, None, country_id, None)
+        )
 
     # Optional DB-level pagination using centralized helpers
     page = request.args.get('page', type=int)
     per_page = request.args.get('per_page', type=int)
+    per_page = min(per_page, api_key_max_per_page()) if per_page else per_page
 
     if page and per_page:
         # Build pagination queries using helper
@@ -1134,6 +1180,7 @@ _build_star_tables_response = _build_star_data_response
 
 
 @api_bp.route('/data', methods=['GET'])
+@api_capability(DATA_READ, scope_aware=True)
 @api_rate_limit()
 def get_all_data():
     """
@@ -1374,7 +1421,8 @@ def get_all_data():
         # API key auth always paginates. Session auth paginates when per_page is requested
         # (e.g. data explorer sends per_page=10000); otherwise return all accessible rows.
         # Public anonymous access always paginates (capped page size).
-        should_paginate = elevated_access or public_data_access
+        key_authenticated = api_key_record is not None
+        should_paginate = elevated_access or public_data_access or key_authenticated
 
         # Validate and sanitize parameters
         if should_paginate:
@@ -1383,6 +1431,8 @@ def get_all_data():
             per_page = validated_params['per_page']
             if public_data_access:
                 per_page = min(int(per_page), PUBLIC_DATA_MAX_PER_PAGE)
+            elif key_authenticated:
+                per_page = min(int(per_page), api_key_max_per_page())
         else:
             page = 1
             per_page = None
@@ -2038,7 +2088,7 @@ def get_all_data():
                 current_app.logger.error(
                     f"related=all expansion failed in /data [ID: {error_id}]: {_e}",
                     exc_info=True,
-                    extra={'endpoint': '/data', 'params': dict(request.args)}
+                    extra={'endpoint': '/data', 'params': redact_request_params()}
                 )
                 expansion_failed = True
 
@@ -2069,6 +2119,7 @@ def get_all_data():
             auth_user=auth_user,
             date_from=date_from,
             date_to=date_to,
+            key_scope=get_api_key_data_scope() if api_key_record is not None else None,
         ) if (include_dynamic or include_repeat) else {
             'dynamic_data': [], 'repeat_data': [], 'dynamic_context': [], 'assigned_submission_ids': set(),
         }
@@ -2222,7 +2273,7 @@ def get_all_data():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching data: {e}",
             exc_info=True,
-            extra={'endpoint': '/data', 'params': dict(request.args)}
+            extra={'endpoint': '/data', 'params': redact_request_params()}
         )
         return api_error("Could not fetch data", 500, error_id, None)
 

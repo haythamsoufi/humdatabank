@@ -23,6 +23,7 @@ from app.services.public.document_service import (
     stream_public_ai_document_download,
 )
 from app.services.public.report_service import build_country_report, get_report_template
+from app.utils.api_errors import GENERIC_NOT_FOUND_MESSAGE, client_error_message
 from app.utils.api_helpers import api_error, json_response
 from app.utils.rate_limiting import api_rate_limit
 
@@ -52,7 +53,7 @@ def public_global_trend():
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 400)
+        return api_error(client_error_message(exc, context="public_integrations"), 400)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -120,7 +121,7 @@ def public_submission_coverage():
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 400)
+        return api_error(client_error_message(exc, context="public_integrations"), 400)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -209,11 +210,11 @@ def public_search_documents():
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except PublicDocumentSearchUnavailable as exc:
-        return api_error(str(exc), 503, extra={"error_type": "service_unavailable"})
+        return api_error("Document search is temporarily unavailable", 503, extra={"error_type": "service_unavailable"})
     except PublicDocumentScopeTooLarge as exc:
-        return api_error(str(exc), 400, extra={"error_type": "scope_too_large"})
+        return api_error(client_error_message(exc), 400, extra={"error_type": "scope_too_large"})
     except ValueError as exc:
-        return api_error(str(exc), 400)
+        return api_error(client_error_message(exc, context="public_integrations"), 400)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -241,7 +242,7 @@ def public_get_document_chunk_context(chunk_id: int):
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 404)
+        return api_error(client_error_message(exc, GENERIC_NOT_FOUND_MESSAGE, context="public_integrations"), 404)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -265,7 +266,7 @@ def public_get_document(document_id: int):
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 404)
+        return api_error(client_error_message(exc, GENERIC_NOT_FOUND_MESSAGE, context="public_integrations"), 404)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -287,7 +288,7 @@ def public_download_ai_document(document_id: int):
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 404)
+        return api_error(client_error_message(exc, GENERIC_NOT_FOUND_MESSAGE, context="public_integrations"), 404)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -332,7 +333,7 @@ def public_documents_catalog():
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 400)
+        return api_error(client_error_message(exc, context="public_integrations"), 400)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
@@ -387,7 +388,7 @@ def public_country_report():
         response.headers["X-Public-Data-Access"] = "true"
         return response
     except ValueError as exc:
-        return api_error(str(exc), 400)
+        return api_error(client_error_message(exc, context="public_integrations"), 400)
     except Exception as exc:
         error_id = str(uuid.uuid4())
         current_app.logger.error(

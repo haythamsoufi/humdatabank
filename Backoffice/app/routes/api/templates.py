@@ -16,7 +16,8 @@ from app.utils.sql_utils import safe_ilike_pattern
 from app.models import (
     FormPage, FormSection, FormItem, FormTemplateVersion, LookupList, LookupListRow
 )
-from app.utils.auth import require_api_key
+from app.utils.auth import api_capability, require_api_key
+from app.services.security.api_key_permissions import REFERENCE_READ, TEMPLATES_READ
 from app.utils.rate_limiting import api_rate_limit
 from app import db
 from sqlalchemy import func as _sa_func
@@ -25,22 +26,31 @@ from sqlalchemy import func as _sa_func
 from app.utils.api_helpers import json_response, api_error
 from app.services import TemplateService
 from app.utils.api_serialization import format_form_item_info
-from app.services.security.api_authentication import authenticate_api_request, get_user_allowed_template_ids
+from app.services.security.api_authentication import (
+    api_key_max_per_page,
+    api_key_template_filter,
+    authenticate_api_request,
+    get_api_key_data_scope,
+    get_user_allowed_template_ids,
+    redact_request_params,
+)
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.form_localization import get_localized_indicator_name
 
 
 @api_bp.route('/templates', methods=['GET'])
+@api_capability(TEMPLATES_READ, scope_aware=True)
 def get_templates():
     """
     API endpoint to retrieve a list of form templates.
     Authentication (one of):
-      - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
+      - Authorization: Bearer YOUR_API_KEY with ``templates:read`` (paginated response;
+        a key scoped to templates only sees those templates)
       - HTTP Basic auth or session (user-scoped access, no pagination)
     Query Parameters:
         - search: Search query for template name or description
         - page: Page number (default: 1, only used with API key auth)
-        - per_page: Items per page (default: 20, max 100000, only used with API key auth)
+        - per_page: Items per page (default: 20, capped by API_KEY_MAX_PER_PAGE, only used with API key auth)
     """
     try:
         # Authenticate request
@@ -49,12 +59,12 @@ def get_templates():
             return auth_result
         elevated_access, auth_user, api_key_record = auth_result
 
-        # Determine if we should paginate
-        should_paginate = elevated_access
+        # Key-authenticated callers (scoped or not) always get a bounded, paginated response
+        should_paginate = elevated_access or api_key_record is not None
 
         # Validate pagination parameters
         if should_paginate:
-            page, per_page = validate_pagination_params(request.args)
+            page, per_page = validate_pagination_params(request.args, max_per_page=api_key_max_per_page())
         else:
             page = 1
             per_page = None
@@ -66,6 +76,10 @@ def get_templates():
 
         # Build base query using service layer
         query = TemplateService.get_all()
+
+        key_template_ids = api_key_template_filter(get_api_key_data_scope()) if api_key_record is not None else None
+        if key_template_ids is not None:
+            query = TemplateService.get_by_ids(key_template_ids)
 
         # Apply RBAC filtering for user auth
         if not elevated_access and auth_user is not None:
@@ -192,21 +206,19 @@ def get_templates():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching templates: {e}",
             exc_info=True,
-            extra={'endpoint': '/templates', 'params': dict(request.args)}
+            extra={'endpoint': '/templates', 'params': redact_request_params()}
         )
         return api_error("Could not fetch templates", 500, error_id, None)
 
 
 @api_bp.route('/templates/<int:template_id>', methods=['GET'])
-@require_api_key
+@require_api_key(capability=TEMPLATES_READ, scope_aware=True)
 @api_rate_limit()
 def get_template_details(template_id):
     """
     API endpoint to retrieve detailed structure of a specific template.
-    Authentication: API key in Authorization header (Bearer token).
-
-    SECURITY NOTE: API key holders have full read access to template structures.
-    This is by design for external system integrations.
+    Authentication: API key with ``templates:read`` (a key scoped to templates only sees
+    those templates; others return 404).
 
     Returns:
         JSON object containing complete template structure including pages, sections, and items
@@ -219,7 +231,8 @@ def get_template_details(template_id):
 
         template = TemplateService.get_by_id(template_id)
 
-        if not template:
+        key_template_ids = api_key_template_filter(get_api_key_data_scope())
+        if not template or (key_template_ids is not None and template_id not in key_template_ids):
             return api_error('Template not found', 404)
 
         # Get pages
@@ -420,11 +433,13 @@ def get_template_details(template_id):
 
 
 @api_bp.route('/form-items', methods=['GET'])
+@api_capability(TEMPLATES_READ, scope_aware=True)
 def get_form_items():
     """
     API endpoint to retrieve form items with optional filtering.
     Authentication (one of):
-      - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
+      - Authorization: Bearer YOUR_API_KEY with ``templates:read`` (paginated response;
+        limited to the key's templates when scoped)
       - HTTP Basic auth or session (user-scoped access, no pagination)
     Query Parameters:
         - template_id: Filter by template ID
@@ -432,7 +447,7 @@ def get_form_items():
         - item_type: Filter by item type ('indicator', 'question', 'document_field')
         - search: Search query for item label
         - page: Page number (default: 1, only used with API key auth)
-        - per_page: Items per page (default: 50, max 1000, only used with API key auth)
+        - per_page: Items per page (default: 20, capped by API_KEY_MAX_PER_PAGE, only used with API key auth)
     """
     try:
         # Authenticate request
@@ -441,12 +456,12 @@ def get_form_items():
             return auth_result
         elevated_access, auth_user, api_key_record = auth_result
 
-        # Determine if we should paginate
-        should_paginate = elevated_access
+        # Key-authenticated callers (scoped or not) always get a bounded, paginated response
+        should_paginate = elevated_access or api_key_record is not None
 
         # Validate pagination parameters
         if should_paginate:
-            page, per_page = validate_pagination_params(request.args)
+            page, per_page = validate_pagination_params(request.args, max_per_page=api_key_max_per_page())
         else:
             page = 1
             per_page = None
@@ -461,6 +476,10 @@ def get_form_items():
 
         # Build base query
         query = FormItem.query
+
+        key_template_ids = api_key_template_filter(get_api_key_data_scope()) if api_key_record is not None else None
+        if key_template_ids is not None:
+            query = query.filter(FormItem.template_id.in_(key_template_ids))
 
         # Apply RBAC filtering for user auth
         if not elevated_access and auth_user is not None:
@@ -635,23 +654,25 @@ def get_form_items():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching form items: {e}",
             exc_info=True,
-            extra={'endpoint': '/form-items', 'params': dict(request.args)}
+            extra={'endpoint': '/form-items', 'params': redact_request_params()}
         )
         return api_error("Could not fetch form items", 500, error_id, None)
 
 
 @api_bp.route('/form-items/<int:item_id>', methods=['GET'])
-@require_api_key
+@require_api_key(capability=TEMPLATES_READ, scope_aware=True)
 @api_rate_limit()
 def get_form_item_details(item_id):
     """
     API endpoint to retrieve details for a specific form item.
-    Authentication: API key in Authorization header (Bearer token).
+    Authentication: API key with ``templates:read`` (template-scoped keys only see items
+    of their templates; others return 404).
     """
     try:
         item = FormItem.query.get(item_id)
 
-        if not item:
+        key_template_ids = api_key_template_filter(get_api_key_data_scope())
+        if not item or (key_template_ids is not None and item.template_id not in key_template_ids):
             return api_error('Form item not found', 404)
 
         # Get section and page information
@@ -752,7 +773,7 @@ def get_form_item_details(item_id):
 
 
 @api_bp.route('/lookup-lists', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_lookup_lists():
     """
@@ -823,7 +844,7 @@ def get_lookup_lists():
 
 
 @api_bp.route('/lookup-lists/<int:list_id>', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_lookup_list_details(list_id):
     """

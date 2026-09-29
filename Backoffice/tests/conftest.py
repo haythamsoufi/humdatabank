@@ -528,7 +528,7 @@ def reset_site_lock_flags(app):
 
 
 @pytest.fixture(autouse=True)
-def reset_in_memory_rate_limits():
+def reset_in_memory_rate_limits(request):
     """Clear in-memory rate limit counters between tests.
 
     The custom deque-based limiter in rate_limiting.py uses a module-level
@@ -542,6 +542,17 @@ def reset_in_memory_rate_limits():
         _rate_limit_storage.clear()
     except Exception:
         pass
+    if "app" in request.fixturenames:
+        try:
+            from sqlalchemy import text
+
+            from app.extensions import db
+
+            with request.getfixturevalue("app").app_context():
+                with db.engine.begin() as conn:
+                    conn.execute(text("DELETE FROM auth_state_entry WHERE namespace IN ('rl', 'login_fail')"))
+        except Exception:
+            pass
 
 
 @pytest.fixture(autouse=True)
@@ -622,6 +633,7 @@ def api_key(db_session, app):
         import app.models
 
         from app.models import APIKey
+        from app.services.security.api_key_permissions import full_access_document
 
         # Verify tables exist before trying to create API key
         # db_session fixture should have created them, but double-check
@@ -644,7 +656,8 @@ def api_key(db_session, app):
             client_description='API key for testing',
             rate_limit_per_minute=1000,
             is_active=True,
-            is_revoked=False
+            is_revoked=False,
+            permissions=full_access_document(),
         )
         db.session.add(api_key_obj)
         db.session.commit()

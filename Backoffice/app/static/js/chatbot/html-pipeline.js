@@ -6,9 +6,7 @@
 export const HtmlPipelineMixin = {
     escapeHtml(text) {
         if (typeof text !== 'string') return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
     _safeSameOriginUrl(rawHref) {
@@ -599,7 +597,7 @@ export const HtmlPipelineMixin = {
                 if (fromList.length > segments.length) segments = fromList;
             }
             if (!segments.length) return;
-            const sanitizeSegmentHtml = (html) => (window.sanitizeHtml || ((h) => h))(html);
+            const sanitizeSegmentHtml = (html) => (window.sanitizeHtml ? window.sanitizeHtml(html) : this.escapeHtml(html));
             let sourceCountForLabel = 0;
             for (const segment of segments) {
                 countProbe.innerHTML = sanitizeSegmentHtml(segment);

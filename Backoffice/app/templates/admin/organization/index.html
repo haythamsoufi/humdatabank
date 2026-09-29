@@ -880,7 +880,7 @@ try {
                 if (!params.value) {
                     return '<span class="text-gray-400">-</span>';
                 }
-                return '<img src="' + params.value + '" alt="" class="h-8 w-8 object-contain rounded border border-gray-200 bg-white">';
+                return '<img src="' + SafeDom.safeHrefAttr(params.value) + '" alt="" class="h-8 w-8 object-contain rounded border border-gray-200 bg-white">';
             },
             cellStyle: { 'text-align': 'center' }
         },

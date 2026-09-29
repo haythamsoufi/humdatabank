@@ -24,6 +24,7 @@ from app.utils.activity_logging_skip import (
     SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS,
 )
 from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.sql_utils import escape_like_wildcards
 
 
 def _session_audit_scope(session_log: UserSessionLog) -> dict[str, Any] | None:
@@ -93,7 +94,7 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
     suffix_noise = or_(
         *[
             UserActivityLog.endpoint.like(
-                "%.{0}".format(suffix.replace("_", r"\_")),
+                "%.{0}".format(escape_like_wildcards(suffix)),
                 escape="\\",
             )
             for suffix in sorted(SKIP_ACTIVITY_ENDPOINT_SUFFIXES)

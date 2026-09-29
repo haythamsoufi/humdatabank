@@ -25,7 +25,8 @@ from app.services.validation.registry_service import (
     upsert_threshold,
 )
 from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api_responses import json_bad_request, json_ok
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.request_validation import enforce_csrf_json
 
@@ -184,4 +185,4 @@ def validation_rules_question_templates_update_api(row_id: int):
         return json_bad_request(str(exc))
     except Exception as exc:
         db.session.rollback()
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)

@@ -575,13 +575,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.logo_filename) {
                     const logoUrl = data.logo_url || `{{ url_for('system_admin.sector_logo', sector_id=0) }}`.replace('0', sectorId);
                     if (logoPreview) {
-                        logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        logoPreview.innerHTML = `<img src="${SafeDom.safeHrefAttr(logoUrl)}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
                     } else {
                         // Create preview if it doesn't exist
                         const logoInput = document.querySelector('#editSectorModal input[name="logo_file"]');
                         const previewDiv = document.createElement('div');
                         previewDiv.classList.add('file-upload-preview');
-                        previewDiv.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        previewDiv.innerHTML = `<img src="${SafeDom.safeHrefAttr(logoUrl)}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
                         logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
                     }
                 } else {

@@ -178,16 +178,14 @@ def _as_filter_text(value: Any) -> str:
 
 
 def _open_workbook(source: Source):
-    import openpyxl
+    from app.utils.safe_workbook import load_workbook_safe
 
-    if isinstance(source, (bytes, bytearray)):
-        return openpyxl.load_workbook(io.BytesIO(source), read_only=True, data_only=True)
-    if hasattr(source, "read"):
+    if hasattr(source, "read") and not isinstance(source, (bytes, bytearray)):
         data = source.read()
         if isinstance(data, str):
             data = data.encode("utf-8")
-        return openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-    return openpyxl.load_workbook(source, read_only=True, data_only=True)
+        return load_workbook_safe(data, read_only=True, data_only=True)
+    return load_workbook_safe(source, read_only=True, data_only=True)
 
 
 def read_xlsx_sheet(

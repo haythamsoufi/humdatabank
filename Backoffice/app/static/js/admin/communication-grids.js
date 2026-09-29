@@ -731,7 +731,7 @@ class CommunicationsGridManager {
         const data = params.data;
         let html = '<div class="flex items-center justify-center gap-2">';
         if (data.related_url) {
-            html += `<a href="${data.related_url}" class="text-blue-600 hover:text-blue-900" title="${t.view || 'View'}"><i class="fas fa-external-link-alt fa-fw"></i></a>`;
+            html += `<a href="${window.SafeDom.safeHrefAttr(data.related_url)}" class="text-blue-600 hover:text-blue-900" title="${t.view || 'View'}"><i class="fas fa-external-link-alt fa-fw"></i></a>`;
         }
         if (data.email_can_retry && data.email_log_id) {
             html += `<button type="button" class="text-orange-600 hover:text-orange-900 retry-email-btn" data-email-log-id="${data.email_log_id}" title="${t.retryEmail || 'Retry email'}"><i class="fas fa-redo fa-fw"></i></button>`;

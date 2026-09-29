@@ -14,6 +14,8 @@ from app.services.imports.kobo_data_import_service import KoboDataImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 from app.services.platform.user_analytics_service import log_admin_action
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.routes.admin.shared import admin_required, system_manager_required
@@ -228,7 +230,7 @@ def kobo_data_import_preview():
         with open(tmp_path, 'rb') as f:
             file_bytes = f.read()
     except Exception as e:
-        return json_server_error(f'Cannot read uploaded file: {e}')
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     from app.services.imports.kobo_data_import_service import KoboDataImportService
     result = KoboDataImportService.generate_preview(
@@ -376,7 +378,7 @@ def kobo_data_import_execute():
         with open(tmp_path, 'rb') as f:
             file_bytes = f.read()
     except Exception as e:
-        return json_server_error(f'Cannot read uploaded file: {e}')
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     sub_time_idx = None
     if data.get('submission_time_column_index') is not None:

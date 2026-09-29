@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app import db
+from app.utils.api_errors import ClientInputError
 from app.models import FormData, FormTemplate
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.forms import FormTemplateVersion
@@ -43,11 +44,11 @@ def compute_data_quality(
 ) -> DataQualityResult:
     template = FormTemplate.query.get(template_id)
     if not template or not template.published_version:
-        raise ValueError(f"Template {template_id} has no published version.")
+        raise ClientInputError(f"Template {template_id} has no published version.")
 
     methodology_code = template.published_version.data_quality_methodology
     if not methodology_code:
-        raise ValueError(f"Template {template_id} has no data_quality_methodology configured.")
+        raise ClientInputError(f"Template {template_id} has no data_quality_methodology configured.")
 
     methodology = get_methodology(methodology_code)
     return methodology.compute(

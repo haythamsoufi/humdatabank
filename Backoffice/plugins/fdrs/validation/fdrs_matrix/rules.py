@@ -4,6 +4,7 @@ FDRS matrix v1 validation rules (see IFRC Docs/fdrs-automatic-validation-checks-
 
 from __future__ import annotations
 
+from app.utils.sql_utils import ilike_contains
 from app.models.validation import CountryAttribute, CountryYearReference, ValidationKpiCheckType, ValidationThreshold
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 from app.services.data_quality.helpers import is_reported_value, numeric_value, parse_period_year
@@ -277,7 +278,7 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                 FormItem.template_id == ctx.template_id,
                 FormItem.item_type == "document_field",
                 FormItem.archived == False,
-                FormItem.label.ilike(f"%{doc_label}%"),
+                ilike_contains(FormItem.label, doc_label),
             )
             .first()
         )

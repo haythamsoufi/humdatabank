@@ -1919,7 +1919,7 @@
                     if (fileInput) fileInput.disabled = false;
                     _renderImportStatus(
                         '<div class="excel-io-dropzone__preview"><p class="excel-io-dropzone__preview-line excel-io-dropzone__preview-line--success">'
-                        + '<i class="fas fa-check-circle" aria-hidden="true"></i><span>' + (msg || '') + '</span></p>'
+                        + '<i class="fas fa-check-circle" aria-hidden="true"></i><span>' + escapeHtml(msg || '') + '</span></p>'
                         + '<button type="button" class="btn btn-secondary btn-sm reset-file-upload-btn mt-2">'
                         + escapeHtml({{ _('Choose different file')|tojson|safe }}) + '</button></div>',
                         'valid'
@@ -2351,9 +2351,9 @@
             var checkboxes = IB_SECTIONS.map(function (s) {
                 return '<label style="display:flex;align-items:center;gap:8px;padding:8px;'
                     + 'background:#fff;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer;">'
-                    + '<input type="checkbox" class="ib-section-checkbox" value="' + s.id + '" '
+                    + '<input type="checkbox" class="ib-section-checkbox" value="' + SafeDom.escapeHtml(String(s.id)) + '" '
                     + 'style="border-radius:4px;border-color:#d1d5db;accent-color:#4f46e5;" checked>'
-                    + '<span style="font-size:0.875rem;font-weight:500;color:#374151;">' + s.label + '</span>'
+                    + '<span style="font-size:0.875rem;font-weight:500;color:#374151;">' + SafeDom.escapeHtml(s.label) + '</span>'
                     + '</label>';
             }).join('');
 

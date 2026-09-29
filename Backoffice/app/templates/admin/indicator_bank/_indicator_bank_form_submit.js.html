@@ -118,14 +118,17 @@
                         throw new Error((data && data.message) || {{ _('Failed to save indicator')|tojson|safe }});
                     }
 
-                    if (resp.redirected) {
-                        window.location.href = resp.url;
+                    var redirectTarget = '';
+                    if (data && data.success && data.redirect_url) {
+                        redirectTarget = data.redirect_url;
+                    } else if (resp.redirected) {
+                        redirectTarget = resp.url;
+                    }
+                    if (redirectTarget && window.SafeDom && window.SafeDom.navigate(redirectTarget)) {
                         return;
                     }
 
-                    document.open();
-                    document.write(text);
-                    document.close();
+                    throw new Error((data && data.message) || {{ _('Failed to save indicator')|tojson|safe }});
                 });
             })
             .catch(function(err) {

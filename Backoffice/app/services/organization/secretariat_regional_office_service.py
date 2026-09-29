@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.extensions import db
+from app.utils.sql_utils import ilike_equals
 
 # Canonical IFRC statutory regions (SecretariatRegionalOffice rows).
 IFRC_REGION_SEED: List[dict] = [
@@ -162,7 +163,7 @@ def resolve_secretariat_regional_office_by_label(
     ensure_secretariat_regional_offices(sess)
 
     office = sess.query(SecretariatRegionalOffice).filter(
-        SecretariatRegionalOffice.name.ilike(canonical),
+        ilike_equals(SecretariatRegionalOffice.name, canonical),
     ).one_or_none()
     return office
 

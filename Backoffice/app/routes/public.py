@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify
 from app.models import db, Resource, SubmittedDocument
-from app.models.enums import DocumentStatus
+from app.services.documents import public_access
 from sqlalchemy import text
 import os
 from datetime import datetime
@@ -99,14 +99,14 @@ def download_resource_thumbnail(resource_id, language):
 # =================== PUBLIC DOCUMENT THUMBNAILS ===================
 # Serve document thumbnails publicly for approved public documents
 
-@bp.route("/documents/thumbnail/<int:doc_id>", methods=["GET"])
-def download_document_thumbnail_public(doc_id):
-    """Serve a public thumbnail for a submitted document."""
-    document = SubmittedDocument.query.get_or_404(doc_id)
-
-    if not document.is_public or DocumentStatus.normalize(document.status) != DocumentStatus.APPROVED:
+def _public_document_or_404(identifier) -> SubmittedDocument:
+    document = public_access.find_document(identifier)
+    if document is None or not public_access.is_publicly_displayable(document):
         abort(404)
+    return document
 
+
+def _stream_public_thumbnail(document: SubmittedDocument):
     if not document.thumbnail_relative_path:
         abort(404)
 
@@ -120,19 +120,14 @@ def download_document_thumbnail_public(doc_id):
         as_attachment=False,
     )
 
-# =================== PUBLIC DOCUMENT DISPLAY (IMAGES ONLY) ===================
 
-@bp.route("/documents/display/<int:doc_id>", methods=["GET"])
-def display_document_file_public(doc_id):
-    """Serve a public document file inline when it's an image (for cover images)."""
-    document = SubmittedDocument.query.get_or_404(doc_id)
+_PUBLIC_DISPLAY_IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
 
-    if not document.is_public or DocumentStatus.normalize(document.status) != DocumentStatus.APPROVED:
-        abort(404)
 
-    # Only serve inline if it's an image
+def _stream_public_display_image(document: SubmittedDocument):
+    """Serve a public document file inline, images only (cover images)."""
     lower = (document.filename or '').lower()
-    if not lower.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+    if not lower.endswith(_PUBLIC_DISPLAY_IMAGE_EXTENSIONS):
         abort(404)
 
     main_cat = storage.submitted_document_rel_storage_category(document.storage_path)
@@ -143,6 +138,32 @@ def display_document_file_public(doc_id):
         main_cat, document.storage_path,
         filename=document.filename, as_attachment=False,
     )
+
+
+@bp.route("/documents/thumbnail/<uuid:public_id>", methods=["GET"])
+def download_document_thumbnail_by_public_id(public_id):
+    """Serve a public thumbnail for an approved public document (opaque id)."""
+    return _stream_public_thumbnail(_public_document_or_404(public_id))
+
+
+@bp.route("/documents/thumbnail/<int:doc_id>", methods=["GET"])
+def download_document_thumbnail_public(doc_id):
+    """Serve a public thumbnail by legacy integer id (deprecated; same visibility policy)."""
+    return _stream_public_thumbnail(_public_document_or_404(doc_id))
+
+
+# =================== PUBLIC DOCUMENT DISPLAY (IMAGES ONLY) ===================
+
+@bp.route("/documents/display/<uuid:public_id>", methods=["GET"])
+def display_document_file_by_public_id(public_id):
+    """Serve an approved public document inline when it is an image (opaque id)."""
+    return _stream_public_display_image(_public_document_or_404(public_id))
+
+
+@bp.route("/documents/display/<int:doc_id>", methods=["GET"])
+def display_document_file_public(doc_id):
+    """Serve an approved public image by legacy integer id (deprecated; same visibility policy)."""
+    return _stream_public_display_image(_public_document_or_404(doc_id))
 
 # =================== LEGACY URL REDIRECTS ===================
 
@@ -160,8 +181,15 @@ def legacy_public_submission_success_redirect(submission_id):
 
 @bp.route("/public_documents/download/<int:document_id>", methods=["GET"])
 def legacy_public_document_download_redirect(document_id):
-    """Backward-compatible redirect for old public document download URLs."""
-    return redirect(url_for("forms.download_public_document_public", document_id=document_id), code=302)
+    """Backward-compatible redirect for old public document download URLs.
+
+    The integer id is only honoured when the document is publicly downloadable, and the
+    redirect target is the opaque-id URL so the integer never propagates further.
+    """
+    document = public_access.find_document(document_id)
+    if document is None or not public_access.is_publicly_downloadable(document):
+        abort(404)
+    return redirect(public_access.public_document_download_url(document), code=302)
 
 
 @bp.route("/landing", methods=["GET"])

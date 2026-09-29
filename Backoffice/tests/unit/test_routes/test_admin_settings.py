@@ -633,16 +633,27 @@ class TestEmailTemplateTestSend:
             )
         assert resp.status_code == 400
 
-    def test_test_send_unknown_recipient_user_id(self, logged_in_client, db_session, app):
+    def test_test_send_unknown_recipient_user_id(self, logged_in_sm_client, db_session, app):
         with _auth():
             payload = self._valid_payload()
             payload["recipient_user_id"] = 999999999
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/settings/email-template-test-send",
                 json=payload,
                 headers=_json_headers(),
             )
         assert resp.status_code == 400
+
+    def test_test_send_to_another_user_requires_system_manager(self, logged_in_client, test_user, db_session, app):
+        with _auth():
+            payload = self._valid_payload()
+            payload["recipient_user_id"] = test_user.id
+            resp = logged_in_client.post(
+                "/admin/api/settings/email-template-test-send",
+                json=payload,
+                headers=_json_headers(),
+            )
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------

@@ -285,19 +285,6 @@ class TestCreateAppEdgeCases:
                 )
             mock_debug.assert_called_once()
 
-    def test_warn_if_multi_worker_exception_swallowed(self, app):
-        """Exception in warn_if_multi_worker_without_redis should be silently swallowed."""
-        with patch(
-            'app.utils.rate_limiting.warn_if_multi_worker_without_redis',
-            side_effect=Exception("redis check failed"),
-        ):
-            # The except clause in create_app catches this
-            try:
-                from app.utils.rate_limiting import warn_if_multi_worker_without_redis
-                warn_if_multi_worker_without_redis(app)
-            except Exception:
-                pass  # Exception silently swallowed as in create_app
-
 
 # ---------------------------------------------------------------------------
 # create_app — compress middleware branches

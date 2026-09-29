@@ -39,18 +39,11 @@ class TestLoginRouteExtended:
         assert resp.status_code in (301, 302, 303, 307, 308)
 
     def test_login_account_locked(self, client, db_session, app):
-        from app.models.core import UserLoginLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
             create_test_user(db_session, email='locked-login@example.com', password='TestPass123!')
-            for _ in range(10):
-                db_session.add(UserLoginLog(
-                    email_attempted='locked-login@example.com',
-                    event_type='login_failed',
-                    timestamp=utcnow(),
-                    ip_address='127.0.0.1',
-                ))
-            db_session.commit()
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
+                record_login_failure('locked-login@example.com')
         with patch('app.routes.auth.render_template', return_value=('locked', 200)):
             resp = client.post('/login', data={
                 'email': 'locked-login@example.com',

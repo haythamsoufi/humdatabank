@@ -101,18 +101,15 @@ class DeepLinkService {
   void _handleDeepLink(Uri uri, {bool isInitialLink = false}) {
     // Handle Azure OAuth mobile callback — delivers JWT tokens to the waiting
     // AzureLoginScreen without going through the Navigator.
-    if (uri.scheme == 'humdatabank' && uri.host == 'oauth-success') {
+    if (uri.scheme == 'humdatabank' &&
+        (uri.host == 'oauth-success' || uri.host == 'oauth-error')) {
       final params = Map<String, String>.from(uri.queryParameters);
-      final hasAccess = params.containsKey('access_token') &&
-          (params['access_token']?.isNotEmpty ?? false);
-      final hasRefresh = params.containsKey('refresh_token') &&
-          (params['refresh_token']?.isNotEmpty ?? false);
       DebugLogger.logInfo('DEEPLINK',
           'Azure OAuth callback received — '
           'isInitialLink: $isInitialLink, '
-          'has_access_token: $hasAccess, '
-          'has_refresh_token: $hasRefresh, '
-          'expires_in: ${params['expires_in'] ?? "absent"}');
+          'result: ${uri.host}, '
+          'has_code: ${params.containsKey('code')}, '
+          'error: ${params['error'] ?? "none"}');
       if (isInitialLink) {
         // Buffer for AzureLoginScreen to consume after subscribing (cold-start
         // race: the broadcast fires before any subscriber exists).

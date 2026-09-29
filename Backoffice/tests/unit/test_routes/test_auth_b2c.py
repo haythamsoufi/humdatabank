@@ -217,7 +217,7 @@ class TestAzureCallbackRoute:
         cfg = _b2c_config(app)
         state = quote(_signed_oauth_state(app, mobile=True), safe='')
         with patch('app.routes.auth._b2c_get_required_config', return_value=cfg), \
-             patch('app.routes.auth._mobile_deep_link_for_user', return_value=redirect('humdatabank://oauth-success')):
+             patch('app.routes.auth._mobile_oauth_redirect', return_value=redirect('humdatabank://oauth-success')):
             resp = logged_in_client.get(
                 f'/auth/azure/callback?code=x&state={state}',
                 follow_redirects=False,

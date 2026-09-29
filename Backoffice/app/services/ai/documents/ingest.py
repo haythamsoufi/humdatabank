@@ -58,7 +58,7 @@ def sync_ai_document_from_submitted(
         return False
 
     changed = False
-    want_public = bool(getattr(submitted, "is_public", False))
+    want_public = _submitted_is_ai_public(submitted)
     if ai_doc.is_public is not want_public:
         ai_doc.is_public = want_public
         changed = True
@@ -100,6 +100,15 @@ def sync_ai_document_from_submitted(
             new_status,
         )
     return True
+
+
+def _submitted_is_ai_public(submitted) -> bool:
+    """An AI document is world-readable only while its source is both flagged public AND approved."""
+    from app.models.enums import DocumentStatus
+
+    if not bool(getattr(submitted, "is_public", False)):
+        return False
+    return _normalize_document_status(getattr(submitted, "status", None)) == DocumentStatus.APPROVED
 
 
 def sync_ai_document_is_public_from_submitted(submitted) -> None:
@@ -464,7 +473,7 @@ def _prepare_submitted_document_ai_import(
         content_hash=content_hash,
         processing_status="pending",
         user_id=uid,
-        is_public=submitted_doc.is_public,
+        is_public=_submitted_is_ai_public(submitted_doc),
         searchable=True,
         country_id=(int(getattr(derived_country, "id", 0)) or None) if derived_country else None,
         country_name=(getattr(derived_country, "name", None) if derived_country else None),

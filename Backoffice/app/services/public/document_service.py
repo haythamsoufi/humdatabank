@@ -12,7 +12,9 @@ from flask import current_app
 from sqlalchemy import text
 from sqlalchemy.orm import joinedload
 
+from app.services.ai.documents.access import ANONYMOUS_PRINCIPAL, ai_document_read_filter
 from app.extensions import db
+from app.utils.api_errors import ClientInputError
 from app.models import AIDocument, AIDocumentChunk
 from app.models.enums import AIDocumentProcessingStatusValue
 from app.services.ai.documents.country_detection import detect_country_id_and_name
@@ -59,7 +61,7 @@ class PublicDocumentSearchUnavailable(Exception):
     """Transient embedding/DB failure during public document search (retry-worthy)."""
 
 
-class PublicDocumentScopeTooLarge(ValueError):
+class PublicDocumentScopeTooLarge(ClientInputError):
     """Too many documents in scope for the requested search mode."""
 
 
@@ -207,9 +209,9 @@ def _parse_country_ids_param(country_ids: str | None) -> tuple[List[int] | None,
         try:
             parsed.append(int(part))
         except ValueError as exc:
-            raise ValueError(f"Invalid country_ids entry: {part!r}") from exc
+            raise ClientInputError(f"Invalid country_ids entry: {part!r}") from exc
     if not parsed:
-        raise ValueError("country_ids must be a comma-separated list of ids or 'all'")
+        raise ClientInputError("country_ids must be a comma-separated list of ids or 'all'")
     return sorted(set(parsed)), False
 
 
@@ -326,11 +328,12 @@ def _load_public_ai_document(document_id: int) -> AIDocument:
     doc = AIDocument.query.filter(
         AIDocument.id == int(document_id),
         AIDocument.is_public.is_(True),
+        ai_document_read_filter(ANONYMOUS_PRINCIPAL),
         AIDocument.searchable.is_(True),
         AIDocument.processing_status == completed,
     ).first()
     if not doc:
-        raise ValueError("Document not found or not public")
+        raise ClientInputError("Document not found or not public")
     return doc
 
 
@@ -482,6 +485,7 @@ def _public_searchable_document_ids(document_ids: set[int]) -> set[int]:
         AIDocument.query.filter(
             AIDocument.id.in_(document_ids),
             AIDocument.is_public.is_(True),
+            ai_document_read_filter(ANONYMOUS_PRINCIPAL),
             AIDocument.searchable.is_(True),
             AIDocument.processing_status == completed,
         )
@@ -671,6 +675,7 @@ def list_public_documents_in_scope(filters: Dict[str, Any] | None) -> List[AIDoc
     completed = AIDocumentProcessingStatusValue.completed.value
     query = AIDocument.query.filter(
         AIDocument.is_public.is_(True),
+        ai_document_read_filter(ANONYMOUS_PRINCIPAL),
         AIDocument.searchable.is_(True),
         AIDocument.processing_status == completed,
     )
@@ -756,7 +761,7 @@ def catalog_public_documents(
     if normalized_type in ("", "all"):
         normalized_type = ""
     elif normalized_type not in DOCUMENT_TYPE_CHOICES:
-        raise ValueError(
+        raise ClientInputError(
             f"Unknown document_type {document_type!r}. "
             f"Use one of: {', '.join(DOCUMENT_TYPE_CHOICES)}, or omit for all types."
         )
@@ -765,7 +770,7 @@ def catalog_public_documents(
     documents = list_public_documents_in_scope(filters)
 
     if len(documents) > PUBLIC_DOC_CATALOG_MAX_DOCS:
-        raise ValueError(
+        raise ClientInputError(
             f"Too many public documents in scope ({len(documents)}). "
             "Narrow with country_id, country_name, or document_type."
         )
@@ -1210,7 +1215,7 @@ def search_public_documents(
     """
     raw_query = (query or "").strip()
     if not raw_query:
-        raise ValueError("query is required")
+        raise ClientInputError("query is required")
 
     top_k = max(1, min(int(top_k), PUBLIC_DOC_MAX_TOP_K))
     min_score = max(0.0, min(float(min_score), 1.0))
@@ -1425,6 +1430,7 @@ def get_public_document_chunk_context(
         .filter(
             AIDocumentChunk.id == int(chunk_id),
             AIDocument.is_public.is_(True),
+            ai_document_read_filter(ANONYMOUS_PRINCIPAL),
             AIDocument.searchable.is_(True),
             AIDocument.processing_status == completed,
         )
@@ -1432,7 +1438,7 @@ def get_public_document_chunk_context(
         .first()
     )
     if not target:
-        raise ValueError("Chunk not found, or its document is not public")
+        raise ClientInputError("Chunk not found, or its document is not public")
 
     target_chunk, document = target
     doc_id = int(document.id)
@@ -1504,7 +1510,7 @@ def stream_public_ai_document_download(document_id: int):
             return redirect(source_url, code=302)
 
     if not doc.storage_path or not _ai_doc_source_ready(doc):
-        raise ValueError("Document file not available")
+        raise ClientInputError("Document file not available")
 
     storage = StorageService()
     if getattr(doc, "submitted_document_id", None):
@@ -1518,7 +1524,7 @@ def stream_public_ai_document_download(document_id: int):
                     download_name=doc.filename,
                     mimetype="application/octet-stream",
                 )
-            raise ValueError("Document file not available")
+            raise ClientInputError("Document file not available")
         category, rel = category_rel
         return storage.stream_response(
             category,

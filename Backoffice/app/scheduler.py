@@ -242,6 +242,10 @@ def init_scheduler(app, is_reloader):
                         )
                         run_fds_access_request_digest_job()
 
+                    def _purge_ai_trace_content():
+                        from app.services.ai.quality.trace_privacy import purge_expired_trace_content
+                        purge_expired_trace_content()
+
                     def _process_scheduled_notifications():
                         from app.services.notification.scheduling import process_scheduled_notifications
                         processed = process_scheduled_notifications()
@@ -267,6 +271,13 @@ def init_scheduler(app, is_reloader):
                         func=lambda: _run_scheduled_job(app, 'cleanup_notifications', _cleanup_notifications),
                         trigger="cron", hour=2, minute=0,
                         id='cleanup_notifications', name='Cleanup old notifications',
+                        replace_existing=True
+                    )
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(app, 'purge_ai_trace_content', _purge_ai_trace_content),
+                        trigger="cron", hour=3, minute=30,
+                        id='purge_ai_trace_content', name='Purge expired AI trace content',
                         replace_existing=True
                     )
 

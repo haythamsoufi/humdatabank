@@ -13,6 +13,8 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from app.utils.sql_utils import like_contains
+
 logger = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────────────────────────────
@@ -655,7 +657,7 @@ def match_focus_areas(
             lexical_fallback_debug: Dict[str, Any] = {}
             for key in zero_areas:
                 terms = area_seed_terms.get(key) or []
-                conds = [content_lc.like(f"%{t.lower()}%") for t in terms if t]
+                conds = [like_contains(content_lc, t.lower()) for t in terms if t]
                 if not conds:
                     continue
                 rows = (
@@ -695,7 +697,7 @@ def match_focus_areas(
         detection_method = "lexical_fallback"
         for key in area_keys:
             terms = area_seed_terms.get(key) or []
-            conds = [content_lc.like(f"%{t.lower()}%") for t in terms if t]
+            conds = [like_contains(content_lc, t.lower()) for t in terms if t]
             if not conds:
                 continue
             rows = (
@@ -796,7 +798,7 @@ def extract_area_evidence(
         )
         terms = area_seed_terms.get(key) or []
         conds = [
-            content_lc.like(f"%{str(t).lower()}%")
+            like_contains(content_lc, str(t).lower())
             for t in terms if str(t).strip()
         ][:40]
         q = db.session.query(

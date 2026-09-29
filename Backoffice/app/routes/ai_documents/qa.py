@@ -16,6 +16,7 @@ from app.models import AIDocument, AIDocumentChunk
 from app.services.ai.documents.vector_store import AIVectorStore
 from plugins.upr.ai import document_answering as upr_doc_answering
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_ok, json_bad_request, json_server_error
 from app.utils.sql_utils import safe_ilike_pattern
 
@@ -860,9 +861,15 @@ def _answer_with_full_documents(
         if doc_id not in retrieval_doc_ids:
             retrieval_doc_ids.append(doc_id)
 
+    from app.services.ai.documents.access import apply_document_read_filter, principal_for_legacy_args
+
+    reader = principal_for_legacy_args(user_id, None)
+
     retrieved_docs: list[AIDocument] = []
     if retrieval_doc_ids:
-        retrieved_docs = AIDocument.query.filter(AIDocument.id.in_(retrieval_doc_ids)).all()
+        retrieved_docs = apply_document_read_filter(
+            AIDocument.query.filter(AIDocument.id.in_(retrieval_doc_ids)), reader
+        ).all()
     documents_by_id: dict[int, AIDocument] = {doc.id: doc for doc in retrieved_docs}
 
     if requested_years and (focus_country_id or focus_country_name):
@@ -880,8 +887,7 @@ def _answer_with_full_documents(
 
             q_docs = q_docs.filter(AIDocument.processing_status == "completed")
 
-            if (not is_admin) and user_id:
-                q_docs = q_docs.filter(or_(AIDocument.is_public == True, AIDocument.user_id == int(user_id)))
+            q_docs = apply_document_read_filter(q_docs, reader)
 
             extra_docs = q_docs.order_by(AIDocument.created_at.desc()).limit(50).all()
             for d in extra_docs:
@@ -1177,7 +1183,7 @@ def answer_documents():
             try:
                 from openai import OpenAI
             except Exception as e:
-                return json_server_error(f'OpenAI SDK not available: {e}')
+                return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
             openai_key = current_app.config.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
             if not openai_key:
@@ -1436,7 +1442,7 @@ def answer_documents():
         try:
             from openai import OpenAI
         except Exception as e:
-            return json_server_error(f'OpenAI SDK not available: {e}')
+            return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
         openai_key = current_app.config.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
         if not openai_key:

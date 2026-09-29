@@ -24,6 +24,8 @@ from app.extensions import db
 from app.models import AIDocument, AIDocumentChunk, Country
 from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
 from app.utils.sql_utils import safe_ilike_pattern
+from app.services.ai.documents.access import apply_document_read_filter
+from app.services.ai.policies.access_policy import resolve_ai_access_policy
 
 logger = logging.getLogger(__name__)
 
@@ -169,22 +171,7 @@ def get_upr_kpi_value(
             )
         )
 
-        if user_role not in ["admin", "system_manager"]:
-            if user_id:
-                q = q.filter(db.or_(AIDocument.is_public == True, AIDocument.user_id == user_id))  # noqa: E712
-            else:
-                q = q.filter(AIDocument.is_public == True)  # noqa: E712
-
-            if dialect == "postgresql":
-                role = (user_role or "public").strip().lower()
-                role_json = json.dumps([role])
-                q = q.filter(
-                    db.or_(
-                        AIDocument.is_public == True,  # noqa: E712
-                        AIDocument.allowed_roles.is_(None),
-                        text("(ai_documents.allowed_roles::jsonb @> CAST(:role_json AS jsonb))").bindparams(role_json=role_json),
-                    )
-                )
+        q = apply_document_read_filter(q, resolve_ai_access_policy().documents)
 
         if dialect == "postgresql":
             q = q.filter(
@@ -224,16 +211,6 @@ def get_upr_kpi_value(
                 continue
             if upr.get("block") != "in_support_kpis":
                 continue
-
-            if dialect != "postgresql" and user_role not in ["admin", "system_manager"]:
-                if not getattr(doc, "is_public", False):
-                    allowed_roles = getattr(doc, "allowed_roles", None)
-                    if allowed_roles is not None:
-                        try:
-                            if role_lc not in [str(r).strip().lower() for r in (allowed_roles or [])]:
-                                continue
-                        except Exception:
-                            continue
 
             kpis = upr.get("kpis") if isinstance(upr.get("kpis"), dict) else {}
             val = (kpis or {}).get(metric_norm)
@@ -362,21 +339,7 @@ def get_upr_kpi_timeseries(
             )
         )
 
-        if user_role not in ["admin", "system_manager"]:
-            if user_id:
-                q = q.filter(db.or_(AIDocument.is_public == True, AIDocument.user_id == user_id))  # noqa: E712
-            else:
-                q = q.filter(AIDocument.is_public == True)  # noqa: E712
-            if dialect == "postgresql":
-                role = (user_role or "public").strip().lower()
-                role_json = json.dumps([role])
-                q = q.filter(
-                    db.or_(
-                        AIDocument.is_public == True,  # noqa: E712
-                        AIDocument.allowed_roles.is_(None),
-                        text("(ai_documents.allowed_roles::jsonb @> CAST(:role_json AS jsonb))").bindparams(role_json=role_json),
-                    )
-                )
+        q = apply_document_read_filter(q, resolve_ai_access_policy().documents)
 
         if dialect == "postgresql":
             q = q.filter(
@@ -419,16 +382,6 @@ def get_upr_kpi_timeseries(
                 continue
             if upr.get("block") != "in_support_kpis":
                 continue
-
-            if dialect != "postgresql" and user_role not in ["admin", "system_manager"]:
-                if not getattr(doc, "is_public", False):
-                    allowed_roles = getattr(doc, "allowed_roles", None)
-                    if allowed_roles is not None:
-                        try:
-                            if role_lc not in [str(r).strip().lower() for r in (allowed_roles or [])]:
-                                continue
-                        except Exception:
-                            continue
 
             kpis = upr.get("kpis") if isinstance(upr.get("kpis"), dict) else {}
             val_raw = (kpis or {}).get(metric_norm)
@@ -556,21 +509,7 @@ def get_upr_kpi_values_for_all_countries(metric: str) -> Dict[str, Any]:
                     AIDocument.country_id.in_(allowed_country_ids),
                 )
             )
-        if user_role not in ["admin", "system_manager"]:
-            if user_id:
-                q = q.filter(db.or_(AIDocument.is_public == True, AIDocument.user_id == user_id))  # noqa: E712
-            else:
-                q = q.filter(AIDocument.is_public == True)  # noqa: E712
-            if dialect == "postgresql":
-                role = (user_role or "public").strip().lower()
-                role_json = json.dumps([role])
-                q = q.filter(
-                    db.or_(
-                        AIDocument.is_public == True,  # noqa: E712
-                        AIDocument.allowed_roles.is_(None),
-                        text("(ai_documents.allowed_roles::jsonb @> CAST(:role_json AS jsonb))").bindparams(role_json=role_json),
-                    )
-                )
+        q = apply_document_read_filter(q, resolve_ai_access_policy().documents)
         if dialect == "postgresql":
             q = q.filter(
                 AIDocumentChunk.extra_metadata["upr"].isnot(None),
@@ -607,16 +546,6 @@ def get_upr_kpi_values_for_all_countries(metric: str) -> Dict[str, Any]:
                 continue
             if upr.get("block") != "in_support_kpis":
                 continue
-
-            if dialect != "postgresql" and user_role not in ["admin", "system_manager"]:
-                if not getattr(doc, "is_public", False):
-                    allowed_roles = getattr(doc, "allowed_roles", None)
-                    if allowed_roles is not None:
-                        try:
-                            if role_lc not in [str(r).strip().lower() for r in (allowed_roles or [])]:
-                                continue
-                        except Exception:
-                            continue
 
             kpis = upr.get("kpis") if isinstance(upr.get("kpis"), dict) else {}
             val = (kpis or {}).get(metric_norm)
@@ -754,21 +683,7 @@ def get_upr_visual_blocks(
             )
         )
 
-        if user_role not in ["admin", "system_manager"]:
-            if user_id:
-                q = q.filter(db.or_(AIDocument.is_public == True, AIDocument.user_id == user_id))  # noqa: E712
-            else:
-                q = q.filter(AIDocument.is_public == True)  # noqa: E712
-            if dialect == "postgresql":
-                role = (user_role or "public").strip().lower()
-                role_json = json.dumps([role])
-                q = q.filter(
-                    db.or_(
-                        AIDocument.is_public == True,  # noqa: E712
-                        AIDocument.allowed_roles.is_(None),
-                        text("(ai_documents.allowed_roles::jsonb @> CAST(:role_json AS jsonb))").bindparams(role_json=role_json),
-                    )
-                )
+        q = apply_document_read_filter(q, resolve_ai_access_policy().documents)
 
         if dialect == "postgresql":
             q = q.filter(AIDocumentChunk.extra_metadata["upr"].isnot(None))
@@ -807,16 +722,6 @@ def get_upr_visual_blocks(
             block = str(upr.get("block") or "").strip().lower()
             if block not in wanted:
                 continue
-            if dialect != "postgresql" and user_role not in ["admin", "system_manager"]:
-                if not getattr(doc, "is_public", False):
-                    allowed_roles = getattr(doc, "allowed_roles", None)
-                    if allowed_roles is not None:
-                        try:
-                            if role_lc not in [str(r).strip().lower() for r in (allowed_roles or [])]:
-                                continue
-                        except Exception:
-                            continue
-
             payload: Dict[str, Any] = {}
             for key in _VISUAL_PAYLOAD_KEYS.get(block, ()):
                 if key in upr and upr.get(key) is not None:

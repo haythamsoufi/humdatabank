@@ -868,8 +868,10 @@ class AIDocumentProcessor:
             return [[None for _ in range(ncols)] for _ in range(nrows)]
 
         # Render at moderate DPI for reasonable sampling quality.
-        pix = page.get_pixmap(dpi=150, alpha=False)
-        img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
+        from app.utils.safe_image import clamp_dpi, open_image_safe, render_page_size
+
+        pix = page.get_pixmap(dpi=clamp_dpi(*render_page_size(page), 150), alpha=False)
+        img = open_image_safe(pix.tobytes("png")).convert("RGB")
 
         page_rect = page.rect
         sx = img.width / float(page_rect.width or 1.0)
@@ -1227,7 +1229,9 @@ class AIDocumentProcessor:
         }
 
         try:
-            wb = openpyxl.load_workbook(file_path, data_only=True)
+            from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
+
+            wb = load_workbook_safe(file_path, read_only=True, data_only=True)
 
             result['metadata'] = {
                 'title': filename,
@@ -1243,7 +1247,7 @@ class AIDocumentProcessor:
                 sheet_text = f"\n\n=== Sheet: {sheet_name} ===\n\n"
                 rows = []
 
-                for row in ws.iter_rows(values_only=True):
+                for row in safe_iter_rows(ws, values_only=True):
                     # Filter out empty rows
                     if any(cell is not None for cell in row):
                         row_text = '\t'.join(str(cell) if cell is not None else '' for cell in row)
@@ -1401,17 +1405,18 @@ class AIDocumentProcessor:
             return ""
 
         try:
-            import pytesseract
-            from PIL import Image
-            import io
+            import pytesseract  # noqa: F401
+            from app.utils.safe_image import (
+                clamp_dpi,
+                ocr_image_to_string,
+                open_image_safe,
+                render_page_size,
+            )
 
-            # Render page as image
-            pix = page.get_pixmap(dpi=300)
-            img_data = pix.tobytes("png")
-            img = Image.open(io.BytesIO(img_data))
+            pix = page.get_pixmap(dpi=clamp_dpi(*render_page_size(page), 300))
+            img = open_image_safe(pix.tobytes("png"))
 
-            # Perform OCR
-            text = pytesseract.image_to_string(img)
+            text = ocr_image_to_string(img)
             logger.info(f"OCR performed on page {page_num}, extracted {len(text)} characters")
             return text
 

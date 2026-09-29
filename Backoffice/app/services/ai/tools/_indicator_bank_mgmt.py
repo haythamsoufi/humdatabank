@@ -181,9 +181,9 @@ def query_indicators_filtered(
         sector_str = str(sector).strip()
         sector_row = Sector.query.filter(Sector.name.ilike(safe_ilike_pattern(sector_str))).first()
         if sector_row:
-            q = q.filter(IndicatorBank.sector.contains(str(sector_row.id)))
+            q = q.filter(IndicatorBank.sector.contains(str(sector_row.id), autoescape=True))
         else:
-            q = q.filter(IndicatorBank.sector.contains(sector_str))
+            q = q.filter(IndicatorBank.sector.contains(sector_str, autoescape=True))
 
     if search:
         pattern = safe_ilike_pattern(search)

@@ -28,6 +28,16 @@ from app.services.translation.auto_translator import (
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.fixture(autouse=True)
+def _public_dns_for_libre(monkeypatch):
+    import ipaddress
+
+    monkeypatch.setattr(
+        "app.utils.outbound_url.resolve_host_ips",
+        lambda host, port=None: (ipaddress.ip_address("93.184.216.34"),),
+    )
+
+
 def _make_translator(services):
     """Build an AutoTranslator with injected services, bypassing env-based init."""
     tr = AutoTranslator.__new__(AutoTranslator)

@@ -171,7 +171,7 @@ class TestSubmitIndicatorSuggestion:
         payload = {
             'submitter_name': 'Test User',
             'submitter_email': 'test@example.com',
-            'suggestion_type': 'new',
+            'suggestion_type': 'new_indicator',
             'indicator_name': 'New Indicator',
             'reason': 'This is needed for tracking',
         }
@@ -195,7 +195,7 @@ class TestSubmitIndicatorSuggestion:
         payload = {
             'submitter_name': 'Test User',
             'submitter_email': 'test@example.com',
-            'suggestion_type': 'new',
+            'suggestion_type': 'new_indicator',
             'indicator_name': 'Sector Indicator',
             'reason': 'Needed',
             'sector': {'primary': 'Health', 'secondary': None, 'tertiary': None},
@@ -221,7 +221,7 @@ class TestSubmitIndicatorSuggestion:
         payload = {
             'submitter_name': '',
             'submitter_email': 'test@example.com',
-            'suggestion_type': 'new',
+            'suggestion_type': 'new_indicator',
             'indicator_name': 'Indicator',
             'reason': 'Reason',
         }
@@ -243,7 +243,7 @@ class TestSubmitIndicatorSuggestion:
         payload = {
             'submitter_name': 'Test',
             'submitter_email': 'test@example.com',
-            'suggestion_type': 'new',
+            'suggestion_type': 'new_indicator',
             'indicator_name': 'Test',
             'reason': 'Reason',
             'sector': {'primary': ''},
@@ -266,7 +266,7 @@ class TestSubmitIndicatorSuggestion:
         payload = {
             'submitter_name': 'Test',
             'submitter_email': 'test@example.com',
-            'suggestion_type': 'new',
+            'suggestion_type': 'new_indicator',
             'indicator_name': 'Indicator',
             'reason': 'Reason',
         }

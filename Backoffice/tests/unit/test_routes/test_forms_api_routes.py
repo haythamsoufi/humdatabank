@@ -26,8 +26,44 @@ def _json_put(client, url, data):
     return client.put(url, json=data, content_type="application/json")
 
 
-def _json_patch(client, url, data):
-    return client.patch(url, json=data, content_type="application/json")
+def _json_patch(client, url, data=None):
+    return client.patch(url, json=data or {}, content_type="application/json")
+
+
+def _lookup_list_get(lookup_list):
+    from app import db as _db
+    from app.models import LookupList
+
+    real_get = _db.session.get
+
+    def _get(model, ident, *args, **kwargs):
+        if model is LookupList:
+            return lookup_list
+        return real_get(model, ident, *args, **kwargs)
+
+    return _get
+
+
+def _deny_aes(*_args, **_kwargs):
+    from app.utils.api_responses import json_forbidden
+
+    return None, json_forbidden("Assignment not found or access denied")
+
+
+def _allow_aes(aes):
+    return lambda *_args, **_kwargs: (aes, None)
+
+
+def _deny_child(*_args, **_kwargs):
+    from app.utils.api_responses import json_not_found
+
+    return None, json_not_found("Item not found")
+
+
+def _allow_child(obj, aes=None):
+    from app.utils.form_authorization import ChildAccess
+
+    return lambda *_args, **_kwargs: (ChildAccess(obj, aes=aes), None)
 
 
 # =====================================================================
@@ -286,7 +322,7 @@ class TestApiAddDynamicIndicator:
 
     def test_access_denied_returns_403(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "Access denied"}):
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_deny_aes):
             resp = _json_post(
                 client,
                 "/api/forms/dynamic-indicators/add",
@@ -301,7 +337,7 @@ class TestApiAddDynamicIndicator:
         mock_section = MagicMock()
         mock_section.section_type = "static"
 
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
              patch("app.routes.forms_api.FormSection") as MockSection:
             MockSection.query.get_or_404.return_value = mock_section
             resp = _json_post(
@@ -317,10 +353,11 @@ class TestApiAddDynamicIndicator:
         mock_aes.id = 1
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
+        mock_section.template_id = mock_aes.assigned_form.template_id
         mock_indicator = MagicMock()
         mock_existing = MagicMock()
 
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID:
@@ -340,13 +377,14 @@ class TestApiAddDynamicIndicator:
         mock_aes.id = 1
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
+        mock_section.template_id = mock_aes.assigned_form.template_id
         mock_indicator = MagicMock()
         mock_indicator.id = 99
         mock_indicator.type = "numeric"
         mock_indicator.unit = "count"
         mock_indicator.definition = "Test def"
 
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
@@ -390,7 +428,7 @@ class TestApiRenderPendingDynamicIndicator:
 
     def test_access_denied_returns_403(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "No access"}):
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_deny_aes):
             resp = _json_post(
                 client,
                 "/api/forms/dynamic-indicators/render-pending",
@@ -409,7 +447,8 @@ class TestApiRenderPendingDynamicIndicator:
         mock_section = MagicMock()
         mock_section.section_type = "static"
 
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.joinedload"), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB:
             MockSection.query.options.return_value.get_or_404.return_value = mock_section
@@ -431,10 +470,12 @@ class TestApiRenderPendingDynamicIndicator:
         mock_aes.id = 1
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
+        mock_section.template_id = mock_aes.assigned_form.template_id
         mock_indicator = MagicMock()
         mock_existing = MagicMock()
 
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.joinedload"), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID:
@@ -460,44 +501,30 @@ class TestApiRenderPendingDynamicIndicator:
 
 
 class TestApiRenderDynamicIndicator:
-    def test_no_aes_id_returns_400(self, app, admin_user, db_session, client):
+    def test_no_aes_returns_400(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status_id = None
 
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID:
-            MockDID.query.get_or_404.return_value = mock_dyn
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_dyn, aes=None)):
             resp = client.get("/api/forms/dynamic-indicators/1/render")
         assert resp.status_code == 400
 
-    def test_access_denied_returns_403(self, app, admin_user, db_session, client):
+    def test_access_denied_returns_404(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status_id = 5
-
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "No access"}):
-            MockDID.query.get_or_404.return_value = mock_dyn
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_deny_child):
             resp = client.get("/api/forms/dynamic-indicators/1/render")
-        assert resp.status_code == 403
+        assert resp.status_code == 404
 
     def test_success_returns_200(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status_id = 5
         mock_dyn.section_id = 1
         mock_aes = MagicMock()
-        mock_aes.assigned_form = MagicMock()
-        mock_aes.assigned_form.template = None
         mock_section = MagicMock()
-        mock_section.template = None
 
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_dyn, aes=mock_aes)), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
-             patch("app.routes.forms_api._create_dynamic_indicator_object", return_value=MagicMock()), \
-             patch("app.routes.forms_api.render_template", return_value="<div>html</div>"):
-            MockDID.query.get_or_404.return_value = mock_dyn
+             patch("app.routes.forms_api.render_dynamic_indicator_item_html", return_value="<div>html</div>"):
             MockSection.query.get_or_404.return_value = mock_section
             resp = client.get("/api/forms/dynamic-indicators/1/render")
         assert resp.status_code == 200
@@ -509,30 +536,24 @@ class TestApiRenderDynamicIndicator:
 
 
 class TestApiRemoveDynamicIndicator:
-    def test_access_denied_returns_403(self, app, admin_user, db_session, client):
+    def test_access_denied_returns_404(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status.country.id = 99
-
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.check_country_access", return_value=False):
-            MockDID.query.get_or_404.return_value = mock_dyn
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_deny_child) as mock_authz, \
+             patch("app.routes.forms_api.db") as mock_db:
             resp = _json_delete(client, "/api/forms/dynamic-indicators/1/remove")
-        assert resp.status_code == 403
+        assert resp.status_code == 404
+        mock_db.session.delete.assert_not_called()
+        assert mock_authz.call_args.args[2] == "edit"
 
     def test_success_returns_200(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status.country.id = 1
 
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.check_country_access", return_value=True), \
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_dyn)), \
              patch("app.routes.forms_api.db") as mock_db:
-            MockDID.query.get_or_404.return_value = mock_dyn
-            mock_db.session.delete = MagicMock()
-            mock_db.session.flush = MagicMock()
             resp = _json_delete(client, "/api/forms/dynamic-indicators/1/remove")
         assert resp.status_code == 200
+        mock_db.session.delete.assert_called_once_with(mock_dyn)
 
 
 # =====================================================================
@@ -541,54 +562,40 @@ class TestApiRemoveDynamicIndicator:
 
 
 class TestApiUpdateDynamicIndicator:
-    def test_access_denied_returns_403(self, app, admin_user, db_session, client):
+    def test_access_denied_returns_404(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status.country.id = 99
-
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.check_country_access", return_value=False):
-            MockDID.query.get_or_404.return_value = mock_dyn
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_deny_child):
             resp = _json_put(client, "/api/forms/dynamic-indicators/1/update", {"custom_label": "new"})
-        assert resp.status_code == 403
+        assert resp.status_code == 404
 
     def test_success_updates_custom_label(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status.country.id = 1
         mock_dyn.custom_label = None
 
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.check_country_access", return_value=True), \
-             patch("app.routes.forms_api.db") as mock_db:
-            MockDID.query.get_or_404.return_value = mock_dyn
-            mock_db.session.flush = MagicMock()
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_dyn)), \
+             patch("app.routes.forms_api.db"):
             resp = _json_put(client, "/api/forms/dynamic-indicators/1/update", {"custom_label": "My Label"})
         assert resp.status_code == 200
+        assert mock_dyn.custom_label == "My Label"
 
     def test_success_updates_order(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status.country.id = 1
 
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.check_country_access", return_value=True), \
-             patch("app.routes.forms_api.db") as mock_db:
-            MockDID.query.get_or_404.return_value = mock_dyn
-            mock_db.session.flush = MagicMock()
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_dyn)), \
+             patch("app.routes.forms_api.db"):
             resp = _json_put(client, "/api/forms/dynamic-indicators/1/update", {"order": 3})
         assert resp.status_code == 200
+        assert mock_dyn.order == 3
 
     def test_invalid_order_returns_400(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_dyn = MagicMock()
-        mock_dyn.assignment_entity_status.country.id = 1
 
-        with patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
-             patch("app.routes.forms_api.check_country_access", return_value=True):
-            MockDID.query.get_or_404.return_value = mock_dyn
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_dyn)):
             resp = _json_put(client, "/api/forms/dynamic-indicators/1/update", {"order": "not-int"})
-        assert resp.status_code in (400, 200)  # ValueError caught
+        assert resp.status_code == 400
 
 
 # =====================================================================
@@ -597,15 +604,20 @@ class TestApiUpdateDynamicIndicator:
 
 
 class TestApiToggleRepeatInstanceHide:
+    def test_access_denied_returns_404(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_deny_child):
+            resp = _json_patch(client, "/api/forms/repeat-instances/1/toggle-hide")
+        assert resp.status_code == 404
+
     def test_success_toggles_is_hidden(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
         mock_instance = MagicMock()
         mock_instance.is_hidden = False
+        mock_instance.assignment_entity_status_id = None
 
-        with patch("app.routes.forms_api.RepeatGroupInstance") as MockRGI, \
-             patch("app.routes.forms_api.db") as mock_db:
-            MockRGI.query.get_or_404.return_value = mock_instance
-            mock_db.session.flush = MagicMock()
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_instance)), \
+             patch("app.routes.forms_api.db"):
             resp = _json_patch(client, "/api/forms/repeat-instances/1/toggle-hide")
         assert resp.status_code == 200
         assert mock_instance.is_hidden is True
@@ -615,9 +627,8 @@ class TestApiToggleRepeatInstanceHide:
         mock_instance = MagicMock()
         mock_instance.is_hidden = False
 
-        with patch("app.routes.forms_api.RepeatGroupInstance") as MockRGI, \
+        with patch("app.routes.forms_api.authorize_child_json", side_effect=_allow_child(mock_instance)), \
              patch("app.routes.forms_api.db") as mock_db:
-            MockRGI.query.get_or_404.return_value = mock_instance
             mock_db.session.flush.side_effect = Exception("db error")
             resp = _json_patch(client, "/api/forms/repeat-instances/1/toggle-hide")
         assert resp.status_code == 500
@@ -782,8 +793,8 @@ class TestGetLookupListOptions:
 
     def test_numeric_list_not_found_returns_404(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        with patch("app.routes.forms_api.LookupList") as MockLL:
-            MockLL.query.get.return_value = None
+        with patch("app.routes.forms_api.db.session.get", side_effect=_lookup_list_get(None)), \
+             patch("app.routes.forms_api.user_can_read_lookup_list", return_value=True):
             resp = client.get("/api/forms/lookup-lists/99999/options")
         assert resp.status_code == 404
 
@@ -796,8 +807,8 @@ class TestGetLookupListOptions:
         mock_row2.data = {"code": "B", "label": "Option B"}
         mock_list.rows.order_by.return_value.all.return_value = [mock_row1, mock_row2]
 
-        with patch("app.routes.forms_api.LookupList") as MockLL:
-            MockLL.query.get.return_value = mock_list
+        with patch("app.routes.forms_api.db.session.get", side_effect=_lookup_list_get(mock_list)), \
+             patch("app.routes.forms_api.user_can_read_lookup_list", return_value=True):
             resp = client.get("/api/forms/lookup-lists/1/options")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -811,8 +822,8 @@ class TestGetLookupListOptions:
         mock_list.rows.order_by.return_value.all.return_value = [mock_row]
 
         filters = json.dumps([{"field": "code", "op": "equals", "value": "EUR"}])
-        with patch("app.routes.forms_api.LookupList") as MockLL:
-            MockLL.query.get.return_value = mock_list
+        with patch("app.routes.forms_api.db.session.get", side_effect=_lookup_list_get(mock_list)), \
+             patch("app.routes.forms_api.user_can_read_lookup_list", return_value=True):
             resp = client.get(f"/api/forms/lookup-lists/1/options?filters={filters}")
         assert resp.status_code == 200
 
@@ -821,8 +832,8 @@ class TestGetLookupListOptions:
         mock_list = MagicMock()
         mock_list.rows.order_by.return_value.all.return_value = []
 
-        with patch("app.routes.forms_api.LookupList") as MockLL:
-            MockLL.query.get.return_value = mock_list
+        with patch("app.routes.forms_api.db.session.get", side_effect=_lookup_list_get(mock_list)), \
+             patch("app.routes.forms_api.user_can_read_lookup_list", return_value=True):
             resp = client.get("/api/forms/lookup-lists/1/options?filters=not-valid-json")
         assert resp.status_code == 400
 
@@ -937,8 +948,8 @@ class TestDetectCountryContextFromRequest:
         with app.test_request_context(
             "/", headers={"Referer": "http://localhost/forms/entry/42"}
         ):
-            with patch("app.routes.forms_api.AssignmentEntityStatus") as MockAES:
-                MockAES.query.get.return_value = mock_aes
+            with patch("app.routes.forms_api.load_aes_for_user", return_value=mock_aes), \
+                 patch("app.utils.api_serialization._country_for_aes", return_value=mock_aes.country):
                 country, iso2, iso3 = _detect_country_context_from_request()
         assert iso2 == "US"
 
@@ -1284,7 +1295,7 @@ class TestDiscussionCommentsApi:
 
     def test_get_access_denied_returns_403(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "Access denied"}):
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_deny_aes):
             resp = client.get("/api/forms/discussion/comments?assignment_entity_status_id=1")
         assert resp.status_code == 403
 
@@ -1304,7 +1315,7 @@ class TestDiscussionCommentsApi:
             db_session.add(comment)
             db_session.commit()
 
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}):
+            with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(aes)):
                 resp = client.get(f"/api/forms/discussion/comments?assignment_entity_status_id={aes.id}")
 
         assert resp.status_code == 200
@@ -1317,7 +1328,7 @@ class TestDiscussionCommentsApi:
         mock_aes = MagicMock()
         mock_aes.id = 42
 
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
              patch("app.routes.forms_api.SubmissionDiscussionComment.query") as mock_query, \
              patch("app.routes.forms_api.joinedload") as mock_joinedload, \
              patch("app.routes.forms_api.current_user") as mock_user:
@@ -1337,7 +1348,7 @@ class TestDiscussionCommentsApi:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
              patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True):
             resp = _json_post(
                 client,
@@ -1350,8 +1361,7 @@ class TestDiscussionCommentsApi:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
-             patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=False):
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_deny_aes):
             resp = _json_post(
                 client,
                 "/api/forms/discussion/comments",
@@ -1363,7 +1373,7 @@ class TestDiscussionCommentsApi:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+        with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
              patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True):
             resp = _json_post(
                 client,
@@ -1379,7 +1389,7 @@ class TestDiscussionCommentsApi:
         client = _make_logged_in_client(client, admin_user.id)
         with app.app_context():
             aes = create_test_assignment_entity_status(db_session)
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+            with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(aes)), \
                  patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True), \
                  patch("app.routes.forms_api.log_entity_activity"):
                 resp = _json_post(
@@ -1419,7 +1429,7 @@ class TestDiscussionCommentsApi:
             db_session.commit()
             comment_id = comment.id
 
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+            with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(aes)), \
                  patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True):
                 resp = _json_patch(
                     client,
@@ -1444,7 +1454,7 @@ class TestDiscussionCommentsApi:
             db_session.commit()
             comment_id = comment.id
 
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+            with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(aes)), \
                  patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True), \
                  patch("app.routes.forms_api.log_entity_activity"):
                 resp = _json_patch(
@@ -1475,7 +1485,7 @@ class TestDiscussionCommentsApi:
             db_session.commit()
             comment_id = comment.id
 
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+            with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(aes)), \
                  patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True), \
                  patch("app.routes.forms_api.log_entity_activity"):
                 resp = client.delete(f"/api/forms/discussion/comments/{comment_id}")

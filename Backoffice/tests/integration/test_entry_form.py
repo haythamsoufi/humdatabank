@@ -2165,7 +2165,7 @@ class TestEntryFormMatrixOperations:
         with app.app_context():
             from app.models import LookupList, LookupListRow
 
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             with client.session_transaction() as sess:
                 sess["_user_id"] = str(user.id)
                 sess["_fresh"] = True

@@ -70,7 +70,7 @@ def _validate_unified_country_plan_assignment(aes_id, *, is_ajax: bool):
 
 
 def _validate_assignment_editable_state(aes, *, is_ajax: bool):
-    if aes.status in ["submitted", "approved", "cancelled"] and not AuthorizationService.is_admin(current_user):
+    if not AuthorizationService.can_edit_assignment(aes, current_user):
         error_msg = "This assignment is no longer in an editable state."
         flash(error_msg, "warning")
         if is_ajax:

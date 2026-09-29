@@ -139,9 +139,12 @@ def register_request_hooks(app):
         from app.utils.request_utils import is_static_asset_request as _is_static
         if _is_static():
             return
-        if not current_user.is_authenticated:
-            from app.utils.mobile_auth import _try_jwt_auth
-            _try_jwt_auth()
+        if not (request.headers.get("Authorization") or "").startswith("Bearer "):
+            return
+        from app.utils.mobile_auth import _try_jwt_auth, bearer_jwt_allowed_for_path
+        if not bearer_jwt_allowed_for_path(request.path):
+            return
+        _try_jwt_auth()
 
     @app.before_request
     def _migrate_oauth_id_token_out_of_cookie():

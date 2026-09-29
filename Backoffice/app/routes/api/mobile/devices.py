@@ -31,11 +31,8 @@ def register_device():
     if not platform or platform not in ('ios', 'android'):
         return mobile_bad_request('platform must be "ios" or "android"')
 
-    ip_address = (
-        request.headers.getlist("X-Forwarded-For")[0].split(',')[0].strip()
-        if request.headers.getlist("X-Forwarded-For")
-        else request.remote_addr
-    )
+    from app.utils.client_ip import get_client_ip
+    ip_address = get_client_ip()
 
     result = PushNotificationService.register_device(
         user_id=current_user.id,

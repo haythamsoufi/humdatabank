@@ -293,12 +293,45 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 - No translations volume is needed. `entrypoint.sh` rebuilds `.po`/`.mo` from `messages.pot` + `translation_string` after migrations. Deployments still mounting Azure Files at `/data/translations` must run `flask translations import-catalog` **before** upgrading — see `Backoffice/docs/setup/persistent-translations.md`.
 
 ### AI System Configuration (Backoffice)
-- **Chat API**: `/api/ai/v2` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v2/ws`. Health: `GET /api/ai/v2/health` (includes `agent_available`).
+- **Chat API**: `/api/ai/v2` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v2/ws`. Health: `GET /api/ai/v2/health` (anonymous callers get only `{"ok": bool}`; system managers / `admin.ai.manage` also get per-check detail incl. `agent_available` and the `?probe=embedding` probe).
 - **Auth**: Session (Backoffice) or Bearer token (e.g. mobile). Issue tokens via `GET /api/ai/v2/token` (authenticated).
 - **Environment**: `OPENAI_API_KEY`, `OPENAI_MODEL` (default `gpt-5-mini`), `GEMINI_API_KEY`, `AZURE_OPENAI_*` for providers. `AI_EMBEDDING_PROVIDER`, `AI_EMBEDDING_MODEL`, `AI_EMBEDDING_DIMENSIONS` (must match pgvector column; changing requires migration and possibly re-embedding). `AI_AGENT_ENABLED`, `AI_AGENT_MAX_ITERATIONS`, `AI_AGENT_TIMEOUT_SECONDS`, `AI_AGENT_COST_LIMIT_USD`, `AI_AGENT_MAX_COMPLETION_TOKENS` (default 32768; cap 128000 for large tables; use 4096 for GPT-4o). `AI_TOOL_OBSERVATION_MAX_ROWS_TABLE_RESULT` (default 250; cap 2000; rows sent from indicator/UPR “all countries” tools; increase for full country datasets). `REDIS_URL` optional for cross-worker rate limiting.
 - **Supported models**: Depend on OpenAI account. Some models (e.g. GPT-5) reject sampling params; see `app.utils.ai_utils.openai_model_supports_sampling_params`.
 - **Shared helpers**: `app.utils.ai_utils` (e.g. `openai_model_supports_sampling_params`, `sanitize_page_context`). RAG: `app.services.ai_vector_store`, `app.services.ai_embedding_service`. Agent: `app.services.ai_agent_executor`, `app.services.ai_tools_registry`. Shared chat request handling: `app.services.ai_chat_request` (parse, resolve conversation, idempotency).
 - **Optional dependencies**: `flask-sock` required for WebSocket endpoints (`/api/ai/v2/ws`, document QA WS). Without it, AI HTTP and SSE still work. `redis` (and `REDIS_URL`) optional for cross-worker WebSocket rate limiting; in-memory limiter used otherwise. `pgvector` required for RAG document search; run migrations so `ai_documents`, `ai_embeddings`, `ai_document_chunks` exist. For full chat (non-fallback): at least one of `OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure/Copilot keys. For RAG embeddings: `OPENAI_API_KEY` when `AI_EMBEDDING_PROVIDER=openai`, or local model when `AI_EMBEDDING_PROVIDER=local` (dimensions must match DB).
+
+### AI access policy (who may read what)
+
+One policy object per request answers "which data may this principal read?" for AI tools, RAG retrieval, structured data retrieval and the document APIs. Code: `app/services/ai/policies/access_policy.py` (`AIAccessPolicy`, built once by `_bind_ai_request_policy` in `routes/ai.py` / `routes/ai_ws.py`, stored on `flask.g.ai_access_policy`, deny-by-default when absent), `app/services/data_retrieval/access.py` (`DataAccessPolicy`), `app/services/ai/documents/access.py` (`DocumentPrincipal`, `ai_document_read_filter`, `can_read_ai_document`). Enforcement happens **in the query** (SQL predicate), never by post-filtering results.
+
+| Principal | Tools | Structured (form) data | AI documents |
+|---|---|---|---|
+| Anonymous (Website proxy, needs `AI_PUBLIC_PROXY_SECRET`) | Allow-list only (`PUBLIC_TOOL_ALLOWLIST`: indicator bank / public form values / public documents / workflow help); sources clamped to `historical`, `system_documents`, `upr_documents` | `privacy='public'` items that are submitted/approved, any country | `is_public` AND role check (only the `public` role token) |
+| Authenticated user (incl. same org e-mail domain) | Full RBAC-gated catalog | Public items anywhere; non-public items and drafts **only for countries the user is assigned to** (`UserEntityPermission`) | Public (role check) + own uploads (owner scope check) |
+| Focal point | Same as user | Same as user: own countries only | Same as user |
+| Admin / countries manager / system manager, elevated API key | Full catalog | Every country | Every document (document admins: `is_admin`, system manager, `admin.documents.manage`, `admin.ai.manage`) |
+| Internal jobs (`user_role="system_manager"` with no user) | n/a | n/a | Every document |
+
+Same-organisation e-mail domain alone never widens access. `page_context.formBuilder` is honoured only for a cookie-session user holding `admin.templates.create|edit` whose `template_id`/`version_id` pass `check_template_access` (`authorize_form_builder_context`); otherwise it is dropped before DLP, tool selection and prompting (`trusted_form_builder_context()` is the only source executors read).
+
+**Document ACL semantics** (`can_read_ai_document`, mirrored in SQL by `ai_document_read_filter`):
+
+```
+readable = document admin
+        OR internal job
+        OR ( is_public AND role_ok )                 -- world-readable, optionally role-restricted
+        OR ( owner AND owner_scope_ok )              -- the uploader, while still in scope
+role_ok        = allowed_roles IS NULL OR principal role tokens ∩ allowed_roles ≠ ∅   ([] = nobody)
+owner_scope_ok = document is not a submitted document OR the owner still has access to one of its countries
+```
+
+`allowed_roles` only *restricts* public documents; it never grants access to a private one. Country tags are retrieval metadata and do not widen access. Role tokens are the user's access level (`user`, `focal_point`, `admin`, `system_manager`), RBAC role codes, and `authenticated`/`public`. Set via `PATCH /api/ai/documents/<id>` (`allowed_roles`) or the `allowed_roles` upload field (admins only). Ingested submitted documents are `is_public` only while the source is public **and** approved. Search, tools (`list_documents`, `search_documents*`, `analyze_unified_plans_focus_areas`, UPR KPI tools), full-document QA, download and the public Website document API all use the same predicate.
+
+**Limits and budgets** (`app/services/ai/policies/usage_budget.py`; `0` disables): `AI_CHAT_DAILY_USER_LIMIT` (1500/day), `AI_CHAT_DAILY_MANAGER_LIMIT`, `AI_CHAT_DAILY_ANON_IP_LIMIT` (150), `AI_CHAT_DAILY_ANON_LIMIT` (all anonymous, 20000), `AI_CHAT_DAILY_SYSTEM_LIMIT`, `AI_DAILY_COST_BUDGET_USER_USD` (10), `AI_DAILY_COST_BUDGET_ANON_USD` (25), `AI_DAILY_COST_BUDGET_SYSTEM_USD` (250; cost is summed from `ai_reasoning_traces`). WebSocket messages re-check user status, AI-beta access and the cost budget on every message; the admin document WebSocket re-checks `admin.ai.manage` per question. If Redis is configured but unavailable the WS limiter falls back to a stricter per-worker in-memory limit instead of failing open. Anonymous chat without `AI_PUBLIC_PROXY_SECRET` is refused unless the process is an explicit local dev run (`FLASK_CONFIG` development/default + DEBUG + loopback client).
+
+**Trace privacy** (`app/services/ai/quality/trace_privacy.py`): traces and tool-usage rows are stored redacted by default (`AI_TRACE_STORE_MODE=redacted|minimal|full`). `AI_TRACE_RETENTION_DAYS` (90) scrubs trace content and `AI_TOOL_USAGE_PAYLOAD_RETENTION_DAYS` (30) nulls tool inputs/outputs via the nightly `purge_ai_trace_content` scheduler job (`flask ai-trace-purge [--dry-run]`). Raw step observations in the admin trace viewer are shown only to system managers or holders of the permission named by `AI_TRACE_RAW_OUTPUT_PERMISSION`.
+
+**Outbound requests and exports**: server-side fetches to admin/user-influenced URLs (MCP upstream, LibreTranslate, IFRC document fetch) go through `app/utils/outbound_url.py` (https only, no credentials, host allow-list where applicable, private/link-local/metadata ranges blocked after DNS resolution, redirects re-validated). `/mcp` requires a session or an API key with the `mcp:use` capability (`MCP_PROXY_AUTH_MODE=public` opts out), strips cookies/credentials, caps the body and is rate limited. Every CSV/XLSX writer must use `app/utils/export_safety.py` (`safe_csv_writer`, `safe_csv_dict_writer`, `sanitize_workbook`, `sanitize_dataframe`) so cells starting with `= + - @ TAB CR` are neutralised.
 
 ### AI document batch jobs & processing (`AI_DOCS_*`)
 
@@ -378,12 +411,16 @@ npm run dev:safe
 - Automatic cleanup of inactive sessions (2-hour timeout)
 - Session blacklisting for security
 - User activity tracking and analytics
+- Idle timeout and revocation apply to every cookie-authenticated request (including `/api/` paths); Bearer JWTs authenticate only under `MOBILE_JWT_BEARER_PATH_PREFIXES` (default `/api/mobile/v1/`).
+- **Client IP has one source:** `app.utils.client_ip.get_client_ip()` (= `request.remote_addr` after ProxyFix with `PROXY_FIX_X_*` hops). Never read `X-Forwarded-For` / `request.remote_addr` directly in routes; use `is_loopback_request()` for dev-only loopback gates.
+- **Revocation/rotation state is shared** (`app/utils/auth_state.py`: Redis, else Postgres `auth_state_entry`), never per-process. Mobile refresh tokens are single-use with family revocation on reuse. `FLASK_CONFIG` unset means production; production/staging need a distinct `MOBILE_JWT_SECRET`. Details, env vars and upgrade notes: [`Backoffice/docs/setup/security.md`](../Backoffice/docs/setup/security.md#authentication-sessions-and-perimeter).
 
 ### API Structure
 - RESTful endpoints under `/api/v1/`
 - Authentication varies by surface area (session auth in Backoffice UI; bearer/JWT used by some API clients)
 - CORS enabled for frontend integration
 - Request/response tracking and monitoring
+- **API key authorization is capability-based and centrally enforced.** Every route that accepts a DB API key must declare exactly one capability via `@require_api_key(capability=..., scope_aware=...)`, `@require_api_key_or_session(capability=...)`, or `@api_capability(...)` plus `authenticate_api_request()` in the view. Routes without a capability are denied for keys (fail closed), and `undeclared_key_routes(app)` is tested to stay empty. Scopable capabilities (`data:read`, `submissions:read`, `templates:read`) must apply the key's data scope on lists **and** detail routes (`apply_api_key_data_scoping`, `api_key_scope_allows`) or leave `scope_aware=False` so scoped keys are refused. Vocabulary and parser: `app/services/security/api_key_permissions.py`. Details, route classification and migration: [`Backoffice/docs/setup/api-keys-and-permissions.md`](../Backoffice/docs/setup/api-keys-and-permissions.md).
 
 ### API Response Helpers
 
@@ -417,11 +454,41 @@ npm run dev:safe
 - **Backend guardrails:** Validate `status` and only update fields intended for that status transition (e.g., dismiss should not overwrite annotation content).
 - **Null-safe rendering:** Guard optional relationships (`if trace`, `if review.user`, etc.) before dereferencing attributes in links/labels.
 - **Quick verification before merge:** Open page + browser console (CSP errors), exercise primary actions (save/dismiss), verify no unintended field mutation in DB.
+- **`|safe` policy:** `|safe` is only for (a) `|tojson|safe` / `escapejs` / `safe_json_attr` output, (b) values that are already `Markup` produced by an escaping helper, or (c) trusted, developer-authored macro arguments (e.g. `excel_io_modal`, `_page_header` action content). For admin- or user-authored HTML use **`|rich_text`** (re-applies the allow-list at render time). Never `|safe` request, DB or API values directly. Hand-built HTML in Python (f-strings) must `markupsafe.escape` every interpolation and return `Markup`. Plugin `panel_template` output is trusted only through `_render_panel_template` (see [plugin panel contract](#plugin-data-explorer-panel-contract)).
+
+### Safe primitives (injection & resource limits)
+
+Use the shared primitive; do not hand-roll. A guard test fails the build if the pattern reappears.
+
+| Threat | Primitive | Guard test |
+|---|---|---|
+| `LIKE`/`ILIKE` wildcard injection (`%`, `_`, `\` in user input) | [`app/utils/sql_utils.py`](../Backoffice/app/utils/sql_utils.py): `ilike_contains`, `ilike_prefix`, `ilike_equals`, `like_contains`, `safe_ilike_pattern`, `escape_like_wildcards`; for SQLAlchemy string ops `col.contains(x, autoescape=True)` / `startswith(x, autoescape=True)` | `tests/unit/test_utils/test_sql_like_safety.py` (AST scan of `app/`, `plugins/`, `scripts/`) |
+| DOM XSS in Backoffice JS | [`app/static/js/lib/safe-dom.js`](../Backoffice/app/static/js/lib/safe-dom.js) (`window.SafeDom`): `escapeHtml` (escapes quotes), `safeUrl` / `safeHrefAttr` / `setHref` / `setSrc` / `openWindow` / `navigate` (http/https + same-origin allow-list, control-char and entity-obfuscation aware), `html` tagged template + `raw`, `setHtml`, `sanitizeHtml` (allow-list; `allowControls` for plugin config forms). There is **no identity fallback**: if `SafeDom` is missing, render text via `textContent`. Prefer DOM APIs / `textContent`; never concatenate data into `innerHTML` without `SafeDom.escapeHtml`. | `tests/js/lib/safe-dom.test.js` (`npx vitest run tests/js/lib`) |
+| Email header / envelope injection | [`app/utils/email_headers.py`](../Backoffice/app/utils/email_headers.py): `sanitize_header_value`, `sanitize_subject`, `sanitize_filename`, `validate_email_address`, `sanitize_sender`. `services/email/client.send_email` applies them to subject, sender and every To/Cc/Bcc address (invalid recipients are dropped and logged; nothing valid left = `no_recipients`; bad sender = `invalid_sender`). | `tests/unit/test_utils/test_email_headers.py` |
+| Open redirects | [`app/utils/redirect_utils.py`](../Backoffice/app/utils/redirect_utils.py): `is_safe_redirect_url` (root-relative or same-origin http(s) only; rejects `//`, backslashes, control characters, userinfo, encoded/NFKC-normalised variants), `safe_redirect`, `get_safe_redirect_url`. Never call `redirect(<user value>)`. For stored external URLs use `external_url_validation.safe_external_redirect_target`. | `tests/unit/test_utils/test_redirect_utils.py` |
+| Zip/XML bombs and huge sheets in spreadsheets | [`app/utils/safe_workbook.py`](../Backoffice/app/utils/safe_workbook.py): `load_workbook_safe`, `read_excel_safe`, `inspect_xlsx`, `safe_iter_rows` (raw size, member count, uncompressed size, per-member ratio, declared rows/cols, sheet count, all checked **before** openpyxl parses; `read_only=True` by default). Limits: `WORKBOOK_MAX_*` config. Never call `openpyxl.load_workbook` / `pd.read_excel` on uploaded data. CSV/JSON uploads: `app/utils/file_parsing.py` (`read_stream_capped`, `load_json_upload`, `MAX_CSV_ROWS`). | `tests/unit/test_utils/test_safe_workbook.py` (includes a tree scan for raw loaders) |
+| Decompression bombs / runaway OCR | [`app/utils/safe_image.py`](../Backoffice/app/utils/safe_image.py): `open_image_safe` (pixel budget from the header, `DecompressionBombWarning` is fatal), `clamp_dpi` / `clamp_render_scale` for PDF page rasterisation, `ocr_image_to_string` (tesseract timeout + downscale). | `tests/unit/test_utils/test_safe_image.py` |
+| Exception text leaking to clients | `raise ClientInputError(...)` for deliberate, user-presentable validation messages and `client_error_message(exc)` in `except ValueError` blocks ([`app/utils/api_errors.py`](../Backoffice/app/utils/api_errors.py)); `handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)` for everything else. Never `json_*(str(e))` from `except Exception`. | `tests/unit/test_utils/test_error_exposure.py` |
+| Scanner outages / SSRF | `FILE_SCANNER_FAIL_OPEN=true` outside DEBUG logs a CRITICAL warning (uploads pass unscanned); default is fail-closed. `CLOUD_SCANNER_URL` is validated with `app.utils.outbound_url.validate_outbound_url` (https, no private/link-local/metadata; private scanners must be listed in `CLOUD_SCANNER_ALLOWED_NETWORKS`), redirects are not followed. | `tests/unit/test_utils/test_file_scanning_extended.py` |
 
 ### File Uploads
 - Document management system
 - PDF thumbnail generation
 - Resource file organization by language
+
+#### Serving files without login (public documents, logos, template images)
+
+Rules for any route that returns a stored file to an unauthenticated or low-privilege caller:
+
+1. **Authorization is the control; ids are defense in depth.** A document is publicly downloadable only when `SubmittedDocument.public_submission_id` is set **and** `is_public` **and** status is `approved` (thumbnails/cover images: `is_public` + `approved`). The policy lives in [`app/services/documents/public_access.py`](../Backoffice/app/services/documents/public_access.py); do not re-implement it in a route.
+2. **Public URLs use the opaque `SubmittedDocument.public_id` (UUIDv4), never the integer primary key.** Build them only with `public_document_download_url` / `public_document_display_url` / `public_document_thumbnail_url`. The integer routes (`/forms/public-document/<int>/download`, `/documents/{display,thumbnail}/<int>`, `/public_documents/download/<int>`) remain for existing links: they apply the same policy, the download routes then 302 to the opaque URL with a `Deprecation: true` header, and denied and unknown ids are indistinguishable (404).
+3. **Rate-limit unauthenticated downloads** with `@limiter.limit(public_access.public_download_rate_limit)` (default `60 per minute` per client IP; override with `PUBLIC_DOWNLOAD_RATE_LIMIT`).
+4. **Always stream through `storage_service.stream_response`.** It adds `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; sandbox`, and forces `attachment` for active content (HTML, SVG, XML, JS, CSS) even when `as_attachment=False`. Inline PDFs get `nosniff` only (Chrome's viewer cannot render under `sandbox`). `add_security_headers` keeps a CSP that is already on the response. Do not use raw `send_file` / `send_from_directory` for user-supplied files.
+5. **Never redirect to a stored URL** (`source_url`, FDRS-synced values) without `app.utils.external_url_validation.safe_external_redirect_target` (https + `IFRC_DOCUMENT_ALLOWED_HOSTS`, default port, no credentials, fail closed).
+6. **Branding uploads accept raster images only** (PNG, JPEG, GIF, WebP; ICO for favicons), verified by decoding with Pillow so content must match the extension. SVG is not accepted; a bundled static `logo.svg` can still be set through the path field. Legacy uploaded SVGs are served as sandboxed attachments.
+7. **Template images** (`/forms/template-image/<item>/<path>`): logged-in users, or anonymous visitors presenting `?public_token=<AssignedForm.unique_token>` of an active public form whose published version contains the item (the URL builder adds the token on the public form page). The old `?preview=` bypass no longer exists.
+
+Migration `add_submitted_document_public_id` adds and backfills `submitted_document.public_id` (unique index `uq_submitted_doc_public_id`); downgrade drops it. Signed expiring URLs (`URLSafeTimedSerializer`) or per-submission tokens are the right tool if submitters ever need to view their own *unpublished* uploads; they are not needed for published documents.
 
 ### Security
 - CSRF protection enabled
@@ -436,6 +503,43 @@ npm run dev:safe
   - Route parameters use `aes_id`. JSON keys use `assignment_entity_status_id`.
   - Service functions: `get_aes_with_joins`, `ensure_aes_access`.
 - Do not reintroduce `acs` naming in new code.
+
+### Object-Level Authorization (child ids, assignments, lookup lists)
+Any route that takes an id of an object owned by an assignment (`RepeatGroupInstance`, `DynamicIndicatorData`, `SubmissionDiscussionComment`, `FormData`, ...) must resolve the **owner** and authorize the acting verb on it. `@login_required` plus "the id exists" is not authorization, and neither is `EntityService.check_user_entity_access` alone (it lets any `admin.*` holder through).
+
+All helpers live in [`app/utils/form_authorization.py`](../Backoffice/app/utils/form_authorization.py) and delegate to `AuthorizationService.can_access_assignment` / `can_edit_assignment` / `can_submit_assignment` (RBAC-, entity-scope-, status- and round-aware - the same rules the entry page uses):
+
+| Need | Helper |
+|---|---|
+| Child id in the URL/body (repeat instance, dynamic indicator, ...) | `authorize_child_json(Model, id, AES_ACTION_VIEW/EDIT/SUBMIT, label=...)` -> `(ChildAccess, None)` or `(None, response)` |
+| AES id in the request | `authorize_aes_json(aes_id, action, forbidden_message=...)` |
+| Already-loaded objects | `check_aes_action(aes, user, action)` / `authorize_child(obj, user, action)` -> `AUTH_OK` / `AUTH_HIDDEN` / `AUTH_FORBIDDEN` |
+| Public submissions (country-scoped, not AES-scoped) | `public_submission_access(submission, user, PUBLIC_SUBMISSION_ACTION_VIEW/EDIT/MANAGE)` |
+| Template structure (mobile) | `user_can_access_template(user, template_id)` |
+| Lookup-list rows | `user_can_read_lookup_list(user, list_id)` |
+| Status transitions (approve / reopen / return / page actions / admin overrides) | `begin_aes_transition(aes, user, permission=..., allowed_from=...)` - see *Locking status transitions* below |
+| Bulk transitions / imports over many AES rows | `lock_aes_rows_for_update(ids, assigned_form_id=...)` (ascending id order) |
+| Submit / send for review / save on the entry page | `lock_aes_for_update(aes)` (True when the row moved meanwhile); `forms.entry` calls it on every POST |
+
+**Error policy.** A child addressed by its *own* id that is missing or not visible to the caller returns an opaque **404** (existence is not disclosed; unknown and out-of-scope look identical). If the caller can view the owner but the verb is denied (read-only user, submitted/locked assignment) the response is **403**. Requests that carry an AES id return **403** "Assignment not found or access denied" (the `ensure_aes_access` convention). An orphaned child (no owner) is reachable by System Managers only.
+
+Lookup lists are global reference data with no owner. Numeric (admin-managed) lists are readable when a template the user can reach references them, or by System Managers / template and assignment admins; system lists (`country_map`, `national_society`, `indicator_bank`) and plugin lists stay open to authenticated users. Row responses are capped at 5000 with a `truncated` flag.
+
+Mobile (`@mobile_auth_required`) routes follow the same rules as their web counterparts: the write routes require the exact web permission (`permission=`, not the any-of `permissions=`), record `log_admin_action`, and send the same notifications. The anonymous `POST /api/mobile/v1/data/indicator-suggestions` is protected by a shared-store rate limit, strict payload validation (`app/utils/suggestion_intake.py`), DB-backed per-email and global caps (`SUGGESTION_PER_EMAIL_DAILY_LIMIT`, `SUGGESTION_GLOBAL_HOURLY_LIMIT`) and an optional reCAPTCHA token (`MOBILE_SUGGESTION_REQUIRE_CAPTCHA=true`).
+
+#### Locking status transitions (TOCTOU)
+Every write to `AssignmentEntityStatus.status` (via `apply_entity_status_change` or directly) must hold the row lock and validate against the **locked** row, otherwise two concurrent requests both pass the "allowed from this status" check and transition twice (double notifications, approve over a just-reopened form).
+
+1. Take `SELECT ... FOR UPDATE` on the AES row with `begin_aes_transition` (single row) or `lock_aes_rows_for_update` (many rows).
+2. Re-validate on the locked row: `allowed_from=` (source statuses) and `permission=` (an `AuthorizationService.can_*` predicate, evaluated after the lock so status-dependent rules see the fresh status). The result has `ok`, `reason` (`ok` / `gone` / `stale_status` / `forbidden`) and `changed` (another transaction moved the row since it was loaded).
+3. Only then write. Refuse with a redirect/flash (web) or JSON error, never by raising.
+
+Rules that make this safe:
+- The lock lasts until the request transaction ends. `transaction_middleware` commits at `after_request` for status < 400 and rolls back for >= 400 or exceptions, so keep the lock -> validate -> write sequence in one request and never `db.session.commit()` between the lock and the write. `FormDataService._commit_or_flush` only flushes in managed requests; routes marked `@no_auto_transaction` own their commit.
+- Lock order is always **AES rows in ascending id, then dependent rows** (`AssignmentPageStatus`, child data). `lock_aes_rows_for_update` sorts ids and uses `ORDER BY id FOR UPDATE OF assignment_entity_status`; bulk paths must not lock rows one by one in request order or two overlapping bulk actions can deadlock.
+- The approve route only accepts `submitted`, return-for-revision only `sent_for_review`; reopen / page actions rely on their `can_*` predicate (which already encodes the source status).
+- Admin overrides (`update_entity_status`, `bulk_update_entity_status`, `edit_assignment_entity_status`) may set any status but still lock, so they serialize with user transitions and fail cleanly when the entity was removed meanwhile. Batch importers (FDRS status sync, UPR PNS pending reset) lock their rows up front for non-dry runs and hold them until the run commits.
+- The tests in `tests/integration/test_assignment_transition_locking.py` run real Postgres lock contention (one thread and DB connection per request); add new transition routes there.
 
 ### Presence Tracking (Do Not Use `user_activity_log`)
 - Live presence heartbeat endpoints (`/api/forms/presence/...`) should use cache/memory (Redis when available, in-memory fallback), not `user_activity_log`.
@@ -501,6 +605,16 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 5. No core app file changes required — `PluginManager` discovers `plugin.py` at startup.
 
 **To unplug:** delete the plugin folder. Core Data Explorer tabs remain.
+
+#### Plugin Data Explorer panel contract
+
+A plugin contributes a Data Explorer tab by returning a `DataExplorerTabConfig` with a `panel_template`. The core renders it in `app/routes/admin/data_exploration._render_panel_template` and embeds the result **without** `|safe` (the value is `Markup`). This is the only place plugin HTML is trusted, so panels must obey:
+
+- `panel_template` must be a relative `.html`/`.htm` template path (no `..`, no leading `/`); other suffixes disable Jinja autoescaping and are rejected.
+- Render with `{{ value }}` (autoescaped). Do **not** use `|safe`, `Markup(...)` or `{% autoescape false %}` on request-, DB- or API-derived data. JSON for scripts must go through `|tojson`.
+- Context comes only from `get_panel_render_context()`; keep it to ids, flags and pre-escaped/Markup values. Inline scripts need `nonce="{{ csp_nonce() }}"`.
+- Failures render an empty panel and are logged; a panel must not depend on exceptions for control flow.
+- Field-type entry templates receive `config_json` as `Markup` from `htmlsafe_json_dumps` (safe inside `<script type="application/json">` with plain `{{ config_json }}`); `existing_data_json` is a plain string for attribute use (`{{ existing_data_json | e }}`).
 
 **Config override:** `PB_VISUALS_TOOL_DIR` in Flask config overrides the default `plugins/pb_progress/visuals/` path for the P&B build pipeline.
 
@@ -591,7 +705,7 @@ Every route decorator above (and `mobile_auth_required`) stamps metadata attribu
 
 ### Automated guardrails
 
-- **Startup audit** — `audit_admin_route_guards()` in `app/startup_tasks.py` walks `app.url_map` for every `/admin` rule and warns (or raises, if `RBAC_ADMIN_ROUTE_GUARD_MODE=strict`) about any route with none of the guard decorators above and no `rbac_guard_audit_exempt`. Catches a **missing** guard.
+- **Startup audit** — `audit_admin_route_guards()` in `app/startup_tasks.py` (findings collected by `collect_admin_route_guard_findings()`, rules in [`app/routes/admin/route_policy.py`](../Backoffice/app/routes/admin/route_policy.py)) walks `app.url_map` for every `/admin` rule plus `/plugins/static` and warns (or raises, if `RBAC_ADMIN_ROUTE_GUARD_MODE=error`/`strict`) about: `missing_guard` (no guard decorator and no `rbac_guard_audit_exempt`), `non_admin_permission` (guarded only by a non-`admin.*` code), `read_permission_on_mutating_route` (POST/PUT/PATCH/DELETE behind a `*.view` code; read-only POST lookups are listed in `READ_ONLY_POST_ALLOWLIST`), `get_side_effect_name` (GET-only view named `cleanup_*`/`delete_*`/`send_*`/`test_*`...), `csrf_exempt_mutation` (CSRF-exempt mutation not in `CSRF_EXEMPT_MUTATION_ALLOWLIST`), and the per-endpoint policy tables (`SYSTEM_MANAGER_ONLY_ENDPOINTS`, `POST_ONLY_ENDPOINTS`, `REQUIRED_PERMISSION_BY_ENDPOINT`). `tests/unit/test_routes/test_admin_rbac_scope_hardening.py::TestGuardAudit` fails if the live app has any finding, if a policy entry names an endpoint that no longer exists, and proves each finding kind fires on a synthetic route.
 - **Catalog completeness test** — [`tests/unit/test_rbac_catalog_completeness.py`](../Backoffice/tests/unit/test_rbac_catalog_completeness.py) walks every registered view function's RBAC metadata (web + mobile) plus every baseline/plugin role's `permission_codes`, and asserts each referenced code exists in `_permission_catalog()` + `_extension_permission_catalog()`. Also guards against duplicate permission/role codes across core + plugins, and pins the two migration-backfilled roles from the pitfall above so their extra codes can't be trimmed from `_baseline_roles()` by accident. Catches a **typo'd/renamed** code — the class of bug where the guard exists but silently protects a permission that no non-System-Manager role can ever hold.
 - Neither check can verify *which* permission a route ought to have — only that a guard exists and that whatever it names is real. Code review still has to confirm `admin.foo.edit` is the *right* code for a given route (e.g. matching the equivalent HTML/JSON/mobile route for the same action).
 
@@ -600,6 +714,23 @@ Every route decorator above (and `mobile_auth_required`) stamps metadata attribu
 Only a System Manager may grant/revoke the `system_manager`, `admin_full`, or `admin_plugins_manager` roles. The codes are centralized once in `_RESTRICTED_RBAC_ROLE_CODES` ([`app/routes/admin/user_management/helpers.py`](../Backoffice/app/routes/admin/user_management/helpers.py)) and imported by every call site that assigns roles: `admin/user_management/crud.py` (HTML), `admin/user_management/api.py` (JSON), `api/mobile/admin_users.py` (mobile).
 
 `_critical_rbac_roles_integrity_ok(restricted_codes, restricted_role_ids)` gates all three call sites: if RBAC hasn't been seeded at all yet, there's nothing to enforce (returns `True`); if it *has* been seeded but one of those three role codes can't be resolved (renamed, corrupted, deleted out-of-band), it **fails closed** — RBAC role assignment is disabled entirely for non-System-Managers until `flask rbac seed` is re-run — rather than silently letting through whichever restriction couldn't be verified.
+
+### Canonical guard and permission model (admin routes)
+
+- **Canonical decorator:** `@permission_required('admin.<area>.<action>')` (or `permission_required_any`). An `admin.*` code can only come from a role or a *global* allow grant, which is exactly what `AuthorizationService.is_admin` tests, so it already implies the admin gate — `@admin_required` on top is redundant. The audit enforces the `admin.` prefix (non-`admin.` codes only for the `assignment.`/`documents.` families that carry their own object rules).
+- **`@admin_required` alone** is only for pages open to every admin whose view performs an object-level check (e.g. import change logs). **`@system_manager_required`** (stacked under `admin_required`/`permission_required`) is for platform-level capabilities. `admin_permission_required` is a shorthand for the combination.
+- **Read permissions never guard mutations.** Destructive housekeeping uses `admin.system.maintain` (end sessions, session cleanup, clear monitoring logs); resolving security events uses `admin.security.respond`; hard-deleting a country uses `admin.countries.delete`; writing Data Explorer imputed values uses `admin.data_explore.impute` (on top of `admin.data_explore.data_table`).
+- **System Manager only:** plugin install / upload / uninstall (the archive is extracted into the plugins directory and imported as Python — remote-code-execution equivalent) and the monitoring error-notification test. Plugin upload additionally needs `PLUGIN_UPLOAD_ENABLED=true` (`config/config.py` enables it by default only for development/testing; with no configured value the route treats it as off); activating/deactivating/configuring plugins stays on `admin.plugins.manage`.
+- **GET is safe and idempotent.** Side-effecting endpoints are POST-only (CSRF-protected). The one deliberate GET that mints a token is `/admin/api/refresh-csrf-token` (needed after a POST already failed on an expired token); it refuses `Sec-Fetch-Site: cross-site` and is `no-store`.
+- **Scope is enforced server-side, not by the UI.** `admin.*` permissions are global by default; object-level actions must additionally check scope: countries (`AuthorizationService.has_country_scoped_permission`, honours entity-scoped `RbacAccessGrant` deny/allow), Data Explorer rows (template access + country access, same rules as `apply_user_template_scoping`), import logs (System Manager, `admin.audit.view`, or the initiating user).
+- **Delegated administration (entity grants):** `AuthorizationService.can_delegate_entity_access(actor, entity_type, entity_id)` — System Managers everywhere; country-linked entities for actors with global country scope (`admin.countries.view|edit`, `admin.organization.manage`) or who hold the entity/its country themselves; Secretariat entities for `admin.organization.manage` or holders of the entity/its parent. Adding/removing a grant additionally refuses self-changes and admin/System Manager targets unless the actor is a System Manager. Form edits use `apply_scoped_entity_replace`, which never deletes rows the actor could not have granted.
+- **Role assignment:** non-System-Managers cannot hand out restricted roles, `admin_*` roles they do not hold, or any role that bundles an `admin.*` permission they do not hold (`_role_ids_blocked_for_actor`); `GET /admin/api/rbac/roles` lists only assignable roles.
+
+**Upgrade notes (no migration required; run `flask rbac seed`, which every deploy does):**
+
+- New permissions: `admin.system.maintain`, `admin.countries.delete`, `admin.data_explore.impute`. New role `admin_system_maintainer` (analytics view + maintain). `admin_countries_manager` gains `delete`; `admin_data_explorer_data_table` gains `impute`; `admin_full` gains `delete`/`impute` but **not** `admin.system.maintain`, `admin.settings.manage` or `admin.plugins.manage` (those stay explicit grants).
+- Behaviour changes for existing users: holders of only `admin.analytics.view` (including `admin_full`) can no longer end sessions / clean up sessions / clear monitoring logs until assigned `admin_system_maintainer`; `admin_plugins_manager` holders can no longer install/upload/uninstall plugins; custom roles that bundle the split-off actions must be given the new codes by an operator (the seeder does not touch custom roles). Non-System-Manager user managers can only delegate entity access within their own scope.
+- Config: set `PLUGIN_UPLOAD_ENABLED=false` (or leave unset in production) to disable ZIP upload, and optional `PLUGIN_PUBLIC_STATIC_PLUGINS` (plugin ids whose `/plugins/static/<id>/...` assets may be fetched anonymously; default none — everything else requires login).
 
 ### Troubleshooting
 

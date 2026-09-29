@@ -4,7 +4,7 @@ import base64
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, g
 from app.utils.api_helpers import get_json_safe, GENERIC_ERROR_MESSAGE
 from app.utils.request_utils import get_request_data
-from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_ok, json_server_error
 from flask_login import login_required, current_user
 from app.routes.admin.shared import admin_required, admin_permission_required
 from config import Config
@@ -1715,6 +1715,12 @@ def _resolve_email_template_test_recipient(data: dict):
         uid = int(raw_uid)
     except (TypeError, ValueError):
         return None, None, json_bad_request("recipient_user_id must be a valid user id.")
+
+    if uid != int(current_user.id):
+        from app.services.organization.authorization_service import AuthorizationService
+
+        if not AuthorizationService.is_system_manager(current_user):
+            return None, None, json_forbidden("Only a System Manager can send a test message to another user.")
 
     user = User.query.filter(User.id == uid, User.active.is_(True)).first()
     if not user:

@@ -117,9 +117,9 @@ class TestLegacyRedirects:
         resp = client.get("/public_submission_success/1")
         assert resp.status_code in (301, 302)
 
-    def test_legacy_document_download_redirect(self, client):
-        resp = client.get("/public_documents/download/1")
-        assert resp.status_code in (301, 302)
+    def test_legacy_document_download_unknown_id_404(self, client, db_session):
+        resp = client.get("/public_documents/download/999999")
+        assert resp.status_code == 404
 
 
 # =====================================================================
@@ -308,179 +308,98 @@ class TestDownloadResourceThumbnail:
 
 
 # =====================================================================
-# download_document_thumbnail_public
+# download_document_thumbnail_public / display_document_file_public
 # =====================================================================
 
 
-class TestDownloadDocumentThumbnailPublic:
-    def test_not_public_404(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = False
+def _make_document(db_session, **overrides):
+    from app.models.documents import SubmittedDocument
+    from app.models.enums import DocumentStatus
+    from tests.factories import create_test_user
 
-        with patch("app.routes.public.SubmittedDocument") as MockDoc:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            resp = client.get("/documents/thumbnail/1")
-        assert resp.status_code == 404
-
-    def test_not_approved_404(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.status = "pending"
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            MockStatus.normalize.return_value = MagicMock()  # Not APPROVED
-            MockStatus.APPROVED = object()
-            resp = client.get("/documents/thumbnail/1")
-        assert resp.status_code == 404
-
-    def test_no_thumbnail_path_404(self, app, client):
-        from app.models.enums import DocumentStatus
-
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.thumbnail_relative_path = None
-        mock_doc.status = "approved"
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
-            resp = client.get("/documents/thumbnail/1")
-        assert resp.status_code == 404
-
-    def test_thumbnail_not_in_storage_404(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.thumbnail_relative_path = "thumb/path.jpg"
-        mock_doc.status = "approved"
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus, \
-             patch("app.routes.public.storage") as mock_storage:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
-            mock_storage.submitted_document_rel_storage_category.return_value = "cat"
-            mock_storage.exists.return_value = False
-            resp = client.get("/documents/thumbnail/1")
-        assert resp.status_code == 404
-
-    def test_thumbnail_success(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.thumbnail_relative_path = "thumb/path.jpg"
-        mock_doc.status = "approved"
-
-        fake_response = make_response(b"thumb", 200)
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus, \
-             patch("app.routes.public.storage") as mock_storage:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
-            mock_storage.submitted_document_rel_storage_category.return_value = "cat"
-            mock_storage.exists.return_value = True
-            mock_storage.stream_response.return_value = fake_response
-            resp = client.get("/documents/thumbnail/1")
-        assert resp.status_code == 200
+    user = create_test_user(db_session)
+    fields = dict(
+        filename="cover.png",
+        storage_path="docs/cover.png",
+        thumbnail_relative_path="thumb/cover.jpg",
+        is_public=True,
+        status=DocumentStatus.APPROVED,
+        uploaded_by_user_id=user.id,
+    )
+    fields.update(overrides)
+    doc = SubmittedDocument(**fields)
+    db_session.add(doc)
+    db_session.flush()
+    return doc
 
 
-# =====================================================================
-# display_document_file_public
-# =====================================================================
+class _PublicImageRouteCases:
+    """Shared matrix; subclasses set ``kind`` ("thumbnail" or "display")."""
 
+    kind = ""
 
-class TestDisplayDocumentFilePublic:
-    def test_not_public_404(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = False
+    def _url(self, ref):
+        return f"/documents/{self.kind}/{ref}"
 
-        with patch("app.routes.public.SubmittedDocument") as MockDoc:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            resp = client.get("/documents/display/1")
-        assert resp.status_code == 404
-
-    def test_not_image_extension_404(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.filename = "report.pdf"
-        mock_doc.status = "approved"
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
-            resp = client.get("/documents/display/1")
-        assert resp.status_code == 404
-
-    def test_image_not_in_storage_404(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.filename = "cover.jpg"
-        mock_doc.storage_path = "docs/cover.jpg"
-        mock_doc.status = "approved"
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus, \
-             patch("app.routes.public.storage") as mock_storage:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
-            mock_storage.submitted_document_rel_storage_category.return_value = "cat"
-            mock_storage.exists.return_value = False
-            resp = client.get("/documents/display/1")
-        assert resp.status_code == 404
-
-    def test_image_success(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.filename = "cover.png"
-        mock_doc.storage_path = "docs/cover.png"
-        mock_doc.status = "approved"
-
+    def _get(self, client, doc, *, by_public_id, storage_exists=True):
         fake_response = make_response(b"img", 200)
-
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus, \
-             patch("app.routes.public.storage") as mock_storage:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
+        ref = doc.public_id if by_public_id else doc.id
+        with patch("app.routes.public.storage") as mock_storage:
             mock_storage.submitted_document_rel_storage_category.return_value = "cat"
-            mock_storage.exists.return_value = True
+            mock_storage.exists.return_value = storage_exists
             mock_storage.stream_response.return_value = fake_response
-            resp = client.get("/documents/display/1")
-        assert resp.status_code == 200
+            return client.get(self._url(ref))
 
-    def test_webp_image_success(self, app, client):
-        mock_doc = MagicMock()
-        mock_doc.is_public = True
-        mock_doc.filename = "cover.webp"
-        mock_doc.storage_path = "docs/cover.webp"
-        mock_doc.status = "approved"
+    @pytest.mark.parametrize("by_public_id", [True, False])
+    def test_public_approved_served(self, client, db_session, by_public_id):
+        doc = _make_document(db_session)
+        assert self._get(client, doc, by_public_id=by_public_id).status_code == 200
 
-        fake_response = make_response(b"img", 200)
+    @pytest.mark.parametrize("by_public_id", [True, False])
+    def test_not_public_404(self, client, db_session, by_public_id):
+        doc = _make_document(db_session, is_public=False)
+        assert self._get(client, doc, by_public_id=by_public_id).status_code == 404
 
-        with patch("app.routes.public.SubmittedDocument") as MockDoc, \
-             patch("app.routes.public.DocumentStatus") as MockStatus, \
-             patch("app.routes.public.storage") as mock_storage:
-            MockDoc.query.get_or_404.return_value = mock_doc
-            approved = MagicMock()
-            MockStatus.normalize.return_value = approved
-            MockStatus.APPROVED = approved
-            mock_storage.submitted_document_rel_storage_category.return_value = "cat"
-            mock_storage.exists.return_value = True
-            mock_storage.stream_response.return_value = fake_response
-            resp = client.get("/documents/display/1")
-        assert resp.status_code == 200
+    @pytest.mark.parametrize("status", ["pending", "rejected"])
+    @pytest.mark.parametrize("by_public_id", [True, False])
+    def test_not_approved_404(self, client, db_session, by_public_id, status):
+        doc = _make_document(db_session, status=status)
+        assert self._get(client, doc, by_public_id=by_public_id).status_code == 404
+
+    def test_unknown_public_id_404(self, client, db_session):
+        from uuid import uuid4
+        assert client.get(self._url(uuid4())).status_code == 404
+
+    def test_unknown_integer_id_404(self, client, db_session):
+        assert client.get(self._url(999999)).status_code == 404
+
+    def test_integer_segment_never_matches_public_id_route(self, client, db_session):
+        doc = _make_document(db_session)
+        resp = client.get(self._url(str(doc.public_id).replace("-", "")[:8]))
+        assert resp.status_code == 404
+
+    def test_not_in_storage_404(self, client, db_session):
+        doc = _make_document(db_session)
+        assert self._get(client, doc, by_public_id=True, storage_exists=False).status_code == 404
+
+
+class TestDownloadDocumentThumbnailPublic(_PublicImageRouteCases):
+    kind = "thumbnail"
+
+    def test_no_thumbnail_path_404(self, client, db_session):
+        doc = _make_document(db_session, thumbnail_relative_path=None)
+        assert self._get(client, doc, by_public_id=True).status_code == 404
+
+
+class TestDisplayDocumentFilePublic(_PublicImageRouteCases):
+    kind = "display"
+
+    @pytest.mark.parametrize("filename", ["cover.jpg", "cover.jpeg", "cover.gif", "cover.webp"])
+    def test_image_extensions_served(self, client, db_session, filename):
+        doc = _make_document(db_session, filename=filename)
+        assert self._get(client, doc, by_public_id=True).status_code == 200
+
+    @pytest.mark.parametrize("filename", ["report.pdf", "logo.svg", "page.html"])
+    def test_non_raster_extension_404(self, client, db_session, filename):
+        doc = _make_document(db_session, filename=filename)
+        assert self._get(client, doc, by_public_id=True).status_code == 404

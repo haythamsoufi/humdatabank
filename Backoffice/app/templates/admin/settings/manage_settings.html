@@ -460,7 +460,7 @@
       <div class="branding-visual-upload-box">
       <div class="mb-3 max-w-4xl space-y-1.5">
         <p class="text-xs text-gray-400">{{ _('Azure Blob uploads are enabled. Choose image files below; they are stored in your configured Azure Blob container (same as other uploads), under system/branding/. After uploading, click Save so the paths are recorded in branding settings.') }}</p>
-        <p class="text-xs text-gray-400">{{ _('Formats: PNG, JPEG, GIF, WebP, and SVG for the logo; favicon also accepts ICO. Maximum 2 MB per file.') }}</p>
+        <p class="text-xs text-gray-400">{{ _('Formats: PNG, JPEG, GIF, and WebP for the logo; favicon also accepts ICO. SVG uploads are not accepted (use a bundled static SVG via the path field). Maximum 2 MB per file.') }}</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -493,7 +493,7 @@
           <input type="file"
                  id="branding-logo-file"
                  class="file-input-hidden"
-                 accept=".png,.jpg,.jpeg,.gif,.webp,.svg,image/png,image/jpeg,image/gif,image/webp,image/svg+xml" />
+                 accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp" />
 
           <div class="flex items-center gap-2 flex-wrap">
             <label for="branding-logo-file"
@@ -538,7 +538,7 @@
           <input type="file"
                  id="branding-favicon-file"
                  class="file-input-hidden"
-                 accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.ico,image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon" />
+                 accept=".png,.jpg,.jpeg,.gif,.webp,.ico,image/png,image/jpeg,image/gif,image/webp,image/x-icon" />
 
           <div class="flex items-center gap-2 flex-wrap">
             <label for="branding-favicon-file"

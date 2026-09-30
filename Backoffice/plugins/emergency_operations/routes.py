@@ -444,6 +444,8 @@ def create_blueprint():
                 name_with_code = f"{operation_name} ({operation_code})" if operation_code else operation_name
 
                 list_data.append({
+                    'id': operation_code,
+                    '_id': operation_code,
                     'name': operation_name,
                     'code': operation_code,
                     'name_with_code': name_with_code,
@@ -975,6 +977,38 @@ def get_emergency_operations_config_ui(config=None):
     return html
 
 
+def _assignment_period_from_request():
+    """Period name for the assignment that opened this lookup, when the request has one."""
+    from flask import has_request_context, request
+
+    if not has_request_context():
+        return None
+    payload = request.get_json(silent=True) or {}
+    aes_id = payload.get('assignment_entity_status_id')
+    if not aes_id:
+        return None
+    try:
+        from app.extensions import db
+        from app.models.assignments import AssignmentEntityStatus
+
+        aes = db.session.get(AssignmentEntityStatus, int(aes_id))
+    except (TypeError, ValueError):
+        return None
+    period = getattr(getattr(aes, 'assigned_form', None), 'period_name', None) if aes else None
+    text = str(period).strip() if period else ''
+    return text or None
+
+
+def _end_date_gte_for_assignment_period(period_name):
+    """Year from a period label, as the inclusive end-date cutoff the dropdown already uses."""
+    import re
+
+    match = re.search(r'\b(20\d{2})\b', str(period_name or ''))
+    if not match:
+        return None
+    return f"{match.group(1)}-01-01"
+
+
 def get_emergency_operations_options_handler(country_iso=None, config=None, **kwargs):
     """
     Handler function for getting emergency operations lookup list options.
@@ -1072,12 +1106,20 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
         else:
             normalized_config['start_date'] = None
 
-        # Handle end_date_gt - get from config or use plugin default
+        # Handle end_date_gt - get from config or use plugin default.
+        # assignment_period overrides the static date, matching the repeat-group dropdown.
         end_date_gt = None
+        timeframe_mode = None
         if config:
             end_date_gt = config.get('end_date_gt')
             if end_date_gt is None:
                 end_date_gt = config.get('emops_end_date_gt')
+            timeframe_mode = config.get('emops_timeframe_mode') or config.get('timeframe_mode')
+
+        if timeframe_mode == 'assignment_period':
+            period_end = _end_date_gte_for_assignment_period(_assignment_period_from_request())
+            if period_end:
+                end_date_gt = period_end
 
         # If not in config, get default from plugin config
         if not end_date_gt:
@@ -1114,6 +1156,8 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
 
             # Create a row dictionary with the expected structure
             row_dict = {
+                'id': operation_code,
+                '_id': operation_code,
                 'name': operation_name,
                 'code': operation_code,
                 'name_with_code': name_with_code,
@@ -1200,6 +1244,13 @@ def get_emergency_operations_data(country_iso=None, config=None):
         if country_iso:
             results = _filter_by_country_iso(results, country_iso)
             current_app.logger.debug(f"[EmOps Direct] Filtered by iso={country_iso}: {len(results)} results")
+
+        if end_date_gt:
+            before_end = len(results)
+            results = _apply_filters(results, end_date_gt=end_date_gt)
+            current_app.logger.debug(
+                f"[EmOps Direct] Filtered by end_date_gt {end_date_gt}: {len(results)} of {before_end} remaining"
+            )
 
         # Filter by start_date if provided (client-side filtering as backup)
         if start_date:

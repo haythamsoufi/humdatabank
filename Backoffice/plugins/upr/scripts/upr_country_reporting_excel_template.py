@@ -3638,10 +3638,10 @@ def run_upr_country_reporting_import(
 
     with _ctx:
         _, country_name, iso3, period = _load_assignment_meta(aes_id)
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
         with _quiet_openpyxl_io():
-            wb = load_workbook_safe(input_path, read_only=False, data_only=True)
+            wb = load_workbook_safe(read_workbook_file_bytes(input_path), read_only=False, data_only=True)
         meta = validate_upr_country_reporting_workbook(
             wb,
             expected_country=country_name,

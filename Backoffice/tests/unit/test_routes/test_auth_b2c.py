@@ -1,5 +1,6 @@
 """Unit/integration tests for Azure B2C and web auth routes in app.routes.auth."""
 import time
+from urllib.parse import urlparse
 from unittest.mock import MagicMock, patch
 
 import jwt
@@ -66,7 +67,7 @@ class TestB2cConfigHelpers:
             with patch('app.routes.auth.requests.get', return_value=mock_resp) as mock_get:
                 meta = _b2c_metadata('tenant.onmicrosoft.com', 'B2C_1_signin')
         assert meta['issuer'] == 'https://login.example.com'
-        assert 'tenant.b2clogin.com' in mock_get.call_args[0][0]
+        assert urlparse(mock_get.call_args[0][0]).hostname == 'tenant.b2clogin.com'
 
     def test_verify_and_decode_id_token_no_jwks(self, app):
         with app.app_context():
@@ -94,7 +95,7 @@ class TestAzureLoginRoute:
         with patch('app.routes.auth._b2c_metadata', return_value=meta):
             resp = client.get('/login/azure', follow_redirects=False)
         assert resp.status_code in (301, 302, 303, 307, 308)
-        assert 'login.example.com' in (resp.headers.get('Location') or '')
+        assert urlparse(resp.headers.get('Location') or '').hostname == 'login.example.com'
 
     def test_azure_login_mobile_clears_stale_session(self, client, logged_in_client, app):
         app.config.update({

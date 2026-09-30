@@ -234,8 +234,9 @@ class TestStrictMode:
             "https://images.example.org http://insecure.example.org * 'unsafe-inline' https://ok.example.org;script-src",
         )
         img = _csp_directives(_headers(app).headers["Content-Security-Policy"])["img-src"]
-        assert "https://images.example.org" in img
-        assert "http://insecure.example.org" not in img
+        img_sources = list(img)
+        assert "https://images.example.org" in img_sources
+        assert "http://insecure.example.org" not in img_sources
         assert "'unsafe-inline'" not in img
         assert "https://ok.example.org;script-src" not in img
 

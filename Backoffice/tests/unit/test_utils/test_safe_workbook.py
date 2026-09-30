@@ -19,6 +19,7 @@ from app.utils.safe_workbook import (
     inspect_xlsx,
     load_workbook_safe,
     read_excel_safe,
+    read_workbook_file_bytes,
     safe_iter_rows,
 )
 
@@ -41,11 +42,16 @@ def _zip_with(members):
     return buf.getvalue()
 
 
-def test_loads_valid_workbook_from_bytes_stream_path_and_filestorage(tmp_path):
+def test_loads_valid_workbook_from_bytes_stream_trusted_path_and_filestorage(tmp_path):
     data = _xlsx_bytes()
     path = tmp_path / "w.xlsx"
     path.write_bytes(data)
-    for source in (data, io.BytesIO(data), str(path), FileStorage(io.BytesIO(data), filename="w.xlsx")):
+    for source in (
+        data,
+        io.BytesIO(data),
+        read_workbook_file_bytes(str(path)),
+        FileStorage(io.BytesIO(data), filename="w.xlsx"),
+    ):
         wb = load_workbook_safe(source)
         assert [tuple(r) for r in wb.active.iter_rows(values_only=True)] == [(1, "a"), (2, "b")]
         wb.close()
@@ -226,3 +232,19 @@ def test_no_unguarded_workbook_loaders_in_upload_paths():
                 if pattern.search(line) and "load_workbook_safe(" not in line:
                     offenders.append(f"{rel}:{lineno}")
     assert not offenders, "Use app.utils.safe_workbook for untrusted workbooks: " + ", ".join(offenders)
+
+
+def test_path_sources_are_rejected_by_the_loader(tmp_path):
+    path = tmp_path / "w.xlsx"
+    path.write_bytes(_xlsx_bytes())
+    with pytest.raises(TypeError):
+        load_workbook_safe(str(path))
+
+
+def test_read_workbook_file_bytes_enforces_size_cap_and_missing_file(tmp_path):
+    path = tmp_path / "w.xlsx"
+    path.write_bytes(_xlsx_bytes())
+    with pytest.raises(UnsafeWorkbookError):
+        read_workbook_file_bytes(str(path), WorkbookLimits(max_upload_bytes=10))
+    with pytest.raises(UnsafeWorkbookError):
+        read_workbook_file_bytes(str(tmp_path / "missing.xlsx"))

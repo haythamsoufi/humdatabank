@@ -263,12 +263,11 @@ class APITester:
 
     def run_all_tests(self):
         """Run all API endpoint tests"""
-        api_key_display = '*' * (len(self.api_key) - 4) + self.api_key[-4:] if len(self.api_key) > 4 else '****'
         logger.info("=" * 80)
         logger.info("API Endpoint Test Suite")
         logger.info("=" * 80)
         logger.info("Base URL: %s", self.base_url)
-        logger.info("API Key: %s", api_key_display)
+        logger.info("API Key: %s", "provided" if self.api_key else "missing")
         logger.info("Test Client: %s", 'Flask Test Client' if self.use_flask_client else 'Requests')
         logger.info("")
 

@@ -1302,10 +1302,10 @@ def run_unified_country_plan_import(
     _aes, country_name, iso3, period, _region = _load_assignment_meta(aes_id)
     ctx = build_import_context([PLANNING_COUNTRY_TEMPLATE_ID])
 
-    from app.utils.safe_workbook import load_workbook_safe
+    from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
     with _quiet_openpyxl_io():
-        wb = load_workbook_safe(workbook_path, read_only=False, data_only=True)
+        wb = load_workbook_safe(read_workbook_file_bytes(workbook_path), read_only=False, data_only=True)
     try:
         validation = validate_unified_country_plan_import_file(
             wb,

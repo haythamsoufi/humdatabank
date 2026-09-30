@@ -1229,9 +1229,13 @@ class AIDocumentProcessor:
         }
 
         try:
-            from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
+            from app.utils.safe_workbook import (
+                load_workbook_safe,
+                read_workbook_file_bytes,
+                safe_iter_rows,
+            )
 
-            wb = load_workbook_safe(file_path, read_only=True, data_only=True)
+            wb = load_workbook_safe(read_workbook_file_bytes(file_path), read_only=True, data_only=True)
 
             result['metadata'] = {
                 'title': filename,

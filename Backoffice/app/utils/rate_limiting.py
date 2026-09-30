@@ -143,7 +143,9 @@ def rate_limit(requests_per_minute=10, key_func=None, flash_message=None, redire
                     return redirect(url_for(redirect_to))
                 elif request.endpoint:
                     # Path only (no query string) to avoid redirect loops.
-                    return redirect(request.path)
+                    from app.utils.redirect_utils import safe_redirect
+
+                    return safe_redirect(request.path)
                 else:
                     try:
                         return redirect(url_for('main.dashboard'))

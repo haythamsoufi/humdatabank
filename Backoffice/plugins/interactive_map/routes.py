@@ -23,6 +23,8 @@ from app.utils.api_responses import json_bad_request, json_error, json_not_found
 
 from pathlib import Path
 
+_TILE_CONTENT_TYPES = frozenset({'image/png', 'image/jpeg', 'image/webp'})
+
 plugin_config = load_plugin_config(Path(__file__).parent, "interactive_map")
 
 
@@ -106,9 +108,16 @@ def create_blueprint():
                 )
                 return Response(status=upstream.status_code)
 
+            upstream_type = (upstream.headers.get('Content-Type') or '').split(';')[0].strip().lower()
+            if upstream_type not in _TILE_CONTENT_TYPES:
+                current_app.logger.warning('Mapbox tile proxy rejected upstream content type %r', upstream_type)
+                return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
+
             headers = {
-                'Content-Type': upstream.headers.get('Content-Type', 'image/png'),
+                'Content-Type': upstream_type,
                 'Cache-Control': 'public, max-age=86400',
+                'X-Content-Type-Options': 'nosniff',
+                'Content-Security-Policy': "default-src 'none'; sandbox",
             }
             return Response(upstream.content, status=200, headers=headers)
         except requests.exceptions.RequestException as exc:

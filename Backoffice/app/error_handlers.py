@@ -14,7 +14,7 @@ from flask_wtf.csrf import CSRFError, generate_csrf
 
 from app.utils.csp_nonce import get_style_nonce
 from app.utils.logging_security import redact_url
-from app.utils.redirect_utils import get_current_relative_url
+from app.utils.redirect_utils import get_current_relative_url, safe_redirect
 from app.utils.request_utils import is_json_request
 from app.utils.session_persistence import suppress_session_cookie_for_request
 
@@ -200,7 +200,7 @@ def register_error_handlers(app):
             flash(flash_message, "warning")
         with suppress(Exception):
             generate_csrf()
-        return redirect(_safe_csrf_reload_url())
+        return safe_redirect(_safe_csrf_reload_url())
 
     @app.errorhandler(400)
     def bad_request(error):

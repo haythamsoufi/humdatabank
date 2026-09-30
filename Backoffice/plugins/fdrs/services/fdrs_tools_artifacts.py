@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, BinaryIO, Dict, List, Optional, Union
 
@@ -178,8 +179,10 @@ def _as_filter_text(value: Any) -> str:
 
 
 def _open_workbook(source: Source):
-    from app.utils.safe_workbook import load_workbook_safe
+    from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
+    if isinstance(source, (str, os.PathLike)):
+        return load_workbook_safe(read_workbook_file_bytes(source), read_only=True, data_only=True)
     if hasattr(source, "read") and not isinstance(source, (bytes, bytearray)):
         data = source.read()
         if isinstance(data, str):

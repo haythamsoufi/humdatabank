@@ -97,7 +97,7 @@ def sanitize_blank_body_html(html: str) -> str:
     except Exception:
         from markupsafe import escape as _escape
 
-        return str(_escape(re.sub(r'<[^>]+>', '', html)))
+        return str(_escape(re.sub(r'<[^<>]+>', '', html)))
 
 
 def is_conditions_meaningful(conditions_json):

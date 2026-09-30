@@ -21,6 +21,8 @@ import stat
 import zipfile
 from pathlib import Path
 
+from werkzeug.security import safe_join
+
 # Create blueprint
 plugin_bp = Blueprint('plugin_management', __name__, url_prefix='/admin/api/plugins')
 
@@ -529,9 +531,12 @@ def serve_plugin_static(plugin_name, filename):
             )
 
         static_dir = Path(static_dir).resolve()
-        static_file = (static_dir / filename).resolve()
+        joined = safe_join(str(static_dir), filename)
+        if joined is None:
+            return current_app.response_class("Access denied", status=403, mimetype='text/plain')
+        static_file = Path(joined).resolve()
 
-        # Security check: ensure file is within static directory
+        # Symlinks may still point outside the directory after the lexical join.
         try:
             static_file.relative_to(static_dir)
         except ValueError:

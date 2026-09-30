@@ -14,7 +14,7 @@ from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
-MIN_SIGNING_SECRET_LENGTH = 32
+MIN_SIGNING_KEY_LENGTH = 32
 
 # config/gunicorn.conf.py runs 3 workers when GUNICORN_WORKERS is unset.
 _GUNICORN_CONF_DEFAULT_WORKERS = 3
@@ -82,8 +82,8 @@ def collect_security_findings(app) -> Tuple[List[str], List[str]]:
             )
         elif mobile_secret == secret_key:
             errors.append("MOBILE_JWT_SECRET must differ from SECRET_KEY.")
-        elif len(mobile_secret) < MIN_SIGNING_SECRET_LENGTH:
-            errors.append(f"MOBILE_JWT_SECRET is too short (minimum {MIN_SIGNING_SECRET_LENGTH} characters).")
+        elif len(mobile_secret) < MIN_SIGNING_KEY_LENGTH:
+            errors.append(f"MOBILE_JWT_SECRET is too short (minimum {MIN_SIGNING_KEY_LENGTH} characters).")
 
         if not ai_secret:
             warnings.append(
@@ -92,8 +92,8 @@ def collect_security_findings(app) -> Tuple[List[str], List[str]]:
             )
         elif ai_secret in (secret_key, mobile_secret):
             errors.append("AI_JWT_SECRET must differ from SECRET_KEY and MOBILE_JWT_SECRET.")
-        elif len(ai_secret) < MIN_SIGNING_SECRET_LENGTH:
-            errors.append(f"AI_JWT_SECRET is too short (minimum {MIN_SIGNING_SECRET_LENGTH} characters).")
+        elif len(ai_secret) < MIN_SIGNING_KEY_LENGTH:
+            errors.append(f"AI_JWT_SECRET is too short (minimum {MIN_SIGNING_KEY_LENGTH} characters).")
 
         if not cfg.get("TRUST_PROXY_HEADERS"):
             warnings.append(

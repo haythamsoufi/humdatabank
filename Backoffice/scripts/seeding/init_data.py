@@ -33,18 +33,22 @@ _PASSWORD_ENV_BY_ROLE = {
 }
 
 
-def _password_for(role: str, generated: dict) -> str:
-    """Password from the role's env var, else a random one remembered in ``generated`` (printed once)."""
+def _password_for(role: str, randomized_roles: set) -> str:
+    """Password from the role's env var, else a random one that is never displayed or stored.
+
+    Seeded accounts without a configured password are only reachable through the
+    development "Act as" login panel or a password reset, so no credential ever
+    reaches stdout, CI logs or disk.
+    """
     configured = (os.environ.get(_PASSWORD_ENV_BY_ROLE[role]) or '').strip()
     if configured:
         return configured
-    if role not in generated:
-        generated[role] = secrets.token_urlsafe(16)
-    return generated[role]
+    randomized_roles.add(role)
+    return secrets.token_urlsafe(24)
 
 
 def main():
-    generated_passwords: dict = {}
+    randomized_roles: set = set()
     try:
         flask_config = (os.environ.get('FLASK_CONFIG') or '').strip().lower()
         if flask_config != 'development':
@@ -116,7 +120,7 @@ def main():
                         # Set default sex categories
                         default_sex_categories = ["Male", "Female", "Non-binary", "Unknown"]
                         set_sex_categories(default_sex_categories, user_id=None)
-                        logger.info('  - Set default sex categories: %s', ", ".join(default_sex_categories))
+                        logger.info('  - Set default sex categories: %d entries', len(default_sex_categories))
 
                         # Set default enabled entity types
                         set_enabled_entity_types(["countries", "ns_structure", "secretariat"], user_id=None)
@@ -194,7 +198,7 @@ def main():
                     admin_exists = User.query.filter_by(email='test_admin@humdatabank.org').first()
                     if not admin_exists:
                         admin = User(email='test_admin@humdatabank.org', name='Test Admin')
-                        admin.set_password(_password_for('admin', generated_passwords))
+                        admin.set_password(_password_for('admin', randomized_roles))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(admin)
@@ -212,7 +216,7 @@ def main():
                     second_admin_exists = User.query.filter_by(email='test_admin2@humdatabank.org').first()
                     if not second_admin_exists:
                         admin2 = User(email='test_admin2@humdatabank.org', name='Test Admin 2')
-                        admin2.set_password(_password_for('admin', generated_passwords))
+                        admin2.set_password(_password_for('admin', randomized_roles))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(admin2)
@@ -230,7 +234,7 @@ def main():
                     focal_point_exists = User.query.filter_by(email='test_focal@humdatabank.org').first()
                     if not focal_point_exists:
                         focal_point = User(email='test_focal@humdatabank.org', name='Test Focal Point')
-                        focal_point.set_password(_password_for('focal', generated_passwords))
+                        focal_point.set_password(_password_for('focal', randomized_roles))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(focal_point)
@@ -248,7 +252,7 @@ def main():
                     second_focal_exists = User.query.filter_by(email='test_focal2@humdatabank.org').first()
                     if not second_focal_exists:
                         focal_point2 = User(email='test_focal2@humdatabank.org', name='Test Focal Point 2')
-                        focal_point2.set_password(_password_for('focal', generated_passwords))
+                        focal_point2.set_password(_password_for('focal', randomized_roles))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(focal_point2)
@@ -271,7 +275,7 @@ def main():
                     sys_manager_exists = User.query.filter_by(email='test_sys@humdatabank.org').first()
                     if not sys_manager_exists:
                         sys_manager = User(email='test_sys@humdatabank.org', name='Test System Manager')
-                        sys_manager.set_password(_password_for('sys_manager', generated_passwords))
+                        sys_manager.set_password(_password_for('sys_manager', randomized_roles))
                         try:
                             with atomic(remove_session=True):
                                 db.session.add(sys_manager)
@@ -282,10 +286,12 @@ def main():
                             logger.info('Default system manager user already exists (skipped)')
 
                     logger.info('Default data creation complete!')
-                    if generated_passwords:
-                        print("Generated passwords (shown once; set TEST_*_PASSWORD to choose your own):")
-                        for role, password in generated_passwords.items():
-                            print(f"  {role}: {password}")
+                    if randomized_roles:
+                        logger.info(
+                            'Seeded roles with a random, undisclosed password: %s. Log in through the '
+                            'development "Act as" panel, or set the TEST_*_PASSWORD variables and re-seed.',
+                            ', '.join(sorted(randomized_roles)),
+                        )
                 else:
                     logger.info('Found %d existing users, skipping default data creation', user_count)
             else:

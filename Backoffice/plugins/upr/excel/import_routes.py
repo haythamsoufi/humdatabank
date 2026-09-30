@@ -8,6 +8,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from pathlib import Path
+from urllib.parse import quote
 
 from flask import Blueprint, redirect, request, send_file, current_app, url_for
 from flask_login import current_user
@@ -59,7 +60,9 @@ legacy_bp = Blueprint("upr_excel_import_legacy", __name__, url_prefix="/admin/te
 @admin_permission_required("admin.templates.view")
 @system_manager_required
 def legacy_redirect(subpath: str = ""):
-    target = url_for("upr_excel_import.wizard") if not subpath else f"/admin/upr-excel-import/{subpath}"
+    if not subpath:
+        return redirect(url_for("upr_excel_import.wizard"), code=301)
+    target = f"{bp.url_prefix}/{quote(subpath.lstrip('/'), safe='/')}"
     return redirect(target, code=301)
 
 UPR_TEMPLATE_CHOICES = [

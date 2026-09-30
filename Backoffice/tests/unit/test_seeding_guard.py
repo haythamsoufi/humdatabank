@@ -116,16 +116,17 @@ class TestInitDataScript:
         with patch.dict(os.environ, env):
             assert module.main() == 1
 
-    def test_passwords_from_env_else_random_and_remembered(self):
+    def test_passwords_from_env_else_random_and_never_recorded(self):
         module = _load_init_data()
-        generated: dict = {}
+        randomized: set = set()
         with patch.dict(os.environ, {"TEST_ADMIN_PASSWORD": "from-env-value"}):
             os.environ.pop("TEST_FOCAL_PASSWORD", None)
-            assert module._password_for("admin", generated) == "from-env-value"
-            first = module._password_for("focal", generated)
-            assert first == module._password_for("focal", generated)
+            assert module._password_for("admin", randomized) == "from-env-value"
+            first = module._password_for("focal", randomized)
+            second = module._password_for("focal", randomized)
         assert len(first) >= 16 and first != "test123"
-        assert "admin" not in generated
+        assert first != second
+        assert randomized == {"focal"}
 
 
 class TestScanSecretsFlagsSeedPasswords:

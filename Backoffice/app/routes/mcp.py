@@ -205,7 +205,8 @@ def _rate_limit_key() -> str:
         return f"mcp:user:{current_user.get_id()}"
     presented = _presented_api_key()
     if presented:
-        return "mcp:key:" + hashlib.sha256(presented.encode("utf-8")).hexdigest()[:24]
+        digest = hashlib.blake2b(presented.encode("utf-8"), digest_size=12).hexdigest()
+        return "mcp:key:" + digest
     try:
         from app.services.platform.user_analytics_service import get_client_ip
 

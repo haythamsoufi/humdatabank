@@ -1333,9 +1333,9 @@ def load_upr_data_sheet(path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
     except ImportError as exc:
         raise RuntimeError("Excel support requires openpyxl: pip install openpyxl") from exc
 
-    from app.utils.safe_workbook import load_workbook_safe
+    from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
-    wb = load_workbook_safe(path, read_only=True, data_only=True)
+    wb = load_workbook_safe(read_workbook_file_bytes(path), read_only=True, data_only=True)
     if UPR_DATA_SHEET not in wb.sheetnames:
         wb.close()
         raise ValueError(f"Sheet {UPR_DATA_SHEET!r} not found in workbook")

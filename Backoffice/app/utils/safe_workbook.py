@@ -92,16 +92,8 @@ def _read_source_bytes(source: WorkbookSource, limits: WorkbookLimits) -> bytes:
     cap = limits.max_upload_bytes
     if isinstance(source, (bytes, bytearray)):
         data = bytes(source)
-    elif isinstance(source, (str, os.PathLike)) and not hasattr(source, "read"):
-        path = os.fspath(source)
-        try:
-            size = os.path.getsize(path)
-        except OSError as exc:
-            raise UnsafeWorkbookError("The spreadsheet file could not be read.") from exc
-        if size > cap:
-            raise UnsafeWorkbookError("The spreadsheet file is too large.")
-        with open(path, "rb") as fh:
-            data = fh.read(cap + 1)
+    elif isinstance(source, (str, os.PathLike)):
+        raise TypeError("Read files with read_workbook_file_bytes() and pass the bytes.")
     else:
         stream = source if hasattr(source, "read") else getattr(source, "stream", source)
         try:
@@ -123,6 +115,20 @@ def _read_source_bytes(source: WorkbookSource, limits: WorkbookLimits) -> bytes:
         raise UnsafeWorkbookError("The spreadsheet file is too large.")
     if not data:
         raise UnsafeWorkbookError("The spreadsheet file is empty.")
+    return data
+
+
+def read_workbook_file_bytes(path: "str | os.PathLike[str]", limits: Optional[WorkbookLimits] = None) -> bytes:
+    """Read a workbook from a *trusted* local path (never a request-derived one), size-capped."""
+    limits = limits or WorkbookLimits.from_config()
+    cap = limits.max_upload_bytes
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read(cap + 1)
+    except OSError as exc:
+        raise UnsafeWorkbookError("The spreadsheet file could not be read.") from exc
+    if len(data) > cap:
+        raise UnsafeWorkbookError("The spreadsheet file is too large.")
     return data
 
 
@@ -182,8 +188,8 @@ def load_workbook_safe(
 ):
     """Open an untrusted ``.xlsx`` with size/zip/dimension checks. Returns an openpyxl Workbook.
 
-    ``source`` may be bytes, a filesystem path, a file-like object or a werkzeug
-    ``FileStorage``. Pass ``read_only=False`` only when the caller must mutate cells
+    ``source`` may be bytes, a file-like object or a werkzeug ``FileStorage``
+    (use ``read_workbook_file_bytes`` for a trusted local path). Pass ``read_only=False`` only when the caller must mutate cells
     or access random cell coordinates; dimensions are still bounded up front.
     """
     import openpyxl

@@ -12,7 +12,7 @@
 {% from "components/ag_grid_includes.html" import ag_grid_body_wrap, ag_grid_skeleton_inner %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
-    {% set explore_first_tab = explore_first_tab|default('data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else ('compliance' if can_access_compliance else (explorer_extension_tabs_render[0].tab_id if explorer_extension_tabs_render else 'data-table')))) %}
+    {% set explore_first_tab = explore_first_tab|default('data-table' if can_access_data_table|default(false) else (explorer_extension_tabs_render[0].tab_id if explorer_extension_tabs_render else 'data-table')) %}
     {% set pb_manage_tab = (explorer_extension_tabs_render|selectattr('tab_id', 'equalto', 'pb-progress')|selectattr('can_manage')|list|length > 0) %}
 
 {{ page_header(
@@ -22,7 +22,7 @@
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
         {'name': _('Data Exploration')}
     ],
-    info_tooltip=_('Explore and filter form data directly from the database. Use parameters on the Data Table tab to narrow down data by template and assignment period. Disaggregation Analysis uses the template selector in its sub-tabs bar (defaults to FDRS).') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
+    info_tooltip=_('Explore and filter form data directly from the database. Use parameters on the Data Table tab to narrow down data by template and assignment period.') if can_access_data_table|default(false) else _('Open a Data Explorer tab to review FDRS or UPR reporting.'),
         actions=[
         {
             'type': 'link',
@@ -47,22 +47,6 @@
                     aria-selected="{{ 'true' if explore_first_tab == 'data-table' else 'false' }}"
                     class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'data-table') }}">
                 <i class="fas fa-table mr-1.5"></i>{{ _('Data Table') }}
-            </button>
-            {% endif %}
-            {% if can_access_analysis %}
-            <button type="button" role="tab" id="tab-disaggregation"
-                    data-tab="disaggregation"
-                    aria-selected="{{ 'true' if explore_first_tab == 'disaggregation' else 'false' }}"
-                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'disaggregation') }}">
-                <i class="fas fa-chart-pie mr-1.5"></i>{{ _('Disaggregation Analysis') }}
-            </button>
-            {% endif %}
-            {% if can_access_compliance %}
-            <button type="button" role="tab" id="tab-compliance"
-                    data-tab="compliance"
-                    aria-selected="{{ 'true' if explore_first_tab == 'compliance' else 'false' }}"
-                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'compliance') }}">
-                <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Compliance') }}
             </button>
             {% endif %}
             {% for ext_tab in explorer_extension_tabs_render|default([]) %}
@@ -220,329 +204,6 @@
     {% endif %}
     <!-- End Tab panel: Data Table -->
 
-    <!-- Tab panel: Analysis -->
-    {% if can_access_analysis %}
-    <div id="panel-disaggregation" class="explore-panel{% if explore_first_tab != 'disaggregation' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-disaggregation">
-        <!-- Sub-tabs for Disaggregation (template selector + analysis views) -->
-        <div class="bg-white shadow-md border border-gray-200 mb-6">
-            <div class="border-b border-gray-200 px-3 sm:px-4">
-                <div class="flex flex-wrap items-center gap-1 overflow-x-auto py-1" id="disagg-subtabs">
-                    <div id="disagg-template-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
-                        <label for="disagg-template-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Template') }}</label>
-                        <select id="disagg-template-filter"
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 max-w-[7rem] py-1.5 pl-2 pr-8 text-gray-700">
-                            {% for template in templates %}
-                            <option value="{{ template.id }}"{% if template.id == fdrs_template_id %} selected{% endif %}>{{ template.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div id="disagg-year-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
-                        <label for="disagg-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Year') }}</label>
-                        <select id="disagg-year-filter"
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-20 max-w-[5rem] py-1.5 pl-2 pr-8 text-gray-700"
-                                disabled>
-                            <option value="">{{ _('Loading...') }}</option>
-                        </select>
-                    </div>
-                    <div class="disagg-subtabs-divider" aria-hidden="true"></div>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="women-leadership">{{ _('Women Participation') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="sex-age">{{ _('Sex, Age & Sex & Age') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="country-coverage">{{ _('Country Disaggregation Coverage') }}</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Initial prompt message (shown when no data is loaded) -->
-        <div id="disagg-initial-prompt" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
-            <div class="text-center py-12 text-gray-500">
-                <i class="fas fa-chart-pie text-4xl mb-4"></i>
-                <p class="text-lg font-medium mb-2">{{ _('No data loaded yet') }}</p>
-                <p class="text-sm">{{ _('Select a template above to analyze eligible disaggregation indicators.') }}</p>
-            </div>
-        </div>
-
-        <!-- Loading indicator (shown while data is loading) -->
-        <div id="disagg-loading" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6" style="display: none;">
-            <div class="text-center py-12">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
-                <p class="text-lg text-gray-600">{{ _('Analyzing data...') }}</p>
-            </div>
-        </div>
-
-        <!-- Disaggregation content wrapper (hidden until data is loaded) -->
-        <div id="disagg-content-wrapper" style="display: none;">
-        <!-- Sub-tab content panels -->
-        <div id="disagg-content-overview" class="disagg-content bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Overview') }}</h3>
-            <!-- Summary stats bar (5 cards) - Modern gradient design with inline styles for color compatibility -->
-            <div id="disagg-stats-bar" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="display: none;">
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);"
-                     title="{{ _('Percentage of eligible indicators reported with sex, age, sex-and-age, matrix, or disability disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
-                     aria-label="{{ _('Disaggregation coverage: percentage of eligible indicators reported with disaggregation.')|forceescape }}">
-                    <div class="flex items-center justify-between mb-2">
-                        <i class="fas fa-chart-pie text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
-                            {{ _('Disaggregation coverage') }}
-                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
-                        </span>
-                    </div>
-                    <div id="stat-avg-disagg" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported with disaggregation') }}</div>
-                </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);"
-                     title="{{ _('Number of indicators included in this analysis. Eligible indicators have people-oriented units or configured disaggregation options.')|forceescape }}"
-                     aria-label="{{ _('Eligible indicators: count of indicators included in this analysis.')|forceescape }}">
-                    <div class="flex items-center justify-between mb-2">
-                        <i class="fas fa-users text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
-                            {{ _('Eligible indicators') }}
-                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
-                        </span>
-                    </div>
-                    <div id="stat-avg-age" class="text-3xl font-bold">0</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Indicators in scope') }}</div>
-                </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);"
-                     title="{{ _('Indicators with a single reported value but no disaggregation breakdown. These are reported, but not disaggregated.')|forceescape }}"
-                     aria-label="{{ _('Total-only reporting: indicators with a value but without a disaggregation breakdown.')|forceescape }}">
-                    <div class="flex items-center justify-between mb-2">
-                        <i class="fas fa-crown text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
-                            {{ _('Total-only reporting') }}
-                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
-                        </span>
-                    </div>
-                    <div id="stat-women-leadership" class="text-3xl font-bold">0</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported, not disaggregated') }}</div>
-                </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"
-                     title="{{ _('Expected indicators with no saved reported value. These appear when non-reported items are included for a bounded template, period, and country scope.')|forceescape }}"
-                     aria-label="{{ _('Not reported: expected indicators with no saved reported value.')|forceescape }}">
-                    <div class="flex items-center justify-between mb-2">
-                        <i class="fas fa-hand-holding-heart text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
-                            {{ _('Not reported') }}
-                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
-                        </span>
-                    </div>
-                    <div id="stat-women-volunteering" class="text-3xl font-bold">0</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('No reported value saved') }}</div>
-                </div>
-                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);"
-                     title="{{ _('Percentage of eligible indicators that include age information, either age-only or combined sex-and-age disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
-                     aria-label="{{ _('Age breakdown coverage: percentage of eligible indicators with age or sex-and-age disaggregation.')|forceescape }}">
-                    <div class="flex items-center justify-between mb-2">
-                        <i class="fas fa-briefcase text-lg" style="color: rgba(255,255,255,0.7);"></i>
-                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
-                            {{ _('Age breakdown coverage') }}
-                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
-                        </span>
-                    </div>
-                    <div id="stat-women-staff" class="text-3xl font-bold">0%</div>
-                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('With age breakdown') }}</div>
-                </div>
-            </div>
-            <p class="text-sm text-gray-600 mb-4">
-                {{ _('Analysis is limited to eligible indicators with people-oriented units or configured disaggregation options. Percentages reflect the current filters.') }}
-            </p>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Top Countries by Disaggregation Coverage') }}</h4>
-                    <div id="chart-overview-countries"></div>
-                </div>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Reporting Status') }}</h4>
-                    <div id="chart-overview-sex"></div>
-                </div>
-            </div>
-            <p id="overview-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible disaggregation indicators found for the current parameters.') }}</p>
-        </div>
-        <div id="disagg-content-by-indicator" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Indicator') }}</h3>
-            <p class="text-sm text-gray-600 mb-4">{{ _('Shows disaggregation coverage by indicator, not summed values across mixed units.') }}</p>
-            <div class="chart-container" style="min-height: 450px; position: relative;">
-                <div id="chart-by-indicator"></div>
-            </div>
-            <p id="by-indicator-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible indicators found.') }}</p>
-        </div>
-        <div id="disagg-content-by-country" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Country') }}</h3>
-            <p class="text-sm text-gray-600 mb-4">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters.') }}</p>
-            <div class="bg-gray-50 rounded-xl p-4" style="min-height: 500px;">
-                <div id="chart-by-country"></div>
-            </div>
-            <p id="by-country-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>
-        </div>
-        <div id="disagg-content-women-leadership" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('Women Participation') }}</h3>
-            <p class="text-sm text-gray-600 mb-4">{{ _('Based on FDRS governing board, volunteers, and staff indicators when available in the current filters.') }}</p>
-            <div class="space-y-6">
-                <!-- First row: Two charts side by side -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-gray-50 rounded-xl p-4">
-                        <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Women Participation by Category') }}</h4>
-                        <div id="chart-women-comparison"></div>
-                    </div>
-                    <div class="bg-gray-50 rounded-xl p-4">
-                        <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Gender Distribution by Country') }}</h4>
-                        <div id="chart-women-by-country"></div>
-                    </div>
-                </div>
-                <!-- Second row: Trends chart full width -->
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Trends Over Time') }}</h4>
-                    <div id="chart-women-trends"></div>
-                </div>
-                <!-- Third row: Leadership, Staff, Volunteering trends (moved from Trends tab) -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="rounded-xl p-4" style="background-color: #fdf2f8;">
-                        <h4 class="text-sm font-medium mb-3" style="color: #be185d;">{{ _('Women in Leadership Roles') }}</h4>
-                        <div id="chart-trends-governing"></div>
-                    </div>
-                    <div class="rounded-xl p-4" style="background-color: #ecfeff;">
-                        <h4 class="text-sm font-medium mb-3" style="color: #0e7490;">{{ _('Women in Staff') }}</h4>
-                        <div id="chart-trends-staff"></div>
-                    </div>
-                    <div class="rounded-xl p-4 bg-green-50">
-                        <h4 class="text-sm font-medium text-green-700 mb-3">{{ _('Women in Volunteering') }}</h4>
-                        <div id="chart-trends-volunteers"></div>
-                    </div>
-                </div>
-            </div>
-            <p id="women-leadership-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No governing board, volunteer, or staff gender-disaggregated data found.') }}</p>
-        </div>
-        <div id="disagg-content-sex-age" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Sex, Age & Sex & Age') }}</h3>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Distribution by Sex') }}</h4>
-                    <div id="chart-by-sex"></div>
-                </div>
-                <div class="bg-gray-50 rounded-xl p-4">
-                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Distribution by Age Group') }}</h4>
-                    <div id="chart-by-age"></div>
-                </div>
-            </div>
-            <div class="bg-gray-50 rounded-xl p-4">
-                <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Combined Sex & Age Distribution') }}</h4>
-                <div id="chart-by-sex-age"></div>
-            </div>
-            <p id="sex-age-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No sex or age disaggregation found for the current parameters.') }}</p>
-        </div>
-        <div id="disagg-content-country-coverage" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ _('Country Disaggregation Coverage') }}</h3>
-            <p class="text-sm text-gray-600 mb-2">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters, including sex, age, and disability breakdowns where applicable.') }}</p>
-            <p class="text-xs text-gray-500 mb-4">{{ _('Countries marked "No data" have no eligible indicator records for the selected view.') }}</p>
-            <div id="coverage-regional-summary" class="mb-6"></div>
-            <div id="coverage-countries-table" class="overflow-x-auto"></div>
-            <p id="country-coverage-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>
-        </div>
-        </div><!-- End disagg-content-wrapper -->
-    </div>
-    {% endif %}
-    <!-- End Tab panel: Analysis -->
-
-    <!-- Tab panel: Compliance -->
-    {% if can_access_compliance %}
-    <div id="panel-compliance" class="explore-panel{% if explore_first_tab != 'compliance' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-compliance">
-        <div>
-            <div class="flex justify-between items-center mb-4">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">{{ _('FDRS Document Compliance') }}</h3>
-                    <p class="text-sm text-gray-600 mt-1">
-                        {{ _('Compliance requires at least one Annual Report AND one Audited Financial Statement in the past 3 years.') }}
-                    </p>
-                </div>
-                <div class="flex gap-2 items-center flex-wrap">
-                    <div class="flex items-center gap-2">
-                        <label for="compliance-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('As of Year:') }}</label>
-                        <select id="compliance-year-filter" class="pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">{{ _('Latest') }}</option>
-                        </select>
-                    </div>
-                    <button id="refresh-compliance-btn" class="px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition duration-150 ease-in-out" title="{{ _('Refresh')|forceescape }}">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button id="download-compliance-btn" class="btn btn-success">
-                        <i class="fas fa-file-excel mr-2"></i>{{ _('Download Excel') }}
-                    </button>
-                </div>
-            </div>
-
-            <!-- Loading indicator -->
-            <div id="compliance-loading" class="bg-white border border-gray-200 rounded-lg overflow-hidden" style="display: none;" aria-live="polite" aria-busy="true" aria-label="{{ _('Loading compliance data...') }}">
-                {{ ag_grid_skeleton_inner(row_count=6) }}
-            </div>
-
-            <!-- Initial message (shown briefly before auto-load) -->
-            <div id="compliance-initial" class="text-center py-12 text-gray-500" style="display: none;">
-                <i class="fas fa-clipboard-check text-4xl mb-4"></i>
-                <p class="text-lg">{{ _('Loading compliance data...') }}</p>
-            </div>
-
-            <!-- Compliance summary -->
-            <div id="compliance-summary" class="mb-6" style="display: none;">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div class="flex items-center">
-                            <i class="fas fa-check-circle text-green-600 text-2xl mr-3"></i>
-                            <div>
-                                <div id="compliant-count" class="text-2xl font-bold text-green-700">0</div>
-                                <div class="text-sm text-green-600">{{ _('Compliant Countries') }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div class="flex items-center">
-                            <i class="fas fa-times-circle text-red-600 text-2xl mr-3"></i>
-                            <div>
-                                <div id="non-compliant-count" class="text-2xl font-bold text-red-700">0</div>
-                                <div class="text-sm text-red-600">{{ _('Non-Compliant Countries') }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="compliance-status-legend" class="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600" style="display: none;">
-                <span class="font-medium text-gray-700">{{ _('Document status:') }}</span>
-                <span class="inline-flex items-center gap-1"><i class="fas fa-check-circle text-green-500"></i>{{ _('Approved') }}</span>
-                <span class="inline-flex items-center gap-1"><i class="fas fa-clock text-amber-500"></i>{{ _('Pending validation') }}</span>
-                <span class="inline-flex items-center gap-1"><i class="fas fa-times-circle text-red-500"></i>{{ _('Rejected') }}</span>
-                <span class="inline-flex items-center gap-1"><i class="fas fa-times-circle text-gray-400"></i>{{ _('Missing') }}</span>
-            </div>
-
-            <div id="compliance-pending-validation-notice" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" style="display: none;" role="status" aria-live="polite">
-                <div class="flex items-start gap-2">
-                    <i class="fas fa-clock text-amber-600 mt-0.5" aria-hidden="true"></i>
-                    <div>
-                        <p id="compliance-pending-validation-title" class="font-semibold mb-1"></p>
-                        <p id="compliance-pending-validation-body" class="mb-0 text-amber-800"></p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Compliance Grid -->
-            <div id="compliance-grid-toolbar" class="flex justify-end items-center mb-4" style="display: none;">
-                <div id="compliance-column-visibility-placeholder"></div>
-            </div>
-            <div id="complianceGrid-container" class="overflow-x-auto" style="display: none;">
-                {{ ag_grid_body_wrap('complianceGrid', placeholder_id='compliance-column-visibility-placeholder', grid_height='600px', show_loading_overlay=false, use_container=false, wrapper_class='ag-grid-body-wrap relative') }}
-            </div>
-
-            <!-- Error message -->
-            <div id="compliance-error" class="text-center py-12 text-red-600" style="display: none;">
-                <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
-                <p id="compliance-error-text" class="text-lg"></p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    <!-- End Tab panel: Compliance -->
-
     {% for ext_tab in explorer_extension_tabs_render|default([]) %}
     {{ extension_panels.get(ext_tab.tab_id, '')|safe }}
     {% endfor %}
@@ -553,21 +214,15 @@
 {% endblock %}
 
 {% block extra_js %}
-    <!-- ApexCharts (served locally to avoid Tracking Prevention blocking CDN storage) -->
-    <script src="{{ static_url('libs/apexcharts.min.js') }}"></script>
     <!-- AG Grid JS -->
     {% from "components/ag_grid_includes.html" import ag_grid_js %}
     {{ ag_grid_js() }}
     <script src="{{ static_url('js/components/status-labels.js') }}"></script>
-    <!-- Disaggregation Analysis (pure processing + ApexCharts rendering) -->
-    <script src="{{ static_url('js/data-exploration/data-exploration-analysis-core.js') }}"></script>
-    <script src="{{ static_url('js/data-exploration/data-exploration-disaggregation-apex.js') }}"></script>
 
     <script nonce="{{ csp_nonce() }}">
     // Permission flags (passed from server)
     const CAN_ACCESS_DATA_TABLE = {{ can_access_data_table|tojson }};
-    const CAN_ACCESS_ANALYSIS = {{ can_access_analysis|tojson }};
-    const CAN_ACCESS_COMPLIANCE = {{ can_access_compliance|tojson }};
+    const CAN_ACCESS_ANALYSIS = {{ can_access_disaggregation|default(false)|tojson }};
     const CAN_ACCESS_PB_PROGRESS = {{ can_access_pb_progress|default(false)|tojson }};
     const CAN_USE_AI_VALIDATION = {{ user_has_ai_beta_access(current_user)|tojson }};
     const FDRS_TEMPLATE_ID = {{ fdrs_template_id|tojson }};
@@ -757,11 +412,10 @@
     }
     window.applyExploreParamsToUrl = applyParamsToUrl;
 
-    // Get the currently active main tab id (data-table | disaggregation | compliance | pb-progress)
+    // Get the currently active main tab id (data-table | disaggregation | plugin tabs)
     function getActiveMainTabId() {
         if (domCache.tabDataTable && domCache.tabDataTable.getAttribute('aria-selected') === 'true') return 'data-table';
         if (domCache.tabDisaggregation && domCache.tabDisaggregation.getAttribute('aria-selected') === 'true') return 'disaggregation';
-        if (domCache.tabCompliance && domCache.tabCompliance.getAttribute('aria-selected') === 'true') return 'compliance';
         if (domCache.tabPbProgress && domCache.tabPbProgress.getAttribute('aria-selected') === 'true') return 'pb-progress';
         const selected = document.querySelector('#explore-data-tabs .settings-tab[aria-selected="true"]');
         return selected ? (selected.getAttribute('data-tab') || '') : '';
@@ -795,7 +449,6 @@
             if (tabId && tabId !== getActiveMainTabId()) {
                 if (tabId === 'data-table' && domCache.tabDataTable && CAN_ACCESS_DATA_TABLE) switchMainTabFn(domCache.tabDataTable);
                 else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
-                else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
                 else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
                 else {
                     const extTab = document.getElementById('tab-' + tabId);
@@ -1038,11 +691,9 @@
         // Disaggregation tab elements
         domCache.tabDataTable = document.getElementById('tab-data-table');
         domCache.tabDisaggregation = document.getElementById('tab-disaggregation');
-        domCache.tabCompliance = document.getElementById('tab-compliance');
         domCache.tabPbProgress = document.getElementById('tab-pb-progress');
         domCache.panelDataTable = document.getElementById('panel-data-table');
         domCache.panelDisaggregation = document.getElementById('panel-disaggregation');
-        domCache.panelCompliance = document.getElementById('panel-compliance');
         domCache.panelPbProgress = document.getElementById('panel-pb-progress');
         domCache.exploreParametersSection = document.getElementById('explore-parameters-section');
         domCache.disaggTemplateFilterWrap = document.getElementById('disagg-template-filter-wrap');
@@ -1053,71 +704,8 @@
         domCache.disaggInitialPrompt = document.getElementById('disagg-initial-prompt');
         domCache.disaggLoading = document.getElementById('disagg-loading');
         domCache.disaggContentWrapper = document.getElementById('disagg-content-wrapper');
-        // Compliance tab elements
-        domCache.refreshComplianceBtn = document.getElementById('refresh-compliance-btn');
-        domCache.complianceYearFilter = document.getElementById('compliance-year-filter');
-        domCache.complianceLoading = document.getElementById('compliance-loading');
-        domCache.complianceInitial = document.getElementById('compliance-initial');
-        domCache.complianceSummary = document.getElementById('compliance-summary');
-        domCache.complianceStatusLegend = document.getElementById('compliance-status-legend');
-        domCache.compliancePendingValidationNotice = document.getElementById('compliance-pending-validation-notice');
-        domCache.compliancePendingValidationTitle = document.getElementById('compliance-pending-validation-title');
-        domCache.compliancePendingValidationBody = document.getElementById('compliance-pending-validation-body');
-        domCache.complianceGridContainer = document.getElementById('complianceGrid-container');
-        domCache.complianceGridToolbar = document.getElementById('compliance-grid-toolbar');
-        domCache.complianceError = document.getElementById('compliance-error');
-        domCache.complianceErrorText = document.getElementById('compliance-error-text');
-        domCache.compliantCount = document.getElementById('compliant-count');
-        domCache.nonCompliantCount = document.getElementById('non-compliant-count');
     }
 
-    // Track if compliance data has been loaded
-    let complianceDataLoaded = false;
-    let complianceGridHelper = null;
-    let complianceGridApi = null;
-
-    const COMPLIANCE_DOC_TYPE_LABELS = {
-        'Annual Report': {{ _("Annual Report")|tojson|safe }},
-        'Audited Financial Statement': {{ _("Audited Financial Statement")|tojson|safe }}
-    };
-    const DEFAULT_COMPLIANCE_DOC_TYPES = ['Annual Report', 'Audited Financial Statement'];
-    const COMPLIANCE_DOC_STATUS_LABELS = {
-        missing: {{ _("Missing")|tojson|safe }},
-        pending: {{ _("Pending validation")|tojson|safe }},
-        approved: {{ _("Approved")|tojson|safe }},
-        rejected: {{ _("Rejected")|tojson|safe }}
-    };
-    const COMPLIANCE_YEAR_STORAGE_KEY = 'humdb_compliance_reference_year_v1';
-
-    function getSavedComplianceReferenceYear() {
-        try {
-            const raw = localStorage.getItem(COMPLIANCE_YEAR_STORAGE_KEY);
-            return raw ? String(raw).trim() : '';
-        } catch (e) {
-            return '';
-        }
-    }
-
-    function saveComplianceReferenceYear(value) {
-        try {
-            const normalized = value == null ? '' : String(value).trim();
-            if (normalized) {
-                localStorage.setItem(COMPLIANCE_YEAR_STORAGE_KEY, normalized);
-            } else {
-                localStorage.removeItem(COMPLIANCE_YEAR_STORAGE_KEY);
-            }
-        } catch (e) {
-            // Ignore storage failures (private browsing, quota, etc.)
-        }
-    }
-
-    function resolveComplianceReferenceYear() {
-        const filterValue = domCache.complianceYearFilter?.value;
-        if (filterValue) {
-            return filterValue;
-        }
-        return getSavedComplianceReferenceYear();
-    }
 
     // Debounce helper function
     function debounce(func, wait) {
@@ -2628,358 +2216,6 @@
         setTimeout(() => observer.disconnect(), 5000);
     }
 
-    function complianceDocFieldKey(periodIndex, docIndex) {
-        return `period_${periodIndex}_doc_${docIndex}`;
-    }
-
-    function buildComplianceDocColumn(periodIndex, docIndex, docType) {
-        const field = complianceDocFieldKey(periodIndex, docIndex);
-        return {
-            field: field,
-            colId: field,
-            headerName: COMPLIANCE_DOC_TYPE_LABELS[docType] || docType,
-            width: 130,
-            minWidth: 110,
-            maxWidth: 180,
-            sortable: true,
-            filter: 'customSetFilter',
-            cellRenderer: function(params) {
-                return renderDocIcon(params.value);
-            },
-            filterValueGetter: function(params) {
-                const status = params.data ? params.data[field] : 'missing';
-                return COMPLIANCE_DOC_STATUS_LABELS[status] || COMPLIANCE_DOC_STATUS_LABELS.missing;
-            },
-            cellClass: 'compliance-cell-center',
-            headerClass: 'compliance-header-center',
-            cellStyle: { textAlign: 'center' }
-        };
-    }
-
-    function buildComplianceColumnDefs(periods, docTypes) {
-        const complianceDocTypes = docTypes && docTypes.length ? docTypes : DEFAULT_COMPLIANCE_DOC_TYPES;
-        const periodGroups = (periods || []).map(function(period, periodIndex) {
-            return {
-                headerName: String(period),
-                headerClass: 'compliance-header-center',
-                children: complianceDocTypes.map(function(docType, docIndex) {
-                    return buildComplianceDocColumn(periodIndex, docIndex, docType);
-                })
-            };
-        });
-
-        return [
-            {
-                field: 'country_name',
-                headerName: {{ _("Country")|tojson|safe }},
-                pinned: 'left',
-                width: 220,
-                minWidth: 180,
-                maxWidth: 320,
-                filter: 'customSetFilter',
-                sortable: true,
-                cellStyle: { display: 'flex', alignItems: 'center', fontWeight: '600' }
-            },
-            ...periodGroups,
-            {
-                field: 'is_compliant',
-                headerName: {{ _("Compliance Status")|tojson|safe }},
-                pinned: 'right',
-                width: 170,
-                minWidth: 150,
-                maxWidth: 220,
-                sortable: true,
-                filter: 'customSetFilter',
-                cellRenderer: function(params) {
-                    return renderComplianceBadge(!!params.value);
-                },
-                filterValueGetter: function(params) {
-                    return params.data && params.data.is_compliant ? {{ _("Compliant")|tojson|safe }} : {{ _("Non-Compliant")|tojson|safe }};
-                },
-                cellClass: 'compliance-cell-center',
-                headerClass: 'compliance-header-center',
-                cellStyle: { textAlign: 'center' }
-            }
-        ];
-    }
-
-    function buildComplianceRowData(data, periods, docTypes) {
-        const complianceDocTypes = docTypes && docTypes.length ? docTypes : DEFAULT_COMPLIANCE_DOC_TYPES;
-
-        return (data || []).map(function(country) {
-            const row = {
-                country_id: country.country_id,
-                country_name: country.country_name,
-                country_iso3: country.country_iso3,
-                is_compliant: !!country.is_compliant
-            };
-
-            const periodDocsMap = {};
-            (country.periods || []).forEach(function(p) {
-                periodDocsMap[p.period] = p.documents || {};
-            });
-
-            (periods || []).forEach(function(period, periodIndex) {
-                const docs = periodDocsMap[period] || {};
-                complianceDocTypes.forEach(function(docType, docIndex) {
-                    row[complianceDocFieldKey(periodIndex, docIndex)] = docs[docType] || 'missing';
-                });
-            });
-
-            return row;
-        });
-    }
-
-    function initializeComplianceGrid() {
-        if (complianceGridHelper) {
-            return complianceGridApi;
-        }
-
-        complianceGridHelper = new AgGridHelper({
-            containerId: 'complianceGrid',
-            templateId: 'compliance',
-            columnDefs: buildComplianceColumnDefs([], DEFAULT_COMPLIANCE_DOC_TYPES),
-            rowData: [],
-            showResultCount: false,
-            options: {
-                pagination: false
-            },
-            columnVisibilityOptions: {
-                enableExport: true,
-                enableReset: true,
-                buttonPlaceholderId: 'compliance-column-visibility-placeholder'
-            }
-        });
-
-        complianceGridApi = complianceGridHelper.initialize();
-        window.complianceGridApi = complianceGridApi;
-        window.complianceGridHelper = complianceGridHelper;
-        return complianceGridApi;
-    }
-
-    function updateComplianceGrid(columnDefs, rowData) {
-        if (!complianceGridHelper) {
-            initializeComplianceGrid();
-        }
-
-        complianceGridHelper.config.columnDefs = columnDefs;
-
-        if (complianceGridApi) {
-            if (typeof complianceGridApi.setGridOption === 'function') {
-                complianceGridApi.setGridOption('columnDefs', columnDefs);
-                complianceGridApi.setGridOption('rowData', rowData);
-            } else {
-                if (typeof complianceGridApi.setColumnDefs === 'function') {
-                    complianceGridApi.setColumnDefs(columnDefs);
-                }
-                complianceGridHelper.setRowData(rowData);
-            }
-        }
-
-        if (complianceGridHelper) {
-            complianceGridHelper.refresh();
-        }
-    }
-
-    // Compliance data loading and rendering with AG Grid
-    async function loadComplianceData() {
-        // Show loading, hide other elements
-        if (domCache.complianceLoading) domCache.complianceLoading.style.display = 'block';
-        if (domCache.complianceInitial) domCache.complianceInitial.style.display = 'none';
-        if (domCache.complianceSummary) domCache.complianceSummary.style.display = 'none';
-        if (domCache.complianceStatusLegend) domCache.complianceStatusLegend.style.display = 'none';
-        if (domCache.compliancePendingValidationNotice) domCache.compliancePendingValidationNotice.style.display = 'none';
-        if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'none';
-        if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'none';
-        if (domCache.complianceError) domCache.complianceError.style.display = 'none';
-
-        try {
-            // Build URL with reference year if selected (includes browser-saved preference)
-            let url = '/admin/data-exploration/compliance';
-            const referenceYear = resolveComplianceReferenceYear();
-            if (referenceYear) {
-                url += `?reference_year=${encodeURIComponent(referenceYear)}`;
-            }
-
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-CSRFToken': csrfToken,
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to load compliance data');
-            }
-
-            // Populate year dropdown if available years are provided
-            if (result.available_years && result.available_years.length > 0) {
-                populateComplianceYearDropdown(result.available_years, result.reference_year);
-            }
-
-            renderComplianceData(result.data, result.periods, result.doc_types, result.pending_validation_notice);
-
-        } catch (error) {
-            console.error('Error loading compliance data:', error);
-            if (domCache.complianceErrorText) {
-                domCache.complianceErrorText.textContent = error.message || {{ _("An error occurred while loading compliance data")|tojson|safe }};
-            }
-            if (domCache.complianceError) domCache.complianceError.style.display = 'block';
-        } finally {
-            if (domCache.complianceLoading) domCache.complianceLoading.style.display = 'none';
-        }
-    }
-
-    // Populate the year dropdown with available years
-    function populateComplianceYearDropdown(availableYears, selectedYear) {
-        const yearFilter = domCache.complianceYearFilter;
-        if (!yearFilter) return;
-
-        const savedValue = getSavedComplianceReferenceYear();
-        const preferredValue = savedValue || yearFilter.value || (selectedYear ? String(selectedYear) : '');
-        const availableSet = new Set((availableYears || []).map(function(year) { return String(year); }));
-        const selectedValue = preferredValue && availableSet.has(String(preferredValue)) ? String(preferredValue) : '';
-
-        if (savedValue && !selectedValue) {
-            saveComplianceReferenceYear('');
-        }
-
-        // Clear and rebuild options
-        yearFilter.innerHTML = '<option value="">' + {{ _("Latest")|tojson|safe }} + '</option>';
-
-        for (const year of availableYears) {
-            const option = document.createElement('option');
-            option.value = year;
-            option.textContent = `${year} (${year}, ${year - 1}, ${year - 2})`;
-            if (String(year) === selectedValue) {
-                option.selected = true;
-            }
-            yearFilter.appendChild(option);
-        }
-
-        yearFilter.value = selectedValue;
-    }
-
-    // Render document status icon (missing | pending | approved | rejected)
-    function renderDocIcon(status) {
-        const value = status || 'missing';
-        if (value === 'pending') {
-            return `<i class="fas fa-clock text-amber-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.pending)}"></i>`;
-        }
-        if (value === 'approved') {
-            return `<i class="fas fa-check-circle text-green-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.approved)}"></i>`;
-        }
-        if (value === 'rejected') {
-            return `<i class="fas fa-times-circle text-red-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.rejected)}"></i>`;
-        }
-        return `<i class="fas fa-times-circle text-gray-400 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.missing)}"></i>`;
-    }
-
-    // Render compliance status badge
-    function renderComplianceBadge(isCompliant) {
-        const badgeText = isCompliant ? {{ _("Compliant")|tojson|safe }} : {{ _("Non-Compliant")|tojson|safe }};
-        return StatusLabels.render(badgeText, isCompliant ? 'success' : 'danger');
-    }
-
-    function renderCompliancePendingValidationNotice(notice) {
-        const noticeEl = domCache.compliancePendingValidationNotice;
-        if (!noticeEl) return;
-
-        const countries = notice && Array.isArray(notice.countries) ? notice.countries : [];
-        if (!countries.length) {
-            noticeEl.style.display = 'none';
-            return;
-        }
-
-        const count = countries.length;
-        const countryLines = countries.map(function(country) {
-            const pendingDocs = (country.pending_documents || []).map(function(item) {
-                const label = COMPLIANCE_DOC_TYPE_LABELS[item.doc_type] || item.doc_type || '';
-                const period = item.period ? String(item.period) : '';
-                return period ? `${label} (${period})` : label;
-            }).filter(Boolean);
-            const name = escapeHtml(country.country_name || '');
-            if (!pendingDocs.length) {
-                return name;
-            }
-            return `${name}: ${pendingDocs.map(function(text) { return escapeHtml(text); }).join(', ')}`;
-        });
-
-        const maxLines = 12;
-        let bodyLines = countryLines.slice(0, maxLines).join('<br>');
-        if (countryLines.length > maxLines) {
-            bodyLines += `<br>` + {{ _('and')|tojson|safe }} + ` ${countryLines.length - maxLines} ` + {{ _('more')|tojson|safe }};
-        }
-
-        if (domCache.compliancePendingValidationTitle) {
-            domCache.compliancePendingValidationTitle.textContent = count === 1
-                ? {{ _("1 non-compliant country has compliance documents pending validation.")|tojson|safe }}
-                : String(count) + ' ' + {{ _("non-compliant countries have compliance documents pending validation.")|tojson|safe }};
-        }
-        if (domCache.compliancePendingValidationBody) {
-            domCache.compliancePendingValidationBody.innerHTML = `
-                {{ _('These countries have uploaded Annual Reports or Audited Financial Statements that are still awaiting approval. Pending documents do not count toward compliance — validate or reject them as a priority.') }}
-                <span class="block mt-2 font-medium">{{ _('Countries and documents:') }}</span>
-                <span class="block mt-1">${bodyLines}</span>
-            `;
-        }
-
-        noticeEl.style.display = 'block';
-    }
-
-    function renderComplianceData(data, periods, docTypes, pendingValidationNotice) {
-        if (!data || data.length === 0) {
-            if (domCache.complianceInitial) {
-                domCache.complianceInitial.innerHTML = `
-                    <i class="fas fa-info-circle text-4xl text-blue-400 mb-4"></i>
-                    <p class="text-lg text-gray-600">{{ _('No compliance data available.') }}</p>
-                `;
-                domCache.complianceInitial.style.display = 'block';
-            }
-            if (domCache.compliancePendingValidationNotice) domCache.compliancePendingValidationNotice.style.display = 'none';
-            if (domCache.complianceStatusLegend) domCache.complianceStatusLegend.style.display = 'none';
-            if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'none';
-            if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'none';
-            return;
-        }
-
-        // Calculate summary stats
-        const compliantCount = data.filter(c => c.is_compliant).length;
-        const nonCompliantCount = data.filter(c => !c.is_compliant).length;
-
-        if (domCache.compliantCount) domCache.compliantCount.textContent = compliantCount;
-        if (domCache.nonCompliantCount) domCache.nonCompliantCount.textContent = nonCompliantCount;
-        if (domCache.complianceSummary) domCache.complianceSummary.style.display = 'block';
-        if (domCache.complianceStatusLegend) domCache.complianceStatusLegend.style.display = 'flex';
-        renderCompliancePendingValidationNotice(pendingValidationNotice);
-
-        const columnDefs = buildComplianceColumnDefs(periods, docTypes);
-        const rowData = buildComplianceRowData(data, periods, docTypes);
-        updateComplianceGrid(columnDefs, rowData);
-
-        if (domCache.complianceGridToolbar) domCache.complianceGridToolbar.style.display = 'flex';
-        if (domCache.complianceGridContainer) domCache.complianceGridContainer.style.display = 'block';
-
-        requestAnimationFrame(function() {
-            if (complianceGridHelper) {
-                complianceGridHelper.refresh();
-            }
-        });
-
-        // Mark as loaded
-        complianceDataLoaded = true;
-    }
-
     // Initialize when DOM is ready (optimized)
     function maybeAutoLoadDisaggData() {
         if (!CAN_ACCESS_ANALYSIS) return;
@@ -3004,15 +2240,7 @@
         if (CAN_ACCESS_DATA_TABLE) {
             initializeGrid();
         }
-        if (CAN_ACCESS_COMPLIANCE) {
-            initializeComplianceGrid();
-        }
         setupEventHandlers();
-        // Only auto-load compliance when that tab is the default active one;
-        // otherwise the tab click handler loads it on first access.
-        if (CAN_ACCESS_COMPLIANCE && {{ (explore_first_tab == 'compliance')|tojson }}) {
-            loadComplianceData();
-        }
         bootstrapDisaggFilters();
     }
 
@@ -3397,8 +2625,8 @@
             if (window.AdminUnderlineTabs) {
                 AdminUnderlineTabs.activateStripTab('#explore-data-tabs', tabId, { panelSelector: '.explore-panel' });
             } else {
-                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance, domCache.tabPbProgress];
-                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance, domCache.panelPbProgress];
+                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabPbProgress];
+                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelPbProgress];
                 tabs.forEach((tab, index) => {
                     if (!tab) return;
                     const isActive = tab === activeTab;
@@ -3415,7 +2643,7 @@
             }
         }
 
-        // Main tab switch: Data Table | Analysis | Compliance
+        // Main tab switch: Data Table | Analysis | plugin tabs
         if (domCache.tabDataTable) {
             domCache.tabDataTable.addEventListener('click', function() {
                 switchMainTab(domCache.tabDataTable);
@@ -3465,20 +2693,6 @@
             }, 300);
             domCache.disaggYearFilter.addEventListener('change', _onDisaggYearChange);
         }
-        if (domCache.tabCompliance) {
-            domCache.tabCompliance.addEventListener('click', function() {
-                switchMainTab(domCache.tabCompliance);
-                applyParamsToUrl();
-                // Auto-load compliance data when tab is first accessed
-                if (!complianceDataLoaded) {
-                    loadComplianceData();
-                } else if (complianceGridHelper) {
-                    requestAnimationFrame(function() {
-                        complianceGridHelper.refresh();
-                    });
-                }
-            });
-        }
         if (domCache.tabPbProgress) {
             domCache.tabPbProgress.addEventListener('click', function() {
                 switchMainTab(domCache.tabPbProgress);
@@ -3487,39 +2701,13 @@
         }
         document.querySelectorAll('#explore-data-tabs .settings-tab[data-tab]').forEach(function(tabBtn) {
             const tabId = tabBtn.getAttribute('data-tab');
-            if (['data-table', 'disaggregation', 'compliance', 'pb-progress'].indexOf(tabId) !== -1) return;
+            if (['data-table', 'disaggregation', 'pb-progress'].indexOf(tabId) !== -1) return;
             tabBtn.addEventListener('click', function() {
                 switchMainTab(tabBtn);
                 applyParamsToUrl();
             });
         });
 
-        // Refresh compliance data button
-        if (domCache.refreshComplianceBtn) {
-            domCache.refreshComplianceBtn.addEventListener('click', loadComplianceData);
-        }
-
-        // Reload compliance data when year filter changes (persist selection in browser)
-        if (domCache.complianceYearFilter) {
-            domCache.complianceYearFilter.addEventListener('change', function() {
-                saveComplianceReferenceYear(domCache.complianceYearFilter.value);
-                loadComplianceData();
-            });
-        }
-
-        // Download compliance Excel button
-        const downloadComplianceBtn = document.getElementById('download-compliance-btn');
-        if (downloadComplianceBtn) {
-            downloadComplianceBtn.addEventListener('click', function() {
-                // Trigger download by navigating to the download endpoint with selected year
-                let downloadUrl = '/admin/data-exploration/compliance/download';
-                const referenceYear = domCache.complianceYearFilter?.value;
-                if (referenceYear) {
-                    downloadUrl += `?reference_year=${encodeURIComponent(referenceYear)}`;
-                }
-                window.location.href = downloadUrl;
-            });
-        }
         // Default Analysis sub-tab so Overview charts render on first data load.
         window.currentDisaggSubtab = 'overview';
 

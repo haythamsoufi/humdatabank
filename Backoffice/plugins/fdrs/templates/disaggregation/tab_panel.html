@@ -1,0 +1,243 @@
+<style nonce="{{ csp_nonce() }}">
+        /* Disaggregation sub-tab styling */
+        .disagg-subtab.active { border-bottom-color: #2563eb; color: #2563eb; }
+        .disagg-subtabs-divider {
+            width: 1px;
+            height: 1.5rem;
+            background-color: #d1d5db;
+            margin: 0 0.5rem;
+            flex-shrink: 0;
+        }
+        /* ApexCharts container styling */
+        .chart-container { min-height: 0; overflow: visible; }
+        .apexcharts-canvas { margin: 0 auto; }
+        .apexcharts-tooltip { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border-radius: 8px; }
+        .apexcharts-menu { border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .apexcharts-menu-item:hover { background-color: #eff6ff; }
+    
+</style>
+
+    <div id="panel-disaggregation" class="explore-panel{% if explore_first_tab != 'disaggregation' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-disaggregation">
+        <!-- Sub-tabs for Disaggregation (template selector + analysis views) -->
+        <div class="bg-white shadow-md border border-gray-200 mb-6">
+            <div class="border-b border-gray-200 px-3 sm:px-4">
+                <div class="flex flex-wrap items-center gap-1 overflow-x-auto py-1" id="disagg-subtabs">
+                    <div id="disagg-template-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
+                        <label for="disagg-template-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Template') }}</label>
+                        <select id="disagg-template-filter"
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 max-w-[7rem] py-1.5 pl-2 pr-8 text-gray-700">
+                            {% for template in templates %}
+                            <option value="{{ template.id }}"{% if template.id == fdrs_template_id %} selected{% endif %}>{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="disagg-year-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
+                        <label for="disagg-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Year') }}</label>
+                        <select id="disagg-year-filter"
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-20 max-w-[5rem] py-1.5 pl-2 pr-8 text-gray-700"
+                                disabled>
+                            <option value="">{{ _('Loading...') }}</option>
+                        </select>
+                    </div>
+                    <div class="disagg-subtabs-divider" aria-hidden="true"></div>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="women-leadership">{{ _('Women Participation') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="sex-age">{{ _('Sex, Age & Sex & Age') }}</button>
+                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="country-coverage">{{ _('Country Disaggregation Coverage') }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Initial prompt message (shown when no data is loaded) -->
+        <div id="disagg-initial-prompt" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
+            <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-chart-pie text-4xl mb-4"></i>
+                <p class="text-lg font-medium mb-2">{{ _('No data loaded yet') }}</p>
+                <p class="text-sm">{{ _('Select a template above to analyze eligible disaggregation indicators.') }}</p>
+            </div>
+        </div>
+
+        <!-- Loading indicator (shown while data is loading) -->
+        <div id="disagg-loading" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6" style="display: none;">
+            <div class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+                <p class="text-lg text-gray-600">{{ _('Analyzing data...') }}</p>
+            </div>
+        </div>
+
+        <!-- Disaggregation content wrapper (hidden until data is loaded) -->
+        <div id="disagg-content-wrapper" style="display: none;">
+        <!-- Sub-tab content panels -->
+        <div id="disagg-content-overview" class="disagg-content bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Overview') }}</h3>
+            <!-- Summary stats bar (5 cards) - Modern gradient design with inline styles for color compatibility -->
+            <div id="disagg-stats-bar" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="display: none;">
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);"
+                     title="{{ _('Percentage of eligible indicators reported with sex, age, sex-and-age, matrix, or disability disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
+                     aria-label="{{ _('Disaggregation coverage: percentage of eligible indicators reported with disaggregation.')|forceescape }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-chart-pie text-lg" style="color: rgba(255,255,255,0.7);"></i>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Disaggregation coverage') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <div id="stat-avg-disagg" class="text-3xl font-bold">0%</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported with disaggregation') }}</div>
+                </div>
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);"
+                     title="{{ _('Number of indicators included in this analysis. Eligible indicators have people-oriented units or configured disaggregation options.')|forceescape }}"
+                     aria-label="{{ _('Eligible indicators: count of indicators included in this analysis.')|forceescape }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-users text-lg" style="color: rgba(255,255,255,0.7);"></i>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Eligible indicators') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <div id="stat-avg-age" class="text-3xl font-bold">0</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Indicators in scope') }}</div>
+                </div>
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);"
+                     title="{{ _('Indicators with a single reported value but no disaggregation breakdown. These are reported, but not disaggregated.')|forceescape }}"
+                     aria-label="{{ _('Total-only reporting: indicators with a value but without a disaggregation breakdown.')|forceescape }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-crown text-lg" style="color: rgba(255,255,255,0.7);"></i>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Total-only reporting') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <div id="stat-women-leadership" class="text-3xl font-bold">0</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported, not disaggregated') }}</div>
+                </div>
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"
+                     title="{{ _('Expected indicators with no saved reported value. These appear when non-reported items are included for a bounded template, period, and country scope.')|forceescape }}"
+                     aria-label="{{ _('Not reported: expected indicators with no saved reported value.')|forceescape }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-hand-holding-heart text-lg" style="color: rgba(255,255,255,0.7);"></i>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Not reported') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <div id="stat-women-volunteering" class="text-3xl font-bold">0</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('No reported value saved') }}</div>
+                </div>
+                <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);"
+                     title="{{ _('Percentage of eligible indicators that include age information, either age-only or combined sex-and-age disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
+                     aria-label="{{ _('Age breakdown coverage: percentage of eligible indicators with age or sex-and-age disaggregation.')|forceescape }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fas fa-briefcase text-lg" style="color: rgba(255,255,255,0.7);"></i>
+                        <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
+                            {{ _('Age breakdown coverage') }}
+                            <i class="fas fa-info-circle ml-1" aria-hidden="true"></i>
+                        </span>
+                    </div>
+                    <div id="stat-women-staff" class="text-3xl font-bold">0%</div>
+                    <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('With age breakdown') }}</div>
+                </div>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">
+                {{ _('Analysis is limited to eligible indicators with people-oriented units or configured disaggregation options. Percentages reflect the current filters.') }}
+            </p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Top Countries by Disaggregation Coverage') }}</h4>
+                    <div id="chart-overview-countries"></div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Reporting Status') }}</h4>
+                    <div id="chart-overview-sex"></div>
+                </div>
+            </div>
+            <p id="overview-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible disaggregation indicators found for the current parameters.') }}</p>
+        </div>
+        <div id="disagg-content-by-indicator" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Indicator') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Shows disaggregation coverage by indicator, not summed values across mixed units.') }}</p>
+            <div class="chart-container" style="min-height: 450px; position: relative;">
+                <div id="chart-by-indicator"></div>
+            </div>
+            <p id="by-indicator-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible indicators found.') }}</p>
+        </div>
+        <div id="disagg-content-by-country" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Country') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters.') }}</p>
+            <div class="bg-gray-50 rounded-xl p-4" style="min-height: 500px;">
+                <div id="chart-by-country"></div>
+            </div>
+            <p id="by-country-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>
+        </div>
+        <div id="disagg-content-women-leadership" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('Women Participation') }}</h3>
+            <p class="text-sm text-gray-600 mb-4">{{ _('Based on FDRS governing board, volunteers, and staff indicators when available in the current filters.') }}</p>
+            <div class="space-y-6">
+                <!-- First row: Two charts side by side -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Women Participation by Category') }}</h4>
+                        <div id="chart-women-comparison"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Gender Distribution by Country') }}</h4>
+                        <div id="chart-women-by-country"></div>
+                    </div>
+                </div>
+                <!-- Second row: Trends chart full width -->
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Trends Over Time') }}</h4>
+                    <div id="chart-women-trends"></div>
+                </div>
+                <!-- Third row: Leadership, Staff, Volunteering trends (moved from Trends tab) -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="rounded-xl p-4" style="background-color: #fdf2f8;">
+                        <h4 class="text-sm font-medium mb-3" style="color: #be185d;">{{ _('Women in Leadership Roles') }}</h4>
+                        <div id="chart-trends-governing"></div>
+                    </div>
+                    <div class="rounded-xl p-4" style="background-color: #ecfeff;">
+                        <h4 class="text-sm font-medium mb-3" style="color: #0e7490;">{{ _('Women in Staff') }}</h4>
+                        <div id="chart-trends-staff"></div>
+                    </div>
+                    <div class="rounded-xl p-4 bg-green-50">
+                        <h4 class="text-sm font-medium text-green-700 mb-3">{{ _('Women in Volunteering') }}</h4>
+                        <div id="chart-trends-volunteers"></div>
+                    </div>
+                </div>
+            </div>
+            <p id="women-leadership-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No governing board, volunteer, or staff gender-disaggregated data found.') }}</p>
+        </div>
+        <div id="disagg-content-sex-age" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Sex, Age & Sex & Age') }}</h3>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Distribution by Sex') }}</h4>
+                    <div id="chart-by-sex"></div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Distribution by Age Group') }}</h4>
+                    <div id="chart-by-age"></div>
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4">
+                <h4 class="text-sm font-medium text-gray-600 mb-3">{{ _('Combined Sex & Age Distribution') }}</h4>
+                <div id="chart-by-sex-age"></div>
+            </div>
+            <p id="sex-age-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No sex or age disaggregation found for the current parameters.') }}</p>
+        </div>
+        <div id="disagg-content-country-coverage" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ _('Country Disaggregation Coverage') }}</h3>
+            <p class="text-sm text-gray-600 mb-2">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters, including sex, age, and disability breakdowns where applicable.') }}</p>
+            <p class="text-xs text-gray-500 mb-4">{{ _('Countries marked "No data" have no eligible indicator records for the selected view.') }}</p>
+            <div id="coverage-regional-summary" class="mb-6"></div>
+            <div id="coverage-countries-table" class="overflow-x-auto"></div>
+            <p id="country-coverage-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>
+        </div>
+        </div><!-- End disagg-content-wrapper -->
+    </div>
+
+<script src="{{ static_url('libs/apexcharts.min.js') }}"></script>
+<script src="{{ static_url('js/data-exploration/data-exploration-analysis-core.js') }}"></script>
+<script src="{{ static_url('js/data-exploration/data-exploration-disaggregation-apex.js') }}"></script>

@@ -404,6 +404,7 @@ try {
             name: {{ (country.name or '')|tojson|safe }},
             short_name: {{ (country.short_name or '')|tojson|safe }},
             iso3: {{ (country.iso3 or '')|tojson|safe }},
+            iso2: {{ (country.iso2 or '')|tojson|safe }},
             status: {{ (country.status or '')|tojson|safe }},
             preferred_language: {{ (country.preferred_language_code or '')|tojson|safe }},
             currency_code: {{ (country.currency_code or '')|tojson|safe }},
@@ -486,6 +487,18 @@ try {
             width: 120,
             minWidth: 100,
             maxWidth: 150,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value ? params.value.toUpperCase() : '<span class="text-gray-400">-</span>';
+            }
+        },
+        {
+            field: 'iso2',
+            headerName: {{ _("ISO2 Code") | tojson }},
+            width: 110,
+            minWidth: 90,
+            maxWidth: 140,
             filter: 'agTextColumnFilter',
             sortable: true,
             cellRenderer: function(params) {
@@ -654,7 +667,7 @@ try {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
                 const desiredOrder = ['id', 'name']
                     .concat(nameColumns)
-                    .concat(['iso3', 'status', 'preferred_language', 'currency_code', 'fds_member_name'])
+                    .concat(['iso3', 'iso2', 'status', 'preferred_language', 'currency_code', 'fds_member_name'])
                     .concat(['actions']);
                 AgGridHelper.pinActionsColumn(gridApi, desiredOrder, countriesGridHelper.columnVisibilityManager);
             }
@@ -677,6 +690,7 @@ try {
                             $('#edit_name').val(data.name);
                             $('#edit_short_name').val(data.short_name || '');
                             $('#edit_iso3').val(data.iso3);
+                            $('#edit_iso2').val(data.iso2 || '');
                             $('#edit_status').val(data.status);
                             $('#edit_preferred_language').val(data.preferred_language);
                             $('#edit_currency_code').val(data.currency_code);

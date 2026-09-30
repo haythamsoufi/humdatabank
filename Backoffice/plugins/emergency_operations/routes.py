@@ -19,12 +19,17 @@ from app.utils.api_responses import json_bad_request, json_error, json_ok, json_
 
 from pathlib import Path
 
+from .appeal_group import CACHE_SOURCE
 from .data_store import get_data_store, trigger_background_refresh
 
 plugin_config = load_plugin_config(Path(__file__).parent, "emergency_operations")
 
 
-GO_APPEALS_URL = plugin_config.get_all_config().get('api', {}).get('base_url', "https://goadmin.ifrc.org/api/v2/appeal/")
+def _appeals_feed_url() -> str:
+    from .appeal_group import url_for_feed
+
+    api = plugin_config.get_all_config().get('api') or {}
+    return url_for_feed(api.get('feed'))
 
 # Constants
 MAX_LIMIT = 1000
@@ -51,6 +56,41 @@ def _format_api_error(exc):
     if isinstance(exc, req.exceptions.ConnectionError):
         return 'Could not connect to the API. Check the URL and network.'
     return str(exc) if exc else 'Unknown API error'
+
+
+def _cache_matches_feed(cached, url: str) -> bool:
+    """Old GO appeal caches must not be served once the feed is appealgroupchild."""
+    if not cached:
+        return False
+    if "appealgroupchild" in (url or ""):
+        return cached.get("source") == CACHE_SOURCE
+    return True
+
+
+def _fetch_live_results(url: str, fetch_params: dict, timeout: int):
+    if "appealgroupchild" in (url or ""):
+        from .appeal_group import fetch_appeal_group_records
+        return fetch_appeal_group_records(url, timeout=timeout)
+    response = requests.get(url, params=fetch_params, timeout=timeout)
+    response.raise_for_status()
+    try:
+        payload = response.json() or {}
+    except Exception as exc:
+        raise ValueError(f"Invalid JSON from appeals API: {exc}") from exc
+    return payload.get("results") or []
+
+
+def _load_appeal_results(store, *, use_file_cache: bool, timeout: int, fetch_params: dict):
+    """Return (results, from_cache). Refetch when the on-disk cache is from the legacy feed."""
+    url = _appeals_feed_url()
+    cached = store.load_cached() if use_file_cache else None
+    if _cache_matches_feed(cached, url):
+        return cached.get("results") or [], True
+    results = _fetch_live_results(url, fetch_params, timeout)
+    if use_file_cache:
+        source = CACHE_SOURCE if "appealgroupchild" in url else None
+        store.save(results, fetch_params, source=source)
+    return results, False
 
 
 def _decode_query_b64_params():
@@ -189,6 +229,20 @@ def create_blueprint():
     # Use a unique blueprint name to avoid collisions
     bp = Blueprint('emergency_operations_plugin', __name__, url_prefix='/admin/plugins/emergency_operations', template_folder=template_folder)
 
+    @bp.route('/settings')
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
+    def emergency_operations_settings():
+        """Settings page with the hardcoded appeal-feed choices."""
+        from app.plugins.plugin_utils import settings_plugin_info
+        from .appeal_group import APPEAL_FEEDS
+
+        return render_plugin_template(
+            'emergency_operations',
+            'settings.html',
+            plugin_info=settings_plugin_info('emergency_operations'),
+            appeal_feeds=APPEAL_FEEDS,
+        )
+
     # Use the base plugin routes utility
     plugin_routes = BasePluginRoutes('emergency_operations', 'Emergency Operations Plugin', plugin_config)
     plugin_routes.create_standard_routes(bp, render_plugin_template)
@@ -325,35 +379,26 @@ def create_blueprint():
             # repeated requests within a process never re-parse the JSON file.
             store = get_data_store()
             fetch_params = {
-                'end_date__gte': end_date_gt,
                 'format': 'json',
-                'limit': limit,
             }
-            cached = store.load_cached() if use_file_cache else None
-            if cached is not None:
-                results = cached.get('results', [])
+            try:
+                results, from_cache = _load_appeal_results(
+                    store,
+                    use_file_cache=use_file_cache,
+                    timeout=timeout_sec,
+                    fetch_params=fetch_params,
+                )
+            except Exception as fetch_err:
+                current_app.logger.error(f"[EmOps List] appeals fetch failed: {fetch_err}", exc_info=True)
+                return json_error(_format_api_error(fetch_err), 502, success=False, error=_format_api_error(fetch_err))
+            if from_cache:
                 current_app.logger.debug(f"[EmOps List] Serving from file cache ({len(results)} records)")
-                # Stale-while-revalidate: if the scheduled refresh is overdue, kick off a
-                # background refresh so the NEXT request gets fresher data without blocking
-                # this one.
                 schedule = cfg.get('data_cache', {}).get('schedule', 'off')
-                if store.is_refresh_due(schedule, cached.get('fetched_at')):
+                cached = store.load_cached()
+                if cached and store.is_refresh_due(schedule, cached.get('fetched_at')):
                     current_app.logger.info('[EmOps List] Scheduled refresh due — triggering background update')
-                    trigger_background_refresh(GO_APPEALS_URL, fetch_params, timeout=timeout_sec)
-            else:
-                current_app.logger.info('[EmOps List] No file cache; fetching live from GO API')
-                r = requests.get(GO_APPEALS_URL, params=fetch_params, timeout=timeout_sec)
-                current_app.logger.debug(f"[EmOps List] GO status: {r.status_code}")
-                r.raise_for_status()
-                try:
-                    data = r.json() or {}
-                except Exception as je:
-                    current_app.logger.error(f"[EmOps List] JSON parse error: {je}; text={r.text[:500]}")
-                    return json_error('Invalid JSON from GO', 502, success=False, error='Invalid JSON from GO')
-                results = data.get('results', [])
-                if use_file_cache:
-                    store.save(results, fetch_params)
-            current_app.logger.debug(f"[EmOps List] GO results total: {len(results)}")
+                    trigger_background_refresh(_appeals_feed_url(), fetch_params, timeout=timeout_sec)
+            current_app.logger.debug(f"[EmOps List] appeals results total: {len(results)}")
 
             # Apply country + date filters on raw GO rows (required when serving from file
             # cache — cache is stored with admin default dates, not per-request query_b64).
@@ -543,45 +588,23 @@ def create_blueprint():
         use_file_cache = data_cache_cfg.get('use_file_cache', True)
         schedule = data_cache_cfg.get('schedule', 'off')
 
-        # ── 1. Try file cache (unless live API mode) ────────────────────────────
         store = get_data_store()
-        cached = store.load() if use_file_cache else None
-
-        if cached is not None:
-            current_app.logger.debug(
-                f'[EmOps] Serving from file cache ({cached.get("record_count", "?")} records, '
-                f'fetched {cached.get("fetched_at", "?")})'
+        fetch_params = {'format': 'json'}
+        try:
+            results, from_cache = _load_appeal_results(
+                store,
+                use_file_cache=use_file_cache,
+                timeout=timeout_sec,
+                fetch_params=fetch_params,
             )
-            results = cached.get('results', [])
-
-            # Trigger a background refresh if the schedule says it is overdue.
-            fetched_at = cached.get('fetched_at')
-            if store.is_refresh_due(schedule, fetched_at):
+        except Exception as e:
+            current_app.logger.error(f'[EmOps] Live fetch failed: {e}', exc_info=True)
+            return json_error(_format_api_error(e), 502, success=False, error=_format_api_error(e))
+        if from_cache:
+            cached = store.load_cached() or {}
+            if store.is_refresh_due(schedule, cached.get('fetched_at')):
                 current_app.logger.info('[EmOps] Scheduled refresh is overdue; starting background refresh')
                 _bg_refresh(cfg, store, limit_default, end_date_default, timeout_sec)
-
-        else:
-            # ── 2. No cache file or live API mode — fetch live ──────────────────
-            try:
-                fetch_params = {
-                    'end_date__gte': end_date_default,
-                    'format': 'json',
-                    'limit': limit_default,
-                }
-                r = requests.get(GO_APPEALS_URL, params=fetch_params, timeout=timeout_sec)
-                r.raise_for_status()
-                try:
-                    raw = r.json() or {}
-                except Exception as je:
-                    current_app.logger.error(f'[EmOps] JSON parse error: {je}')
-                    return json_error('Invalid JSON from GO', 502, success=False, error='Invalid JSON from GO')
-                results = raw.get('results', [])
-                if use_file_cache:
-                    store.save(results, fetch_params)
-                    current_app.logger.info(f'[EmOps] Fetched {len(results)} records and saved to file cache')
-            except Exception as e:
-                current_app.logger.error(f'[EmOps] Live fetch failed: {e}', exc_info=True)
-                return json_error(_format_api_error(e), 502, success=False, error=_format_api_error(e))
 
         # ── Apply all filters from request params ──────────────────────────────
         results = _apply_filters(results, iso=iso, end_date_gt=end_date_gt, start_date_gte=start_date_gte)
@@ -628,7 +651,7 @@ def create_blueprint():
             'limit': limit_default,
         }
         store = get_data_store()
-        result = store.refresh_from_api(GO_APPEALS_URL, fetch_params, timeout=timeout_sec)
+        result = store.refresh_from_api(_appeals_feed_url(), fetch_params, timeout=timeout_sec)
         if result['success']:
             status = store.get_status()
             return json_ok(
@@ -678,7 +701,7 @@ def _bg_refresh(cfg, store, limit_default, end_date_default, timeout_sec):
         'format': 'json',
         'limit': limit_default,
     }
-    trigger_background_refresh(GO_APPEALS_URL, fetch_params, timeout=timeout_sec)
+    trigger_background_refresh(_appeals_feed_url(), fetch_params, timeout=timeout_sec)
 
 
 def _apply_filters(results, *, iso='', end_date_gt=None, start_date_gte=None):
@@ -1155,33 +1178,19 @@ def get_emergency_operations_data(country_iso=None, config=None):
         timeout_sec = cfg.get('api', {}).get('timeout', 10)
         use_file_cache = cfg.get('data_cache', {}).get('use_file_cache', True)
 
-        # Try file cache first (unless live API mode); fall back to live GO API
         store = get_data_store()
-        cached = store.load() if use_file_cache else None
-        if cached is not None:
-            results = cached.get('results', [])
-            current_app.logger.debug(f"[EmOps Direct] Serving from file cache ({len(results)} records)")
-        else:
-            current_app.logger.info('[EmOps Direct] No file cache; fetching live from GO API')
-            params = {
-                'end_date__gte': end_date_gt,
-                'format': 'json',
-                'limit': limit_default,
-            }
-            if start_date:
-                params['start_date__gte'] = start_date
-            current_app.logger.debug(f"[EmOps Direct] Fetching GO: {GO_APPEALS_URL} params={params}")
-            r = requests.get(GO_APPEALS_URL, params=params, timeout=timeout_sec)
-            current_app.logger.debug(f"[EmOps Direct] GO status: {r.status_code}")
-            r.raise_for_status()
-            try:
-                data = r.json() or {}
-            except Exception as je:
-                current_app.logger.error(f"[EmOps Direct] JSON parse error: {je}; text={r.text[:500]}")
-                raise Exception('Invalid JSON from GO API')
-            results = data.get('results', [])
-            if use_file_cache:
-                store.save(results, params)
+        params = {'format': 'json'}
+        results, from_cache = _load_appeal_results(
+            store,
+            use_file_cache=use_file_cache,
+            timeout=timeout_sec,
+            fetch_params=params,
+        )
+        current_app.logger.debug(
+            "[EmOps Direct] %s records (%s)",
+            len(results),
+            "cache" if from_cache else "live",
+        )
 
         current_app.logger.debug(f"[EmOps Direct] GO results total: {len(results)}")
 

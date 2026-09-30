@@ -377,7 +377,7 @@ def new_country():
 def edit_country(country_id):
     """Edit an existing country."""
     country = Country.query.get_or_404(country_id)
-    form = CountryForm()
+    form = CountryForm(original_country_id=country.id)
 
     if request.method == 'GET':
         # Populate non-translation fields from the country object

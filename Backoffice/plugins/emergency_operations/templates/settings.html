@@ -116,17 +116,21 @@
             <!-- API Settings -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="md:col-span-2">
-                    <label for="eo-api-base-url" class="block text-sm font-medium text-gray-700 mb-2">
-                        GO API Base URL
+                    <label for="eo-api-feed" class="block text-sm font-medium text-gray-700 mb-2">
+                        Appeals feed
                     </label>
-                    <input type="text"
-                           id="eo-api-base-url"
-                           name="api_base_url"
-                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
-                           placeholder="https://goadmin.ifrc.org/api/v2/appeal/">
+                    <select id="eo-api-feed"
+                            name="api_feed"
+                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                        {% for feed_id, feed in appeal_feeds.items() %}
+                        <option value="{{ feed_id }}">{{ feed.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <p id="eo-api-feed-url" class="mt-1 text-xs text-gray-500 font-mono break-all"></p>
                     <p class="mt-1 text-xs text-gray-500">
-                        Base URL for the IFRC GO API to fetch appeals data
+                        Appeal group includes country-level child appeals. GO appeals is the previous public list.
                     </p>
+                    <script type="application/json" id="eo-appeal-feeds">{{ appeal_feeds | tojson }}</script>
                 </div>
 
                 <div>
@@ -307,6 +311,30 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
+function appealFeeds() {
+    const node = document.getElementById('eo-appeal-feeds');
+    if (!node) return {};
+    try {
+        return JSON.parse(node.textContent || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function showSelectedFeedUrl() {
+    const select = document.getElementById('eo-api-feed');
+    const urlNode = document.getElementById('eo-api-feed-url');
+    if (!select || !urlNode) return;
+    const feed = appealFeeds()[select.value];
+    urlNode.textContent = feed && feed.url ? feed.url : '';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('eo-api-feed');
+    if (select) select.addEventListener('change', showSelectedFeedUrl);
+    showSelectedFeedUrl();
+});
+
 // Plugin management functions (use centralized showConfirmation/showAlert from confirm-dialogs.js)
 function reloadPlugin() {
     const msg = 'Are you sure you want to reload the Emergency Operations plugin? This will restart the plugin service.';
@@ -408,7 +436,8 @@ document.getElementById('plugin-settings-form').addEventListener('submit', funct
         },
         body: JSON.stringify({
             api: {
-                base_url: settings.api_base_url,
+                feed: settings.api_feed,
+                base_url: (appealFeeds()[settings.api_feed] || {}).url,
                 timeout: parseInt(settings.api_timeout) || 10
             },
             query_defaults: {
@@ -485,9 +514,11 @@ function loadCurrentSettings() {
 
                 // Populate API settings
                 if (config.api) {
-                    if (config.api.base_url) {
-                        document.getElementById('eo-api-base-url').value = config.api.base_url;
+                    const feedSelect = document.getElementById('eo-api-feed');
+                    if (feedSelect && config.api.feed && appealFeeds()[config.api.feed]) {
+                        feedSelect.value = config.api.feed;
                     }
+                    showSelectedFeedUrl();
                     if (config.api.timeout) {
                         document.getElementById('eo-api-timeout').value = config.api.timeout;
                     }

@@ -1024,11 +1024,18 @@ class PluginManager:
             }
 
     def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
-        tabs = [
-            plugin.get_data_explorer_tab()
-            for plugin in self.plugins.values()
-            if plugin.get_data_explorer_tab() is not None
-        ]
+        tabs: List[DataExplorerTabConfig] = []
+        for plugin in self.plugins.values():
+            try:
+                contributed = plugin.get_data_explorer_tabs() or []
+            except Exception as exc:
+                self.logger.warning(
+                    "get_data_explorer_tabs failed for plugin %s: %s",
+                    getattr(plugin, "plugin_id", plugin),
+                    exc,
+                )
+                continue
+            tabs.extend(contributed)
         return sorted(tabs, key=lambda tab: tab.priority)
 
     def get_documentation_sources(self) -> List[PluginDocsSource]:

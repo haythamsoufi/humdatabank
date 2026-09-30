@@ -22,6 +22,24 @@ def _plugin_manager_with_pb_progress():
     return manager
 
 
+def test_fdrs_plugin_owns_fdrs_explorer_tabs():
+    from plugins.fdrs.plugin import FdrsPlugin
+    from plugins.pb_progress.plugin import PBProgressPlugin
+    from plugins.upr.plugin import UprPlugin
+
+    tabs = {tab.tab_id: tab for tab in FdrsPlugin().get_data_explorer_tabs()}
+    assert list(tabs) == ["disaggregation", "compliance", "pb-progress"]
+    assert tabs["disaggregation"].permission == "admin.data_explore.analysis"
+    assert tabs["compliance"].permission == "admin.data_explore.compliance"
+    assert tabs["pb-progress"].permission == "admin.data_explore.pb_progress"
+    assert tabs["pb-progress"].plugin_id == "fdrs"
+    assert PBProgressPlugin().get_data_explorer_tab() is None
+    upr = UprPlugin().get_data_explorer_tab()
+    assert upr is not None
+    assert upr.tab_id == "upr"
+    assert upr.plugin_id == "upr"
+
+
 def test_explore_first_tab_returns_lowest_priority_accessible_tab():
     flags = {
         "can_access_data_table": True,

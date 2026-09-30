@@ -58,9 +58,32 @@ class TestApiData:
             "&include_dimensions=true"
         )
         assert resp.status_code == 200
+        assert "max-age=300" in (resp.headers.get("Cache-Control") or "")
         payload = resp.get_json()
         assert isinstance(payload.get("indicator_bank"), list)
         assert len(payload.get("indicator_bank") or []) > 0
+
+    def test_get_data_public_live_skips_http_cache(self, client, db_session, app):
+        from tests.unit.test_services.test_data_retrieval_form import _make_full_setup
+
+        with app.app_context():
+            _, template, _, ind, _, _, _, _ = _make_full_setup(
+                db_session,
+                status="submitted",
+                value="42",
+                period_name="Annual Report 2024",
+            )
+            template_id = template.id
+            indicator_bank_id = ind.id
+
+        resp = client.get(
+            f"/api/v1/data?indicator_bank_id={indicator_bank_id}&template_id={template_id}"
+            "&include_dimensions=true&live=true"
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("Cache-Control") == "no-store"
+        payload = resp.get_json()
+        assert len(payload.get("countries") or []) > 0
 
     def test_get_data_public_blocks_analysis_without_auth(self, client, db_session, app):
         from tests.unit.test_services.test_data_retrieval_form import _make_full_setup

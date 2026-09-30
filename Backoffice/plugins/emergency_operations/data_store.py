@@ -135,13 +135,14 @@ class EmergencyOperationsDataStore:
                 _mem_mtime = mtime
         return data
 
-    def save(self, results: List[Dict], query_params: Dict) -> bool:
+    def save(self, results: List[Dict], query_params: Dict, source: Optional[str] = None) -> bool:
         """Write results to disk atomically (write-then-rename)."""
         try:
             payload = {
                 'fetched_at':   _utcnow().isoformat(),
                 'record_count': len(results),
                 'query_params': query_params,
+                'source':       source,
                 'results':      results,
             }
             tmp = self.cache_file.with_suffix('.tmp')
@@ -257,12 +258,17 @@ class EmergencyOperationsDataStore:
             return str(exc) if exc else 'Unknown API error'
 
         try:
-            logger.info(f'[EmOps DataStore] Fetching GO: {api_url}  params={query_params}')
-            r = req.get(api_url, params=query_params, timeout=timeout)
-            r.raise_for_status()
-            data = r.json()
-            results = data.get('results', [])
-            ok = self.save(results, query_params)
+            logger.info(f'[EmOps DataStore] Fetching appeals: {api_url}  params={query_params}')
+            if 'appealgroupchild' in (api_url or ''):
+                from .appeal_group import CACHE_SOURCE, fetch_appeal_group_records
+                results = fetch_appeal_group_records(api_url, timeout=timeout)
+                ok = self.save(results, query_params, source=CACHE_SOURCE)
+            else:
+                r = req.get(api_url, params=query_params, timeout=timeout)
+                r.raise_for_status()
+                data = r.json()
+                results = data.get('results', [])
+                ok = self.save(results, query_params)
             if ok:
                 return {'success': True,  'record_count': len(results), 'error': None}
             return {'success': False, 'record_count': 0, 'error': 'Failed to write cache file'}

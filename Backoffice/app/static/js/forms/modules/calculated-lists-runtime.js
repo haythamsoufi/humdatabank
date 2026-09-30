@@ -126,7 +126,7 @@ function cachedFetch(urlString) {
 function resolveAssignedCountryIso() {
     const ctx = window.metadataContext;
     if (ctx) {
-        const fromCtx = String(ctx.country_iso || ctx.country_iso2 || '').trim();
+        const fromCtx = String(ctx.country_iso2 || ctx.country_iso || '').trim();
         if (fromCtx) {
             return fromCtx.toUpperCase();
         }

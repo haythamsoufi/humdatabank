@@ -934,19 +934,15 @@ class AIAgentExecutor:
         """When the full LLM agent path fails (timeout / API error), attempt
         the deterministic fast path as a graceful fallback.  Returns real
         data-backed results instead of a tool-less hallucination."""
-        from app.services.ai.planning.query_planner import (
-            AIQueryPlanner,
-            _UNIFIED_PLAN_THEME_PATTERNS,
-        )
+        from plugins.upr.ai.focus_area_analysis import match_unified_plans_focus_plan
 
         q_lower = (query or "").strip().lower()
         if not q_lower:
             return original_result
 
-        if "analyze_unified_plans_focus_areas" in tool_names and any(
-            p in q_lower for p in _UNIFIED_PLAN_THEME_PATTERNS
-        ):
-            areas = AIQueryPlanner._extract_theme_areas_from_query(query)
+        matched = match_unified_plans_focus_plan(query, tool_names)
+        if matched:
+            areas = (matched.get("tool_args") or {}).get("areas") or []
             if not areas:
                 return original_result
             logger.info(

@@ -1192,31 +1192,9 @@ def _looks_like_inline_stat_summary(stripped: str) -> bool:
 
 
 def _unified_plans_focus_wants_reference_enrichment(combined_text: str) -> bool:
-    """True when the user (or answer) clearly asks for external reference columns."""
-    q = (combined_text or "").lower()
-    needles = (
-        "population",
-        "inform ",
-        "inform risk",
-        "inform severity",
-        "hdi",
-        "human development",
-        "gdp",
-        "gni",
-        "income group",
-        "per capita",
-        "climate risk",
-        "world bank",
-        "urbanization rate",
-        "literacy",
-        "life expectancy",
-        "median age",
-        "fertility rate",
-        "infant mortality",
-        "poverty rate",
-        "multidimensional poverty",
-    )
-    return any(n in q for n in needles)
+    from plugins.upr.ai.focus_area_analysis import unified_plans_focus_wants_reference_enrichment
+
+    return unified_plans_focus_wants_reference_enrichment(combined_text)
 
 
 def _table_enrichment_model() -> str:

@@ -183,34 +183,6 @@ def normalize_language_code(
     return s if s in allowed_set else default
 
 
-# UPL document title patterns: "UPL-2024-...", "Country 2025 Unified Plan (UPL-2025-...)"
-_UPL_YEAR_RE = re.compile(r"UPL-(\d{4})|(\d{4})\s+Unified\s+Plan", re.IGNORECASE)
-
-
-def extract_upl_year_from_title(title: str) -> Optional[int]:
-    """
-    Extract the plan year from a Unified Plan (UPL) document title.
-
-    Matches patterns such as:
-    - "Vietnam 2024 Unified Plan (UPL-2024-MAAVN002)"
-    - "Estonia 2025 Unified Plan (UPL-2025-MAAEE001)"
-    - "UPL_SYRIA_2023 (UPL-2023-MAASY002)"
-
-    Returns the four-digit year as int, or None if no year is found.
-    """
-    if not title or not isinstance(title, str):
-        return None
-    m = _UPL_YEAR_RE.search(title)
-    if not m:
-        return None
-    for g in m.groups():
-        if g:
-            y = int(g)
-            if 2000 <= y <= 2100:
-                return y
-    return None
-
-
 def detect_query_language(
     message: str,
     *,

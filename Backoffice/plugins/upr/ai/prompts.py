@@ -19,12 +19,11 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
+from plugins.upr.catalog import UPR_FORM_TEMPLATE_IDS
+
 logger = logging.getLogger(__name__)
 
 _KNOWLEDGE_PATH = os.path.join(os.path.dirname(__file__), "KNOWLEDGE.md")
-
-# Form templates owned by this plugin (see excel/import_routes.UPR_TEMPLATE_CHOICES).
-UPR_FORM_TEMPLATE_IDS = frozenset({22, 23, 24, 33})
 
 
 def is_upr_form_template(template_id: Any) -> bool:
@@ -134,6 +133,16 @@ def get_upr_prompt_section() -> str:
         "\n"
         "Internal names – UPR:\n"
         "- Do NOT mention internal tool/function names in the final answer. Use user-facing terms: \"UPR documents\", \"uploaded documents\".\n"
+        "\n"
+        "analyze_unified_plans_focus_areas:\n"
+        "- Use when the user asks which National Societies or countries prioritise a focus area (e.g. social protection, cash, CEA, livelihoods) in their Unified Plans, or for a review/highlights of plans by focus area.\n"
+        "- It returns countries_grouped with per-country, per-plan details (area_details, activity_examples, document links). Prefer this over search_documents for focus-area prioritisation queries.\n"
+        "- For 15+ country results: the platform renders an interactive table with per-country activity & partnership highlights and document links. Your text response should be a thematic summary that synthesizes the activity_examples: what activities are planned (e.g. shock-responsive social protection, graduation pilots, cash linkages), what partnerships are described, regional patterns, and caveats about lexical matching. Use specific examples from activity_examples to illustrate themes. End with ## Sources.\n"
+        "- For fewer than 15 countries: you MAY output a markdown table with columns: Country | Plan year | Document | Highlight | Key terms.\n"
+        "- STRICTLY FORBIDDEN: calling search_documents after analyze_unified_plans_focus_areas has returned a result. The analysis tool covers ALL Unified Plans. Finish immediately with your summary and ## Sources — no more tool calls.\n"
+        "- Unified Plan / country plan inclusion (user wants to know how NS address this topic in their plans): after search_indicator_bank, call analyze_unified_plans_focus_areas with the relevant focus area(s).\n"
+        "- When analyze_unified_plans_focus_areas returns 15+ rows: the platform AUTOMATICALLY renders a complete, sortable, interactive table. You MUST NOT output ANY markdown table — not even partial. Provide ONLY a thematic summary synthesized from activity_examples and ## Sources.\n"
+        "- For compound queries where search_indicator_bank is followed by analyze_unified_plans_focus_areas: the indicator table is still auto-rendered, but your text response must also include the thematic plan summary — do not omit the document part.\n"
     )
 
 
@@ -151,11 +160,18 @@ def get_upr_formdata_validation_prompt(context: Optional[Dict[str, Any]] = None)
     period = ctx.get("period_name") or ctx.get("period_year") or "the assignment period"
     effective_label = (ctx.get("upr_effective_label") or ctx.get("form_item_label") or "").strip()
 
+    from plugins.upr.catalog import (
+        PLAN_TEMPLATE_ID,
+        PNS_PLAN_TEMPLATE_ID,
+        PNS_REPORT_TEMPLATE_ID,
+        REPORT_TEMPLATE_ID,
+    )
+
     plan_or_report = "Unified Country Plan"
     try:
-        if int(template_id) in (22, 24):
+        if int(template_id) in (PNS_PLAN_TEMPLATE_ID, PLAN_TEMPLATE_ID):
             plan_or_report = "Unified Country Plan"
-        elif int(template_id) in (23, 33):
+        elif int(template_id) in (PNS_REPORT_TEMPLATE_ID, REPORT_TEMPLATE_ID):
             plan_or_report = "Unified Country Report"
     except (TypeError, ValueError):
         pass

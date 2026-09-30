@@ -24,6 +24,8 @@ from unified_country_plan_excel_template import (  # noqa: E402
     SUPPORT_TABLE,
     COMMENT_NAMED_CELL,
     _cell_is_tick,
+    _collect_planning_emergency_slots,
+    _export_reach_to_workbook,
     _export_support_to_workbook,
     _import_funding_matrices,
     _import_support_matrix,
@@ -31,6 +33,8 @@ from unified_country_plan_excel_template import (  # noqa: E402
     _parse_emergency_row_id,
     _parse_planning_support_ticks,
     _quiet_openpyxl_io,
+    _detach_funding_ns_lookup_column_from_table,
+    _funding_ns_english_lookup_formula,
     _refresh_funding_pns_array_formula,
     restore_workbook_dynamic_array_metadata,
     _workbook_region_for_ns_name,
@@ -44,6 +48,7 @@ from unified_country_plan_excel_template import (  # noqa: E402
     period_to_workbook_version,
     planning_year_triplet,
     read_named_table,
+    read_named_cell,
     read_table_cell,
     rewrite_planning_year_headers,
     validate_unified_country_plan_import_file,
@@ -108,6 +113,155 @@ def test_parse_funding_row_entity():
 def test_parse_emergency_row_id():
     assert _parse_emergency_row_id("Flood response (MDR123)") == ("Flood response", "MDR123")
     assert _parse_emergency_row_id("Appeal only") == ("Appeal only", "")
+    assert _parse_emergency_row_id("MDRAF019") == ("", "MDRAF019")
+    assert _parse_emergency_row_id("mdraf018") == ("", "MDRAF018")
+
+
+def _matrix_entry(cells):
+    return type("Entry", (), {"disagg_data": cells})()
+
+
+def test_collect_emergency_slots_from_funding_headers_only():
+    funding = _matrix_entry(
+        {
+            "col_header|EA1": "Afghanistan - Earthquake (MDRAF019)",
+            "col_header|EA2": "Afghanistan - Population mvt from Pakistan (MDRAF018)",
+            "IFRC Secretariat_EA1": 16000000,
+        }
+    )
+    slots = _collect_planning_emergency_slots(None, [funding])
+    assert slots[0]["code"] == "MDRAF019"
+    assert slots[0]["name"] == "Afghanistan - Earthquake"
+    assert slots[1]["code"] == "MDRAF018"
+    assert slots[1]["name"] == "Afghanistan - Population mvt from Pakistan"
+    assert slots[2] is None
+
+
+def test_collect_emergency_slots_matrix_keeps_storage_order():
+    """Matrix-only rows must not be reordered A–Z; first stored row is EA1."""
+    emergency = _matrix_entry(
+        {
+            "Zulu Response (MDRZZ009)_Total People to be reached": 10,
+            "Alpha Floods (MDRAA001)_Total People to be reached": 20,
+        }
+    )
+    slots = _collect_planning_emergency_slots(emergency, [])
+    assert [slot["code"] for slot in slots if slot] == ["MDRZZ009", "MDRAA001"]
+
+
+def test_collect_emergency_slots_matches_bare_mdr_matrix_keys():
+    """List-library rows are sometimes stored as MDR code only; they must not become EA3."""
+    funding = _matrix_entry(
+        {
+            "col_header|EA1": "Afghanistan - Earthquake (MDRAF019)",
+            "col_header|EA2": "Afghanistan - Population mvt from Pakistan (MDRAF018)",
+        }
+    )
+    emergency = _matrix_entry(
+        {
+            "MDRAF019_Total People to be reached": 123,
+            "MDRAF018_Total People to be reached": 456,
+        }
+    )
+    slots = _collect_planning_emergency_slots(emergency, [funding])
+    assert slots[0]["code"] == "MDRAF019"
+    assert slots[0]["name"] == "Afghanistan - Earthquake"
+    assert slots[0]["reach"] == 123
+    assert slots[1]["code"] == "MDRAF018"
+    assert slots[1]["reach"] == 456
+    assert slots[2] is None
+
+
+def test_collect_emergency_slots_funding_order_wins_and_matches_reach():
+    funding = _matrix_entry(
+        {
+            "col_header|EA1": "Later listed (MDRBB002)",
+            "col_header|EA2": "First listed (MDRAA001)",
+        }
+    )
+    emergency = _matrix_entry(
+        {
+            "First listed (MDRAA001)_Total People to be reached": 111,
+            "Later listed (MDRBB002)_Total People to be reached": 222,
+        }
+    )
+    slots = _collect_planning_emergency_slots(emergency, [funding])
+    assert slots[0]["code"] == "MDRBB002"
+    assert slots[0]["reach"] == 222
+    assert slots[1]["code"] == "MDRAA001"
+    assert slots[1]["reach"] == 111
+
+
+def test_export_reach_writes_start_names_from_funding_headers():
+    import openpyxl
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    funding = _matrix_entry(
+        {
+            "col_header|EA1": "Afghanistan - Earthquake (MDRAF019)",
+            "col_header|EA2": "Afghanistan - Population mvt from Pakistan (MDRAF018)",
+        }
+    )
+    emergency = _matrix_entry(
+        {
+            "MDRAF019_Total People to be reached": 123,
+            "MDRAF018_Total People to be reached": 456,
+        }
+    )
+    _export_reach_to_workbook(wb, None, emergency, funding_entries=[funding])
+    assert read_named_cell(wb, "Data_MDR1") == "MDRAF019"
+    assert read_named_cell(wb, "Data_EA1") == "Afghanistan - Earthquake"
+    assert read_named_cell(wb, "Data_MDR2") == "MDRAF018"
+    assert read_named_cell(wb, "Data_EA2") == "Afghanistan - Population mvt from Pakistan"
+    assert read_named_cell(wb, "Reach_EA1") == 123
+    assert read_named_cell(wb, "Reach_EA2") == 456
+    assert read_named_cell(wb, "Data_MDR3") in (None, "")
+    assert read_named_cell(wb, "Data_EA3") in (None, "")
+    assert read_named_cell(wb, "Reach_EA3") in (None, "")
+    wb.close()
+
+
+def test_import_funding_headers_follow_start_slot_order():
+    import openpyxl
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    write_named_cell(wb, "Data_MDR1", "MDRAF019")
+    write_named_cell(wb, "Data_EA1", "Afghanistan - Earthquake")
+    write_named_cell(wb, "Data_MDR2", "MDRAF018")
+    write_named_cell(wb, "Data_EA2", "Afghanistan - Population mvt from Pakistan")
+    ctx = UprImportContext(template_ids=[24])
+    extra_go = {"name": "Should not fill EA3", "code": "MDRAF099"}
+    ctx.emergency_ops_by_iso["AFG"] = {
+        "MDRAF019": {"name": "Afghanistan - Earthquake", "code": "MDRAF019"},
+        "MDRAF018": {
+            "name": "Afghanistan - Population mvt from Pakistan",
+            "code": "MDRAF018",
+        },
+        "MDRAF099": extra_go,
+    }
+    ctx.emergency_ops_ordered_by_iso["AFG"] = [
+        ctx.emergency_ops_by_iso["AFG"]["MDRAF019"],
+        ctx.emergency_ops_by_iso["AFG"]["MDRAF018"],
+        extra_go,
+    ]
+    matrices = _import_funding_matrices(
+        wb,
+        ctx,
+        aes_id=1,
+        iso3="AFG",
+        period="2027",
+        rnd="P27",
+        warnings=[],
+    )
+    for item_id in (967, 968, 974):
+        assert matrices[item_id]["col_header|EA1"] == "Afghanistan - Earthquake (MDRAF019)"
+        assert matrices[item_id]["col_header|EA2"] == (
+            "Afghanistan - Population mvt from Pakistan (MDRAF018)"
+        )
+        assert "col_header|EA3" not in matrices[item_id]
+    wb.close()
 
 
 def test_cell_is_tick():
@@ -364,6 +518,24 @@ def test_import_funding_reads_pns_values_by_bilateral_row_index():
             pass
 
 
+def test_funding_ns_lookup_formula_anchors_to_b10_spill():
+    assert "B11" not in _funding_ns_english_lookup_formula(2)
+    assert "ANCHORARRAY($B$10)" in _funding_ns_english_lookup_formula(2)
+    assert ",2)" in _funding_ns_english_lookup_formula(2)
+
+
+def test_detach_funding_ns_column_leaves_x_outside_data_fr():
+    import openpyxl
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _detach_funding_ns_lookup_column_from_table(wb)
+    headers, _ = read_named_table(wb, FUNDING_SHEET, FUNDING_TABLE)
+    assert "NS" not in headers
+    assert headers[-1].startswith("EFs_")
+    wb.close()
+
+
 def test_refresh_funding_pns_array_formula_keeps_dynamic_formula():
     import openpyxl
     from openpyxl.worksheet.formula import ArrayFormula
@@ -388,6 +560,7 @@ def test_parse_and_write_comment_single_cell(ucp_workbook):
 
 def test_restore_workbook_dynamic_array_metadata_preserves_cm_flag():
     import openpyxl
+    import re
     import tempfile
     import zipfile
     from openpyxl.worksheet.formula import ArrayFormula
@@ -405,8 +578,19 @@ def test_restore_workbook_dynamic_array_metadata_preserves_cm_flag():
         restore_workbook_dynamic_array_metadata(TEMPLATE_PATH, path)
         with zipfile.ZipFile(path) as z:
             assert "xl/metadata.xml" in z.namelist()
+            assert "xl/calcChain.xml" not in z.namelist()
+            workbook_xml = z.read("xl/workbook.xml").decode("utf-8")
+            assert 'fullCalcOnLoad="1"' in workbook_xml
+            assert 'calcMode="auto"' in workbook_xml
             funding_xml = z.read("xl/worksheets/sheet5.xml").decode("utf-8")
             assert 'r="B10"' in funding_xml and 'cm="1"' in funding_xml
+            x11 = re.search(r'<c r="X11"[^>]*>.*?</c>', funding_xml)
+            assert x11 is not None
+            assert "XLOOKUP" in x11.group(0)
+            assert "ANCHORARRAY" in x11.group(0)
+            assert "B11" not in x11.group(0)
+            assert 'cm="1"' in x11.group(0)
+            assert "<v" not in x11.group(0)
             assert isinstance(
                 openpyxl.load_workbook(path)[FUNDING_SHEET]["B10"].value,
                 ArrayFormula,

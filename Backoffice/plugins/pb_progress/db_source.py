@@ -21,7 +21,8 @@ from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.models.indicator_bank import IndicatorBank, IndicatorBankSpef
 from app.services.platform import storage_service
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID, UPR_REPORTING_TEMPLATE_ID
+from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+from plugins.upr.catalog import UPR_REPORTING_TEMPLATE_ID
 from plugins.pb_progress.plugin_data_store import (
     EXCEL_NAME,
     PBProgressDataStore,

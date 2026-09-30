@@ -18,6 +18,7 @@ from app.services.imports.import_change_log import (
     attach_import_change_log_to_activity,
     set_import_audit_details,
 )
+from plugins.upr.catalog import UPR_TEMPLATE_CHOICES
 from plugins.upr.excel.excel_import_service import UprExcelImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_helpers import get_json_safe
@@ -61,15 +62,6 @@ legacy_bp = Blueprint("upr_excel_import_legacy", __name__, url_prefix="/admin/te
 def legacy_redirect(subpath: str = ""):
     # Only the wizard page is worth bookmarking; job status/download URLs are ephemeral.
     return redirect(url_for("upr_excel_import.wizard"), code=301)
-
-UPR_TEMPLATE_CHOICES = [
-    # Planning (rounds P*)
-    {"id": 24, "name": "Unified Country Plan — planning country data (P*)"},
-    {"id": 22, "name": "Annual Planning – International Bilateral Support — PNS staff (P*)"},
-    # Reporting (rounds AR*, MYR*)
-    {"id": 33, "name": "Reporting – Country — NS Data, indicators, funding, support (AR*, MYR*)"},
-    {"id": 23, "name": "Reporting – PNS — PNS funding totals (AR* only)"},
-]
 
 
 def _upr_template_labels(template_ids: List[int]) -> List[str]:

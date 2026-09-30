@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from app.services.ai.validation.parsers import (
@@ -146,3 +147,52 @@ def retrieve_upr_kpi_reference(context: Dict[str, Any]) -> Optional[Dict[str, An
     except Exception as e:
         logger.debug("retrieve_upr_kpi_reference failed: %s", e)
         return None
+
+
+def _title_case_report_type(v: str) -> str:
+    s = (v or "").strip()
+    if not s:
+        return ""
+    s = s.replace("_", " ").replace("-", " ").strip()
+    mapping = {
+        "midyear report": "Mid-year Report",
+        "mid year report": "Mid-year Report",
+        "annual report": "Annual Report",
+        "unified plan": "Unified Plan",
+    }
+    key = re.sub(r"\s+", " ", s.lower()).strip()
+    if key in mapping:
+        return mapping[key]
+    return " ".join(w.capitalize() if w.isalpha() else w for w in re.split(r"\s+", s))
+
+
+def format_ifrc_upr_extraction(extraction: str) -> str:
+    """Turn IFRC extraction tokens into a user-facing one-liner."""
+    s = "" if extraction is None else str(extraction)
+    if not s:
+        return ""
+    s2 = s.replace("\r", " ").replace("\n", " ").strip()
+    meta = {}
+    try:
+        left, _, right = s2.partition("-")
+        for part in re.split(r"[;,\|]\s*", left):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                meta[k.strip().lower()] = v.strip()
+        if not meta:
+            return s2
+        pieces = []
+        rtype = meta.get("ype") or meta.get("pe") or meta.get("type")
+        year = meta.get("year")
+        if rtype:
+            pieces.append(_title_case_report_type(rtype))
+        if year and str(year).strip().isdigit():
+            pieces.append(str(int(year)))
+        prefix = " — ".join([p for p in pieces if p])
+        if right:
+            right_clean = re.sub(r"\s*-\s*", "; ", right.strip())
+            return (f"{prefix} — {right_clean}" if prefix else right_clean).strip()
+        return prefix or s2
+    except Exception as e:
+        logger.debug("prefix merge failed: %s", e)
+        return s2

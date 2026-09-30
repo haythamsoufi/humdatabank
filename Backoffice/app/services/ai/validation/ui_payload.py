@@ -21,8 +21,10 @@ from app.services.ai.validation.parsers import (
 )
 from plugins.upr.ai.upr_rules import (
     _required_terms_for_claims,
+    _title_case_report_type,
     _upr_document_label,
     _upr_suggestion_reason,
+    format_ifrc_upr_extraction,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,65 +74,8 @@ def build_opinion_ui(
         s2 = (s1 + " " + parts[1].strip()).strip() if len(parts) > 1 and len(s1) < 120 else s1
         return _truncate(s2, 260)
 
-    def _title_case_report_type(v: str) -> str:
-        s = (v or "").strip()
-        if not s:
-            return ""
-        s = s.replace("_", " ").replace("-", " ").strip()
-        # Common IFRC API tokens
-        mapping = {
-            "midyear report": "Mid-year Report",
-            "mid year report": "Mid-year Report",
-            "annual report": "Annual Report",
-            "unified plan": "Unified Plan",
-        }
-        key = re.sub(r"\s+", " ", s.lower()).strip()
-        if key in mapping:
-            return mapping[key]
-        # Fallback: capitalize words conservatively
-        return " ".join(w.capitalize() if w.isalpha() else w for w in re.split(r"\s+", s))
-
     def _format_ifrc_upr_extraction(extraction: str) -> str:
-        """
-        Turn internal extraction tokens like:
-          'ype=midyear_report; year=2024 - National Society local units: 94 - ...'
-        into a user-friendly one-liner.
-        """
-        s = _safe_str(extraction)
-        if not s:
-            return ""
-        # Normalize separators
-        s2 = s.replace("\r", " ").replace("\n", " ").strip()
-        # Extract key=value metadata prefix (ype/pe/year) if present
-        meta = {}
-        try:
-            # Split on '-' once; left side usually contains "ype=...; year=..."
-            left, _, right = s2.partition("-")
-            # Parse key/value pairs in the left part
-            for part in re.split(r"[;,\|]\s*", left):
-                if "=" in part:
-                    k, v = part.split("=", 1)
-                    meta[k.strip().lower()] = v.strip()
-            # If no meta keys found, keep original
-            if not meta:
-                return s2
-            pieces = []
-            rtype = meta.get("ype") or meta.get("pe") or meta.get("type")
-            year = meta.get("year")
-            if rtype:
-                pieces.append(_title_case_report_type(rtype))
-            if year and str(year).strip().isdigit():
-                pieces.append(str(int(year)))
-            prefix = " — ".join([p for p in pieces if p])
-            if right:
-                # Clean up " - " list into semicolons for readability
-                right_clean = right.strip()
-                right_clean = re.sub(r"\s*-\s*", "; ", right_clean)
-                return (f"{prefix} — {right_clean}" if prefix else right_clean).strip()
-            return prefix or s2
-        except Exception as e:
-            logger.debug("prefix merge failed: %s", e)
-            return s2
+        return format_ifrc_upr_extraction(extraction)
 
     def _extract_ifrc_meta(text: str) -> Dict[str, Any]:
         """

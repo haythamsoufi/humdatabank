@@ -39,60 +39,6 @@ _DOCUMENT_LIST_PATTERNS = (
     "countries with ",
 )
 
-# Phrases that indicate a thematic Unified Plans coverage query — should route to
-# analyze_unified_plans_focus_areas, not to a structured indicator lookup.
-_UNIFIED_PLAN_THEME_PATTERNS = (
-    "included in unified plan",
-    "included in their unified plan",
-    "include in unified plan",
-    "in their unified plan",
-    "in their 20",           # "in their 2026 Unified Plans"
-    "unified plans that include",
-    "unified plans that mention",
-    "unified plans include",
-    "unified plans mention",
-    "unified plans cover",
-    "which unified plans",
-    "ns include",
-    "national societies that include",
-    "national societies that mention",
-    "national societies that priorit",
-    "national societies with ",
-    "how many national societies",
-    # Substring of "unified plans" / matches "(UPL)"-style rewrites, e.g.
-    # "List countries whose Unified Plans (UPL) prioritize…" (must not fall through
-    # to document_list + search_documents + an extra synthesis LLM).
-    "unified plan",
-    "(upl",
-    "upl)",
-    "whose unified",
-    "upl-",
-)
-
-# Queries containing these phrases need LLM-depth analysis and should NOT
-# be handled by the deterministic fast path, even if they also match a
-# theme pattern above.  The fast path cannot extract activity details,
-# build custom table columns, or assess whether a topic is *substantively*
-# addressed (vs merely mentioned in a boilerplate header).
-_UNIFIED_PLAN_FORCE_LLM_RE = re.compile(
-    r"(?:"
-    r"details?\s+on\s+(?:the\s+)?(?:activity|activities|plan|plans|programme|program)"
-    r"|activity\s+(?:detail|plans?|description)"
-    r"|table\s+with\s+columns?"
-    r"|create\s+a\s+table"
-    r"|columns?\s+on\s+detail"
-    r"|specific\s+activit"
-    r"|what\s+(?:specific|concrete)\s+(?:activit|plan|programme)"
-    r"|descri(?:be|ption)\s+(?:of\s+)?(?:the\s+)?(?:migration|activit)"
-    r"|budget|timeframe|partner|implementing\s+partner"
-    r"|target\s+population|geographic\s+focus"
-    r"|how\s+(?:do|are)\s+(?:they|these|the\s+ns)"
-    r"|compare\s+(?:the\s+)?(?:activit|plan|approach)"
-    r"|breakdown\s+(?:of|by)"
-    r")",
-    re.IGNORECASE,
-)
-
 # Phrases signalling free-text Indicator Bank similarity search — must not trigger
 # the Unified Plans thematic fast path; prefer search_indicator_bank when available.
 _INDICATOR_SEARCH_SIGNALS = (
@@ -342,32 +288,9 @@ class AIQueryPlanner:
 
     @staticmethod
     def _extract_theme_areas_from_query(query: str) -> List[str]:
-        """
-        Extract likely focus-area keys from a thematic Unified Plans query.
-        Returns a list of snake_case area keys for analyze_unified_plans_focus_areas.
-        """
-        q = (query or "").lower()
-        _THEME_MAP = [
-            (["migration", "displacement", "migrant", "refugee", "idp", "asylum", "forced migration", "mixed migration"], "migration_displacement"),
-            (["climate change", "climate adaptation", "climate risk", "climate resilience", "climate"], "climate"),
-            (["mhpss", "mental health", "psychosocial"], "mhpss"),
-            (["pgi", "protection gender inclusion", "gender-based violence", "gbv", "gender equality", "disability inclusion"], "pgi"),
-            (["livelihood", "livelihoods", "food security", "economic security"], "livelihoods"),
-            (["cash assistance", "cash transfer", "cash and voucher", "cva", "cash-based"], "cash"),
-            (["community engagement", "accountability", "cea", "aap"], "cea"),
-            (["social protection", "social assistance", "social safety net"], "social_protection"),
-            (["health", "primary health care", "community health", "epidemic", "pandemic"], "health"),
-            (["disaster risk reduction", "drr", "disaster preparedness", "early warning"], "disaster_risk_reduction"),
-        ]
-        scores: Dict[str, int] = {}
-        for keywords, area_key in _THEME_MAP:
-            hit_count = sum(1 for kw in keywords if kw in q)
-            if hit_count:
-                scores[area_key] = scores.get(area_key, 0) + hit_count
-        if not scores:
-            return []
-        ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
-        return [area for area, _ in ranked]
+        from plugins.upr.ai.focus_area_analysis import extract_theme_areas_from_query
+
+        return extract_theme_areas_from_query(query)
 
     @staticmethod
     def try_rule_based_document_list(query: str, tool_names: Set[str]) -> Optional[SimplePlan]:
@@ -396,37 +319,17 @@ class AIQueryPlanner:
                 )
                 return plan
 
-        # Thematic Unified Plans queries (e.g. "migration in Unified Plans") must go to
-        # analyze_unified_plans_focus_areas, not to a structured indicator tool.
-        # However, queries that ask for activity details, custom table columns,
-        # budgets, partners etc. need the full LLM path because the deterministic
-        # fast path cannot assess substantive activity coverage.
-        if "analyze_unified_plans_focus_areas" in tool_names and any(p in q for p in _UNIFIED_PLAN_THEME_PATTERNS):
-            if any(s in q for s in _INDICATOR_SEARCH_SIGNALS):
-                logger.info(
-                    "Query planner: unified_plans_focus theme skipped — indicator similarity intent detected."
+        if not any(s in q for s in _INDICATOR_SEARCH_SIGNALS):
+            from plugins.upr.ai.focus_area_analysis import match_unified_plans_focus_plan
+
+            matched = match_unified_plans_focus_plan(query, tool_names)
+            if matched:
+                return SimplePlan(
+                    kind=matched["kind"],
+                    tool_name=matched["tool_name"],
+                    tool_args=dict(matched.get("tool_args") or {}),
+                    output_hint=matched.get("output_hint") or "table",
                 )
-                return None
-            if _UNIFIED_PLAN_FORCE_LLM_RE.search(q):
-                logger.info(
-                    "Query planner: unified_plans_focus theme matched but query "
-                    "requests activity details / custom table — deferring to LLM path."
-                )
-                return None
-            areas = AIQueryPlanner._extract_theme_areas_from_query(query)
-            if not areas:
-                logger.info(
-                    "Query planner: unified_plans_focus theme matched but no focus areas inferred — deferring to LLM planner.",
-                )
-                return None
-            plan = SimplePlan(
-                kind="unified_plans_focus",
-                tool_name="analyze_unified_plans_focus_areas",
-                tool_args={"areas": areas, "limit": 500},
-                output_hint="table",
-            )
-            logger.info("Query planner: rule-based unified_plans_focus plan (skip LLM), areas=%s", areas)
-            return plan
 
         if "search_documents" not in tool_names:
             return None

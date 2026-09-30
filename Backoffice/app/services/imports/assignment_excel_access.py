@@ -1,25 +1,16 @@
 """Assignment-level flags for form Excel export/import and PDF export.
 
-Admins only toggle the standard Export/Import Excel buttons. Template 33
-(UPR Country Reporting) and template 24 (Unified Country Plan) then resolve
-to their structured workbooks; every other template uses the generic
-item-row workbook.
+Admins only toggle the standard Export/Import Excel buttons. UPR Country
+Reporting and Unified Country Plan then resolve to their structured
+workbooks; every other template uses the generic item-row workbook.
 
 Dedicated ``enable_upr_country_reporting_excel`` /
 ``enable_unified_country_plan_excel`` columns are legacy and still honored
 when the standard flags are off, so existing assignments keep working.
+
+Plugin helpers are imported lazily so this module can load during
+``plugins.upr`` bootstrap without a circular import.
 """
-
-from app.utils.data_quality_constants import (
-    UPR_PLANNING_TEMPLATE_ID,
-    UPR_REPORTING_TEMPLATE_ID,
-)
-
-
-def _template_id(assigned_form) -> int:
-    if not assigned_form:
-        return 0
-    return int(getattr(assigned_form, "template_id", 0) or 0)
 
 
 def _legacy_custom_excel_enabled(assigned_form) -> bool:
@@ -27,6 +18,32 @@ def _legacy_custom_excel_enabled(assigned_form) -> bool:
         getattr(assigned_form, "enable_upr_country_reporting_excel", False)
         or getattr(assigned_form, "enable_unified_country_plan_excel", False)
     )
+
+
+def _upr_assignment_access():
+    from plugins.upr.excel.assignment_access import (
+        assignment_uses_unified_country_plan_excel,
+        assignment_uses_upr_country_reporting_excel,
+        resolve_upr_excel_mode,
+        sync_assignment_custom_excel_flags,
+    )
+
+    return (
+        assignment_uses_upr_country_reporting_excel,
+        assignment_uses_unified_country_plan_excel,
+        resolve_upr_excel_mode,
+        sync_assignment_custom_excel_flags,
+    )
+
+
+def assignment_uses_upr_country_reporting_excel(assigned_form) -> bool:
+    uses_upr, _, _, _ = _upr_assignment_access()
+    return uses_upr(assigned_form)
+
+
+def assignment_uses_unified_country_plan_excel(assigned_form) -> bool:
+    _, uses_ucp, _, _ = _upr_assignment_access()
+    return uses_ucp(assigned_form)
 
 
 def assignment_excel_export_enabled(assigned_form) -> bool:
@@ -47,38 +64,18 @@ def assignment_excel_import_enabled(assigned_form) -> bool:
     )
 
 
-def assignment_uses_upr_country_reporting_excel(assigned_form) -> bool:
-    """Return True when this assignment should use the T33 structured workbook."""
-    if _template_id(assigned_form) != UPR_REPORTING_TEMPLATE_ID:
-        return False
-    return assignment_excel_export_enabled(assigned_form) or assignment_excel_import_enabled(
-        assigned_form
-    )
-
-
-def assignment_uses_unified_country_plan_excel(assigned_form) -> bool:
-    """Return True when this assignment should use the T24 structured workbook."""
-    if _template_id(assigned_form) != UPR_PLANNING_TEMPLATE_ID:
-        return False
-    return assignment_excel_export_enabled(assigned_form) or assignment_excel_import_enabled(
-        assigned_form
-    )
-
-
 def assignment_uses_export_excel(assigned_form) -> bool:
     """Return True when this assignment has generic Excel export enabled."""
-    if assignment_uses_upr_country_reporting_excel(assigned_form):
-        return False
-    if assignment_uses_unified_country_plan_excel(assigned_form):
+    _, _, resolve_mode, _ = _upr_assignment_access()
+    if resolve_mode(assigned_form):
         return False
     return bool(getattr(assigned_form, "enable_export_excel", False))
 
 
 def assignment_uses_import_excel(assigned_form) -> bool:
     """Return True when this assignment has generic Excel import enabled."""
-    if assignment_uses_upr_country_reporting_excel(assigned_form):
-        return False
-    if assignment_uses_unified_country_plan_excel(assigned_form):
+    _, _, resolve_mode, _ = _upr_assignment_access()
+    if resolve_mode(assigned_form):
         return False
     return bool(getattr(assigned_form, "enable_import_excel", False))
 
@@ -90,16 +87,12 @@ def assignment_uses_export_pdf(assigned_form) -> bool:
 
 def resolve_assignment_excel_ui(assigned_form) -> dict:
     """Return entry-form Excel UI flags derived from template + standard toggles."""
+    _, _, resolve_mode, _ = _upr_assignment_access()
     show_export = assignment_excel_export_enabled(assigned_form)
     show_import = assignment_excel_import_enabled(assigned_form)
-    if assignment_uses_upr_country_reporting_excel(assigned_form):
-        mode = "upr"
-    elif assignment_uses_unified_country_plan_excel(assigned_form):
-        mode = "ucp"
-    elif show_export or show_import:
+    mode = resolve_mode(assigned_form)
+    if not mode and (show_export or show_import):
         mode = "generic"
-    else:
-        mode = None
     return {
         "mode": mode,
         "show_export": bool(mode) and show_export,
@@ -108,18 +101,8 @@ def resolve_assignment_excel_ui(assigned_form) -> dict:
 
 
 def sync_assignment_custom_excel_flags(assignment) -> None:
-    """Keep legacy dedicated columns aligned with the standard Excel toggles."""
-    excel_on = bool(
-        getattr(assignment, "enable_export_excel", False)
-        or getattr(assignment, "enable_import_excel", False)
-    )
-    template_id = _template_id(assignment)
-    assignment.enable_upr_country_reporting_excel = (
-        excel_on and template_id == UPR_REPORTING_TEMPLATE_ID
-    )
-    assignment.enable_unified_country_plan_excel = (
-        excel_on and template_id == UPR_PLANNING_TEMPLATE_ID
-    )
+    _, _, _, sync_flags = _upr_assignment_access()
+    sync_flags(assignment)
 
 
 def populate_standard_excel_flags_from_legacy(assignment, form) -> None:

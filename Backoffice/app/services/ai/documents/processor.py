@@ -485,29 +485,6 @@ class AIDocumentProcessor:
                     logger.debug("AI_PDF_LAYOUT_WORDS_MAX_PAGES parse failed: %s", e)
                     layout_words_max_pages = 3
 
-                # Optional: capture a cropped rendering of the top-of-page region for vision-based extraction.
-                # Also disabled by default; only used during chunking (not stored in DB).
-                try:
-                    upr_vision_enabled = bool(current_app.config.get("AI_UPR_VISION_KPI_ENABLED", False))
-                except Exception as e:
-                    logger.debug("AI_UPR_VISION_KPI_ENABLED parse failed: %s", e)
-                    upr_vision_enabled = False
-                try:
-                    upr_vision_max_pages = int(current_app.config.get("AI_UPR_VISION_MAX_PAGES", 1))
-                except Exception as e:
-                    logger.debug("AI_UPR_VISION_MAX_PAGES parse failed: %s", e)
-                    upr_vision_max_pages = 1
-                try:
-                    upr_vision_dpi = int(current_app.config.get("AI_UPR_VISION_DPI", 160))
-                except Exception as e:
-                    logger.debug("AI_UPR_VISION_DPI parse failed: %s", e)
-                    upr_vision_dpi = 160
-                try:
-                    upr_vision_clip_top_frac = float(current_app.config.get("AI_UPR_VISION_CLIP_TOP_FRAC", 0.42))
-                except Exception as e:
-                    logger.debug("AI_UPR_VISION_CLIP_TOP_FRAC parse failed: %s", e)
-                    upr_vision_clip_top_frac = 0.42
-
                 # Extract tables (best-effort) first so we can optionally exclude table regions from text.
                 page_tables: List[Dict[str, Any]] = []
                 if current_app.config.get('AI_TABLE_EXTRACTION_ENABLED', True):
@@ -594,24 +571,9 @@ class AIDocumentProcessor:
                     except Exception as e:
                         logger.debug("Word layout extraction failed: %s", e)
 
-                # Attach cropped rendering for vision-based UPR extraction (first N pages only).
-                if upr_vision_enabled and int(page_num) <= int(upr_vision_max_pages):
-                    try:
-                        import base64
+                from plugins.upr.ai.visual_chunking import attach_upr_kpi_vision_clip
 
-                        rect = page.rect
-                        clip = fitz.Rect(
-                            float(rect.x0),
-                            float(rect.y0),
-                            float(rect.x1),
-                            float(rect.y0 + (rect.height * float(upr_vision_clip_top_frac))),
-                        )
-                        pix = page.get_pixmap(dpi=int(upr_vision_dpi), alpha=False, clip=clip)
-                        png_bytes = pix.tobytes("png")
-                        page_obj["upr_kpi_clip_png_b64"] = base64.b64encode(png_bytes).decode("ascii")
-                        page_obj["upr_kpi_clip_box"] = [float(clip.x0), float(clip.y0), float(clip.x1), float(clip.y1)]
-                    except Exception as e:
-                        logger.debug("UPR KPI clip extraction failed: %s", e)
+                attach_upr_kpi_vision_clip(page, page_num, page_obj)
 
                 result['pages'].append(page_obj)
 

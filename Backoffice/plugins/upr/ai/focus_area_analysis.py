@@ -447,3 +447,353 @@ def run_unified_plans_focus_fastpath(
         "llm_model_used": model if llm_synthesis_used else None,
         "llm_synthesis_debug": llm_synthesis_debug,
     }
+
+
+UNIFIED_PLAN_THEME_PATTERNS = (
+    "included in unified plan",
+    "included in their unified plan",
+    "include in unified plan",
+    "in their unified plan",
+    "in their 20",
+    "unified plans that include",
+    "unified plans that mention",
+    "unified plans include",
+    "unified plans mention",
+    "unified plans cover",
+    "which unified plans",
+    "ns include",
+    "national societies that include",
+    "national societies that mention",
+    "national societies that priorit",
+    "national societies with ",
+    "how many national societies",
+    "unified plan",
+    "(upl",
+    "upl)",
+    "whose unified",
+    "upl-",
+)
+
+UNIFIED_PLAN_FORCE_LLM_RE = re.compile(
+    r"(?:"
+    r"details?\s+on\s+(?:the\s+)?(?:activity|activities|plan|plans|programme|program)"
+    r"|activity\s+(?:detail|plans?|description)"
+    r"|table\s+with\s+columns?"
+    r"|create\s+a\s+table"
+    r"|columns?\s+on\s+detail"
+    r"|specific\s+activit"
+    r"|what\s+(?:specific|concrete)\s+(?:activit|plan|programme)"
+    r"|descri(?:be|ption)\s+(?:of\s+)?(?:the\s+)?(?:migration|activit)"
+    r"|budget|timeframe|partner|implementing\s+partner"
+    r"|target\s+population|geographic\s+focus"
+    r"|how\s+(?:do|are)\s+(?:they|these|the\s+ns)"
+    r"|compare\s+(?:the\s+)?(?:activit|plan|approach)"
+    r"|breakdown\s+(?:of|by)"
+    r")",
+    re.IGNORECASE,
+)
+
+_THEME_MAP = [
+    (["migration", "displacement", "migrant", "refugee", "idp", "asylum", "forced migration", "mixed migration"], "migration_displacement"),
+    (["climate change", "climate adaptation", "climate risk", "climate resilience", "climate"], "climate"),
+    (["mhpss", "mental health", "psychosocial"], "mhpss"),
+    (["pgi", "protection gender inclusion", "gender-based violence", "gbv", "gender equality", "disability inclusion"], "pgi"),
+    (["livelihood", "livelihoods", "food security", "economic security"], "livelihoods"),
+    (["cash assistance", "cash transfer", "cash and voucher", "cva", "cash-based"], "cash"),
+    (["community engagement", "accountability", "cea", "aap"], "cea"),
+    (["social protection", "social assistance", "social safety net"], "social_protection"),
+    (["health", "primary health care", "community health", "epidemic", "pandemic"], "health"),
+    (["disaster risk reduction", "drr", "disaster preparedness", "early warning"], "disaster_risk_reduction"),
+]
+
+
+def extract_theme_areas_from_query(query: str) -> List[str]:
+    """Return snake_case focus-area keys mentioned in a Unified Plans query."""
+    q = (query or "").lower()
+    scores: Dict[str, int] = {}
+    for keywords, area_key in _THEME_MAP:
+        hit_count = sum(1 for kw in keywords if kw in q)
+        if hit_count:
+            scores[area_key] = scores.get(area_key, 0) + hit_count
+    if not scores:
+        return []
+    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+    return [area for area, _ in ranked]
+
+
+def match_unified_plans_focus_plan(query: str, tool_names) -> Optional[Dict[str, Any]]:
+    """Return a rule-based Unified Plans focus plan, or None to defer."""
+    from plugins.upr.ai import is_upr_active
+
+    if not is_upr_active():
+        return None
+    names = set(tool_names or [])
+    if "analyze_unified_plans_focus_areas" not in names:
+        return None
+    q = (query or "").strip().lower()
+    if not q or not any(p in q for p in UNIFIED_PLAN_THEME_PATTERNS):
+        return None
+    if UNIFIED_PLAN_FORCE_LLM_RE.search(q):
+        logger.info(
+            "Query planner: unified_plans_focus theme matched but query "
+            "requests activity details / custom table — deferring to LLM path."
+        )
+        return None
+    areas = extract_theme_areas_from_query(query)
+    if not areas:
+        logger.info(
+            "Query planner: unified_plans_focus theme matched but no focus areas inferred — deferring to LLM planner.",
+        )
+        return None
+    logger.info("Query planner: rule-based unified_plans_focus plan (skip LLM), areas=%s", areas)
+    return {
+        "kind": "unified_plans_focus",
+        "tool_name": "analyze_unified_plans_focus_areas",
+        "tool_args": {"areas": areas, "limit": 500},
+        "output_hint": "table",
+    }
+
+
+def unified_plans_focus_wants_reference_enrichment(combined_text: str) -> bool:
+    """True when the user (or answer) clearly asks for external reference columns."""
+    q = (combined_text or "").lower()
+    needles = (
+        "population",
+        "inform ",
+        "inform risk",
+        "inform severity",
+        "hdi",
+        "human development",
+        "gdp",
+        "gni",
+        "income group",
+        "per capita",
+        "climate risk",
+        "world bank",
+        "urbanization rate",
+        "literacy",
+        "life expectancy",
+        "median age",
+        "fertility rate",
+        "infant mortality",
+        "poverty rate",
+        "multidimensional poverty",
+    )
+    return any(n in q for n in needles)
+
+
+def run_analyze_unified_plans_focus_areas(
+    *,
+    areas: Optional[List[str]] = None,
+    limit: int = 500,
+) -> Dict[str, Any]:
+    """Classify which Unified Plan documents mention the requested focus areas."""
+    from sqlalchemy import or_, not_
+
+    from app.models.embeddings import AIDocument
+    from app.services.ai.documents.access import apply_document_read_filter
+    from app.services.ai.policies.access_policy import resolve_ai_access_policy
+    from app.services.ai.tools._utils import resolve_source_config
+    from plugins.upr.ai.focus_area_tools import (
+        assemble_plan_results,
+        compile_area_regexes,
+        extract_area_evidence,
+        match_focus_areas,
+        normalized_plan_key,
+        resolve_area_config,
+    )
+
+    run_started_at = time.time()
+
+    area_keys, area_seed_terms, area_regex_patterns, strict_patterns, area_labels = (
+        resolve_area_config(areas)
+    )
+    compiled_area_regexes, compiled_strict_area_regexes = compile_area_regexes(
+        area_keys, area_seed_terms, area_regex_patterns, strict_patterns,
+    )
+
+    docs_query = apply_document_read_filter(
+        AIDocument.query.filter(
+            AIDocument.searchable == True,  # noqa: E712
+            AIDocument.processing_status == "completed",
+        ),
+        resolve_ai_access_policy().documents,
+    )
+
+    sources_norm = resolve_source_config()
+    if isinstance(sources_norm, dict):
+        include_system = bool(sources_norm.get("system_documents", False))
+        include_upr = bool(sources_norm.get("upr_documents", False))
+        if include_system and not include_upr:
+            docs_query = docs_query.filter(AIDocument.source_url.is_(None))
+        elif include_upr and not include_system:
+            docs_query = docs_query.filter(AIDocument.source_url.isnot(None))
+        elif not include_system and not include_upr:
+            return {
+                "total_plans": 0, "plans_analyzed": 0,
+                "counts_by_area": {k: 0 for k in area_keys},
+                "plans_with_no_target_areas": 0, "plans": [],
+                "quality_debug": {
+                    "detection_method": "not_run",
+                    "reason": "document_sources_disabled",
+                    "filters": {"area_keys": area_keys, "limit": int(limit)},
+                },
+                "summary": "Document sources are disabled for this chat request.",
+            }
+        elif include_system and include_upr:
+            docs_query = docs_query.filter(AIDocument.source_url.isnot(None))
+
+    docs_query = docs_query.filter(
+        or_(
+            AIDocument.title.ilike("%unified plan%"),
+            AIDocument.title.ilike("%upl-%"),
+            AIDocument.title.ilike("%upl_%"),
+            AIDocument.title.ilike("%unified country plan%"),
+            AIDocument.filename.ilike("%upl-%"),
+            AIDocument.filename.ilike("%upl_%"),
+        )
+    )
+    docs_query = docs_query.filter(
+        not_(AIDocument.filename.ilike("%_AR_%")),
+        not_(AIDocument.filename.ilike("%_MYR_%")),
+        not_(AIDocument.title.ilike("%annual report%")),
+        not_(AIDocument.title.ilike("%mid-year%")),
+        not_(AIDocument.title.ilike("%mid year%")),
+    )
+
+    total_documents_matching_filter = int(docs_query.count())
+    limit = max(1, min(int(limit), 1000))
+    raw_fetch_limit = min(max(limit * 3, 1000), 4000)
+    docs_raw = docs_query.order_by(AIDocument.created_at.desc()).limit(raw_fetch_limit).all()
+
+    docs: List[Any] = []
+    seen_keys: set = set()
+    for d in docs_raw or []:
+        key = normalized_plan_key(d)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        docs.append(d)
+        if len(docs) >= limit:
+            break
+
+    total_plans = len(docs)
+    doc_ids = [int(d.id) for d in docs]
+
+    hits_by_area, detection_method, debug_info = match_focus_areas(
+        doc_ids=doc_ids,
+        area_keys=area_keys,
+        area_seed_terms=area_seed_terms,
+        compiled_area_regexes=compiled_area_regexes,
+        compiled_strict_area_regexes=compiled_strict_area_regexes,
+    )
+
+    area_evidence_by_doc = extract_area_evidence(
+        area_keys=area_keys,
+        hits_by_area=hits_by_area,
+        area_seed_terms=area_seed_terms,
+        compiled_strict_area_regexes=compiled_strict_area_regexes,
+        compiled_area_regexes=compiled_area_regexes,
+    )
+
+    plans, none_count, country_groups_map, all_countries_considered = assemble_plan_results(
+        docs=docs,
+        area_keys=area_keys,
+        hits_by_area=hits_by_area,
+        area_labels=area_labels,
+        area_evidence_by_doc=area_evidence_by_doc,
+    )
+
+    countries_grouped: List[Dict[str, Any]] = []
+    most_recent_plan_per_country: List[Dict[str, Any]] = []
+    for grp in country_groups_map.values():
+        grp_plans = list(grp.get("plans") or [])
+        grp_plans.sort(
+            key=lambda p: (
+                int(p.get("plan_year") or 0),
+                str(p.get("document_title") or p.get("document_filename") or ""),
+            ),
+            reverse=True,
+        )
+        grp_counts = {k: 0 for k in area_keys}
+        for p in grp_plans:
+            for k in (p.get("areas_mentioned") or []):
+                if k in grp_counts:
+                    grp_counts[k] += 1
+        latest = grp_plans[0] if grp_plans else None
+        if isinstance(latest, dict):
+            most_recent_plan_per_country.append({
+                "country_name": grp.get("country_name"),
+                "country_iso3": grp.get("country_iso3"),
+                "plan_year": latest.get("plan_year"),
+                "document_id": latest.get("document_id"),
+                "document_title": latest.get("document_title"),
+                "document_url": latest.get("document_url"),
+                "areas_mentioned": latest.get("areas_mentioned") or [],
+                "no_target_areas": bool(latest.get("no_target_areas")),
+            })
+        countries_grouped.append({
+            "country_name": grp.get("country_name"),
+            "country_iso3": grp.get("country_iso3"),
+            "plans_count": len(grp_plans),
+            "counts_by_area": grp_counts,
+            "plans": grp_plans,
+        })
+    countries_grouped.sort(key=lambda c: str(c.get("country_name") or ""))
+    most_recent_plan_per_country.sort(key=lambda c: str(c.get("country_name") or ""))
+
+    counts_by_area = {k: len(hits_by_area.get(k, set())) for k in area_keys}
+    plans_with_any = len(plans)
+    countries_with_matches = len(countries_grouped)
+    total_countries_considered = len(all_countries_considered)
+    top_area = max(counts_by_area.items(), key=lambda kv: kv[1])[0] if counts_by_area else None
+    bottom_area = min(counts_by_area.items(), key=lambda kv: kv[1])[0] if counts_by_area else None
+    summary = (
+        f"Analyzed {total_plans} Unified Plan document(s)."
+        f" {plans_with_any} mention at least one target area."
+        f" {countries_with_matches} countries with mentions out of {total_countries_considered} considered."
+        + (f" Most-mentioned area: {top_area}." if top_area is not None else "")
+        + (f" Least-mentioned area: {bottom_area}." if bottom_area is not None else "")
+    )
+
+    quality_debug: Dict[str, Any] = {
+        "run_started_at_unix": float(run_started_at),
+        "run_elapsed_ms": int((time.time() - run_started_at) * 1000),
+        "filters": {
+            "area_keys": area_keys,
+            "limit": int(limit),
+            "raw_fetch_limit": int(raw_fetch_limit),
+            "total_documents_matching_filter": int(total_documents_matching_filter),
+            "total_plans_after_dedup": int(total_plans),
+            "excluded_no_target_areas": int(none_count),
+        },
+        "detection_method": detection_method,
+        **debug_info,
+        "lexical_debug": {
+            "regex_patterns_per_area": {k: len(compiled_area_regexes.get(k) or []) for k in area_keys},
+            "strict_regex_patterns_per_area": {k: len(compiled_strict_area_regexes.get(k) or []) for k in area_keys},
+        },
+    }
+
+    return {
+        "total_plans": int(total_plans),
+        "total_documents_matching_filter": int(total_documents_matching_filter),
+        "plans_analyzed": len(plans),
+        "countries_with_matches": int(countries_with_matches),
+        "total_countries_considered": int(total_countries_considered),
+        "detection_method": detection_method,
+        "counts_by_area": counts_by_area,
+        "plans_with_no_target_areas": int(none_count),
+        "plans_excluded_no_target_areas": int(none_count),
+        "plans": plans,
+        "countries_grouped": countries_grouped,
+        "most_recent_plan_per_country": most_recent_plan_per_country,
+        "recommended_follow_up_actions": [
+            "Run the same analysis on only the most recent Unified Plan per country to avoid over-weighting countries with many historical plans.",
+            "Filter to countries where the latest plan has no target-area mentions, then inspect those plans for alternative terminology or data gaps.",
+            "Compare each country's latest plan vs previous plan year to identify newly added or dropped focus areas.",
+            "If results look too broad, increase semantic strictness thresholds and re-run with lexical confirmation emphasis.",
+        ],
+        "quality_debug": quality_debug,
+        "summary": summary,
+    }

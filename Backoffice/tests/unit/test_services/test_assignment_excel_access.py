@@ -9,7 +9,7 @@ from app.services.imports.assignment_excel_access import (
     resolve_assignment_excel_ui,
     sync_assignment_custom_excel_flags,
 )
-from app.utils.data_quality_constants import (
+from plugins.upr.catalog import (
     UPR_PLANNING_TEMPLATE_ID,
     UPR_REPORTING_TEMPLATE_ID,
 )

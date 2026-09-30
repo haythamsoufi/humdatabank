@@ -180,53 +180,6 @@ def _infer_primary_keyword(form_item_label: Optional[str]) -> Optional[str]:
     return None
 
 
-def _upr_kpi_applicable(form_item_label: Optional[str], keyword: str) -> bool:
-    """
-    Guardrail: only use UPR KPI cards for truly *generic* headcount indicators (e.g. "number of volunteers").
-    Do NOT use UPR KPI cards for subset/qualified indicators like "volunteers covered by accident insurance",
-    "active volunteers", "trained volunteers", etc., since the UPR KPI card typically reports totals.
-    """
-    if not form_item_label or not keyword:
-        return False
-    s = str(form_item_label).strip().lower()
-    k = str(keyword).strip().lower()
-
-    # Disqualifiers that indicate a subset rather than total headcount.
-    subset_terms = [
-        "insurance", "insured", "accident", "covered", "coverage",
-        "active", "trained", "training", "certified", "accredited",
-        "first aid", "aid", "blood", "donor",
-        "youth", "women", "men", "girls", "boys", "children",
-        "with disability", "disability", "disabled",
-        "migrants", "refugee", "refugees",
-        "reached", "assisted", "benefited", "beneficiaries",
-        "percentage", "proportion", "rate", "%",
-        # Death/safety-related: UPR KPI "volunteers" = total headcount, never deaths
-        "death", "deaths", "fatality", "fatalities", "on duty", "injuries", "injured",
-    ]
-    if any(t in s for t in subset_terms):
-        return False
-
-    # Only allow for the basic UPR KPI set.
-    return k in {"branches", "staff", "volunteers", "local units"}
-
-
-def _required_terms_for_claims(form_item_label: Optional[str], keyword: str) -> List[str]:
-    """
-    Extra precision for document-claim extraction.
-    When an indicator is a qualified subset (e.g. accident insurance volunteers),
-    require that at least one of these terms appears near the extracted number.
-    """
-    if not form_item_label or not keyword:
-        return []
-    s = str(form_item_label).strip().lower()
-    k = str(keyword).strip().lower()
-
-    if k == "volunteers" and ("insurance" in s or "insured" in s or "accident" in s):
-        return ["insurance", "insured", "accident"]
-    return []
-
-
 def _parse_year_from_period(period_name: Any) -> Optional[int]:
     """
     Best-effort parse of a year from AssignedForm.period_name (often '2024', 'FY2024', '2024-2025', etc.)
@@ -242,61 +195,6 @@ def _parse_year_from_period(period_name: Any) -> Optional[int]:
     except Exception as e:
         logger.debug("_parse_year_from_period failed for %r: %s", period_name, e)
         return None
-
-
-def _upr_document_label(upr: Optional[Dict[str, Any]]) -> str:
-    """
-    Build a short, clear label for the UPR document source (e.g. "UPR Plan 2026") for use in opinions.
-    """
-    if not isinstance(upr, dict):
-        return "UPR document"
-    source = upr.get("source") if isinstance(upr.get("source"), dict) else {}
-    title = (source.get("document_title") or "").strip()
-    filename = (source.get("document_filename") or "").strip()
-    year = None
-    for s in (title, filename):
-        if s:
-            m = _YEAR_RE.findall(s)
-            if m:
-                try:
-                    year = max(int(x) for x in m)
-                    break
-                except Exception as e:
-                    logger.debug("Optional validation step failed: %s", e)
-    if title and len(title) <= 80:
-        return title
-    if year is not None:
-        return f"UPR Plan {year}"
-    return "UPR document"
-
-
-def _upr_suggestion_reason(upr: Optional[Dict[str, Any]], value_int: int) -> str:
-    """
-    Build a precise, user-facing reason string for a UPR-derived suggestion.
-    Includes document title + page when available (from get_upr_kpi_value()).
-    """
-    try:
-        src = upr.get("source") if isinstance(upr, dict) and isinstance(upr.get("source"), dict) else {}
-        title = (src.get("document_title") or "").strip()
-        page = src.get("page_number")
-        extraction = (src.get("extraction") or "").strip()
-        conf = src.get("confidence")
-        conf_txt = ""
-        try:
-            if conf is not None:
-                cf = float(conf)
-                if cf == cf:  # not NaN
-                    conf_txt = f", confidence {int(round(cf * 100))}%"
-        except Exception as e:
-            logger.debug("confidence format failed: %s", e)
-            conf_txt = ""
-        page_txt = f" (p. {int(page)})" if isinstance(page, (int, float)) and int(page) > 0 else ""
-        title_txt = f"'{title}'" if title else _upr_document_label(upr)
-        extraction_txt = f", extraction: {extraction}" if extraction else ""
-        return f"Structured KPI card in {title_txt}{page_txt} reports {_format_int(int(value_int))}{conf_txt}{extraction_txt}."
-    except Exception as e:
-        logger.debug("_upr_suggestion_reason failed: %s", e)
-        return f"Structured KPI evidence suggests {_format_int(int(value_int))}."
 
 
 def _format_int(n: Optional[int]) -> str:

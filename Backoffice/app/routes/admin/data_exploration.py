@@ -4,16 +4,15 @@ Data Exploration Module - Explore form data with filters
 """
 
 from functools import wraps
-from flask import Blueprint, render_template, request, current_app, send_file, abort, redirect, url_for, flash
+from flask import Blueprint, render_template, request, current_app, abort, redirect, url_for, flash
 from flask_login import current_user
 from sqlalchemy import distinct, func, and_, or_, tuple_
 from sqlalchemy.orm import joinedload
 from typing import Any, Dict, List
-from io import BytesIO
 from app import db
 from app.models import (
     FormTemplate, AssignedForm, Country, FormItem, FormData, AIFormDataValidation,
-    AssignmentEntityStatus, SubmittedDocument, FormSection, FormPage
+    AssignmentEntityStatus, FormSection, FormPage
 )
 from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.redirect_utils import get_current_relative_url
@@ -31,16 +30,7 @@ from app.plugins.data_explorer import (
     tab_flag_key,
 )
 from app.plugins.manager import PluginManager
-from plugins.fdrs.data_quality.fdrs_v1_catalog import (
-    COMPLIANCE_DOC_TYPES,
-    fdrs_compliance_doc_label_matches,
-)
-from app.services.data_quality.helpers import (
-    active_country_map_query,
-    build_compliance_document_lookups,
-    compliance_doc_status_counts_toward_requirement,
-    list_exploration_period_names,
-)
+from app.services.data_quality.helpers import list_exploration_period_names
 from flask_babel import gettext as _
 import json
 import logging
@@ -48,7 +38,7 @@ import logging
 logger = logging.getLogger(__name__)
 bp = Blueprint("data_exploration", __name__, url_prefix="/admin")
 
-# FDRS template ID — default for Disaggregation Analysis and compliance checks
+# FDRS template ID — default for Disaggregation Analysis
 FDRS_TEMPLATE_ID = 21
 
 # Data Explorer core permission codes (extension tabs add their own at runtime).
@@ -100,8 +90,6 @@ def _explore_tab_access_flags(user) -> dict[str, bool]:
         is_sm = AuthorizationService.is_system_manager(user)
         return {
             'can_access_data_table': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.data_table'),
-            'can_access_analysis': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.analysis'),
-            'can_access_compliance': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.compliance'),
         }
 
 
@@ -113,12 +101,6 @@ def _explore_active_tab(flags: dict[str, bool], requested_tab: str | None = None
         accessible = []
         if flags.get('can_access_data_table'):
             accessible.append('data-table')
-        if flags.get('can_access_analysis'):
-            accessible.append('disaggregation')
-        if flags.get('can_access_compliance'):
-            accessible.append('compliance')
-        if flags.get('can_access_pb_progress'):
-            accessible.append('pb-progress')
         if requested_tab and requested_tab in accessible:
             return requested_tab
         if accessible:
@@ -152,7 +134,11 @@ def _explorer_extension_tabs_render(
     return rendered
 
 
-def _render_extension_panels(flags: dict[str, bool], first_tab: str) -> dict[str, str]:
+def _render_extension_panels(
+    flags: dict[str, bool],
+    first_tab: str,
+    extra_context: dict[str, Any] | None = None,
+) -> dict[str, str]:
     panels: dict[str, str] = {}
     try:
         plugin_manager = _plugin_manager()
@@ -167,6 +153,8 @@ def _render_extension_panels(flags: dict[str, bool], first_tab: str) -> dict[str
         context: dict[str, Any] = {
             'explore_first_tab': first_tab,
         }
+        if extra_context:
+            context.update(extra_context)
         context.update(plugin_manager.get_panel_render_context(tab.plugin_id, flags, first_tab))
         if tab.manage_requires_system_manager:
             context[manage_flag_key(tab.tab_id)] = flags.get(manage_flag_key(tab.tab_id), False)
@@ -212,10 +200,6 @@ def explore_data():
         tab_flags = _explore_tab_access_flags(current_user)
         requested_tab = request.args.get('tab')
         explore_first_tab = _explore_active_tab(tab_flags, requested_tab)
-        extension_panels = _render_extension_panels(tab_flags, explore_first_tab)
-        explorer_extension_tabs_render = _explorer_extension_tabs_render(
-            tab_flags, explore_first_tab, extension_panels
-        )
         # System managers can see all templates regardless of ownership and sharing
         # Use joinedload for published_version to avoid N+1 queries when accessing template.name
         if AuthorizationService.is_system_manager(current_user):
@@ -240,6 +224,17 @@ def explore_data():
         # Note: published_version is already eager-loaded, avoiding N+1 queries
         templates.sort(key=lambda t: t.name if t.name else "")
 
+        panel_context = {
+            "templates": templates,
+            "fdrs_template_id": FDRS_TEMPLATE_ID,
+        }
+        extension_panels = _render_extension_panels(
+            tab_flags, explore_first_tab, panel_context
+        )
+        explorer_extension_tabs_render = _explorer_extension_tabs_render(
+            tab_flags, explore_first_tab, extension_panels
+        )
+
         # All periods with assignments or saved data (closed/deactivated included).
         period_names = list_exploration_period_names()
 
@@ -262,7 +257,11 @@ def explore_data():
         tab_flags = _explore_tab_access_flags(current_user)
         requested_tab = request.args.get('tab')
         explore_first_tab = _explore_active_tab(tab_flags, requested_tab)
-        extension_panels = _render_extension_panels(tab_flags, explore_first_tab)
+        extension_panels = _render_extension_panels(
+            tab_flags,
+            explore_first_tab,
+            {"templates": [], "fdrs_template_id": FDRS_TEMPLATE_ID},
+        )
         explorer_extension_tabs_render = _explorer_extension_tabs_render(
             tab_flags, explore_first_tab, extension_panels
         )
@@ -931,525 +930,4 @@ def apply_imputed_value():
         )
     except Exception as e:
         logger.error("Error applying imputed value: %s", e, exc_info=True)
-        return json_server_error(GENERIC_ERROR_MESSAGE)
-
-
-@bp.route("/data-exploration/compliance", methods=["GET"])
-@permission_required('admin.data_explore.compliance')
-def get_compliance_data():
-    """
-    Get compliance data for FDRS template (ID 21).
-
-    Query params:
-    - reference_year: The most recent year to measure from (e.g., 2024 means check 2024, 2023, 2022)
-
-    Returns document upload status for each country across the last 3 periods,
-    and determines compliance based on:
-    - At least one approved Annual Report in the past 3 years
-    - At least one approved Audited Financial Statement in the past 3 years
-    Pending or rejected documents are shown in the grid but do not count as compliant.
-    """
-    try:
-        # Get reference year from query params (optional)
-        reference_year = request.args.get('reference_year', type=int)
-
-        # All FDRS periods (closed/deactivated assignments and saved data included).
-        all_periods = list_exploration_period_names(FDRS_TEMPLATE_ID)
-
-        # Extract available years from period names (assuming format like "2024" or "2024-2025")
-        available_years = set()
-        for period in all_periods:
-            # Try to extract year from period name
-            import re
-            years_in_period = re.findall(r'20\d{2}', str(period))
-            for y in years_in_period:
-                available_years.add(int(y))
-        available_years = sorted(available_years, reverse=True)
-
-        # If reference_year is provided, filter periods to those containing that year or earlier (up to 3 years back)
-        if reference_year:
-            target_years = [reference_year, reference_year - 1, reference_year - 2]
-            periods = []
-            for period in all_periods:
-                # Check if any target year is in this period
-                years_in_period = re.findall(r'20\d{2}', str(period))
-                for y in years_in_period:
-                    if int(y) in target_years:
-                        periods.append(period)
-                        break
-                if len(periods) >= 3:
-                    break
-        else:
-            # Default: get the last 3 periods
-            periods = all_periods[:3]
-
-        periods = list(reversed(periods))
-
-        if not periods:
-            return json_ok(
-                success=True,
-                data=[],
-                periods=[],
-                available_years=available_years,
-                reference_year=reference_year,
-                doc_types=COMPLIANCE_DOC_TYPES,
-                message="No FDRS assignment periods found",
-            )
-
-        # Active countries only (country map status=Active)
-        countries = active_country_map_query().all()
-
-        # Get document fields from FDRS template that match our compliance doc types
-        doc_items = (
-            FormItem.query
-            .filter(
-                FormItem.template_id == FDRS_TEMPLATE_ID,
-                FormItem.item_type == 'document_field',
-                FormItem.archived == False
-            )
-            .all()
-        )
-
-        # Map document field labels to their IDs
-        doc_item_map = {}
-        all_doc_item_ids = []
-        for item in doc_items:
-            label = item.label.strip() if item.label else ""
-            for doc_type in COMPLIANCE_DOC_TYPES:
-                if fdrs_compliance_doc_label_matches(label, doc_type):
-                    if doc_type not in doc_item_map:
-                        doc_item_map[doc_type] = []
-                    doc_item_map[doc_type].append(item.id)
-                    all_doc_item_ids.append(item.id)
-                    break
-
-        # Create reverse mapping: item_id -> doc_type
-        item_id_to_doc_type = {}
-        for doc_type, item_ids in doc_item_map.items():
-            for item_id in item_ids:
-                item_id_to_doc_type[item_id] = doc_type
-
-        # ========== OPTIMIZED BULK QUERIES ==========
-        # Instead of N+1 queries, we fetch everything in just 4 queries total
-
-        # 1. Get all assignments for the selected periods (1 query)
-        assignments = (
-            AssignedForm.query
-            .filter(
-                AssignedForm.template_id == FDRS_TEMPLATE_ID,
-                AssignedForm.period_name.in_(periods)
-            )
-            .all()
-        )
-        assignment_map = {a.period_name: a for a in assignments}
-        assignment_ids = [a.id for a in assignments]
-
-        # 2. Get all AssignmentEntityStatus records for these assignments (1 query)
-        all_aes = []
-        if assignment_ids:
-            all_aes = (
-                AssignmentEntityStatus.query
-                .filter(
-                    AssignmentEntityStatus.assigned_form_id.in_(assignment_ids),
-                    AssignmentEntityStatus.entity_type == 'country'
-                )
-                .all()
-            )
-
-        # Build lookup: (assignment_id, country_id) -> aes
-        aes_lookup = {}
-        aes_ids = []
-        for aes in all_aes:
-            aes_lookup[(aes.assigned_form_id, aes.entity_id)] = aes
-            aes_ids.append(aes.id)
-
-        # 3. Get all SubmittedDocuments for these AES records and doc item types (1 query)
-        submitted_docs = []
-        if aes_ids and all_doc_item_ids:
-            submitted_docs = (
-                SubmittedDocument.query
-                .filter(
-                    SubmittedDocument.assignment_entity_status_id.in_(aes_ids),
-                    SubmittedDocument.form_item_id.in_(all_doc_item_ids)
-                )
-                .all()
-            )
-
-        _, _, doc_status_lookup = build_compliance_document_lookups(
-            submitted_docs, item_id_to_doc_type
-        )
-
-        # ========== PROCESS DATA IN MEMORY ==========
-        compliance_data = []
-        pending_validation_countries = []
-
-        for country in countries:
-            country_periods = []
-            has_annual_report = False
-            has_audited_financial = False
-            pending_validation_documents = []
-
-            for period in periods:
-                period_docs = {doc_type: "missing" for doc_type in COMPLIANCE_DOC_TYPES}
-
-                assignment = assignment_map.get(period)
-                if assignment:
-                    aes = aes_lookup.get((assignment.id, country.id))
-                    if aes:
-                        for doc_type in COMPLIANCE_DOC_TYPES:
-                            doc_status = doc_status_lookup.get((aes.id, doc_type), "missing")
-                            period_docs[doc_type] = doc_status
-                            if compliance_doc_status_counts_toward_requirement(doc_status):
-                                if doc_type == "Annual Report":
-                                    has_annual_report = True
-                                elif doc_type == "Audited Financial Statement":
-                                    has_audited_financial = True
-                            if doc_status == "pending":
-                                pending_validation_documents.append({
-                                    "period": period,
-                                    "doc_type": doc_type,
-                                })
-
-                country_periods.append({
-                    "period": period,
-                    "documents": period_docs
-                })
-
-            # Determine compliance: must have at least 1 Annual Report AND 1 Audited Financial Statement
-            is_compliant = has_annual_report and has_audited_financial
-
-            country_row = {
-                "country_id": country.id,
-                "country_name": country.name,
-                "country_iso3": country.iso3,
-                "region": country.region,
-                "periods": country_periods,
-                "is_compliant": is_compliant,
-                "has_annual_report": has_annual_report,
-                "has_audited_financial": has_audited_financial,
-            }
-            compliance_data.append(country_row)
-
-            if not is_compliant and pending_validation_documents:
-                pending_validation_countries.append({
-                    "country_id": country.id,
-                    "country_name": country.name,
-                    "pending_documents": pending_validation_documents,
-                })
-
-        return json_ok(
-            success=True,
-            data=compliance_data,
-            periods=periods,
-            available_years=available_years,
-            reference_year=reference_year,
-            doc_types=COMPLIANCE_DOC_TYPES,
-            pending_validation_notice={
-                "count": len(pending_validation_countries),
-                "countries": pending_validation_countries,
-            },
-        )
-
-    except Exception as e:
-        logger.error("Error fetching compliance data: %s", e, exc_info=True)
-        return json_server_error(GENERIC_ERROR_MESSAGE)
-
-
-@bp.route("/data-exploration/compliance/download", methods=["GET"])
-@permission_required('admin.data_explore.compliance')
-def download_compliance_excel():
-    """
-    Download compliance data as an Excel file.
-
-    Query params:
-    - reference_year: The most recent year to measure from (e.g., 2024 means check 2024, 2023, 2022)
-    """
-    try:
-        import openpyxl
-        import re
-        from openpyxl.styles import Font, Fill, PatternFill, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
-        from datetime import datetime
-
-        # Get reference year from query params (optional)
-        reference_year = request.args.get('reference_year', type=int)
-
-        # All FDRS periods (closed/deactivated assignments and saved data included).
-        all_periods = list_exploration_period_names(FDRS_TEMPLATE_ID)
-
-        # If reference_year is provided, filter periods to those containing that year or earlier (up to 3 years back)
-        if reference_year:
-            target_years = [reference_year, reference_year - 1, reference_year - 2]
-            periods = []
-            for period in all_periods:
-                # Check if any target year is in this period
-                years_in_period = re.findall(r'20\d{2}', str(period))
-                for y in years_in_period:
-                    if int(y) in target_years:
-                        periods.append(period)
-                        break
-                if len(periods) >= 3:
-                    break
-        else:
-            # Default: get the last 3 periods
-            periods = all_periods[:3]
-
-        periods = list(reversed(periods))
-
-        # Active countries only (country map status=Active)
-        countries = active_country_map_query().all()
-
-        # Get document fields from FDRS template
-        doc_items = (
-            FormItem.query
-            .filter(
-                FormItem.template_id == FDRS_TEMPLATE_ID,
-                FormItem.item_type == 'document_field',
-                FormItem.archived == False
-            )
-            .all()
-        )
-
-        # Map document field labels to their IDs
-        doc_item_map = {}
-        all_doc_item_ids = []
-        for item in doc_items:
-            label = item.label.strip() if item.label else ""
-            for doc_type in COMPLIANCE_DOC_TYPES:
-                if fdrs_compliance_doc_label_matches(label, doc_type):
-                    if doc_type not in doc_item_map:
-                        doc_item_map[doc_type] = []
-                    doc_item_map[doc_type].append(item.id)
-                    all_doc_item_ids.append(item.id)
-                    break
-
-        # Create reverse mapping: item_id -> doc_type
-        item_id_to_doc_type = {}
-        for doc_type, item_ids in doc_item_map.items():
-            for item_id in item_ids:
-                item_id_to_doc_type[item_id] = doc_type
-
-        # ========== OPTIMIZED BULK QUERIES ==========
-        # Get all assignments for the selected periods (1 query)
-        assignments = (
-            AssignedForm.query
-            .filter(
-                AssignedForm.template_id == FDRS_TEMPLATE_ID,
-                AssignedForm.period_name.in_(periods)
-            )
-            .all()
-        )
-        assignment_map = {a.period_name: a for a in assignments}
-        assignment_ids = [a.id for a in assignments]
-
-        # Get all AssignmentEntityStatus records (1 query)
-        all_aes = []
-        if assignment_ids:
-            all_aes = (
-                AssignmentEntityStatus.query
-                .filter(
-                    AssignmentEntityStatus.assigned_form_id.in_(assignment_ids),
-                    AssignmentEntityStatus.entity_type == 'country'
-                )
-                .all()
-            )
-
-        aes_lookup = {}
-        aes_ids = []
-        for aes in all_aes:
-            aes_lookup[(aes.assigned_form_id, aes.entity_id)] = aes
-            aes_ids.append(aes.id)
-
-        # Get all SubmittedDocuments (1 query)
-        submitted_docs = []
-        if aes_ids and all_doc_item_ids:
-            submitted_docs = (
-                SubmittedDocument.query
-                .filter(
-                    SubmittedDocument.assignment_entity_status_id.in_(aes_ids),
-                    SubmittedDocument.form_item_id.in_(all_doc_item_ids)
-                )
-                .all()
-            )
-
-        _, _, doc_status_lookup = build_compliance_document_lookups(
-            submitted_docs, item_id_to_doc_type
-        )
-
-        # Create workbook
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "FDRS Compliance"
-
-        # Define styles
-        header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
-        compliant_fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
-        non_compliant_fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
-        yes_font = Font(color="059669")
-        no_font = Font(color="DC2626")
-        thin_border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-        center_align = Alignment(horizontal='center', vertical='center')
-
-        # Build headers dynamically based on periods
-        # Row 1: Country | period1 (merged) | period2 (merged) | ... | Compliance Status
-        # Row 2: (empty) | Annual Report | Audited Financial Statement | ... | (empty)
-
-        num_periods = len(periods)
-        num_doc_types = len(COMPLIANCE_DOC_TYPES)
-        data_start_col = 2
-
-        # First header row
-        ws.cell(row=1, column=1, value="Country").font = header_font
-        ws.cell(row=1, column=1).fill = header_fill
-        ws.cell(row=1, column=1).alignment = center_align
-        ws.cell(row=1, column=1).border = thin_border
-        ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
-
-        for idx, period in enumerate(periods):
-            period_start_col = data_start_col + (idx * num_doc_types)
-            period_end_col = period_start_col + num_doc_types - 1
-            cell = ws.cell(row=1, column=period_start_col, value=period)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_align
-            cell.border = thin_border
-            if num_doc_types > 1:
-                ws.merge_cells(
-                    start_row=1,
-                    start_column=period_start_col,
-                    end_row=1,
-                    end_column=period_end_col,
-                )
-
-        # Compliance Status header
-        compliance_col = data_start_col + (num_periods * num_doc_types)
-        ws.cell(row=1, column=compliance_col, value="Compliance Status").font = header_font
-        ws.cell(row=1, column=compliance_col).fill = header_fill
-        ws.cell(row=1, column=compliance_col).alignment = center_align
-        ws.cell(row=1, column=compliance_col).border = thin_border
-        ws.merge_cells(start_row=1, start_column=compliance_col, end_row=2, end_column=compliance_col)
-
-        # Second header row with document types under each period
-        for idx, _period in enumerate(periods):
-            period_start_col = data_start_col + (idx * num_doc_types)
-            for doc_idx, doc_type in enumerate(COMPLIANCE_DOC_TYPES):
-                cell = ws.cell(row=2, column=period_start_col + doc_idx, value=doc_type)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = center_align
-                cell.border = thin_border
-
-        # Add borders to merged cells in row 2 for Country and Compliance Status
-        for col in [1, compliance_col]:
-            cell = ws.cell(row=2, column=col)
-            cell.border = thin_border
-
-        # Write data (using pre-fetched lookups) - one row per country
-        row_num = 3
-        for country in countries:
-            has_annual_report = False
-            has_audited_financial = False
-
-            # Build period_docs data and determine compliance
-            period_docs_map = {}
-            for period in periods:
-                period_docs = {doc_type: "missing" for doc_type in COMPLIANCE_DOC_TYPES}
-                assignment = assignment_map.get(period)
-                if assignment:
-                    aes = aes_lookup.get((assignment.id, country.id))
-                    if aes:
-                        for doc_type in COMPLIANCE_DOC_TYPES:
-                            doc_status = doc_status_lookup.get((aes.id, doc_type), "missing")
-                            period_docs[doc_type] = doc_status
-                            if compliance_doc_status_counts_toward_requirement(doc_status):
-                                if doc_type == "Annual Report":
-                                    has_annual_report = True
-                                elif doc_type == "Audited Financial Statement":
-                                    has_audited_financial = True
-                period_docs_map[period] = period_docs
-
-            is_compliant = has_annual_report and has_audited_financial
-
-            # Write single row for country
-            ws.cell(row=row_num, column=1, value=country.name).border = thin_border
-
-            # Document columns grouped by period
-            for idx, period in enumerate(periods):
-                period_start_col = data_start_col + (idx * num_doc_types)
-                for doc_idx, doc_type in enumerate(COMPLIANCE_DOC_TYPES):
-                    cell = ws.cell(row=row_num, column=period_start_col + doc_idx)
-                    doc_status = period_docs_map.get(period, {}).get(doc_type, "missing")
-                    if doc_status == "approved":
-                        cell.value = "Approved"
-                        cell.font = yes_font
-                    elif doc_status == "pending":
-                        cell.value = "Pending"
-                        cell.font = Font(color="D97706")
-                    elif doc_status == "rejected":
-                        cell.value = "Rejected"
-                        cell.font = Font(color="DC2626")
-                    else:
-                        cell.value = "Missing"
-                        cell.font = no_font
-                    cell.alignment = center_align
-                    cell.border = thin_border
-
-            # Compliance Status
-            cell = ws.cell(row=row_num, column=compliance_col)
-            cell.value = "Compliant" if is_compliant else "Non-Compliant"
-            cell.fill = compliant_fill if is_compliant else non_compliant_fill
-            cell.alignment = center_align
-            cell.border = thin_border
-
-            row_num += 1
-
-        # Adjust column widths dynamically
-        ws.column_dimensions[get_column_letter(1)].width = 30  # Country
-        for idx in range(num_periods * num_doc_types):
-            ws.column_dimensions[get_column_letter(data_start_col + idx)].width = 18
-        ws.column_dimensions[get_column_letter(compliance_col)].width = 18  # Compliance Status
-
-        # Freeze header rows (data starts at row 3)
-        ws.freeze_panes = 'A3'
-
-        # Add summary sheet
-        ws_summary = wb.create_sheet("Summary")
-        ws_summary.cell(row=1, column=1, value="FDRS Document Compliance Summary").font = Font(bold=True, size=14)
-        ws_summary.cell(row=2, column=1, value=f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        if reference_year:
-            ws_summary.cell(row=3, column=1, value=f"Reference Year: {reference_year} (analyzing {reference_year}, {reference_year-1}, {reference_year-2})")
-        ws_summary.cell(row=4, column=1, value=f"Periods analyzed: {', '.join(periods)}")
-
-        ws_summary.cell(row=6, column=1, value="Total Countries:").font = Font(bold=True)
-        ws_summary.cell(row=6, column=2, value=len(countries))
-        ws_summary.cell(row=7, column=1, value="Compliance Rule:").font = Font(bold=True)
-        ws_summary.cell(row=7, column=2, value="At least 1 approved Annual Report AND 1 approved Audited Financial Statement in the past 3 years")
-
-        # Save to BytesIO
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        # Generate filename with timestamp and reference year
-        year_suffix = f"_{reference_year}" if reference_year else ""
-        filename = f"FDRS_Compliance{year_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=filename
-        )
-
-    except ImportError:
-        logger.error("openpyxl not installed for Excel export")
-        return json_server_error("Excel export requires openpyxl library")
-    except Exception as e:
-        logger.error("Error generating compliance Excel: %s", e, exc_info=True)
         return json_server_error(GENERIC_ERROR_MESSAGE)

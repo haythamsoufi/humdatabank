@@ -201,7 +201,8 @@ EXTERNAL_API_REGISTRY = [
          'Unified submission data bundle: facts (data, dynamic_data, repeat_data, matrix_cells) plus '
          'dimension tables (form_items, countries, national_societies, indicator_bank). '
          'Percentage-type fields return value/num_value as 0–1 decimals (25% → 0.25). '
-         'layout=star for BI export. /api/v1/data/tables redirects here (308).'
+         'layout=star for BI export. live=true reloads dimension tables from the database. '
+         '/api/v1/data/tables redirects here (308).'
      )},
     {'group': 'Form Data', 'path': '/api/v1/data/tables', 'methods': ['GET'],
      'auth': 'api_key_or_session', 'rate_limited': True, 'featured': False,

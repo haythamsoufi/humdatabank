@@ -271,8 +271,13 @@ class BasePlugin(ABC):
         return []
 
     def get_data_explorer_tab(self) -> Optional[DataExplorerTabConfig]:
-        """Optional Data Explorer tab for org-specific admin features."""
+        """Optional single Data Explorer tab. Prefer get_data_explorer_tabs()."""
         return None
+
+    def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
+        """Data Explorer tabs this plugin contributes. One plugin may own several."""
+        tab = self.get_data_explorer_tab()
+        return [tab] if tab is not None else []
 
     def get_documentation_source(self) -> Optional[PluginDocsSource]:
         """Optional Markdown docs this plugin injects into the core docs UI."""
@@ -284,7 +289,7 @@ class BasePlugin(ABC):
         Default: plugins that contribute a Data Explorer tab. Backend-only admin
         tools (for example FDRS data sync) can override this without adding a tab.
         """
-        return self.get_data_explorer_tab() is not None
+        return bool(self.get_data_explorer_tabs())
 
     def get_seed_permissions(self) -> List[SeedPermission]:
         """RBAC permissions to seed on startup."""

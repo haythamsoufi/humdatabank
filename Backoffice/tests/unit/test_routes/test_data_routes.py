@@ -844,6 +844,16 @@ class TestDataHelpers:
             {'include_dimensions': 'true'}, public_data_access=True,
         ) is True
 
+    def test_resolve_live_defaults_false(self, app):
+        from app.routes.api.data import _resolve_live
+        assert _resolve_live({}) is False
+        assert _resolve_live({'live': 'false'}) is False
+
+    def test_resolve_live_explicit_true(self, app):
+        from app.routes.api.data import _resolve_live
+        assert _resolve_live({'live': 'true'}) is True
+        assert _resolve_live({'live': '1'}) is True
+
     def test_resolve_include_calculated_totals_defaults_true(self, app):
         from app.routes.api.data import _resolve_include_calculated_totals
         assert _resolve_include_calculated_totals({}) is True

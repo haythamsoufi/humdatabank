@@ -17,6 +17,7 @@ class CountryForm(BaseForm, MultilingualFieldsMixin):
     name = StringField("Country Name", validators=[DataRequired(), Length(min=2, max=100)])
     short_name = StringField("Short Name", validators=[Optional(), Length(max=50)])
     iso3 = StringField("ISO3 Code", validators=[DataRequired(), Length(min=3, max=3, message="ISO3 code must be exactly 3 characters.")])
+    iso2 = StringField("ISO2 Code", validators=[Optional(), Length(min=2, max=2, message="ISO2 code must be exactly 2 characters.")])
     national_society_name = StringField("National Society Name", validators=[Optional(), Length(max=255)])
 
     # Additional fields
@@ -51,3 +52,14 @@ class CountryForm(BaseForm, MultilingualFieldsMixin):
     def validate_iso3(self, field):
         """Validates that the ISO3 code is unique."""
         CommonValidators.validate_iso3_unique(field, self.original_country_id)
+
+    def validate_iso2(self, field):
+        """Normalizes an optional ISO2 code and checks uniqueness."""
+        raw = (field.data or '').strip().upper()
+        if not raw:
+            field.data = ''
+            return
+        if len(raw) != 2 or not raw.isalpha():
+            raise ValidationError('ISO2 code must be exactly 2 letters.')
+        field.data = raw
+        CommonValidators.validate_iso2_unique(field, self.original_country_id)

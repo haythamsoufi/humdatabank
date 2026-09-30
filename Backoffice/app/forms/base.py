@@ -208,6 +208,19 @@ class CommonValidators:
             raise ValidationError('A country with this ISO3 code already exists.')
 
     @staticmethod
+    def validate_iso2_unique(field, exclude_id=None):
+        """Validates that a non-empty ISO2 code is unique."""
+        code = (field.data or '').strip().upper()
+        if not code:
+            return
+        query = Country.query.filter_by(iso2=code)
+        if exclude_id:
+            query = query.filter(Country.id != exclude_id)
+        existing = query.first()
+        if existing:
+            raise ValidationError('A country with this ISO2 code already exists.')
+
+    @staticmethod
     def validate_age_groups_config(field, selected_disaggregation_options, indicator_unit, indicator_type):
         """Validates custom age groups configuration."""
         # Check if age disaggregation is selected

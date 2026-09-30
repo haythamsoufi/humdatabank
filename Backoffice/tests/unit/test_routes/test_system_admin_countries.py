@@ -6,6 +6,7 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
+from app.models import Country
 from tests.factories import create_test_country
 
 pytestmark = [pytest.mark.unit]
@@ -113,6 +114,7 @@ class TestGetCountryDataJson:
         data = json.loads(resp.data)
         assert data.get("success") is True
         assert data.get("id") == country.id
+        assert data.get("iso2")
 
     def test_404_for_nonexistent_country(self, logged_in_client, db_session):
         resp = logged_in_client.get("/admin/countries/999999/data")
@@ -144,6 +146,7 @@ class TestGetCountryData:
         assert data.get("success") is True
         assert data.get("id") == country.id
         assert data.get("iso3") == "BJC"
+        assert "iso2" in data
 
     def test_404_for_missing_country(self, logged_in_client, db_session):
         resp = logged_in_client.get("/admin/countries/9999998")
@@ -177,6 +180,25 @@ class TestEditCountry:
             follow_redirects=False,
         )
         assert resp.status_code == 302
+
+    def test_post_saves_iso2(self, logged_in_client, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session, name="EditIso2Country", iso3="EI2", iso2="EA")
+        resp = logged_in_client.post(
+            f"/admin/countries/edit/{country.id}",
+            data={
+                "name": "EditIso2Country",
+                "iso3": "EI2",
+                "iso2": "qx",
+                "status": "Active",
+                "preferred_language": "en",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        with app.app_context():
+            updated = db_session.get(Country, country.id)
+            assert updated.iso2 == "QX"
 
     def test_post_valid_json_returns_json_ok(self, logged_in_client, db_session, app):
         with app.app_context():

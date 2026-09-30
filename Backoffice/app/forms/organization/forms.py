@@ -2,8 +2,9 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
 from wtforms import StringField, TextAreaField, BooleanField, IntegerField, SelectField, DateField
-from wtforms.validators import DataRequired, Optional, Length
+from wtforms.validators import DataRequired, Optional, Length, ValidationError
 
+from app.forms.base import CommonValidators
 from app.models.organization import SecretariatRegionalOffice, NS_STATUS_CHOICES, NS_STATUS_ACTIVE
 from app.services.organization.secretariat_regional_office_service import ensure_secretariat_regional_offices
 from app.forms.organization.translation_helpers import add_translation_fields
@@ -19,6 +20,7 @@ class CountryForm(FlaskForm):
     currency_code = StringField('Currency Code', validators=[Optional(), Length(max=3)])
 
     def __init__(self, *args, **kwargs):
+        self.original_country_id = kwargs.pop('original_country_id', None)
         # Add language fields at runtime (requires app context).
         add_translation_fields(self.__class__, 'name', 'Country Name', 100)
         super().__init__(*args, **kwargs)
@@ -27,6 +29,16 @@ class CountryForm(FlaskForm):
             SecretariatRegionalOffice.display_order, SecretariatRegionalOffice.name,
         ).all()
         self.secretariat_regional_office_id.choices = [(o.id, o.name) for o in offices]
+
+    def validate_iso2(self, field):
+        raw = (field.data or '').strip().upper()
+        if not raw:
+            field.data = ''
+            return
+        if len(raw) != 2 or not raw.isalpha():
+            raise ValidationError('ISO2 code must be exactly 2 letters.')
+        field.data = raw
+        CommonValidators.validate_iso2_unique(field, self.original_country_id)
 
 
 class NationalSocietyForm(FlaskForm):

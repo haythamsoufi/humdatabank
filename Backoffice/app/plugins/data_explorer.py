@@ -15,18 +15,6 @@ CORE_DATA_EXPLORER_TABS: tuple[dict[str, Any], ...] = (
         "priority": 10,
         "flag_key": "can_access_data_table",
     },
-    {
-        "tab_id": "disaggregation",
-        "permission": "admin.data_explore.analysis",
-        "priority": 20,
-        "flag_key": "can_access_analysis",
-    },
-    {
-        "tab_id": "compliance",
-        "permission": "admin.data_explore.compliance",
-        "priority": 30,
-        "flag_key": "can_access_compliance",
-    },
 )
 
 CORE_DATA_EXPLORER_PERMISSIONS: tuple[str, ...] = tuple(

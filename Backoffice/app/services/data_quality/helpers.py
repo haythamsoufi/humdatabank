@@ -462,3 +462,51 @@ def compliance_doc_status_counts_toward_requirement(status: str | None) -> bool:
 def active_country_map_query():
     """Active countries from the country map (Country.status == 'Active')."""
     return Country.query.filter_by(status="Active").order_by(Country.name)
+
+
+def compliance_country_activity(country) -> dict[str, Any]:
+    """Whether a country belongs in FDRS compliance counts.
+
+    A country counts only when its country-map status is Active and at least
+    one National Society is active. Everyone else stays visible in the grid
+    with activity tags (country status, NS status, or no National Society).
+    """
+    raw_status = getattr(country, "status", None)
+    country_status = str(raw_status).strip() if raw_status else ""
+    country_active = country_status.casefold() == "active"
+
+    try:
+        national_societies = list(getattr(country, "national_societies", None) or [])
+    except Exception:
+        national_societies = []
+
+    ns_active = any(bool(getattr(ns, "is_active", False)) for ns in national_societies)
+
+    tags: list[str] = []
+    seen: set[str] = set()
+
+    def _add_tag(key: str) -> None:
+        folded = key.casefold()
+        if not folded or folded == "active" or folded in seen:
+            return
+        seen.add(folded)
+        tags.append(key)
+
+    if not country_active:
+        _add_tag(country_status or "Inactive")
+    if not ns_active:
+        if not national_societies:
+            _add_tag("no_national_society")
+        else:
+            for ns in national_societies:
+                label = (
+                    getattr(ns, "status_label", None)
+                    or getattr(ns, "status", None)
+                    or "Inactive"
+                )
+                _add_tag(str(label).strip() or "Inactive")
+
+    return {
+        "counts_in_compliance": country_active and ns_active,
+        "activity_tags": tags,
+    }

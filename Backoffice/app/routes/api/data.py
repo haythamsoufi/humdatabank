@@ -541,16 +541,38 @@ def _load_full_national_societies_table_uncached():
     return [format_national_society_info(ns) for ns in societies]
 
 
-def _load_full_indicator_bank_table():
+def _load_full_indicator_bank_table(*, live: bool = False):
+    if live:
+        return _load_full_indicator_bank_table_uncached()
     return _indicator_bank_table_cache.get_or_load(_load_full_indicator_bank_table_uncached)
 
 
-def _load_full_countries_table():
+def _load_full_countries_table(*, live: bool = False):
+    if live:
+        return _load_full_countries_table_uncached()
     return _countries_table_cache.get_or_load(_load_full_countries_table_uncached)
 
 
-def _load_full_national_societies_table():
+def _load_full_national_societies_table(*, live: bool = False):
+    if live:
+        return _load_full_national_societies_table_uncached()
     return _national_societies_table_cache.get_or_load(_load_full_national_societies_table_uncached)
+
+
+def _dimension_tables(*, include: bool, live: bool):
+    """Return (countries, national_societies, indicator_bank) for a /data response.
+
+    ``live`` skips the per-worker TTL cache and reads the three tables from the
+    database. Fact rows are always queried live; this only affects the dimension
+    arrays.
+    """
+    if not include:
+        return [], [], []
+    return (
+        _load_full_countries_table(live=live),
+        _load_full_national_societies_table(live=live),
+        _load_full_indicator_bank_table(live=live),
+    )
 
 
 def _invalidate_reference_table_caches_for_test():
@@ -634,6 +656,15 @@ def _resolve_include_dimensions(args, *, public_data_access: bool) -> bool:
     if raw is None or str(raw).strip() == '':
         return True
     return str(raw).strip().lower() not in ('0', 'false', 'no', 'n')
+
+
+def _resolve_live(args) -> bool:
+    """True when dimension tables must be read from the database, skipping the worker cache.
+
+    Pass ``live=true`` (also ``1`` / ``yes``). Default is the cached tables.
+    Public responses with this flag are sent with ``Cache-Control: no-store``.
+    """
+    return str(args.get('live') or '').strip().lower() in ('1', 'true', 'yes', 'y')
 
 
 def _resolve_include_calculated_totals(args) -> bool:
@@ -1158,6 +1189,10 @@ def get_all_data():
         - include_dimensions: default true for authenticated callers (false for public);
           pass ``false``/``true`` to override and skip/include countries[], national_societies[],
           indicator_bank[] (~860 rows combined)
+        - live: default false; pass ``true`` to reload those three dimension tables from
+          the database instead of the per-worker cache (use after a direct SQL edit).
+          Public responses then send ``Cache-Control: no-store``. Fact rows are always
+          queried live either way.
         - include_calculated_totals: default true; pass ``false`` to drop calculated
           row/column/grand totals from matrix_cells[] / bridge_disagg_values[] /
           fact_form_values[].disaggregation_data, keeping only raw reported cells.
@@ -1188,7 +1223,18 @@ def get_all_data():
         # dimension tables (~860 rows combined). Computed once up front so every response
         # path (including the "no accessible rows" shortcuts below) stays consistent.
         include_dims = _resolve_include_dimensions(request.args, public_data_access=public_data_access)
+        live = _resolve_live(request.args)
         include_calculated_totals = _resolve_include_calculated_totals(request.args)
+
+        def _finish(response):
+            if hasattr(response, 'headers'):
+                if live:
+                    response.headers['Cache-Control'] = 'no-store'
+                elif public_data_access:
+                    response.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=60'
+                if public_data_access:
+                    response.headers['X-Public-Data-Access'] = 'true'
+            return response
 
         analysis_requested = str(request.args.get('analysis', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
         if analysis_requested and not elevated_access and auth_user is not None:
@@ -1518,12 +1564,12 @@ def get_all_data():
                                 include_repeat=_inc_rep,
                                 include_dimensions=include_dims,
                             )
-                            _countries = _load_full_countries_table() if include_dims else []
-                            _national_societies = _load_full_national_societies_table() if include_dims else []
-                            _indicator_bank = _load_full_indicator_bank_table() if include_dims else []
+                            _countries, _national_societies, _indicator_bank = _dimension_tables(
+                                include=include_dims, live=live,
+                            )
                             _assignment_statuses = _assignment_statuses_for_scope()
                             if layout == 'star':
-                                return _build_star_data_response(
+                                return _finish(_build_star_data_response(
                                     [], [], _countries, _national_societies, _indicator_bank, [],
                                     should_paginate=should_paginate,
                                     total_items=0,
@@ -1532,8 +1578,8 @@ def get_all_data():
                                     assignment_statuses=_assignment_statuses,
                                     scope_meta=scope_meta,
                                     array_catalog=_catalog,
-                                )
-                            return json_response(_assemble_flat_data_payload(
+                                ))
+                            return _finish(json_response(_assemble_flat_data_payload(
                                 data_rows=[],
                                 form_items_table=[],
                                 countries_table=_countries,
@@ -1547,7 +1593,7 @@ def get_all_data():
                                 per_page=None,
                                 scope_meta=scope_meta,
                                 array_catalog=_catalog,
-                            ))
+                            )))
 
         # ---------- Scoped API key: restrict to template_ids / country_ids on the key ----------
         api_key_scope = getattr(g, 'api_key_data_scope', None)
@@ -1592,12 +1638,12 @@ def get_all_data():
                                 include_repeat=_inc_rep,
                                 include_dimensions=include_dims,
                             )
-                            _countries = _load_full_countries_table() if include_dims else []
-                            _national_societies = _load_full_national_societies_table() if include_dims else []
-                            _indicator_bank = _load_full_indicator_bank_table() if include_dims else []
+                            _countries, _national_societies, _indicator_bank = _dimension_tables(
+                                include=include_dims, live=live,
+                            )
                             _assignment_statuses = _assignment_statuses_for_scope()
                             if layout == 'star':
-                                return _build_star_data_response(
+                                return _finish(_build_star_data_response(
                                     [], [], _countries, _national_societies, _indicator_bank, [],
                                     should_paginate=should_paginate,
                                     total_items=0,
@@ -1606,8 +1652,8 @@ def get_all_data():
                                     assignment_statuses=_assignment_statuses,
                                     scope_meta=scope_meta,
                                     array_catalog=_catalog,
-                                )
-                            return json_response(_assemble_flat_data_payload(
+                                ))
+                            return _finish(json_response(_assemble_flat_data_payload(
                                 data_rows=[],
                                 form_items_table=[],
                                 countries_table=_countries,
@@ -1621,7 +1667,7 @@ def get_all_data():
                                 per_page=None,
                                 scope_meta=scope_meta,
                                 array_catalog=_catalog,
-                            ))
+                            )))
 
         assigned_form_data_query, public_form_data_query = apply_form_data_version_scoping(
             assigned_form_data_query,
@@ -2132,14 +2178,9 @@ def get_all_data():
             assignment_statuses_table = []
             array_catalog = None
         else:
-            if include_dims:
-                countries_table = _load_full_countries_table()
-                national_societies_table = _load_full_national_societies_table()
-                indicator_bank_table = _load_full_indicator_bank_table()
-            else:
-                countries_table = []
-                national_societies_table = []
-                indicator_bank_table = []
+            countries_table, national_societies_table, indicator_bank_table = _dimension_tables(
+                include=include_dims, live=live,
+            )
             # Flat layout normalizes matrix cells into matrix_cells[] and strips them
             # from data[]. Star layout keeps matrix payloads on fact_form_values as a
             # long array on disaggregation_data.
@@ -2213,10 +2254,7 @@ def get_all_data():
                 array_catalog=array_catalog,
             )
 
-        if public_data_access and hasattr(response, 'headers'):
-            response.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=60'
-            response.headers['X-Public-Data-Access'] = 'true'
-        return response
+        return _finish(response)
     except Exception as e:
         error_id = str(uuid.uuid4())
         current_app.logger.error(

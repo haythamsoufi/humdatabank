@@ -1,7 +1,8 @@
 {
   "api": {
-    "base_url": "https://goadmin.ifrc.org/api/v2/appeal/",
-    "timeout": 10
+    "feed": "appeal_group",
+    "base_url": "https://go-api.ifrc.org/api/appealgroupchild",
+    "timeout": 60
   },
   "query_defaults": {
     "end_date_gt": "2023-12-31",

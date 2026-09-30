@@ -74,7 +74,11 @@
                                         </div>
                                         <div>
                                             <label for="edit_iso3" class="block text-sm font-medium text-gray-700 mb-1">{{ _('ISO3 Code') }}</label>
-                                            <input type="text" id="edit_iso3" name="iso3" required maxlength="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                            <input type="text" id="edit_iso3" name="iso3" required maxlength="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md uppercase">
+                                        </div>
+                                        <div>
+                                            <label for="edit_iso2" class="block text-sm font-medium text-gray-700 mb-1">{{ _('ISO2 Code') }}</label>
+                                            <input type="text" id="edit_iso2" name="iso2" maxlength="2" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md uppercase">
                                         </div>
                                         <div>
                                             <label for="edit_status" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Status') }}</label>
@@ -202,6 +206,7 @@
     th.col-id, td.col-id { min-width: 100px; white-space: nowrap; }
     th.col-name, td.col-name { min-width: 280px; }
     th.col-iso3, td.col-iso3 { min-width: 120px; white-space: nowrap; text-transform: uppercase; }
+    th.col-iso2, td.col-iso2 { min-width: 110px; white-space: nowrap; text-transform: uppercase; }
     th.col-status, td.col-status { min-width: 140px; white-space: nowrap; text-align: center; }
     th.col-pref-lang, td.col-pref-lang { min-width: 220px; }
     th.col-currency, td.col-currency { min-width: 140px; white-space: nowrap; text-transform: uppercase; }
@@ -231,6 +236,7 @@
                     $('#edit_name').val(data.name);
                     $('#edit_short_name').val(data.short_name || '');
                     $('#edit_iso3').val(data.iso3);
+                    $('#edit_iso2').val(data.iso2 || '');
                     $('#edit_status').val(data.status);
                     $('#edit_preferred_language').val(data.preferred_language);
                     $('#edit_currency_code').val(data.currency_code);

@@ -38,6 +38,7 @@ def new_country():
                 name=form.name.data,
                 short_name=(form.short_name.data or '').strip() or None,
                 iso3=(form.iso3.data or '').upper(),
+                iso2=(form.iso2.data or '').strip().upper() or None,
                 status=form.status.data,
                 preferred_language=Country.normalize_language_code(form.preferred_language.data),
                 currency_code=form.currency_code.data
@@ -75,6 +76,7 @@ def get_country_data_json(country_id):
         name=country.name,
         short_name=country.short_name or '',
         iso3=country.iso3,
+        iso2=country.iso2 or '',
         status=country.status,
         preferred_language=country.preferred_language_code,
         currency_code=country.currency_code,
@@ -89,7 +91,14 @@ def get_country_data_json(country_id):
 def get_country_data(country_id):
     """API endpoint to get country data as JSON"""
     country = Country.query.get_or_404(country_id)
-    return json_ok(id=country.id, name=country.name, region=country.region, iso3=country.iso3, status=country.status)
+    return json_ok(
+        id=country.id,
+        name=country.name,
+        region=country.region,
+        iso3=country.iso3,
+        iso2=country.iso2 or '',
+        status=country.status,
+    )
 
 @bp.route("/countries/edit/<int:country_id>", methods=["GET", "POST"])
 @permission_required('admin.countries.edit')
@@ -103,6 +112,7 @@ def edit_country(country_id):
             country.name = form.name.data
             country.short_name = (form.short_name.data or '').strip() or None
             country.iso3 = (form.iso3.data or '').upper()
+            country.iso2 = (form.iso2.data or '').strip().upper() or None
             country.status = form.status.data
             country.preferred_language = Country.normalize_language_code(form.preferred_language.data)
             country.currency_code = form.currency_code.data
@@ -135,6 +145,7 @@ def edit_country(country_id):
                         'name': country.name,
                         'short_name': country.short_name or '',
                         'iso3': country.iso3,
+                        'iso2': country.iso2 or '',
                         'status': country.status,
                         'preferred_language': country.preferred_language_code,
                         'currency_code': country.currency_code,

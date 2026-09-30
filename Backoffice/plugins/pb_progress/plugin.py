@@ -67,17 +67,12 @@ class PBProgressPlugin(FirstPartyPluginMetadata, BasePlugin):
 
         return [settings_bp]
 
-    def get_data_explorer_tab(self) -> DataExplorerTabConfig:
-        return DataExplorerTabConfig(
-            tab_id="pb-progress",
-            label="P&B visuals",
-            permission="admin.data_explore.pb_progress",
-            priority=40,
-            panel_template="plugins/pb_progress/pb_progress/tab_panel.html",
-            plugin_id=self.plugin_id,
-            icon="fas fa-chart-line",
-            manage_requires_system_manager=True,
-        )
+    def is_admin_feature(self) -> bool:
+        # Routes stay registered here. The Data Explorer tab is contributed by FDRS.
+        return True
+
+    def get_data_explorer_tab(self) -> DataExplorerTabConfig | None:
+        return None
 
     def get_seed_permissions(self) -> list[SeedPermission]:
         return [

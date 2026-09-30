@@ -308,6 +308,7 @@ Authenticated callers (API key / session) bypass these restrictions.
 | `order` | string | `desc` (default) or `asc` |
 | `page` / `per_page` | int | Pagination |
 | `date_from` / `date_to` | string | ISO date bounds on `submitted_at` |
+| `live` | bool | `true` reloads `countries[]` / `national_societies[]` / `indicator_bank[]` from the database (skips the worker cache) and sends `Cache-Control: no-store`. Public callers also need `include_dimensions=true`. |
 
 ### Flat response shape
 

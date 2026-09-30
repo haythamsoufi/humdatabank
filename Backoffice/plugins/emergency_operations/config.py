@@ -8,8 +8,9 @@ from app.plugins.db_config import DbPluginConfig
 # Default configuration for Emergency Operations Plugin
 DEFAULT_CONFIG = {
     "api": {
-        "base_url": "https://goadmin.ifrc.org/api/v2/appeal/",
-        "timeout": 10
+        "feed": "appeal_group",
+        "base_url": "https://go-api.ifrc.org/api/appealgroupchild",
+        "timeout": 60
     },
     "query_defaults": {
         "end_date_gt": "2022-12-31",
@@ -41,9 +42,40 @@ class EmergencyOperationsConfig(DbPluginConfig):
     def __init__(self):
         super().__init__("emergency_operations", DEFAULT_CONFIG, plugin_root=Path(__file__).parent)
 
+    def _normalize_api_section(self, api: dict) -> dict:
+        from plugins.emergency_operations.appeal_group import effective_feed_id, url_for_feed
+
+        normalized = dict(api or {})
+        feed = effective_feed_id(normalized)
+        normalized["feed"] = feed
+        normalized["base_url"] = url_for_feed(feed)
+        return normalized
+
+    def get_all_config(self):
+        config = super().get_all_config()
+        api = config.get("api")
+        if isinstance(api, dict):
+            config["api"] = self._normalize_api_section(api)
+        return config
+
+    def update_config(self, new_config):
+        if isinstance(new_config, dict) and isinstance(new_config.get("api"), dict):
+            new_config = dict(new_config)
+            new_config["api"] = self._normalize_api_section(new_config["api"])
+        return super().update_config(new_config)
+
+    def update_section(self, section_name, section_data):
+        if section_name == "api" and isinstance(section_data, dict):
+            current = self.get_section("api")
+            if not isinstance(current, dict):
+                current = {}
+            current.update(section_data)
+            section_data = self._normalize_api_section(current)
+        return super().update_section(section_name, section_data)
+
     def get_api_config(self):
         """Get API configuration."""
-        return self.get_section('api')
+        return self.get_all_config().get("api", {})
 
     def get_query_defaults(self):
         """Get query default configuration."""

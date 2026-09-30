@@ -35,6 +35,28 @@
     ]
 ) }}
 
+{% if security_config_flags %}
+<div class="mb-4 space-y-3">
+  {% for flag in security_config_flags %}
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900" role="status">
+    {% if flag == 'mobile_jwt_missing' %}
+      <p class="font-medium">{{ _('MOBILE_JWT_SECRET is not set') }}</p>
+      <p class="mt-1">{{ _('Mobile tokens are signed with SECRET_KEY. Set a dedicated secret of at least 32 characters that is different from SECRET_KEY.') }}</p>
+    {% elif flag == 'mobile_jwt_same' %}
+      <p class="font-medium">{{ _('MOBILE_JWT_SECRET matches SECRET_KEY') }}</p>
+      <p class="mt-1">{{ _('Use a different value for MOBILE_JWT_SECRET so a leaked session secret does not sign mobile tokens.') }}</p>
+    {% elif flag == 'mobile_jwt_short' %}
+      <p class="font-medium">{{ _('MOBILE_JWT_SECRET is too short') }}</p>
+      <p class="mt-1">{{ _('Use at least 32 characters.') }}</p>
+    {% elif flag == 'enable_ssh' %}
+      <p class="font-medium">{{ _('Container SSH is disabled') }}</p>
+      <p class="mt-1">{{ _('ENABLE_SSH is not true, so Azure portal SSH will not connect. Set ENABLE_SSH=true on the app if break-glass SSH is required.') }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="bg-white shadow-md border border-gray-200">
   {# no-submit-guard: async save calls preventDefault(); global FormSubmitGuard would reset the button in bubble phase.
      enctype is pinned to urlencoded so a no-JS / failed-orchestrator fallback never silently flips the

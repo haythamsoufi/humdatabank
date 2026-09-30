@@ -413,7 +413,7 @@ npm run dev:safe
 - User activity tracking and analytics
 - Idle timeout and revocation apply to every cookie-authenticated request (including `/api/` paths); Bearer JWTs authenticate only under `MOBILE_JWT_BEARER_PATH_PREFIXES` (default `/api/mobile/v1/`).
 - **Client IP has one source:** `app.utils.client_ip.get_client_ip()` (= `request.remote_addr` after ProxyFix with `PROXY_FIX_X_*` hops). Never read `X-Forwarded-For` / `request.remote_addr` directly in routes; use `is_loopback_request()` for dev-only loopback gates.
-- **Revocation/rotation state is shared** (`app/utils/auth_state.py`: Redis, else Postgres `auth_state_entry`), never per-process. Mobile refresh tokens are single-use with family revocation on reuse. `FLASK_CONFIG` unset means production; production/staging need a distinct `MOBILE_JWT_SECRET`. Details, env vars and upgrade notes: [`Backoffice/docs/setup/security.md`](../Backoffice/docs/setup/security.md#authentication-sessions-and-perimeter).
+- **Revocation/rotation state is shared** (`app/utils/auth_state.py`: Redis, else Postgres `auth_state_entry`), never per-process. Mobile refresh tokens are single-use with family revocation on reuse. `FLASK_CONFIG` unset means production. A missing `MOBILE_JWT_SECRET` or `ENABLE_SSH` is flagged on System Configuration and does not block startup. Details, env vars and upgrade notes: [`Backoffice/docs/setup/security.md`](../Backoffice/docs/setup/security.md#authentication-sessions-and-perimeter).
 
 ### API Structure
 - RESTful endpoints under `/api/v1/`

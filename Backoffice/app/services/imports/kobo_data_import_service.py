@@ -23,12 +23,21 @@ from collections import OrderedDict
 
 from flask import current_app
 
+from app.utils.safe_workbook import UnsafeWorkbookError, load_workbook_safe, safe_iter_rows
+
 _logger = logging.getLogger(__name__)
 
 try:
     import openpyxl
 except ImportError:
     openpyxl = None
+
+
+def _open_error_message(exc: Exception) -> str:
+    """User-safe reason a workbook could not be opened (never echoes parser internals)."""
+    if isinstance(exc, UnsafeWorkbookError):
+        return exc.public_message
+    return 'The file could not be read as an Excel workbook.'
 
 KOBO_SYSTEM_EXACT = {
     'start', 'end', 'today', 'deviceid', 'phonenumber',
@@ -782,13 +791,13 @@ class KoboDataImportService:
             }
 
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+            wb = load_workbook_safe(file_bytes, read_only=True, data_only=True)
         except Exception as e:
             _logger.warning('validate_data_export: cannot open file – %s', e)
             return {
                 'valid': False,
-                'message': f'Cannot open Excel file: {e}',
-                'errors': [str(e)],
+                'message': f'Cannot open Excel file: {_open_error_message(e)}',
+                'errors': [_open_error_message(e)],
                 'preview': preview,
             }
 
@@ -813,7 +822,7 @@ class KoboDataImportService:
         sheet_name = wb.sheetnames[0]
         preview['sheet_name'] = sheet_name
 
-        rows_iter = ws.iter_rows(values_only=True)
+        rows_iter = safe_iter_rows(ws, values_only=True)
         try:
             header_row = next(rows_iter)
         except StopIteration:
@@ -900,16 +909,16 @@ class KoboDataImportService:
             return {'success': False, 'message': 'openpyxl is required', 'errors': ['openpyxl not installed']}
 
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+            wb = load_workbook_safe(file_bytes, read_only=True, data_only=True)
         except Exception as e:
             _logger.warning('analyze: cannot open file – %s', e)
-            return {'success': False, 'message': f'Cannot open Excel file: {e}', 'errors': [str(e)]}
+            return {'success': False, 'message': f'Cannot open Excel file: {_open_error_message(e)}', 'errors': [_open_error_message(e)]}
 
         ws = wb.worksheets[0]
         sheet_name = wb.sheetnames[0]
         _logger.debug('analyze: sheet=%r', sheet_name)
 
-        rows_iter = ws.iter_rows(values_only=True)
+        rows_iter = safe_iter_rows(ws, values_only=True)
         try:
             header_row = next(rows_iter)
         except StopIteration:
@@ -1099,9 +1108,9 @@ class KoboDataImportService:
         if openpyxl is None:
             return []
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+            wb = load_workbook_safe(file_bytes, read_only=True, data_only=True)
             ws = wb.worksheets[0]
-            rows_iter = ws.iter_rows(values_only=True)
+            rows_iter = safe_iter_rows(ws, values_only=True)
             header_row = next(rows_iter)
             headers = list(header_row)
             data_rows: List[list] = []
@@ -1277,12 +1286,12 @@ class KoboDataImportService:
             return {'success': False, 'message': 'openpyxl is required'}
 
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+            wb = load_workbook_safe(file_bytes, read_only=True, data_only=True)
         except Exception as e:
-            return {'success': False, 'message': f'Cannot open file: {e}'}
+            return {'success': False, 'message': f'Cannot open file: {_open_error_message(e)}'}
 
         ws = wb.worksheets[0]
-        rows_iter = ws.iter_rows(values_only=True)
+        rows_iter = safe_iter_rows(ws, values_only=True)
         headers = list(next(rows_iter))
 
         data_rows: List[list] = []
@@ -1503,12 +1512,12 @@ class KoboDataImportService:
             return {'success': False, 'message': 'openpyxl is required'}
 
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+            wb = load_workbook_safe(file_bytes, read_only=True, data_only=True)
         except Exception as e:
-            return {'success': False, 'message': f'Cannot open file: {e}'}
+            return {'success': False, 'message': f'Cannot open file: {_open_error_message(e)}'}
 
         ws = wb.worksheets[0]
-        rows_iter = ws.iter_rows(values_only=True)
+        rows_iter = safe_iter_rows(ws, values_only=True)
         headers = list(next(rows_iter))
 
         data_rows = []
@@ -1874,7 +1883,7 @@ class KoboDataImportService:
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"KoBo data import commit failed: {e}", exc_info=True)
-            return {'success': False, 'message': f'Database error: {e}'}
+            return {'success': False, 'message': 'A database error occurred while importing. No data was saved.'}
 
         return {
             'success': True,

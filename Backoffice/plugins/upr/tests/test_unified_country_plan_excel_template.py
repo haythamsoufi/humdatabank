@@ -50,12 +50,26 @@ from unified_country_plan_excel_template import (  # noqa: E402
     write_table_cell,
 )
 from upr_country_reporting_excel_template import _bilateral_ns_name_for_row, write_named_cell, _write_bilateral_ns_source_cell  # noqa: E402
-TEMPLATE_PATH = os.path.join(
+_PLUGIN_TEMPLATE_PATH = os.path.normpath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "static",
+        "templates",
+        "unified_country_plan.xlsx",
+    )
+)
+_LEGACY_TEMPLATE_PATH = os.path.join(
     BACKOFFICE_DIR,
     "app",
     "static",
     "templates",
     "unified_country_plan.xlsx",
+)
+TEMPLATE_PATH = (
+    _PLUGIN_TEMPLATE_PATH
+    if os.path.isfile(_PLUGIN_TEMPLATE_PATH)
+    else _LEGACY_TEMPLATE_PATH
 )
 
 

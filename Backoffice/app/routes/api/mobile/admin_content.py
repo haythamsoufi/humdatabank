@@ -13,6 +13,7 @@ from app import db
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.mobile_auth import mobile_auth_required
+from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_not_found, mobile_forbidden,
     mobile_server_error, mobile_paginated, mobile_error,
@@ -258,11 +259,11 @@ def toggle_public_access(assignment_id):
     if not assignment:
         return mobile_not_found('Assignment not found')
 
+    if not assignment.has_public_url():
+        return mobile_bad_request('This assignment does not have a public URL.')
+
     try:
-        if hasattr(assignment, 'toggle_public_access'):
-            assignment.toggle_public_access()
-        else:
-            assignment.is_public_active = not getattr(assignment, 'is_public_active', False)
+        assignment.toggle_public_access()
         db.session.flush()
         return mobile_ok(
             message='Public access toggled',
@@ -286,8 +287,9 @@ def generate_public_url(assignment_id):
         return mobile_not_found('Assignment not found')
 
     try:
-        if hasattr(assignment, 'generate_public_url'):
+        if not assignment.has_public_url():
             assignment.generate_public_url()
+            assignment.is_public_active = True
         db.session.flush()
         return mobile_ok(
             message='Public URL generated',

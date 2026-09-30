@@ -205,45 +205,34 @@ def _validate_ifrc_fetch_url(url: str) -> tuple[bool, str]:
     """
     SSRF protection for IFRC document import: allow only https URLs to allowlisted hosts.
     Host allowlist is configured via IFRC_DOCUMENT_ALLOWED_HOSTS.
+
+    Delegates to the shared policy in ``app.utils.outbound_url``; kept under this name for callers.
     """
     from urllib.parse import urlparse
-    import ipaddress
 
-    u = (url or "").strip()
-    if not u:
-        return False, "URL is required"
+    from app.utils.outbound_url import validate_outbound_url
 
-    parsed = urlparse(u)
-    if parsed.scheme.lower() != "https":
-        return False, "Only https URLs are allowed"
-    if not parsed.netloc:
-        return False, "Invalid URL"
-    if parsed.username or parsed.password:
-        return False, "URL must not include credentials"
+    host = (urlparse((url or "").strip()).hostname or "").strip()
+    if host:
+        import ipaddress
 
-    host = (parsed.hostname or "").strip().lower().strip(".")
-    if not host:
-        return False, "Invalid URL host"
-
-    try:
-        ipaddress.ip_address(host)
-        return False, "IP address URLs are not allowed"
-    except Exception as e:
-        logger.debug("IP address check (expected for hostnames): %s", e)
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            pass
+        else:
+            return False, "IP address URLs are not allowed"
 
     allowed_hosts = current_app.config.get("IFRC_DOCUMENT_ALLOWED_HOSTS") or []
-    allowed_hosts = [str(h).strip().lower().strip(".") for h in allowed_hosts if str(h).strip()]
-    if not allowed_hosts:
+    result = validate_outbound_url(
+        url,
+        allowed_hosts=[str(h) for h in allowed_hosts],
+        allowed_ports=(443,),
+        resolve_dns=False,
+    )
+    if not result.ok and result.reason == "Outbound host allow-list is not configured":
         return False, "External document import is not configured (no allowed hosts)"
-
-    is_allowed = any(host == ah or host.endswith("." + ah) for ah in allowed_hosts)
-    if not is_allowed:
-        return False, "URL host is not allowed"
-
-    if parsed.port is not None and parsed.port != 443:
-        return False, "Only default https port is allowed"
-
-    return True, ""
+    return result.ok, result.reason
 
 
 def _normalize_ifrc_source_url(url: str) -> str:

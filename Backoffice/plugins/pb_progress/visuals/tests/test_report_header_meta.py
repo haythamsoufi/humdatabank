@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
@@ -10,8 +11,10 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "tests"))
 
 from pb_figures.report_meta import format_report_date, report_header_meta  # noqa: E402
+from workbook_fixtures import sp1_mapping_row, temporary_report_excel  # noqa: E402
 
 
 class ReportHeaderMetaTests(unittest.TestCase):
@@ -40,10 +43,14 @@ class ReportHeaderMetaTests(unittest.TestCase):
             "French": "Publié",
         }.get(lang, "Published")
 
-        meta = report_header_meta(
-            ("English", "French", "Arabic"),
-            published_on=date(2026, 8, 6),
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "SG Report.xlsx"
+            with temporary_report_excel(path, mapping_rows=[sp1_mapping_row()]):
+                meta = report_header_meta(
+                    ("English", "French", "Arabic"),
+                    excel_path=path,
+                    published_on=date(2026, 8, 6),
+                )
 
         self.assertEqual(meta["French"]["title"], "Rapport du Conseil de direction — Figures")
         self.assertEqual(meta["French"]["authorLabel"], "Auteur")

@@ -10,6 +10,7 @@ from typing import Optional
 from flask import current_app
 
 from app.services.platform import storage_service as storage
+from app.utils.safe_image import clamp_render_scale, open_image_safe, render_page_size
 
 
 class ThumbnailService:
@@ -46,11 +47,11 @@ class ThumbnailService:
 
             with fitz.open(pdf_full_path) as pdf_document:
                 page = pdf_document[0]
-                mat = fitz.Matrix(1.5, 1.5)
-                pix = page.get_pixmap(matrix=mat)
+                scale = clamp_render_scale(*render_page_size(page), 1.5)
+                pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
                 img_data = pix.tobytes("png")
 
-                img = Image.open(io.BytesIO(img_data))
+                img = open_image_safe(img_data)
                 img.thumbnail((300, 400), Image.Resampling.LANCZOS)
 
                 thumbnail_filename = (

@@ -15,6 +15,11 @@ from app.utils.datetime_helpers import utcnow
 from .form_items import FormItem
 
 
+def _enum_text(value) -> str:
+    """Plain text for a column value that may be an Enum member or a raw string."""
+    return str(getattr(value, 'value', value))
+
+
 class IndicatorBankType(db.Model):
     """Central catalog: indicator measurement data types (Number, Percentage, …)."""
 
@@ -626,7 +631,8 @@ class IndicatorSuggestion(db.Model):
             'rejected': 'Rejected',
             'implemented': 'Implemented',
         }
-        return status_map.get(str(self.status).casefold(), str(self.status).title())
+        raw = _enum_text(self.status)
+        return status_map.get(raw.casefold(), raw.replace('_', ' ').title())
 
     @property
     def suggestion_type_display(self):
@@ -636,7 +642,8 @@ class IndicatorSuggestion(db.Model):
             'new_indicator': 'Propose new indicator',
             'other': 'Other'
         }
-        return type_map.get(str(self.suggestion_type), str(self.suggestion_type).title())
+        raw = _enum_text(self.suggestion_type)
+        return type_map.get(raw, raw.replace('_', ' ').title())
 
     @property
     def has_data_availability_flags(self):

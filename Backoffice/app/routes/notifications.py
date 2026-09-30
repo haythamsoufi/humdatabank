@@ -1030,11 +1030,11 @@ def api_export_notifications():
 
         if format_type == 'csv':
             from flask import Response
-            import csv
             import io
+            from app.utils.export_safety import safe_csv_writer
 
             output = io.StringIO()
-            writer = csv.writer(output)
+            writer = safe_csv_writer(output)
 
             # Write header
             writer.writerow(['ID', 'Title', 'Message', 'Type', 'Priority', 'Read', 'Created At', 'Related URL'])
@@ -1096,11 +1096,8 @@ def register_device():
         timezone = data.get('timezone')
 
         # Get IP address from request
-        ip_address = None
-        if request.headers.getlist("X-Forwarded-For"):
-            ip_address = request.headers.getlist("X-Forwarded-For")[0].split(',')[0].strip()
-        elif request.remote_addr:
-            ip_address = request.remote_addr
+        from app.utils.client_ip import get_client_ip
+        ip_address = get_client_ip()
 
         if not device_token:
             return json_bad_request('device_token is required', success=False)

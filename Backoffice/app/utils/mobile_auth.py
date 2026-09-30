@@ -13,11 +13,59 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask import current_app, g, request
+from flask import current_app, g, request, session
 from flask_login import current_user, login_user
 
+from app.utils.datetime_helpers import utcnow
 from app.utils.mobile_responses import mobile_auth_error, mobile_forbidden
 from app.utils.request_validation import enforce_api_or_csrf_protection
+
+
+def bearer_jwt_allowed_for_path(path: str) -> bool:
+    """True when a Bearer mobile JWT may establish ``current_user`` for ``path``.
+
+    Only mobile/JWT API prefixes qualify (``MOBILE_JWT_BEARER_PATH_PREFIXES`` plus the
+    deprecated ``MOBILE_JWT_LEGACY_BEARER_PATH_PREFIXES``). Server-rendered admin pages
+    and every other cookie/CSRF-protected route ignore Bearer credentials entirely.
+    """
+    path = path or ""
+    for prefix in current_app.config.get("MOBILE_JWT_BEARER_PATH_PREFIXES") or ():
+        if prefix and path.startswith(prefix):
+            return True
+    for prefix in current_app.config.get("MOBILE_JWT_LEGACY_BEARER_PATH_PREFIXES") or ():
+        if prefix and path.startswith(prefix):
+            current_app.logger.warning(
+                "DEPRECATED: Bearer mobile JWT accepted on legacy prefix %s (path=%s); "
+                "migrate the client to /api/mobile/v1/.", prefix, path,
+            )
+            return True
+    return False
+
+
+def _bind_session_to_jwt(sid: str | None) -> None:
+    """Give the cookie session minted for a JWT request the JWT's session identity.
+
+    The mobile WebView reuses the session cookie returned on JWT API responses. Carrying
+    the JWT ``sid`` and activity timestamps lets the idle/absolute timeouts and the
+    force-logout blacklist apply to that cookie instead of it living unchecked for the
+    full cookie lifetime.
+    """
+    if not sid:
+        return
+    now = utcnow()
+    if session.get('session_id') != sid or 'session_start' not in session:
+        session['session_id'] = sid
+        session['session_start'] = now.isoformat()
+    session['last_activity'] = now.isoformat()
+    session.permanent = True
+
+
+def request_authenticated_by_jwt() -> bool:
+    """True when this request's identity came from a valid Bearer mobile JWT."""
+    memo = getattr(g, "_mobile_jwt_memo", None)
+    if memo is None or memo[0] is not request._get_current_object():
+        return False
+    return bool(getattr(g, "_mobile_jwt_auth", False))
 
 
 def _try_jwt_auth() -> bool:
@@ -26,6 +74,9 @@ def _try_jwt_auth() -> bool:
     Returns True if a valid mobile JWT was found and the user was loaded
     into ``current_user``.  Returns False if no Bearer header or the token
     is not a valid mobile JWT (so the caller can fall back to session auth).
+
+    The result is memoised per request so the global hook and the route decorator
+    do not decode the token and load the user twice.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -34,6 +85,12 @@ def _try_jwt_auth() -> bool:
     token = auth_header[7:].strip()
     if not token:
         return False
+
+    memo = getattr(g, "_mobile_jwt_memo", None)
+    if memo is not None and memo[0] is request._get_current_object() and memo[1] == token:
+        return bool(getattr(g, "_mobile_jwt_auth", False))
+    g._mobile_jwt_memo = (request._get_current_object(), token)
+    g._mobile_jwt_auth = False
 
     try:
         from app.utils.mobile_jwt import decode_mobile_token
@@ -60,6 +117,7 @@ def _try_jwt_auth() -> bool:
             return False
 
     login_user(user, remember=False)
+    _bind_session_to_jwt(claims.sid)
     g._mobile_jwt_auth = True
     g._mobile_jwt_sid = claims.sid  # expose for downstream use if needed
     return True
@@ -131,7 +189,7 @@ def mobile_auth_required(
                         "Access token invalid or expired. Please refresh."
                     )
             else:
-                jwt_authenticated = getattr(g, '_mobile_jwt_auth', False)
+                jwt_authenticated = False
 
             if not current_user.is_authenticated:
                 return mobile_auth_error()

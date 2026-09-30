@@ -14,6 +14,7 @@ from app.routes.api import api_bp
 # Import models
 from app.models import CommonWord
 from app.utils.auth import require_api_key
+from app.services.security.api_key_permissions import CONTENT_READ
 from app.utils.rate_limiting import api_rate_limit, rate_limit
 
 # Import utility functions
@@ -21,7 +22,7 @@ from app.utils.api_helpers import json_response, api_error
 
 
 @api_bp.route('/common-words', methods=['GET'])
-@require_api_key
+@require_api_key(capability=CONTENT_READ)
 @api_rate_limit()
 def get_common_words():
     """

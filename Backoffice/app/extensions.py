@@ -5,7 +5,8 @@ from flask_babel import Babel
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
 from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+
+from app.utils.client_ip import get_client_ip
 import os
 from contextlib import suppress
 from pathlib import Path
@@ -21,9 +22,9 @@ babel = Babel()
 csrf = CSRFProtect()
 mail = Mail()
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=get_client_ip,
     default_limits=[],
-    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    storage_uri=(os.environ.get("RATELIMIT_STORAGE_URI") or "").strip() or "memory://",
 )
 
 

@@ -5,6 +5,7 @@
  * for its side-effect, then access Utils through the global.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import '../../../app/static/js/lib/safe-dom.js';
 import '../../../app/static/js/form_builder/modules/utils.js';
 
 const Utils = window.Utils;
@@ -213,6 +214,19 @@ describe('Utils.setSanitizedHtml', () => {
         Utils.setSanitizedHtml(container, '<img src="data:text/html,<script>evil()</script>">');
         const img = container.querySelector('img');
         expect(img?.getAttribute('src')).toBeNull();
+    });
+
+    it('falls back to text (never raw HTML) when SafeDom is unavailable', () => {
+        const saved = window.SafeDom;
+        window.SafeDom = undefined;
+        try {
+            const container = document.createElement('div');
+            Utils.setSanitizedHtml(container, '<img src=x onerror=alert(1)>');
+            expect(container.querySelector('img')).toBeNull();
+            expect(container.textContent).toContain('<img');
+        } finally {
+            window.SafeDom = saved;
+        }
     });
 
     it('handles null container without throwing', () => {

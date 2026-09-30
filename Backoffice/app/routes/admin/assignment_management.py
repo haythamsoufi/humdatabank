@@ -46,6 +46,7 @@ from app.utils.form_localization import get_localized_country_name, build_templa
 from app.utils.country_utils import get_countries_by_region_with_part_of
 from app.services.assignments.service import AssignmentService
 from app.services.assignments.workflow_service import apply_entity_status_change
+from app.utils.form_authorization import begin_aes_transition, lock_aes_rows_for_update
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
@@ -1591,6 +1592,8 @@ def update_entity_status(assignment_id, status_id):
     is_public_available = data.get('is_public_available')
 
     if status:
+        if not begin_aes_transition(aes, current_user).ok:
+            return json_not_found('Assignment entity no longer exists')
         apply_entity_status_change(aes, status, current_user.id)
 
     if due_date:
@@ -1662,10 +1665,7 @@ def bulk_update_entity_status(assignment_id):
     audit_changes = []
     if safe_ids:
         _now = utcnow()
-        rows = AssignmentEntityStatus.query.filter(
-            AssignmentEntityStatus.id.in_(safe_ids),
-            AssignmentEntityStatus.assigned_form_id == assignment_id,
-        ).all()
+        rows = lock_aes_rows_for_update(safe_ids, assigned_form_id=assignment_id)
         entity_names = {}
         with suppress(Exception):
             entity_names = EntityService.batch_entity_names(
@@ -1708,6 +1708,9 @@ def edit_assignment_entity_status(aes_id):
 
     if form.validate():
         try:
+            if not begin_aes_transition(aes, current_user).ok:
+                flash("This assignment entity no longer exists.", "warning")
+                return redirect(url_for("assignment_management.manage_assignments"))
             apply_entity_status_change(aes, form.status.data, current_user.id)
             aes.due_date = form.due_date.data
             db.session.flush()

@@ -16,6 +16,8 @@ from app.utils.sql_utils import safe_ilike_pattern
 # Import models
 from app.models import Resource, ResourceTranslation
 from app.utils.auth import require_api_key
+from app.services.security.api_authentication import redact_request_params
+from app.services.security.api_key_permissions import CONTENT_READ
 from app.utils.rate_limiting import api_rate_limit
 
 # Import utility functions
@@ -53,7 +55,7 @@ def _get_thumbnail_url_with_fallback(resource, language):
 
 
 @api_bp.route('/resources', methods=['GET'])
-@require_api_key
+@require_api_key(capability=CONTENT_READ)
 @api_rate_limit()
 def get_resources():
     """
@@ -81,7 +83,7 @@ def get_resources():
 
     try:
         from app.utils.api_pagination import validate_pagination_params
-        page, per_page = validate_pagination_params(request.args, default_per_page=10)
+        page, per_page = validate_pagination_params(request.args, default_per_page=10, max_per_page=500)
         search_query = request.args.get('search', default='', type=str).strip()
         resource_type_filter = request.args.get('resource_type', default='', type=str).strip()
         language = request.args.get('language', default='en', type=str).strip()
@@ -172,6 +174,6 @@ def get_resources():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching resources: {e}",
             exc_info=True,
-            extra={'endpoint': '/resources', 'params': dict(request.args)}
+            extra={'endpoint': '/resources', 'params': redact_request_params()}
         )
         return api_error("Could not fetch resources", 500, error_id, None)

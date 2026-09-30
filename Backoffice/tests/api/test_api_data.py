@@ -2,6 +2,12 @@ import pytest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+from app.services.security.api_key_permissions import (
+    ALL_CAPABILITY_CODES,
+    DATA_READ,
+    REFERENCE_READ,
+    build_permissions_document,
+)
 from tests.factories import create_test_template, create_test_country
 from tests.unit.test_services.test_data_retrieval_form import _make_full_setup
 
@@ -75,10 +81,22 @@ class TestApiData:
         )
         assert resp.status_code == 401
 
-    def test_get_data_contract_with_api_key_query_param(self, client, api_key):
-        _api_key_obj, full_key = api_key
+    def test_get_data_refuses_query_param_key_by_default(self, client, api_key, db_session):
+        api_key_obj, full_key = api_key
+        api_key_obj.permissions = build_permissions_document(ALL_CAPABILITY_CODES)
+        db_session.commit()
+        resp = client.get(f"/api/v1/data?api_key={full_key}")
+        assert resp.status_code == 403
+
+    def test_get_data_contract_with_api_key_query_param(self, client, api_key, db_session):
+        api_key_obj, full_key = api_key
+        api_key_obj.permissions = build_permissions_document(
+            [DATA_READ, REFERENCE_READ], allow_query_api_key=True
+        )
+        db_session.commit()
         resp = client.get(f"/api/v1/data?api_key={full_key}")
         assert resp.status_code == 200
+        assert "no-store" in resp.headers.get("Cache-Control", "")
         data = resp.get_json()
         assert isinstance(data, dict)
         assert "data" in data
@@ -132,7 +150,7 @@ class TestApiData:
         assert "data" in payload
         assert "meta" in payload
         star = payload["data"]
-        assert star.get("schema_version") == "1.1"
+        assert star.get("schema_version") == "1.2"
         assert "grain" in star
         tables = star.get("tables") or {}
         for key in (

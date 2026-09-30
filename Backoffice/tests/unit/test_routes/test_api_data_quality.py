@@ -119,17 +119,29 @@ class TestGetDataQualityScore:
         assert data["enabled"] is True
         assert data["score"] == 85
 
-    def test_value_error_returns_400(self, logged_in_client, db_session):
-        """ValueError from compute_data_quality returns 400."""
+    def test_client_input_error_message_is_returned_with_400(self, logged_in_client, db_session):
+        from app.utils.api_errors import ClientInputError
+
         with patch("app.routes.api.data_quality.is_data_quality_dashboard_enabled", return_value=True), \
              patch("app.routes.api.data_quality._user_can_access_entity", return_value=True), \
-             patch("app.routes.api.data_quality.compute_data_quality", side_effect=ValueError("bad params")):
+             patch("app.routes.api.data_quality.compute_data_quality", side_effect=ClientInputError("bad params")):
             resp = logged_in_client.get(
                 _api("/dashboard/data-quality?entity_type=country&entity_id=1&template_id=1&period=2024")
             )
         assert resp.status_code == 400
-        data = resp.get_json()
-        assert "bad params" in data.get("error", "") or "bad params" in str(data)
+        assert resp.get_json()["error"] == "bad params"
+
+    def test_incidental_value_error_is_not_echoed(self, logged_in_client, db_session):
+        with patch("app.routes.api.data_quality.is_data_quality_dashboard_enabled", return_value=True), \
+             patch("app.routes.api.data_quality._user_can_access_entity", return_value=True), \
+             patch("app.routes.api.data_quality.compute_data_quality",
+                   side_effect=ValueError("invalid literal for int() at /srv/app/secret.py")):
+            resp = logged_in_client.get(
+                _api("/dashboard/data-quality?entity_type=country&entity_id=1&template_id=1&period=2024")
+            )
+        assert resp.status_code == 400
+        body = resp.get_data(as_text=True)
+        assert "secret.py" not in body and "invalid literal" not in body
 
     def test_generic_exception_returns_500(self, logged_in_client, db_session):
         """Generic exception from compute_data_quality returns 500."""

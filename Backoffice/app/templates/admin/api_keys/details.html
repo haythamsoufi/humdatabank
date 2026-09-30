@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "admin/api_keys/_access_summary.html" import access_summary %}
 {% from "components/_status_label.html" import status_label, status_label_for_active %}
 
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
@@ -254,6 +255,20 @@
                     <dd class="mt-1 text-sm text-gray-700">{{ api_key.client_description }}</dd>
                 </div>
                 {% endif %}
+
+                <div>
+                    <dt class="text-xs font-medium text-gray-500">{{ _('Access') }}</dt>
+                    <dd class="mt-1">
+                        {{ access_summary(access) }}
+                        {% if access.legacy_full_access or (access.sensitive and not api_key.expires_at) %}
+                        <p class="mt-2 text-xs text-amber-800">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            {% if access.legacy_full_access %}{{ _('Recommended: narrow this key to the permissions its client needs.') }}{% endif %}
+                            {% if not api_key.expires_at %}{{ _('Recommended: set an expiry date for keys with sensitive access.') }}{% endif %}
+                        </p>
+                        {% endif %}
+                    </dd>
+                </div>
 
                 <div>
                     <dt class="text-xs font-medium text-gray-500">{{ _('Rate Limit') }}</dt>

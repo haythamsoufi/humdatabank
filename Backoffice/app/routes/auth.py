@@ -7,6 +7,7 @@ from flask_babel import _
 # Removed check_password_hash as it's now in the User model method
 from app.models import User
 from app import db # db instance might not be needed here unless modifying user on login
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from app.forms.auth_forms import LoginForm, AccountSettingsForm, RegisterForm, ForgotPasswordForm, ResetPasswordForm
 from urllib.parse import urlencode
@@ -25,6 +26,10 @@ from app.services.platform.user_analytics_service import (
     end_other_active_sessions_for_device,
 )
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
+from app.utils.client_ip import is_loopback_request
+from app.utils.login_security import (
+    burn_password_check, clear_login_failures, record_login_failure,
+)
 from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit, rate_limit
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error, json_forbidden
 from app.utils.error_handling import handle_json_view_exception
@@ -52,41 +57,14 @@ _DEV_ACT_AS_ACCESS_LABELS = {
     'user': 'User',
 }
 
-_ACCOUNT_LOCKOUT_THRESHOLD = 10  # consecutive failures before temporary lockout
-_ACCOUNT_LOCKOUT_WINDOW_MINUTES = 15  # window in which failures are counted
-_ACCOUNT_LOCKOUT_DURATION_MINUTES = 15  # how long lockout lasts
-
-
 def _is_account_locked_out(email: str) -> bool:
-    """Check if an account is temporarily locked due to repeated login failures."""
-    try:
-        from app.models.core import UserLoginLog
-        cutoff = utcnow() - timedelta(minutes=_ACCOUNT_LOCKOUT_WINDOW_MINUTES)
-        recent_failures = UserLoginLog.query.filter(
-            UserLoginLog.email_attempted == email,
-            UserLoginLog.event_type == 'login_failed',
-            UserLoginLog.timestamp >= cutoff,
-        ).order_by(UserLoginLog.timestamp.desc()).limit(_ACCOUNT_LOCKOUT_THRESHOLD + 1).all()
+    """True when the account is temporarily locked after repeated login failures.
 
-        if len(recent_failures) < _ACCOUNT_LOCKOUT_THRESHOLD:
-            return False
-
-        last_success = UserLoginLog.query.filter(
-            UserLoginLog.email_attempted == email,
-            UserLoginLog.event_type == 'login',
-            UserLoginLog.timestamp >= cutoff,
-        ).order_by(UserLoginLog.timestamp.desc()).first()
-
-        if last_success and recent_failures:
-            failures_after_success = [f for f in recent_failures if f.timestamp > last_success.timestamp]
-            return len(failures_after_success) >= _ACCOUNT_LOCKOUT_THRESHOLD
-
-        return True
-    except Exception as e:
-        current_app.logger.error(
-            "SECURITY: Account lockout check failed — denying login as a precaution: %s", e
-        )
-        return True
+    Backed by the shared failure counter (all workers, Redis or DB) and fail-closed:
+    an unreadable counter denies the login.
+    """
+    from app.utils.login_security import is_login_locked_out
+    return is_login_locked_out(email)
 
 
 def _flag_deactivated_account_login_attempt(*, user: User, auth_method: str, email: str, password_verified: bool | None = None) -> None:
@@ -138,16 +116,29 @@ def _is_dev_act_as_enabled(*, require_loopback: bool = False) -> bool:
         return False
     if not current_app.config.get('DEBUG', False):
         return False
-    if require_loopback:
-        remote_addr = (request.remote_addr or '').strip()
-        if remote_addr not in ('127.0.0.1', '::1', 'localhost'):
-            return False
+    if require_loopback and not is_loopback_request():
+        return False
     return True
 
 
+def _dev_act_as_allowed_emails() -> set[str]:
+    """Accounts dev act-as may sign in as: the seeded test users plus explicit extras."""
+    allowed = {
+        email for email in (_dev_preset_email(p) for p in ('sys_manager', 'admin', 'focal')) if email
+    }
+    extras = current_app.config.get('DEV_ACT_AS_EXTRA_EMAILS') or []
+    allowed.update(str(e).strip().lower() for e in extras if str(e).strip())
+    return allowed
+
+
 def _get_dev_act_as_users() -> list[dict]:
-    """Active users for the dev act-as picker."""
-    users = User.query.filter_by(active=True).order_by(User.name, User.email).all()
+    """Active seeded/allow-listed users for the dev act-as picker."""
+    allowed = _dev_act_as_allowed_emails()
+    users = (
+        User.query.filter(User.active.is_(True), func.lower(User.email).in_(allowed))
+        .order_by(User.name, User.email)
+        .all()
+    )
     result = []
     for user in users:
         access = AuthorizationService.access_level(user)
@@ -276,7 +267,7 @@ def dev_act_as_login():
     # Defence-in-depth layers (all must pass):
     #   1. FLASK_CONFIG must be 'development' or 'default'
     #   2. Flask DEBUG must be True (enforced at startup in __init__.py)
-    #   3. Request must originate from a loopback address (127.0.0.1 / ::1)
+    #   3. Request must be a direct loopback connection (no forwarding headers)
     #   4. CSRF token must be valid (enforced by Flask-WTF globally)
     #   5. Session is wiped before binding the new user (prevents fixation)
     # The HTML panel and all JS are also only rendered when conditions 1-3 hold,
@@ -292,7 +283,14 @@ def dev_act_as_login():
     if preset:
         user = _resolve_dev_act_as_preset(preset)
     if not user and user_id:
-        user = User.query.filter_by(id=user_id, active=True).first()
+        candidate = User.query.filter_by(id=user_id, active=True).first()
+        if candidate and (candidate.email or '').strip().lower() in _dev_act_as_allowed_emails():
+            user = candidate
+        elif candidate:
+            current_app.logger.warning(
+                "SECURITY: dev act-as refused for non-seeded user id=%s from %s",
+                user_id, get_client_ip(),
+            )
 
     if not user:
         if preset:
@@ -392,17 +390,22 @@ def login():
 
         failure_reason = None
 
+        if user is None:
+            burn_password_check(submitted_password)
         password_ok = bool(user and user.check_password(submitted_password))
 
         if not user:
             failure_reason = 'user_not_found'
         elif not password_ok:
             failure_reason = 'wrong_password'
+        if not password_ok:
+            record_login_failure(submitted_email)
 
         # If the account is deactivated, refuse login and show a clear message (only when identity is confirmed).
         if user and not user.is_active:
             if password_ok:
                 # Confirmed identity -> inform the user and flag for admin review
+                record_login_failure(submitted_email)
                 log_login_attempt(submitted_email, success=False, failure_reason='account_disabled')
                 _flag_deactivated_account_login_attempt(
                     user=user,
@@ -426,6 +429,7 @@ def login():
             )
 
         if user and password_ok:
+            clear_login_failures(submitted_email)
             # Prevent session fixation: clear pre-auth session data before binding user
             session.clear()
 
@@ -571,19 +575,40 @@ def _verify_and_decode_id_token(id_token: str, meta: dict, audience: str, expect
         current_app.logger.debug("JWT verify failed: %s", e)
         return None
 
-def _mobile_deep_link_for_user(user, existing_session_id=None):
-    """Issue a JWT token pair and return a ``humdatabank://oauth-success`` redirect.
+def _mobile_oauth_redirect(user, session_id, code_challenge):
+    """Hand a completed mobile Azure sign-in back to the app via its ``humdatabank://`` scheme.
 
-    Used when a mobile Chrome Custom Tab OAuth flow hits an endpoint where the
-    user is *already* authenticated via the web session cookie, so the normal
-    Azure callback code path is skipped entirely.  We still need to deliver JWT
-    tokens to the Flutter app via the deep link.
+    Current apps send a PKCE ``code_challenge`` and receive a single-use code they redeem at
+    ``POST /api/mobile/v1/auth/oauth/exchange``; no JWT ever appears in the URL. Builds that
+    predate the code flow send no challenge and still get tokens in the URL while
+    ``MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK`` is on (deprecated).
     """
-    from app.utils.mobile_jwt import issue_token_pair
     from urllib.parse import urlencode as _urlencode
-    session_id = existing_session_id or session.get('session_id') or secrets.token_urlsafe(16)
+
+    from app.utils.auth_state import AuthStateUnavailable
+    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile_oauth_code import create_oauth_code
+
+    session_id = session_id or session.get('session_id') or secrets.token_urlsafe(16)
+
+    if code_challenge:
+        try:
+            code = create_oauth_code(user.id, session_id, code_challenge)
+        except AuthStateUnavailable:
+            return redirect("humdatabank://oauth-error?" + _urlencode({"error": "temporarily_unavailable"}))
+        current_app.logger.info("Mobile OAuth: issued single-use code for user %s", user.id)
+        return redirect("humdatabank://oauth-success?" + _urlencode({"code": code}))
+
+    if not current_app.config.get("MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK"):
+        current_app.logger.warning("Mobile OAuth: request without code_challenge rejected (legacy deep link disabled)")
+        return redirect("humdatabank://oauth-error?" + _urlencode({"error": "app_update_required"}))
+
+    current_app.logger.warning(
+        "DEPRECATED: Mobile OAuth delivered JWTs in the deep-link query string for user %s "
+        "(app build without PKCE code flow).", user.id,
+    )
     tokens = issue_token_pair(user.id, session_id=session_id)
-    deep_link = (
+    return redirect(
         "humdatabank://oauth-success?"
         + _urlencode({
             "access_token": tokens["access_token"],
@@ -591,10 +616,6 @@ def _mobile_deep_link_for_user(user, existing_session_id=None):
             "expires_in": tokens["expires_in"],
         })
     )
-    current_app.logger.info(
-        "Mobile OAuth (already-authenticated): issuing JWT tokens via deep link for user %s", user.id
-    )
-    return redirect(deep_link)
 
 
 @bp.route("/login/azure")
@@ -603,7 +624,7 @@ def azure_login():
         if request.args.get("mobile_return_scheme") == "humdatabank":
             # Mobile Chrome Custom Tab OAuth flow.
             #
-            # Do NOT short-circuit to _mobile_deep_link_for_user here.
+            # Do NOT short-circuit to _mobile_oauth_redirect here.
             # Chrome Custom Tabs share the system-browser cookie store.  When
             # the user logs out of the mobile app the JWT tokens are cleared
             # locally, but the Flask session cookie that was written during the
@@ -650,6 +671,17 @@ def azure_login():
     # Mobile app (Chrome Custom Tabs) passes this to request JWT token delivery
     # via a deep link instead of relying on the session cookie.
     is_mobile_oauth = request.args.get("mobile_return_scheme") == "humdatabank"
+    app_code_challenge = None
+    if is_mobile_oauth:
+        from app.utils.mobile_oauth_code import is_valid_code_challenge
+
+        candidate = (request.args.get("app_code_challenge") or "").strip()
+        method = (request.args.get("app_code_challenge_method") or "S256").strip()
+        if candidate and method == "S256" and is_valid_code_challenge(candidate):
+            app_code_challenge = candidate
+        elif candidate or not current_app.config.get("MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK"):
+            current_app.logger.warning("Mobile OAuth start rejected: missing or invalid app_code_challenge")
+            return redirect("humdatabank://oauth-error?" + urlencode({"error": "invalid_request"}))
 
     import time as _time
 
@@ -664,7 +696,8 @@ def azure_login():
             "verifier": verifier,
             "nonce": nonce,
             "next": next_url,
-            "mobile": is_mobile_oauth,  # mobile app: deliver tokens via deep link
+            "mobile": is_mobile_oauth,  # mobile app: hand back via deep link
+            "app_cc": app_code_challenge,
             "iat": _now,
             "exp": _now + 600,  # 10-minute window
         },
@@ -676,7 +709,10 @@ def azure_login():
     # backward compat (browsers that correctly forward SameSite=Lax cookies).
     session.permanent = True
     pending = session.get("b2c_pending") or {}
-    pending[state] = {"verifier": verifier, "nonce": nonce, "next": next_url, "mobile": is_mobile_oauth}
+    pending[state] = {
+        "verifier": verifier, "nonce": nonce, "next": next_url,
+        "mobile": is_mobile_oauth, "app_cc": app_code_challenge,
+    }
     if len(pending) > 5:
         oldest_states = list(pending.keys())[:-5]
         for old in oldest_states:
@@ -721,10 +757,12 @@ def azure_callback():
                 )
                 if _decoded_peek.get("mobile"):
                     try:
-                        return _mobile_deep_link_for_user(current_user)
+                        return _mobile_oauth_redirect(
+                            current_user, session.get('session_id'), _decoded_peek.get("app_cc"),
+                        )
                     except Exception as e:
                         current_app.logger.error(
-                            "Mobile OAuth (already-authed callback): JWT issuance failed: %s", e, exc_info=True
+                            "Mobile OAuth (already-authed callback): hand-off failed: %s", e, exc_info=True
                         )
             except Exception:
                 pass
@@ -766,7 +804,8 @@ def azure_callback():
     # session cookie was not forwarded by the client (Android WebView SameSite=Lax).
     verifier = nonce = next_page_from_state = None
     _jwt_state_ok = False
-    _mobile_oauth = False  # True when mobile app requested token delivery via deep link
+    _mobile_oauth = False  # True when the mobile app started this flow
+    _app_code_challenge = None
     try:
         _decoded = jwt.decode(
             state,
@@ -777,6 +816,7 @@ def azure_callback():
         nonce = _decoded.get("nonce")
         next_page_from_state = _decoded.get("next")
         _mobile_oauth = bool(_decoded.get("mobile", False))
+        _app_code_challenge = _decoded.get("app_cc")
         # Clean up any matching session entry that a browser may have stored.
         _inner = _decoded.get("_state", "")
         _sess_pending = session.get("b2c_pending") or {}
@@ -816,6 +856,7 @@ def azure_callback():
             nonce = auth_data.get("nonce")
             next_page_from_state = auth_data.get("next")
             _mobile_oauth = bool(auth_data.get("mobile", False))
+            _app_code_challenge = auth_data.get("app_cc")
 
     _nonce_for_verify = nonce
     try:
@@ -1066,25 +1107,12 @@ def azure_callback():
     session.pop('b2c_nonce', None)
     session.pop('b2c_next', None)
 
-    # Mobile app (Chrome Custom Tabs flow): deliver JWT tokens via deep link
-    # instead of a session cookie so the native app can authenticate API calls.
+    # Mobile app (Chrome Custom Tabs flow): hand back a single-use code, not the tokens.
     if _mobile_oauth:
         try:
-            from app.utils.mobile_jwt import issue_token_pair
-            from urllib.parse import urlencode as _urlencode
-            tokens = issue_token_pair(user.id, session_id=session_id)
-            deep_link = (
-                "humdatabank://oauth-success?"
-                + _urlencode({
-                    "access_token": tokens["access_token"],
-                    "refresh_token": tokens["refresh_token"],
-                    "expires_in": tokens["expires_in"],
-                })
-            )
-            current_app.logger.info("Mobile OAuth: redirecting to deep link for user %s", user.id)
-            return redirect(deep_link)
+            return _mobile_oauth_redirect(user, session_id, _app_code_challenge)
         except Exception as e:
-            current_app.logger.error("Mobile OAuth: failed to issue JWT tokens: %s", e, exc_info=True)
+            current_app.logger.error("Mobile OAuth: hand-off failed: %s", e, exc_info=True)
             # Fall through to normal web redirect as a best-effort fallback
 
     # Keep the established server-side redirect flow. A 200 "Signing you in"
@@ -1266,7 +1294,23 @@ def _send_password_reset_email(recipient_email: str, token: str) -> bool:
         current_app.logger.warning("Password reset email send failed: %s", e)
         return False
 
+def _registration_neutral_message() -> str:
+    return _(
+        'Registration request received. If this email was not already registered, your account has been '
+        'created and your country access request is pending admin approval. If you already have an '
+        'account, please sign in or use "Forgot password".'
+    )
+
+
 @bp.route('/register', methods=['GET', 'POST'])
+@rate_limit(
+    requests_per_minute=5,
+    key_func=lambda: f"register_{get_client_ip()}",
+    flash_message='Too many registration attempts. Please wait 60 seconds before trying again.',
+    redirect_to='auth.login',
+    methods=['POST'],
+    shared=True,
+)
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
@@ -1284,10 +1328,9 @@ def register():
     if form.validate_on_submit():
         from app.services import UserService
         existing = UserService.get_by_email(form.email.data.strip().lower())
-        if existing:
+        reveal_existing = bool(current_app.config.get('REGISTRATION_REVEAL_EXISTING_EMAIL'))
+        if existing and reveal_existing:
             flash(_('An account with this email already exists.'), 'warning')
-            # Re-render login with modal open and errors
-            flask_config = os.environ.get('FLASK_CONFIG', '').lower()
             return render_template(
                 'auth/login.html',
                 **_login_page_context(
@@ -1322,6 +1365,10 @@ def register():
 
         user = User(email=form.email.data.strip().lower(), name=form.name.data or None, title=form.title.data or None)
         user.set_password(form.password.data)
+        if existing:
+            # Same response and hashing cost as a real sign-up, without revealing the account.
+            flash(_registration_neutral_message(), 'success')
+            return redirect(url_for('auth.login'))
         db.session.add(user)
         try:
             # Flush to get user.id without committing
@@ -1364,7 +1411,10 @@ def register():
                         'source': 'self_service_form'
                     }
                 )
-            flash(_('Your account has been created. Your country access request is pending admin approval.'), 'success')
+            if reveal_existing:
+                flash(_('Your account has been created. Your country access request is pending admin approval.'), 'success')
+            else:
+                flash(_registration_neutral_message(), 'success')
             return redirect(url_for('auth.login'))
         except Exception as e:
             current_app.logger.warning("Account registration failed: %s", e, exc_info=True)
@@ -1394,13 +1444,15 @@ def register():
     )
 
 @bp.route('/register/check-email', methods=['GET'])
-@rate_limit(requests_per_minute=10, key_func=lambda: f"check_email_{get_client_ip()}")
+@rate_limit(requests_per_minute=10, key_func=lambda: f"check_email_{get_client_ip()}", shared=True)
 def check_register_email():
     """
-    Lightweight endpoint used by the registration modal to check if an email
-    address is already registered. Returns JSON:
+    Optional helper for the registration modal (``REGISTRATION_EMAIL_CHECK_ENABLED``,
+    off by default because it is an account-enumeration oracle). Returns JSON:
       { "ok": true, "exists": true|false }
     """
+    if not current_app.config.get('REGISTRATION_EMAIL_CHECK_ENABLED'):
+        abort(404)
     if is_azure_b2c_configured():
         return json_forbidden('registration_disabled', success=False, ok=False)
     email = (request.args.get('email') or '').strip().lower()

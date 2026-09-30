@@ -22,8 +22,16 @@ from app.services.organization.entity_service import EntityService
 from app.services.forms.data_service import FormDataService
 from app.services.forms.processing_service import get_form_items_for_section, slugify_age_group
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.constants import SELF_REPORT_PERIOD_NAME
+from app.utils.form_authorization import (
+    AUTH_FORBIDDEN,
+    AUTH_OK,
+    PUBLIC_SUBMISSION_ACTION_EDIT,
+    PUBLIC_SUBMISSION_ACTION_MANAGE,
+    PUBLIC_SUBMISSION_ACTION_VIEW,
+    public_submission_access,
+)
 from app.utils.form_localization import (
     get_localized_country_name,
     get_localized_indicator_definition,
@@ -41,6 +49,23 @@ from .helpers import (
     _prepare_submitted_documents_for_template,
     build_entry_form_features,
 )
+
+
+def _authorize_public_submission(submission, action, *, as_json=False):
+    """Return an error response when the caller may not perform ``action``, else ``None``.
+
+    Missing and out-of-scope submissions both answer 404 so ids cannot be enumerated.
+    """
+    decision = public_submission_access(submission, current_user, action)
+    if decision == AUTH_OK:
+        return None
+    if decision == AUTH_FORBIDDEN:
+        if as_json:
+            return json_forbidden("You do not have permission to perform this action.", success=False)
+        abort(403)
+    if as_json:
+        return json_not_found("Submission not found.", success=False)
+    abort(404)
 
 
 def register_submission_routes(bp):
@@ -63,6 +88,7 @@ def register_submission_routes(bp):
     def approve_public_submission(submission_id):
         """Approve a public submission."""
         submission = PublicSubmission.query.get_or_404(submission_id)
+        _authorize_public_submission(submission, PUBLIC_SUBMISSION_ACTION_MANAGE)
         csrf_form = FlaskForm()
 
         if csrf_form.validate_on_submit():
@@ -84,6 +110,7 @@ def register_submission_routes(bp):
     def reject_public_submission(submission_id):
         """Reject a public submission."""
         submission = PublicSubmission.query.get_or_404(submission_id)
+        _authorize_public_submission(submission, PUBLIC_SUBMISSION_ACTION_MANAGE)
         csrf_form = FlaskForm()
 
         if csrf_form.validate_on_submit():
@@ -105,6 +132,7 @@ def register_submission_routes(bp):
     def delete_public_submission(submission_id):
         """Delete a public submission."""
         submission = PublicSubmission.query.get_or_404(submission_id)
+        _authorize_public_submission(submission, PUBLIC_SUBMISSION_ACTION_MANAGE)
         csrf_form = FlaskForm()
 
         if csrf_form.validate_on_submit():
@@ -156,6 +184,9 @@ def register_submission_routes(bp):
     def update_public_submission_status(submission_id):
         """Update public submission status via AJAX."""
         submission = PublicSubmission.query.get_or_404(submission_id)
+        denied = _authorize_public_submission(submission, PUBLIC_SUBMISSION_ACTION_MANAGE, as_json=True)
+        if denied is not None:
+            return denied
         csrf_form = FlaskForm()
 
         if csrf_form.validate_on_submit():
@@ -278,16 +309,10 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
         db.joinedload(PublicSubmission.country)
     ).get_or_404(submission_id)
 
-    if AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(current_user, 'admin.assignments.public_submissions.manage'):
-        can_edit = True
-    elif AuthorizationService.has_country_access(current_user, submission.country_id) and AuthorizationService.has_rbac_permission(current_user, 'assignment.enter'):
-        can_edit = True
-    else:
-        can_edit = False
+    _authorize_public_submission(submission, PUBLIC_SUBMISSION_ACTION_VIEW)
+    can_edit = public_submission_access(submission, current_user, PUBLIC_SUBMISSION_ACTION_EDIT) == AUTH_OK
 
-    if request.args.get('edit') == 'true':
-        can_edit = True
-    elif request.args.get('edit') == 'false':
+    if request.args.get('edit') == 'false':
         can_edit = False
 
     form_template = submission.assigned_form.template
@@ -337,7 +362,9 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                 if new_country_id and new_country_id != str(submission.country_id):
                     try:
                         new_country = Country.query.get(int(new_country_id))
-                        if new_country:
+                        if new_country and not AuthorizationService.has_country_access(current_user, new_country.id):
+                            flash('You do not have access to the selected country', 'danger')
+                        elif new_country:
                             submission.country_id = new_country.id
                             db.session.flush()
                             flash(f'Country changed to {new_country.name}', 'success')

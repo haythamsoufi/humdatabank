@@ -11,8 +11,17 @@ def escapejs(value):
     """Escape a string to be safe for use in JavaScript strings."""
     if value is None:
         return ''
-    # Use JSON encoding to properly escape the string for JavaScript
-    return Markup(json.dumps(str(value))[1:-1])  # Remove surrounding quotes
+    encoded = json.dumps(str(value))[1:-1]
+    for char, replacement in (
+        ("<", "\\u003c"),
+        (">", "\\u003e"),
+        ("&", "\\u0026"),
+        ("'", "\\u0027"),
+        ("\u2028", "\\u2028"),
+        ("\u2029", "\\u2029"),
+    ):
+        encoded = encoded.replace(char, replacement)
+    return Markup(encoded)
 
 def safe_json_attr(value):
     """Convert a value to JSON and make it safe for HTML attributes."""
@@ -21,8 +30,7 @@ def safe_json_attr(value):
     try:
         # Convert to JSON string
         json_str = json.dumps(value, ensure_ascii=False)
-        # HTML escape the JSON string for safe use in attributes
-        return Markup(json_str.replace('"', '&quot;').replace("'", '&#39;'))
+        return escape(json_str)
     except (TypeError, ValueError):
         return '{}'
 
@@ -95,6 +103,20 @@ def nl2br(value):
     return Markup(normalized.replace('\n', '<br>'))
 
 
+def rich_text(value):
+    """Sanitize stored rich-text (Blank/Note bodies) at render time and mark it safe.
+
+    Use instead of ``|safe`` for any admin-authored HTML fragment: it re-applies the
+    same allow-list as on save so content written through imports, seeds or APIs that
+    skipped the save-time sanitizer cannot inject markup.
+    """
+    if value is None:
+        return Markup("")
+    from app.routes.admin.form_builder.helpers.item_updaters import sanitize_blank_body_html
+
+    return Markup(sanitize_blank_body_html(str(value)))
+
+
 def profile_initials_filter(user):
     """Two-letter profile avatar initials (matches user form colour preview)."""
     from app.utils.profile_utils import display_initials_for_user
@@ -110,4 +132,5 @@ def register_filters(app):
     app.jinja_env.filters['format_number'] = format_number
     app.jinja_env.filters['to_number'] = to_number
     app.jinja_env.filters['nl2br'] = nl2br
+    app.jinja_env.filters['rich_text'] = rich_text
     app.jinja_env.filters['profile_initials'] = profile_initials_filter

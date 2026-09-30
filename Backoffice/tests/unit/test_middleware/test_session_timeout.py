@@ -120,7 +120,8 @@ class TestHandleSessionTimeout:
                 assert result is None
 
     def test_api_v1_returns_none(self, app):
-        with app.test_request_context("/api/v1/users"):
+        with app.test_request_context("/api/v1/users"), patch("app.middleware.session_timeout.current_user") as cu:
+            cu.is_authenticated = False
             result = handle_session_timeout()
             assert result is None
 
@@ -269,3 +270,48 @@ class TestRegisterSessionTimeoutMiddleware:
         mock_app = MagicMock()
         register_session_timeout_middleware(mock_app)
         mock_app.before_request.assert_called_once()
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# /api/ paths: cookie sessions are bounded, Bearer-JWT requests are not
+# ────────────────────────────────────────────────────────────────────────────
+
+class TestApiPathsAreNotExempt:
+    @staticmethod
+    def _patches(*, jwt_auth, authenticated=True, timed_out=False, blacklisted=False):
+        from contextlib import ExitStack
+
+        stack = ExitStack()
+        stack.enter_context(patch("app.middleware.session_timeout.request_authenticated_by_jwt", return_value=jwt_auth))
+        user = stack.enter_context(patch("app.middleware.session_timeout.current_user"))
+        user.is_authenticated = authenticated
+        stack.enter_context(patch("app.middleware.session_timeout.is_session_blacklisted", return_value=blacklisted))
+        stack.enter_context(patch("app.middleware.session_timeout.check_session_timeout", return_value=timed_out))
+        stack.enter_context(patch("app.middleware.session_timeout.end_user_session"))
+        stack.enter_context(patch("app.middleware.session_timeout.logout_user"))
+        stack.enter_context(patch("app.middleware.session_timeout.remove_session_from_blacklist"))
+        stack.enter_context(patch("app.middleware.session_timeout.session", {"session_id": "sid"}))
+        return stack
+
+    @pytest.mark.parametrize("path", ["/api/v1/users", "/api/mobile/v1/data", "/api/notifications"])
+    def test_idle_cookie_session_on_api_path_gets_json_401(self, app, path):
+        with app.test_request_context(path), self._patches(jwt_auth=False, timed_out=True):
+            result = handle_session_timeout()
+        assert result is not None
+        assert result.status_code == 401
+        assert result.is_json
+
+    @pytest.mark.parametrize("path", ["/api/v1/users", "/api/mobile/v1/data"])
+    def test_revoked_cookie_session_on_api_path_gets_json_401(self, app, path):
+        with app.test_request_context(path), self._patches(jwt_auth=False, blacklisted=True):
+            result = handle_session_timeout()
+        assert result is not None
+        assert result.status_code == 401
+
+    def test_bearer_jwt_request_is_not_subject_to_idle_timeout(self, app):
+        with app.test_request_context("/api/mobile/v1/data"), self._patches(jwt_auth=True, timed_out=True):
+            assert handle_session_timeout() is None
+
+    def test_unauthenticated_api_request_is_left_to_the_view(self, app):
+        with app.test_request_context("/api/v1/users"), self._patches(jwt_auth=False, authenticated=False, timed_out=True):
+            assert handle_session_timeout() is None

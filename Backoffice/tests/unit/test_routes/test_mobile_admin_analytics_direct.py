@@ -233,6 +233,12 @@ class TestSessionLogs:
 # ---------------------------------------------------------------------------
 
 class TestEndSession:
+    @pytest.fixture(autouse=True)
+    def _grant_maintain(self, db_session, route_admin):
+        from tests.factories import _grant_role_permission
+        _grant_role_permission(db_session, 'admin_core', 'admin.system.maintain')
+        db_session.expire_all()
+
     def test_session_not_found(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_analytics import end_session
         from app.services.platform.user_analytics_query_service import EndSessionResult
@@ -365,22 +371,26 @@ class TestAdminSendNotification:
         _, status = _parse(resp)
         assert status == 400
 
-    def test_success_broadcast(self, app, db_session, route_admin):
+    def test_success_broadcast(self, app, db_session, route_admin, route_user):
         from app.routes.api.mobile.admin_analytics import admin_send_notification
-
-        mock_push = MagicMock()
-        mock_push.send_broadcast.return_value = {'sent': 5, 'failed': 0}
 
         with app.test_request_context(
             '/api/mobile/v1/admin/analytics/send-notification',
             method='POST',
-            data=json.dumps({'title': 'Test Title', 'body': 'Test Body'}),
+            data=json.dumps({
+                'title': 'Test Title',
+                'body': 'Test Body',
+                'user_ids': [route_user.id],
+            }),
             content_type='application/json',
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.routes.api.mobile.admin_analytics.PushNotificationService',
-                       return_value=mock_push):
+                 patch('app.utils.notification_push.is_notifications_push_enabled',
+                       return_value=True), \
+                 patch('app.routes.api.mobile.admin_analytics.PushNotificationService'
+                       '.send_bulk_push_notifications',
+                       return_value={'sent': 5, 'failed': 0}):
                 resp = admin_send_notification()
 
         _, status = _parse(resp)
@@ -389,56 +399,67 @@ class TestAdminSendNotification:
     def test_target_user_not_found_returns_404(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_analytics import admin_send_notification
 
+        # Endpoint requires user_ids; empty/missing list is 400 (not per-user 404).
         with app.test_request_context(
             '/api/mobile/v1/admin/analytics/send-notification',
             method='POST',
-            data=json.dumps({'title': 'Test Title', 'body': 'Test Body', 'user_id': 99999}),
-            content_type='application/json',
-        ):
-            login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
-                resp = admin_send_notification()
-
-        _, status = _parse(resp)
-        assert status == 404
-
-    def test_target_user_success(self, app, db_session, route_admin, route_user):
-        from app.routes.api.mobile.admin_analytics import admin_send_notification
-
-        mock_push = MagicMock()
-        mock_push.send_to_user.return_value = {'sent': 1, 'failed': 0}
-
-        with app.test_request_context(
-            '/api/mobile/v1/admin/analytics/send-notification',
-            method='POST',
-            data=json.dumps({'title': 'Test Title', 'body': 'Test Body', 'user_id': route_user.id}),
+            data=json.dumps({'title': 'Test Title', 'body': 'Test Body', 'user_ids': []}),
             content_type='application/json',
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.routes.api.mobile.admin_analytics.PushNotificationService',
-                       return_value=mock_push):
+                 patch('app.utils.notification_push.is_notifications_push_enabled',
+                       return_value=True):
+                resp = admin_send_notification()
+
+        _, status = _parse(resp)
+        assert status == 400
+
+    def test_target_user_success(self, app, db_session, route_admin, route_user):
+        from app.routes.api.mobile.admin_analytics import admin_send_notification
+
+        with app.test_request_context(
+            '/api/mobile/v1/admin/analytics/send-notification',
+            method='POST',
+            data=json.dumps({
+                'title': 'Test Title',
+                'body': 'Test Body',
+                'user_ids': [route_user.id],
+            }),
+            content_type='application/json',
+        ):
+            login_user(route_admin)
+            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+                 patch('app.utils.notification_push.is_notifications_push_enabled',
+                       return_value=True), \
+                 patch('app.routes.api.mobile.admin_analytics.PushNotificationService'
+                       '.send_bulk_push_notifications',
+                       return_value={'sent': 1, 'failed': 0}):
                 resp = admin_send_notification()
 
         _, status = _parse(resp)
         assert status == 200
 
-    def test_push_service_error_returns_500(self, app, db_session, route_admin):
+    def test_push_service_error_returns_500(self, app, db_session, route_admin, route_user):
         from app.routes.api.mobile.admin_analytics import admin_send_notification
-
-        mock_push = MagicMock()
-        mock_push.send_broadcast.side_effect = RuntimeError('push failed')
 
         with app.test_request_context(
             '/api/mobile/v1/admin/analytics/send-notification',
             method='POST',
-            data=json.dumps({'title': 'Test Title', 'body': 'Test Body'}),
+            data=json.dumps({
+                'title': 'Test Title',
+                'body': 'Test Body',
+                'user_ids': [route_user.id],
+            }),
             content_type='application/json',
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.routes.api.mobile.admin_analytics.PushNotificationService',
-                       return_value=mock_push):
+                 patch('app.utils.notification_push.is_notifications_push_enabled',
+                       return_value=True), \
+                 patch('app.routes.api.mobile.admin_analytics.PushNotificationService'
+                       '.send_bulk_push_notifications',
+                       side_effect=RuntimeError('push failed')):
                 resp = admin_send_notification()
 
         _, status = _parse(resp)

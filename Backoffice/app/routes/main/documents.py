@@ -137,7 +137,7 @@ def documents_submit():
             SubmittedDocument.linked_entity_type == sel_type,
             SubmittedDocument.linked_entity_id == sel_id,
         ),
-        SubmittedDocument.storage_path.like(f"{sel_type}/{sel_id}/%"),
+        SubmittedDocument.storage_path.startswith(f"{sel_type}/{sel_id}/", autoescape=True),
     ]
     if sel_type == EntityType.country.value:
         m2m_for_country = db.session.query(submitted_document_countries.c.submitted_document_id).filter(

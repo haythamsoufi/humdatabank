@@ -4,6 +4,7 @@ from app.utils.datetime_helpers import utcnow
 Analytics Module - Dashboard APIs and Reporting
 """
 
+from werkzeug.exceptions import HTTPException
 from flask import Blueprint, request, current_app
 from flask_login import current_user
 from app import db
@@ -94,7 +95,7 @@ def session_log_page_view_paths_api(session_id):
 
 @bp.route("/analytics/end-session/<session_id>", methods=["POST"])
 @csrf.exempt  # Mobile app POSTs without a Referer header; auth/permission checks below are sufficient
-@permission_required('admin.analytics.view')
+@permission_required('admin.system.maintain')
 def end_session_api(session_id):
     """End a user session and blacklist it (JSON for admin clients)."""
     from app.services.platform.user_analytics_service import log_admin_action
@@ -183,11 +184,7 @@ def dashboard_stats_api():
 
     except Exception as e:
         current_app.logger.error(f"Error getting dashboard stats: {e}", exc_info=True)
-        return json_server_error(
-            'An internal error occurred.',
-            status='error',
-            message='An internal error occurred.'
-        )
+        return json_server_error('An internal error occurred.')
 
 @bp.route("/dashboard/activity", methods=["GET"])
 @permission_required('admin.analytics.view')
@@ -237,7 +234,7 @@ def dashboard_activity_api():
 
         if inspect(db.engine).has_table(SecurityEvent.__tablename__):
             security_events = SecurityEvent.query.order_by(
-                SecurityEvent.occurred_at.desc()
+                SecurityEvent.timestamp.desc()
             ).limit(20).all()
 
             for event in security_events:
@@ -247,7 +244,7 @@ def dashboard_activity_api():
                     'description': event.description,
                     'user_id': getattr(event, 'user_id', None),
                     'ip_address': getattr(event, 'ip_address', None),
-                    'occurred_at': event.occurred_at.isoformat()
+                    'occurred_at': event.timestamp.isoformat()
                 })
 
         return json_ok(
@@ -261,11 +258,7 @@ def dashboard_activity_api():
 
     except Exception as e:
         current_app.logger.error(f"Error getting dashboard activity: {e}", exc_info=True)
-        return json_server_error(
-            'Error retrieving dashboard activity',
-            status='error',
-            message='Error retrieving dashboard activity'
-        )
+        return json_server_error('Error retrieving dashboard activity')
 
 @bp.route("/dashboard/trends", methods=["GET"])
 @permission_required('admin.analytics.view')
@@ -342,11 +335,7 @@ def dashboard_trends_api():
 
     except Exception as e:
         current_app.logger.error(f"Error getting dashboard trends: {e}", exc_info=True)
-        return json_server_error(
-            'Error retrieving dashboard trends',
-            status='error',
-            message='Error retrieving dashboard trends'
-        )
+        return json_server_error('Error retrieving dashboard trends')
 
 @bp.route("/users/activity/<int:user_id>", methods=["GET"])
 @permission_required('admin.audit.view')
@@ -413,13 +402,11 @@ def user_activity_api(user_id):
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         current_app.logger.error(f"Error getting user activity: {e}", exc_info=True)
-        return json_server_error(
-            'Error retrieving user activity',
-            status='error',
-            message='Error retrieving user activity'
-        )
+        return json_server_error('Error retrieving user activity')
 
 @bp.route("/submissions/statistics", methods=["GET"])
 @permission_required('admin.analytics.view')
@@ -483,11 +470,7 @@ def submission_statistics_api():
 
     except Exception as e:
         current_app.logger.error(f"Error getting submission statistics: {e}", exc_info=True)
-        return json_server_error(
-            'Error retrieving submission statistics',
-            status='error',
-            message='Error retrieving submission statistics'
-        )
+        return json_server_error('Error retrieving submission statistics')
 
 @bp.route("/indicators/usage", methods=["GET"])
 @permission_required('admin.analytics.view')
@@ -540,11 +523,7 @@ def indicator_usage_api():
 
     except Exception as e:
         current_app.logger.error(f"Error getting indicator usage: {e}", exc_info=True)
-        return json_server_error(
-            'Error retrieving indicator usage statistics',
-            status='error',
-            message='Error retrieving indicator usage statistics'
-        )
+        return json_server_error('Error retrieving indicator usage statistics')
 
 @bp.route("/system/health", methods=["GET"])
 @permission_required('admin.analytics.view')
@@ -586,8 +565,4 @@ def system_health_api():
 
     except Exception as e:
         current_app.logger.error(f"Error getting system health: {e}", exc_info=True)
-        return json_server_error(
-            'Error retrieving system health',
-            status='error',
-            message='Error retrieving system health'
-        )
+        return json_server_error('Error retrieving system health')

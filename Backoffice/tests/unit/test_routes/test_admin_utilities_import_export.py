@@ -525,7 +525,7 @@ class TestPreviewIndicatorImport:
         ), patch(
             "app.routes.admin.utilities.import_export._preview_indicator_import",
             side_effect=RuntimeError("workbook error"),
-        ), patch("builtins.open", MagicMock()), patch(
+        ), patch(
             "os.path.exists", return_value=True
         ), patch(
             "os.remove"
@@ -583,7 +583,8 @@ class TestApplyIndicatorImport:
         )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert "token" in data.get("message", "").lower()
+        err = (data.get("error") or data.get("message") or "").lower()
+        assert "token" in err
 
     def test_invalid_uuid_token_returns_400(self, logged_in_client, db_session):
         resp = logged_in_client.post(
@@ -592,7 +593,8 @@ class TestApplyIndicatorImport:
         )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert "invalid" in data.get("message", "").lower()
+        err = (data.get("error") or data.get("message") or "").lower()
+        assert "invalid" in err
 
     def test_missing_temp_file_returns_400(self, logged_in_client, db_session):
         token = str(uuid.uuid4())
@@ -607,7 +609,8 @@ class TestApplyIndicatorImport:
 
         assert resp.status_code == 400
         data = resp.get_json()
-        assert "expired" in data.get("message", "").lower() or "not found" in data.get("message", "").lower()
+        err = (data.get("error") or data.get("message") or "").lower()
+        assert "expired" in err or "not found" in err
 
     def test_successful_import_returns_200_with_message(
         self, logged_in_client, db_session, tmp_path

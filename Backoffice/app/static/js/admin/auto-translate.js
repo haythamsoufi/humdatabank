@@ -2,6 +2,16 @@
     'use strict';
     var cfg = window.autoTranslatePageConfig || {};
 
+    function escAT(value) {
+        if (value === null || value === undefined) return '';
+        if (window.SafeDom && typeof window.SafeDom.escapeHtml === 'function') {
+            return window.SafeDom.escapeHtml(String(value));
+        }
+        return String(value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     function normalizeAutoTranslateConfig(config) {
         var c = config || {};
         if (!c.itemType && c.item_type) {
@@ -352,7 +362,7 @@
             if (totalCount === 0) {
                 const allLabel = cfg.t.all_b1c94ca2;
                 const alreadyTranslatedLabel = cfg.t.are_already_translated_04d7029d;
-                jQuery('#translation-summary').html(`<span class="text-green-600">${allLabel} ${autoTranslateConfig.itemType} ${alreadyTranslatedLabel}</span>`);
+                jQuery('#translation-summary').html(`<span class="text-green-600">${escAT(allLabel)} ${escAT(autoTranslateConfig.itemType)} ${escAT(alreadyTranslatedLabel)}</span>`);
                 jQuery('#auto-translate-start-btn').prop('disabled', true);
             } else {
                 const foundLabel = cfg.t.found_5d695cc2;
@@ -367,7 +377,7 @@
                     readyForTranslationLabel = readyForTranslationLabel.replace('.', ' ' + selectedLabel + '.');
                 }
 
-                jQuery('#translation-summary').html(`${foundLabel} <strong>${totalCount}</strong> ${blankLabel} ${autoTranslateConfig.itemType} ${readyForTranslationLabel}`);
+                jQuery('#translation-summary').html(`${escAT(foundLabel)} <strong>${escAT(totalCount)}</strong> ${escAT(blankLabel)} ${escAT(autoTranslateConfig.itemType)} ${escAT(readyForTranslationLabel)}`);
                 updateStartButtonState();
             }
 
@@ -469,7 +479,7 @@
             if (state.errorCount > 0) {
                 jQuery('#error-details').removeClass('hidden');
                 const errorList = state.errors.map(error =>
-                    `<div class="py-1">${error}</div>`
+                    `<div class="py-1">${escAT(error)}</div>`
                 ).join('');
                 jQuery('#error-list').html(errorList);
             }
@@ -660,7 +670,7 @@
             } else {
                 // Default to showing the modal without specific counts
                 const fallbackMessage = cfg.t.click_start_translation_blank_6e8f4a2b || cfg.t.items_691d502c;
-                jQuery('#translation-summary').html(`${fallbackMessage} ${autoTranslateConfig.itemType}.`);
+                jQuery('#translation-summary').html(`${escAT(fallbackMessage)} ${escAT(autoTranslateConfig.itemType)}.`);
                 jQuery('#auto-translate-start-btn').prop('disabled', false);
             }
 

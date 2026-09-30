@@ -50,6 +50,8 @@ Azure App Service needs to know how to start the Flask app. Ensure the startup c
 gunicorn --config=config/gunicorn.conf.py run:app
 ```
 
+The repository `Procfile` uses the same command (`web: gunicorn --config config/gunicorn.conf.py run:app`), and the Docker image defaults to `FLASK_CONFIG=production`; local development must opt in with `FLASK_CONFIG=development`.
+
 Or inline (override specific settings via env vars listed in §3a):
 ```bash
 gunicorn --bind=0.0.0.0:8000 --workers=4 --worker-class=gthread --threads=4 --timeout=120 run:app
@@ -75,6 +77,7 @@ Set these in Azure Portal → App Service → Configuration → Application sett
 | `WEBSITES_CONTAINER_START_TIME_LIMIT` | `230` | Azure waits up to this many seconds for the container to pass the startup/warmup probe. Entrypoint (translations + migrations + tour JSON + Gunicorn) needs **~45s** before `/health` returns 200; without this setting prod saw `ContainerStartupFailure` ~7s after a health-check config change (2026-07-30). Use `230` (platform default ceiling) or higher if startup still races |
 | `WEBSITE_HEALTHCHECK_PATH` | `/health` | App Service health probe path (Monitoring → Health check). Lightweight route in `app/routes/public.py` — no DB check by default (`HEALTH_CHECK_DB=false`). Do **not** enable until `WEBSITES_CONTAINER_START_TIME_LIMIT` comfortably exceeds cold-start duration |
 | `WEBSITE_HEALTHCHECK_MAXPINGFAILURES` | `10` | Consecutive probe failures before Azure replaces the instance |
+| `ENABLE_SSH` | unset | Starts the container's OpenSSH daemon (port 2222, reachable only through the Kudu/SCM tunnel). Off by default; set temporarily for break-glass access and mark slot-specific. See [Container SSH access](../operations/container-ssh-access.md) |
 | `REDIS_URL` | `rediss://<host>:6380/0` | Cross-worker coordination (not sessions). **SKU:** [Azure Managed Redis Balanced B0 — West Europe](redis-provisioning.md). |
 
 > **Redis SKU:** [Redis provisioning](redis-provisioning.md) — **Azure Managed Redis Balanced B0** (~CHF 11/mo staging single-node, ~CHF 22/mo prod two-node HA in West Europe).

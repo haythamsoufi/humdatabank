@@ -6,6 +6,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
+from app.utils.api_errors import ClientInputError
 
 from app.services.indicators.bank_service import IndicatorBankFilters, get_indicator_list
 
@@ -157,7 +158,7 @@ def fetch_public_data_rows(
             resp = get_all_data()
 
         if resp.status_code != 200:
-            raise ValueError(f"Public data fetch failed (HTTP {resp.status_code})")
+            raise ClientInputError(f"Public data fetch failed (HTTP {resp.status_code})")
 
         payload = resp.get_json() or {}
         rows.extend(payload.get("data") or [])
@@ -189,7 +190,7 @@ def fetch_public_scoped_rows(
     anything public" rather than "who reported this one indicator".
     """
     if template_id is None and indicator_bank_id is None:
-        raise ValueError("Provide template_id or indicator_bank_id")
+        raise ClientInputError("Provide template_id or indicator_bank_id")
 
     from app.routes.api.data import get_all_data
 
@@ -213,7 +214,7 @@ def fetch_public_scoped_rows(
             resp = get_all_data()
 
         if resp.status_code != 200:
-            raise ValueError(f"Public data fetch failed (HTTP {resp.status_code})")
+            raise ClientInputError(f"Public data fetch failed (HTTP {resp.status_code})")
 
         payload = resp.get_json() or {}
         rows.extend(payload.get("data") or [])
@@ -243,12 +244,12 @@ def aggregate_global_trend(
         resolved = resolve_indicator_query(query.strip(), limit=1)
         best = resolved.get("best_match") or {}
         if not best.get("id"):
-            raise ValueError(f"Could not resolve indicator for query: {query!r}")
+            raise ClientInputError(f"Could not resolve indicator for query: {query!r}")
         indicator_bank_id = int(best["id"])
         indicator_meta = {k: v for k, v in best.items() if k != "match_reason"}
         resolved_from = best.get("match_reason")
     else:
-        raise ValueError("Provide indicator_bank_id or query")
+        raise ClientInputError("Provide indicator_bank_id or query")
 
     rows, truncated = fetch_public_data_rows(
         indicator_bank_id=int(indicator_bank_id),
@@ -316,7 +317,7 @@ def aggregate_submission_coverage(
     unauthenticated callers.
     """
     if template_id is None and indicator_bank_id is None and not query.strip():
-        raise ValueError("Provide template_id, indicator_bank_id, or query")
+        raise ClientInputError("Provide template_id, indicator_bank_id, or query")
 
     resolved_from: Optional[str] = None
     indicator_meta: Optional[Dict[str, Any]] = None

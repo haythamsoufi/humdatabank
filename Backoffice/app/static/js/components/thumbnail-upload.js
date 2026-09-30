@@ -354,9 +354,7 @@
 
   // Minimal HTML escaping for error messages we display via innerHTML
   function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return String((value == null ? '' : String(value)) == null ? '' : (value == null ? '' : String(value))).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function register() {

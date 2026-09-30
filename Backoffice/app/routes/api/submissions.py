@@ -16,14 +16,25 @@ from app.routes.api import api_bp
 # Import models
 from app.models import FormData, PublicSubmission, AssignedForm
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.auth import require_api_key
+from app.utils.auth import api_capability, require_api_key
+from app.services.security.api_key_permissions import DOCUMENTS_READ, SUBMISSIONS_READ
 from app.utils.rate_limiting import api_rate_limit
 from app import db
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error
-from app.utils.api_serialization import format_country_info
-from app.services.security.api_authentication import authenticate_api_request, get_user_allowed_template_ids, _get_user_allowed_country_ids
+from app.utils.api_serialization import batch_countries_for_aes_list, _country_for_aes, format_country_info
+from app.services.security.api_authentication import (
+    api_key_can_read_personal_data,
+    api_key_has_capability,
+    api_key_max_per_page,
+    api_key_scope_allows,
+    authenticate_api_request,
+    get_api_key_data_scope,
+    get_user_allowed_template_ids,
+    redact_request_params,
+    _get_user_allowed_country_ids,
+)
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_formatting import format_form_data_response
 from app.utils.api_serialization import format_indicator_details
@@ -31,18 +42,22 @@ from app.services import get_assignments_for_country
 
 
 @api_bp.route('/submissions', methods=['GET'])
+@api_capability(SUBMISSIONS_READ, scope_aware=True)
 def get_submissions():
     """
     API endpoint to retrieve a list of submissions.
     Authentication (one of):
-      - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
+      - Authorization: Bearer YOUR_API_KEY with ``submissions:read`` (paginated response,
+        limited to the key's template/country scope when it has one)
       - HTTP Basic auth or session (user-scoped access, no pagination)
+    Public-submission ``contact_name`` / ``contact_email`` are returned to API keys only
+    when the key also holds ``users:read``.
     Query Parameters:
         - template_id: Filter by template ID
         - country_id: Filter by country ID
         - submission_type: Filter by submission type ('assigned' or 'public')
         - page: Page number (default: 1, only used with API key auth)
-        - per_page: Items per page (default: 20, max 100000, only used with API key auth)
+        - per_page: Items per page (default: 20, capped by API_KEY_MAX_PER_PAGE, only used with API key auth)
     """
     try:
         # Authenticate request
@@ -52,12 +67,12 @@ def get_submissions():
             return auth_result  # Return error response
         elevated_access, auth_user, api_key_record = auth_result
 
-        # Determine if we should paginate
-        should_paginate = elevated_access
+        # Key-authenticated callers (scoped or not) always get a bounded, paginated response
+        should_paginate = elevated_access or api_key_record is not None
 
         # Validate pagination parameters
         if should_paginate:
-            page, per_page = validate_pagination_params(request.args)
+            page, per_page = validate_pagination_params(request.args, max_per_page=api_key_max_per_page())
         else:
             page = 1
             per_page = None
@@ -70,7 +85,19 @@ def get_submissions():
         # Apply RBAC filtering for user auth (template + country scoping)
         allowed_template_ids = None
         allowed_country_ids = None
-        if not elevated_access and auth_user is not None:
+        key_scope = get_api_key_data_scope() if api_key_record is not None else None
+        if key_scope is not None:
+            if not key_scope['template_ids'] and not key_scope['country_ids']:
+                return json_response({
+                    'submissions': [],
+                    'total_items': 0,
+                    'total_pages': 0,
+                    'current_page': page,
+                    'per_page': per_page
+                })
+            allowed_template_ids = key_scope['template_ids'] or None
+            allowed_country_ids = key_scope['country_ids'] or None
+        elif not elevated_access and auth_user is not None:
             allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
             if not allowed_template_ids:
                 return json_response({
@@ -116,11 +143,11 @@ def get_submissions():
             )
             if template_id:
                 assigned_sel = assigned_sel.where(AssignedForm.template_id == template_id)
-            elif allowed_template_ids is not None:
+            if allowed_template_ids is not None:
                 assigned_sel = assigned_sel.where(AssignedForm.template_id.in_(allowed_template_ids))
             if country_id:
                 assigned_sel = assigned_sel.where(AssignmentEntityStatus.entity_id == country_id)
-            elif allowed_country_ids is not None:
+            if allowed_country_ids is not None:
                 assigned_sel = assigned_sel.where(AssignmentEntityStatus.entity_id.in_(allowed_country_ids))
             selects.append(assigned_sel)
 
@@ -136,11 +163,11 @@ def get_submissions():
             )
             if template_id:
                 public_sel = public_sel.where(AssignedForm.template_id == template_id)
-            elif allowed_template_ids is not None:
+            if allowed_template_ids is not None:
                 public_sel = public_sel.where(AssignedForm.template_id.in_(allowed_template_ids))
             if country_id:
                 public_sel = public_sel.where(PublicSubmission.country_id == country_id)
-            elif allowed_country_ids is not None:
+            if allowed_country_ids is not None:
                 public_sel = public_sel.where(PublicSubmission.country_id.in_(allowed_country_ids))
             selects.append(public_sel)
 
@@ -184,7 +211,6 @@ def get_submissions():
                 AssignmentEntityStatus.query
                 .options(
                     joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template),
-                    joinedload(AssignmentEntityStatus.country),
                 )
                 .filter(AssignmentEntityStatus.id.in_(assigned_ids))
                 .all()
@@ -215,6 +241,8 @@ def get_submissions():
             )
             latest_submitted_map = {int(aes_id): dt for (aes_id, dt) in rows if aes_id is not None}
 
+        aes_countries = batch_countries_for_aes_list(list(assigned_map.values()))
+        include_contacts = api_key_can_read_personal_data()
         serialized_submissions = []
         for r in page_rows:
             stype = r.get('submission_type')
@@ -227,7 +255,7 @@ def get_submissions():
                 if not status_entry:
                     continue
                 assigned_form = status_entry.assigned_form
-                country = status_entry.country
+                country = _country_for_aes(status_entry, aes_countries)
                 submitted_dt = latest_submitted_map.get(sid_int)
                 serialized_submissions.append({
                     'id': status_entry.id,
@@ -256,8 +284,8 @@ def get_submissions():
                     'template_name': submission.assigned_form.template.name if submission.assigned_form and submission.assigned_form.template else None,
                     'country_info': format_country_info(submission.country),
                     'organization_name': None,
-                    'contact_name': submission.submitter_name,
-                    'contact_email': submission.submitter_email,
+                    'contact_name': submission.submitter_name if include_contacts else None,
+                    'contact_email': submission.submitter_email if include_contacts else None,
                     'submitted_at': submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
                     'created_at': submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
                     'updated_at': None,
@@ -286,17 +314,21 @@ def get_submissions():
         current_app.logger.error(
             f"API Error [ID: {error_id}] fetching submissions: {e}",
             exc_info=True,
-            extra={'endpoint': '/submissions', 'params': dict(request.args)}
+            extra={'endpoint': '/submissions', 'params': redact_request_params()}
         )
         return api_error("Could not fetch submissions", 500, error_id, None)
 
 
 @api_bp.route('/submissions/<int:submission_id>', methods=['GET'])
-@require_api_key
+@require_api_key(capability=SUBMISSIONS_READ, scope_aware=True)
 @api_rate_limit()
 def get_submission_details(submission_id):
     """
     API endpoint to retrieve details and data for a specific submission.
+
+    Requires ``submissions:read``. A data-scoped key only sees submissions inside its
+    template/country scope (others return 404). Public-submitter contact fields need
+    ``users:read``; the ``documents`` list needs ``documents:read``.
     """
     assigned_submission_status = AssignmentEntityStatus.query.get(submission_id)
     submission = None
@@ -313,6 +345,19 @@ def get_submission_details(submission_id):
 
     if not submission:
         return api_error('Submission not found', 404)
+
+    key_scope = get_api_key_data_scope()
+    if key_scope is not None:
+        scope_template_id = submission.assigned_form.template_id if submission.assigned_form else None
+        if submission_type == 'assigned':
+            scope_country_id = submission.country.id if submission.country else None
+        else:
+            scope_country_id = submission.country_id
+        if not api_key_scope_allows(key_scope, scope_template_id, scope_country_id):
+            return api_error('Submission not found', 404)
+
+    include_contacts = api_key_can_read_personal_data()
+    include_documents = api_key_has_capability(DOCUMENTS_READ)
 
     # Serialize submission details and data
     serialized_submission = {
@@ -366,7 +411,7 @@ def get_submission_details(submission_id):
                 'updated_at': None,
             })
         serialized_submission['documents'] = []
-        for submitted_doc in submission.submitted_documents:
+        for submitted_doc in (submission.submitted_documents if include_documents else []):
             serialized_submission['documents'].append({
                 'id': submitted_doc.id,
                 'form_item_id': submitted_doc.form_item_id,
@@ -384,8 +429,8 @@ def get_submission_details(submission_id):
             'template_name': submission.assigned_form.template.name if submission.assigned_form and submission.assigned_form.template else None,
             'country_info': format_country_info(submission.country),
             'organization_name': None,
-            'contact_name': submission.submitter_name,
-            'contact_email': submission.submitter_email,
+            'contact_name': submission.submitter_name if include_contacts else None,
+            'contact_email': submission.submitter_email if include_contacts else None,
             'submitted_at': submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
             'created_at': submission.submitted_at.isoformat() if submission.submitted_at is not None else None,
             'updated_at': None,
@@ -418,7 +463,7 @@ def get_submission_details(submission_id):
                 'assignment_name': submission.assigned_form.period_name if submission.assigned_form else None
             })
         serialized_submission['documents'] = []
-        for submitted_doc in submission.submitted_documents:
+        for submitted_doc in (submission.submitted_documents if include_documents else []):
             serialized_submission['documents'].append({
                 'id': submitted_doc.id,
                 'form_item_id': submitted_doc.form_item_id,

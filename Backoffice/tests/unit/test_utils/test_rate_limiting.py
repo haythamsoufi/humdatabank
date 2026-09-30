@@ -1,7 +1,7 @@
 """
 Unit tests for app/utils/rate_limiting.py
 
-Covers: warn_if_multi_worker_without_redis, rate_limit decorator (all branches),
+Covers: shared-store limiting, rate_limit decorator (all branches),
         mobile_rate_limit, and factory helpers.
 """
 import logging
@@ -19,75 +19,80 @@ def _clear_storage():
 
 
 # ---------------------------------------------------------------------------
-# warn_if_multi_worker_without_redis
+# shared (cross-worker) storage
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestWarnIfMultiWorkerWithoutRedis:
-    def test_no_warning_single_worker(self, app):
-        from app.utils.rate_limiting import warn_if_multi_worker_without_redis
-        import app.utils.rate_limiting as rl_module
-        original_concurrency = app.config.get("WEB_CONCURRENCY")
-        app.config["WEB_CONCURRENCY"] = 1
-        try:
-            with patch.object(rl_module._rl_logger, "warning") as mock_warn:
-                warn_if_multi_worker_without_redis(app)
-                mock_warn.assert_not_called()
-        finally:
-            app.config["WEB_CONCURRENCY"] = original_concurrency
+class TestSharedRateLimitStorage:
+    def setup_method(self):
+        _clear_storage()
 
-    def test_warning_multi_worker_no_redis(self, app):
-        from app.utils.rate_limiting import warn_if_multi_worker_without_redis
-        import app.utils.rate_limiting as rl_module
-        original_concurrency = app.config.get("WEB_CONCURRENCY")
-        original_redis = app.config.get("RATELIMIT_STORAGE_URI")
-        original_redis2 = app.config.get("REDIS_URL")
-        try:
-            app.config["WEB_CONCURRENCY"] = 4
-            app.config["RATELIMIT_STORAGE_URI"] = None
-            app.config["REDIS_URL"] = None
-            with patch.object(rl_module._rl_logger, "warning") as mock_warn:
-                warn_if_multi_worker_without_redis(app)
-                mock_warn.assert_called_once()
-                call_args = mock_warn.call_args[0]
-                assert "RATE-LIMIT WARNING" in call_args[0]
-        finally:
-            app.config["WEB_CONCURRENCY"] = original_concurrency
-            app.config["RATELIMIT_STORAGE_URI"] = original_redis
-            app.config["REDIS_URL"] = original_redis2
+    def teardown_method(self):
+        _clear_storage()
 
-    def test_no_warning_multi_worker_with_ratelimit_storage(self, app):
-        from app.utils.rate_limiting import warn_if_multi_worker_without_redis
-        import app.utils.rate_limiting as rl_module
-        original_concurrency = app.config.get("WEB_CONCURRENCY")
-        original_ratelimit = app.config.get("RATELIMIT_STORAGE_URI")
-        try:
-            app.config["WEB_CONCURRENCY"] = 4
-            app.config["RATELIMIT_STORAGE_URI"] = "redis://localhost:6379/0"
-            with patch.object(rl_module._rl_logger, "warning") as mock_warn:
-                warn_if_multi_worker_without_redis(app)
-                mock_warn.assert_not_called()
-        finally:
-            app.config["WEB_CONCURRENCY"] = original_concurrency
-            app.config["RATELIMIT_STORAGE_URI"] = original_ratelimit
+    @pytest.fixture
+    def db_fallback(self, app):
+        original = app.config.get("RATE_LIMIT_SHARED_FALLBACK")
+        app.config["RATE_LIMIT_SHARED_FALLBACK"] = "db"
+        yield
+        app.config["RATE_LIMIT_SHARED_FALLBACK"] = original
 
-    def test_no_warning_multi_worker_with_redis_url(self, app):
-        from app.utils.rate_limiting import warn_if_multi_worker_without_redis
-        import app.utils.rate_limiting as rl_module
-        original_concurrency = app.config.get("WEB_CONCURRENCY")
-        original_redis = app.config.get("REDIS_URL")
-        original_ratelimit = app.config.get("RATELIMIT_STORAGE_URI")
-        try:
-            app.config["WEB_CONCURRENCY"] = 4
-            app.config["REDIS_URL"] = "redis://localhost:6379/0"
-            app.config["RATELIMIT_STORAGE_URI"] = None
-            with patch.object(rl_module._rl_logger, "warning") as mock_warn:
-                warn_if_multi_worker_without_redis(app)
-                mock_warn.assert_not_called()
-        finally:
-            app.config["WEB_CONCURRENCY"] = original_concurrency
-            app.config["REDIS_URL"] = original_redis
-            app.config["RATELIMIT_STORAGE_URI"] = original_ratelimit
+    def test_shared_limit_counts_in_store_not_process_memory(self, app, db_session, db_fallback):
+        from app.utils import rate_limiting as rl
+        with app.app_context():
+            results = [rl.hit_rate_limit("shared-key-1", 3, shared=True) for _ in range(5)]
+            assert results == [False, False, False, True, True]
+            assert "shared-key-1" not in rl._rate_limit_storage
+
+    def test_shared_limit_visible_to_a_second_worker(self, app, db_session, db_fallback):
+        """Wiping the in-process buckets (a fresh worker) does not reset a shared counter."""
+        from app.utils import rate_limiting as rl
+        with app.app_context():
+            for _ in range(3):
+                rl.hit_rate_limit("shared-key-2", 3, shared=True)
+            rl._rate_limit_storage.clear()
+            assert rl.hit_rate_limit("shared-key-2", 3, shared=True) is True
+
+    def test_non_shared_limit_stays_in_memory(self, app, db_session, db_fallback):
+        from app.utils import rate_limiting as rl
+        with app.app_context():
+            assert rl.hit_rate_limit("mem-key", 1, shared=False) is False
+            assert rl.hit_rate_limit("mem-key", 1, shared=False) is True
+            assert "mem-key" in rl._rate_limit_storage
+
+    def test_memory_fallback_config_keeps_shared_limiter_in_process(self, app):
+        from app.utils import rate_limiting as rl
+        app.config["RATE_LIMIT_SHARED_FALLBACK"] = "memory"
+        with app.app_context():
+            rl.hit_rate_limit("mem-only", 5, shared=True)
+            assert "mem-only" in rl._rate_limit_storage
+
+    def test_store_outage_degrades_to_process_limiter_not_open(self, app, db_session, db_fallback):
+        from app.utils import rate_limiting as rl
+        from app.utils.auth_state import AuthStateUnavailable
+        with app.app_context():
+            with patch("app.utils.auth_state.DbAuthStateBackend.incr", side_effect=AuthStateUnavailable("down")):
+                results = [rl.hit_rate_limit("outage-key", 2, shared=True) for _ in range(3)]
+            assert results == [False, False, True]
+
+    def test_auth_rate_limit_uses_shared_store(self, app, db_session, db_fallback):
+        from app.utils import rate_limiting as rl
+        app.config["DEBUG"] = False
+        decorated = rl.auth_rate_limit()(lambda: ("ok", 200))
+        with app.test_request_context("/login", method="POST", environ_base={"REMOTE_ADDR": "203.0.113.9"}):
+            for _ in range(5):
+                decorated()
+            rl._rate_limit_storage.clear()
+            response = decorated()
+        assert getattr(response, "status_code", None) == 302
+
+    def test_limit_key_ignores_spoofed_forwarded_for(self, app):
+        from app.utils.client_ip import get_client_ip
+        with app.test_request_context(
+            "/login", environ_base={"REMOTE_ADDR": "198.51.100.7"},
+            headers={"X-Forwarded-For": "6.6.6.6", "X-Real-IP": "7.7.7.7"},
+        ):
+            assert get_client_ip() == "198.51.100.7"
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +194,7 @@ class TestRateLimitDecorator:
                 view()
                 view()
                 result = view()  # third call exceeds limit of 2
-                assert result[1] == 429
+                assert result.status_code == 429
 
     # -- Rate limit exceeded: web redirect with endpoint -----------------------
 
@@ -265,7 +270,7 @@ class TestRateLimitDecorator:
                 view()
                 view()
                 result = view()
-                assert result[1] == 429
+                assert result.status_code == 429
 
     # -- on_limit callback returns response ------------------------------------
 
@@ -296,7 +301,7 @@ class TestRateLimitDecorator:
             with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.2.2"):
                 view()
                 result = view()
-                assert result[1] == 429
+                assert result.status_code == 429
 
     # -- Custom flash message --------------------------------------------------
 

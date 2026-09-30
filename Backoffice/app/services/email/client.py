@@ -9,6 +9,12 @@ from requests import Response
 from typing import Iterable, Optional, List, Tuple
 from flask import current_app
 from app.services.email.protection import _is_production_flask_config
+from app.utils.email_headers import (
+    filter_valid_addresses,
+    sanitize_filename,
+    sanitize_sender,
+    sanitize_subject,
+)
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 # At most one alert email for a repeated 'email_delivery_failure' event within
@@ -188,7 +194,7 @@ def _redact_email_api_url_for_logs(url: str) -> str:
             else:
                 for v in vals or [""]:
                     pairs.append((key, v))
-        new_q = urlencode(pairs, doseq=True)
+        new_q = urlencode(pairs, doseq=True, safe="*")
         return urlunparse((p.scheme, p.netloc, p.path, p.params, new_q, p.fragment))
     except Exception:
         return "<email_api_url_unparseable>"
@@ -197,7 +203,22 @@ def _redact_email_api_url_for_logs(url: str) -> str:
 def _to_list(values: Optional[Iterable[str]]) -> List[str]:
     if not values:
         return []
+    if isinstance(values, str):
+        values = [values]
     return [str(v).strip() for v in values if str(v).strip()]
+
+
+def _validated_address_list(values: Optional[Iterable[str]], field: str) -> List[str]:
+    """Drop (and log) anything that is not a plain ``local@domain`` address."""
+    valid, rejected = filter_valid_addresses(_to_list(values))
+    if rejected:
+        current_app.logger.warning(
+            "send_email dropped %d invalid %s address(es): %s",
+            len(rejected),
+            field,
+            ", ".join(rejected[:5]),
+        )
+    return valid
 
 
 def _failure_warrants_security_event(fail: dict) -> bool:
@@ -391,10 +412,12 @@ def send_email(
     Returns:
         True if email was sent successfully, False otherwise
     """
-    sender_email = sender or current_app.config.get("MAIL_DEFAULT_SENDER")
-    recipients_list = _to_list(recipients)
-    cc_list = _to_list(cc)
-    bcc_list = _to_list(bcc)
+    raw_sender = sender or current_app.config.get("MAIL_DEFAULT_SENDER")
+    sender_email = sanitize_sender(raw_sender) if raw_sender else None
+    subject = sanitize_subject(subject)
+    recipients_list = _validated_address_list(recipients, "To")
+    cc_list = _validated_address_list(cc, "Cc")
+    bcc_list = _validated_address_list(bcc, "Bcc")
 
     if not recipients_list and not cc_list and not bcc_list:
         current_app.logger.warning("send_email called with no recipients")
@@ -402,7 +425,13 @@ def send_email(
             _failure_info.append({"code": "no_recipients"})
         return False
 
-    # Validate sender email is configured
+    if raw_sender and not sender_email:
+        current_app.logger.error("send_email rejected an invalid sender address")
+        fail = {"code": "invalid_sender"}
+        if _failure_info is not None:
+            _failure_info.append(fail)
+        return False
+
     if not sender_email:
         current_app.logger.error(
             "MAIL_DEFAULT_SENDER is not configured. "
@@ -533,7 +562,9 @@ def _send_via_ifrc(
         api_key_in_url = False
 
     # Dummy / organizational "To" in the API envelope; real delivery in Cc/Bcc
-    fixed_to_address = (current_app.config.get("MAIL_NOREPLY_SENDER") or sender or "").strip() or sender
+    fixed_to_address = (
+        sanitize_sender(current_app.config.get("MAIL_NOREPLY_SENDER") or sender or "") or sender
+    )
 
     # Drop NULs (some DB/editor paths inject them; gateways may reject the JSON or body).
     raw_html = (html or "").strip().replace("\x00", "")
@@ -566,11 +597,11 @@ def _send_via_ifrc(
     cc_b64 = _b64_utf8(out_cc) if (out_cc and out_cc.strip()) else ""
     bcc_b64 = _b64_utf8(out_bcc) if (out_bcc and out_bcc.strip()) else ""
     payload: dict = {
-        "FromAsBase64": _b64_utf8(sender),
+        "FromAsBase64": _b64_utf8(sanitize_sender(sender) or ""),
         "ToAsBase64": _b64_utf8(to_addr),
         "CcAsBase64": cc_b64,
         "BccAsBase64": bcc_b64,
-        "SubjectAsBase64": _b64_utf8(subject),
+        "SubjectAsBase64": _b64_utf8(sanitize_subject(subject)),
         "BodyAsBase64": body_b64,
         "IsBodyHtml": True,
         "TemplateName": "",
@@ -582,7 +613,7 @@ def _send_via_ifrc(
         try:
             payload["Attachments"] = [
                 {
-                    "FileNameAsBase64": _b64_utf8(fn or "attachment"),
+                    "FileNameAsBase64": _b64_utf8(sanitize_filename(fn)),
                     "ContentAsBase64": str(base64.b64encode(content), "utf-8"),
                     "ContentType": (ct or "application/octet-stream"),
                 }

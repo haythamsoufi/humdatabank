@@ -2759,6 +2759,28 @@ def _format_merged_trace_query_security(merged: dict) -> dict:
     }
 
 
+class _TraceView:
+    """Read-only view of an ``AIReasoningTrace`` whose step observations are hidden from viewers who
+    may not see raw tool output. Never touches the ORM row."""
+
+    def __init__(self, trace, steps):
+        self._trace = trace
+        self.steps = steps
+
+    def __getattr__(self, name):
+        return getattr(self._trace, name)
+
+
+def _trace_for_viewer(trace):
+    from app.services.ai.quality.trace_privacy import can_view_raw_tool_output, strip_raw_outputs
+
+    if can_view_raw_tool_output(current_user):
+        return trace
+    steps = trace.steps if isinstance(trace.steps, list) else []
+    return _TraceView(trace, strip_raw_outputs({"steps": steps})["steps"])
+
+
+
 def _admin_trace_query_security(trace) -> dict:
     """Suspicion summary for a trace (agent query + optional original user query)."""
     from app.utils.ai_query_security import analyze_ai_user_query, merge_ai_query_security_results
@@ -3087,7 +3109,7 @@ def conversation_traces(conversation_id):
                 'total_cost_usd': float(t.total_cost_usd) if t.total_cost_usd is not None else None,
                 'grounding_score': float(t.grounding_score) if t.grounding_score is not None else None,
                 'confidence_level': t.confidence_level or '',
-                'steps': t.steps if isinstance(t.steps, list) else [],
+                'steps': _trace_for_viewer(t).steps if isinstance(t.steps, list) else [],
             }
             for t in traces
         ]
@@ -3095,7 +3117,7 @@ def conversation_traces(conversation_id):
         return render_template(
             "admin/ai/conversation_traces.html",
             conversation_id=conversation_id,
-            traces=traces,
+            traces=[_trace_for_viewer(t) for t in traces],
             tool_usages_by_trace=tool_usages_by_trace,
             conversation_summary_data=conversation_summary_data,
             conversation_full_data=conversation_full_data,
@@ -3241,7 +3263,7 @@ def trace_detail(trace_id):
 
         return render_template(
             "admin/ai/trace_detail.html",
-            trace=trace,
+            trace=_trace_for_viewer(trace),
             user=user,
             tool_usages=tool_usages,
             quality_debug=quality_debug if has_quality_debug else None,

@@ -29,6 +29,7 @@ from .helpers import (
     build_admin_user_list_rows,
     _set_user_rbac_roles,
     _filter_requested_admin_roles_for_actor,
+    filter_role_catalog_for_actor,
     _apply_role_type_and_implications,
     _country_access_request_to_dict,
     _get_user_deletion_preview,
@@ -70,7 +71,7 @@ def api_rbac_roles_catalog():
     try:
         from app.models.rbac import RbacRole
 
-        roles = RbacRole.query.order_by(RbacRole.code.asc()).all()
+        roles = filter_role_catalog_for_actor(RbacRole.query.order_by(RbacRole.code.asc()).all(), current_user)
         rows = [{"id": r.id, "code": r.code, "name": r.name} for r in roles]
         return json_ok({"data": rows}, status="success")
     except Exception as e:

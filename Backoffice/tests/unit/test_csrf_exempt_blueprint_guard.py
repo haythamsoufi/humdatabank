@@ -71,6 +71,11 @@ EXPLICITLY_ALLOWED_UNPROTECTED_ROUTES = {
         "via mobile_auth_required, so no token can exist yet to check. Guarded by "
         "auth_rate_limit() instead."
     ),
+    ("mobile_api", "/api/mobile/v1/auth/oauth/exchange"): (
+        "Token-issuance endpoint for the mobile Azure sign-in hand-off. Authenticated by the "
+        "single-use authorization code plus the PKCE code_verifier held only by the app; no "
+        "ambient cookie is used or accepted. Guarded by shared-store rate limiting."
+    ),
     ("mobile_api", "/api/mobile/v1/data/indicator-suggestions"): (
         "Intentionally public/unauthenticated per app/routes/api/mobile/__init__.py "
         "docstring ('Public data endpoints ... unauthenticated but rate-limited')."

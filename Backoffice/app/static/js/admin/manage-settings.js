@@ -83,9 +83,7 @@
         if (data.update_available) {
           var esc = function (s) {
             if (s == null) return '';
-            var d = document.createElement('div');
-            d.textContent = String(s);
-            return d.innerHTML;
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
           };
           var raw = String(data.release_url || '').trim();
           var safeUrl = (raw.indexOf('https://') === 0 || raw.indexOf('http://') === 0) ? escAttr(raw) : '#';

@@ -9,12 +9,13 @@ from flask import request, current_app
 from app.routes.api import api_bp
 from app.models import EmbedContent
 from app.utils.auth import require_api_key
+from app.services.security.api_key_permissions import CONTENT_READ
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.api_helpers import json_response, api_error
 
 
 @api_bp.route('/embed-content', methods=['GET'])
-@require_api_key
+@require_api_key(capability=CONTENT_READ)
 @api_rate_limit()
 def get_embed_content():
     """

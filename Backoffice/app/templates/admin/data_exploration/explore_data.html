@@ -544,7 +544,7 @@
     <!-- End Tab panel: Compliance -->
 
     {% for ext_tab in explorer_extension_tabs_render|default([]) %}
-    {{ extension_panels.get(ext_tab.tab_id, '')|safe }}
+    {{ extension_panels.get(ext_tab.tab_id, '') }}
     {% endfor %}
 
         </div>{# /p-4 sm:p-6 content wrapper #}

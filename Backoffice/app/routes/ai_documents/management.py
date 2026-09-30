@@ -179,12 +179,9 @@ def list_documents():
             or AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage")
         )
         if not can_manage_docs:
-            query = query.filter(
-                db.or_(
-                    AIDocument.is_public == True,
-                    AIDocument.user_id == current_user.id
-                )
-            )
+            from app.services.ai.documents.access import apply_document_read_filter, principal_for_user
+
+            query = apply_document_read_filter(query, principal_for_user(current_user))
 
         query = apply_ai_document_library_filters(query, filters)
         total = query.count()
@@ -228,7 +225,9 @@ def get_document(document_id: int):
             or AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage")
         )
         if not can_manage_docs:
-            if not doc.is_public and doc.user_id != current_user.id:
+            from app.services.ai.documents.access import can_read_ai_document
+
+            if not can_read_ai_document(current_user, doc):
                 return json_forbidden('Access denied')
 
         include_chunks = request.args.get('include_chunks', 'false').lower() == 'true'
@@ -277,6 +276,16 @@ def update_document(document_id: int):
                 return json_forbidden('Only admins can make documents public')
             doc.is_public = is_public
 
+        if "allowed_roles" in data:
+            if not AuthorizationService.is_admin(current_user):
+                return json_forbidden('Only admins can restrict documents by role')
+            from app.services.ai.documents.access import normalize_allowed_roles
+
+            roles_ok, roles = normalize_allowed_roles(data.get("allowed_roles"))
+            if not roles_ok:
+                return json_bad_request('allowed_roles must be null or a list of role codes')
+            doc.allowed_roles = roles
+
         if "document_category" in data:
             cat = (data.get("document_category") or "").strip() or None
             if cat is not None and cat not in DOCUMENT_CATEGORIES:
@@ -309,7 +318,9 @@ def download_document(document_id: int):
             or AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage")
         )
         if not can_manage_docs:
-            if not doc.is_public and doc.user_id != current_user.id:
+            from app.services.ai.documents.access import can_read_ai_document
+
+            if not can_read_ai_document(current_user, doc):
                 return json_forbidden('Access denied')
 
         if doc.source_url:

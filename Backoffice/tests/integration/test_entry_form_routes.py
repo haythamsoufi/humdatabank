@@ -68,7 +68,7 @@ class TestEntryFormCoreRoutes:
             _login(client, user_id)
             resp = client.get(f"/forms/assignment_status/{aes_id}", follow_redirects=False)
             assert resp.status_code in (301, 302, 308)
-            assert f"/forms/assignment/{aes_id}" in (resp.headers.get("Location") or "")
+            assert f"/assignment/{aes_id}" in (resp.headers.get("Location") or "")
 
     def test_view_edit_form_invalid_type_redirects_dashboard(self, client, db_session, app):
         with app.app_context():
@@ -77,14 +77,15 @@ class TestEntryFormCoreRoutes:
             resp = client.get("/forms/not-a-type/123", follow_redirects=False)
             assert resp.status_code in (301, 302, 308)
 
-    def test_view_edit_form_assignment_renders_entry_form(self, client, db_session, app):
+    def test_view_edit_form_assignment_redirects_to_canonical_url(self, client, db_session, app):
         with app.app_context():
             user, _country, aes = create_focal_point_with_country(db_session)
             aes_id = aes.id
             _login(client, user.id)
 
-            resp = client.get(f"/forms/assignment/{aes_id}")
-            assert resp.status_code == 200
+            resp = client.get(f"/forms/assignment/{aes_id}", follow_redirects=False)
+            assert resp.status_code == 301
+            assert resp.headers["Location"].endswith(f"/assignment/{aes_id}")
 
 
 @pytest.mark.integration
@@ -155,7 +156,7 @@ class TestEntryFormExportAndMatrixRoutes:
 
     def test_matrix_search_rows_returns_options(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             import uuid as _uuid
@@ -476,7 +477,7 @@ class TestEntryFormSendForReview:
                  side_effect=_simulate_send_for_review,
              ) as mock_process:
             resp = logged_in_focal_client.post(
-                f"/forms/assignment/{aes_id}",
+                f"/assignment/{aes_id}",
                 data={"action": "send_for_review"},
                 follow_redirects=False,
             )

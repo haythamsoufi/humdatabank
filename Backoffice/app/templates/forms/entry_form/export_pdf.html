@@ -40,6 +40,36 @@
         {%- if field_is_imputed -%} field-value-imputed{%- elif field_is_prefilled or field_is_carry_forward -%} field-value-prefilled{%- endif -%}
     {%- endmacro %}
 
+    {% macro matrix_tick_mark(checked) -%}
+        {%- if checked -%}
+        <span class="tick-icon tick-icon-yes">
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+                <circle cx="8" cy="8" r="7" fill="#15803d"/>
+                <path d="M4.6 8.2 L7 10.6 L11.6 5.4" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </span>
+        {%- else -%}
+        <span class="tick-icon tick-icon-no">
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+                <circle cx="8" cy="8" r="6.25" fill="none" stroke="#d1d5db" stroke-width="1.25"/>
+                <path d="M5.2 8 H10.8" fill="none" stroke="#9ca3af" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+        </span>
+        {%- endif -%}
+    {%- endmacro %}
+
+    {# Selectable column headers store the user's choice in col_header|{name}. #}
+    {% macro matrix_column_heading(column, col_display, matrix_data) -%}
+        {%- set heading = col_display -%}
+        {%- if column is mapping and column.get('header_type') == 'selectable' and matrix_data is mapping -%}
+            {%- set _saved = matrix_data.get('col_header|' ~ (column.get('name') or '')) -%}
+            {%- if _saved is not none and (_saved|string)|trim and (_saved|string)|trim != '__other__' -%}
+                {%- set heading = _saved -%}
+            {%- endif -%}
+        {%- endif -%}
+        {{- heading -}}
+    {%- endmacro %}
+
     {% macro render_section(section, level=0, root_heading='h3') %}
         <section class="section {{ 'subsection' if level > 0 else '' }}">
             {% if level == 0 %}
@@ -193,22 +223,35 @@
                             {% set matrix_column_groups = field.matrix_column_groups if field.matrix_column_groups is defined else matrix_config.get('column_groups', {}) %}
                             {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
                             {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
-                            {# Sort rows A–Z by display label (case-insensitive), matching matrix-handler.js #}
+                            {# Manual and list-library rows sort A–Z. Hybrid keeps fixed rows in config order
+                               (already arranged by the export route) and only alphabetizes list rows. #}
                             {# Rows may be plain strings (legacy) or {text, name_translations} objects #}
+                            {% set _preserve_row_order = field.matrix_skip_row_sort if field.matrix_skip_row_sort is defined else false %}
                             {% set ns = namespace(rows_for_sort=[]) %}
                             {% for r in matrix_rows %}
                                 {% if r is mapping %}
                                     {% set _r_id = r.text %}
                                     {% set _r_trans = r.name_translations if r.name_translations else {} %}
                                     {% set _r_cand = _r_trans.get(translation_key) or _r_trans.get('en') %}
-                                    {% set _r_display = _r_cand if _r_cand and _r_cand|trim else r.text %}
+                                    {% set _r_resolved = r.display_text if r.display_text is defined else '' %}
+                                    {% if _r_cand and _r_cand|trim %}
+                                        {% set _r_display = _r_cand %}
+                                    {% elif _r_resolved and _r_resolved|string|trim %}
+                                        {% set _r_display = _r_resolved %}
+                                    {% else %}
+                                        {% set _r_display = r.text %}
+                                    {% endif %}
                                 {% else %}
                                     {% set _r_id = r %}
                                     {% set _r_display = row_labels.get(r, r) %}
                                 {% endif %}
                                 {% set _ = ns.rows_for_sort.append({'row_id': _r_id, 'row_display': _r_display, 'sort_label': (_r_display | string | trim | lower)}) %}
                             {% endfor %}
-                            {% set sorted_matrix_rows = ns.rows_for_sort | sort(attribute='sort_label', case_sensitive=False) %}
+                            {% if _preserve_row_order %}
+                                {% set sorted_matrix_rows = ns.rows_for_sort %}
+                            {% else %}
+                                {% set sorted_matrix_rows = ns.rows_for_sort | sort(attribute='sort_label', case_sensitive=False) %}
+                            {% endif %}
                             {% if matrix_columns %}
                                 {# Precompute column totals (and grand total) for the totals row, matching matrix-handler.js #}
                                 {% set ns_ct = namespace(col_totals=[], grand_total=0) %}
@@ -282,7 +325,7 @@
                                                     {% endif %}
                                                     {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
                                                     {% if not _col_group %}
-                                                        <th rowspan="2" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ _col_display }}</th>
+                                                        <th rowspan="2" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
                                                     {% else %}
                                                         {% set _prev_group = '' %}
                                                         {% if loop.index0 > 0 %}
@@ -322,7 +365,7 @@
                                                             {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                                         {% endif %}
                                                         {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
-                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ _col_display }}</th>
+                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
                                                     {% endif %}
                                                 {% endfor %}
                                             </tr>
@@ -343,7 +386,7 @@
                                                     {% set col_display = col_name %}
                                                     {% set col_type = 'number' %}
                                                 {% endif %}
-                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% endif %}">{{ col_display }}</th>
+                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(col, col_display, matrix_data) }}</th>
                                             {% endfor %}
                                             {% if show_row_totals %}
                                                 <th class="matrix-col-header">{{ _('Total') }}</th>
@@ -422,7 +465,7 @@
                                                     ) %}
                                                     <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}">
                                                         {% if col_type == 'tick' %}
-                                                            {% if display_cell in [1, '1', true, 'true', 'True'] %}✓{% else %}-{% endif %}
+                                                            {{ matrix_tick_mark(display_cell in [1, '1', true, 'true', 'True']) }}
                                                         {% else %}
                                                             {{ (display_cell | format_number) if display_cell is not none and display_cell|string|trim != '' else '' }}
                                                         {% endif %}

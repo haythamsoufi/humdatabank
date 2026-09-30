@@ -124,6 +124,81 @@ class TestAssignmentPdfHelpers:
         assert '<p>&nbsp;</p>' not in cleaned
         assert cleaned.count('<p>') == 3
 
+    def test_hybrid_pdf_rows_keep_fixed_order_and_ignore_header_keys(self):
+        from app.routes.forms.export import apply_matrix_rows_for_pdf_export
+
+        field = {
+            'kind': 'matrix',
+            'matrix_config': {
+                'row_mode': 'hybrid',
+                'rows': [{'text': 'Z Fixed'}, {'text': 'A Fixed'}],
+                'show_row_totals': True,
+                'lookup_list_id': '',
+            },
+            'matrix_columns': [
+                {'name': 'People', 'type': 'number'},
+                {'name': 'EA1', 'type': 'number', 'header_type': 'selectable'},
+            ],
+            'matrix_rows': [{'text': 'Z Fixed'}, {'text': 'A Fixed'}],
+        }
+        data = {
+            'Z Fixed_People': 2,
+            'A Fixed_People': 1,
+            '20_People': 5,
+            '3_People': 9,
+            '3_Total': 9,
+            '99_Total': 4,
+            'col_header|EA1': 'Flood appeal',
+            'col_header_go_unmatched|EA1': 1,
+            'row_go_unmatched|20': 1,
+            '_table': 'ignore',
+        }
+        with patch(
+            'app.routes.forms.export._resolve_saved_matrix_row_labels',
+            return_value={'20': 'Bravo appeal', '3': 'Alpha appeal', '99': 'Zulu row'},
+        ):
+            apply_matrix_rows_for_pdf_export(field, data)
+
+        assert field['matrix_skip_row_sort'] is True
+        assert [
+            r.get('text') if isinstance(r, dict) else r
+            for r in field['matrix_rows']
+        ] == ['Z Fixed', 'A Fixed', '3', '20', '99']
+        assert field['matrix_row_labels']['3'] == 'Alpha appeal'
+        assert field['matrix_row_labels']['20'] == 'Bravo appeal'
+        assert 'col_header|EA1' not in field['matrix_rows']
+
+    def test_list_library_pdf_rows_still_replace_configured_rows(self):
+        from app.routes.forms.export import apply_matrix_rows_for_pdf_export
+
+        field = {
+            'kind': 'matrix',
+            'matrix_config': {'row_mode': 'list_library', 'lookup_list_id': ''},
+            'matrix_columns': [{'name': 'People'}],
+            'matrix_rows': [],
+        }
+        with patch(
+            'app.routes.forms.export._resolve_saved_matrix_row_labels',
+            return_value={'8': 'Eight'},
+        ):
+            apply_matrix_rows_for_pdf_export(field, {'8_People': 1, 'col_header|People': 'Nope'})
+
+        assert field['matrix_rows'] == ['8']
+        assert field['matrix_row_labels']['8'] == 'Eight'
+        assert 'matrix_skip_row_sort' not in field
+
+    def test_hybrid_fixed_row_display_keeps_cell_key(self):
+        from app.routes.forms.export import _resolve_hybrid_fixed_row_displays
+
+        rows = _resolve_hybrid_fixed_row_displays(
+            [{'text': 'Support to [country]', 'name_translations': {'en': 'Support to [country]'}}],
+            {'country': 'Bangladesh'},
+            {},
+        )
+        assert rows[0]['text'] == 'Support to [country]'
+        assert rows[0]['display_text'] == 'Support to Bangladesh'
+        assert rows[0]['name_translations']['en'] == 'Support to Bangladesh'
+
     def test_matrix_row_entity_ids_from_labels(self):
         from app.routes.forms.export import _matrix_row_entity_ids
 
@@ -238,7 +313,7 @@ class TestAssignmentPdfHelpers:
         assert widths[0] == ('__row__', 22)
         assert widths[1][0] == 'Amount'
         assert widths[2] == ('Done', 7.0)
-        assert sum(w for _, w in widths) <= 190
+        assert sum(w for _, w in widths) <= 192
 
     def test_merge_matrix_variable_values_preserves_saved_override(self):
         from app.routes.forms.export import _merge_matrix_variable_values

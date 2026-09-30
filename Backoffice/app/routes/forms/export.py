@@ -170,7 +170,7 @@ def matrix_portrait_column_widths_mm(
     columns,
     *,
     show_row_totals=True,
-    table_width_mm=190,
+    table_width_mm=192,
 ):
     """Return ``(name, width_mm)`` pairs for a portrait-compact matrix ``colgroup``."""
     try:
@@ -363,6 +363,288 @@ def _make_assignment_pdf_download_name(entity_name, assignment_name):
     cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip('.')
     cleaned = cleaned[:200] or 'Assignment'
     return f"{cleaned}.pdf"
+
+
+def _matrix_export_column_names(columns, matrix_config):
+    """Column names used to parse ``rowId_columnName`` keys, longest match first.
+
+    The row-total column is stored as ``{rowId}_Total`` and is not listed in
+    ``columns``. Include it when row totals are shown so a row that only has a
+    total still appears in the PDF.
+    """
+    names = []
+    for column in columns or []:
+        if isinstance(column, dict):
+            name = column.get('name') if column.get('name') else column
+        else:
+            name = column
+        name = str(name or '').strip()
+        if name and name != 'None':
+            names.append(name)
+    show_row_totals = True
+    if isinstance(matrix_config, dict) and matrix_config.get('show_row_totals') is False:
+        show_row_totals = False
+    if show_row_totals and 'Total' not in names:
+        names.append('Total')
+    return sorted(set(names), key=len, reverse=True)
+
+
+def _static_matrix_row_id(row):
+    """Stable id for a configured matrix row (the value stored in cell keys)."""
+    if isinstance(row, dict):
+        text = row.get('text')
+        return '' if text is None else str(text)
+    if row is None:
+        return ''
+    return str(row)
+
+
+def _saved_matrix_row_ids(matrix_data, column_names):
+    """Row ids present in saved matrix JSON, ignoring header and metadata keys."""
+    from app.utils.api_serialization import _is_matrix_metadata_key
+
+    row_ids = []
+    seen = set()
+    if not isinstance(matrix_data, dict):
+        return row_ids
+    for key in matrix_data.keys():
+        if not isinstance(key, str) or key.startswith('_') or _is_matrix_metadata_key(key):
+            continue
+        matched = None
+        for column_name in column_names:
+            suffix = '_' + column_name
+            if key.endswith(suffix) and len(key) > len(suffix):
+                matched = key[: -len(suffix)]
+                break
+        if matched and matched not in seen:
+            seen.add(matched)
+            row_ids.append(matched)
+    return row_ids
+
+
+def _label_from_lookup_option_row(row, display_column):
+    if not isinstance(row, dict):
+        return None
+    raw_id = row.get('_id', row.get('id'))
+    if raw_id is None:
+        return None
+    label = row.get(display_column)
+    if label is None or str(label).strip() == '':
+        label = row.get('name')
+    if label is None or str(label).strip() == '':
+        return None
+    return str(raw_id), str(label)
+
+
+def _rows_from_lookup_options_response(response):
+    if response is None:
+        return []
+    payload = None
+    get_json = getattr(response, 'get_json', None)
+    if callable(get_json):
+        payload = get_json(silent=True)
+    elif isinstance(response, dict):
+        payload = response
+    if not isinstance(payload, dict):
+        return []
+    rows = payload.get('rows')
+    return rows if isinstance(rows, list) else []
+
+
+def _resolve_saved_matrix_row_labels(row_ids, matrix_config, country_iso=None):
+    """Map saved list-library row ids to display labels. Unknown ids stay as ids."""
+    labels = {rid: rid for rid in row_ids}
+    if not row_ids:
+        return labels
+
+    lookup_list_id = ''
+    display_column = 'name'
+    plugin_config = None
+    if isinstance(matrix_config, dict):
+        lookup_list_id = str(matrix_config.get('lookup_list_id') or '').strip()
+        display_column = (
+            matrix_config.get('display_column')
+            or matrix_config.get('list_display_column')
+            or 'name'
+        )
+        display_column = str(display_column).strip() or 'name'
+        plugin_config = matrix_config.get('plugin_config') if isinstance(matrix_config.get('plugin_config'), dict) else None
+
+    if lookup_list_id and lookup_list_id.isdigit():
+        from app.models import LookupListRow
+        for rid in row_ids:
+            try:
+                rid_int = int(rid)
+            except (ValueError, TypeError):
+                continue
+            row_obj = LookupListRow.query.get(rid_int)
+            if row_obj and isinstance(row_obj.data, dict):
+                label = row_obj.data.get(display_column) or row_obj.data.get('name') or rid
+                labels[rid] = str(label)
+        return labels
+
+    if lookup_list_id in ('country_map', 'national_society', 'indicator_bank'):
+        from flask import session
+        current_locale = session.get('language', 'en') or (str(get_locale()) if get_locale() else 'en')
+        if isinstance(current_locale, str) and '_' in current_locale:
+            current_locale = current_locale.split('_', 1)[0]
+
+        if lookup_list_id == 'country_map':
+            for rid in row_ids:
+                try:
+                    rid_int = int(rid)
+                except (ValueError, TypeError):
+                    continue
+                obj = Country.query.get(rid_int)
+                if obj:
+                    labels[rid] = get_localized_country_name(obj)
+        elif lookup_list_id == 'national_society':
+            from app.models.organization import NationalSociety
+            for rid in row_ids:
+                try:
+                    rid_int = int(rid)
+                except (ValueError, TypeError):
+                    continue
+                obj = NationalSociety.query.get(rid_int)
+                if obj:
+                    localized_name = obj.get_name_translation(current_locale) if hasattr(obj, 'get_name_translation') else None
+                    labels[rid] = (
+                        localized_name.strip()
+                        if isinstance(localized_name, str) and localized_name.strip()
+                        else obj.name
+                    )
+        else:
+            from app.models.indicator_bank import IndicatorBank
+            for rid in row_ids:
+                try:
+                    rid_int = int(rid)
+                except (ValueError, TypeError):
+                    continue
+                obj = IndicatorBank.query.get(rid_int)
+                if obj and obj.name:
+                    labels[rid] = obj.name
+        return labels
+
+    if not lookup_list_id:
+        return labels
+
+    try:
+        from app.routes.forms_api import get_plugin_lookup_list_options
+        response = get_plugin_lookup_list_options(
+            lookup_list_id,
+            country_iso=country_iso,
+            config=plugin_config,
+        )
+        for row in _rows_from_lookup_options_response(response):
+            parsed = _label_from_lookup_option_row(row, display_column)
+            if parsed and parsed[0] in labels:
+                labels[parsed[0]] = parsed[1]
+    except Exception as exc:
+        current_app.logger.debug(
+            "Plugin lookup labels unavailable for PDF matrix rows (%s): %s",
+            lookup_list_id,
+            exc,
+        )
+    return labels
+
+
+def _resolve_hybrid_fixed_row_displays(matrix_rows, resolved_variables, variable_configs):
+    """Resolve [variable] placeholders in hybrid fixed-row labels without changing row ids.
+
+    Saved cells are keyed by the original ``text``. The entry form does the same
+    for hybrid rows, so only the printed label may change.
+    """
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+
+    if not matrix_rows or not resolved_variables:
+        return matrix_rows
+
+    resolved_rows = []
+    for row in matrix_rows:
+        if isinstance(row, str):
+            if '[' in row:
+                resolved = VariableResolutionService.replace_variables_in_text(
+                    row, resolved_variables, variable_configs
+                )
+                if resolved != row:
+                    resolved_rows.append({'text': row, 'display_text': resolved})
+                    continue
+            resolved_rows.append(row)
+            continue
+        if not isinstance(row, dict):
+            resolved_rows.append(row)
+            continue
+
+        new_row = dict(row)
+        text = new_row.get('text') or ''
+        if isinstance(text, str) and '[' in text:
+            resolved_text = VariableResolutionService.replace_variables_in_text(
+                text, resolved_variables, variable_configs
+            )
+            if resolved_text != text:
+                new_row['display_text'] = resolved_text
+        name_translations = new_row.get('name_translations')
+        if isinstance(name_translations, dict) and name_translations:
+            resolved_map = VariableResolutionService.resolve_translation_map(
+                name_translations,
+                resolved_variables,
+                variable_configs,
+            )
+            if resolved_map is not None:
+                new_row['name_translations'] = resolved_map
+        resolved_rows.append(new_row)
+    return resolved_rows
+
+
+def apply_matrix_rows_for_pdf_export(field_dict, matrix_data, country_iso=None):
+    """Fill PDF matrix rows for list-library and hybrid (fixed + list library) items.
+
+    List-library replaces configured rows with the saved entity ids.
+    Hybrid keeps configured rows in config order, then appends saved list-library
+    rows sorted by display label. Selectable header keys are not treated as rows.
+    """
+    if not isinstance(field_dict, dict) or field_dict.get('kind') != 'matrix':
+        return
+
+    matrix_config = field_dict.get('matrix_config') if isinstance(field_dict.get('matrix_config'), dict) else {}
+    row_mode = str(matrix_config.get('row_mode') or '').strip().lower()
+    if row_mode not in ('list_library', 'hybrid'):
+        return
+
+    if row_mode == 'hybrid':
+        field_dict['matrix_skip_row_sort'] = True
+
+    if not isinstance(matrix_data, dict) or not matrix_data:
+        return
+
+    column_names = _matrix_export_column_names(field_dict.get('matrix_columns') or [], matrix_config)
+    if not column_names:
+        return
+
+    saved_ids = _saved_matrix_row_ids(matrix_data, column_names)
+    if not saved_ids:
+        return
+
+    if row_mode == 'list_library':
+        field_dict['matrix_rows'] = saved_ids
+        field_dict['matrix_row_labels'] = _resolve_saved_matrix_row_labels(
+            saved_ids, matrix_config, country_iso=country_iso
+        )
+        return
+
+    fixed_rows = list(field_dict.get('matrix_rows') or [])
+    fixed_ids = {_static_matrix_row_id(row) for row in fixed_rows}
+    fixed_ids.discard('')
+    dynamic_ids = [rid for rid in saved_ids if rid not in fixed_ids]
+    labels = dict(field_dict.get('matrix_row_labels') or {})
+    if dynamic_ids:
+        labels.update(_resolve_saved_matrix_row_labels(
+            dynamic_ids, matrix_config, country_iso=country_iso
+        ))
+        dynamic_ids.sort(key=lambda rid: str(labels.get(rid, rid)).casefold())
+        fixed_rows.extend(dynamic_ids)
+    field_dict['matrix_rows'] = fixed_rows
+    field_dict['matrix_row_labels'] = labels
 
 
 def _matrix_row_entity_ids(field_dict):
@@ -685,9 +967,9 @@ def _export_pdf_impl(aes_id):
 
                         try:
                             if isinstance(matrix_config, dict):
-                                row_mode = matrix_config.get('row_mode', 'manual')
-                                if row_mode == 'manual' or not row_mode:
-                                    if resolved_variables and matrix_rows and isinstance(matrix_rows, list):
+                                row_mode = str(matrix_config.get('row_mode') or 'manual').strip().lower()
+                                if resolved_variables and matrix_rows and isinstance(matrix_rows, list):
+                                    if row_mode in ('', 'manual'):
                                         resolved_rows = []
                                         for r in matrix_rows:
                                             if isinstance(r, str):
@@ -705,6 +987,10 @@ def _export_pdf_impl(aes_id):
                                             else:
                                                 resolved_rows.append(r)
                                         matrix_rows = resolved_rows
+                                    elif row_mode == 'hybrid':
+                                        matrix_rows = _resolve_hybrid_fixed_row_displays(
+                                            matrix_rows, resolved_variables, variable_configs
+                                        )
                         except Exception as e:
                             current_app.logger.warning(
                                 f"Error resolving variables in matrix row labels for form_item {form_item.id}: {e}",
@@ -869,116 +1155,9 @@ def _export_pdf_impl(aes_id):
             filtered_sections_by_page[page_id] = kept_roots
         sections_by_page = filtered_sections_by_page
 
-        def _infer_list_library_rows_and_labels(field_dict, matrix_data):
-            try:
-                if not isinstance(field_dict, dict):
-                    return
-                if field_dict.get('kind') != 'matrix':
-                    return
-                if not isinstance(matrix_data, dict) or not matrix_data:
-                    return
-
-                matrix_config = field_dict.get('matrix_config') if isinstance(field_dict.get('matrix_config'), dict) else {}
-                row_mode = (matrix_config.get('row_mode') or '').strip().lower()
-                if row_mode != 'list_library':
-                    return
-
-                cols = field_dict.get('matrix_columns') or []
-                col_names = []
-                for c in cols:
-                    if isinstance(c, dict):
-                        col_names.append(str(c.get('name') if c.get('name') else c))
-                    else:
-                        col_names.append(str(c))
-                col_names = [c for c in col_names if c and c != 'None']
-                if not col_names:
-                    return
-
-                col_names_sorted = sorted(col_names, key=len, reverse=True)
-                row_ids = []
-                seen = set()
-                for k in matrix_data.keys():
-                    if not isinstance(k, str):
-                        continue
-                    if k.startswith('_'):
-                        continue
-                    matched_row_id = None
-                    for cn in col_names_sorted:
-                        suffix = "_" + cn
-                        if k.endswith(suffix):
-                            matched_row_id = k[: -len(suffix)]
-                            break
-                    if matched_row_id and matched_row_id not in seen:
-                        seen.add(matched_row_id)
-                        row_ids.append(matched_row_id)
-
-                if not row_ids:
-                    return
-
-                from flask import session
-                lookup_list_id = (matrix_config.get('lookup_list_id') or '').strip()
-
-                display_column = (matrix_config.get('display_column') or matrix_config.get('list_display_column') or 'name').strip() or 'name'
-
-                row_labels = {}
-                if lookup_list_id and str(lookup_list_id).isdigit():
-                    from app.models import LookupListRow
-                    for rid in row_ids:
-                        try:
-                            rid_int = int(rid)
-                        except (ValueError, TypeError):
-                            row_labels[rid] = rid
-                            continue
-                        row_obj = LookupListRow.query.get(rid_int)
-                        if row_obj and isinstance(row_obj.data, dict):
-                            row_labels[rid] = str(row_obj.data.get(display_column) or row_obj.data.get('name') or rid)
-                        else:
-                            row_labels[rid] = rid
-                elif lookup_list_id in ('country_map', 'national_society', 'indicator_bank'):
-                    current_locale = session.get('language', 'en') or (str(get_locale()) if get_locale() else 'en')
-                    if isinstance(current_locale, str) and '_' in current_locale:
-                        current_locale = current_locale.split('_', 1)[0]
-
-                    if lookup_list_id == 'country_map':
-                        for rid in row_ids:
-                            try:
-                                rid_int = int(rid)
-                            except (ValueError, TypeError):
-                                row_labels[rid] = rid
-                                continue
-                            obj = Country.query.get(rid_int)
-                            row_labels[rid] = get_localized_country_name(obj) if obj else rid
-                    elif lookup_list_id == 'national_society':
-                        from app.models.organization import NationalSociety
-                        for rid in row_ids:
-                            try:
-                                rid_int = int(rid)
-                            except (ValueError, TypeError):
-                                row_labels[rid] = rid
-                                continue
-                            obj = NationalSociety.query.get(rid_int)
-                            if obj:
-                                localized_name = obj.get_name_translation(current_locale) if hasattr(obj, 'get_name_translation') else None
-                                row_labels[rid] = (localized_name.strip() if isinstance(localized_name, str) and localized_name.strip() else obj.name)
-                            else:
-                                row_labels[rid] = rid
-                    else:
-                        from app.models.indicator_bank import IndicatorBank
-                        for rid in row_ids:
-                            try:
-                                rid_int = int(rid)
-                            except (ValueError, TypeError):
-                                row_labels[rid] = rid
-                                continue
-                            obj = IndicatorBank.query.get(rid_int)
-                            row_labels[rid] = obj.name if obj else rid
-                else:
-                    row_labels = {rid: rid for rid in row_ids}
-
-                field_dict['matrix_rows'] = row_ids
-                field_dict['matrix_row_labels'] = row_labels
-            except Exception as e:
-                current_app.logger.warning(f"Failed to infer list-library matrix rows for PDF: {e}", exc_info=True)
+        export_country_iso = None
+        if country is not None:
+            export_country_iso = getattr(country, 'iso3', None) or getattr(country, 'iso2', None)
 
         def _walk_sections_for_export(section_node):
             if not isinstance(section_node, dict):
@@ -988,7 +1167,17 @@ def _export_pdf_impl(aes_id):
                 for f in fields:
                     if isinstance(f, dict) and f.get('kind') == 'matrix':
                         item_key = f"form_item_{f.get('id')}"
-                        _infer_list_library_rows_and_labels(f, existing_data_processed_for_export.get(item_key))
+                        try:
+                            apply_matrix_rows_for_pdf_export(
+                                f,
+                                existing_data_processed_for_export.get(item_key),
+                                country_iso=export_country_iso,
+                            )
+                        except Exception as e:
+                            current_app.logger.warning(
+                                f"Failed to infer matrix rows for PDF: {e}",
+                                exc_info=True,
+                            )
             for child in section_node.get('subsections', []) or []:
                 _walk_sections_for_export(child)
 
@@ -1042,7 +1231,7 @@ def _export_pdf_impl(aes_id):
         pdf_css_string = '''
             @page {
                 size: A4;
-                margin: 20mm 10mm 20mm 10mm;
+                margin: 16mm 6mm 14mm 6mm;
                 @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
             }
             body {
@@ -1229,19 +1418,34 @@ def _export_pdf_impl(aes_id):
                 padding: 2px 2px;
                 text-align: center;
             }
-            /* Wide matrices (14+ cols): landscape page */
+            /* Wide matrices sit inside the field box. Drop the inner side padding
+               so the grid can use the page width instead of being clipped on the right. */
+            .field-box-matrix-wide .field-header {
+                padding: 6px 6px;
+            }
+            .field-box-matrix-wide .field-content {
+                padding: 4px 2px 6px 2px;
+            }
+            /* Wide matrices (14+ cols): landscape page, fitted to the content box.
+               Scaling the table and hiding overflow clipped the last columns. */
             .field-box-matrix-wide.wide-matrix-landscape,
             .field-box-matrix-wide.wide-matrix-landscape-scale {
                 page: wide;
                 page-break-before: always;
                 page-break-inside: auto;
             }
-            .field-box-matrix-wide.wide-matrix-landscape-scale {
-                overflow: hidden;
+            .field-box-matrix-wide.wide-matrix-landscape .matrix-table,
+            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
+                table-layout: fixed;
+                width: 100%;
             }
             .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
-                transform: scale(0.82);
-                transform-origin: top left;
+                font-size: 6.5pt;
+            }
+            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table th,
+            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td {
+                padding: 2px 2px;
+                overflow-wrap: anywhere;
             }
             .field-box-matrix .matrix-table {
                 page-break-inside: auto;
@@ -1261,6 +1465,11 @@ def _export_pdf_impl(aes_id):
                 min-width: 22mm;
                 max-width: 34mm;
                 vertical-align: top;
+            }
+            .field-box-matrix-wide.field-box-matrix .matrix-table td:first-child,
+            .field-box-matrix-wide.field-box-matrix .matrix-table th:first-child {
+                min-width: 0;
+                max-width: none;
             }
             .matrix-group-header {
                 background: #eef2ff;
@@ -1455,6 +1664,26 @@ def _export_pdf_impl(aes_id):
             html[dir="ltr"] .matrix-table tbody td.matrix-row-label {
                 text-align: left;
             }
+            /* Tick cells also carry matrix-col-data, which is right-aligned above. */
+            html[dir="ltr"] .matrix-table tbody td.matrix-col-data.cell-tick,
+            html[dir="rtl"] .matrix-table tbody td.matrix-col-data.cell-tick,
+            html[dir="ltr"] .matrix-table thead th.matrix-col-header.cell-tick,
+            html[dir="rtl"] .matrix-table thead th.matrix-col-header.cell-tick {
+                text-align: center;
+                vertical-align: middle;
+            }
+            .tick-icon {
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                line-height: 0;
+                vertical-align: middle;
+            }
+            .tick-icon svg {
+                display: block;
+                width: 12px;
+                height: 12px;
+            }
             html[dir="rtl"] .matrix-table thead th.matrix-row-header,
             html[dir="rtl"] .matrix-table thead th.matrix-col-header {
                 text-align: right;
@@ -1470,7 +1699,7 @@ def _export_pdf_impl(aes_id):
             }
             @page wide {
                 size: A4 landscape;
-                margin: 15mm 8mm 15mm 8mm;
+                margin: 12mm 6mm 12mm 6mm;
                 @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
             }
             .page-break { page-break-before: always; }

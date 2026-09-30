@@ -528,6 +528,37 @@ class ProfessionalPDFDocument {
         return width ? parseInt(width, 10) : 12;
     }
 
+    // Matrices are tables. Rendering them as a single input would print the first
+    // header select or cell instead of the grid (including hybrid rows).
+    renderFormItemBlocks(fields, analyzer) {
+        const scalarFields = [];
+        const matrixFields = [];
+        fields.forEach((field) => {
+            if (field.querySelector('.matrix-container')) {
+                matrixFields.push(field);
+            } else {
+                scalarFields.push(field);
+            }
+        });
+
+        if (scalarFields.length > 0) {
+            this.renderFieldsWithLayout(scalarFields, analyzer);
+            scalarFields.forEach((field) => {
+                field.querySelectorAll('.disaggregation-inputs').forEach((disaggregation) => {
+                    this.renderDisaggregationTable(disaggregation, analyzer);
+                });
+            });
+        }
+
+        matrixFields.forEach((field) => {
+            const label = field.querySelector('label');
+            const title = label ? label.textContent.trim() : '';
+            field.querySelectorAll('.disaggregation-inputs').forEach((disaggregation) => {
+                this.renderDisaggregationTable(disaggregation, analyzer, title);
+            });
+        });
+    }
+
     // Render fields with responsive layout
     renderFieldsWithLayout(fields, analyzer) {
         if (!fields || fields.length === 0) return;
@@ -702,8 +733,56 @@ class ProfessionalPDFDocument {
         return groups;
     }
 
+    /**
+     * Text shown in a matrix/disaggregation cell.
+     * Selectable headers keep their choice on a hidden select; the visible
+     * label is .matrix-header-picker-label. Tick cells must follow checked
+     * state, not the constant value="1".
+     */
+    extractTableCellText(cell) {
+        if (!cell) return '';
+
+        const pickerLabel = cell.querySelector('.matrix-header-picker-label');
+        if (pickerLabel && !pickerLabel.classList.contains('matrix-header-picker-label--placeholder')) {
+            const chosen = (pickerLabel.textContent || '').trim();
+            if (chosen) return chosen;
+        }
+
+        const otherInput = cell.querySelector('.matrix-header-other-input');
+        if (otherInput && !otherInput.classList.contains('hidden') && (otherInput.value || '').trim()) {
+            return otherInput.value.trim();
+        }
+
+        const checkbox = cell.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            return checkbox.checked ? '✓' : '';
+        }
+
+        const valueInput = cell.querySelector(
+            'input:not([type="hidden"]):not([type="checkbox"]):not(.matrix-header-other-input)'
+        );
+        if (valueInput && (valueInput.value || '').trim()) {
+            return valueInput.value.trim();
+        }
+
+        const select = cell.querySelector('select');
+        if (select && select.selectedIndex >= 0) {
+            const option = select.options[select.selectedIndex];
+            const optionValue = option ? String(option.value || '') : '';
+            if (option && optionValue && optionValue !== '__other__') {
+                return (option.textContent || '').trim();
+            }
+        }
+
+        const clone = cell.cloneNode(true);
+        clone.querySelectorAll(
+            'select, .matrix-header-picker, .matrix-header-other-input, button, .remove-matrix-row-btn'
+        ).forEach((el) => el.remove());
+        return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
     // Enhanced disaggregation table rendering (only visible/selected modes)
-    renderDisaggregationTable(disaggregationElement, analyzer) {
+    renderDisaggregationTable(disaggregationElement, analyzer, titleOverride) {
         // Skip if this disaggregation container is not currently visible/selected
         if (disaggregationElement.style.display === 'none' ||
             disaggregationElement.classList.contains('hidden') ||
@@ -727,9 +806,13 @@ class ProfessionalPDFDocument {
 
         this.checkPageBreak(30);
 
-        // Get table title
+        // Get table title. Matrix containers do not repeat the field label, so the
+        // caller passes the form-item label when it has one.
         const titleElement = disaggregationElement.querySelector('p, label, h5');
-        const tableTitle = titleElement ? this.cleanTextForPDF(titleElement.textContent.trim()) : 'Disaggregated Data';
+        const fallbackTitle = titleElement ? this.cleanTextForPDF(titleElement.textContent.trim()) : 'Disaggregated Data';
+        const tableTitle = titleOverride
+            ? this.cleanTextForPDF(String(titleOverride).trim())
+            : fallbackTitle;
 
         // Table header with enhanced styling
         this.drawAdvancedBox(
@@ -783,11 +866,7 @@ class ProfessionalPDFDocument {
         rows.forEach(row => {
             const cells = row.querySelectorAll('td, th');
             cells.forEach(cell => {
-                const input = cell.querySelector('input');
-                if (input && input.value && input.value.trim()) {
-                    hasVisibleData = true;
-                }
-                if (!input && cell.textContent.trim()) {
+                if (this.extractTableCellText(cell)) {
                     hasVisibleData = true;
                 }
             });
@@ -812,20 +891,20 @@ class ProfessionalPDFDocument {
             const rowData = [];
 
             cells.forEach((cell, cellIndex) => {
-                const input = cell.querySelector('input');
-                let cellText = '';
+                const input = cell.querySelector(
+                    'input:not([type="hidden"]):not(.matrix-header-other-input), input[type="checkbox"]'
+                );
+                const cellText = this.extractTableCellText(cell);
 
-                if (input && input.value) {
-                    cellText = input.value;
-                    tableStats.filled++;
-                    if (!isNaN(parseFloat(input.value))) {
-                        tableStats.sum += parseFloat(input.value);
+                if (input) {
+                    tableStats.total++;
+                    if (cellText) {
+                        tableStats.filled++;
+                        if (input.type !== 'checkbox' && !isNaN(parseFloat(cellText))) {
+                            tableStats.sum += parseFloat(cellText);
+                        }
                     }
-                } else if (!input) {
-                    cellText = cell.textContent.trim();
                 }
-
-                if (input) tableStats.total++;
                 rowData.push(cellText || '');
             });
 
@@ -2137,16 +2216,7 @@ export async function exportToPDF(formId, title) {
                 );
 
                 if (visibleFields.length > 0) {
-                    // Use responsive layout rendering
-                    pdfDoc.renderFieldsWithLayout(visibleFields, analyzer);
-
-                    // Handle disaggregation tables separately after field rendering
-                    visibleFields.forEach(field => {
-                        const disaggregationInputs = field.querySelectorAll('.disaggregation-inputs');
-                        disaggregationInputs.forEach(disaggregation => {
-                            pdfDoc.renderDisaggregationTable(disaggregation, analyzer);
-                        });
-                    });
+                    pdfDoc.renderFormItemBlocks(visibleFields, analyzer);
                 }
             } else {
                 // Fallback to old method if no container found
@@ -2158,7 +2228,7 @@ export async function exportToPDF(formId, title) {
                 );
 
                 if (fieldArray.length > 0) {
-                    pdfDoc.renderFieldsWithLayout(fieldArray, analyzer);
+                    pdfDoc.renderFormItemBlocks(fieldArray, analyzer);
                 }
             }
 

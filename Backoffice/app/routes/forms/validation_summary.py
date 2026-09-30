@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import logging
+from html import escape as html_escape
 from contextlib import suppress
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import io
@@ -1052,7 +1053,8 @@ def register_validation_summary_routes(bp) -> None:
             return json_bad_request("run_id is required", success=False)
 
         _mark_cancelled(run_id)
-        return {"success": True, "run_id": run_id}
+        # Echo an escaped id. The JSON body is not HTML, but the value is caller-supplied.
+        return json_ok(run_id=html_escape(run_id, quote=True))
 
     @bp.route("/assignment_status/<int:aes_id>/validation_summary/events", methods=["GET"])
     @login_required

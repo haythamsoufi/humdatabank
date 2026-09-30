@@ -81,6 +81,19 @@ class TestLoginRouteDirect:
 
 @pytest.mark.unit
 class TestRegisterRouteDirect:
+    @pytest.fixture(autouse=True)
+    def _email_check_enabled(self, app, monkeypatch):
+        monkeypatch.setitem(app.config, 'REGISTRATION_EMAIL_CHECK_ENABLED', True)
+
+    def test_check_register_email_disabled_by_default(self, app, monkeypatch):
+        from werkzeug.exceptions import NotFound
+        from app.routes.auth import check_register_email
+
+        monkeypatch.setitem(app.config, 'REGISTRATION_EMAIL_CHECK_ENABLED', False)
+        with app.test_request_context('/register/check-email?email=test@example.com'):
+            with pytest.raises(NotFound):
+                check_register_email()
+
     def test_check_register_email_missing(self, app):
         from app.routes.auth import check_register_email
 
@@ -276,20 +289,13 @@ class TestLoginRouteDirectExtended:
         assert status == 200
 
     def test_login_account_locked(self, app, db_session):
-        from app.models.core import UserLoginLog
         from app.routes.auth import login
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
             create_test_user(db_session, email='locked-direct@example.com', password='TestPass123!')
-            for _ in range(10):
-                db_session.add(UserLoginLog(
-                    email_attempted='locked-direct@example.com',
-                    event_type='login_failed',
-                    timestamp=utcnow(),
-                    ip_address='127.0.0.1',
-                ))
-            db_session.commit()
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
+                record_login_failure('locked-direct@example.com')
         mock_form = MagicMock()
         mock_form.validate_on_submit.return_value = True
         mock_form.email.data = 'locked-direct@example.com'
@@ -366,8 +372,10 @@ class TestRegisterRouteDirectExtended:
                 register()
         mock_redirect.assert_called()
 
-    def test_check_register_email_exists(self, app, db_session):
+    def test_check_register_email_exists(self, app, db_session, monkeypatch):
         from app.routes.auth import check_register_email
+
+        monkeypatch.setitem(app.config, 'REGISTRATION_EMAIL_CHECK_ENABLED', True)
 
         with app.app_context():
             create_test_user(db_session, email='exists-direct@example.com')
@@ -508,7 +516,7 @@ class TestLogoutAndDevicesDirect:
 
         with app.test_request_context(f'/account-settings/devices/{device_id}/kickout', method='POST'):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            resp, status = _view_result(kickout_own_device(device_id))
             db_session.commit()
         assert status == 200
         assert resp.get_json()['success'] is True

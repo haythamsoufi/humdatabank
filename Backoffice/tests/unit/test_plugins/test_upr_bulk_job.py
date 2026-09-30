@@ -180,7 +180,7 @@ class TestRenderLoop:
         assert uploaded.get("key")
         payload = build_bulk_export_status_payload(job_id)
         assert payload["zip_key"] == uploaded["key"]
-        assert "render boom" in (payload.get("error") or "")
+        assert "render failed" in (payload.get("error") or "")
 
     def test_bulk_pdf_writes_zip(self, db_session, admin_user, assigned_form, app, monkeypatch):
         with app.app_context():

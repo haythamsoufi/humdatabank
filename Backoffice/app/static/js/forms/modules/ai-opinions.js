@@ -123,9 +123,8 @@ function upsertOpinionBlock(fieldBlock, html) {
 
     // Defense-in-depth: html is expected to come from renderOpinionHtml
     // (which escapes all dynamic values), but guard against misuse.
-    const safe = (window.SafeDom && window.SafeDom.sanitizeHtml)
-        ? window.SafeDom.sanitizeHtml(html)
-        : html;
+    if (!(window.SafeDom && window.SafeDom.sanitizeHtml)) return;
+    const safe = window.SafeDom.sanitizeHtml(html);
 
     if (existing) {
         existing.outerHTML = safe;

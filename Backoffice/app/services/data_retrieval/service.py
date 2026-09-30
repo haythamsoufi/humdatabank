@@ -455,7 +455,6 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
                     AssignmentEntityStatus.query
                     .options(
                         joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template),
-                        joinedload(AssignmentEntityStatus.country)
                     )
                     .filter(
                         AssignmentEntityStatus.entity_id.in_(country_ids),
@@ -495,6 +494,13 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
 
 # ==================== FormData Map & ACS Access ====================
 
+def _current_user_can_view_aes(aes) -> bool:
+    """Single assignment-visibility rule shared with the entry form (AuthorizationService)."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    return AuthorizationService.can_access_assignment(aes, current_user)
+
+
 def get_formdata_map(aes_id: int, item_ids: Optional[List[int]] = None) -> Dict[int, str]:
     """Get FormData entries for an assignment as a map of form_item_id -> value."""
     try:
@@ -504,8 +510,7 @@ def get_formdata_map(aes_id: int, item_ids: Optional[List[int]] = None) -> Dict[
             logger.warning(f"Access denied for ACS {aes_id} (not found)")
             return {}
 
-        from app.services.organization.entity_service import EntityService
-        if not EntityService.check_user_entity_access(current_user, aes.entity_type, aes.entity_id):
+        if not _current_user_can_view_aes(aes):
             logger.warning(f"Access denied for ACS {aes_id} (entity_type={aes.entity_type}, entity_id={aes.entity_id})")
             return {}
 
@@ -524,7 +529,6 @@ def get_aes_with_joins(aes_id: int):
     try:
         from app.models import AssignedForm
         from sqlalchemy.orm import joinedload
-        from app.services.organization.entity_service import EntityService
 
         aes = AssignmentEntityStatus.query.options(
             joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template),
@@ -533,7 +537,7 @@ def get_aes_with_joins(aes_id: int):
         if not aes:
             logger.warning(f"AES {aes_id} not found")
             return None
-        if not EntityService.check_user_entity_access(current_user, aes.entity_type, aes.entity_id):
+        if not _current_user_can_view_aes(aes):
             logger.warning(f"Access denied for AES {aes_id} (entity_type={aes.entity_type}, entity_id={aes.entity_id})")
             return None
         return aes
@@ -595,17 +599,10 @@ def check_aes_access_light(aes_id: int) -> bool:
                         return True
                     _aes_access_cache.pop(cache_key, None)
 
-        from app.services.organization.entity_service import EntityService
-
-        row = db.session.execute(
-            select(AssignmentEntityStatus.entity_type, AssignmentEntityStatus.entity_id)
-            .where(AssignmentEntityStatus.id == aes_id)
-        ).first()
-        if not row:
+        aes = db.session.get(AssignmentEntityStatus, int(aes_id))
+        if not aes:
             return False
-        allowed = EntityService.check_user_entity_access(
-            current_user, row.entity_type, row.entity_id
-        )
+        allowed = _current_user_can_view_aes(aes)
         if allowed and user_id is not None:
             _store_aes_access_cache(
                 cache_key, time.monotonic() + _AES_ACCESS_CACHE_TTL_SECONDS

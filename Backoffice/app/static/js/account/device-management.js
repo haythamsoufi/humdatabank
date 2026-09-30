@@ -139,9 +139,9 @@
                             ? window.DateTimeUtils.format(now, 'datetime')
                             : now.toLocaleString();
                         const escHtml = window.escapeHtml || function (v) {
-                            const d = document.createElement('div');
-                            d.textContent = String(v == null ? '' : v);
-                            return d.innerHTML;
+                            return String(v == null ? '' : v)
+                                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                         };
 
                         statusCell.innerHTML = `

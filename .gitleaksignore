@@ -1,0 +1,3 @@
+# Synthetic JWT-shaped fixture (not a credential). Later commits assemble it at runtime,
+# but the original literal remains in this commit's history and would fail every scan.
+503934c80254ebd06b2364658dcf603513d84164:Backoffice/tests/unit/test_utils/test_logging_security.py:jwt:21

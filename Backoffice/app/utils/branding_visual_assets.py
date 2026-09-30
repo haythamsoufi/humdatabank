@@ -19,12 +19,24 @@ from app.services.platform import storage_service as storage
 
 SYSTEM_BRANDING_REL_PREFIX = "branding"
 
+# SVG is deliberately not accepted: it is an active document format and no allowlist
+# sanitizer is vetted for it. Bundled static ``logo.svg`` / ``favicon.svg`` remain usable
+# via the path-only (non-upload) setting.
 _ALLOWED_LOGO_EXTENSIONS = frozenset(
-    {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+    {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 )
 _ALLOWED_FAV_EXTENSIONS = frozenset(
-    {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"}
+    {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico"}
 )
+
+_EXTENSION_FORMATS = {
+    ".png": frozenset({"PNG"}),
+    ".jpg": frozenset({"JPEG"}),
+    ".jpeg": frozenset({"JPEG"}),
+    ".gif": frozenset({"GIF"}),
+    ".webp": frozenset({"WEBP"}),
+    ".ico": frozenset({"ICO"}),
+}
 
 _MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 
@@ -61,6 +73,23 @@ def relative_path_under_branding(stored_rel: Optional[str]) -> Optional[str]:
     return None
 
 
+def _assert_raster_content_matches_extension(file_storage: FileStorage, ext: str) -> None:
+    """Reject files whose decoded image format does not match their extension."""
+    from app.utils.safe_image import open_image_safe
+
+    try:
+        file_storage.seek(0)
+        with open_image_safe(file_storage.stream) as img:
+            detected = (img.format or "").upper()
+            img.verify()
+    except Exception as exc:
+        raise ValueError("File is not a valid image") from exc
+    finally:
+        file_storage.seek(0)
+    if detected not in _EXTENSION_FORMATS.get(ext, frozenset()):
+        raise ValueError("File content does not match its extension")
+
+
 def _validate_and_upload(
     file_storage: FileStorage,
     *,
@@ -84,6 +113,7 @@ def _validate_and_upload(
     file_storage.seek(0)
     if sz > _MAX_BYTES:
         raise ValueError(f"File is too large (max {_MAX_BYTES // (1024 * 1024)} MB)")
+    _assert_raster_content_matches_extension(file_storage, ext)
     uniq = uuid.uuid4().hex[:12]
     safe_stem = secure_filename(basename_stem) or basename_stem
     stored_filename = f"{uniq}_{safe_stem}{ext}"

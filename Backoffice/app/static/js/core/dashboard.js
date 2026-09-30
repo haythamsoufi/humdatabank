@@ -644,7 +644,7 @@ function renderDataQualityComponentRows(pillarKey, subPillarKey, componentDetail
 
 function renderDataQualitySubPillarLabel(item, pillarKey, hasComponents) {
     if (!hasComponents) {
-        return `<span class="data-quality-sub-pillar__label">${item.label}</span>`;
+        return `<span class="data-quality-sub-pillar__label">${sanitizeTextContent(item.label)}</span>`;
     }
 
     const listId = dataQualityComponentListId(pillarKey, item.key);
@@ -657,11 +657,11 @@ function renderDataQualitySubPillarLabel(item, pillarKey, hasComponents) {
         <button type="button"
                 class="data-quality-sub-pillar__toggle${expanded ? ' is-expanded' : ''}"
                 data-pillar-key="${pillarKey}"
-                data-sub-pillar-key="${item.key}"
+                data-sub-pillar-key="${sanitizeTextContent(item.key)}"
                 aria-expanded="${expanded ? 'true' : 'false'}"
                 aria-controls="${listId}"
                 aria-label="${actionLabel}">
-            <span class="data-quality-sub-pillar__label">${item.label}</span>
+            <span class="data-quality-sub-pillar__label">${sanitizeTextContent(item.label)}</span>
             <i class="fas fa-chevron-right data-quality-sub-pillar__chevron" aria-hidden="true"></i>
         </button>
     `;
@@ -702,7 +702,7 @@ function renderDataQualitySubPillars(pillarKey, subDetail, pillarComponentDetail
                     <li class="data-quality-sub-pillar data-quality-sub-pillar--binary${expandableClass}">
                         ${labelHtml}
                         <span class="data-quality-sub-pillar__status ${isPresent ? 'is-present' : 'is-missing'}"
-                              aria-label="${item.label}: ${statusLabel}">
+                              aria-label="${sanitizeTextContent(item.label)}: ${statusLabel}">
                             <i class="fas ${isPresent ? 'fa-check-circle' : 'fa-times-circle'}" aria-hidden="true"></i>
                         </span>
                         ${componentRowsHtml}
@@ -723,7 +723,7 @@ function renderDataQualitySubPillars(pillarKey, subDetail, pillarComponentDetail
                     <span class="data-quality-sub-pillar__score" style="color: ${scoreColor}">${pct}%</span>
                     <div class="data-quality-sub-pillar__bar-track" role="progressbar"
                          aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
-                         aria-label="${item.label}">
+                         aria-label="${sanitizeTextContent(item.label)}">
                         <div class="data-quality-sub-pillar__bar-fill"
                              style="width: ${barWidth}%; background-color: ${barColor};"></div>
                     </div>
@@ -764,7 +764,7 @@ function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail,
                         <i class="fas ${meta.icon}" aria-hidden="true"></i>
                     </span>
                     <div>
-                        <p class="data-quality-pillar-card__label">${meta.label}</p>
+                        <p class="data-quality-pillar-card__label">${sanitizeTextContent(meta.label)}</p>
                         <p class="data-quality-pillar-card__weight">${weightLabel}: ${meta.weight}%</p>
                     </div>
                 </div>
@@ -774,11 +774,11 @@ function renderDataQualityPillarCard(key, meta, pillars, weightLabel, subDetail,
             </div>
             <div class="data-quality-pillar-card__bar-track" role="progressbar"
                  aria-valuemin="0" aria-valuemax="100" aria-valuenow="${hasScore ? barWidth : 0}"
-                 aria-label="${meta.label}">
+                 aria-label="${sanitizeTextContent(meta.label)}">
                 <div class="data-quality-pillar-card__bar-fill"
                      style="width: ${barWidth}%; background-color: ${barColor};"></div>
             </div>
-            <p class="data-quality-pillar-card__desc">${meta.description}</p>
+            <p class="data-quality-pillar-card__desc">${sanitizeTextContent(meta.description)}</p>
             ${subPillarsHtml}
         </div>
     `;

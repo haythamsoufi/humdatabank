@@ -3,7 +3,7 @@
 Per-country Unified Country Plan Excel template round-trip for Template 24 (planning).
 
 Uses the structured IFRC planning workbook (named cells + Excel tables) for export/import
-from a single country assignment (aes_id). Workbook: app/static/templates/unified_country_plan.xlsx
+from a single country assignment (aes_id). Workbook: plugins/upr/static/templates/unified_country_plan.xlsx
 """
 
 from __future__ import annotations
@@ -1302,8 +1302,10 @@ def run_unified_country_plan_import(
     _aes, country_name, iso3, period, _region = _load_assignment_meta(aes_id)
     ctx = build_import_context([PLANNING_COUNTRY_TEMPLATE_ID])
 
+    from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
+
     with _quiet_openpyxl_io():
-        wb = openpyxl.load_workbook(workbook_path, data_only=True)
+        wb = load_workbook_safe(read_workbook_file_bytes(workbook_path), read_only=False, data_only=True)
     try:
         validation = validate_unified_country_plan_import_file(
             wb,
@@ -1371,9 +1373,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Unified Country Plan Excel round-trip (T24)")
     parser.add_argument("--aes-id", type=int, required=True)
+    _plugin_template = os.path.normpath(
+        os.path.join(script_dir, "..", "static", "templates", "unified_country_plan.xlsx")
+    )
+    _legacy_template = os.path.join(
+        backoffice_dir, "app", "static", "templates", "unified_country_plan.xlsx"
+    )
     parser.add_argument(
         "--template",
-        default=os.path.join(backoffice_dir, "app", "static", "templates", "unified_country_plan.xlsx"),
+        default=_plugin_template if os.path.isfile(_plugin_template) else _legacy_template,
     )
     parser.add_argument("--output", required=True)
     args = parser.parse_args()

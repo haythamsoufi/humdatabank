@@ -903,11 +903,13 @@ class TestRegisterDevice:
         _assert_status(resp, 400)
 
     def test_success_ios(self, logged_in_client, db_session):
-        mock_device = MagicMock()
-        mock_device.id = 1
-        mock_device.device_token = "tok-abc"
-        with patch("app.services.notification.push.PushNotificationService.register_device",
-                   return_value=(mock_device, True)):
+        with patch(
+            "app.utils.notification_push.is_notifications_push_enabled",
+            return_value=True,
+        ), patch(
+            "app.services.notification.push.PushNotificationService.register_device",
+            return_value={"success": True, "message": "Device registered", "device_id": 1},
+        ):
             resp = logged_in_client.post(
                 self.BASE_URL,
                 json={"device_token": "tok-abc", "platform": "ios"},
@@ -915,11 +917,13 @@ class TestRegisterDevice:
         _assert_status(resp, 200, 201)
 
     def test_success_android(self, logged_in_client, db_session):
-        mock_device = MagicMock()
-        mock_device.id = 2
-        mock_device.device_token = "tok-and"
-        with patch("app.services.notification.push.PushNotificationService.register_device",
-                   return_value=(mock_device, False)):
+        with patch(
+            "app.utils.notification_push.is_notifications_push_enabled",
+            return_value=True,
+        ), patch(
+            "app.services.notification.push.PushNotificationService.register_device",
+            return_value={"success": True, "message": "Device registered", "device_id": 2},
+        ):
             resp = logged_in_client.post(
                 self.BASE_URL,
                 json={

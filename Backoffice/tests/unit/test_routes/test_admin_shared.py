@@ -162,8 +162,8 @@ class TestPermissionRequired:
                  patch("app.routes.admin.shared._is_json_request", return_value=True):
                 mock_user.is_authenticated = False
                 app.config["DEBUG_SKIP_LOGIN"] = False
-                resp, status = dummy_view()
-        assert status == 401
+                resp = dummy_view()
+        assert resp.status_code == 401
 
     def test_no_permission_html_redirects(self, app, db_session):
         from app.routes.admin.shared import permission_required
@@ -201,8 +201,8 @@ class TestPermissionRequired:
                  patch("app.routes.admin.shared._is_json_request", return_value=True):
                 mock_user.is_authenticated = True
                 app.config["DEBUG_SKIP_LOGIN"] = False
-                resp, status = dummy_view()
-        assert status == 403
+                resp = dummy_view()
+        assert resp.status_code == 403
 
     def test_permitted_user_proceeds(self, app, db_session):
         from app.routes.admin.shared import permission_required
@@ -284,8 +284,8 @@ class TestSystemManagerRequired:
                  patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=False), \
                  patch("app.routes.admin.shared._is_json_request", return_value=True):
                 mock_user.is_authenticated = True
-                resp, status = dummy_view()
-        assert status == 403
+                resp = dummy_view()
+        assert resp.status_code == 403
 
     def test_system_manager_proceeds(self, app, db_session):
         from app.routes.admin.shared import system_manager_required
@@ -412,8 +412,8 @@ class TestPermissionRequiredAny:
                  patch("app.routes.admin.shared._is_json_request", return_value=True):
                 mock_user.is_authenticated = False
                 app.config["DEBUG_SKIP_LOGIN"] = False
-                resp, status = dummy_view()
-        assert status == 401
+                resp = dummy_view()
+        assert resp.status_code == 401
 
     def test_no_permission_json_returns_403(self, app, db_session):
         from app.routes.admin.shared import permission_required_any
@@ -428,8 +428,8 @@ class TestPermissionRequiredAny:
                  patch("app.routes.admin.shared._is_json_request", return_value=True):
                 mock_user.is_authenticated = True
                 app.config["DEBUG_SKIP_LOGIN"] = False
-                resp, status = dummy_view()
-        assert status == 403
+                resp = dummy_view()
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------

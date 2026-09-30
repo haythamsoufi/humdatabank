@@ -35,8 +35,9 @@ from app.services.indicators.bank_service import (
 )
 from app.services.indicators.resolution_service import IndicatorResolutionService
 from app.services.platform import storage_service as storage
-from app.services.security.api_authentication import authenticate_db_api_key_only
+from app.services.security.api_key_permissions import INDICATORS_SUGGEST, REFERENCE_READ
 from app.utils.api_helpers import api_error, get_json_safe
+from app.utils.auth import require_api_key
 from app.utils.datetime_helpers import utcnow
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.sql_utils import safe_ilike_pattern
@@ -85,17 +86,9 @@ def _localized_text(translations: Optional[dict], locale: str, fallback: Optiona
     return (fallback or "").strip()
 
 
-def _require_compat_api_key(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_result = authenticate_db_api_key_only()
-        if hasattr(auth_result, "status_code"):
-            return auth_result
-        g.skip_auth = True
-        return f(*args, **kwargs)
-
-    decorated._ep_auth = "api_key"
-    return decorated
+def _require_compat_api_key(capability: str = REFERENCE_READ):
+    """Compat routes use the same key pipeline and capabilities as /api/v1."""
+    return require_api_key(capability=capability)
 
 
 def _verify_recaptcha(token: str) -> bool:
@@ -325,6 +318,8 @@ def _build_legacy_excel_export(locale: str) -> bytes:
         ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
     output = io.BytesIO()
+    from app.utils.export_safety import sanitize_workbook
+    sanitize_workbook(wb)
     wb.save(output)
     return output.getvalue()
 
@@ -445,8 +440,12 @@ def _indicator_detail(
         "emergency": _emergency_to_string(indicator.emergency),
         "disaggregation": indicator.disaggregation_guidance or "",
         "indicatorSource": indicator.data_source or "",
-        "spef": indicator.area or "",
-        "spefLabel": getattr(indicator, "area_label", None) or "",
+        "spef": (indicator.area if isinstance(getattr(indicator, "area", None), str) else "") or "",
+        "spefLabel": (
+            getattr(indicator, "area_label", None)
+            if isinstance(getattr(indicator, "area_label", None), str)
+            else ""
+        ),
         "relatedPrograms": [{"text": p} for p in indicator.related_programs_list],
         "monitoringQuestions": [{"text": q} for q in indicator.monitoring_questions_list],
         "tags": [{"text": t} for t in indicator.tags_list],
@@ -567,7 +566,7 @@ def _select_option(text: str) -> dict:
 
 
 @indicator_bank_compat_bp.route("/Indicator", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def indicator_list():
     query, locale = _apply_indicator_filters(IndicatorBank.query)
@@ -587,7 +586,7 @@ def indicator_list():
 
 
 @indicator_bank_compat_bp.route("/Indicator/<int:indicator_id>", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def indicator_detail(indicator_id: int):
     indicator = db.session.get(IndicatorBank, indicator_id)
@@ -601,7 +600,7 @@ def indicator_detail(indicator_id: int):
 
 
 @indicator_bank_compat_bp.route("/Indicator/search", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def indicator_search():
     query_text = (request.args.get("filter") or request.args.get("Filter") or "").strip()
@@ -652,7 +651,7 @@ def indicator_search():
 
 
 @indicator_bank_compat_bp.route("/Indicator/tags", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def indicator_tags():
     tags: Set[str] = set()
@@ -663,7 +662,7 @@ def indicator_tags():
 
 
 @indicator_bank_compat_bp.route("/Indicator/selectOptions", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def indicator_select_options():
     locale = _compat_locale()
@@ -677,15 +676,24 @@ def indicator_select_options():
     program_items: Set[str] = set()
 
     for indicator in indicators:
-        if indicator.unit:
-            units.add(indicator.unit.strip())
-        if indicator.type:
-            types.add(indicator.type.strip())
-        if indicator.disaggregation_guidance:
-            disaggregations.add(indicator.disaggregation_guidance.strip())
-        tag_items.update(indicator.tags_list)
-        monitoring_items.update(indicator.monitoring_questions_list)
-        program_items.update(indicator.related_programs_list)
+        unit = indicator.unit if isinstance(getattr(indicator, "unit", None), str) else None
+        typ = indicator.type if isinstance(getattr(indicator, "type", None), str) else None
+        if unit:
+            units.add(unit.strip())
+        if typ:
+            types.add(typ.strip())
+        guidance = getattr(indicator, "disaggregation_guidance", None)
+        if isinstance(guidance, str) and guidance.strip():
+            disaggregations.add(guidance.strip())
+        for tag in (indicator.tags_list or []):
+            if isinstance(tag, str) and tag.strip():
+                tag_items.add(tag.strip())
+        for q in (indicator.monitoring_questions_list or []):
+            if isinstance(q, str) and q.strip():
+                monitoring_items.add(q.strip())
+        for p in (indicator.related_programs_list or []):
+            if isinstance(p, str) and p.strip():
+                program_items.add(p.strip())
 
     active_types = IndicatorBankType.query.filter_by(is_active=True).order_by(IndicatorBankType.sort_order).all()
     active_units = IndicatorBankUnit.query.filter_by(is_active=True).order_by(IndicatorBankUnit.sort_order).all()
@@ -701,7 +709,13 @@ def indicator_select_options():
             for row in active_spef
         ]
     else:
-        spef_codes = sorted({(ind.area or "").strip() for ind in indicators if (ind.area or "").strip()})
+        spef_codes = sorted(
+            {
+                (ind.area or "").strip()
+                for ind in indicators
+                if isinstance(getattr(ind, "area", None), str) and (ind.area or "").strip()
+            }
+        )
         spef_options = [_select_option(c) for c in spef_codes]
 
     return jsonify(
@@ -722,7 +736,7 @@ def indicator_select_options():
 
 
 @indicator_bank_compat_bp.route("/Indicator/Suggestion", methods=["POST"])
-@_require_compat_api_key
+@_require_compat_api_key(INDICATORS_SUGGEST)
 @api_rate_limit()
 def indicator_suggestion():
     data = get_json_safe() or {}
@@ -806,7 +820,7 @@ def indicator_suggestion():
 
 
 @indicator_bank_compat_bp.route("/Sector", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def sector_list():
     locale = _compat_locale()
@@ -821,7 +835,7 @@ def sector_list():
 
 
 @indicator_bank_compat_bp.route("/Subsector", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def subsector_list():
     locale = _compat_locale()
@@ -842,7 +856,7 @@ def subsector_list():
 
 
 @indicator_bank_compat_bp.route("/list-home", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def list_home():
     locale = _compat_locale()
@@ -863,7 +877,7 @@ def list_home():
 
 
 @indicator_bank_compat_bp.route("/Excel", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def export_excel():
     locale = _compat_locale()
@@ -880,7 +894,7 @@ def export_excel():
 
 
 @indicator_bank_compat_bp.route("/CommonWord", methods=["GET"])
-@_require_compat_api_key
+@_require_compat_api_key()
 @api_rate_limit()
 def common_word_list():
     locale = _compat_locale()

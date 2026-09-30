@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import html as html_lib
 import io
 import json
@@ -28,6 +29,18 @@ from flask_login import login_required, current_user, login_user, logout_user
 from app.utils.ai_request_user import resolve_ai_identity
 from app.utils.ai_tokens import issue_ai_token
 from app.utils.ai_pricing import estimate_chat_cost
+from app.utils.outbound_url import is_local_dev_environment
+from app.services.ai.policies.usage_budget import (
+    budget_exceeded_payload,
+    check_daily_cost_budget,
+    daily_request_limit_string,
+)
+from app.services.ai.policies.access_policy import (
+    build_ai_access_policy,
+    record_form_builder_authorization,
+    set_request_policy,
+    trusted_form_builder_context,
+)
 from app.utils.ai_utils import (
     is_form_builder_assistant_context,
     sanitize_page_context,
@@ -59,6 +72,7 @@ from app.services.ai.chat.fastpath import try_answer_value_question
 # Telemetry tracking
 from app.services.ai.chat.telemetry import ChatbotTelemetryService, ChatbotMetrics
 from app.services.platform.user_analytics_service import get_client_ip
+from app.utils.client_ip import is_loopback_ip
 
 # AI Agent integration (RAG + agentic reasoning)
 # Lazy-loaded to avoid import errors if dependencies are missing
@@ -87,9 +101,11 @@ def _chat_json_body():
 PUBLIC_AI_PROXY_HEADER = "X-hum-databank-AI-Proxy"
 
 
-def _is_development_mode() -> bool:
-    flask_config = (os.environ.get("FLASK_CONFIG") or "").strip().lower()
-    return flask_config in {"development", "default", ""}
+def _is_local_dev_request() -> bool:
+    """Explicit local development only: dev FLASK_CONFIG, DEBUG on, and a loopback client address."""
+    if not is_local_dev_environment():
+        return False
+    return is_loopback_ip(get_client_ip())
 
 
 def _public_ai_proxy_secret() -> Optional[str]:
@@ -102,26 +118,27 @@ def _is_allowed_public_proxy_request() -> bool:
     """
     Allow anonymous AI chat only when coming through the Website proxy.
 
-    In production/staging, require a shared secret header (prevents direct public abuse).
-    In development, allow anonymous without a secret for convenience.
+    Requires the shared secret header (constant-time compare). With no secret configured the request is
+    allowed only in an explicit local development process (dev config + DEBUG + loopback client);
+    every other environment fails closed.
     """
     secret = _public_ai_proxy_secret()
     if not secret:
-        # Dev convenience: don't block anonymous when not configured.
-        if _is_development_mode():
+        if _is_local_dev_request():
             current_app.logger.warning(
-                "AI_PUBLIC_PROXY_SECRET is not set; allowing anonymous AI chat in development. "
-                "Set AI_PUBLIC_PROXY_SECRET in production to prevent abuse."
+                "AI_PUBLIC_PROXY_SECRET is not set; allowing anonymous AI chat for local development only."
             )
             return True
         current_app.logger.error(
-            "AI_PUBLIC_PROXY_SECRET is not set in non-development mode; blocking anonymous AI chat. "
-            "Set AI_PUBLIC_PROXY_SECRET to enable Website public chatbot safely."
+            "AI_PUBLIC_PROXY_SECRET is not set; blocking anonymous AI chat. "
+            "Set AI_PUBLIC_PROXY_SECRET to enable the Website public chatbot."
         )
         return False
 
     presented = (request.headers.get(PUBLIC_AI_PROXY_HEADER) or "").strip()
-    return bool(presented) and presented == secret
+    if not presented:
+        return False
+    return hmac.compare_digest(presented.encode("utf-8"), secret.encode("utf-8"))
 
 
 def _ai_beta_denied_response(identity):
@@ -188,27 +205,56 @@ def _ai_chat_limit() -> str:
     return "60 per minute"
 
 def _ai_chat_daily_user_limit() -> str:
-    # System managers should not be constrained by the per-user daily cap.
     try:
         identity = resolve_ai_identity()
         if identity.is_authenticated and identity.user:
             from app.services.organization.authorization_service import AuthorizationService
+
             if AuthorizationService.is_system_manager(identity.user):
-                # Effectively exempt (Flask-Limiter does not provide a reliable "disable limit"
-                # signal via dynamic strings; use a very high ceiling instead).
-                return "5000000 per day"
+                return daily_request_limit_string("AI_CHAT_DAILY_MANAGER_LIMIT")
+            return daily_request_limit_string("AI_CHAT_DAILY_USER_LIMIT")
+        return daily_request_limit_string("AI_CHAT_DAILY_ANON_IP_LIMIT")
     except Exception as e:
-        logger.debug("resolve_ai_identity or is_system_manager failed: %s", e, exc_info=True)
-    return "1000000 per day"
+        logger.debug("daily user limit resolution failed, using strict default: %s", e, exc_info=True)
+    return daily_request_limit_string("AI_CHAT_DAILY_ANON_IP_LIMIT")
 
 
 def _ai_chat_daily_system_limit() -> str:
-    return "5000000 per day"
+    return daily_request_limit_string("AI_CHAT_DAILY_SYSTEM_LIMIT")
+
+
+def _ai_chat_daily_anonymous_limit() -> str:
+    return daily_request_limit_string("AI_CHAT_DAILY_ANON_LIMIT")
 
 
 def _ai_chat_system_rate_limit_key() -> str:
     # Single shared bucket for system-wide daily cap.
     return "ai_chat:system"
+
+
+def _ai_chat_anonymous_rate_limit_key() -> str:
+    return "ai_chat:anonymous_all"
+
+
+def _ai_chat_caller_is_authenticated() -> bool:
+    try:
+        return bool(resolve_ai_identity().is_authenticated)
+    except Exception:
+        return False
+
+
+def _daily_budget_denied_response(identity):
+    """429 when the caller's / anonymous / platform daily cost budget is spent."""
+    uid = int(identity.user.id) if identity.is_authenticated and identity.user else None
+    verdict = check_daily_cost_budget(uid)
+    if verdict.allowed:
+        return None
+    logger.warning(
+        "AI daily cost budget reached scope=%s spent=%.2f budget=%.2f user_id=%s",
+        verdict.scope, verdict.spent_usd, verdict.budget_usd, uid,
+    )
+    payload = budget_exceeded_payload(verdict)
+    return json_error(payload.pop("error"), 429, **payload)
 
 
 def _ai_cancel_limit() -> str:
@@ -857,44 +903,96 @@ def issue_token():
         return json_server_error("Failed to issue token")
 
 
+def _can_view_ai_health_details() -> bool:
+    if not getattr(current_user, "is_authenticated", False):
+        return False
+    try:
+        from app.services.organization.authorization_service import AuthorizationService
+
+        return bool(
+            AuthorizationService.is_system_manager(current_user)
+            or AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage")
+        )
+    except Exception as e:
+        logger.debug("AI health detail permission check failed: %s", e)
+        return False
+
+
 @ai_bp.route("/health", methods=["GET"])
+@limiter.limit("60 per minute")
 def ai_health():
     """
-    Health check for AI stack: config, agent availability, and optional embedding probe.
-    Use for load balancers or monitoring. No auth required.
-    Query: ?probe=embedding to run a minimal embedding call (slower).
+    Health check for AI stack. Unauthenticated callers (load balancers, monitors) get only a generic
+    ``{"ok": bool}``; per-check detail and the optional embedding probe (``?probe=embedding``, which
+    spends provider quota) require an AI manager session.
     """
-    status = {"ok": True, "checks": {}}
-    # Config checks
-    status["checks"]["openai_key"] = bool(current_app.config.get("OPENAI_API_KEY"))
-    status["checks"]["embedding_provider"] = "openai"
-    if not status["checks"]["openai_key"]:
-        status["ok"] = False
+    detailed = _can_view_ai_health_details()
+    checks: Dict[str, Any] = {}
+    ok = True
 
-    # Agent availability (lazy init; best-effort)
+    openai_key = bool(current_app.config.get("OPENAI_API_KEY"))
+    checks["openai_key"] = openai_key
+    checks["embedding_provider"] = "openai"
+    if not openai_key:
+        ok = False
+
     try:
         integration = _get_ai_chat_integration()
-        status["checks"]["agent_available"] = integration is not None and getattr(integration, "agent_enabled", False) and getattr(integration, "agent", None) is not None
+        checks["agent_available"] = bool(
+            integration is not None
+            and getattr(integration, "agent_enabled", False)
+            and getattr(integration, "agent", None) is not None
+        )
     except Exception as e:
         logger.debug("AI health agent check failed: %s", e, exc_info=True)
-        status["checks"]["agent_available"] = False
+        checks["agent_available"] = False
 
-    # Optional embedding probe
-    if request.args.get("probe") == "embedding":
+    if detailed and request.args.get("probe") == "embedding":
         try:
             from app.services.ai.documents.embedding import AIEmbeddingService
+
             svc = AIEmbeddingService()
-            _, _ = svc.generate_embedding("health")
-            status["checks"]["embedding_probe"] = "ok"
+            svc.generate_embedding("health")
+            checks["embedding_probe"] = "ok"
         except Exception as e:
-            status["checks"]["embedding_probe"] = str(e)[:200]
-            status["ok"] = False
-    code = 200 if status["ok"] else 503
-    return jsonify(status), code
+            logger.warning("AI health embedding probe failed: %s", e)
+            checks["embedding_probe"] = "failed"
+            ok = False
+
+    code = 200 if ok else 503
+    if not detailed:
+        return jsonify({"ok": ok}), code
+    return jsonify({"ok": ok, "checks": checks}), code
+
+
+def _bind_ai_request_policy(identity, parsed):
+    """Compute the request's AIAccessPolicy once and constrain client-supplied inputs to it.
+
+    Returns ``(policy, error_message)``. Client-asserted privileged context (``page_context.formBuilder``)
+    is dropped unless the server can vouch for it, and anonymous callers cannot widen their sources.
+    """
+    policy = set_request_policy(
+        build_ai_access_policy(identity.user if identity.is_authenticated else None)
+    )
+    parsed.page_context = policy.bind_page_context(parsed.page_context, auth_source=identity.auth_source) or {}
+    record_form_builder_authorization(parsed.page_context.get("formBuilder"))
+    parsed.sources_cfg = policy.clamp_sources(getattr(parsed, "sources_cfg", None))
+    try:
+        max_chars = int(current_app.config.get("AI_MAX_MESSAGE_CHARS", 4000))
+    except (TypeError, ValueError):
+        max_chars = 4000
+    if not is_form_builder_assistant_context(parsed.page_context) and len(parsed.message or "") > max_chars:
+        return policy, f"Message is too long (max {max_chars} characters)"
+    return policy, None
 
 
 @ai_bp.route("/chat", methods=["POST"])
 @limiter.limit(_ai_chat_daily_system_limit, key_func=_ai_chat_system_rate_limit_key)
+@limiter.limit(
+    _ai_chat_daily_anonymous_limit,
+    key_func=_ai_chat_anonymous_rate_limit_key,
+    exempt_when=_ai_chat_caller_is_authenticated,
+)
 @limiter.limit(_ai_chat_daily_user_limit, key_func=_ai_chat_rate_limit_key)
 @limiter.limit(_ai_chat_limit, key_func=_ai_chat_rate_limit_key, override_defaults=True)
 def chat():
@@ -912,6 +1010,9 @@ def chat():
     csrf_error = _enforce_ai_csrf(identity)
     if csrf_error:
         return csrf_error
+    budget_denied = _daily_budget_denied_response(identity)
+    if budget_denied is not None:
+        return budget_denied
     # Ensure current_user reflects Bearer auth so existing RBAC helpers (used by tools) work.
     did_login = False
     try:
@@ -933,6 +1034,9 @@ def chat():
     parsed, err_msg, err_code = parse_chat_request(data)
     if err_msg:
         return json_error(err_msg, err_code, success=False)
+    _policy, policy_error = _bind_ai_request_policy(identity, parsed)
+    if policy_error is not None:
+        return json_error(policy_error, 400, success=False)
 
     # Optional: user-selected source gating for tools (databank vs system docs vs UPR docs).
     # Stored on request-scoped g so tool registry can enforce/filter deterministically.
@@ -1402,6 +1506,11 @@ def chat():
 
 @ai_bp.route("/chat/stream", methods=["POST"])
 @limiter.limit(_ai_chat_daily_system_limit, key_func=_ai_chat_system_rate_limit_key)
+@limiter.limit(
+    _ai_chat_daily_anonymous_limit,
+    key_func=_ai_chat_anonymous_rate_limit_key,
+    exempt_when=_ai_chat_caller_is_authenticated,
+)
 @limiter.limit(_ai_chat_daily_user_limit, key_func=_ai_chat_rate_limit_key)
 @limiter.limit(_ai_chat_limit, key_func=_ai_chat_rate_limit_key, override_defaults=True)
 def chat_stream():
@@ -1421,6 +1530,9 @@ def chat_stream():
     csrf_error = _enforce_ai_csrf(identity)
     if csrf_error:
         return csrf_error
+    budget_denied = _daily_budget_denied_response(identity)
+    if budget_denied is not None:
+        return budget_denied
     did_login = False
     try:
         if identity.user and identity.auth_source == "bearer" and not current_user.is_authenticated:
@@ -1440,6 +1552,9 @@ def chat_stream():
     parsed, err_msg, err_code = parse_chat_request(data)
     if err_msg:
         return json_error(err_msg, err_code, success=False)
+    _policy, policy_error = _bind_ai_request_policy(identity, parsed)
+    if policy_error is not None:
+        return json_error(policy_error, 400, success=False)
 
     # Capture explicit sources selection for worker thread propagation.
     sources_cfg = getattr(parsed, "sources_cfg", None)
@@ -1899,12 +2014,11 @@ def chat_stream():
                         g.ai_sources_cfg = sources_cfg
                     except Exception as e:
                         logger.debug("g.ai_sources_cfg failed in worker: %s", e)
+                    set_request_policy(_policy)
                     try:
                         fb_ctx = (page_context or {}).get("formBuilder") if isinstance(page_context, dict) else None
-                        if isinstance(fb_ctx, dict):
-                            g.ai_form_builder_ctx = {**fb_ctx, "enabled": True}
-                        else:
-                            g.ai_form_builder_ctx = None
+                        record_form_builder_authorization(fb_ctx)
+                        g.ai_form_builder_ctx = trusted_form_builder_context()
                     except Exception as e:
                         logger.debug("g.ai_form_builder_ctx failed in worker: %s", e)
                     # Pass conversation_id so agent traces can log it (do not mutate cached platform_context)
@@ -2418,28 +2532,35 @@ def get_or_delete_conversation(conversation_id: str):
         .all()
     )
 
-    # If messages were archived, load them from archive storage.
-    if not msgs and getattr(convo, "is_archived", False) and getattr(convo, "archive_path", None):
-        try:
-            payload = load_archived_conversation(convo)
-            archived_msgs = (payload or {}).get("messages") or []
-            archived_msgs = archived_msgs[:limit]
-            return json_ok(
-                success=True,
-                conversation={
-                    "id": convo.id,
-                    "title": convo.title,
-                    "updated_at": convo.updated_at.isoformat() if convo.updated_at else None,
-                    "last_message_at": convo.last_message_at.isoformat() if convo.last_message_at else None,
-                    "is_archived": True,
-                    "archived_at": convo.archived_at.isoformat() if getattr(convo, "archived_at", None) else None,
-                },
-                messages=archived_msgs,
-                meta={"source": "archive"},
-            )
-        except Exception as e:
-            current_app.logger.error(f"Failed to load archived conversation {conversation_id}: {e}", exc_info=True)
-            return json_server_error("Failed to load archived conversation")
+    # Prefer archive storage when an archive object exists. Use archive_path as
+    # the source of truth (is_archived alone can be stale in long-lived sessions).
+    # Also covers stray DB message rows from a partial cleanup / concurrent write.
+    if getattr(convo, "archive_path", None):
+        with suppress(Exception):
+            db.session.refresh(convo)
+        if getattr(convo, "is_archived", False) or getattr(convo, "archive_path", None):
+            try:
+                payload = load_archived_conversation(convo)
+                archived_msgs = (payload or {}).get("messages") or []
+                archived_msgs = archived_msgs[:limit]
+                return json_ok(
+                    success=True,
+                    conversation={
+                        "id": convo.id,
+                        "title": convo.title,
+                        "updated_at": convo.updated_at.isoformat() if convo.updated_at else None,
+                        "last_message_at": convo.last_message_at.isoformat() if convo.last_message_at else None,
+                        "is_archived": True,
+                        "archived_at": convo.archived_at.isoformat() if getattr(convo, "archived_at", None) else None,
+                    },
+                    messages=archived_msgs,
+                    meta={"source": "archive"},
+                )
+            except Exception as e:
+                current_app.logger.error(f"Failed to load archived conversation {conversation_id}: {e}", exc_info=True)
+                # Fall through to DB messages if archive load fails and rows still exist.
+                if not msgs:
+                    return json_server_error("Failed to load archived conversation")
 
     return json_ok(
         success=True,
@@ -2529,7 +2650,9 @@ def export_conversation(conversation_id: str):
         }
     else:
         # fallback to archived payload if present
-        if getattr(convo, "is_archived", False) and getattr(convo, "archive_path", None):
+        if getattr(convo, "archive_path", None):
+            with suppress(Exception):
+                db.session.refresh(convo)
             payload = load_archived_conversation(convo)
             payload["exported_at"] = utcnow().isoformat()
             payload["source"] = "archive"
@@ -2651,6 +2774,8 @@ def export_table_as_excel():
         logger.debug("Column width auto-fit failed: %s", e)
 
     output = io.BytesIO()
+    from app.utils.export_safety import sanitize_workbook
+    sanitize_workbook(wb)
     wb.save(output)
     output.seek(0)
 

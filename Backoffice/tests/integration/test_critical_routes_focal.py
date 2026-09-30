@@ -57,12 +57,13 @@ class TestCriticalAssignmentFormRoutes:
         resp = client.get(f"/forms/assignment/{aes_id}", follow_redirects=False)
         assert resp.status_code in (301, 302, 303, 307, 308)
 
-    def test_assignment_form_happy_path_focal_point(
+    def test_legacy_assignment_form_url_redirects_for_focal_point(
         self, logged_in_focal_client, focal_point_user, app
     ):
         aes_id = focal_point_user["aes_id"]
-        resp = logged_in_focal_client.get(f"/forms/assignment/{aes_id}")
-        assert resp.status_code == 200
+        resp = logged_in_focal_client.get(f"/forms/assignment/{aes_id}", follow_redirects=False)
+        assert resp.status_code == 301
+        assert resp.headers["Location"].endswith(f"/assignment/{aes_id}")
 
     def test_assignment_form_save_via_http(self, logged_in_client, db_session, app):
         with app.app_context():

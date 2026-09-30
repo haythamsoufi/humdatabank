@@ -321,10 +321,13 @@ def upsert_assignment_status_from_plan(
             logger.debug("assignment status progress_cb failed: %s", e)
 
     aes_ids = [int(r["assignment_entity_status_id"]) for r in plan_rows]
-    aes_by_id = {
-        int(row.id): row
-        for row in AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
-    }
+    if dry_run:
+        aes_rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
+    else:
+        from app.utils.form_authorization import lock_aes_rows_for_update
+
+        aes_rows = lock_aes_rows_for_update(aes_ids)
+    aes_by_id = {int(row.id): row for row in aes_rows}
 
     for i, row in enumerate(plan_rows, start=1):
         _check_cancel()

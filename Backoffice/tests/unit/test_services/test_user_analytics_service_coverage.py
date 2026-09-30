@@ -329,22 +329,34 @@ class TestResolveUserSessionIdForLogging:
 
 
 class TestGetClientIp:
-    def test_x_forwarded_for(self, app):
-        with app.test_request_context("/", headers={"X-Forwarded-For": "5.5.5.5, 1.1.1.1"}):
-            assert _svc.get_client_ip() == "5.5.5.5"
+    def test_client_supplied_forwarded_for_is_ignored(self, app):
+        with app.test_request_context(
+            "/", headers={"X-Forwarded-For": "5.5.5.5, 1.1.1.1"},
+            environ_base={"REMOTE_ADDR": "203.0.113.5"},
+        ):
+            assert _svc.get_client_ip() == "203.0.113.5"
 
-    def test_x_real_ip(self, app):
-        with app.test_request_context("/", headers={"X-Real-IP": "6.6.6.6"}):
-            assert _svc.get_client_ip() == "6.6.6.6"
+    def test_client_supplied_x_real_ip_is_ignored(self, app):
+        with app.test_request_context(
+            "/", headers={"X-Real-IP": "6.6.6.6"}, environ_base={"REMOTE_ADDR": "203.0.113.5"},
+        ):
+            assert _svc.get_client_ip() == "203.0.113.5"
 
-    def test_remote_addr_fallback(self, app):
-        with app.test_request_context("/"):
-            ip = _svc.get_client_ip()
-            assert ip is not None
+    def test_remote_addr_used(self, app):
+        with app.test_request_context("/", environ_base={"REMOTE_ADDR": "198.51.100.20"}):
+            assert _svc.get_client_ip() == "198.51.100.20"
 
-    def test_strips_port_from_forwarded_for(self, app):
-        with app.test_request_context("/", headers={"X-Forwarded-For": "1.2.3.4:12345"}):
+    def test_strips_port_from_remote_addr(self, app):
+        with app.test_request_context("/", environ_base={"REMOTE_ADDR": "1.2.3.4:12345"}):
             assert _svc.get_client_ip() == "1.2.3.4"
+
+    def test_invalid_remote_addr_is_unknown(self, app):
+        with app.test_request_context("/", environ_base={"REMOTE_ADDR": "not-an-ip"}):
+            assert _svc.get_client_ip() == "unknown"
+
+    def test_ipv4_mapped_ipv6_is_normalised(self, app):
+        with app.test_request_context("/", environ_base={"REMOTE_ADDR": "::ffff:192.0.2.7"}):
+            assert _svc.get_client_ip() == "192.0.2.7"
 
 
 class TestGetClientInfo:
@@ -428,16 +440,30 @@ class TestSessionBlacklist:
             _svc.add_session_to_blacklist("sess-001")
             assert _svc.is_session_blacklisted("sess-001") is True
 
-    def test_remove_from_blacklist(self, app):
+    def test_remove_only_drops_the_process_cache_not_the_shared_revocation(self, app):
+        """The shared revocation must survive: it also invalidates outstanding JWTs."""
         with app.app_context():
             _svc.add_session_to_blacklist("sess-002")
             _svc.remove_session_from_blacklist("sess-002")
-            # Now must fall back to DB; mock query returning None
+            assert "sess-002" not in _svc._blacklisted_sessions
+            assert _svc.is_session_blacklisted("sess-002") is True
+
+    def test_revocation_visible_after_process_cache_cleared(self, app):
+        """A second worker (empty cache) still sees a revocation written by the first."""
+        with app.app_context():
+            _svc.add_session_to_blacklist("sess-003")
+            _svc._blacklisted_sessions.clear()
+            assert _svc.is_session_blacklisted("sess-003") is True
+            assert _svc.should_block_mobile_jwt_session("sess-003") is True
+
+    def test_mobile_block_fails_closed_when_store_down(self, app):
+        from app.utils.auth_state import AuthStateUnavailable
+        with app.app_context():
             with patch(
-                "app.services.platform.user_analytics_service.UserSessionLog"
-            ) as MockSL:
-                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = None
-                assert _svc.is_session_blacklisted("sess-002") is False
+                "app.utils.auth_state.DbAuthStateBackend.exists",
+                side_effect=AuthStateUnavailable("down"),
+            ):
+                assert _svc.should_block_mobile_jwt_session("sess-004") is True
 
     def test_not_blacklisted_by_default(self, app):
         with app.app_context():
@@ -2125,31 +2151,23 @@ class TestCleanupInactiveSessions:
                         assert result == 0
 
     def test_closes_inactive_sessions(self, app):
-        """Sessions that are active and past the cutoff should be closed."""
+        """Sessions that are active and past the cutoff should be closed (bulk UPDATE)."""
         with app.app_context():
-            old_session = MagicMock()
-            old_session.is_active = True
-            old_session.session_start = datetime.now(timezone.utc) - timedelta(hours=10)
-            old_session.last_activity = datetime.now(timezone.utc) - timedelta(hours=10)
-            old_session.session_end = None
-
             with patch("app.services.platform.user_analytics_service.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.return_value = True
                 with patch("app.services.platform.user_analytics_service.db") as mock_db:
                     mock_db.engine.dialect.name = "sqlite"
 
                     with patch("app.services.platform.user_analytics_service.UserSessionLog.query") as mock_query:
-                        mock_query.filter.return_value.all.side_effect = [
-                            [old_session],
-                            [],
-                        ]
+                        # Three mutually-exclusive bulk UPDATE groups:
+                        # both / inactive-only / max-duration-only
+                        mock_query.filter.return_value.update.side_effect = [0, 1, 0]
 
                         result = _svc.cleanup_inactive_sessions(
                             inactivity_hours=1, max_session_hours=48
                         )
                         assert result == 1
-                        assert old_session.is_active is False
-                        assert old_session.ended_by == "inactivity_timeout"
+                        assert mock_query.filter.return_value.update.call_count == 3
 
     def test_exception_returns_zero(self, app):
         with app.app_context():

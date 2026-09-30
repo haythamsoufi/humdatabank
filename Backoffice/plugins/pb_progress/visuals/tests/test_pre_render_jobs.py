@@ -10,16 +10,19 @@ import pytest
 from pb_figures.config import build_workers
 from pb_figures.data import load_mapping
 from pre_render import SectionJob, _clean_build_workspace, _generate_assets, _section_jobs
-from workbook_fixtures import sp1_mapping_row, write_test_workbook
+from workbook_fixtures import apply_section_order_env, sp1_mapping_row, write_test_workbook
 
 
 @pytest.fixture
-def staging_workbook(tmp_path):
+def staging_workbook(tmp_path, monkeypatch):
     path = tmp_path / "staging_gap.xlsx"
     write_test_workbook(
         path,
         mapping_rows=[sp1_mapping_row()],
-        section_order={"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
+    )
+    apply_section_order_env(
+        monkeypatch,
+        {"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
     )
     return path
 
@@ -81,6 +84,10 @@ def test_generate_assets_parallelizes_multiple_sections(tmp_path, monkeypatch) -
             sp1_mapping_row(**{"Strategic Priority / Enabling Function": "SP1", "ID": "618"}),
             sp1_mapping_row(**{"Strategic Priority / Enabling Function": "EF1", "ID": "901"}),
         ],
+    )
+    apply_section_order_env(
+        monkeypatch,
+        {"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
     )
     monkeypatch.setenv("PB_REPORT_EXCEL", str(path))
     monkeypatch.setenv("PB_BUILD_WORKERS", "4")

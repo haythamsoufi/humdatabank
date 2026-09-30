@@ -68,7 +68,7 @@
                                 <div class="form-note-heading">{{ note_label }}</div>
                             {% endif %}
                             {% if note_body and note_body|trim %}
-                                <div class="form-note-body">{{ note_body | safe }}</div>
+                                <div class="form-note-body">{{ note_body | rich_text }}</div>
                             {% endif %}
                         </div>
                     {% endif %}

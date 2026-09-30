@@ -25,8 +25,12 @@ def _make_submitted_doc(
     file_pending=False,
     source_url=None,
     aes=None,
+    is_public=True,
+    status="approved",
 ):
     doc = MagicMock()
+    doc.is_public = is_public
+    doc.status = status
     doc.storage_path = storage_path
     doc.filename = filename
     doc.public_submission_id = public_submission_id
@@ -38,6 +42,9 @@ def _make_submitted_doc(
 
 def _make_aes(country_id=1, status="in_progress"):
     aes = MagicMock()
+    aes.id = 1
+    aes.entity_type = "country"
+    aes.entity_id = country_id
     aes.country_id = country_id
     aes.status = status
     return aes
@@ -223,7 +230,7 @@ class TestStreamDownloadResponse:
         doc = _make_submitted_doc(
             aes=aes,
             file_pending=True,
-            source_url="https://example.com/doc.pdf",
+            source_url="https://go.ifrc.org/doc.pdf",
         )
         with app.app_context():
             with patch("app.services.documents.service.SubmittedDocument") as MockModel:
@@ -233,10 +240,37 @@ class TestStreamDownloadResponse:
                     "app.services.documents.service.AuthorizationService.is_admin",
                     return_value=False,
                 ):
-                    from flask import Flask
                     with app.test_request_context():
                         response = DocumentService.stream_download_response(1, user)
             assert response.status_code in (301, 302)
+            assert response.headers["Location"] == "https://go.ifrc.org/doc.pdf"
+
+    @pytest.mark.parametrize(
+        "source_url",
+        [
+            "https://evil.example.com/doc.pdf",
+            "http://go.ifrc.org/doc.pdf",
+            "javascript:alert(1)",
+            "//evil.example.com/doc.pdf",
+            "https://go.ifrc.org.evil.example.com/doc.pdf",
+            "https://go.ifrc.org@evil.example.com/doc.pdf",
+            "https://127.0.0.1/doc.pdf",
+        ],
+    )
+    def test_file_pending_with_untrusted_source_url_is_not_redirected(self, app, source_url):
+        aes = _make_aes(country_id=1)
+        doc = _make_submitted_doc(aes=aes, file_pending=True, source_url=source_url)
+        with app.app_context():
+            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
+                MockModel.query.get_or_404.return_value = doc
+                user = _make_current_user(country_ids=[1])
+                with patch(
+                    "app.services.documents.service.AuthorizationService.is_admin",
+                    return_value=False,
+                ):
+                    with app.test_request_context():
+                        with pytest.raises(FileNotFoundError):
+                            DocumentService.stream_download_response(1, user)
 
     def test_raises_file_not_found_when_no_storage_path(self, app):
         aes = _make_aes(country_id=1)
@@ -281,17 +315,55 @@ class TestStreamPublicDownloadResponse:
     def test_raises_permission_error_when_not_public(self, app):
         doc = _make_submitted_doc(public_submission_id=None)
         with app.app_context():
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with pytest.raises(PermissionError, match="Not a public document"):
                     DocumentService.stream_public_download_response(1)
+
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {"is_public": False},
+            {"status": "pending"},
+            {"status": "rejected"},
+            {"is_public": False, "status": "pending"},
+        ],
+    )
+    def test_raises_permission_error_when_not_public_or_not_approved(self, app, overrides):
+        doc = _make_submitted_doc(public_submission_id=42, **overrides)
+        with app.app_context():
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
+                with pytest.raises(PermissionError, match="Not a public document"):
+                    DocumentService.stream_public_download_response(1)
+
+    def test_raises_permission_error_when_document_missing(self, app):
+        with app.app_context():
+            with patch("app.services.documents.public_access.find_document", return_value=None):
+                with pytest.raises(PermissionError, match="Not a public document"):
+                    DocumentService.stream_public_download_response(1)
+
+    def test_file_pending_public_document_redirects_only_to_allowlisted_host(self, app):
+        ok = _make_submitted_doc(
+            public_submission_id=42, storage_path=None, file_pending=True,
+            source_url="https://go.ifrc.org/doc.pdf",
+        )
+        bad = _make_submitted_doc(
+            public_submission_id=42, storage_path=None, file_pending=True,
+            source_url="https://evil.example.com/doc.pdf",
+        )
+        with app.app_context():
+            with app.test_request_context():
+                with patch("app.services.documents.public_access.find_document", return_value=ok):
+                    resp = DocumentService.stream_public_download_response(1)
+                assert resp.headers["Location"] == "https://go.ifrc.org/doc.pdf"
+                with patch("app.services.documents.public_access.find_document", return_value=bad):
+                    with pytest.raises(FileNotFoundError):
+                        DocumentService.stream_public_download_response(1)
 
     def test_success_streams_response(self, app):
         doc = _make_submitted_doc(public_submission_id=42)
         mock_response = MagicMock()
         with app.app_context():
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with patch.object(_storage, "submitted_document_rel_storage_category", return_value=_storage.SUBMISSIONS):
                     with patch.object(_storage, "stream_response", return_value=mock_response):
                         result = DocumentService.stream_public_download_response(1)
@@ -301,8 +373,7 @@ class TestStreamPublicDownloadResponse:
         doc = _make_submitted_doc(public_submission_id=42, filename="my_report.pdf")
         mock_response = MagicMock()
         with app.app_context():
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with patch.object(_storage, "submitted_document_rel_storage_category", return_value=_storage.SUBMISSIONS):
                     with patch.object(_storage, "stream_response", return_value=mock_response) as mock_stream:
                         DocumentService.stream_public_download_response(1)
@@ -390,7 +461,10 @@ class TestDeleteAssignmentDocument:
                     ):
                         with patch.object(_storage, "submitted_document_rel_storage_category", return_value=_storage.SUBMISSIONS):
                             with patch.object(_storage, "delete", side_effect=OSError("disk full")):
-                                with patch("app.services.documents.service.db") as mock_db:
+                                with patch("app.services.documents.service.db") as mock_db, \
+                                     patch(
+                                         "app.services.assignments.completion_service.AssignmentCompletionService.refresh_and_persist"
+                                     ):
                                     result = DocumentService.delete_assignment_document(1, user)
                 mock_db.session.delete.assert_called_once_with(doc)
                 assert result == "report.pdf"
@@ -412,7 +486,10 @@ class TestDeleteAssignmentDocument:
                     ):
                         with patch.object(_storage, "submitted_document_rel_storage_category", return_value=_storage.SUBMISSIONS):
                             with patch.object(_storage, "delete", return_value=None):
-                                with patch("app.services.documents.service.db") as mock_db:
+                                with patch("app.services.documents.service.db") as mock_db, \
+                                     patch(
+                                         "app.services.assignments.completion_service.AssignmentCompletionService.refresh_and_persist"
+                                     ):
                                     result = DocumentService.delete_assignment_document(1, user)
                 assert result == "doc.pdf"
                 mock_db.session.delete.assert_called_once_with(doc)
@@ -428,8 +505,7 @@ class TestGetPublicDownloadPaths:
     def test_raises_permission_error_when_not_public(self, app):
         doc = _make_submitted_doc(public_submission_id=None)
         with app.app_context():
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with pytest.raises(PermissionError, match="Not a public document"):
                     DocumentService.get_public_download_paths(1)
 
@@ -437,8 +513,7 @@ class TestGetPublicDownloadPaths:
         doc = _make_submitted_doc(public_submission_id=42, storage_path="/etc/passwd")
         with app.app_context():
             app.config["UPLOAD_FOLDER"] = "/safe/uploads"
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with patch.object(_storage, "submitted_document_rel_storage_category", return_value="admin_documents"):
                     with patch(
                         "app.services.documents.service.DocumentService._resolve_storage_path",
@@ -451,8 +526,7 @@ class TestGetPublicDownloadPaths:
     def test_success_with_azure(self, app):
         doc = _make_submitted_doc(public_submission_id=42, storage_path="submissions/file.pdf")
         with app.app_context():
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with patch.object(
                     DocumentService, "_resolve_storage_path", return_value="/abs/file.pdf"
                 ):
@@ -467,8 +541,7 @@ class TestGetPublicDownloadPaths:
         doc = _make_submitted_doc(public_submission_id=42, storage_path=str(test_file))
         with app.app_context():
             app.config["UPLOAD_FOLDER"] = str(tmp_path)
-            with patch("app.services.documents.service.SubmittedDocument") as MockModel:
-                MockModel.query.get_or_404.return_value = doc
+            with patch("app.services.documents.public_access.find_document", return_value=doc):
                 with patch.object(
                     DocumentService, "_resolve_storage_path", return_value=str(test_file)
                 ):

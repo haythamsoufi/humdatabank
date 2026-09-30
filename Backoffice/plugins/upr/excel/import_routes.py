@@ -21,6 +21,8 @@ from app.services.imports.import_change_log import (
 from plugins.upr.excel.excel_import_service import UprExcelImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_helpers import get_json_safe
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_accepted, json_bad_request, json_ok, json_server_error
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 
@@ -57,8 +59,8 @@ legacy_bp = Blueprint("upr_excel_import_legacy", __name__, url_prefix="/admin/te
 @admin_permission_required("admin.templates.view")
 @system_manager_required
 def legacy_redirect(subpath: str = ""):
-    target = url_for("upr_excel_import.wizard") if not subpath else f"/admin/upr-excel-import/{subpath}"
-    return redirect(target, code=301)
+    # Only the wizard page is worth bookmarking; job status/download URLs are ephemeral.
+    return redirect(url_for("upr_excel_import.wizard"), code=301)
 
 UPR_TEMPLATE_CHOICES = [
     # Planning (rounds P*)
@@ -228,7 +230,7 @@ def run_import():
             return json_ok(**stats)
         except Exception as exc:
             current_app.logger.error("UPR import failed: %s", exc, exc_info=True)
-            return json_server_error(str(exc))
+            return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
     job_id = uuid.uuid4().hex
     filename = os.path.basename(file_path)

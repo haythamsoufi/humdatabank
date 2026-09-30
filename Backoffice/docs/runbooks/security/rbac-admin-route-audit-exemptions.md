@@ -21,6 +21,7 @@ Some endpoints are intentionally public (or protected by non-standard controls).
 | `/admin/organization/api/public/branches/<int:country_id>` | `organization.api_get_branches_by_country_public` | `app/routes/admin/organization.py` | Public dynamic selector data for branches. |
 | `/admin/organization/api/public/subbranches/<int:branch_id>` | `organization.api_get_subbranches_by_branch_public` | `app/routes/admin/organization.py` | Public dynamic selector data for sub-branches. |
 | `/admin/organization/api/public/subbranches/by-country/<int:country_id>` | `organization.api_get_subbranches_by_country_public` | `app/routes/admin/organization.py` | Public dynamic selector data for sub-branches by country. |
+| `/plugins/static/<plugin_name>/<path:filename>` | `plugin_static.serve_plugin_static` | `app/routes/admin/plugin_management.py` | Outside `/admin` but audited. Requires login unless the plugin id is listed in `PLUGIN_PUBLIC_STATIC_PLUGINS`; only allow-listed asset extensions are served; non-public responses are `Cache-Control: private`. |
 
 ## Non-Exempt Route Fixes Applied
 
@@ -28,6 +29,10 @@ The following routes were previously detected as unguarded and were fixed by add
 
 - `/admin/api/refresh_csrf_token`
 - `/admin/api/refresh-csrf-token`
+
+## Other audit findings (not exemptions)
+
+The audit also reports policy findings that are fixed in code, not exempted: `non_admin_permission`, `read_permission_on_mutating_route`, `get_side_effect_name`, `csrf_exempt_mutation` and violations of the tables in `app/routes/admin/route_policy.py`. Deliberate exceptions live in that module's allowlists (`READ_ONLY_POST_ALLOWLIST`, `CSRF_EXEMPT_MUTATION_ALLOWLIST`, `LOGIN_ONLY_POST_ALLOWLIST`, `GET_SIDE_EFFECT_NAME_ALLOWLIST`), each with a justification; adding an entry needs the same review as a new exemption and an update to this document.
 
 ## Rules for Adding New Exemptions
 

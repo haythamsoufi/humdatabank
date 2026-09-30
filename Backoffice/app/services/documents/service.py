@@ -3,6 +3,8 @@ from contextlib import suppress
 from flask import current_app
 from app.models import db, SubmittedDocument
 from app.services.organization.authorization_service import AuthorizationService
+from app.services.documents import public_access
+from app.utils.external_url_validation import safe_external_redirect_target
 from app.utils.file_paths import resolve_submitted_document_file
 from app.utils.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
 from app.services.platform import storage_service as _storage
@@ -91,12 +93,19 @@ class DocumentService:
             raise PermissionError("Not authorized to download this document")
 
         if getattr(submitted_document, "file_pending", False) and submitted_document.source_url:
+            target = safe_external_redirect_target(submitted_document.source_url)
+            if target is None:
+                current_app.logger.warning(
+                    "Refusing redirect to non-allowlisted source_url for submitted_document id=%s",
+                    submitted_document.id,
+                )
+                raise FileNotFoundError("Document file has not been imported yet")
             flash(
                 "This document was imported from FDRS with metadata only; opening the external source URL. "
                 "IFRC is fixing direct file access — re-run FDRS sync after URLs work to import the file.",
                 "info",
             )
-            return redirect(submitted_document.source_url)
+            return redirect(target)
 
         if not submitted_document.storage_path:
             raise FileNotFoundError("Document file has not been imported yet")
@@ -109,11 +118,38 @@ class DocumentService:
         )
 
     @classmethod
-    def stream_public_download_response(cls, document_id: int, *, as_attachment: bool = True):
-        """Return a Flask Response streaming a public submission document."""
-        document = SubmittedDocument.query.get_or_404(document_id)
-        if not document.public_submission_id:
+    def load_public_download_document(cls, identifier) -> SubmittedDocument:
+        """Return the document behind an unauthenticated download, or raise ``PermissionError``.
+
+        ``identifier`` is the opaque ``public_id`` (``uuid.UUID``) or the legacy integer id.
+        Missing rows and rows that fail the policy are indistinguishable to callers so the
+        endpoint cannot be used to probe which ids exist.
+        """
+        document = public_access.find_document(identifier)
+        if document is None or not public_access.is_publicly_downloadable(document):
             raise PermissionError("Not a public document")
+        return document
+
+    @classmethod
+    def stream_public_download_response(cls, identifier, *, as_attachment: bool = True):
+        """Return a Flask Response streaming a public submission document.
+
+        Only documents that belong to a public submission, are marked public and are
+        approved may be served without authentication.
+        """
+        from flask import redirect
+
+        document = cls.load_public_download_document(identifier)
+
+        if not document.storage_path:
+            target = (
+                safe_external_redirect_target(document.source_url)
+                if getattr(document, "file_pending", False)
+                else None
+            )
+            if target is None:
+                raise FileNotFoundError("Document file has not been imported yet")
+            return redirect(target)
 
         download_name = document.filename or os.path.basename(document.storage_path)
         main_cat = _storage.submitted_document_rel_storage_category(document.storage_path)
@@ -172,14 +208,14 @@ class DocumentService:
         return doc_filename
 
     @classmethod
-    def get_public_download_paths(cls, document_id: int) -> Tuple[str, str, str]:
+    def get_public_download_paths(cls, document_id) -> Tuple[str, str, str]:
         """Validate and return (directory, filename_on_disk, download_name) for public document download.
 
         Prefer ``stream_public_download_response`` for new code.
         """
-        document = SubmittedDocument.query.get_or_404(document_id)
-        if not document.public_submission_id:
-            raise PermissionError("Not a public document")
+        document = cls.load_public_download_document(document_id)
+        if not document.storage_path:
+            raise FileNotFoundError("Document file has not been imported yet")
 
         abs_path = cls._resolve_storage_path(document.storage_path)
         directory = os.path.dirname(abs_path)

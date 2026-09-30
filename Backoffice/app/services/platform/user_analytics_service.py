@@ -15,6 +15,7 @@ from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy import and_, or_, cast, func, inspect, text, Integer
 from app import db
+from app.utils.client_ip import _strip_ip_port, get_client_ip  # noqa: F401 — canonical implementation, re-exported
 from app.utils.datetime_helpers import utcnow, ensure_utc
 from app.utils.transactions import atomic, request_transaction_rollback
 from app.models import (
@@ -132,38 +133,6 @@ def _commit_or_flush():
 def _rollback_transaction(reason: str) -> None:
     """Rollback the current transaction and signal the middleware to skip auto-commit."""
     request_transaction_rollback(reason=reason)
-
-
-def _strip_ip_port(ip):
-    """Strip port suffix from an IP address string.
-
-    Handles IPv4:port (1.2.3.4:5678) and [IPv6]:port ([::1]:5678).
-    Raw IPv6 with multiple colons is left untouched.
-    """
-    if not ip or ip == 'unknown':
-        return ip
-    if ip.startswith('['):
-        bracket_end = ip.find(']')
-        if bracket_end != -1:
-            return ip[1:bracket_end]
-    elif ip.count(':') == 1:
-        return ip.rsplit(':', 1)[0]
-    return ip
-
-
-def get_client_ip():
-    """Get the client's IP address, considering proxies.
-
-    Strips port suffixes that some proxies (e.g. Azure App Service) append
-    to X-Forwarded-For entries (``1.2.3.4:53708`` → ``1.2.3.4``).
-    """
-    if request.headers.get('X-Forwarded-For'):
-        ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    elif request.headers.get('X-Real-IP'):
-        ip = request.headers.get('X-Real-IP').strip()
-    else:
-        ip = request.remote_addr or 'unknown'
-    return _strip_ip_port(ip)
 
 
 def get_device_type(user_agent):
@@ -953,33 +922,50 @@ def user_session_log_active_duration_minutes_sql():
     return None
 
 
-# Global set to store blacklisted session IDs for force logout.
-# SECURITY NOTE: This is per-process; in multi-worker deployments a
-# force-logout may not take effect on every worker. For production, consider
-# moving this to a shared store (Redis or database) so all workers honour the
-# blacklist immediately.
+# Per-process cache of revoked session IDs (positives only). The authoritative,
+# cross-worker record is shared storage (app.utils.auth_state: Redis or the
+# auth_state_entry table) plus the ended UserSessionLog row, so a force-logout or a
+# refresh-token-reuse revocation takes effect on every worker and survives restarts.
 _blacklisted_sessions = set()
 
 
 def add_session_to_blacklist(session_id):
     """
-    Add a session ID to the blacklist for immediate termination.
+    Revoke a session ID for immediate termination on every worker.
 
     Args:
         session_id (str): Session ID to blacklist
     """
     global _blacklisted_sessions
+    if not session_id:
+        return
     _blacklisted_sessions.add(session_id)
+    try:
+        from app.utils.mobile_jwt import revoke_session_id
+        revoke_session_id(session_id)
+    except Exception as e:
+        current_app.logger.error(
+            "Could not persist session revocation for %s to shared storage: %s", session_id, e
+        )
     current_app.logger.info(f"Session {session_id} added to blacklist for force logout")
+
+
+def _session_revoked_in_shared_store(session_id, *, fail_closed: bool) -> bool:
+    from app.utils.auth_state import AuthStateUnavailable
+    from app.utils.mobile_jwt import is_session_id_revoked
+    try:
+        return is_session_id_revoked(session_id)
+    except AuthStateUnavailable:
+        return fail_closed
 
 
 def is_session_blacklisted(session_id):
     """
     Check if a session ID is blacklisted for termination.
 
-    Checks the in-memory set first (fast path), then falls back to the DB so
-    that force-logouts survive server restarts and work across Gunicorn workers
-    that each maintain their own in-memory copy.
+    Checks the in-process cache first (fast path), then shared storage (revocations
+    written by any worker) and finally the ``UserSessionLog`` row, so force-logouts
+    survive restarts and work across Gunicorn workers.
 
     Args:
         session_id (str): Session ID to check
@@ -988,7 +974,12 @@ def is_session_blacklisted(session_id):
         bool: True if session is blacklisted
     """
     global _blacklisted_sessions
+    if not session_id:
+        return False
     if session_id in _blacklisted_sessions:
+        return True
+    if _session_revoked_in_shared_store(session_id, fail_closed=False):
+        _blacklisted_sessions.add(session_id)
         return True
     # DB fallback: any session that has been ended (logout, timeout, admin force)
     # is treated as blacklisted so that replayed cookies are rejected across all
@@ -1032,8 +1023,9 @@ def should_block_mobile_jwt_session(session_id: str | None) -> bool:
     hold a long-lived **refresh token**; when the row was closed by scheduled cleanup
     or web idle timeout, rotation should succeed without re-entering credentials.
 
-    Blocks: explicit in-memory blacklist (admin force-logout, mobile logout, refresh
-    reuse), user logout, admin_action, force_cleanup, and any unknown ``ended_by``.
+    Blocks: explicit revocation (shared storage / in-process cache: admin force-logout,
+    mobile logout, refresh reuse), user logout, admin_action, force_cleanup, and any
+    unknown ``ended_by``. Fails closed when shared storage or the database is unreachable.
 
     Does **not** warm ``_blacklisted_sessions`` from the DB (avoids poisoning web
     checks after a mobile-only resume).
@@ -1043,6 +1035,8 @@ def should_block_mobile_jwt_session(session_id: str | None) -> bool:
 
     global _blacklisted_sessions
     if session_id in _blacklisted_sessions:
+        return True
+    if _session_revoked_in_shared_store(session_id, fail_closed=True):
         return True
 
     try:
@@ -1069,14 +1063,17 @@ def should_block_mobile_jwt_session(session_id: str | None) -> bool:
 
 def remove_session_from_blacklist(session_id):
     """
-    Remove a session ID from the blacklist (cleanup after logout).
+    Drop a session ID from this process's cache once the cookie has been cleared.
+
+    The shared revocation record is intentionally kept until its TTL: deleting it
+    would re-validate any JWT still carrying the session id.
 
     Args:
-        session_id (str): Session ID to remove from blacklist
+        session_id (str): Session ID to remove from the in-process cache
     """
     global _blacklisted_sessions
     _blacklisted_sessions.discard(session_id)
-    current_app.logger.info(f"Session {session_id} removed from blacklist")
+    current_app.logger.info(f"Session {session_id} removed from in-process blacklist cache")
 
 
 def log_admin_action(action_type, description, target_type=None, target_id=None,
@@ -1548,7 +1545,9 @@ def _empty_page_path_histogram(days: int) -> Dict[str, Any]:
 def format_page_path_histogram_csv(paths: List[Dict[str, Any]]) -> str:
     """CSV text for path, total_views, session_hits (UTF-8 with header)."""
     buf = StringIO()
-    w = csv.writer(buf)
+    from app.utils.export_safety import safe_csv_writer
+
+    w = safe_csv_writer(buf)
     w.writerow(["path", "total_views", "sessions_with_path"])
     for row in paths:
         w.writerow(

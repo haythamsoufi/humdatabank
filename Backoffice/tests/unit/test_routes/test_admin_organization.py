@@ -3,6 +3,7 @@ Comprehensive tests for app/routes/admin/organization/ package.
 Targeting 100% code coverage of organization management routes.
 """
 import io
+from contextlib import ExitStack, contextmanager
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -20,11 +21,26 @@ def _json_headers():
     return {"Content-Type": "application/json", "Accept": "application/json"}
 
 
+_ORG_ROUTE_MODULES = (
+    "countries",
+    "import_export",
+    "ns_structure",
+    "secretariat",
+)
+
+
+@contextmanager
 def _mock_render(return_value="<html>ok</html>"):
-    return patch(
-        "flask.render_template",
-        return_value=return_value,
-    )
+    shared_mock = MagicMock(return_value=return_value)
+    with ExitStack() as stack:
+        for module in _ORG_ROUTE_MODULES:
+            stack.enter_context(
+                patch(
+                    f"app.routes.admin.organization.{module}.render_template",
+                    new=shared_mock,
+                )
+            )
+        yield shared_mock
 
 
 def _make_country_data(**overrides):
@@ -235,6 +251,13 @@ class TestEditCountry:
 
 
 class TestDeleteCountry:
+    @pytest.fixture(autouse=True)
+    def _grant_country_delete(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.countries.delete")
+        db_session.commit()
+
     def test_delete_existing_country_redirects(self, logged_in_client, db_session, app):
         country = create_test_country(db_session, name="Delete Country", iso3="DEL", iso2="DL")
         resp = logged_in_client.post(
@@ -851,7 +874,12 @@ class TestNSLocalUnitsCRUD:
         branch, _ = self._setup(db_session)
         resp = logged_in_client.post(
             "/admin/organization/ns-localunits/new",
-            data={"name": "New Local Unit", "branch_id": str(branch.id), "is_active": "y"},
+            data={
+                "name": "New Local Unit",
+                "branch_id": str(branch.id),
+                "subbranch_id": "",
+                "is_active": "y",
+            },
             follow_redirects=False,
         )
         assert resp.status_code in (200, 302)
@@ -860,7 +888,7 @@ class TestNSLocalUnitsCRUD:
         with _mock_render():
             resp = logged_in_client.post(
                 "/admin/organization/ns-localunits/new",
-                data={"name": "", "branch_id": ""},
+                data={"name": "", "branch_id": "", "subbranch_id": ""},
                 follow_redirects=False,
             )
         assert resp.status_code == 200
@@ -887,7 +915,12 @@ class TestNSLocalUnitsCRUD:
         db_session.commit()
         resp = logged_in_client.post(
             f"/admin/organization/ns-localunits/{lu.id}/edit",
-            data={"name": "Updated LU", "branch_id": str(branch.id), "is_active": "y"},
+            data={
+                "name": "Updated LU",
+                "branch_id": str(branch.id),
+                "subbranch_id": "",
+                "is_active": "y",
+            },
             follow_redirects=False,
         )
         assert resp.status_code in (200, 302)
@@ -924,7 +957,9 @@ class TestSecretariatDivisionsCRUD:
     def test_get_divisions_list(self, logged_in_client, db_session):
         with _mock_render():
             resp = logged_in_client.get("/admin/organization/secretariat-divisions")
-        assert resp.status_code == 200
+        # List routes redirect to the unified organization index (secretariat tab)
+        assert resp.status_code == 302
+        assert "organization" in (resp.headers.get("Location") or "")
 
     def test_new_division_get(self, logged_in_client, db_session):
         with _mock_render():
@@ -1003,7 +1038,8 @@ class TestSecretariatDepartmentsCRUD:
     def test_get_departments_list(self, logged_in_client, db_session):
         with _mock_render():
             resp = logged_in_client.get("/admin/organization/secretariat-departments")
-        assert resp.status_code == 200
+        assert resp.status_code == 302
+        assert "organization" in (resp.headers.get("Location") or "")
 
     def test_new_department_get(self, logged_in_client, db_session):
         with _mock_render():
@@ -1075,7 +1111,8 @@ class TestSecretariatRegionalOfficesCRUD:
     def test_get_regions_list(self, logged_in_client, db_session):
         with _mock_render():
             resp = logged_in_client.get("/admin/organization/secretariat-regional-offices")
-        assert resp.status_code == 200
+        assert resp.status_code == 302
+        assert "organization" in (resp.headers.get("Location") or "")
 
     def test_new_region_get(self, logged_in_client, db_session):
         with _mock_render():
@@ -1154,7 +1191,8 @@ class TestSecretariatClusterOfficesCRUD:
     def test_get_clusters_list(self, logged_in_client, db_session):
         with _mock_render():
             resp = logged_in_client.get("/admin/organization/secretariat-cluster-offices")
-        assert resp.status_code == 200
+        assert resp.status_code == 302
+        assert "organization" in (resp.headers.get("Location") or "")
 
     def test_new_cluster_get(self, logged_in_client, db_session):
         with _mock_render():
@@ -1517,13 +1555,16 @@ class TestOrganizationAPIEndpoints:
         assert resp.status_code in (200, 400, 500)
 
     def test_api_auto_translate_with_entity_type(self, logged_in_client, db_session, app):
-        country = create_test_country(db_session, name="Translate Country", iso3="TRC", iso2="TR")
-        with patch("app.routes.admin.organization.EntityService") as mock_svc:
-            mock_svc.auto_translate.return_value = {"translated": 1}
+        create_test_country(db_session, name="Translate Country", iso3="TRC", iso2="TR")
+        with patch(
+            "app.services.translation.auto_translator.get_auto_translator",
+            return_value=MagicMock(),
+        ):
             resp = logged_in_client.post(
                 "/admin/organization/api/auto-translate-organizations",
-                json={"entity_type": "countries", "entity_id": country.id},
-                headers=_json_headers(),
+                json={"entity_type": "countries", "target_languages": ["fr"]},
+                headers={**_json_headers(), "Accept": "text/event-stream"},
+                buffered=True,
             )
         assert resp.status_code in (200, 400, 500)
 
@@ -1566,8 +1607,12 @@ class TestOrganizationAPIEndpoints:
         assert resp.status_code in (200, 204, 404)
 
     def test_api_branches_unauthenticated_redirects(self, client, db_session):
-        resp = client.get("/admin/organization/api/branches/1", follow_redirects=False)
-        assert resp.status_code == 302
+        resp = client.get(
+            "/admin/organization/api/branches/1",
+            headers={"Accept": "application/json"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------

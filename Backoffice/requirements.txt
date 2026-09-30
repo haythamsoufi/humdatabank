@@ -16,7 +16,7 @@ Werkzeug==3.1.7
 polib==1.2.0
 filelock==3.20.3                # cross-process PO file write locking (prevents Gunicorn race conditions)
 APScheduler==3.10.4
-python-dotenv==1.2.2                # was 1.0.0 - CVE-2026-12112 (symlink following in set_key)
+python-dotenv==1.2.3                # was 1.0.0 - CVE-2026-12112 (symlink following in set_key)
 psutil==5.9.8
 email_validator==2.2.0
 alembic==1.15.2
@@ -30,7 +30,7 @@ reportlab==4.4.1
 user-agents==2.2.0
 weasyprint==70.0                # was 69.0 — CVE-2026-55073 (EPS rendering / URL fetcher bypass)
 requests==2.33.0                # was 2.32.3 — CVE-2024-47081, CVE-2026-25645
-PyJWT==2.13.0                   # was 2.12.1 — GHSA-xgmm-8j9v-c9wx and related PyJWT CVEs
+PyJWT==2.14.0                   # was 2.13.0 — CVE-2026-102274 (pip-audit); 2.13.0 was 2.12.1 — GHSA-xgmm-8j9v-c9wx
 google-auth==2.40.3
 google-auth-oauthlib==1.2.3
 google-auth-httplib2==0.2.0
@@ -51,7 +51,7 @@ azure-storage-blob==12.27.1
 # The opencensus project is deprecated and opencensus-ext-flask caps Flask < 3.0.
 # For Azure Monitor telemetry on Flask 3.x, use: azure-monitor-opentelemetry>=1.0.0
 # API Documentation
-PyYAML==6.0.2
+PyYAML==6.0.3
 
 # ==================== AI/RAG System Dependencies ====================
 # Vector database and embeddings
@@ -70,15 +70,14 @@ tiktoken==0.11.0
 pdf2image==1.17.0
 pytesseract==0.3.13
 python-docx==1.2.0
-cairosvg>=2.7.0
-matplotlib>=3.8
+cairosvg==2.9.1
+matplotlib==3.11.2
 argon2-cffi==23.1.0
 
 markdown==3.10
 beautifulsoup4==4.14.3
-lxml==6.1.0                         # was 6.0.2 - CVE XXE via iterparse() default config
+lxml==6.1.3                         # was 6.0.2 - CVE XXE via iterparse() default config
 defusedxml==0.7.1                   # hardened XML parse for user-uploaded OOXML (UPR)
 
 # Performance and caching
 redis==7.1.0
-locust

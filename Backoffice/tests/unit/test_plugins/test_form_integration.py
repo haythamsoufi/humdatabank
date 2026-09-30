@@ -830,3 +830,77 @@ class TestRenderCustomFieldEntryFormJsonFailure:
                 field_value={"bad_key": NotSerializable()},
             )
         assert html == "ok"
+
+
+# ---------------------------------------------------------------------------
+# HTML escaping of hand-built markup
+# ---------------------------------------------------------------------------
+
+class TestFormIntegrationEscaping:
+    PAYLOAD = '"><script>alert(1)</script><img src=x onerror=alert(2)>'
+
+    def setup_method(self):
+        self.fi = _make_fi()
+
+    @pytest.mark.parametrize("field_type", ["text", "select", "number", "textarea", "checkbox", "weird"])
+    def test_config_field_escapes_value_label_name_placeholder(self, app, field_type):
+        with app.app_context():
+            html = self.fi._render_config_field(
+                {
+                    "name": self.PAYLOAD,
+                    "type": field_type,
+                    "label": self.PAYLOAD,
+                    "placeholder": self.PAYLOAD,
+                    "options": [{"value": self.PAYLOAD, "label": self.PAYLOAD}],
+                    "min": self.PAYLOAD,
+                    "max": self.PAYLOAD,
+                    "step": self.PAYLOAD,
+                },
+                self.PAYLOAD,
+            )
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert '"><' not in html
+
+    def test_entry_form_fallback_escapes_and_returns_markup(self, app):
+        from markupsafe import Markup
+
+        with app.app_context():
+            out = self.fi._render_entry_form_field(
+                self.PAYLOAD,
+                {"css_files": [self.PAYLOAD]},
+                {"label": self.PAYLOAD, "field_name": self.PAYLOAD, "required": True},
+                self.PAYLOAD,
+            )
+        assert isinstance(out, Markup)
+        assert "<script>" not in out
+        assert "<img" not in out
+        assert 'onerror=alert' not in out.replace("&lt;img src=x onerror=alert(2)&gt;", "")
+
+    def test_entry_form_fallback_js_literals_are_json_escaped(self, app):
+        with app.app_context():
+            out = self.fi._render_entry_form_field(
+                "t",
+                {"es_module_path": "/x.js", "es_module_class": "Cls"},
+                {"field_name": "</script><script>alert(1)</script>"},
+                None,
+            )
+        assert "</script><script>alert(1)" not in out
+        assert "\\u003c/script\\u003e" in out
+
+    def test_entry_form_fallback_rejects_bad_module_class(self, app):
+        with app.app_context():
+            with pytest.raises(ValueError):
+                self.fi._render_entry_form_field(
+                    "t",
+                    {"es_module_path": "/x.js", "es_module_class": "A(); alert(1); //"},
+                    {},
+                    None,
+                )
+
+    def test_unknown_field_type_message_is_escaped(self, app):
+        pm = _mock_plugin_manager(field_type_config=None)
+        fi = _make_fi(pm)
+        with app.app_context():
+            html = fi.render_custom_field_builder_ui("<script>x</script>", {})
+        assert "<script>" not in html

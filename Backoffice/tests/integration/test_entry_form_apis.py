@@ -30,7 +30,7 @@ def _login(client, user_id: int) -> None:
 class TestEntryFormFormsApiLookupLists:
     def test_lookup_list_options_returns_rows(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             ll = LookupList(
@@ -58,7 +58,7 @@ class TestEntryFormFormsApiLookupLists:
 class TestEntryFormFormsApiRepeatInstances:
     def test_repeat_instance_toggle_hide(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -106,7 +106,7 @@ class TestEntryFormFormsApiRepeatInstances:
 class TestEntryFormFormsApiDynamicIndicators:
     def test_dynamic_indicators_add_happy_path(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -153,22 +153,20 @@ class TestEntryFormFormsApiDynamicIndicators:
                 "custom_label": "Custom X",
             }
 
-            # Avoid the access gate complexity; validate our endpoint contract instead
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}):
-                resp = client.post(
-                    "/api/forms/dynamic-indicators/add",
-                    data=json.dumps(payload),
-                    content_type="application/json",
-                )
-                assert resp.status_code == 200
-                data = resp.get_json()
-                assert data["success"] is True
-                assert data["assignment"]["indicator_bank_id"] == indicator_id
-                assert data["assignment"]["name"] == "Custom X"
+            resp = client.post(
+                "/api/forms/dynamic-indicators/add",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert data["assignment"]["indicator_bank_id"] == indicator_id
+            assert data["assignment"]["name"] == "Custom X"
 
     def test_dynamic_indicators_add_requires_dynamic_section(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -213,19 +211,18 @@ class TestEntryFormFormsApiDynamicIndicators:
                 "section_id": section_id,
                 "indicator_bank_id": indicator_id,
             }
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}):
-                resp = client.post(
-                    "/api/forms/dynamic-indicators/add",
-                    data=json.dumps(payload),
-                    content_type="application/json",
-                )
-                assert resp.status_code == 400
-                data = resp.get_json()
-                assert "Section is not a dynamic indicators section" in (data.get("error") or "")
+            resp = client.post(
+                "/api/forms/dynamic-indicators/add",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+            assert resp.status_code == 400
+            data = resp.get_json()
+            assert "Section is not a dynamic indicators section" in (data.get("error") or "")
 
     def test_render_pending_dynamic_indicator_returns_html(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -269,16 +266,15 @@ class TestEntryFormFormsApiDynamicIndicators:
             db_session.commit()
 
             temp_assignment_id = "pending_test_1"
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}):
-                resp = client.post(
-                    "/api/forms/dynamic-indicators/render-pending",
-                    data={
-                        "assignment_entity_status_id": aes_id,
-                        "section_id": section_id,
-                        "indicator_bank_id": indicator_id,
-                        "temp_assignment_id": temp_assignment_id,
-                    },
-                )
+            resp = client.post(
+                "/api/forms/dynamic-indicators/render-pending",
+                data={
+                    "assignment_entity_status_id": aes_id,
+                    "section_id": section_id,
+                    "indicator_bank_id": indicator_id,
+                    "temp_assignment_id": temp_assignment_id,
+                },
+            )
 
             assert resp.status_code == 200
             data = resp.get_json()
@@ -290,7 +286,7 @@ class TestEntryFormFormsApiDynamicIndicators:
 
     def test_render_dynamic_indicator_returns_html(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -344,8 +340,7 @@ class TestEntryFormFormsApiDynamicIndicators:
             indicator_name = indicator.name
             db_session.commit()
 
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}):
-                resp = client.get(f"/api/forms/dynamic-indicators/{assignment_id}/render")
+            resp = client.get(f"/api/forms/dynamic-indicators/{assignment_id}/render")
 
             assert resp.status_code == 200
             data = resp.get_json()
@@ -361,7 +356,7 @@ class TestEntryFormFormsApiDynamicIndicators:
 class TestEntryFormFormsApiPresence:
     def test_presence_sync_returns_success(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -390,7 +385,7 @@ class TestEntryFormFormsApiPresence:
 
     def test_presence_leave_returns_success(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -419,7 +414,7 @@ class TestEntryFormFormsApiPresence:
 class TestEntryFormFormsApiDynamicIndicatorsUpdate:
     def test_dynamic_indicators_update_happy_path(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -471,12 +466,11 @@ class TestEntryFormFormsApiDynamicIndicatorsUpdate:
             assignment_id = dynamic_assignment.id
             db_session.commit()
 
-            with patch("app.routes.forms_api.check_country_access", return_value=True):
-                resp = client.put(
-                    f"/api/forms/dynamic-indicators/{assignment_id}/update",
-                    data=json.dumps({"custom_label": "Updated Label", "order": 2}),
-                    content_type="application/json",
-                )
+            resp = client.put(
+                f"/api/forms/dynamic-indicators/{assignment_id}/update",
+                data=json.dumps({"custom_label": "Updated Label", "order": 2}),
+                content_type="application/json",
+            )
 
             assert resp.status_code == 200
             data = resp.get_json()
@@ -488,7 +482,7 @@ class TestEntryFormFormsApiDynamicIndicatorsUpdate:
 
     def test_dynamic_indicators_update_unknown_id(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             resp = client.put(
@@ -503,7 +497,7 @@ class TestEntryFormFormsApiDynamicIndicatorsUpdate:
 class TestEntryFormFormsApiDynamicIndicatorsRemove:
     def test_dynamic_indicators_remove_happy_path(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             country = create_test_country(db_session)
@@ -555,8 +549,7 @@ class TestEntryFormFormsApiDynamicIndicatorsRemove:
             assignment_id = dynamic_assignment.id
             db_session.commit()
 
-            with patch("app.routes.forms_api.check_country_access", return_value=True):
-                resp = client.delete(f"/api/forms/dynamic-indicators/{assignment_id}/remove")
+            resp = client.delete(f"/api/forms/dynamic-indicators/{assignment_id}/remove")
 
             assert resp.status_code == 200
             data = resp.get_json()
@@ -565,7 +558,7 @@ class TestEntryFormFormsApiDynamicIndicatorsRemove:
 
     def test_dynamic_indicators_remove_unknown_id(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             resp = client.delete("/api/forms/dynamic-indicators/999999/remove")
@@ -612,7 +605,7 @@ class TestEntryFormFormsApiEntryBootstrap:
         # rather than 404 (avoids revealing whether the id exists to unauthorized/absent
         # records).
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
             resp = client.get("/api/forms/assignment/999999999/entry-bootstrap")
             assert resp.status_code == 403
@@ -629,7 +622,7 @@ class TestEntryFormFormsApiEntryBootstrap:
 
     def test_no_published_version_returns_zeroed_defaults(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             template = create_test_template(db_session, status="draft")
@@ -648,7 +641,7 @@ class TestEntryFormFormsApiEntryBootstrap:
 
     def test_happy_path_no_matrices(self, client, db_session, app):
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             _, aes = self._make_assignment(db_session)
@@ -666,7 +659,7 @@ class TestEntryFormFormsApiEntryBootstrap:
         nothing to `auto_load` and must not trigger any variable-resolution calls
         (the cheap `_matrix_uses_auto_load` pre-filter added in the HIGH #3 fix)."""
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             template, aes = self._make_assignment(db_session)
@@ -705,7 +698,7 @@ class TestEntryFormFormsApiEntryBootstrap:
         """A forward-lookup ('same') matrix column should surface entities returned
         by `_resolve_auto_load_entities_inner` under `auto_load[<form_item_id>]`."""
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             template, aes = self._make_assignment(db_session)
@@ -779,7 +772,7 @@ class TestEntryFormFormsApiEntryBootstrap:
         `resolve_variables_batch` call (HIGH #3: previously one batch call per
         reverse-lookup matrix, plus a second, separate call for saved rows)."""
         with app.app_context():
-            user = create_test_user(db_session, role="admin")
+            user = create_test_user(db_session, role="system_manager")
             _login(client, user.id)
 
             template, aes = self._make_assignment(db_session)

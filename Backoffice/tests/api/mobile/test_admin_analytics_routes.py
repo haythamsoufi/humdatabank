@@ -68,9 +68,14 @@ class TestSessionLogs:
 @pytest.mark.api
 @pytest.mark.integration
 class TestEndSession:
-    def test_not_found(self, client, admin_jwt_headers, db_session):
+    def test_requires_maintain_permission(self, client, admin_jwt_headers, db_session):
         resp = client.post(f'{PREFIX}/admin/analytics/sessions/nonexistent/end',
                            headers=admin_jwt_headers)
+        assert resp.status_code == 403
+
+    def test_not_found(self, client, sm_jwt_headers, db_session):
+        resp = client.post(f'{PREFIX}/admin/analytics/sessions/nonexistent/end',
+                           headers=sm_jwt_headers)
         assert resp.status_code == 404
 
 

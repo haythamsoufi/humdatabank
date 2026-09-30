@@ -11,6 +11,9 @@ from flask import request, current_app, abort, url_for
 from app.routes.api import api_bp
 from app.models.documents import SubmittedDocument
 from app.models.enums import DocumentStatus
+from app.services.documents import public_access
+from app.services.security.api_authentication import api_key_has_capability
+from app.services.security.api_key_permissions import CONTENT_READ, DOCUMENTS_READ
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.api_helpers import json_response, api_error
@@ -18,12 +21,14 @@ from app.services.platform import storage_service as storage
 
 
 @api_bp.route('/submitted-documents', methods=['GET'])
-@require_api_key
+@require_api_key(capability=CONTENT_READ)
 @api_rate_limit()
 def get_submitted_documents():
     """
     API endpoint to retrieve submitted documents by country.
-    Authentication: API key in Authorization header (Bearer token).
+    Authentication: API key in Authorization header (Bearer token). Keys with only
+    ``content:read`` see public, approved documents; ``documents:read`` is required for
+    ``is_public=false`` or any ``status`` other than ``approved``.
     Query Parameters:
         - country_id: Filter by country ID (optional)
         - document_type: Filter by document type (optional)
@@ -52,8 +57,19 @@ def get_submitted_documents():
         from app.utils.api_pagination import validate_pagination_params
         page, per_page = validate_pagination_params(request.args, default_per_page=20)
 
-        # Build base query
+        # Keys holding only content:read may list published documents; pending, rejected and
+        # non-public rows need documents:read.
+        may_see_unpublished = api_key_has_capability(DOCUMENTS_READ)
+        requested_status = DocumentStatus.normalize(status) if status else DocumentStatus.APPROVED
+        wants_unpublished = requested_status != DocumentStatus.APPROVED or (
+            is_public is not None and is_public.lower() == 'false'
+        )
+        if wants_unpublished and not may_see_unpublished:
+            return api_error("This API key may only list public, approved documents.", 403)
+
         query = SubmittedDocument.query
+        if not may_see_unpublished:
+            query = query.filter(SubmittedDocument.is_public.is_(True))
 
         # Apply filters
         if country_id:
@@ -90,8 +106,8 @@ def get_submitted_documents():
             )
             download_url = url_for('content_management.download_document', doc_id=doc.id, _external=True) if file_exists else None
             display_url = (
-                url_for('public.display_document_file_public', doc_id=doc.id, _external=True)
-                if file_exists and doc.document_type == 'Cover Image'
+                public_access.public_document_display_url(doc, external=True)
+                if file_exists and doc.document_type == 'Cover Image' and public_access.is_publicly_displayable(doc)
                 else None
             )
 
@@ -114,12 +130,13 @@ def get_submitted_documents():
                 and storage.exists(thumb_cat, doc.thumbnail_relative_path)
             )
             thumbnail_url = (
-                url_for('public.download_document_thumbnail_public', doc_id=doc.id, _external=True)
-                if thumb_exists else None
+                public_access.public_document_thumbnail_url(doc, external=True)
+                if thumb_exists and public_access.is_publicly_displayable(doc) else None
             )
 
             documents_data.append({
                 'id': doc.id,
+                'public_id': str(doc.public_id),
                 'filename': doc.filename,
                 'document_type': doc.document_type,
                 'language': doc.language,
@@ -157,62 +174,56 @@ def get_submitted_documents():
         return api_error("Could not fetch submitted documents", 500)
 
 
+def _safe_upload_basename(filename):
+    """Reduce a URL tail to a single file name; ``None`` for anything that is not a plain name."""
+    name = os.path.basename((filename or '').replace('\\', '/'))
+    if not name or name in ('.', '..') or '\x00' in name:
+        return None
+    return name
+
+
+def _serve_system_upload(subdir, filename, *, log_label, download_name=None):
+    safe_name = _safe_upload_basename(filename)
+    if safe_name is None:
+        abort(404)
+    try:
+        return storage.stream_response(
+            storage.SYSTEM, f"{subdir}/{safe_name}",
+            filename=download_name(safe_name) if download_name else safe_name,
+            as_attachment=False,
+        )
+    except Exception as e:
+        current_app.logger.error("Error serving %s %s: %s", log_label, filename, e)
+        abort(404)
+
+
 @api_bp.route('/uploads/sectors/<path:filename>', methods=['GET'])
 def serve_sector_logo(filename):
     """Serve sector logo files."""
-    try:
-        safe_name = os.path.basename(filename)
-        return storage.stream_response(
-            storage.SYSTEM, f"sectors/{safe_name}",
-            filename=safe_name, as_attachment=False,
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error serving sector logo {filename}: {str(e)}")
-        abort(404)
+    return _serve_system_upload("sectors", filename, log_label="sector logo")
 
 
 @api_bp.route('/uploads/spef/<path:filename>', methods=['GET'])
 def serve_spef_icon(filename):
     """Serve SP/EF catalog icon files."""
-    try:
-        safe_name = os.path.basename(filename)
-        return storage.stream_response(
-            storage.SYSTEM, f"spef/{safe_name}",
-            filename=safe_name, as_attachment=False,
-        )
-    except Exception as e:
-        current_app.logger.error("Error serving SP/EF icon %s: %s", filename, e)
-        abort(404)
+    return _serve_system_upload("spef", filename, log_label="SP/EF icon")
 
 
 @api_bp.route('/uploads/ns/<path:filename>', methods=['GET'])
 def serve_ns_logo(filename):
     """Serve National Society logo files."""
-    try:
-        safe_name = os.path.basename(filename)
-        return storage.stream_response(
-            storage.SYSTEM, f"ns/{safe_name}",
-            filename=safe_name, as_attachment=False,
-        )
-    except Exception as e:
-        current_app.logger.error("Error serving NS logo %s: %s", filename, e)
-        abort(404)
+    return _serve_system_upload("ns", filename, log_label="NS logo")
 
 
 @api_bp.route('/uploads/branding/<path:filename>', methods=['GET'])
 def serve_branding_asset(filename):
-    """Serve organization logo/favicon uploaded from System Configuration (branding tab)."""
+    """Serve organization logo/favicon uploaded from System Configuration (branding tab).
+
+    Legacy uploads may still be SVG; storage_service delivers those as sandboxed attachments.
+    """
     from app.utils.branding_visual_assets import SYSTEM_BRANDING_REL_PREFIX, safe_branding_download_filename
 
-    try:
-        safe_name = os.path.basename((filename or '').replace('\\', '/'))
-        if not safe_name:
-            abort(404)
-        return storage.stream_response(
-            storage.SYSTEM, f"{SYSTEM_BRANDING_REL_PREFIX}/{safe_name}",
-            filename=safe_branding_download_filename(safe_name),
-            as_attachment=False,
-        )
-    except Exception as e:
-        current_app.logger.error("Error serving branding asset %s: %s", filename, e)
-        abort(404)
+    return _serve_system_upload(
+        SYSTEM_BRANDING_REL_PREFIX, filename,
+        log_label="branding asset", download_name=safe_branding_download_filename,
+    )

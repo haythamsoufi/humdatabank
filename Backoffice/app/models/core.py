@@ -597,9 +597,11 @@ def _country_sync_secretariat_regional_office_fields(mapper, connection, target)
     )
 
     if target.secretariat_regional_office_id is None and target.region:
-        assign_country_secretariat_regional_office(target, target.region)
+        assign_country_secretariat_regional_office(
+            target, target.region, connection=connection,
+        )
     else:
-        sync_country_region_fields(target)
+        sync_country_region_fields(target, connection=connection)
 
 
 def _split_login_log_browser_field(browser):

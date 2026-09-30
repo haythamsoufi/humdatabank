@@ -26,6 +26,7 @@ from app.utils.mobile_responses import (
     mobile_paginated,
     mobile_not_found,
     mobile_created,
+    mobile_error,
 )
 from app.utils.transactions import request_transaction_rollback
 from app.utils.sql_utils import safe_ilike_pattern
@@ -165,89 +166,45 @@ def public_indicator_detail(indicator_id):
 
 
 @mobile_bp.route('/data/indicator-suggestions', methods=['POST'])
-@mobile_rate_limit(requests_per_minute=10)
+@mobile_rate_limit(requests_per_minute=5, shared=True)
 def submit_indicator_suggestion():
-    """Submit an indicator suggestion (same JSON body as POST /api/v1/indicator-suggestions)."""
-    from app.utils.api_helpers import get_json_safe
+    """Submit an indicator suggestion (same JSON body as POST /api/v1/indicator-suggestions).
+
+    Anonymous by design (the app offers it before login), so abuse controls are layered:
+    shared-store rate limit, strict payload validation and size caps, DB-backed per-email and
+    global caps, and an optional reCAPTCHA token (``token``) when
+    ``MOBILE_SUGGESTION_REQUIRE_CAPTCHA`` is enabled.
+    """
     from app.models import IndicatorSuggestion
+    from app.utils.api_helpers import get_json_safe
+    from app.utils.suggestion_intake import (
+        SuggestionValidationError,
+        suggestion_throttle_error,
+        validate_suggestion_payload,
+    )
 
     try:
         data = get_json_safe()
-        required_fields = [
-            'submitter_name',
-            'submitter_email',
-            'suggestion_type',
-            'indicator_name',
-            'reason',
-        ]
-        err = _mobile_require_json_keys(data, required_fields)
-        if err:
-            return err
-        for field in required_fields:
-            if not data.get(field):
-                return mobile_bad_request(f'Missing required field: {field}')
+        if not isinstance(data, dict):
+            return mobile_bad_request('Request body must be a JSON object')
 
-        # Validate sector and subsector data (parity with api/v1/indicator-suggestions)
-        if data.get('sector'):
-            sector_data = data['sector']
-            if isinstance(sector_data, dict):
-                if not sector_data.get('primary', '').strip():
-                    return mobile_bad_request('Primary sector must be filled')
+        if current_app.config.get('MOBILE_SUGGESTION_REQUIRE_CAPTCHA'):
+            from app.routes.api.indicator_bank_compat import _verify_recaptcha
 
-        if data.get('sub_sector'):
-            subsector_data = data['sub_sector']
-            if isinstance(subsector_data, dict):
-                if not subsector_data.get('primary', '').strip():
-                    return mobile_bad_request('Primary subsector must be filled')
+            token = data.get('token')
+            if not isinstance(token, str) or not _verify_recaptcha(token):
+                return mobile_bad_request('reCAPTCHA validation failed')
 
-        sector_data = None
-        if data.get('sector'):
-            if isinstance(data['sector'], dict):
-                sector_data = {}
-                for level in ('primary', 'secondary', 'tertiary'):
-                    if data['sector'].get(level):
-                        sector_data[level] = data['sector'][level].strip()
-                    else:
-                        sector_data[level] = None
-            else:
-                sector_data = {
-                    'primary': data['sector'],
-                    'secondary': None,
-                    'tertiary': None,
-                }
+        try:
+            values = validate_suggestion_payload(data)
+        except SuggestionValidationError as validation_error:
+            return mobile_bad_request(validation_error.public_message)
 
-        subsector_data = None
-        if data.get('sub_sector'):
-            if isinstance(data['sub_sector'], dict):
-                subsector_data = {}
-                for level in ('primary', 'secondary', 'tertiary'):
-                    if data['sub_sector'].get(level):
-                        subsector_data[level] = data['sub_sector'][level].strip()
-                    else:
-                        subsector_data[level] = None
-            else:
-                subsector_data = {
-                    'primary': data['sub_sector'],
-                    'secondary': None,
-                    'tertiary': None,
-                }
+        throttle_message = suggestion_throttle_error(values['submitter_email'])
+        if throttle_message:
+            return mobile_error(throttle_message, 429, error_code='RATE_LIMIT_EXCEEDED', retry_after=3600)
 
-        suggestion = IndicatorSuggestion(
-            submitter_name=data['submitter_name'],
-            submitter_email=data['submitter_email'],
-            suggestion_type=data['suggestion_type'],
-            indicator_id=data.get('indicator_id'),
-            indicator_name=data['indicator_name'],
-            definition=data.get('definition'),
-            type=data.get('type'),
-            unit=data.get('unit'),
-            sector=sector_data,
-            sub_sector=subsector_data,
-            emergency=data.get('emergency', False),
-            related_programs=data.get('related_programs'),
-            reason=data['reason'],
-            additional_notes=data.get('additional_notes'),
-        )
+        suggestion = IndicatorSuggestion(**values)
 
         db.session.add(suggestion)
         db.session.flush()

@@ -7,6 +7,7 @@ from wtforms.validators import DataRequired, Optional, Length, ValidationError
 from app.forms.base import CommonValidators
 from app.models.organization import SecretariatRegionalOffice, NS_STATUS_CHOICES, NS_STATUS_ACTIVE
 from app.services.organization.secretariat_regional_office_service import ensure_secretariat_regional_offices
+from app.forms.base import int_or_none
 from app.forms.organization.translation_helpers import add_translation_fields
 
 class CountryForm(FlaskForm):
@@ -113,7 +114,7 @@ class NSLocalUnitForm(FlaskForm):
     code = StringField('Local Unit Code', validators=[Optional(), Length(max=50)])
     description = TextAreaField('Description', validators=[Optional()])
     branch_id = SelectField('Parent Branch', coerce=int, validators=[DataRequired()])
-    subbranch_id = SelectField('Parent Sub-branch (Optional)', coerce=int, validators=[Optional()])
+    subbranch_id = SelectField('Parent Sub-branch (Optional)', coerce=int_or_none, validators=[Optional()])
     address = TextAreaField('Address', validators=[Optional()])
     city = StringField('City', validators=[Optional(), Length(max=100)])
     postal_code = StringField('Postal Code', validators=[Optional(), Length(max=20)])

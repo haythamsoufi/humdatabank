@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "tests"))
 
 from pb_figures.calculations import (  # noqa: E402
     format_donut_value,
@@ -15,6 +17,8 @@ from pb_figures.calculations import (  # noqa: E402
     is_percentage_unit,
     table_row_labels,
 )
+from pb_figures.translations import clear_cache  # noqa: E402
+from workbook_fixtures import sp1_mapping_row, temporary_report_excel  # noqa: E402
 
 
 class FormatValueTests(unittest.TestCase):
@@ -79,6 +83,21 @@ class FormatValueTests(unittest.TestCase):
 
 
 class TableLabelTests(unittest.TestCase):
+    def setUp(self) -> None:
+        clear_cache()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._excel = Path(self._tmpdir.name) / "SG Report.xlsx"
+        self._ctx = temporary_report_excel(
+            self._excel,
+            mapping_rows=[sp1_mapping_row()],
+        )
+        self._ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._ctx.__exit__(None, None, None)
+        self._tmpdir.cleanup()
+        clear_cache()
+
     def test_reporting_and_implementing_include_national_societies_prefix(self) -> None:
         labels = table_row_labels("English")
         self.assertTrue(labels["reporting"].startswith("National Societies "))

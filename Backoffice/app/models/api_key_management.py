@@ -14,11 +14,16 @@ from sqlalchemy import Index, UniqueConstraint, update, text
 from sqlalchemy.orm import sessionmaker
 from typing import Any, Dict, List, Optional, Tuple
 from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.services.security.api_key_permissions import (
+    DATA_READ,
+    KeyPermissions,
+    parse_key_permissions,
+)
 
-# Permissions vocabulary for APIKey.permissions JSON column.
-#   {"data": "read_all"}  — full data access (default when permissions is null)
-#   {"data": "read_scoped", "template_ids": [1], "country_ids": [5]} — scoped read
-#   {"data": "none"}      — explicitly no data access
+# ``APIKey.permissions`` is a schema-v2 capability document; see
+# ``app.services.security.api_key_permissions`` for the vocabulary and the parser.
+# The constants below describe the *data-access mode* derived from it and are kept
+# for callers that only need a coarse answer.
 API_KEY_DATA_READ_ALL = 'read_all'
 API_KEY_DATA_READ_SCOPED = 'read_scoped'
 API_KEY_DATA_NONE = 'none'
@@ -26,37 +31,19 @@ API_KEY_DATA_NONE = 'none'
 
 def resolve_api_key_data_access(permissions: Any) -> Tuple[str, Optional[Dict[str, List[int]]]]:
     """
-    Interpret ``APIKey.permissions`` for data endpoints.
+    Coarse data-access mode for ``APIKey.permissions``.
 
-    Returns:
-        (access_mode, scope) where access_mode is one of
-        ``read_all``, ``read_scoped``, or ``none``; scope is set only for
-        ``read_scoped`` and contains normalized ``template_ids`` / ``country_ids``.
+    Returns ``(access_mode, scope)`` where ``access_mode`` is ``read_all``,
+    ``read_scoped`` or ``none``. Fails closed: NULL, malformed or unknown
+    documents resolve to ``none``. Route authorization does not use this helper;
+    it goes through ``parse_key_permissions`` and the declared route capability.
     """
-    if permissions is None:
-        return API_KEY_DATA_READ_ALL, None
-    if not isinstance(permissions, dict):
-        return API_KEY_DATA_READ_ALL, None
-
-    data_perm = permissions.get('data')
-    if data_perm in (None, API_KEY_DATA_READ_ALL):
-        return API_KEY_DATA_READ_ALL, None
-    if data_perm == API_KEY_DATA_READ_SCOPED:
-        template_ids = [
-            int(x) for x in (permissions.get('template_ids') or [])
-            if x is not None
-        ]
-        country_ids = [
-            int(x) for x in (permissions.get('country_ids') or [])
-            if x is not None
-        ]
-        return API_KEY_DATA_READ_SCOPED, {
-            'template_ids': template_ids,
-            'country_ids': country_ids,
-        }
-    if data_perm == API_KEY_DATA_NONE:
+    parsed = parse_key_permissions(permissions)
+    if not parsed.has(DATA_READ):
         return API_KEY_DATA_NONE, None
-    return API_KEY_DATA_READ_ALL, None
+    if parsed.data_scope is None:
+        return API_KEY_DATA_READ_ALL, None
+    return API_KEY_DATA_READ_SCOPED, dict(parsed.data_scope)
 
 
 class APIKey(db.Model):
@@ -88,7 +75,9 @@ class APIKey(db.Model):
     client_description = db.Column(db.Text, nullable=True)
 
     # Permissions and scope
-    permissions = db.Column(db.JSON, nullable=True)  # Optional: fine-grained permissions
+    # Schema-v2 capability document (see app.services.security.api_key_permissions).
+    # NULL grants nothing: access is always an explicit choice.
+    permissions = db.Column(db.JSON, nullable=True)
     rate_limit_per_minute = db.Column(db.Integer, default=60, nullable=False)
 
     # Status flags (see ``status`` property for the canonical label)
@@ -129,22 +118,35 @@ class APIKey(db.Model):
         full_key = secrets.token_urlsafe(48)
         key_id = secrets.token_hex(16)
         key_prefix = full_key[:8]
-        key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+        key_hash = APIKey._fingerprint_api_token(full_key)
         return full_key, key_id, key_hash, key_prefix
 
     @staticmethod
-    def hash_key(key: str) -> str:
-        """Hash an API key for storage/comparison."""
-        return hashlib.sha256(key.encode()).hexdigest()
+    def _fingerprint_api_token(api_token: str) -> str:
+        """Lookup fingerprint for a high-entropy API token (not a password hash).
 
-    def verify_key(self, provided_key: str) -> bool:
+        Tokens are 384-bit ``token_urlsafe`` values. A fast digest is correct here:
+        a password KDF would add latency on every authenticated request with no
+        brute-force benefit. CodeQL ``py/weak-sensitive-data-hashing`` is a false
+        positive for this use case (see codeql-config query-filters).
         """
-        Verify if the provided key matches this API key.
+        digest = hashlib.new("sha256")
+        digest.update(api_token.encode("utf-8"))
+        return digest.hexdigest()
+
+    @staticmethod
+    def hash_key(api_token: str) -> str:
+        """Fingerprint an API token for storage/comparison."""
+        return APIKey._fingerprint_api_token(api_token)
+
+    def verify_key(self, provided_token: str) -> bool:
+        """
+        Verify if the provided token matches this API key.
 
         Uses constant-time comparison to prevent timing attacks.
         """
         import hmac
-        provided_hash = self.hash_key(provided_key)
+        provided_hash = self.hash_key(provided_token)
         return hmac.compare_digest(self.key_hash, provided_hash)
 
     @property
@@ -162,6 +164,11 @@ class APIKey(db.Model):
     def is_valid(self) -> bool:
         """Check if key is valid (active, not revoked, not expired)."""
         return self.status == 'active'
+
+    @property
+    def parsed_permissions(self) -> KeyPermissions:
+        """Interpreted ``permissions`` document (fails closed)."""
+        return parse_key_permissions(self.permissions)
 
     def disable(self, reason: Optional[str] = None):
         """Pause the key without revoking it (can be re-enabled)."""

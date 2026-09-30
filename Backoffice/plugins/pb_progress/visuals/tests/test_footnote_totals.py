@@ -2,38 +2,52 @@
 
 from __future__ import annotations
 
-import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "tests"))
 
 from pb_figures.calculations import footnote_for_key  # noqa: E402
 from pb_figures.data import reporting_source_totals  # noqa: E402
+from workbook_fixtures import sp1_mapping_row, temporary_report_excel  # noqa: E402
+
+
+def _totals_rows(year: str = "2025") -> list[dict[str, object]]:
+    return [
+        {"Source": "Manual", "Year": year, "TotalReported": 10},
+        {"Source": "FDRS", "Year": year, "TotalReported": 84},
+        {"Source": "UPR", "Year": year, "TotalReported": 143},
+    ]
 
 
 class TestReportingSourceTotals(unittest.TestCase):
     def test_reads_upr_and_fdrs_counts_for_year(self) -> None:
-        totals = reporting_source_totals(
-            Path(__file__).resolve().parents[1] / "SG Report.xlsx",
-            year="2025",
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "SG Report.xlsx"
+            with temporary_report_excel(
+                path,
+                mapping_rows=[sp1_mapping_row()],
+                total_reported_rows=_totals_rows("2025"),
+            ):
+                totals = reporting_source_totals(path, year="2025")
         self.assertEqual(totals["year"], "2025")
         self.assertEqual(totals["upr_ns"], 143)
         self.assertEqual(totals["fdrs_ns"], 84)
 
     def test_footnote_substitutes_placeholders(self) -> None:
-        os.environ["PB_REPORT_EXCEL"] = str(
-            Path(__file__).resolve().parents[1] / "SG Report.xlsx"
-        )
-        os.environ["PB_REPORT_YEAR"] = "2025"
-        try:
-            text = footnote_for_key("default", "English")
-        finally:
-            os.environ.pop("PB_REPORT_EXCEL", None)
-            os.environ.pop("PB_REPORT_YEAR", None)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "SG Report.xlsx"
+            with temporary_report_excel(
+                path,
+                mapping_rows=[sp1_mapping_row()],
+                total_reported_rows=_totals_rows("2025"),
+                year="2025",
+            ):
+                text = footnote_for_key("default", "English")
 
         self.assertIn("143", text)
         self.assertIn("84", text)
@@ -52,6 +66,8 @@ class TestReportingSourceTotals(unittest.TestCase):
         )
         if not uploaded.exists():
             self.skipTest("uploaded SG_Report.xlsx not present")
+        import os
+
         os.environ["PB_REPORT_EXCEL"] = str(uploaded)
         os.environ["PB_REPORT_YEAR"] = "2025"
         try:

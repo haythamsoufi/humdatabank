@@ -8,9 +8,10 @@ import pytest
 from flask import g
 from flask_login import login_user
 
+from app.services.security.api_authentication import _extract_api_credential
+from app.services.security.api_key_permissions import REFERENCE_READ
 from app.utils.api_helpers import api_error
 from app.utils.auth import (
-    _extract_api_key,
     require_api_key,
     require_api_key_or_session,
 )
@@ -19,59 +20,40 @@ pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
 
 
 @pytest.mark.unit
-class TestExtractApiKey:
-    """Test Bearer token extraction from Authorization header."""
+class TestExtractApiCredential:
+    """Credential extraction: Bearer, X-API-Key, then the (opt-in) query string."""
 
-    def test_bearer_token_returns_key_and_header_source(self, app):
-        with app.test_request_context(
-            path='/api/foo',
-            headers={'Authorization': 'Bearer secret-key-123'},
-        ):
-            key, source = _extract_api_key()
-            assert key == 'secret-key-123'
-            assert source == 'header'
+    def test_bearer_token_returns_key_and_header_location(self, app):
+        with app.test_request_context(path='/api/foo', headers={'Authorization': 'Bearer secret-key-123'}):
+            assert _extract_api_credential() == ('secret-key-123', 'header')
 
     def test_bearer_token_strips_surrounding_whitespace(self, app):
-        with app.test_request_context(
-            path='/api/foo',
-            headers={'Authorization': 'Bearer   padded-key  '},
-        ):
-            key, source = _extract_api_key()
-            assert key == 'padded-key'
-            assert source == 'header'
+        with app.test_request_context(path='/api/foo', headers={'Authorization': 'Bearer   padded-key  '}):
+            assert _extract_api_credential() == ('padded-key', 'header')
 
-    def test_empty_bearer_returns_empty_string(self, app):
-        with app.test_request_context(
-            path='/api/foo',
-            headers={'Authorization': 'Bearer '},
-        ):
-            key, source = _extract_api_key()
-            assert key == ''
-            assert source == 'header'
+    def test_x_api_key_header_is_a_header_credential(self, app):
+        with app.test_request_context(path='/api/foo', headers={'X-API-Key': 'abc'}):
+            assert _extract_api_credential() == ('abc', 'header')
 
-    def test_missing_authorization_header(self, app):
+    def test_query_string_key_is_reported_as_query(self, app):
+        with app.test_request_context(path='/api/foo?api_key=abc'):
+            assert _extract_api_credential() == ('abc', 'query')
+
+    def test_header_wins_over_query(self, app):
+        with app.test_request_context(path='/api/foo?api_key=q', headers={'Authorization': 'Bearer h'}):
+            assert _extract_api_credential() == ('h', 'header')
+
+    def test_missing_credentials(self, app):
         with app.test_request_context(path='/api/foo'):
-            key, source = _extract_api_key()
-            assert key is None
-            assert source is None
+            assert _extract_api_credential() == ('', None)
 
-    def test_non_bearer_authorization_header(self, app):
-        with app.test_request_context(
-            path='/api/foo',
-            headers={'Authorization': 'Basic dXNlcjpwYXNz'},
-        ):
-            key, source = _extract_api_key()
-            assert key is None
-            assert source is None
+    def test_non_bearer_authorization_header_is_ignored(self, app):
+        with app.test_request_context(path='/api/foo', headers={'Authorization': 'Basic dXNlcjpwYXNz'}):
+            assert _extract_api_credential() == ('', None)
 
     def test_bearer_prefix_case_sensitive(self, app):
-        with app.test_request_context(
-            path='/api/foo',
-            headers={'Authorization': 'bearer secret-key'},
-        ):
-            key, source = _extract_api_key()
-            assert key is None
-            assert source is None
+        with app.test_request_context(path='/api/foo', headers={'Authorization': 'bearer secret-key'}):
+            assert _extract_api_credential() == ('', None)
 
 
 @pytest.mark.unit
@@ -79,7 +61,7 @@ class TestRequireApiKey:
     """Test require_api_key decorator."""
 
     def test_success_calls_wrapped_function(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return {'ok': True}
 
@@ -89,7 +71,7 @@ class TestRequireApiKey:
             assert result == {'ok': True}
 
     def test_success_sets_skip_auth(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return 'done'
 
@@ -101,7 +83,7 @@ class TestRequireApiKey:
     def test_auth_failure_returns_response_without_calling_view(self, app):
         error_response = api_error('Authentication required', 401)
 
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             pytest.fail('view must not run when auth fails')
 
@@ -115,21 +97,21 @@ class TestRequireApiKey:
             assert result.status_code == 401
 
     def test_sets_endpoint_registry_metadata(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return None
 
         assert protected._ep_auth == 'api_key'
 
     def test_preserves_wrapped_function_name(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return None
 
         assert protected.__name__ == 'protected'
 
     def test_logs_usage_when_config_enabled(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return None
 
@@ -144,7 +126,7 @@ class TestRequireApiKey:
             assert 'API key authenticated' in message
 
     def test_does_not_log_when_config_disabled(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return None
 
@@ -158,7 +140,7 @@ class TestRequireApiKey:
     def test_with_valid_db_api_key(self, app, db_session, api_key):
         _api_key_obj, full_key = api_key
 
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             return {'authenticated': True}
 
@@ -171,7 +153,7 @@ class TestRequireApiKey:
         assert g.skip_auth is True
 
     def test_with_missing_api_key_returns_401(self, app):
-        @require_api_key
+        @require_api_key(capability=REFERENCE_READ)
         def protected():
             pytest.fail('view must not run without API key')
 
@@ -185,7 +167,7 @@ class TestRequireApiKeyOrSession:
     """Test require_api_key_or_session decorator."""
 
     def test_authenticated_session_skips_api_key_check(self, app, test_user):
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             return {'via': 'session'}
 
@@ -201,7 +183,7 @@ class TestRequireApiKeyOrSession:
         mock_user = MagicMock()
         mock_user.is_authenticated = False
 
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             return {'via': 'api_key'}
 
@@ -217,7 +199,7 @@ class TestRequireApiKeyOrSession:
         assert g.skip_auth is True
 
     def test_anonymous_current_user_requires_api_key(self, app):
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             return {'via': 'api_key'}
 
@@ -236,7 +218,7 @@ class TestRequireApiKeyOrSession:
         mock_user.is_authenticated = False
         error_response = api_error('Invalid API key', 401)
 
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             pytest.fail('view must not run when auth fails')
 
@@ -251,14 +233,14 @@ class TestRequireApiKeyOrSession:
         assert result.status_code == 401
 
     def test_sets_endpoint_registry_metadata(self, app):
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             return None
 
         assert protected._ep_auth == 'api_key_or_session'
 
     def test_preserves_wrapped_function_name(self, app):
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             return None
 
@@ -267,7 +249,7 @@ class TestRequireApiKeyOrSession:
     def test_with_valid_db_api_key_when_not_logged_in(self, app, db_session, api_key):
         _api_key_obj, full_key = api_key
 
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             return {'authenticated': True}
 
@@ -280,7 +262,7 @@ class TestRequireApiKeyOrSession:
         assert g.skip_auth is True
 
     def test_with_missing_credentials_returns_401(self, app):
-        @require_api_key_or_session
+        @require_api_key_or_session(capability=REFERENCE_READ)
         def protected():
             pytest.fail('view must not run without session or API key')
 
@@ -292,7 +274,7 @@ class TestRequireApiKeyOrSession:
         mock_user = MagicMock()
         mock_user.is_authenticated = False
 
-        @require_api_key_or_session(browser_login_redirect=True)
+        @require_api_key_or_session(capability=REFERENCE_READ, browser_login_redirect=True)
         def protected():
             pytest.fail('view must not run without session or API key')
 
@@ -317,7 +299,7 @@ class TestRequireApiKeyOrSession:
         mock_user.is_authenticated = False
         error_response = api_error('Authentication required', 401)
 
-        @require_api_key_or_session(browser_login_redirect=True)
+        @require_api_key_or_session(capability=REFERENCE_READ, browser_login_redirect=True)
         def protected():
             pytest.fail('view must not run without session or API key')
 
@@ -340,7 +322,7 @@ class TestRequireApiKeyOrSession:
         mock_user.is_authenticated = False
         error_response = api_error('Invalid API key', 401)
 
-        @require_api_key_or_session(browser_login_redirect=True)
+        @require_api_key_or_session(capability=REFERENCE_READ, browser_login_redirect=True)
         def protected():
             pytest.fail('view must not run with an invalid API key')
 
@@ -366,7 +348,7 @@ class TestRequireApiKeyOrSession:
         mock_user = MagicMock()
         mock_user.is_authenticated = False
 
-        @require_api_key_or_session(browser_login_redirect=True)
+        @require_api_key_or_session(capability=REFERENCE_READ, browser_login_redirect=True)
         def protected():
             return {'authenticated': True}
 

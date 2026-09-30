@@ -328,7 +328,10 @@ class TestInternalErrorHandler:
             assert call_kw["event_type"] == "internal_server_error"
             assert call_kw["severity"] == "critical"
             assert "Internal Server Error" in call_kw["description"]
-            assert "traceback" in call_kw["context_data"]
+            ctx = call_kw["context_data"]
+            assert "traceback" not in ctx
+            assert "exception_type" in ctx and "traceback_hash" in ctx
+            assert ctx["request_id"] == resp.headers["X-Request-ID"]
         finally:
             app.config["DEBUG"] = original
 

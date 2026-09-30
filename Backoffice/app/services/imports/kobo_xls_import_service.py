@@ -38,6 +38,7 @@ from flask_login import current_user
 from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormTemplateVersion
 from app.utils.datetime_helpers import utcnow
+from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
 
 try:
     import openpyxl
@@ -169,11 +170,7 @@ class KoboXlsImportService:
             }
 
         try:
-            workbook = openpyxl.load_workbook(
-                io.BytesIO(excel_file.read()),
-                data_only=True,
-                read_only=False,
-            )
+            workbook = load_workbook_safe(excel_file, read_only=False, data_only=True)
         except Exception as e:
             current_app.logger.error(f"Failed to load Kobo XLS file for validation: {e}", exc_info=True)
             return {
@@ -313,11 +310,7 @@ class KoboXlsImportService:
         created_counts = {'sections': 0, 'items': 0}
 
         try:
-            workbook = openpyxl.load_workbook(
-                io.BytesIO(excel_file.read()),
-                data_only=True,
-                read_only=False,
-            )
+            workbook = load_workbook_safe(excel_file, read_only=False, data_only=True)
         except Exception as e:
             current_app.logger.error(f"Failed to load Kobo XLS file: {e}", exc_info=True)
             return {
@@ -592,7 +585,7 @@ class KoboXlsImportService:
             label_idx = next((i for i, h in enumerate(headers) if h and str(h).strip().lower() == 'label'), None)
             if list_idx is None or name_idx is None or label_idx is None:
                 return result
-            for row in sheet.iter_rows(min_row=2, values_only=True):
+            for row in safe_iter_rows(sheet, min_row=2, values_only=True):
                 if not row or len(row) <= max(list_idx, name_idx, label_idx):
                     continue
                 list_name = _parse_str(row[list_idx])
@@ -614,7 +607,7 @@ class KoboXlsImportService:
             type_idx = next((i for i, h in enumerate(headers) if h == 'type'), None)
             if type_idx is None:
                 return rows
-            for row in sheet.iter_rows(min_row=2, values_only=True):
+            for row in safe_iter_rows(sheet, min_row=2, values_only=True):
                 if not row or len(row) <= type_idx:
                     continue
                 type_val = row[type_idx]

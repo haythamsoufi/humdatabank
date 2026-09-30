@@ -106,7 +106,8 @@ def upload_document():
     Accepts multipart/form-data with:
     - file: Document file (PDF, Word, Excel, etc.)
     - title: Optional title (defaults to filename)
-    - is_public: Boolean - whether document is searchable by all users
+    - is_public: Boolean - whether document is readable by other users (admin only)
+    - allowed_roles: Optional comma-separated role codes restricting who may read a public document
     - searchable: Boolean - whether to enable AI search
 
     Returns:
@@ -127,6 +128,14 @@ def upload_document():
         from app.services.organization.authorization_service import AuthorizationService
         if is_public and not AuthorizationService.is_admin(current_user):
             return json_forbidden('Only admins can create public documents')
+
+        from app.services.ai.documents.access import normalize_allowed_roles
+
+        roles_ok, allowed_roles = normalize_allowed_roles(request.form.get('allowed_roles'))
+        if not roles_ok:
+            return json_bad_request('allowed_roles must be a comma-separated list of role codes')
+        if allowed_roles is not None and not AuthorizationService.is_admin(current_user):
+            return json_forbidden('Only admins can restrict documents by role')
 
         processor = AIDocumentProcessor()
 
@@ -193,6 +202,7 @@ def upload_document():
                 processing_status='pending',
                 user_id=current_user.id,
                 is_public=is_public,
+                allowed_roles=allowed_roles,
                 searchable=searchable,
                 country_id=detected_country_id,
                 country_name=detected_country_name,

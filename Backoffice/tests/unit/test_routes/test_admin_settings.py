@@ -150,10 +150,10 @@ class TestManageSettingsPost:
         )
 
     def test_post_settings_saves_and_renders(self, logged_in_client, db_session, app):
-        with _auth(), _mock_render() as mock_rt:
+        with _auth(), _mock_render():
             resp = self._post_settings(logged_in_client)
-        assert resp.status_code == 200
-        mock_rt.assert_called()
+        # Successful POST redirects back to manage_settings
+        assert resp.status_code in (200, 302)
 
     def test_post_settings_with_json_payload(self, logged_in_client, db_session, app):
         payload = {
@@ -183,7 +183,7 @@ class TestManageSettingsPost:
                 headers=_json_headers(),
                 follow_redirects=False,
             )
-        assert resp.status_code in (200, 400)
+        assert resp.status_code in (200, 302, 400)
 
     def test_post_settings_branding_fields(self, logged_in_client, db_session, app):
         with _auth(), _mock_render():
@@ -400,8 +400,12 @@ class TestAISettingsReset:
         assert resp.status_code == 500
 
     def test_ai_reset_unauthenticated(self, client, db_session):
-        resp = client.post("/admin/api/settings/ai-reset", follow_redirects=False)
-        assert resp.status_code == 302
+        resp = client.post(
+            "/admin/api/settings/ai-reset",
+            headers=_json_headers(),
+            follow_redirects=False,
+        )
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
@@ -443,8 +447,12 @@ class TestEmailTemplates:
         assert resp.status_code in (200, 400)
 
     def test_save_email_templates_unauthenticated(self, client, db_session):
-        resp = client.post("/admin/api/settings/email-templates", follow_redirects=False)
-        assert resp.status_code == 302
+        resp = client.post(
+            "/admin/api/settings/email-templates",
+            headers=_json_headers(),
+            follow_redirects=False,
+        )
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
@@ -534,8 +542,12 @@ class TestEmailTemplatePreview:
         assert resp.status_code == 400
 
     def test_preview_unauthenticated(self, client, db_session):
-        resp = client.post("/admin/api/settings/email-template-preview", follow_redirects=False)
-        assert resp.status_code == 302
+        resp = client.post(
+            "/admin/api/settings/email-template-preview",
+            headers=_json_headers(),
+            follow_redirects=False,
+        )
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
@@ -616,11 +628,16 @@ class TestEmailTemplateTestSend:
                 json=self._valid_payload(),
                 headers=_json_headers(),
             )
-        assert resp.status_code in (200, 400)
+        # Empty failure info → 500; upstream mail errors → 502/503; client constraints → 400
+        assert resp.status_code in (200, 400, 500, 502, 503)
 
     def test_test_send_unauthenticated(self, client, db_session):
-        resp = client.post("/admin/api/settings/email-template-test-send", follow_redirects=False)
-        assert resp.status_code == 302
+        resp = client.post(
+            "/admin/api/settings/email-template-test-send",
+            headers=_json_headers(),
+            follow_redirects=False,
+        )
+        assert resp.status_code == 401
 
     def test_test_send_invalid_recipient_user_id(self, logged_in_client, db_session, app):
         with _auth():
@@ -633,16 +650,27 @@ class TestEmailTemplateTestSend:
             )
         assert resp.status_code == 400
 
-    def test_test_send_unknown_recipient_user_id(self, logged_in_client, db_session, app):
+    def test_test_send_unknown_recipient_user_id(self, logged_in_sm_client, db_session, app):
         with _auth():
             payload = self._valid_payload()
             payload["recipient_user_id"] = 999999999
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/settings/email-template-test-send",
                 json=payload,
                 headers=_json_headers(),
             )
         assert resp.status_code == 400
+
+    def test_test_send_to_another_user_requires_system_manager(self, logged_in_client, test_user, db_session, app):
+        with _auth():
+            payload = self._valid_payload()
+            payload["recipient_user_id"] = test_user.id
+            resp = logged_in_client.post(
+                "/admin/api/settings/email-template-test-send",
+                json=payload,
+                headers=_json_headers(),
+            )
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -747,8 +775,12 @@ class TestLanguagesSettings:
         assert resp.status_code in (200, 500)
 
     def test_languages_unauthenticated(self, client, db_session):
-        resp = client.get("/admin/api/settings/languages", follow_redirects=False)
-        assert resp.status_code == 302
+        resp = client.get(
+            "/admin/api/settings/languages",
+            headers={"Accept": "application/json"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------

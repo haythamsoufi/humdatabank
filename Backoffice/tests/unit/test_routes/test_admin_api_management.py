@@ -39,6 +39,14 @@ def _make_scan():
 # ---------------------------------------------------------------------------
 
 
+def _allow_column_comparisons(model_mock):
+    """``Model.column < x`` builds a SQL expression; MagicMock needs it spelled out."""
+    for column in ("status_code", "timestamp", "response_time"):
+        col = getattr(model_mock, column)
+        for op in ("__lt__", "__le__", "__gt__", "__ge__"):
+            getattr(col, op).return_value = MagicMock()
+
+
 class TestApiManagementView:
     def test_unauthenticated_redirects(self, client, db_session):
         resp = client.get("/admin/api-management")
@@ -78,6 +86,7 @@ class TestApiManagementView:
             mock_au.query.filter.return_value.count.return_value = 0
             mock_au.query.with_entities.return_value.distinct.return_value.count.return_value = 0
             mock_db.session.query.return_value.scalar.return_value = 0
+            _allow_column_comparisons(mock_au)
 
             resp = logged_in_client.get("/admin/api-management")
         assert resp.status_code == 200
@@ -122,6 +131,7 @@ class TestApiManagementView:
             mock_au.query.filter.return_value.count.return_value = 4
             mock_au.query.with_entities.return_value.distinct.return_value.count.return_value = 2
             mock_db.session.query.return_value.scalar.return_value = 150.0
+            _allow_column_comparisons(mock_au)
 
             resp = logged_in_client.get("/admin/api-management")
         assert resp.status_code == 200
@@ -167,7 +177,8 @@ class TestApiStats:
     def test_exception_returns_500(self, logged_in_client, db_session, app):
         with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
-             patch("app.routes.admin.api_management.APIUsage", side_effect=RuntimeError("db down")):
+             patch("app.routes.admin.api_management.APIUsage"), \
+             patch("app.routes.admin.api_management.chart_stats_for_period", side_effect=RuntimeError("db down")):
             resp = logged_in_client.get("/admin/api-management/stats")
         assert resp.status_code == 500
 
@@ -268,7 +279,7 @@ class TestApiManagementHelpers:
         assert _surface_for_path("/api/mobile/v1/auth/token") == "mobile"
         assert _surface_for_path("/api/ai/v2/chat") == "ai"
         assert _surface_for_path("/api/v1/data") == "v1"
-        assert _surface_for_path("/api/other") == "ai"  # starts with /api/ai/... no — falls to 'other'
+        assert _surface_for_path("/api/other") == "other"
         assert _surface_for_path("/some/other") == "other"
 
     def test_count_unique_overlap_pairs(self):

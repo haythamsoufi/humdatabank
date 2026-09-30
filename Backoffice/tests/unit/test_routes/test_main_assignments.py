@@ -307,7 +307,7 @@ class TestApproveAssignment:
         assert_redirect(resp, "dashboard")
 
     def test_success_redirects_to_dashboard(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_approved", return_value=None):
@@ -316,7 +316,7 @@ class TestApproveAssignment:
 
     def test_success_with_selected_country_in_session(self, client, db_session, app, admin_user):
         country = create_test_country(db_session)
-        aes = create_test_assignment_entity_status(db_session, country=country, status="sent_for_review")
+        aes = create_test_assignment_entity_status(db_session, country=country, status="submitted")
         _login(client, admin_user)
         with client.session_transaction() as sess:
             sess["selected_country_id"] = country.id
@@ -329,7 +329,7 @@ class TestApproveAssignment:
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch("app.routes.main.assignments.db.session.flush", side_effect=Exception("DB error")), \
@@ -338,7 +338,7 @@ class TestApproveAssignment:
         assert resp.status_code == 200
 
     def test_notification_error_does_not_break_route(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_approved", side_effect=Exception("notif fail")):

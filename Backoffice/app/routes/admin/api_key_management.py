@@ -16,6 +16,13 @@ from app.utils.api_responses import json_ok, json_ok_result, json_server_error
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
 from app.utils.sql_utils import safe_ilike_pattern
+from app.services.security.api_key_permissions import (
+    CAPABILITIES,
+    PRESETS,
+    describe_permissions,
+    parse_key_permissions,
+)
+from app.services.security.api_key_route_catalog import routes_by_capability
 
 bp = Blueprint("api_key_management", __name__, url_prefix="/admin/api-management")
 
@@ -25,6 +32,70 @@ def _get_api_key_or_404(key_id: int) -> APIKey:
     if api_key is None:
         abort(404)
     return api_key
+
+
+_GROUP_TITLES = (
+    ('data', 'Data and structure'),
+    ('people', 'People'),
+    ('reference', 'Reference and public content'),
+    ('indicators', 'Indicator bank'),
+    ('clients', 'Client integrations'),
+)
+
+
+def _capability_catalog() -> list[dict]:
+    """Every grantable permission with the live endpoints it unlocks (derived from the URL map)."""
+    routes = routes_by_capability(current_app)
+    catalog = []
+    for cap in CAPABILITIES:
+        endpoints = []
+        seen = set()
+        for route in routes.get(cap.code, []):
+            key = (route.path, route.methods)
+            if key in seen:
+                continue
+            seen.add(key)
+            endpoints.append({'path': route.path, 'methods': ', '.join(route.methods), 'scoped': route.scope_aware})
+        catalog.append({
+            'code': cap.code,
+            'label': cap.label,
+            'description': cap.description,
+            'sensitivity': cap.sensitivity,
+            'scopable': cap.scopable,
+            'group': cap.group,
+            'endpoints': endpoints,
+        })
+    return catalog
+
+
+def _capability_groups(catalog: list[dict]) -> list[dict]:
+    return [
+        {'title': title, 'capabilities': [c for c in catalog if c['group'] == group]}
+        for group, title in _GROUP_TITLES
+        if any(c['group'] == group for c in catalog)
+    ]
+
+
+def _permission_form_context() -> dict:
+    catalog = _capability_catalog()
+    return {
+        'capability_groups': _capability_groups(catalog),
+        'capability_catalog': catalog,
+        'presets': [
+            {'code': p.code, 'label': p.label, 'description': p.description, 'capabilities': list(p.capabilities)}
+            for p in PRESETS
+        ],
+    }
+
+
+def _permissions_audit_summary(document: dict | None) -> dict:
+    perms = parse_key_permissions(document)
+    return {
+        'capabilities': sorted(perms.capabilities),
+        'data_scope': perms.data_scope,
+        'allow_query_api_key': perms.allow_query_api_key,
+        'legacy_full_access': perms.legacy_full_access,
+    }
 
 
 def _key_daily_chart(key_id: int, days: int = 30) -> list[dict]:
@@ -97,16 +168,19 @@ def list_api_keys():
             APIKey.expires_at <= now
         ).count()
 
+        access_by_key = {k.id: describe_permissions(k.parsed_permissions) for k in api_keys}
+
         return render_template(
             "admin/api_keys/list.html",
             api_keys=api_keys,
+            access_by_key=access_by_key,
             status_filter=status_filter,
             search_query=search_query,
             total_keys=total_keys,
             active_keys=active_keys,
             revoked_keys=revoked_keys,
             expired_keys=expired_keys,
-            now=now,
+            now=now.replace(tzinfo=None),
             title="API Key Management"
         )
     except Exception as e:
@@ -124,6 +198,7 @@ def create_api_key():
     if form.validate_on_submit():
         try:
             full_key, key_id, key_hash, key_prefix = APIKey.generate_key()
+            permissions = form.build_permissions()
 
             api_key = APIKey(
                 key_id=key_id,
@@ -133,6 +208,7 @@ def create_api_key():
                 client_description=form.client_description.data or None,
                 rate_limit_per_minute=form.rate_limit_per_minute.data or 60,
                 expires_at=form.expires_at.data if form.expires_at.data else None,
+                permissions=permissions,
                 created_by_user_id=current_user.id,
                 is_active=True,
                 is_revoked=False
@@ -152,6 +228,7 @@ def create_api_key():
                     'key_prefix': key_prefix,
                     'rate_limit_per_minute': form.rate_limit_per_minute.data or 60,
                     'expires_at': form.expires_at.data.isoformat() if form.expires_at.data else None,
+                    'permissions': _permissions_audit_summary(permissions),
                 },
                 risk_level='high',
             )
@@ -159,6 +236,7 @@ def create_api_key():
             return render_template(
                 "admin/api_keys/create_success.html",
                 api_key=api_key,
+                access=describe_permissions(api_key.parsed_permissions),
                 full_key=full_key,
                 title="API Key Created"
             )
@@ -170,7 +248,8 @@ def create_api_key():
     return render_template(
         "admin/api_keys/create.html",
         form=form,
-        title="Create API Key"
+        title="Create API Key",
+        **_permission_form_context(),
     )
 
 
@@ -218,7 +297,9 @@ def view_api_key(key_id):
             recent_usage=recent_usage,
             usage_by_endpoint=usage_by_endpoint,
             chart_data=chart_data,
-            now=utcnow(),
+            access=describe_permissions(api_key.parsed_permissions),
+            capability_catalog=_capability_catalog(),
+            now=utcnow().replace(tzinfo=None),
             title=f"API Key: {api_key.client_name}"
         )
     except HTTPException:
@@ -232,14 +313,18 @@ def view_api_key(key_id):
 @bp.route("/api-keys/<int:key_id>/edit", methods=["GET", "POST"])
 @admin_permission_required('admin.api.manage')
 def edit_api_key(key_id):
-    """Edit API key metadata (name, description, rate limit, expiry)"""
+    """Edit API key metadata and permissions"""
     api_key = _get_api_key_or_404(key_id)
 
     if api_key.is_revoked:
         flash("Revoked keys cannot be edited.", "danger")
         return redirect(url_for('api_key_management.view_api_key', key_id=key_id))
 
-    form = APIKeyEditForm(obj=api_key)
+    current_perms = api_key.parsed_permissions
+    form = APIKeyEditForm(obj=api_key, legacy_full_access=current_perms.legacy_full_access)
+    form.original_expires_at = api_key.expires_at
+    if request.method == 'GET':
+        form.load_permissions(current_perms)
 
     if form.validate_on_submit():
         try:
@@ -248,12 +333,14 @@ def edit_api_key(key_id):
                 'client_description': api_key.client_description,
                 'rate_limit_per_minute': api_key.rate_limit_per_minute,
                 'expires_at': api_key.expires_at.isoformat() if api_key.expires_at else None,
+                'permissions': _permissions_audit_summary(api_key.permissions),
             }
 
             api_key.client_name = form.client_name.data
             api_key.client_description = form.client_description.data or None
             api_key.rate_limit_per_minute = form.rate_limit_per_minute.data or 60
             api_key.expires_at = form.expires_at.data if form.expires_at.data else None
+            api_key.permissions = form.build_permissions(current=api_key.permissions)
 
             db.session.flush()
 
@@ -269,7 +356,9 @@ def edit_api_key(key_id):
                     'client_description': api_key.client_description,
                     'rate_limit_per_minute': api_key.rate_limit_per_minute,
                     'expires_at': api_key.expires_at.isoformat() if api_key.expires_at else None,
+                    'permissions': _permissions_audit_summary(api_key.permissions),
                 },
+                risk_level='high',
             )
 
             flash(f"API key '{api_key.client_name}' updated successfully.", "success")
@@ -283,7 +372,9 @@ def edit_api_key(key_id):
         "admin/api_keys/edit.html",
         api_key=api_key,
         form=form,
-        title=f"Edit API Key: {api_key.client_name}"
+        access=describe_permissions(current_perms),
+        title=f"Edit API Key: {api_key.client_name}",
+        **_permission_form_context(),
     )
 
 

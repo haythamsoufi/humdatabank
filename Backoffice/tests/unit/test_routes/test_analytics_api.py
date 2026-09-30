@@ -128,6 +128,27 @@ class TestSessionLogsListApi:
 # ---------------------------------------------------------------------------
 
 class TestEndSessionApi:
+    @pytest.fixture(autouse=True)
+    def _grant_maintain(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.system.maintain")
+        db_session.commit()
+
+    def test_analytics_viewer_without_maintain_cannot_end_sessions(self, logged_in_client, db_session):
+        from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission
+
+        role = RbacRole.query.filter_by(code="admin_core").first()
+        perm = RbacPermission.query.filter_by(code="admin.system.maintain").first()
+        RbacRolePermission.query.filter_by(role_id=role.id, permission_id=perm.id).delete()
+        db_session.commit()
+        with patch("app.routes.admin.analytics_api.execute_end_session") as end_session:
+            resp = logged_in_client.post(
+                "/admin/api/analytics/end-session/some-session", headers={"Accept": "application/json"}
+            )
+        assert resp.status_code == 403
+        end_session.assert_not_called()
+
     def test_session_not_found(self, logged_in_client, db_session):
         with patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
@@ -142,9 +163,11 @@ class TestEndSessionApi:
     def test_session_already_inactive(self, logged_in_client, db_session, app):
         from app.models import UserSessionLog
         with app.app_context():
+            user = create_test_user(db_session)
             session_log = UserSessionLog(
                 session_id="api-inactive-session-123",
-                user_id=None,
+                user_id=user.id,
+                ip_address="127.0.0.1",
                 is_active=False,
             )
             db_session.add(session_log)
@@ -162,6 +185,7 @@ class TestEndSessionApi:
             session_log = UserSessionLog(
                 session_id="api-active-session-456",
                 user_id=user.id,
+                ip_address="127.0.0.1",
                 is_active=True,
             )
             db_session.add(session_log)
@@ -181,6 +205,7 @@ class TestEndSessionApi:
             session_log = UserSessionLog(
                 session_id="api-error-session-789",
                 user_id=user.id,
+                ip_address="127.0.0.1",
                 is_active=True,
             )
             db_session.add(session_log)

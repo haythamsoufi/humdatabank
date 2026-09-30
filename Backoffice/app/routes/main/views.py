@@ -170,14 +170,11 @@ def download_submission_pdf(submission_id):
     """Generate and serve a PDF of the public submission using the exact HTML template."""
     submission = PublicSubmission.query.get_or_404(submission_id)
 
-    from app.services.organization.authorization_service import AuthorizationService
-    if not AuthorizationService.is_admin(current_user):
-        if not any(
-            perm.entity_type == "country" and perm.entity_id == submission.country_id
-            for perm in getattr(current_user, "entity_permissions", [])
-        ):
-            from flask import abort
-            abort(403)
+    from app.utils.form_authorization import AUTH_OK, PUBLIC_SUBMISSION_ACTION_VIEW, public_submission_access
+
+    if public_submission_access(submission, current_user, PUBLIC_SUBMISSION_ACTION_VIEW) != AUTH_OK:
+        from flask import abort
+        abort(404)
 
     # Create a dummy field class for form rendering
     class DummyField:

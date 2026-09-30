@@ -8,7 +8,7 @@ import uuid
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from flask import current_app, url_for
+from flask import current_app, has_request_context, request, url_for
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -96,7 +96,9 @@ def upload_template_image(
     file_storage.seek(0)
     if size > MAX_IMAGE_BYTES:
         raise ValueError(f"File is too large (max {MAX_IMAGE_BYTES // (1024 * 1024)} MB)")
-    validate_upload_extension_and_mime(file_storage, ALLOWED_IMAGE_EXTENSIONS)
+    valid, error, _ext = validate_upload_extension_and_mime(file_storage, ALLOWED_IMAGE_EXTENSIONS)
+    if not valid:
+        raise ValueError(error or "Invalid image file")
     file_storage.seek(0)
     uniq = uuid.uuid4().hex[:12]
     stem = os.path.splitext(name)[0] or "image"
@@ -167,12 +169,18 @@ def build_entry_serve_url(item_id: int, storage_path: str, language: Optional[st
     rel = _normalize_storage_path(storage_path)
     if not rel:
         return ""
+    extra = {}
+    if has_request_context() and request.endpoint == "forms.fill_public_form":
+        public_token = (request.view_args or {}).get("public_token")
+        if public_token:
+            extra["public_token"] = str(public_token)
     try:
         return url_for(
             "forms.serve_template_image",
             item_id=item_id,
             rel_path=rel,
             lang=language or "",
+            **extra,
         )
     except Exception:
         return ""

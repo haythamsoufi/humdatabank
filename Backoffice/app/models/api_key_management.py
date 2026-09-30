@@ -128,7 +128,7 @@ class APIKey(db.Model):
         Keys are 384-bit random tokens, not human-chosen passwords, so a fast unsalted
         digest is the right primitive (there is nothing to brute-force or rainbow-table).
         """
-        return hashlib.sha256(key.encode()).hexdigest()
+        return hashlib.sha256(key.encode()).hexdigest()  # lgtm[py/weak-sensitive-data-hashing]
 
     def verify_key(self, provided_key: str) -> bool:
         """

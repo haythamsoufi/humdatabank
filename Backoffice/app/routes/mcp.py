@@ -20,7 +20,6 @@ and API-key material never leave this process. The upstream host is validated wi
 
 from __future__ import annotations
 
-import hmac
 import time
 from typing import Optional
 from urllib.parse import parse_qsl, quote, urlencode, urlparse
@@ -200,20 +199,25 @@ def authorize_mcp_request() -> Optional[Response]:
     return result
 
 
+def _client_ip_for_limits() -> str:
+    try:
+        from app.services.platform.user_analytics_service import get_client_ip
+
+        return str(get_client_ip())
+    except Exception:
+        return str(request.remote_addr)
+
+
 def _rate_limit_key() -> str:
     if getattr(current_user, "is_authenticated", False):
         return f"mcp:user:{current_user.get_id()}"
     presented = _presented_api_key()
     if presented:
-        secret = str(current_app.config.get("SECRET_KEY") or "").encode("utf-8")
-        digest = hmac.digest(secret, presented.encode("utf-8"), "sha256").hex()[:24]
-        return "mcp:key:" + digest
-    try:
-        from app.services.platform.user_analytics_service import get_client_ip
-
-        return f"mcp:ip:{get_client_ip()}"
-    except Exception:
-        return f"mcp:ip:{request.remote_addr}"
+        # Bucket per (key prefix, client): the prefix is the value already shown in the API key
+        # UI, and including the client stops an attacker who knows a prefix from draining the
+        # legitimate key's bucket with bogus requests.
+        return f"mcp:key:{presented[:8]}:{_client_ip_for_limits()}"
+    return f"mcp:ip:{_client_ip_for_limits()}"
 
 
 def _rate_limit() -> str:

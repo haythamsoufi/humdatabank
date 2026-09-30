@@ -447,13 +447,20 @@ def submitted_document_rel_storage_category(rel_path: str | None) -> str:
 
 def _is_effectively_absolute_stored_path(sp: str) -> bool:
     """True for normal OS absolute paths and for POSIX /foo/... (Linux deploy paths
-    on Windows return False for :func:`os.path.isabs`, so we need this for Azure-style paths)."""
+    on Windows return False for :func:`os.path.isabs`, so we need this for Azure-style paths).
+
+    UNC / network-share style paths (``//host/...``) are intentionally *not*
+    treated as local absolute paths — callers must not ``send_file`` them.
+    """
     if not sp or not (sp.strip()):
+        return False
+    s = (sp or "").replace("\\", "/")
+    # os.path.isabs('//share') is True on POSIX; reject UNC before that check.
+    if s.startswith("//"):
         return False
     if os.path.isabs(sp):
         return True
-    s = (sp or "").replace("\\", "/")
-    if s.startswith("/") and not s.startswith("//"):
+    if s.startswith("/"):
         return True
     return False
 

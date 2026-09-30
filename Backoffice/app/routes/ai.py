@@ -2532,28 +2532,35 @@ def get_or_delete_conversation(conversation_id: str):
         .all()
     )
 
-    # If messages were archived, load them from archive storage.
-    if not msgs and getattr(convo, "is_archived", False) and getattr(convo, "archive_path", None):
-        try:
-            payload = load_archived_conversation(convo)
-            archived_msgs = (payload or {}).get("messages") or []
-            archived_msgs = archived_msgs[:limit]
-            return json_ok(
-                success=True,
-                conversation={
-                    "id": convo.id,
-                    "title": convo.title,
-                    "updated_at": convo.updated_at.isoformat() if convo.updated_at else None,
-                    "last_message_at": convo.last_message_at.isoformat() if convo.last_message_at else None,
-                    "is_archived": True,
-                    "archived_at": convo.archived_at.isoformat() if getattr(convo, "archived_at", None) else None,
-                },
-                messages=archived_msgs,
-                meta={"source": "archive"},
-            )
-        except Exception as e:
-            current_app.logger.error(f"Failed to load archived conversation {conversation_id}: {e}", exc_info=True)
-            return json_server_error("Failed to load archived conversation")
+    # Prefer archive storage when an archive object exists. Use archive_path as
+    # the source of truth (is_archived alone can be stale in long-lived sessions).
+    # Also covers stray DB message rows from a partial cleanup / concurrent write.
+    if getattr(convo, "archive_path", None):
+        with suppress(Exception):
+            db.session.refresh(convo)
+        if getattr(convo, "is_archived", False) or getattr(convo, "archive_path", None):
+            try:
+                payload = load_archived_conversation(convo)
+                archived_msgs = (payload or {}).get("messages") or []
+                archived_msgs = archived_msgs[:limit]
+                return json_ok(
+                    success=True,
+                    conversation={
+                        "id": convo.id,
+                        "title": convo.title,
+                        "updated_at": convo.updated_at.isoformat() if convo.updated_at else None,
+                        "last_message_at": convo.last_message_at.isoformat() if convo.last_message_at else None,
+                        "is_archived": True,
+                        "archived_at": convo.archived_at.isoformat() if getattr(convo, "archived_at", None) else None,
+                    },
+                    messages=archived_msgs,
+                    meta={"source": "archive"},
+                )
+            except Exception as e:
+                current_app.logger.error(f"Failed to load archived conversation {conversation_id}: {e}", exc_info=True)
+                # Fall through to DB messages if archive load fails and rows still exist.
+                if not msgs:
+                    return json_server_error("Failed to load archived conversation")
 
     return json_ok(
         success=True,
@@ -2643,7 +2650,9 @@ def export_conversation(conversation_id: str):
         }
     else:
         # fallback to archived payload if present
-        if getattr(convo, "is_archived", False) and getattr(convo, "archive_path", None):
+        if getattr(convo, "archive_path", None):
+            with suppress(Exception):
+                db.session.refresh(convo)
             payload = load_archived_conversation(convo)
             payload["exported_at"] = utcnow().isoformat()
             payload["source"] = "archive"

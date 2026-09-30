@@ -599,7 +599,12 @@ class TestSubmittedDocumentAiSyncHook:
     def test_hook_syncs_is_public_on_commit_without_explicit_call(self, db_session, app):
         with app.app_context():
             user = create_test_user(db_session)
-            submitted, ai_doc = self._create_linked_pair(db_session, user, is_public=False)
+            submitted, ai_doc = self._create_linked_pair(
+                db_session,
+                user,
+                is_public=False,
+                status=DocumentStatus.APPROVED,
+            )
             assert ai_doc.is_public is False
 
             submitted.is_public = True
@@ -693,6 +698,7 @@ class TestSubmittedDocumentAiSyncHook:
                 user,
                 is_public=False,
                 language="en",
+                status=DocumentStatus.APPROVED,
             )
 
             submitted.is_public = True

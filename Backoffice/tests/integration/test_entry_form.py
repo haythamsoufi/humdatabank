@@ -407,79 +407,79 @@ class TestEntryFormRoutes:
 
     def test_handle_assignment_form_get(self, client, db_session, app, admin_user):
         """Test GET request to assignment form route returns HTML."""
-        with app.app_context():
-            # Create test data
-            country = create_test_country(db_session)
-            template = create_test_template(db_session)
+        # Create test data (app fixture already pushes an app context)
+        country = create_test_country(db_session)
+        template = create_test_template(db_session)
 
-            assigned_form = AssignedForm(
-                template_id=template.id,
-                period_name="2024"
-            )
-            db_session.add(assigned_form)
-            db_session.commit()
+        assigned_form = AssignedForm(
+            template_id=template.id,
+            period_name="2024"
+        )
+        db_session.add(assigned_form)
+        db_session.commit()
 
-            assignment_status = AssignmentEntityStatus(
-                assigned_form_id=assigned_form.id,
-                entity_type=EntityType.country.value,
-                entity_id=country.id,
-                status="in_progress"
-            )
-            db_session.add(assignment_status)
-            db_session.flush()
-            aes_id = assignment_status.id  # capture before commit expires attrs
-            db_session.commit()
+        assignment_status = AssignmentEntityStatus(
+            assigned_form_id=assigned_form.id,
+            entity_type=EntityType.country.value,
+            entity_id=country.id,
+            status="in_progress"
+        )
+        db_session.add(assignment_status)
+        db_session.flush()
+        aes_id = assignment_status.id  # capture before commit expires attrs
+        db_session.commit()
 
-            # Login via session
-            with client.session_transaction() as sess:
-                sess['_user_id'] = str(admin_user.id)
-                sess['_fresh'] = True
+        # Login via session
+        with client.session_transaction() as sess:
+            sess['_user_id'] = str(admin_user.id)
+            sess['_fresh'] = True
 
-            # Mock access/edit checks + template preparation to keep the route fast/stable
-            with patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment') as mock_access, \
-                 patch('app.services.organization.authorization_service.AuthorizationService.can_edit_assignment') as mock_edit, \
-                 patch('app.routes.forms.entry.TemplatePreparationService.prepare_template_for_rendering') as mock_prep:
-                mock_access.return_value = True
-                mock_edit.return_value = True
-                mock_prep.return_value = (template, [], {})
+        # Mock access/edit checks + template preparation to keep the route fast/stable
+        with patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment') as mock_access, \
+             patch('app.services.organization.authorization_service.AuthorizationService.can_edit_assignment') as mock_edit, \
+             patch('app.routes.forms.entry.TemplatePreparationService.prepare_template_for_rendering') as mock_prep:
+            mock_access.return_value = True
+            mock_edit.return_value = True
+            mock_prep.return_value = (template, [], {})
 
-                resp = client.get(f'/assignment/{aes_id}')
-                assert resp.status_code == 200
+            resp = client.get(f'/assignment/{aes_id}')
+            assert resp.status_code == 200
+            # Entry form responses may use stream_with_context; reading the body
+            # pops the request context so pytest_flask teardown stays consistent.
+            assert resp.data
 
     def test_view_edit_form_assignment_redirect(self, client, db_session, app, admin_user):
         """Test legacy /forms/assignment_status/<id> redirects to new canonical route."""
-        with app.app_context():
-            # Create test data
-            country = create_test_country(db_session)
-            template = create_test_template(db_session)
+        country = create_test_country(db_session)
+        template = create_test_template(db_session)
 
-            assigned_form = AssignedForm(
-                template_id=template.id,
-                period_name="2024"
-            )
-            db_session.add(assigned_form)
-            db_session.commit()
+        assigned_form = AssignedForm(
+            template_id=template.id,
+            period_name="2024"
+        )
+        db_session.add(assigned_form)
+        db_session.commit()
 
-            assignment_status = AssignmentEntityStatus(
-                assigned_form_id=assigned_form.id,
-                entity_type=EntityType.country.value,
-                entity_id=country.id,
-                status="in_progress"
-            )
-            db_session.add(assignment_status)
-            db_session.flush()
-            aes_id = assignment_status.id  # capture before commit
-            db_session.commit()
+        assignment_status = AssignmentEntityStatus(
+            assigned_form_id=assigned_form.id,
+            entity_type=EntityType.country.value,
+            entity_id=country.id,
+            status="in_progress"
+        )
+        db_session.add(assignment_status)
+        db_session.flush()
+        aes_id = assignment_status.id  # capture before commit
+        db_session.commit()
 
-            # Login
-            with client.session_transaction() as sess:
-                sess['_user_id'] = str(admin_user.id)
-                sess['_fresh'] = True
+        # Login
+        with client.session_transaction() as sess:
+            sess['_user_id'] = str(admin_user.id)
+            sess['_fresh'] = True
 
-            resp = client.get(f'/forms/assignment_status/{aes_id}', follow_redirects=False)
-            assert resp.status_code in (301, 302, 308)
-            location = resp.headers.get('Location') or ''
-            assert f'/assignment/{aes_id}' in location
+        resp = client.get(f'/forms/assignment_status/{aes_id}', follow_redirects=False)
+        assert resp.status_code in (301, 302, 308)
+        location = resp.headers.get('Location') or ''
+        assert f'/assignment/{aes_id}' in location
 
 
 @pytest.mark.integration

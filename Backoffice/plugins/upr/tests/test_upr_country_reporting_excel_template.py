@@ -83,12 +83,26 @@ from upr_country_reporting_excel_template import (  # noqa: E402
 )
 
 
-TEMPLATE_PATH = os.path.join(
+_PLUGIN_TEMPLATE_PATH = os.path.normpath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "static",
+        "templates",
+        "unified_country_report.xlsx",
+    )
+)
+_LEGACY_TEMPLATE_PATH = os.path.join(
     BACKOFFICE_DIR,
     "app",
     "static",
     "templates",
     "unified_country_report.xlsx",
+)
+TEMPLATE_PATH = (
+    _PLUGIN_TEMPLATE_PATH
+    if os.path.isfile(_PLUGIN_TEMPLATE_PATH)
+    else _LEGACY_TEMPLATE_PATH
 )
 
 

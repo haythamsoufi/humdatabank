@@ -212,6 +212,18 @@ def matrix_portrait_column_widths_mm(
             widths.append((spec['name'], tick_mm))
         else:
             widths.append((spec['name'], round(number_mm, 1)))
+    # Rounding can drift a tenth of a mm over the budget; shrink the last
+    # numeric column so the colgroup never exceeds the page width.
+    total = sum(w for _, w in widths)
+    if total > table_width_mm and widths:
+        overflow = total - table_width_mm
+        for idx in range(len(widths) - 1, -1, -1):
+            name, width = widths[idx]
+            if name == '__row__':
+                continue
+            adjusted = max(min_number_mm if name != '__total__' else min_number_mm, round(width - overflow, 1))
+            widths[idx] = (name, adjusted)
+            break
     return widths
 
 

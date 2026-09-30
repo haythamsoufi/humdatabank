@@ -455,7 +455,6 @@ def get_user_data_context(user_id: Optional[int] = None) -> Dict[str, Any]:
                     AssignmentEntityStatus.query
                     .options(
                         joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template),
-                        joinedload(AssignmentEntityStatus.country)
                     )
                     .filter(
                         AssignmentEntityStatus.entity_id.in_(country_ids),

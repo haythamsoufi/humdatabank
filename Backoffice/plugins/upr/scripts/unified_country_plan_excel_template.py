@@ -3,7 +3,7 @@
 Per-country Unified Country Plan Excel template round-trip for Template 24 (planning).
 
 Uses the structured IFRC planning workbook (named cells + Excel tables) for export/import
-from a single country assignment (aes_id). Workbook: app/static/templates/unified_country_plan.xlsx
+from a single country assignment (aes_id). Workbook: plugins/upr/static/templates/unified_country_plan.xlsx
 """
 
 from __future__ import annotations
@@ -1373,9 +1373,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Unified Country Plan Excel round-trip (T24)")
     parser.add_argument("--aes-id", type=int, required=True)
+    _plugin_template = os.path.normpath(
+        os.path.join(script_dir, "..", "static", "templates", "unified_country_plan.xlsx")
+    )
+    _legacy_template = os.path.join(
+        backoffice_dir, "app", "static", "templates", "unified_country_plan.xlsx"
+    )
     parser.add_argument(
         "--template",
-        default=os.path.join(backoffice_dir, "app", "static", "templates", "unified_country_plan.xlsx"),
+        default=_plugin_template if os.path.isfile(_plugin_template) else _legacy_template,
     )
     parser.add_argument("--output", required=True)
     args = parser.parse_args()

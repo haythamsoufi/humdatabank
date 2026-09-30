@@ -27,7 +27,7 @@ DEFAULT_TRANSLATIONS: dict[str, dict[str, str]] = {
         "English": "Strategic Priorities",
         "French": "Priorités stratégiques",
         "Spanish": "Prioridades estratégicas",
-        "Arabic": "الأولويات الاستراتégicas",
+        "Arabic": "الأولويات الاستراتيجية",
     },
     "ui.part.ef": {
         "English": "Enabling Functions",
@@ -52,6 +52,62 @@ DEFAULT_TRANSLATIONS: dict[str, dict[str, str]] = {
         "French": "Réduire le sommaire",
         "Spanish": "Contraer índice",
         "Arabic": "طي جدول المحتويات",
+    },
+    "ui.not_available": {
+        "English": "Not available yet",
+        "French": "Pas encore disponible",
+        "Spanish": "Aún no disponible",
+        "Arabic": "غير متوفر بعد",
+    },
+    "ui.not_applicable": {
+        "English": "n/a",
+        "French": "s. o.",
+        "Spanish": "n/a",
+        "Arabic": "لا ينطبق",
+    },
+    "ui.national_societies": {
+        "English": "National Societies",
+        "French": "Sociétés nationales",
+        "Spanish": "Sociedades Nacionales",
+        "Arabic": "الجمعيات الوطنية",
+    },
+    "ui.table_reporting_row": {
+        "English": "Reporting",
+        "French": "Rapportant",
+        "Spanish": "Informantes",
+        "Arabic": "المبلّغة",
+    },
+    "ui.table_implementing_row": {
+        "English": "Implementing",
+        "French": "Mettant en œuvre",
+        "Spanish": "Implementando",
+        "Arabic": "المنفّذة",
+    },
+    "ui.year_header": {
+        "English": "Year",
+        "French": "Année",
+        "Spanish": "Año",
+        "Arabic": "السنة",
+    },
+    "footnote.default": {
+        "English": (
+            "*{year} data is based on reports received from {upr_ns} NSs through the unified "
+            "reporting process and {fdrs_ns} NSs through FDRS. There is no complete overlap "
+            "between the two data collection processes (in NSs and in indicators)."
+        ),
+        "French": (
+            "* Les données de {year} reposent sur les rapports de {upr_ns} SN via le processus "
+            "de rapport unifié et de {fdrs_ns} SN via le FDRS."
+        ),
+        "Spanish": (
+            "* Los datos de {year} se basan en los informes de {upr_ns} Sociedades Nacionales "
+            "a través del proceso unificado de presentación de informes y de {fdrs_ns} "
+            "Sociedades Nacionales a través del FDRS."
+        ),
+        "Arabic": (
+            "*تستند بيانات عام {year} إلى تقارير {upr_ns} جمعيات وطنية من خلال عملية التقارير "
+            "الموحدة و{fdrs_ns} جمعية وطنية من خلال FDRS."
+        ),
     },
 }
 

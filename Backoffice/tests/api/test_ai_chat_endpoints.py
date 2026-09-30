@@ -102,23 +102,23 @@ def test_ai_chat_validation_message_too_long(client, app, db_session):
 
 @pytest.mark.api
 def test_ai_chat_returns_success_with_fallback(client, app, db_session):
-    """POST /api/ai/v2/chat returns 200 and a reply (fallback when no API keys)."""
+    """POST /api/ai/v2/chat without OPENAI_API_KEY returns 503 (no offline fallback)."""
     user = create_test_user(db_session, email="ai_chat@test.local", name="AI Chat", role="user")
     with app.app_context():
         token = issue_ai_token(user_id=int(user.id), role="user")
     headers = {"Authorization": f"Bearer {token}"}
 
+    # Ensure keys are unset for this assertion
+    app.config["OPENAI_API_KEY"] = ""
     resp = client.post(
         "/api/ai/v2/chat",
         json={"message": "Hello, what can you do?"},
         content_type="application/json",
         headers=headers,
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 503
     data = resp.get_json()
-    assert data.get("success") is True
-    assert "reply" in data
-    assert data.get("meta", {}).get("provider") in ("fallback", "openai", "gemini", "azure", "agent")
+    assert data.get("success") is False
 
 
 @pytest.mark.api
@@ -300,8 +300,9 @@ def test_ai_chat_archived_conversation_loads_from_archive(client, app, db_sessio
 
     user = create_test_user(db_session, email="archive@test.local", name="Archive Tester", role="user")
 
-    with app.app_context():
-        token = issue_ai_token(user_id=int(user.id), role="user")
+    # app fixture already pushes an app context; avoid nested contexts (they use a
+    # separate scoped session and leave stale AIConversation rows in the outer one).
+    token = issue_ai_token(user_id=int(user.id), role="user")
     headers = {"Authorization": f"Bearer {token}"}
 
     convo_id = str(uuid.uuid4())
@@ -313,16 +314,15 @@ def test_ai_chat_archived_conversation_loads_from_archive(client, app, db_sessio
     db_session.commit()
 
     # Archive it (should delete DB messages and write archive file)
-    with app.app_context():
-        archived = archive_conversation(conversation_id=convo_id, user_id=int(user.id), dry_run=False)
-        assert archived is not None
-        assert archived.is_archived is True
-        assert archived.archive_provider == "filesystem"
-        assert archived.archive_path
+    archived = archive_conversation(conversation_id=convo_id, user_id=int(user.id), dry_run=False)
+    assert archived is not None
+    assert archived.is_archived is True
+    assert archived.archive_provider == "filesystem"
+    assert archived.archive_path
 
-        # Archive file exists on disk
-        full_path = os.path.join(app.config["UPLOAD_FOLDER"], archived.archive_path)
-        assert os.path.exists(full_path)
+    # Archive file exists on disk
+    full_path = os.path.join(app.config["UPLOAD_FOLDER"], archived.archive_path)
+    assert os.path.exists(full_path)
 
     # GET conversation should read from archive
     resp = client.get(f"/api/ai/v2/conversations/{convo_id}?limit=200", headers=headers)

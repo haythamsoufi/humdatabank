@@ -440,8 +440,12 @@ def _indicator_detail(
         "emergency": _emergency_to_string(indicator.emergency),
         "disaggregation": indicator.disaggregation_guidance or "",
         "indicatorSource": indicator.data_source or "",
-        "spef": indicator.area or "",
-        "spefLabel": getattr(indicator, "area_label", None) or "",
+        "spef": (indicator.area if isinstance(getattr(indicator, "area", None), str) else "") or "",
+        "spefLabel": (
+            getattr(indicator, "area_label", None)
+            if isinstance(getattr(indicator, "area_label", None), str)
+            else ""
+        ),
         "relatedPrograms": [{"text": p} for p in indicator.related_programs_list],
         "monitoringQuestions": [{"text": q} for q in indicator.monitoring_questions_list],
         "tags": [{"text": t} for t in indicator.tags_list],
@@ -672,15 +676,24 @@ def indicator_select_options():
     program_items: Set[str] = set()
 
     for indicator in indicators:
-        if indicator.unit:
-            units.add(indicator.unit.strip())
-        if indicator.type:
-            types.add(indicator.type.strip())
-        if indicator.disaggregation_guidance:
-            disaggregations.add(indicator.disaggregation_guidance.strip())
-        tag_items.update(indicator.tags_list)
-        monitoring_items.update(indicator.monitoring_questions_list)
-        program_items.update(indicator.related_programs_list)
+        unit = indicator.unit if isinstance(getattr(indicator, "unit", None), str) else None
+        typ = indicator.type if isinstance(getattr(indicator, "type", None), str) else None
+        if unit:
+            units.add(unit.strip())
+        if typ:
+            types.add(typ.strip())
+        guidance = getattr(indicator, "disaggregation_guidance", None)
+        if isinstance(guidance, str) and guidance.strip():
+            disaggregations.add(guidance.strip())
+        for tag in (indicator.tags_list or []):
+            if isinstance(tag, str) and tag.strip():
+                tag_items.add(tag.strip())
+        for q in (indicator.monitoring_questions_list or []):
+            if isinstance(q, str) and q.strip():
+                monitoring_items.add(q.strip())
+        for p in (indicator.related_programs_list or []):
+            if isinstance(p, str) and p.strip():
+                program_items.add(p.strip())
 
     active_types = IndicatorBankType.query.filter_by(is_active=True).order_by(IndicatorBankType.sort_order).all()
     active_units = IndicatorBankUnit.query.filter_by(is_active=True).order_by(IndicatorBankUnit.sort_order).all()
@@ -696,7 +709,13 @@ def indicator_select_options():
             for row in active_spef
         ]
     else:
-        spef_codes = sorted({(ind.area or "").strip() for ind in indicators if (ind.area or "").strip()})
+        spef_codes = sorted(
+            {
+                (ind.area or "").strip()
+                for ind in indicators
+                if isinstance(getattr(ind, "area", None), str) and (ind.area or "").strip()
+            }
+        )
         spef_options = [_select_option(c) for c in spef_codes]
 
     return jsonify(

@@ -249,14 +249,19 @@ class TestRenderPluginFieldEntry:
 class TestInteractiveMapPluginSecurity:
     def test_field_config_does_not_expose_raw_api_keys(self, client, app):
         mock_user = MagicMock(is_authenticated=True)
-        mock_config = MagicMock()
-        mock_config.get_all_config.return_value = {
+        config_payload = {
             "global_settings": {"default_map_provider": "mapbox"},
             "api_keys": {"mapbox": "pk.secret-token-should-not-leak"},
         }
+        # Plugin blueprints are loaded under a short module name, so patch the
+        # plugin_config object actually closed over by the view function.
+        view = app.view_functions["interactive_map_plugin.get_field_config"]
+        while hasattr(view, "__wrapped__"):
+            view = view.__wrapped__
+        real_config = view.__globals__["plugin_config"]
 
         with patch("flask_login.utils._get_user", return_value=mock_user), \
-             patch("plugins.interactive_map.routes.plugin_config", mock_config):
+             patch.object(real_config, "get_all_config", return_value=config_payload):
             with client.session_transaction() as sess:
                 sess["_user_id"] = "1"
                 sess["_fresh"] = True
@@ -587,8 +592,8 @@ class TestUploadPlugin:
     def test_valid_zip_name_match_install_success(self, logged_in_sm_client, db_session, app, tmp_path):
         zip_data = _make_valid_zip("test_plugin")
         pm = _make_plugin_manager(install_result=True)
-        with patch.object(app, "plugin_manager", pm), \
-             patch.object(app.config, "get", return_value=str(tmp_path)):
+        app.config["PLUGINS_DIR"] = str(tmp_path)
+        with patch.object(app, "plugin_manager", pm):
             resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "test_plugin.zip")},

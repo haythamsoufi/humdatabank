@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -10,9 +11,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "tests"))
 
 from pb_figures.layouts import SECTION_COLUMN  # noqa: E402
 from pb_figures.payload import build_ef_payload  # noqa: E402
+from workbook_fixtures import sp1_mapping_row, temporary_report_excel  # noqa: E402
 
 
 @pytest.mark.unit
@@ -31,7 +34,10 @@ def test_ef_payload_uses_full_mapping_without_final_rows():
     )
     model = pd.DataFrame(columns=["section", "ID", "Value", "Year", "Source"])
 
-    payload = build_ef_payload(model, "EF2", "English", mapping=mapping)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "SG Report.xlsx"
+        with temporary_report_excel(path, mapping_rows=[sp1_mapping_row()]):
+            payload = build_ef_payload(model, "EF2", "English", mapping=mapping)
 
     assert payload["section"] == "EF2"
     assert len(payload["cumulative"]) == 1

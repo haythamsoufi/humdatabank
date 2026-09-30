@@ -74,6 +74,10 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
     mocks["redirect_if_blocked"] = stack.enter_context(
         patch("app.utils.form_authorization.redirect_if_assignment_entry_blocked",
               return_value=None))
+    # lock_aes_for_update refreshes the AES row; MagicMock AES has no SA identity.
+    mocks["lock_aes_for_update"] = stack.enter_context(
+        patch("app.utils.form_authorization.lock_aes_for_update",
+              return_value=False))
 
     # AuthorizationService is locally imported:
     # `from app.services.organization.authorization_service import AuthorizationService`
@@ -660,6 +664,11 @@ class TestHandleAssignmentFormPost:
             }],
             completion_rate=42.5,
             section_statuses={"7": "in_progress"},
+            section_workflow_statuses={},
+            page_workflow_statuses={},
+            pages_submitted_count=0,
+            pages_total_count=0,
+            page_id=None,
         )
 
     def test_post_sent_for_review_ajax(self, app, mock_user):

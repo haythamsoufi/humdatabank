@@ -126,6 +126,14 @@ class TestRegisterAbuseControls:
     def test_post_register_is_rate_limited_per_client_ip(self, client, app, db_session, monkeypatch):
         monkeypatch.setattr("app.routes.auth.is_azure_b2c_configured", lambda: False)
         monkeypatch.setattr("app.routes.auth.RegisterForm.validate_on_submit", lambda self: False)
+        monkeypatch.setattr("app.utils.security_startup.redis_configured", lambda _app: False)
+        app.config["DEBUG"] = False
+        app.config["RATE_LIMIT_SKIP_DEBUG"] = False
+        app.config["RATE_LIMIT_SHARED_FALLBACK"] = "memory"
+
+        from app.utils import rate_limiting as rl
+
+        rl._rate_limit_storage.clear()
 
         def post(ip, headers=None):
             return client.post("/register", data={}, headers=headers or {}, environ_overrides={"REMOTE_ADDR": ip})

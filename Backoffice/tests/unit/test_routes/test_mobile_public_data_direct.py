@@ -127,7 +127,7 @@ class TestPublicIndicatorDetail:
         from app.routes.api.mobile.public_data import public_indicator_detail
         from app.models import IndicatorBank
 
-        ib = IndicatorBank(name='Test Indicator', code='TEST001', indicator_type='number')
+        ib = IndicatorBank(name='Test Indicator', type='number')
         db_session.add(ib)
         db_session.commit()
         db_session.refresh(ib)
@@ -472,7 +472,10 @@ class TestUnifiedPlanningConfig:
 
         body, status = _parse(resp)
         assert status == 200
-        assert 'config' in body.get_json()['data']
+        data = body.get_json()['data']
+        # Flat config keys (not nested under "config")
+        assert 'ifrc_public_site_appeals_url' in data
+        assert 'document_types' in data
 
 
 # ---------------------------------------------------------------------------
@@ -516,8 +519,11 @@ class TestUnifiedPlanningThumbnail:
 
     def test_cached_response(self, app, db_session):
         """Returns cached JPEG if already in cache."""
-        from app.routes.api.mobile.public_data import unified_planning_thumbnail, \
-            _UNIFIED_PLANNING_THUMB_JPEG, _UNIFIED_PLANNING_THUMB_LOCK
+        from plugins.upr.mobile import (
+            unified_planning_thumbnail,
+            _UNIFIED_PLANNING_THUMB_JPEG,
+            _UNIFIED_PLANNING_THUMB_LOCK,
+        )
         import base64
         from hashlib import sha256
 
@@ -535,7 +541,11 @@ class TestUnifiedPlanningThumbnail:
                 data=json.dumps({'url_b64': url_b64}),
                 content_type='application/json',
             ):
-                with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+                with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
+                     patch(
+                         'app.routes.ai_documents.helpers._validate_ifrc_fetch_url',
+                         return_value=(True, ''),
+                     ):
                     resp = unified_planning_thumbnail()
 
             _, status = _parse(resp)

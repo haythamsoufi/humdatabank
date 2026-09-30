@@ -516,7 +516,7 @@ class TestLogoutAndDevicesDirect:
 
         with app.test_request_context(f'/account-settings/devices/{device_id}/kickout', method='POST'):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            resp, status = _view_result(kickout_own_device(device_id))
             db_session.commit()
         assert status == 200
         assert resp.get_json()['success'] is True

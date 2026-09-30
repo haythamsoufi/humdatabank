@@ -67,11 +67,20 @@ def json_error(message, status=400, **extra):
     """
     Return a JSON error response.
 
-    :param message: Error message string
+    :param message: Error message string (never pass an Exception — use a stable
+        user-facing string or GENERIC_ERROR_MESSAGE so internal details are not echoed)
     :param status: HTTP status code (default 400)
     :param extra: Additional keys to include in the response (e.g. success=False)
     :return: Flask Response with status_code set
     """
+    if isinstance(message, BaseException):
+        current_app.logger.error(
+            "json_error received an exception object; substituting generic message",
+            exc_info=message,
+        )
+        message = GENERIC_ERROR_MESSAGE
+    elif not isinstance(message, str):
+        message = str(message) if message is not None else GENERIC_ERROR_MESSAGE
     body = {'error': message, **extra}
     response = jsonify(body)
     response.status_code = status

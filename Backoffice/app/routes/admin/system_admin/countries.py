@@ -34,10 +34,14 @@ def new_country():
         try:
             translatable_langs = current_app.config.get("TRANSLATABLE_LANGUAGES", []) or []
 
+            # ``region`` is NOT NULL; denormalized from secretariat regional office
+            # when provided, otherwise a stable placeholder for legacy admin form.
+            region_label = (getattr(form, 'region', None) and form.region.data) or 'Unassigned'
             new_country = Country(
                 name=form.name.data,
                 short_name=(form.short_name.data or '').strip() or None,
                 iso3=(form.iso3.data or '').upper(),
+                region=region_label,
                 status=form.status.data,
                 preferred_language=Country.normalize_language_code(form.preferred_language.data),
                 currency_code=form.currency_code.data

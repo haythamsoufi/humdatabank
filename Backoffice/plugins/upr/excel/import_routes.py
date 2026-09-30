@@ -26,6 +26,7 @@ from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_accepted, json_bad_request, json_ok, json_server_error
 from app.utils.file_parsing import EXCEL_EXTENSIONS
+from app.utils.redirect_utils import get_safe_redirect_url
 
 from app.routes.admin.data_sync_imputation import (
     _DATA_SYNC_CANCEL_EVENTS,
@@ -63,7 +64,7 @@ def legacy_redirect(subpath: str = ""):
     if not subpath:
         return redirect(url_for("upr_excel_import.wizard"), code=301)
     target = f"{bp.url_prefix}/{quote(subpath.lstrip('/'), safe='/')}"
-    return redirect(target, code=301)
+    return redirect(get_safe_redirect_url(target, "upr_excel_import.wizard"), code=301)
 
 UPR_TEMPLATE_CHOICES = [
     # Planning (rounds P*)

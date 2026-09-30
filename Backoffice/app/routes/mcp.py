@@ -20,7 +20,7 @@ and API-key material never leave this process. The upstream host is validated wi
 
 from __future__ import annotations
 
-import hashlib
+import hmac
 import time
 from typing import Optional
 from urllib.parse import parse_qsl, quote, urlencode, urlparse
@@ -205,7 +205,8 @@ def _rate_limit_key() -> str:
         return f"mcp:user:{current_user.get_id()}"
     presented = _presented_api_key()
     if presented:
-        digest = hashlib.blake2b(presented.encode("utf-8"), digest_size=12).hexdigest()
+        secret = str(current_app.config.get("SECRET_KEY") or "").encode("utf-8")
+        digest = hmac.digest(secret, presented.encode("utf-8"), "sha256").hex()[:24]
         return "mcp:key:" + digest
     try:
         from app.services.platform.user_analytics_service import get_client_ip

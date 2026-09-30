@@ -30,7 +30,7 @@ reportlab==4.4.1
 user-agents==2.2.0
 weasyprint==70.0                # was 69.0 — CVE-2026-55073 (EPS rendering / URL fetcher bypass)
 requests==2.33.0                # was 2.32.3 — CVE-2024-47081, CVE-2026-25645
-PyJWT==2.14.0                   # was 2.13.0 — CVE-2026-102274 (pip-audit); 2.13.0 was 2.12.1 — GHSA-xgmm-8j9v-c9wx
+PyJWT==2.15.1                   # was 2.14.0 — CVE-2026-101918 (pip-audit); 2.14.0 was 2.13.0 — CVE-2026-102274
 google-auth==2.40.3
 google-auth-oauthlib==1.2.3
 google-auth-httplib2==0.2.0

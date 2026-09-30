@@ -91,10 +91,9 @@ def json_error(message=GENERIC_ERROR_MESSAGE, status=400, **extra):
                 type(message).__name__,
             )
         safe_message = GENERIC_ERROR_MESSAGE
-    body = {'error': safe_message, **extra}
-    response = jsonify(body)
-    response.status_code = status
-    return response
+    from app.utils._trusted_primitives import json_error_response
+
+    return json_error_response(safe_message, status, extra)
 
 
 def json_auth_required(message='Authentication required. Please log in.'):

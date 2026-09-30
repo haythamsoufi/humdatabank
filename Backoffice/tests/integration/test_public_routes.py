@@ -131,11 +131,10 @@ class TestPublicRoutesRedirects:
             resp = client.get("/public_submission_success/123", follow_redirects=False)
             assert resp.status_code == 404
 
-    def test_public_documents_download_redirects(self, client, app):
+    def test_public_documents_download_unknown_id_is_404(self, client, app):
         with app.app_context():
             resp = client.get("/public_documents/download/123", follow_redirects=False)
-            assert resp.status_code in (301, 302, 308)
-            assert "/forms/public-document/123/download" in (resp.headers.get("Location") or "")
+            assert resp.status_code == 404
 
 
 @pytest.mark.integration

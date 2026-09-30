@@ -1179,6 +1179,10 @@ class TestUpdateEntityStatus:
         ), ExitStack() as stack:
             stack.enter_context(patch("app.routes.admin.shared.user_has_permission", return_value=True))
             stack.enter_context(patch("app.routes.admin.shared.current_user", mock_user))
+            stack.enter_context(patch(
+                "app.routes.admin.assignment_management._assignment_entity_in_actor_scope",
+                return_value=True,
+            ))
             mock_aes_cls = stack.enter_context(patch("app.routes.admin.assignment_management.AssignmentEntityStatus"))
             stack.enter_context(patch("app.routes.admin.assignment_management.db.session.flush"))
             mock_aes_cls.query.filter_by.return_value.first_or_404.return_value = mock_aes

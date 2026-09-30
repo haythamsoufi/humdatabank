@@ -294,13 +294,27 @@ class TestDeletePublicSubmission:
 # ---------------------------------------------------------------------------
 
 class TestUpdatePublicSubmissionStatus:
+    def _locked_submission(self, mock_sub):
+        """The status route locks the row, then checks manage access."""
+        from contextlib import ExitStack
+        from app.utils.form_authorization import AUTH_OK
+
+        stack = ExitStack()
+        stack.enter_context(patch(
+            "app.utils.form_authorization.lock_public_submission",
+            return_value=mock_sub,
+        ))
+        stack.enter_context(patch(
+            "app.routes.forms.submission.public_submission_access",
+            return_value=AUTH_OK,
+        ))
+        return stack
+
     def test_valid_status_approved(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q:
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-
+        mock_sub = _make_mock_submission(1)
+        with self._locked_submission(mock_sub):
             resp = client.post(
                 "/forms/public-submission/1/status",
                 data={"status": "approved"},
@@ -313,10 +327,8 @@ class TestUpdatePublicSubmissionStatus:
     def test_valid_status_rejected(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q:
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-
+        mock_sub = _make_mock_submission(1)
+        with self._locked_submission(mock_sub):
             resp = client.post(
                 "/forms/public-submission/1/status",
                 data={"status": "rejected"},
@@ -327,10 +339,8 @@ class TestUpdatePublicSubmissionStatus:
     def test_valid_status_pending(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q:
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-
+        mock_sub = _make_mock_submission(1)
+        with self._locked_submission(mock_sub):
             resp = client.post(
                 "/forms/public-submission/1/status",
                 data={"status": "pending"},
@@ -341,10 +351,8 @@ class TestUpdatePublicSubmissionStatus:
     def test_invalid_status_returns_error(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q:
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-
+        mock_sub = _make_mock_submission(1)
+        with self._locked_submission(mock_sub):
             resp = client.post(
                 "/forms/public-submission/1/status",
                 data={"status": "unknown_status"},
@@ -355,11 +363,9 @@ class TestUpdatePublicSubmissionStatus:
     def test_status_csrf_fail_returns_error(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
+        mock_sub = _make_mock_submission(1)
+        with self._locked_submission(mock_sub), \
              patch("app.routes.forms.submission.FlaskForm.validate_on_submit", lambda self, extra_validators=None: False):
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-
             resp = client.post(
                 "/forms/public-submission/1/status",
                 data={"status": "approved"},
@@ -370,10 +376,9 @@ class TestUpdatePublicSubmissionStatus:
     def test_status_exception_returns_server_error(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
+        mock_sub = _make_mock_submission(1)
+        with self._locked_submission(mock_sub), \
              patch("app.routes.forms.submission.db") as mock_db:
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
             mock_db.session.flush.side_effect = Exception("db fail")
 
             resp = client.post(

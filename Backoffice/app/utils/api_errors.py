@@ -19,7 +19,15 @@ GENERIC_NOT_FOUND_MESSAGE = "The requested resource was not found."
 
 
 class ClientInputError(ValueError):
-    """Validation failure whose message is safe to return to the caller."""
+    """Validation failure whose message is safe to return to the caller.
+
+    The deliberate text is kept in ``public_message`` so responses never depend on
+    ``str(exc)``, which for other exception types can carry internal detail.
+    """
+
+    def __init__(self, message: str = "", *args):
+        super().__init__(message, *args)
+        self.public_message = str(message)
 
 
 def client_error_message(
@@ -29,7 +37,7 @@ def client_error_message(
     context: Optional[str] = None,
 ) -> str:
     if isinstance(exc, ClientInputError):
-        return str(exc)
+        return exc.public_message
     logger.warning(
         "Suppressed non-client ValueError%s: %.300s",
         f" ({context})" if context else "",

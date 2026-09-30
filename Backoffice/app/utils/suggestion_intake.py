@@ -9,6 +9,7 @@ from flask import current_app
 
 from app.models.enums import IndicatorSuggestionTypeValue
 from app.utils.advanced_validation import AdvancedValidator
+from app.utils.api_errors import ClientInputError
 from app.utils.datetime_helpers import utcnow
 
 MAX_SHORT_TEXT = 255
@@ -20,7 +21,7 @@ DEFAULT_GLOBAL_HOURLY_LIMIT = 100
 _SECTOR_LEVELS = ("primary", "secondary", "tertiary")
 
 
-class SuggestionValidationError(ValueError):
+class SuggestionValidationError(ClientInputError):
     """Raised with a client-safe message when a suggestion payload is rejected."""
 
 

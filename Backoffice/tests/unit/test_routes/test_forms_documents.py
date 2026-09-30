@@ -26,6 +26,14 @@ def _login(client, user_id):
         sess["_fresh"] = True
 
 
+def _is_dashboard_location(location: str) -> bool:
+    """main.dashboard is mounted at `/` (not `/dashboard`)."""
+    from urllib.parse import urlparse
+
+    path = urlparse(location or "").path or "/"
+    return path == "/"
+
+
 # ---------------------------------------------------------------------------
 # download_document
 # ---------------------------------------------------------------------------
@@ -56,7 +64,7 @@ class TestDownloadDocument:
         ):
             resp = client.get("/forms/download_document/99")
         assert resp.status_code == 302
-        assert "/dashboard" in resp.headers["Location"] or "dashboard" in resp.headers["Location"]
+        assert _is_dashboard_location(resp.headers["Location"])
 
     def test_file_not_found_returns_404(self, client, admin_user):
         """FileNotFoundError → 404."""
@@ -129,7 +137,7 @@ class TestDeleteDocument:
         ):
             resp = self._post(client)
         assert resp.status_code == 302
-        assert "dashboard" in resp.headers["Location"]
+        assert _is_dashboard_location(resp.headers["Location"])
 
     def test_permission_error_flashes_warning(self, client, admin_user):
         """PermissionError during delete → flash warning."""
@@ -175,7 +183,7 @@ class TestDeleteDocument:
             )
         assert resp.status_code == 302
         location = resp.headers["Location"]
-        assert "section=2" in location or "/forms/entry/3" in location or "dashboard" in location
+        assert "section=2" in location or "/forms/entry/3" in location or _is_dashboard_location(location)
 
     def test_unsafe_referrer_falls_back_to_dashboard(self, client, admin_user):
         """Referrer that fails is_safe_redirect_url → dashboard fallback."""
@@ -193,7 +201,7 @@ class TestDeleteDocument:
                 referrer="https://evil.example.com/steal",
             )
         assert resp.status_code == 302
-        assert "dashboard" in resp.headers["Location"]
+        assert _is_dashboard_location(resp.headers["Location"])
 
 
 # ---------------------------------------------------------------------------

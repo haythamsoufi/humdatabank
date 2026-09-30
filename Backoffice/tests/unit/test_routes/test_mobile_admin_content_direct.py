@@ -368,7 +368,7 @@ class TestGetSubmittedDocumentFile:
         from app.routes.api.mobile.admin_content import get_submitted_document_file
         from app.models import SubmittedDocument
 
-        doc = SubmittedDocument(filename='test.pdf', storage_path='docs/test.pdf')
+        doc = SubmittedDocument(filename='test.pdf', storage_path='docs/test.pdf', uploaded_by_user_id=route_admin.id)
         db_session.add(doc)
         db_session.commit()
         db_session.refresh(doc)
@@ -388,7 +388,7 @@ class TestGetSubmittedDocumentFile:
         from app.routes.api.mobile.admin_content import get_submitted_document_file
         from app.models import SubmittedDocument
 
-        doc = SubmittedDocument(filename='missing.pdf', storage_path='docs/missing.pdf')
+        doc = SubmittedDocument(filename='missing.pdf', storage_path='docs/missing.pdf', uploaded_by_user_id=route_admin.id)
         db_session.add(doc)
         db_session.commit()
         db_session.refresh(doc)
@@ -404,7 +404,8 @@ class TestGetSubmittedDocumentFile:
                        return_value=(True, None)), \
                  patch('app.routes.admin.content_management._storage_category_for_submitted_document',
                        return_value='documents'), \
-                 patch('app.routes.api.mobile.admin_content.storage', mock_storage):
+                 patch('app.services.platform.storage_service.exists', mock_storage.exists), \
+                 patch('app.services.platform.storage_service.stream_response', mock_storage.stream_response):
                 resp = get_submitted_document_file(doc.id)
 
         _, status = _parse(resp)
@@ -414,7 +415,7 @@ class TestGetSubmittedDocumentFile:
         from app.routes.api.mobile.admin_content import get_submitted_document_file
         from app.models import SubmittedDocument
 
-        doc = SubmittedDocument(filename='report.pdf', storage_path='docs/report.pdf')
+        doc = SubmittedDocument(filename='report.pdf', storage_path='docs/report.pdf', uploaded_by_user_id=route_admin.id)
         db_session.add(doc)
         db_session.commit()
         db_session.refresh(doc)
@@ -431,7 +432,8 @@ class TestGetSubmittedDocumentFile:
                        return_value=(True, None)), \
                  patch('app.routes.admin.content_management._storage_category_for_submitted_document',
                        return_value='documents'), \
-                 patch('app.routes.api.mobile.admin_content.storage', mock_storage):
+                 patch('app.services.platform.storage_service.exists', mock_storage.exists), \
+                 patch('app.services.platform.storage_service.stream_response', mock_storage.stream_response):
                 resp = get_submitted_document_file(doc.id)
 
         _, status = _parse(resp)
@@ -460,7 +462,7 @@ class TestDeleteDocument:
         from app.routes.api.mobile.admin_content import delete_document
         from app.models import SubmittedDocument
 
-        doc = SubmittedDocument(filename='deleteme.pdf', storage_path='docs/deleteme.pdf')
+        doc = SubmittedDocument(filename='deleteme.pdf', storage_path='docs/deleteme.pdf', uploaded_by_user_id=route_admin.id)
         db_session.add(doc)
         db_session.commit()
         db_session.refresh(doc)
@@ -480,7 +482,7 @@ class TestDeleteDocument:
         from app.routes.api.mobile.admin_content import delete_document
         from app.models import SubmittedDocument
 
-        doc = SubmittedDocument(filename='errdoc.pdf', storage_path='docs/errdoc.pdf')
+        doc = SubmittedDocument(filename='errdoc.pdf', storage_path='docs/errdoc.pdf', uploaded_by_user_id=route_admin.id)
         db_session.add(doc)
         db_session.commit()
         db_session.refresh(doc)
@@ -731,77 +733,20 @@ class TestListTranslationSources:
 # ---------------------------------------------------------------------------
 
 class TestUpdateTranslation:
-    def test_missing_fields_returns_400(self, app, db_session, route_admin):
+    def test_stubbed_endpoint_returns_501(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_content import update_translation
 
         with app.test_request_context(
-            '/api/mobile/v1/admin/content/translations/update',
-            method='POST',
-            data=json.dumps({}),
-            content_type='application/json',
-        ):
-            login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
-                resp = update_translation()
-
-        _, status = _parse(resp)
-        assert status == 400
-
-    def test_invalid_locale_returns_400(self, app, db_session, route_admin):
-        from app.routes.api.mobile.admin_content import update_translation
-
-        with app.test_request_context(
-            '/api/mobile/v1/admin/content/translations/update',
-            method='POST',
-            data=json.dumps({'locale': '', 'msgid': 'hello', 'msgstr': 'bonjour'}),
-            content_type='application/json',
-        ):
-            login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
-                resp = update_translation()
-
-        _, status = _parse(resp)
-        assert status == 400
-
-    def test_translation_file_not_found(self, app, db_session, route_admin):
-        from app.routes.api.mobile.admin_content import update_translation
-
-        with app.test_request_context(
-            '/api/mobile/v1/admin/content/translations/update',
+            '/api/mobile/v1/admin/content/translations/1',
             method='POST',
             data=json.dumps({'locale': 'fr', 'msgid': 'hello', 'msgstr': 'bonjour'}),
             content_type='application/json',
         ):
             login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.extensions.resolve_translations_directory', return_value='/tmp/nonexistent'):
-                resp = update_translation()
+            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'):
+                resp = update_translation(1)
 
-        _, status = _parse(resp)
-        assert status in (400, 404, 500)
-
-    def test_success(self, app, db_session, route_admin):
-        from app.routes.api.mobile.admin_content import update_translation
-
-        mock_po_file = MagicMock()
-        mock_entry = MagicMock()
-        mock_entry.msgstr = 'old translation'
-        mock_po_file.find.return_value = mock_entry
-        mock_po_file.save = MagicMock()
-
-        with app.test_request_context(
-            '/api/mobile/v1/admin/content/translations/update',
-            method='POST',
-            data=json.dumps({'locale': 'fr', 'msgid': 'hello', 'msgstr': 'bonjour'}),
-            content_type='application/json',
-        ):
-            login_user(route_admin)
-            with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.extensions.resolve_translations_directory', return_value='/tmp/fake'), \
-                 patch('os.path.exists', return_value=True), \
-                 patch('polib.pofile', return_value=mock_po_file), \
-                 patch('app.services.platform.user_analytics_service.log_admin_action'):
-                resp = update_translation()
-
-        _, status = _parse(resp)
-        assert status == 200
+        body, status = _parse(resp)
+        assert status == 501
+        data = body.get_json() if hasattr(body, 'get_json') else body
+        assert data.get('error_code') == 'NOT_IMPLEMENTED'

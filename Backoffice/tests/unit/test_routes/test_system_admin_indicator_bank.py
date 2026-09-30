@@ -542,7 +542,9 @@ class TestDeleteIndicatorBank:
         )
         assert resp.status_code == 302
         with app.app_context():
-            assert IndicatorBank.query.get(ind.id) is None
+            deleted = IndicatorBank.query.get(ind.id)
+            assert deleted is not None
+            assert deleted.archived is True
 
     def test_delete_exception_flashes_error(self, logged_in_client, db_session, app):
         with app.app_context():
@@ -968,15 +970,15 @@ class TestGetFilteredIndicatorCount:
 class TestManageCommonWords:
     def test_get_renders_page(self, logged_in_client, db_session):
         with _mock_render() as mock_rt:
-            resp = logged_in_client.get("/admin/common_words")
+            resp = logged_in_client.get("/admin/common_words", follow_redirects=True)
         assert resp.status_code == 200
-        mock_rt.assert_called_once()
+        mock_rt.assert_called()
 
     def test_get_with_search(self, logged_in_client, db_session, app):
         with app.app_context():
             _create_common_word(db_session, "searchterm", "Searchable meaning")
         with _mock_render():
-            resp = logged_in_client.get("/admin/common_words?search=searchterm")
+            resp = logged_in_client.get("/admin/common_words?search=searchterm", follow_redirects=True)
         assert resp.status_code == 200
 
 

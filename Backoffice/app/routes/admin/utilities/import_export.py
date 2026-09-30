@@ -8,7 +8,7 @@ import uuid as _uuid_mod
 from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_babel import _
 from flask_login import current_user
-from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
+from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes, safe_iter_rows
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -361,7 +361,7 @@ def _tags_str_to_list(raw):
 
 def _preview_indicator_import(file_path):
     """Parse the import file and return a change-summary dict without touching the DB."""
-    wb = load_workbook_safe(file_path, read_only=True, data_only=True)
+    wb = load_workbook_safe(read_workbook_file_bytes(file_path), read_only=True, data_only=True)
     sheetnames = set(wb.sheetnames or [])
 
     summary = {
@@ -724,27 +724,26 @@ def _preview_indicator_import(file_path):
 
 def _process_indicator_import(file_path):
     """Process Excel file for indicator import – writes to the DB."""
+    result = {
+        'success': True,
+        'imported': 0,
+        'updated': 0,
+        'sectors_imported': 0,
+        'sectors_updated': 0,
+        'subsectors_imported': 0,
+        'subsectors_updated': 0,
+        'common_words_imported': 0,
+        'common_words_updated': 0,
+        'measurement_types_imported': 0,
+        'measurement_types_updated': 0,
+        'measurement_units_imported': 0,
+        'measurement_units_updated': 0,
+        'errors': [],
+        'message': '',
+    }
     try:
         current_app.logger.info("Loading workbook from: %s", file_path)
-        wb = load_workbook_safe(file_path, read_only=True, data_only=True)
-
-        result = {
-            'success': True,
-            'imported': 0,
-            'updated': 0,
-            'sectors_imported': 0,
-            'sectors_updated': 0,
-            'subsectors_imported': 0,
-            'subsectors_updated': 0,
-            'common_words_imported': 0,
-            'common_words_updated': 0,
-            'measurement_types_imported': 0,
-            'measurement_types_updated': 0,
-            'measurement_units_imported': 0,
-            'measurement_units_updated': 0,
-            'errors': [],
-            'message': '',
-        }
+        wb = load_workbook_safe(read_workbook_file_bytes(file_path), read_only=True, data_only=True)
 
         sheetnames = set(wb.sheetnames or [])
 

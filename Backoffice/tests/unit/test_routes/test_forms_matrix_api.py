@@ -20,9 +20,23 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.models import LookupList, db as models_db
+
 pytestmark = [pytest.mark.unit]
 
 SEARCH_URL = "/forms/matrix/search-rows"
+
+def _patch_lookup_list_get(lookup_list):
+    """Patch db.session.get for LookupList only; leave User loading intact."""
+    real_get = models_db.session.get
+
+    def _get(model, ident, **kwargs):
+        if model is LookupList:
+            return lookup_list
+        return real_get(model, ident, **kwargs)
+
+    return patch("app.routes.forms.matrix_api.db.session.get", side_effect=_get)
+
 
 
 def _login(client, user_id):
@@ -93,8 +107,8 @@ class TestMatrixSearchNumericLookupList:
             row.order = i
             mock_rows.append(row)
         query_mock = MagicMock()
-        query_mock.order_by.return_value.all.return_value = mock_rows
-        # Also support filter chaining for filter tests
+        query_mock.all.return_value = mock_rows
+        query_mock.order_by.return_value = query_mock
         query_mock.filter.return_value = query_mock
         lookup_list.rows.order_by.return_value = query_mock
         lookup_list.rows.filter = MagicMock(return_value=query_mock)
@@ -108,9 +122,9 @@ class TestMatrixSearchNumericLookupList:
             {"name": "Albania", "id": 2},
         ])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -124,9 +138,9 @@ class TestMatrixSearchNumericLookupList:
     def test_lookup_list_not_found_returns_404(self, client, admin_user):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(None), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = None
             resp = _post(client, {
                 "lookup_list_id": "999",
                 "display_column": "name",
@@ -146,9 +160,9 @@ class TestMatrixSearchNumericLookupList:
             {"name": "Zimbabwe", "id": 3},
         ])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -170,9 +184,9 @@ class TestMatrixSearchNumericLookupList:
             {"name": "Albania", "id": 2},
         ])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -191,9 +205,9 @@ class TestMatrixSearchNumericLookupList:
         rows = [{"name": f"Country {i}", "id": i} for i in range(20)]
         lookup_list = self._make_lookup_list(rows)
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -209,9 +223,9 @@ class TestMatrixSearchNumericLookupList:
 
         lookup_list = self._make_lookup_list([{"name": "Test", "id": 1}])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -225,9 +239,9 @@ class TestMatrixSearchNumericLookupList:
 
         lookup_list = self._make_lookup_list([{"name": "Test", "id": 1}])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -243,9 +257,9 @@ class TestMatrixSearchNumericLookupList:
             {"country": "Afghanistan"},  # Missing "name" display_column
         ])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -262,9 +276,9 @@ class TestMatrixSearchNumericLookupList:
             {"name": "Test Country", "description": "A description", "id": 1},
         ])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -285,9 +299,9 @@ class TestMatrixSearchNumericLookupList:
             {"name": "Morocco", "id": 2},
         ])
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -319,9 +333,9 @@ class TestMatrixSearchFilters:
         _login(client, admin_user.id)
         lookup_list = self._make_filterable_lookup_list()
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -334,9 +348,9 @@ class TestMatrixSearchFilters:
         _login(client, admin_user.id)
         lookup_list = self._make_filterable_lookup_list()
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -349,9 +363,9 @@ class TestMatrixSearchFilters:
         _login(client, admin_user.id)
         lookup_list = self._make_filterable_lookup_list()
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -364,9 +378,9 @@ class TestMatrixSearchFilters:
         _login(client, admin_user.id)
         lookup_list = self._make_filterable_lookup_list()
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",
@@ -379,9 +393,9 @@ class TestMatrixSearchFilters:
         _login(client, admin_user.id)
         lookup_list = self._make_filterable_lookup_list()
 
-        with patch("app.routes.forms.matrix_api.LookupList.query") as mock_q, \
+        with _patch_lookup_list_get(lookup_list), \
+             patch("app.routes.forms.matrix_api.user_can_read_lookup_list", return_value=True), \
              patch("app.routes.forms.matrix_api.enforce_csrf_json", return_value=None):
-            mock_q.get.return_value = lookup_list
             resp = _post(client, {
                 "lookup_list_id": "1",
                 "display_column": "name",

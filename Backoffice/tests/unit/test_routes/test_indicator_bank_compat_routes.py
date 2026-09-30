@@ -31,6 +31,7 @@ def _make_indicator(id=1, name="Test Indicator", archived=False):
     ind.disaggregation_guidance = ""
     ind.data_source = ""
     ind.area = ""
+    ind.area_label = ""
     ind.sector = {}
     ind.sub_sector = {}
     ind.related_programs_list = []
@@ -295,6 +296,7 @@ class TestIndicatorSelectOptions:
         ind.unit = "Number"
         ind.type = "Output"
         ind.disaggregation_guidance = "By sex"
+        ind.area = ""
         ind.tags_list = ["tag1"]
         ind.monitoring_questions_list = ["Q1"]
         ind.related_programs_list = ["P1"]
@@ -309,10 +311,15 @@ class TestIndicatorSelectOptions:
         unit_q.filter_by.return_value = unit_q
         unit_q.order_by.return_value = unit_q
         unit_q.all.return_value = []
+        spef_q = MagicMock()
+        spef_q.filter_by.return_value = spef_q
+        spef_q.order_by.return_value = spef_q
+        spef_q.all.return_value = []
         with patch(_AUTH_PATCH, return_value=_FakeKey()), \
              patch("app.routes.api.indicator_bank_compat.IndicatorBank.query", q), \
              patch("app.routes.api.indicator_bank_compat.IndicatorBankType.query", type_q), \
-             patch("app.routes.api.indicator_bank_compat.IndicatorBankUnit.query", unit_q):
+             patch("app.routes.api.indicator_bank_compat.IndicatorBankUnit.query", unit_q), \
+             patch("app.routes.api.indicator_bank_compat.IndicatorBankSpef.query", spef_q):
             resp = client.get(self.URL, headers=_API_HEADERS)
         assert resp.status_code == 200
         data = resp.get_json()

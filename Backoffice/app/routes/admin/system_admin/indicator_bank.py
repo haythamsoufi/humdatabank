@@ -742,6 +742,9 @@ def delete_indicator_bank(id):
     indicator = IndicatorBank.query.get_or_404(id)
 
     try:
+        # History rows FK to indicator_bank without ON DELETE CASCADE, so a hard
+        # delete cannot keep a DELETED audit row. Soft-delete via archive instead
+        # (hard delete would also wipe prior history).
         history = IndicatorBankHistory(
             indicator_bank_id=indicator.id,
             user_id=current_user.id,
@@ -751,7 +754,7 @@ def delete_indicator_bank(id):
         )
         db.session.add(history)
 
-        db.session.delete(indicator)
+        indicator.archived = True
         db.session.flush()
 
         flash(f"Indicator '{indicator.name}' deleted successfully.", "success")

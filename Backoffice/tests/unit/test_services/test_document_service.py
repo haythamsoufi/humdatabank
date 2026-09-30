@@ -42,6 +42,7 @@ def _make_submitted_doc(
 
 def _make_aes(country_id=1, status="in_progress"):
     aes = MagicMock()
+    aes.id = 1
     aes.entity_type = "country"
     aes.entity_id = country_id
     aes.country_id = country_id
@@ -460,7 +461,10 @@ class TestDeleteAssignmentDocument:
                     ):
                         with patch.object(_storage, "submitted_document_rel_storage_category", return_value=_storage.SUBMISSIONS):
                             with patch.object(_storage, "delete", side_effect=OSError("disk full")):
-                                with patch("app.services.documents.service.db") as mock_db:
+                                with patch("app.services.documents.service.db") as mock_db, \
+                                     patch(
+                                         "app.services.assignments.completion_service.AssignmentCompletionService.refresh_and_persist"
+                                     ):
                                     result = DocumentService.delete_assignment_document(1, user)
                 mock_db.session.delete.assert_called_once_with(doc)
                 assert result == "report.pdf"
@@ -482,7 +486,10 @@ class TestDeleteAssignmentDocument:
                     ):
                         with patch.object(_storage, "submitted_document_rel_storage_category", return_value=_storage.SUBMISSIONS):
                             with patch.object(_storage, "delete", return_value=None):
-                                with patch("app.services.documents.service.db") as mock_db:
+                                with patch("app.services.documents.service.db") as mock_db, \
+                                     patch(
+                                         "app.services.assignments.completion_service.AssignmentCompletionService.refresh_and_persist"
+                                     ):
                                     result = DocumentService.delete_assignment_document(1, user)
                 assert result == "doc.pdf"
                 mock_db.session.delete.assert_called_once_with(doc)

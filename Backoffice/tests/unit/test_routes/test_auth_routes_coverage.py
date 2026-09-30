@@ -336,6 +336,7 @@ class TestForgotPasswordEdgeCases:
             with patch("app.routes.auth.ForgotPasswordForm", return_value=mock_form), \
                  patch("app.routes.auth.LoginForm"), \
                  patch("app.routes.auth.RegisterForm"), \
+                 patch("app.routes.auth.is_azure_b2c_configured", return_value=False), \
                  patch("app.routes.auth.render_template", return_value=_mock_html_response()) as mock_render:
                 resp, status = _view_result(forgot_password())
         assert status == 200

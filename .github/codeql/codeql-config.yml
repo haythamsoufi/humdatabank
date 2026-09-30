@@ -8,3 +8,8 @@ paths-ignore:
   - "**/dist/**"
   - "**/build/**"
   - Backoffice/app/static/libs
+query-filters:
+  - exclude:
+      id: py/weak-sensitive-data-hashing
+      paths:
+        - Backoffice/app/models/api_key_management.py

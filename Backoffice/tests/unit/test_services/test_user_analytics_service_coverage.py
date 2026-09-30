@@ -2151,31 +2151,23 @@ class TestCleanupInactiveSessions:
                         assert result == 0
 
     def test_closes_inactive_sessions(self, app):
-        """Sessions that are active and past the cutoff should be closed."""
+        """Sessions that are active and past the cutoff should be closed (bulk UPDATE)."""
         with app.app_context():
-            old_session = MagicMock()
-            old_session.is_active = True
-            old_session.session_start = datetime.now(timezone.utc) - timedelta(hours=10)
-            old_session.last_activity = datetime.now(timezone.utc) - timedelta(hours=10)
-            old_session.session_end = None
-
             with patch("app.services.platform.user_analytics_service.inspect") as mock_inspect:
                 mock_inspect.return_value.has_table.return_value = True
                 with patch("app.services.platform.user_analytics_service.db") as mock_db:
                     mock_db.engine.dialect.name = "sqlite"
 
                     with patch("app.services.platform.user_analytics_service.UserSessionLog.query") as mock_query:
-                        mock_query.filter.return_value.all.side_effect = [
-                            [old_session],
-                            [],
-                        ]
+                        # Three mutually-exclusive bulk UPDATE groups:
+                        # both / inactive-only / max-duration-only
+                        mock_query.filter.return_value.update.side_effect = [0, 1, 0]
 
                         result = _svc.cleanup_inactive_sessions(
                             inactivity_hours=1, max_session_hours=48
                         )
                         assert result == 1
-                        assert old_session.is_active is False
-                        assert old_session.ended_by == "inactivity_timeout"
+                        assert mock_query.filter.return_value.update.call_count == 3
 
     def test_exception_returns_zero(self, app):
         with app.app_context():

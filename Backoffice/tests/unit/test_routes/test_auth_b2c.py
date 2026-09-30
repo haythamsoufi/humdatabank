@@ -133,14 +133,15 @@ class TestAzureCallbackRoute:
         assert resp.status_code in (301, 302, 303, 307, 308)
 
     def test_callback_auth_error_renders_page(self, client, app):
-        from flask import Response
         cfg = _b2c_config(app)
-        with patch('app.routes.auth._b2c_get_required_config', return_value=cfg), \
-             patch('app.routes.auth.render_template', return_value=Response('error', status=200)):
+        with patch('app.routes.auth._b2c_get_required_config', return_value=cfg):
             resp = client.get(
                 '/auth/azure/callback?error=server_error&error_description=fail',
+                follow_redirects=False,
             )
-        assert resp.status_code == 200
+        # Auth errors flash and redirect to login (no dedicated error page)
+        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert 'login' in (resp.headers.get('Location') or '').lower()
 
     def test_callback_expired_state_jwt(self, client, app):
         cfg = _b2c_config(app)

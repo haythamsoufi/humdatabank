@@ -214,13 +214,9 @@ class TestLoadWorkbook:
         ws.append([1, "test"])
         buf = io.BytesIO()
         wb.save(buf)
-        buf.seek(0)
+        raw = buf.getvalue()
 
-        mock_file = MagicMock()
-        mock_file.read.return_value = buf.read()
-        mock_file.stream.seek = MagicMock()
-
-        result = ExcelService.load_workbook(mock_file)
+        result = ExcelService.load_workbook(io.BytesIO(raw))
         assert result is not None
         assert len(result.sheetnames) >= 1
 
@@ -246,8 +242,6 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry.set_simple_value = MagicMock()
 
             with patch("app.services.imports.excel_service.FormData") as MockFormData:
-                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
-                    MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
                     with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
@@ -268,8 +262,6 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry.set_disaggregated_data = MagicMock()
 
             with patch("app.services.imports.excel_service.FormData") as MockFormData:
-                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
-                    MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
                     with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
@@ -283,8 +275,6 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry = MagicMock()
 
             with patch("app.services.imports.excel_service.FormData") as MockFormData:
-                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
-                    MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = None
                     MockFormData.return_value = mock_entry
                     with patch("app.services.imports.excel_service.db") as mock_db:
@@ -296,15 +286,15 @@ class TestBulkSaveFieldsWithDisagg:
             from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             field_data = {1: {'value': '42', 'disagg_data': None}}
+            mock_entry = MagicMock()
 
             with patch("app.services.imports.excel_service.FormData") as MockFormData:
-                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
-                    MockPS.__instancecheck__ = lambda cls, inst: False
-                    MockFormData.query.filter_by.return_value.first.side_effect = RuntimeError("DB error")
-                    with patch("app.services.imports.excel_service.db") as mock_db:
-                        mock_db.session.commit.side_effect = RuntimeError("commit failed")
-                        result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
-                        assert result['success'] is False
+                MockFormData.query.filter_by.return_value.first.return_value = mock_entry
+                with patch("app.services.imports.excel_service.db") as mock_db:
+                    mock_db.session.commit.side_effect = RuntimeError("commit failed")
+                    result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
+                    assert result['success'] is False
+                    mock_db.session.rollback.assert_called()
 
     def test_invalid_disagg_data_structure(self, app):
         with app.app_context():
@@ -315,8 +305,6 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry = MagicMock()
 
             with patch("app.services.imports.excel_service.FormData") as MockFormData:
-                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
-                    MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
                     with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
@@ -330,8 +318,6 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry = MagicMock()
 
             with patch("app.services.imports.excel_service.FormData") as MockFormData:
-                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
-                    MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
                     with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)

@@ -23,13 +23,13 @@ def cleanup_sessions():
             expired_sessions = UserSessionLog.query.filter(
                 and_(
                     UserSessionLog.last_activity < timeout_threshold,
-                    UserSessionLog.ended_at.is_(None)
+                    UserSessionLog.session_end.is_(None)
                 )
             ).all()
 
             for session in expired_sessions:
-                session.ended_at = utcnow()
-                session.end_reason = 'timeout'
+                session.session_end = utcnow()
+                session.ended_by = 'timeout'
 
             db.session.flush()
 
@@ -51,7 +51,7 @@ def show_all_sessions():
 
         if inspect(db.engine).has_table(UserSessionLog.__tablename__):
             active_sessions = UserSessionLog.query.filter(
-                UserSessionLog.ended_at.is_(None)
+                UserSessionLog.session_end.is_(None)
             ).order_by(UserSessionLog.last_activity.desc()).all()
 
             for session in active_sessions:
@@ -59,7 +59,7 @@ def show_all_sessions():
                     'id': session.id,
                     'user_id': session.user_id,
                     'user_name': session.user.name if session.user else 'Unknown',
-                    'started_at': session.started_at,
+                    'started_at': session.session_start,
                     'last_activity': session.last_activity,
                     'ip_address': getattr(session, 'ip_address', None),
                     'user_agent': getattr(session, 'user_agent', None)

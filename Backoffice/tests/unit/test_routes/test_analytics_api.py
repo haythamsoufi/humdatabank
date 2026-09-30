@@ -163,9 +163,11 @@ class TestEndSessionApi:
     def test_session_already_inactive(self, logged_in_client, db_session, app):
         from app.models import UserSessionLog
         with app.app_context():
+            user = create_test_user(db_session)
             session_log = UserSessionLog(
                 session_id="api-inactive-session-123",
-                user_id=None,
+                user_id=user.id,
+                ip_address="127.0.0.1",
                 is_active=False,
             )
             db_session.add(session_log)
@@ -183,6 +185,7 @@ class TestEndSessionApi:
             session_log = UserSessionLog(
                 session_id="api-active-session-456",
                 user_id=user.id,
+                ip_address="127.0.0.1",
                 is_active=True,
             )
             db_session.add(session_log)
@@ -202,6 +205,7 @@ class TestEndSessionApi:
             session_log = UserSessionLog(
                 session_id="api-error-session-789",
                 user_id=user.id,
+                ip_address="127.0.0.1",
                 is_active=True,
             )
             db_session.add(session_log)

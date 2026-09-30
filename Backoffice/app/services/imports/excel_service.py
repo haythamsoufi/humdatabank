@@ -495,9 +495,6 @@ class ExcelService:
         Returns:
             Dict with success status, count of updates, and any errors
         """
-        from app import db
-        import logging
-
         logger = logging.getLogger(__name__)
         updated_count = 0
         errors = []
@@ -603,7 +600,6 @@ class ExcelService:
                     logger.error(error_msg, exc_info=True)
 
             # Commit all changes
-            from app import db
             db.session.commit()
 
             return {
@@ -616,7 +612,6 @@ class ExcelService:
             }
 
         except Exception as e:
-            from app import db
             db.session.rollback()
             logger.error(f"Error in bulk save with disaggregation: {e}", exc_info=True)
             return {

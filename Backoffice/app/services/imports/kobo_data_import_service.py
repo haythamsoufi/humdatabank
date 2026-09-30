@@ -36,7 +36,7 @@ except ImportError:
 def _open_error_message(exc: Exception) -> str:
     """User-safe reason a workbook could not be opened (never echoes parser internals)."""
     if isinstance(exc, UnsafeWorkbookError):
-        return str(exc)
+        return exc.public_message
     return 'The file could not be read as an Excel workbook.'
 
 KOBO_SYSTEM_EXACT = {

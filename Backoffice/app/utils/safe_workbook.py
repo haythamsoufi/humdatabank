@@ -27,6 +27,8 @@ import zipfile
 from dataclasses import dataclass
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
+from app.utils.api_errors import ClientInputError
+
 WorkbookSource = Union[bytes, bytearray, str, "os.PathLike[str]", BinaryIO, Any]
 
 _DIMENSION_RE = re.compile(rb'<dimension\s+ref="([A-Za-z]+)(\d+)(?::([A-Za-z]+)(\d+))?"')
@@ -34,10 +36,10 @@ _SHEET_MEMBER_RE = re.compile(r"^xl/worksheets/[^/]+\.xml$")
 _HEAD_BYTES = 16384
 
 
-class UnsafeWorkbookError(ValueError):
+class UnsafeWorkbookError(ClientInputError):
     """The spreadsheet is malformed or exceeds a configured safety limit.
 
-    ``str(exc)`` is a stable, user-presentable message that never echoes file content.
+    ``public_message`` is a stable, user-presentable message that never echoes file content.
     """
 
 

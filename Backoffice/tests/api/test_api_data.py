@@ -150,7 +150,7 @@ class TestApiData:
         assert "data" in payload
         assert "meta" in payload
         star = payload["data"]
-        assert star.get("schema_version") == "1.1"
+        assert star.get("schema_version") == "1.2"
         assert "grain" in star
         tables = star.get("tables") or {}
         for key in (

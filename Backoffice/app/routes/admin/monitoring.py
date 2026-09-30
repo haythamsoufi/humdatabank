@@ -5,6 +5,7 @@ System Monitoring Module - Memory logs and system monitoring
 
 from flask import Blueprint, render_template, request, current_app, send_file, abort, redirect, url_for, flash
 from flask_login import current_user, login_required
+from werkzeug.exceptions import HTTPException
 from app.routes.admin.shared import admin_required, admin_permission_required, system_manager_required
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_error, json_error_handler, json_not_found, json_ok, json_server_error
@@ -424,6 +425,8 @@ def download_monitoring_logs():
             download_name=f'monitoring_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         current_app.logger.error(f"Error downloading monitoring logs: {e}", exc_info=True)
         abort(500, description="An error occurred.")

@@ -15,6 +15,21 @@ def test_still_scans_production_js_and_templates():
     assert should_scan_file("Backoffice/app/templates/forms/entry.html") is True
 
 
+def test_skips_gettext_catalogs():
+    assert should_scan_file("Backoffice/translations/es/LC_MESSAGES/messages.po") is False
+    assert should_scan_file("Backoffice/translations/messages.pot") is False
+
+
+def test_scan_diff_ignores_translation_eval_mention():
+    diff = """\
+diff --git a/Backoffice/translations/es/LC_MESSAGES/messages.po b/Backoffice/translations/es/LC_MESSAGES/messages.po
++++ b/Backoffice/translations/es/LC_MESSAGES/messages.po
+@@ -0,0 +1 @@
++msgstr "Patrón de sumidero de JavaScript (por ejemplo, eval() o document.cookie)"
+"""
+    assert scan_diff(diff) == []
+
+
 def test_scan_diff_ignores_test_file_innerhtml():
     diff = """\
 diff --git a/Backoffice/tests/js/forms/form-optimization.test.js b/Backoffice/tests/js/forms/form-optimization.test.js

@@ -198,7 +198,7 @@ def submit_indicator_suggestion():
         try:
             values = validate_suggestion_payload(data)
         except SuggestionValidationError as validation_error:
-            return mobile_bad_request(str(validation_error))
+            return mobile_bad_request(validation_error.public_message)
 
         throttle_message = suggestion_throttle_error(values['submitter_email'])
         if throttle_message:

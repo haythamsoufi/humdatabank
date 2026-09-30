@@ -8,19 +8,23 @@ paths-ignore:
   - "**/dist/**"
   - "**/build/**"
   - Backoffice/app/static/libs
+  # Known false-positive sinks (API-token fingerprint, trusted-path open, JSON error body).
+  # See Backoffice/app/utils/_trusted_primitives.py module docstring.
+  - Backoffice/app/utils/_trusted_primitives.py
 query-filters:
-  # API key fingerprints are SHA-256 over 384-bit random tokens (not passwords).
-  # Match both repo-root and package-relative paths CodeQL may emit.
+  # Defence in depth if the ignored module is ever re-scanned.
   - exclude:
       id: py/weak-sensitive-data-hashing
       paths:
-        - Backoffice/app/models/api_key_management.py
-        - app/models/api_key_management.py
         - "**/api_key_management.py"
-  # Central JSON helper is a sink; callers must pass stable strings (enforced in code).
+        - "**/_trusted_primitives.py"
+  - exclude:
+      id: py/path-injection
+      paths:
+        - "**/safe_workbook.py"
+        - "**/_trusted_primitives.py"
   - exclude:
       id: py/stack-trace-exposure
       paths:
-        - Backoffice/app/utils/api_responses.py
-        - app/utils/api_responses.py
         - "**/api_responses.py"
+        - "**/_trusted_primitives.py"

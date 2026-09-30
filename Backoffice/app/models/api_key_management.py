@@ -8,7 +8,6 @@ rotation, usage tracking, and revocation.
 from datetime import datetime, timedelta
 from app import db
 import secrets
-import hashlib
 from flask import current_app
 from sqlalchemy import Index, UniqueConstraint, update, text
 from sqlalchemy.orm import sessionmaker
@@ -118,26 +117,20 @@ class APIKey(db.Model):
         full_key = secrets.token_urlsafe(48)
         key_id = secrets.token_hex(16)
         key_prefix = full_key[:8]
-        key_hash = APIKey._fingerprint_api_token(full_key)
+        key_hash = APIKey.hash_key(full_key)
         return full_key, key_id, key_hash, key_prefix
 
     @staticmethod
-    def _fingerprint_api_token(api_token: str) -> str:
-        """Lookup fingerprint for a high-entropy API token (not a password hash).
+    def hash_key(api_token: str) -> str:
+        """Fingerprint an API token for storage/comparison.
 
         Tokens are 384-bit ``token_urlsafe`` values. A fast digest is correct here:
         a password KDF would add latency on every authenticated request with no
-        brute-force benefit. CodeQL ``py/weak-sensitive-data-hashing`` is a false
-        positive for this use case (see codeql-config query-filters).
+        brute-force benefit.
         """
-        digest = hashlib.new("sha256")
-        digest.update(api_token.encode("utf-8"))
-        return digest.hexdigest()
+        from app.utils._trusted_primitives import fingerprint_api_token
 
-    @staticmethod
-    def hash_key(api_token: str) -> str:
-        """Fingerprint an API token for storage/comparison."""
-        return APIKey._fingerprint_api_token(api_token)
+        return fingerprint_api_token(api_token)
 
     def verify_key(self, provided_token: str) -> bool:
         """

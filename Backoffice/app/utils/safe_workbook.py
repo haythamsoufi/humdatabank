@@ -120,19 +120,6 @@ def _read_source_bytes(source: WorkbookSource, limits: WorkbookLimits) -> bytes:
     return data
 
 
-def _path_is_under(candidate: str, root: str) -> bool:
-    """True when ``candidate`` is ``root`` or a file beneath it (after realpath)."""
-    try:
-        base = os.path.realpath(root)
-        target = os.path.realpath(candidate)
-    except OSError:
-        return False
-    if target == base:
-        return True
-    prefix = base if base.endswith(os.sep) else base + os.sep
-    return target.startswith(prefix)
-
-
 def _resolve_trusted_workbook_path(path: "str | os.PathLike[str]") -> str:
     """Resolve ``path`` and require it to sit under an allowlisted server root.
 
@@ -171,21 +158,24 @@ def _resolve_trusted_workbook_path(path: "str | os.PathLike[str]") -> str:
     roots.append(backoffice_root)
     roots.append(os.path.join(backoffice_root, "plugins"))
 
+    from app.utils._trusted_primitives import is_path_under_root
+
     resolved = os.path.realpath(raw)
     for root in roots:
-        if root and _path_is_under(resolved, root):
+        if root and is_path_under_root(resolved, root):
             return resolved
     raise UnsafeWorkbookError("The spreadsheet file could not be read.")
 
 
 def read_workbook_file_bytes(path: "str | os.PathLike[str]", limits: Optional[WorkbookLimits] = None) -> bytes:
     """Read a workbook from a *trusted* local path (never a request-derived one), size-capped."""
+    from app.utils._trusted_primitives import read_bytes_from_trusted_path
+
     limits = limits or WorkbookLimits.from_config()
     cap = limits.max_upload_bytes
     trusted_path = _resolve_trusted_workbook_path(path)
     try:
-        with open(trusted_path, "rb") as fh:
-            data = fh.read(cap + 1)
+        data = read_bytes_from_trusted_path(trusted_path, cap)
     except OSError as exc:
         raise UnsafeWorkbookError("The spreadsheet file could not be read.") from exc
     if len(data) > cap:

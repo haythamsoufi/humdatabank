@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 00:08+0000\n"
+"POT-Creation-Date: 2026-09-30 12:50+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: en <LL@li.org>\n"
@@ -389,7 +389,7 @@ msgstr "0 selected"
 msgid "1 field failed validation across %(total)s reviewed fields."
 msgstr "1 field failed validation across %(total)s reviewed fields."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:791
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:800
 msgid "1 indicator references this"
 msgstr "1 indicator references this"
 
@@ -541,7 +541,7 @@ msgstr "A server error occurred. Please try again later."
 msgid "A term with this English source and language already exists."
 msgstr "A term with this English source and language already exists."
 
-#: app/templates/admin/settings/manage_settings.html:76
+#: app/templates/admin/settings/manage_settings.html:98
 #: app/utils/audit_trail_labels.py:21
 msgid "AI"
 msgstr "AI"
@@ -566,7 +566,7 @@ msgstr "AI Answer"
 msgid "AI Assistant"
 msgstr "AI Assistant"
 
-#: app/templates/admin/settings/manage_settings.html:1346
+#: app/templates/admin/settings/manage_settings.html:1368
 msgid "AI Beta Access"
 msgstr "AI Beta Access"
 
@@ -822,7 +822,7 @@ msgstr ""
 msgid "AR"
 msgstr "AR"
 
-#: app/templates/admin/settings/manage_settings.html:588
+#: app/templates/admin/settings/manage_settings.html:610
 msgid ""
 "AZURE_STORAGE_CONNECTION_STRING is set, but UPLOAD_STORAGE_PROVIDER is not "
 "azure_blob, so file pickers stay hidden. Set UPLOAD_STORAGE_PROVIDER to "
@@ -1262,7 +1262,7 @@ msgstr "Add Another Document"
 #: app/templates/admin/organization/_nss_component.html:30
 #: app/templates/admin/organization/_nss_component.html:100
 #: app/templates/admin/organization/_nss_component.html:125
-#: app/templates/admin/settings/manage_settings.html:276
+#: app/templates/admin/settings/manage_settings.html:298
 msgid "Add Category"
 msgstr "Add Category"
 
@@ -1297,7 +1297,7 @@ msgstr "Add Entry"
 msgid "Add Filter"
 msgstr "Add Filter"
 
-#: app/templates/admin/settings/manage_settings.html:264
+#: app/templates/admin/settings/manage_settings.html:286
 #: app/templates/forms/form_builder/partials/_item_modal.html:861
 msgid "Add Group"
 msgstr "Add Group"
@@ -1422,7 +1422,7 @@ msgstr "Add Selected"
 msgid "Add Subsection"
 msgstr "Add Subsection"
 
-#: app/templates/admin/settings/manage_settings.html:252
+#: app/templates/admin/settings/manage_settings.html:274
 msgid "Add Type"
 msgstr "Add Type"
 
@@ -1537,7 +1537,7 @@ msgid "Add sector"
 msgstr "Add sector"
 
 #: app/templates/admin/communication/center.html:1497
-#: app/templates/admin/settings/manage_settings.html:1520
+#: app/templates/admin/settings/manage_settings.html:1542
 msgid "Add some template content first, then show sample values."
 msgstr "Add some template content first, then show sample values."
 
@@ -1685,7 +1685,7 @@ msgstr ""
 "Adds an \"Other (please specify)\" entry to the list. Users can type a "
 "custom value that is stored as their answer."
 
-#: app/templates/admin/settings/manage_settings.html:114
+#: app/templates/admin/settings/manage_settings.html:136
 msgid "Add…"
 msgstr "Add…"
 
@@ -1838,7 +1838,7 @@ msgstr "Admin Message"
 msgid "Admin Notes"
 msgstr "Admin Notes"
 
-#: app/templates/admin/settings/manage_settings.html:928
+#: app/templates/admin/settings/manage_settings.html:950
 msgid "Admin Notification (New Suggestion)"
 msgstr "Admin Notification (New Suggestion)"
 
@@ -1925,7 +1925,7 @@ msgstr ""
 msgid "Age"
 msgstr "Age"
 
-#: app/templates/admin/settings/manage_settings.html:260
+#: app/templates/admin/settings/manage_settings.html:282
 msgid "Age Groups"
 msgstr "Age Groups"
 
@@ -2346,7 +2346,7 @@ msgstr ""
 msgid "Allowed"
 msgstr "Allowed"
 
-#: app/templates/admin/settings/manage_settings.html:1361
+#: app/templates/admin/settings/manage_settings.html:1383
 msgid "Allowed Users"
 msgstr "Allowed Users"
 
@@ -2425,8 +2425,8 @@ msgstr "An error occurred."
 #: app/routes/admin/utilities/translations.py:1611
 #: app/routes/admin/utilities/translations.py:1687
 #: app/routes/main/dashboard.py:464 app/routes/main/views.py:117
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:845
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1274
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:854
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1283
 #: app/templates/admin/organization/_countries_component.html:8
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:9
 #: app/templates/admin/organization/_nss_component.html:8
@@ -2472,7 +2472,7 @@ msgstr ""
 #: app/templates/admin/analytics/page_path_analytics.html:24
 #: app/templates/admin/analytics/sessions.html:56
 #: app/templates/admin/analytics/user_detail.html:16
-#: app/templates/admin/settings/manage_settings.html:1194
+#: app/templates/admin/settings/manage_settings.html:1216
 #: app/templates/admin/user_management/user_form.html:122
 #: app/utils/audit_trail_labels.py:29
 msgid "Analytics"
@@ -3112,8 +3112,8 @@ msgstr "Are you sure you want to update the status?"
 msgid "Are you sure you want to validate this assignment?"
 msgstr "Are you sure you want to validate this assignment?"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:741
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:758
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:750
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:767
 #: app/templates/forms/form_builder/form_builder.html:1540
 msgid "Are you sure?"
 msgstr "Are you sure?"
@@ -3268,7 +3268,7 @@ msgstr "Assignment Status"
 msgid "Assignment Submitted"
 msgstr "Assignment Submitted"
 
-#: app/templates/admin/settings/manage_settings.html:1184
+#: app/templates/admin/settings/manage_settings.html:1206
 msgid ""
 "Assignment Submitted uses a grouped email for focal points: one message is "
 "sent to the whole entity team (everyone visible on the To line), and "
@@ -3455,7 +3455,7 @@ msgstr "Assistant is typing"
 msgid "At least 8 characters"
 msgstr "At least 8 characters"
 
-#: app/templates/admin/settings/manage_settings.html:174
+#: app/templates/admin/settings/manage_settings.html:196
 msgid ""
 "At least one entity type must remain enabled. Changes update the UI "
 "immediately; restart only needed if background workers cache the setting."
@@ -3724,18 +3724,18 @@ msgstr "Auto-translate config itemType"
 msgid "Auto-translate endpoint not configured"
 msgstr "Auto-translate endpoint not configured"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:996
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1447
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:1005
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1456
 #: app/templates/admin/translations/manage_translations.html:747
 msgid "Auto-translate failed."
 msgstr "Auto-translate failed."
 
-#: app/templates/admin/settings/manage_settings.html:980
-#: app/templates/admin/settings/manage_settings.html:981
+#: app/templates/admin/settings/manage_settings.html:1002
+#: app/templates/admin/settings/manage_settings.html:1003
 msgid "Auto-translate from English"
 msgstr "Auto-translate from English"
 
-#: app/templates/admin/settings/manage_settings.html:1531
+#: app/templates/admin/settings/manage_settings.html:1553
 msgid "Auto-translate is not available. Refresh the page and try again."
 msgstr "Auto-translate is not available. Refresh the page and try again."
 
@@ -3824,7 +3824,7 @@ msgstr "Avg. completion"
 msgid "Awaiting accept or reject"
 msgstr "Awaiting accept or reject"
 
-#: app/templates/admin/settings/manage_settings.html:462
+#: app/templates/admin/settings/manage_settings.html:484
 msgid ""
 "Azure Blob uploads are enabled. Choose image files below; they are stored in"
 " your configured Azure Blob container (same as other uploads), under "
@@ -3836,7 +3836,7 @@ msgstr ""
 "system/branding/. After uploading, click Save so the paths are recorded in "
 "branding settings."
 
-#: app/templates/admin/settings/manage_settings.html:591
+#: app/templates/admin/settings/manage_settings.html:613
 msgid ""
 "Azure File Share credentials are set separately; this page does not upload "
 "to File Share. Use static file names below, enable Blob-backed uploads, or "
@@ -4018,7 +4018,7 @@ msgstr "Branch"
 msgid "Branches"
 msgstr "Branches"
 
-#: app/templates/admin/settings/manage_settings.html:60
+#: app/templates/admin/settings/manage_settings.html:82
 msgid "Branding"
 msgstr "Branding"
 
@@ -4274,7 +4274,7 @@ msgstr "Campaign Recipients"
 msgid "Campaign Type"
 msgstr "Campaign Type"
 
-#: app/templates/admin/settings/manage_settings.html:68
+#: app/templates/admin/settings/manage_settings.html:90
 msgid "Campaign emails"
 msgstr "Campaign emails"
 
@@ -4324,7 +4324,7 @@ msgstr "Can't find an indicator? Propose a new one here"
 #: app/templates/admin/indicator_bank/_panel_sectors_modals.html:152
 #: app/templates/admin/indicator_bank/_panel_sectors_modals.html:229
 #: app/templates/admin/indicator_bank/_panel_sectors_modals.html:317
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:708
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:717
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:23
 #: app/templates/admin/indicator_bank/indicator_bank.html:517
 #: app/templates/admin/indicator_bank/indicator_bank.html:1715
@@ -4345,8 +4345,8 @@ msgstr "Can't find an indicator? Propose a new one here"
 #: app/templates/admin/organization/_nss_component.html:204
 #: app/templates/admin/organization/edit_entity.html:150
 #: app/templates/admin/plugin_management.html:181
-#: app/templates/admin/settings/manage_settings.html:1157
-#: app/templates/admin/settings/manage_settings.html:1491
+#: app/templates/admin/settings/manage_settings.html:1179
+#: app/templates/admin/settings/manage_settings.html:1513
 #: app/templates/admin/templates/templates.html:325
 #: app/templates/admin/translations/manage_translations.html:582
 #: app/templates/admin/translations/manage_translations.html:709
@@ -4445,11 +4445,11 @@ msgstr ""
 "Cannot cancel deletion. This field allows a maximum of %(max)s document(s). "
 "Remove the newly added document first."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:783
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:792
 msgid "Cannot delete: remove the"
 msgstr "Cannot delete: remove the"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:782
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:791
 msgid "Cannot delete: remove the 1 sub-sector first."
 msgstr "Cannot delete: remove the 1 sub-sector first."
 
@@ -4647,11 +4647,11 @@ msgid ""
 msgstr ""
 "Chat with the AI assistant for help with reporting and using the platform."
 
-#: app/templates/admin/settings/manage_settings.html:630
+#: app/templates/admin/settings/manage_settings.html:652
 msgid "Chatbot"
 msgstr "Chatbot"
 
-#: app/templates/admin/settings/manage_settings.html:632
+#: app/templates/admin/settings/manage_settings.html:654
 msgid "Chatbot Name"
 msgstr "Chatbot Name"
 
@@ -4712,7 +4712,7 @@ msgstr "Checking values against guidelines…"
 msgid "Checking your assignments…"
 msgstr "Checking your assignments…"
 
-#: app/templates/admin/settings/manage_settings.html:1494
+#: app/templates/admin/settings/manage_settings.html:1516
 #: app/templates/forms/form_builder/form_builder.html:1168
 msgid "Checking…"
 msgstr "Checking…"
@@ -4801,7 +4801,7 @@ msgstr "Choose translation service"
 msgid "Choose which breakdowns to allow"
 msgstr "Choose which breakdowns to allow"
 
-#: app/templates/admin/settings/manage_settings.html:139
+#: app/templates/admin/settings/manage_settings.html:161
 msgid ""
 "Choose which entity selectors appear across admin tools like User Management"
 " and Assignment Management. Disable a type to hide the related tabs, forms, "
@@ -4811,7 +4811,7 @@ msgstr ""
 " and Assignment Management. Disable a type to hide the related tabs, forms, "
 "and drag-and-drop panels shown in those pages."
 
-#: app/templates/admin/settings/manage_settings.html:1119
+#: app/templates/admin/settings/manage_settings.html:1141
 msgid ""
 "Choose who should receive this test message. It uses the current template "
 "content and sample placeholder values."
@@ -4845,7 +4845,7 @@ msgstr "Cleaned up %(count)d expired sessions."
 #: app/templates/admin/communication/registry.html:34
 #: app/templates/admin/monitoring/system_monitoring.html:185
 #: app/templates/admin/monitoring/system_monitoring.html:443
-#: app/templates/admin/settings/manage_settings.html:1279
+#: app/templates/admin/settings/manage_settings.html:1301
 #: app/templates/admin/validation_dashboard.html:254
 #: app/templates/components/ag_grid_i18n_js.html:19
 #: app/templates/core/chat_immersive.html:48
@@ -4898,7 +4898,7 @@ msgstr "Clear all conversations"
 msgid "Clear all conversations?"
 msgstr "Clear all conversations?"
 
-#: app/templates/admin/settings/manage_settings.html:1335
+#: app/templates/admin/settings/manage_settings.html:1357
 msgid "Clear all database-saved AI settings and revert to defaults"
 msgstr "Clear all database-saved AI settings and revert to defaults"
 
@@ -4939,8 +4939,8 @@ msgstr "Clear search"
 #: app/templates/admin/communication/center.html:1419
 #: app/templates/admin/documents/documents.html:407
 #: app/templates/admin/reports/partials/_widget_properties.html:35
-#: app/templates/admin/settings/manage_settings.html:507
-#: app/templates/admin/settings/manage_settings.html:552
+#: app/templates/admin/settings/manage_settings.html:529
+#: app/templates/admin/settings/manage_settings.html:574
 #: app/templates/admin/templates/new_template.html:248
 #: app/templates/admin/templates/new_template.html:249
 #: app/templates/admin/templates/new_template.html:448
@@ -4986,7 +4986,7 @@ msgstr ""
 msgid "Click Search or Refresh to load documents from the IFRC API."
 msgstr "Click Search or Refresh to load documents from the IFRC API."
 
-#: app/templates/admin/settings/manage_settings.html:1396
+#: app/templates/admin/settings/manage_settings.html:1418
 msgid "Click a provider to edit its settings. Drag to reorder fallback order."
 msgstr ""
 "Click a provider to edit its settings. Drag to reorder fallback order."
@@ -5117,7 +5117,7 @@ msgid "Click to repeat this group of fields multiple times"
 msgstr "Click to repeat this group of fields multiple times"
 
 #: app/templates/admin/communication/center.html:1494
-#: app/templates/admin/settings/manage_settings.html:1517
+#: app/templates/admin/settings/manage_settings.html:1539
 msgid ""
 "Click to switch: edit the template with Jinja placeholders, or see sample "
 "values (server-rendered preview, not saved)."
@@ -5284,8 +5284,8 @@ msgstr "Collapse"
 
 #: app/templates/admin/docs/documentation.html:1130
 #: app/templates/admin/docs/documentation.html:1131
-#: app/templates/admin/settings/manage_settings.html:1339
-#: app/templates/admin/settings/manage_settings.html:1486
+#: app/templates/admin/settings/manage_settings.html:1361
+#: app/templates/admin/settings/manage_settings.html:1508
 msgid "Collapse all"
 msgstr "Collapse all"
 
@@ -5776,7 +5776,7 @@ msgstr ""
 msgid "Configured"
 msgstr "Configured"
 
-#: app/templates/admin/settings/manage_settings.html:1209
+#: app/templates/admin/settings/manage_settings.html:1231
 msgid "Configured via deployment / Config.FEATURES"
 msgstr "Configured via deployment / Config.FEATURES"
 
@@ -5846,6 +5846,10 @@ msgstr "Contact Email"
 #: app/templates/admin/assignments/public_submissions.html:198
 msgid "Contact Name"
 msgstr "Contact Name"
+
+#: app/templates/admin/settings/manage_settings.html:52
+msgid "Container SSH is disabled"
+msgstr "Container SSH is disabled"
 
 #: app/templates/components/ag_grid_i18n_js.html:79
 msgid "Contains"
@@ -6039,8 +6043,8 @@ msgstr "Copy summary"
 msgid "Copy summary (queries + answers + meta only)"
 msgstr "Copy summary (queries + answers + meta only)"
 
-#: app/templates/admin/settings/manage_settings.html:560
-#: app/templates/admin/settings/manage_settings.html:614
+#: app/templates/admin/settings/manage_settings.html:582
+#: app/templates/admin/settings/manage_settings.html:636
 msgid "Copyright Year"
 msgstr "Copyright Year"
 
@@ -6166,7 +6170,7 @@ msgid "Could not load preview."
 msgstr "Could not load preview."
 
 #: app/templates/admin/communication/center.html:1496
-#: app/templates/admin/settings/manage_settings.html:1519
+#: app/templates/admin/settings/manage_settings.html:1541
 msgid "Could not load sample values for this template."
 msgstr "Could not load sample values for this template."
 
@@ -6200,7 +6204,7 @@ msgstr "Could not mark documents as the same publication"
 msgid "Could not prepare delete request"
 msgstr "Could not prepare delete request"
 
-#: app/templates/admin/settings/manage_settings.html:1536
+#: app/templates/admin/settings/manage_settings.html:1558
 msgid "Could not prepare the email body."
 msgstr "Could not prepare the email body."
 
@@ -6294,7 +6298,7 @@ msgstr "Count of entries"
 #: app/templates/admin/countries/manage_country.html:12
 #: app/templates/admin/organization/_countries_component.html:15
 #: app/templates/admin/organization/index.html:48
-#: app/templates/admin/settings/manage_settings.html:145
+#: app/templates/admin/settings/manage_settings.html:167
 #: app/templates/admin/user_management/access_requests.html:1012
 #: app/templates/admin/user_management/user_form.html:892
 #: app/templates/admin/validation_dashboard.html:97
@@ -6897,7 +6901,7 @@ msgstr "Daily Digest"
 msgid "Daily digest"
 msgstr "Daily digest"
 
-#: app/templates/admin/settings/manage_settings.html:949
+#: app/templates/admin/settings/manage_settings.html:971
 msgid ""
 "Daily email sent to FDS members with pending country access requests for "
 "their countries. Variables: user_name, request_count, request_rows_html, "
@@ -6942,7 +6946,7 @@ msgstr "Dashboard URL"
 msgid "Dashboards"
 msgstr "Dashboards"
 
-#: app/templates/admin/settings/manage_settings.html:56
+#: app/templates/admin/settings/manage_settings.html:78
 #: app/templates/forms/form_builder/field_mapping.html:319
 #: app/templates/forms/form_builder/field_mapping.html:340
 #: app/templates/forms/form_builder/partials/_item_modal.html:1244
@@ -7294,7 +7298,7 @@ msgstr "Default (1000)"
 msgid "Default Value (Optional)"
 msgstr "Default Value (Optional)"
 
-#: app/templates/admin/settings/manage_settings.html:1081
+#: app/templates/admin/settings/manage_settings.html:1103
 msgid "Default email templates"
 msgstr "Default email templates"
 
@@ -7312,7 +7316,7 @@ msgstr "Default notification email"
 msgid "Default priority"
 msgstr "Default priority"
 
-#: app/templates/admin/settings/manage_settings.html:1090
+#: app/templates/admin/settings/manage_settings.html:1112
 msgid "Default templates"
 msgstr "Default templates"
 
@@ -7324,8 +7328,8 @@ msgstr "Default title"
 msgid "Default:"
 msgstr "Default:"
 
-#: app/templates/admin/settings/manage_settings.html:568
-#: app/templates/admin/settings/manage_settings.html:622
+#: app/templates/admin/settings/manage_settings.html:590
+#: app/templates/admin/settings/manage_settings.html:644
 msgid "Defaults to current year if empty."
 msgstr "Defaults to current year if empty."
 
@@ -7391,7 +7395,7 @@ msgstr "Delegation focal point"
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:197
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:289
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:339
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:710
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:719
 #: app/templates/admin/indicator_bank/indicator_bank.html:283
 #: app/templates/admin/indicator_bank/indicator_bank.html:1040
 #: app/templates/admin/indicator_bank/indicator_bank.html:2175
@@ -7548,7 +7552,7 @@ msgid "Delete section"
 msgstr "Delete section"
 
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:156
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:771
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:780
 msgid "Delete sector"
 msgstr "Delete sector"
 
@@ -7565,7 +7569,7 @@ msgstr "Delete selected documents?"
 msgid "Delete selected traces"
 msgstr "Delete selected traces"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:772
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:781
 msgid "Delete sub-sector"
 msgstr "Delete sub-sector"
 
@@ -8207,7 +8211,7 @@ msgstr "Display"
 msgid "Display Column"
 msgstr "Display Column"
 
-#: app/templates/admin/settings/manage_settings.html:130
+#: app/templates/admin/settings/manage_settings.html:152
 msgid "Display Flags"
 msgstr "Display Flags"
 
@@ -8399,7 +8403,7 @@ msgstr "Document Type (Optional)"
 msgid "Document Type:"
 msgstr "Document Type:"
 
-#: app/templates/admin/settings/manage_settings.html:248
+#: app/templates/admin/settings/manage_settings.html:270
 msgid "Document Types"
 msgstr "Document Types"
 
@@ -8523,7 +8527,7 @@ msgstr ""
 "Documents with unreachable FDRS file URLs (tagged during FDRS sync) are "
 "excluded from selection until IFRC fixes the URL and you re-run sync."
 
-#: app/templates/admin/settings/manage_settings.html:345
+#: app/templates/admin/settings/manage_settings.html:367
 msgid "Domains"
 msgstr "Domains"
 
@@ -8935,6 +8939,14 @@ msgstr "Dynamic Indicators"
 msgid "ECHO Programmatic Partnership"
 msgstr "ECHO Programmatic Partnership"
 
+#: app/templates/admin/settings/manage_settings.html:53
+msgid ""
+"ENABLE_SSH is not true, so Azure portal SSH will not connect. Set "
+"ENABLE_SSH=true on the app if break-glass SSH is required."
+msgstr ""
+"ENABLE_SSH is not true, so Azure portal SSH will not connect. Set "
+"ENABLE_SSH=true on the app if break-glass SSH is required."
+
 #: app/utils/form_localization.py:128
 msgid "EUR"
 msgstr "EUR"
@@ -8965,7 +8977,7 @@ msgstr ""
 msgid "Each option can only be selected once in this section"
 msgstr "Each option can only be selected once in this section"
 
-#: app/templates/admin/settings/manage_settings.html:1181
+#: app/templates/admin/settings/manage_settings.html:1203
 msgid ""
 "Each row describes who receives the in-app notification when it is created, "
 "how long it is kept (TTL), and the default priority for new notifications of"
@@ -9273,7 +9285,7 @@ msgstr "Email Content"
 msgid "Email Distribution Rules"
 msgstr "Email Distribution Rules"
 
-#: app/templates/admin/settings/manage_settings.html:358
+#: app/templates/admin/settings/manage_settings.html:380
 msgid "Email Domain"
 msgstr "Email Domain"
 
@@ -9321,7 +9333,7 @@ msgstr "Email delivery"
 msgid "Email delivery status chart"
 msgstr "Email delivery status chart"
 
-#: app/templates/admin/settings/manage_settings.html:1193
+#: app/templates/admin/settings/manage_settings.html:1215
 msgid "Email digests"
 msgstr "Email digests"
 
@@ -9349,7 +9361,7 @@ msgstr ""
 "Email only — title becomes the subject line; message appears in-app and in "
 "the email body."
 
-#: app/templates/admin/settings/manage_settings.html:934
+#: app/templates/admin/settings/manage_settings.html:956
 msgid ""
 "Email sent to admins for security events. Variables: event_type_display, "
 "severity_display, formatted_timestamp, header_style, alert_panel_style "
@@ -9363,7 +9375,7 @@ msgstr ""
 "alert_border_color, description, ip_address, user_email, user_id, admin_url,"
 " org_name, copyright_year"
 
-#: app/templates/admin/settings/manage_settings.html:929
+#: app/templates/admin/settings/manage_settings.html:951
 msgid ""
 "Email sent to admins when a new indicator suggestion is submitted. "
 "Variables: submitter_name, submitter_email, suggestion_type_display, "
@@ -9375,7 +9387,7 @@ msgstr ""
 "indicator_name, submitted_date, suggestion_details, reason, "
 "additional_notes, admin_url, org_name, copyright_year"
 
-#: app/templates/admin/settings/manage_settings.html:939
+#: app/templates/admin/settings/manage_settings.html:961
 msgid ""
 "Email sent to new users upon registration. Variables: user_name, "
 "dashboard_url, documentation_url, org_name, copyright_year, t (locale-aware "
@@ -9391,7 +9403,7 @@ msgstr ""
 "t.docs_title, t.docs_body, t.docs_btn, t.help_title, t.help_body, t.closing,"
 " t.regards, t.team, t.footer_note)"
 
-#: app/templates/admin/settings/manage_settings.html:924
+#: app/templates/admin/settings/manage_settings.html:946
 msgid ""
 "Email sent to users when they submit an indicator suggestion. Variables: "
 "submitter_name, suggestion_type_display, indicator_name, submitted_date, "
@@ -9428,7 +9440,7 @@ msgid "Email templates updated"
 msgstr "Email templates updated"
 
 #: app/templates/admin/communication/center.html:1461
-#: app/templates/admin/settings/manage_settings.html:64
+#: app/templates/admin/settings/manage_settings.html:86
 msgid "Emails"
 msgstr "Emails"
 
@@ -9544,7 +9556,7 @@ msgstr "Enable Import Excel button"
 msgid "Enable Run AI validation button"
 msgstr "Enable Run AI validation button"
 
-#: app/templates/admin/settings/manage_settings.html:156
+#: app/templates/admin/settings/manage_settings.html:178
 msgid ""
 "Enable Secretariat Divisions/Departments and Regions tabs for granular "
 "entity assignments."
@@ -9585,7 +9597,7 @@ msgstr "Enable the translation review tool in Account Settings first"
 msgid "Enabled"
 msgstr "Enabled"
 
-#: app/templates/admin/settings/manage_settings.html:137
+#: app/templates/admin/settings/manage_settings.html:159
 msgid "Enabled Entity Types"
 msgstr "Enabled Entity Types"
 
@@ -9682,7 +9694,7 @@ msgid "Enter Data"
 msgstr "Enter Data"
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:119
-#: app/templates/admin/settings/manage_settings.html:1048
+#: app/templates/admin/settings/manage_settings.html:1070
 msgid "Enter Jinja2 template HTML here..."
 msgstr "Enter Jinja2 template HTML here..."
 
@@ -9727,8 +9739,8 @@ msgstr "Enter both the English source and the translation."
 msgid "Enter category name..."
 msgstr "Enter category name..."
 
-#: app/templates/admin/settings/manage_settings.html:1268
-#: app/templates/admin/settings/manage_settings.html:1484
+#: app/templates/admin/settings/manage_settings.html:1290
+#: app/templates/admin/settings/manage_settings.html:1506
 msgid "Enter new value…"
 msgstr "Enter new value…"
 
@@ -9875,7 +9887,7 @@ msgstr "Equals"
 #: app/templates/admin/monitoring/system_monitoring.html:210
 #: app/templates/admin/monitoring/system_monitoring.html:434
 #: app/templates/admin/monitoring/system_monitoring.html:439
-#: app/templates/admin/settings/manage_settings.html:1495
+#: app/templates/admin/settings/manage_settings.html:1517
 #: app/templates/admin/validation_questions.html:139
 msgid "Error"
 msgstr "Error"
@@ -10268,7 +10280,7 @@ msgstr "Expand Sections Menu"
 
 #: app/templates/admin/docs/documentation.html:1123
 #: app/templates/admin/docs/documentation.html:1124
-#: app/templates/admin/settings/manage_settings.html:1485
+#: app/templates/admin/settings/manage_settings.html:1507
 msgid "Expand all"
 msgstr "Expand all"
 
@@ -10566,7 +10578,7 @@ msgstr ""
 "shape (count = unique pairs). Filtering Overlaps still lists each registry "
 "row."
 
-#: app/templates/admin/settings/manage_settings.html:645
+#: app/templates/admin/settings/manage_settings.html:667
 msgid "External Links"
 msgstr "External Links"
 
@@ -10641,7 +10653,7 @@ msgstr "FDRS Tools"
 msgid "FDRS data sync, imputation, and manage publication"
 msgstr "FDRS data sync, imputation, and manage publication"
 
-#: app/templates/admin/settings/manage_settings.html:948
+#: app/templates/admin/settings/manage_settings.html:970
 msgid "FDS Access Request Digest"
 msgstr "FDS Access Request Digest"
 
@@ -10681,7 +10693,7 @@ msgstr "Facilities"
 #: app/templates/admin/ai/knowledge_base.html:695
 #: app/templates/admin/analytics/_user_detail_partial.html:369
 #: app/templates/admin/analytics/login_logs.html:139
-#: app/templates/admin/settings/manage_settings.html:1498
+#: app/templates/admin/settings/manage_settings.html:1520
 #: app/templates/forms/entry_form/entry_form.html:725
 #: app/templates/forms/entry_form/validation_summary_pdf.html:190
 #: app/templates/forms/entry_form/validation_summary_progress.html:298
@@ -10790,13 +10802,13 @@ msgstr "Failed to load plugins:"
 msgid "Failed to load preview."
 msgstr "Failed to load preview."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:601
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1175
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:610
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1184
 msgid "Failed to load sector data. Please try again."
 msgstr "Failed to load sector data. Please try again."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:652
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1221
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:661
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1230
 msgid "Failed to load subsector data. Please try again."
 msgstr "Failed to load subsector data. Please try again."
 
@@ -10897,8 +10909,8 @@ msgstr "Failed to stop sync"
 msgid "Failed to stop verification"
 msgstr "Failed to stop verification"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:850
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1279
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:859
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1288
 msgid "Failed to submit form. Please try again."
 msgstr "Failed to submit form. Please try again."
 
@@ -10932,7 +10944,7 @@ msgstr "Failed to update."
 msgid "Failed: {count}"
 msgstr "Failed: {count}"
 
-#: app/templates/admin/settings/manage_settings.html:365
+#: app/templates/admin/settings/manage_settings.html:387
 msgid "Falls back to organization domain if empty."
 msgstr "Falls back to organization domain if empty."
 
@@ -10944,15 +10956,15 @@ msgstr "Fast overview — preserves the overall spread of indicators"
 msgid "Fast-path Indicator Bank similarity search"
 msgstr "Fast-path Indicator Bank similarity search"
 
-#: app/templates/admin/settings/manage_settings.html:515
+#: app/templates/admin/settings/manage_settings.html:537
 msgid "Favicon"
 msgstr "Favicon"
 
-#: app/templates/admin/settings/manage_settings.html:605
+#: app/templates/admin/settings/manage_settings.html:627
 msgid "Favicon Path"
 msgstr "Favicon Path"
 
-#: app/templates/admin/settings/manage_settings.html:1216
+#: app/templates/admin/settings/manage_settings.html:1238
 msgid "Feature flags come from environment variables (see Config.FEATURES)."
 msgstr "Feature flags come from environment variables (see Config.FEATURES)."
 
@@ -11103,7 +11115,7 @@ msgstr "Fill empty only"
 msgid "Fill in details"
 msgstr "Fill in details"
 
-#: app/templates/admin/settings/manage_settings.html:1088
+#: app/templates/admin/settings/manage_settings.html:1110
 msgid ""
 "Fills empty template fields from this release, or replaces all with built-in"
 " defaults"
@@ -11111,7 +11123,7 @@ msgstr ""
 "Fills empty template fields from this release, or replaces all with built-in"
 " defaults"
 
-#: app/templates/admin/settings/manage_settings.html:1113
+#: app/templates/admin/settings/manage_settings.html:1135
 msgid ""
 "Fills or overwrites from the current release’s bundled HTML (same as the "
 "flask seed-email-templates command). The page reloads after a successful "
@@ -11432,7 +11444,7 @@ msgstr "Focal Points"
 msgid "Focal Points for"
 msgstr "Focal Points for"
 
-#: app/templates/admin/settings/manage_settings.html:1508
+#: app/templates/admin/settings/manage_settings.html:1530
 msgid "Focal points"
 msgstr "Focal points"
 
@@ -11632,7 +11644,7 @@ msgstr "Format"
 msgid "Format String Detected"
 msgstr "Format String Detected"
 
-#: app/templates/admin/settings/manage_settings.html:463
+#: app/templates/admin/settings/manage_settings.html:485
 msgid ""
 "Formats: PNG, JPEG, GIF, and WebP for the logo; favicon also accepts ICO. "
 "SVG uploads are not accepted (use a bundled static SVG via the path field). "
@@ -11784,7 +11796,7 @@ msgstr "Gathering additional sources…"
 msgid "Gender Distribution by Country"
 msgstr "Gender Distribution by Country"
 
-#: app/templates/admin/settings/manage_settings.html:52
+#: app/templates/admin/settings/manage_settings.html:74
 #: app/templates/admin/templates/new_template.html:1211
 #: app/templates/components/_sidebar_nav_categories.html:8
 msgid "General"
@@ -12054,7 +12066,7 @@ msgstr "Grounding:"
 #: app/routes/admin/communication.py:292
 #: app/templates/admin/communication/center.html:1404
 #: app/templates/admin/communication/registry.html:60
-#: app/templates/admin/settings/manage_settings.html:1505
+#: app/templates/admin/settings/manage_settings.html:1527
 msgid "Group"
 msgstr "Group"
 
@@ -12090,7 +12102,7 @@ msgstr "Group label, e.g. Male"
 msgid "Group matrix table rows"
 msgstr "Group matrix table rows"
 
-#: app/templates/admin/settings/manage_settings.html:1513
+#: app/templates/admin/settings/manage_settings.html:1535
 msgid "Grouped email"
 msgstr "Grouped email"
 
@@ -12112,7 +12124,7 @@ msgstr "Guidance document uploaded"
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:35
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:86
-#: app/templates/admin/settings/manage_settings.html:1013
+#: app/templates/admin/settings/manage_settings.html:1035
 msgid "HTML"
 msgstr "HTML"
 
@@ -12138,7 +12150,7 @@ msgstr ""
 "supports multiple languages and optional default compose text (title, "
 "message, priority) used when starting a new campaign. Variables include:"
 
-#: app/templates/admin/settings/manage_settings.html:916
+#: app/templates/admin/settings/manage_settings.html:938
 msgid ""
 "HTML templates used when the system sends email automatically (registration "
 "welcome, security alerts, indicator suggestions, and the Communication "
@@ -12148,7 +12160,7 @@ msgstr ""
 "welcome, security alerts, indicator suggestions, and the Communication "
 "Center email wrapper). Use Jinja2 syntax. Typical placeholder names include:"
 
-#: app/templates/admin/settings/manage_settings.html:944
+#: app/templates/admin/settings/manage_settings.html:966
 msgid ""
 "HTML wrapper used when sending notifications from the Communication Center "
 "via email. Variables: title, message, org_name"
@@ -12287,7 +12299,7 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:345
 #: app/templates/admin/communication/center.html:683
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:150
-#: app/templates/admin/settings/manage_settings.html:1501
+#: app/templates/admin/settings/manage_settings.html:1523
 msgid "High"
 msgstr "High"
 
@@ -12464,7 +12476,7 @@ msgstr "Hygiene Promotion"
 msgid "Hypothetical"
 msgstr "Hypothetical"
 
-#: app/templates/admin/settings/manage_settings.html:1187
+#: app/templates/admin/settings/manage_settings.html:1209
 msgid ""
 "Hypothetical types are listed at the bottom; the word Hypothetical appears "
 "in the Type column when no in-app notification is emitted for that row yet."
@@ -13198,7 +13210,7 @@ msgstr "Indicator Bank — exact match found"
 msgid "Indicator Change History"
 msgstr "Indicator Change History"
 
-#: app/templates/admin/settings/manage_settings.html:648
+#: app/templates/admin/settings/manage_settings.html:670
 msgid "Indicator Details URL"
 msgstr "Indicator Details URL"
 
@@ -13218,7 +13230,7 @@ msgstr "Indicator Name Translations"
 msgid "Indicator Note Translations"
 msgstr "Indicator Note Translations"
 
-#: app/templates/admin/settings/manage_settings.html:923
+#: app/templates/admin/settings/manage_settings.html:945
 msgid "Indicator Suggestion Confirmation"
 msgstr "Indicator Suggestion Confirmation"
 
@@ -13699,7 +13711,7 @@ msgstr "Items:"
 msgid "Iterations"
 msgstr "Iterations"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:791
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:800
 msgid "Its sector reference will be cleared on deletion."
 msgstr "Its sector reference will be cleared on deletion."
 
@@ -13803,7 +13815,7 @@ msgstr "Keep Data and Archive Item"
 msgid "Keep all placeholders exactly as they appear, for example:"
 msgstr "Keep all placeholders exactly as they appear, for example:"
 
-#: app/templates/admin/settings/manage_settings.html:146
+#: app/templates/admin/settings/manage_settings.html:168
 msgid ""
 "Keep national-level assignment, country permissions, and Select All by "
 "region controls visible (recommended)."
@@ -14172,7 +14184,7 @@ msgstr ""
 msgid "Leave empty to use platform defaults when age breakdown is allowed."
 msgstr "Leave empty to use platform defaults when age breakdown is allowed."
 
-#: app/templates/admin/settings/manage_settings.html:1071
+#: app/templates/admin/settings/manage_settings.html:1093
 msgid ""
 "Leave empty to use system default template. Non-English versions fall back "
 "to English when empty."
@@ -14180,7 +14192,7 @@ msgstr ""
 "Leave empty to use system default template. Non-English versions fall back "
 "to English when empty."
 
-#: app/templates/admin/settings/manage_settings.html:639
+#: app/templates/admin/settings/manage_settings.html:661
 msgid "Leave empty to use the generic assistant label."
 msgstr "Leave empty to use the generic assistant label."
 
@@ -14374,7 +14386,7 @@ msgstr "Load More"
 msgid "Load a reporting period to filter countries."
 msgstr "Load a reporting period to filter countries."
 
-#: app/templates/admin/settings/manage_settings.html:1102
+#: app/templates/admin/settings/manage_settings.html:1124
 msgid "Load defaults (fill empty only)"
 msgstr "Load defaults (fill empty only)"
 
@@ -14582,7 +14594,7 @@ msgstr "Loading more…"
 msgid "Loading national societies..."
 msgstr "Loading national societies..."
 
-#: app/templates/admin/settings/manage_settings.html:1226
+#: app/templates/admin/settings/manage_settings.html:1248
 msgid "Loading notification settings…"
 msgstr "Loading notification settings…"
 
@@ -14871,7 +14883,7 @@ msgstr "Logo (PNG, JPG, GIF, WEBP)"
 msgid "Logo File"
 msgstr "Logo File"
 
-#: app/templates/admin/settings/manage_settings.html:596
+#: app/templates/admin/settings/manage_settings.html:618
 msgid "Logo Path"
 msgstr "Logo Path"
 
@@ -14918,13 +14930,25 @@ msgstr ""
 
 #: app/services/communication/insights_service.py:109
 #: app/templates/admin/analytics/audit_trail.html:343
-#: app/templates/admin/settings/manage_settings.html:1503
+#: app/templates/admin/settings/manage_settings.html:1525
 msgid "Low"
 msgstr "Low"
 
 #: app/templates/admin/ai/dashboard.html:144
 msgid "Low-quality traces needing review"
 msgstr "Low-quality traces needing review"
+
+#: app/templates/admin/settings/manage_settings.html:43
+msgid "MOBILE_JWT_SECRET is not set"
+msgstr "MOBILE_JWT_SECRET is not set"
+
+#: app/templates/admin/settings/manage_settings.html:49
+msgid "MOBILE_JWT_SECRET is too short"
+msgstr "MOBILE_JWT_SECRET is too short"
+
+#: app/templates/admin/settings/manage_settings.html:46
+msgid "MOBILE_JWT_SECRET matches SECRET_KEY"
+msgstr "MOBILE_JWT_SECRET matches SECRET_KEY"
 
 #: app/templates/admin/translations/quality_dashboard.html:148
 #: app/templates/admin/translations/quality_dashboard.html:266
@@ -15007,9 +15031,9 @@ msgstr "Manage Resources"
 msgid "Manage Templates"
 msgstr "Manage Templates"
 
-#: app/templates/admin/settings/manage_settings.html:285
-#: app/templates/admin/settings/manage_settings.html:305
-#: app/templates/admin/settings/manage_settings.html:306
+#: app/templates/admin/settings/manage_settings.html:307
+#: app/templates/admin/settings/manage_settings.html:327
+#: app/templates/admin/settings/manage_settings.html:328
 #: app/templates/admin/translations/manage_translations.html:5
 msgid "Manage Translations"
 msgstr "Manage Translations"
@@ -15045,13 +15069,13 @@ msgstr ""
 msgid "Manage column header translations"
 msgstr "Manage column header translations"
 
-#: app/templates/admin/settings/manage_settings.html:261
+#: app/templates/admin/settings/manage_settings.html:283
 msgid ""
 "Manage default age group buckets used for disaggregation. Drag to reorder."
 msgstr ""
 "Manage default age group buckets used for disaggregation. Drag to reorder."
 
-#: app/templates/admin/settings/manage_settings.html:273
+#: app/templates/admin/settings/manage_settings.html:295
 msgid ""
 "Manage default sex categories used for disaggregation. Drag to reorder."
 msgstr ""
@@ -15103,7 +15127,7 @@ msgstr "Manage template versions"
 msgid "Manage the central repository of indicators used throughout the"
 msgstr "Manage the central repository of indicators used throughout the"
 
-#: app/templates/admin/settings/manage_settings.html:249
+#: app/templates/admin/settings/manage_settings.html:271
 msgid "Manage the list used in the document upload type dropdown."
 msgstr "Manage the list used in the document upload type dropdown."
 
@@ -15589,7 +15613,7 @@ msgstr "Minimize — processing keeps running in background"
 msgid "Minimize — translation keeps running in background"
 msgstr "Minimize — translation keeps running in background"
 
-#: app/templates/admin/settings/manage_settings.html:179
+#: app/templates/admin/settings/manage_settings.html:201
 msgid "Minimum mobile app version"
 msgstr "Minimum mobile app version"
 
@@ -15648,6 +15672,14 @@ msgstr ""
 #: app/templates/admin/communication/center.html:456
 msgid "Mobile push options"
 msgstr "Mobile push options"
+
+#: app/templates/admin/settings/manage_settings.html:44
+msgid ""
+"Mobile tokens are signed with SECRET_KEY. Set a dedicated secret of at least"
+" 32 characters that is different from SECRET_KEY."
+msgstr ""
+"Mobile tokens are signed with SECRET_KEY. Set a dedicated secret of at least"
+" 32 characters that is different from SECRET_KEY."
 
 #: app/templates/admin/api_management.html:525
 #: app/templates/admin/api_management.html:1845
@@ -15982,7 +16014,7 @@ msgstr "National Society Name"
 msgid "National Society Names in Other Languages"
 msgstr "National Society Names in Other Languages"
 
-#: app/templates/admin/settings/manage_settings.html:150
+#: app/templates/admin/settings/manage_settings.html:172
 #: app/templates/core/ns_structure.html:14
 msgid "National Society Structure"
 msgstr "National Society Structure"
@@ -16096,15 +16128,15 @@ msgstr "Network error occurred"
 msgid "Network error saving"
 msgstr "Network error saving"
 
-#: app/templates/admin/settings/manage_settings.html:1540
+#: app/templates/admin/settings/manage_settings.html:1562
 msgid "Network error while seeding templates."
 msgstr "Network error while seeding templates."
 
-#: app/templates/admin/settings/manage_settings.html:1537
+#: app/templates/admin/settings/manage_settings.html:1559
 msgid "Network error while sending test email."
 msgstr "Network error while sending test email."
 
-#: app/templates/admin/settings/manage_settings.html:1489
+#: app/templates/admin/settings/manage_settings.html:1511
 msgid "Network error."
 msgstr "Network error."
 
@@ -17125,7 +17157,7 @@ msgstr "No security events found matching your criteria."
 msgid "No sessions"
 msgstr "No sessions"
 
-#: app/templates/admin/settings/manage_settings.html:1541
+#: app/templates/admin/settings/manage_settings.html:1563
 msgid "No settings were changed."
 msgstr "No settings were changed."
 
@@ -17211,7 +17243,7 @@ msgstr ""
 msgid "No translation services configured"
 msgstr "No translation services configured"
 
-#: app/templates/admin/settings/manage_settings.html:1533
+#: app/templates/admin/settings/manage_settings.html:1555
 msgid "No translation was returned for this language."
 msgstr "No translation was returned for this language."
 
@@ -17334,7 +17366,7 @@ msgstr "None"
 #: app/templates/admin/analytics/admin_actions.html:158
 #: app/templates/admin/communication/center.html:682
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:149
-#: app/templates/admin/settings/manage_settings.html:1500
+#: app/templates/admin/settings/manage_settings.html:1522
 #: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:19
 msgid "Normal"
 msgstr "Normal"
@@ -17387,7 +17419,7 @@ msgstr "Not Started"
 msgid "Not applicable"
 msgstr "Not applicable"
 
-#: app/templates/admin/settings/manage_settings.html:1504
+#: app/templates/admin/settings/manage_settings.html:1526
 msgid ""
 "Not applicable for this notification type (no delivery on this channel)."
 msgstr ""
@@ -17400,7 +17432,7 @@ msgstr ""
 msgid "Not assigned"
 msgstr "Not assigned"
 
-#: app/templates/admin/settings/manage_settings.html:1268
+#: app/templates/admin/settings/manage_settings.html:1290
 msgid "Not configured"
 msgstr "Not configured"
 
@@ -17500,7 +17532,7 @@ msgstr "Note:"
 msgid "Note: %(note)s"
 msgstr "Note: %(note)s"
 
-#: app/templates/admin/settings/manage_settings.html:88
+#: app/templates/admin/settings/manage_settings.html:110
 msgid ""
 "Note: the interface is translated only for languages that have translation "
 "files installed; otherwise it falls back to English."
@@ -17530,8 +17562,8 @@ msgid ""
 msgstr ""
 "Nothing to translate — all enabled language fields already have values."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:969
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1420
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:978
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1429
 msgid ""
 "Nothing to translate — all multilingual name fields already have values."
 msgstr ""
@@ -17547,7 +17579,7 @@ msgstr "Notification"
 msgid "Notification + email"
 msgstr "Notification + email"
 
-#: app/templates/admin/settings/manage_settings.html:943
+#: app/templates/admin/settings/manage_settings.html:965
 msgid "Notification Email Wrapper"
 msgstr "Notification Email Wrapper"
 
@@ -17592,8 +17624,8 @@ msgstr "Notification types"
 #: app/templates/admin/analytics/audit_trail.html:369
 #: app/templates/admin/communication/center.html:483
 #: app/templates/admin/communication/center.html:1460
-#: app/templates/admin/settings/manage_settings.html:72
-#: app/templates/admin/settings/manage_settings.html:1179
+#: app/templates/admin/settings/manage_settings.html:94
+#: app/templates/admin/settings/manage_settings.html:1201
 #: app/templates/auth/account_settings.html:43
 #: app/templates/core/layout.html:306 app/templates/core/layout.html:315
 #: app/templates/notifications/center.html:7
@@ -17607,17 +17639,17 @@ msgstr "Notifications"
 msgid "Notifications and email delivery"
 msgstr "Notifications and email delivery"
 
-#: app/templates/admin/settings/manage_settings.html:1516
+#: app/templates/admin/settings/manage_settings.html:1538
 msgid "Notify deployment-wide system managers"
 msgstr "Notify deployment-wide system managers"
 
-#: app/templates/admin/settings/manage_settings.html:1515
+#: app/templates/admin/settings/manage_settings.html:1537
 msgid ""
 "Notify entity-assigned admins (admin_core / admin_*, not system managers)"
 msgstr ""
 "Notify entity-assigned admins (admin_core / admin_*, not system managers)"
 
-#: app/templates/admin/settings/manage_settings.html:1514
+#: app/templates/admin/settings/manage_settings.html:1536
 msgid "Notify focal points (assignment editor/submitter)"
 msgstr "Notify focal points (assignment editor/submitter)"
 
@@ -17735,8 +17767,8 @@ msgstr "Oct"
 msgid "Of translated catalog strings"
 msgstr "Of translated catalog strings"
 
-#: app/templates/admin/settings/manage_settings.html:1210
-#: app/templates/admin/settings/manage_settings.html:1211
+#: app/templates/admin/settings/manage_settings.html:1232
+#: app/templates/admin/settings/manage_settings.html:1233
 msgid "Off"
 msgstr "Off"
 
@@ -17770,8 +17802,8 @@ msgid "Oldest first"
 msgstr "Oldest first"
 
 #: app/templates/admin/assignments/_assignment_status_overview.html:110
-#: app/templates/admin/settings/manage_settings.html:1210
-#: app/templates/admin/settings/manage_settings.html:1211
+#: app/templates/admin/settings/manage_settings.html:1232
+#: app/templates/admin/settings/manage_settings.html:1233
 msgid "On"
 msgstr "On"
 
@@ -18049,7 +18081,7 @@ msgstr "Optional — TRUE/FALSE (default: TRUE)"
 msgid "Optional — shown on the report list and viewer"
 msgstr "Optional — shown on the report list and viewer"
 
-#: app/templates/admin/settings/manage_settings.html:181
+#: app/templates/admin/settings/manage_settings.html:203
 msgid ""
 "Optional. Mobile clients send X-App-Version (semver from the app). If set, "
 "clients below this version receive HTTP 426 (update required). Leave empty "
@@ -18059,7 +18091,7 @@ msgstr ""
 "clients below this version receive HTTP 426 (update required). Leave empty "
 "to allow all app versions."
 
-#: app/templates/admin/settings/manage_settings.html:376
+#: app/templates/admin/settings/manage_settings.html:398
 msgid ""
 "Optional. Shown in the Indicator Suggestion Confirmation email as the "
 "team_email template variable (contact link and footer). Also used as BCC on "
@@ -18125,7 +18157,7 @@ msgstr "Order"
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:21
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:65
-#: app/templates/admin/settings/manage_settings.html:989
+#: app/templates/admin/settings/manage_settings.html:1011
 msgid "Org Name"
 msgstr "Org Name"
 
@@ -18133,7 +18165,7 @@ msgstr "Org Name"
 msgid "Org admin covering this country."
 msgstr "Org admin covering this country."
 
-#: app/templates/admin/settings/manage_settings.html:1509
+#: app/templates/admin/settings/manage_settings.html:1531
 msgid "Org admins"
 msgstr "Org admins"
 
@@ -18143,15 +18175,15 @@ msgstr "Org admins"
 msgid "Organization"
 msgstr "Organization"
 
-#: app/templates/admin/settings/manage_settings.html:673
+#: app/templates/admin/settings/manage_settings.html:695
 msgid "Organization Branding Translations"
 msgstr "Organization Branding Translations"
 
-#: app/templates/admin/settings/manage_settings.html:348
+#: app/templates/admin/settings/manage_settings.html:370
 msgid "Organization Domain"
 msgstr "Organization Domain"
 
-#: app/templates/admin/settings/manage_settings.html:301
+#: app/templates/admin/settings/manage_settings.html:323
 msgid "Organization Identity"
 msgstr "Organization Identity"
 
@@ -18161,17 +18193,17 @@ msgstr "Organization Identity"
 msgid "Organization Management"
 msgstr "Organization Management"
 
-#: app/templates/admin/settings/manage_settings.html:312
-#: app/templates/admin/settings/manage_settings.html:677
+#: app/templates/admin/settings/manage_settings.html:334
+#: app/templates/admin/settings/manage_settings.html:699
 msgid "Organization Name"
 msgstr "Organization Name"
 
-#: app/templates/admin/settings/manage_settings.html:327
-#: app/templates/admin/settings/manage_settings.html:678
+#: app/templates/admin/settings/manage_settings.html:349
+#: app/templates/admin/settings/manage_settings.html:700
 msgid "Organization Short Name"
 msgstr "Organization Short Name"
 
-#: app/templates/admin/settings/manage_settings.html:469
+#: app/templates/admin/settings/manage_settings.html:491
 msgid "Organization logo"
 msgstr "Organization logo"
 
@@ -18436,7 +18468,7 @@ msgstr ""
 msgid "PO write locking is not active"
 msgstr "PO write locking is not active"
 
-#: app/routes/forms/export.py:1467 app/routes/forms_validation_summary.py:828
+#: app/routes/forms/export.py:1479 app/routes/forms_validation_summary.py:828
 #: app/routes/forms_validation_summary.py:862
 #: app/routes/forms_validation_summary.py:1833
 #: app/services/documentation/pdf_service.py:121
@@ -19017,8 +19049,8 @@ msgstr "Please enter a category name"
 msgid "Please enter a name."
 msgstr "Please enter a name."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:952
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1403
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:961
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1412
 msgid "Please enter a primary name to translate from."
 msgstr "Please enter a primary name to translate from."
 
@@ -19450,8 +19482,8 @@ msgstr ""
 msgid "Preview this widget"
 msgstr "Preview this widget"
 
-#: app/templates/admin/settings/manage_settings.html:489
-#: app/templates/admin/settings/manage_settings.html:534
+#: app/templates/admin/settings/manage_settings.html:511
+#: app/templates/admin/settings/manage_settings.html:556
 msgid "Preview unavailable."
 msgstr "Preview unavailable."
 
@@ -19541,7 +19573,7 @@ msgstr "Prior year"
 
 #: app/templates/admin/communication/center.html:679
 #: app/templates/admin/communication/center.html:1370
-#: app/templates/admin/settings/manage_settings.html:1512
+#: app/templates/admin/settings/manage_settings.html:1534
 msgid "Priority"
 msgstr "Priority"
 
@@ -19704,7 +19736,7 @@ msgstr "Propose Changes"
 msgid "Propose Indicator"
 msgstr "Propose Indicator"
 
-#: app/templates/admin/settings/manage_settings.html:658
+#: app/templates/admin/settings/manage_settings.html:680
 msgid "Propose New Indicator URL"
 msgstr "Propose New Indicator URL"
 
@@ -19724,7 +19756,7 @@ msgstr ""
 msgid "Provide translations of the meaning in different languages (optional)"
 msgstr "Provide translations of the meaning in different languages (optional)"
 
-#: app/templates/admin/settings/manage_settings.html:1393
+#: app/templates/admin/settings/manage_settings.html:1415
 msgid "Provider Priority"
 msgstr "Provider Priority"
 
@@ -19874,7 +19906,7 @@ msgstr "Push notification preview"
 msgid "Push notification title"
 msgstr "Push notification title"
 
-#: app/templates/admin/settings/manage_settings.html:1192
+#: app/templates/admin/settings/manage_settings.html:1214
 msgid "Push notifications"
 msgstr "Push notifications"
 
@@ -20340,14 +20372,14 @@ msgstr "Recent sessions"
 msgid "Recently Processed"
 msgstr "Recently Processed"
 
-#: app/templates/admin/settings/manage_settings.html:1123
+#: app/templates/admin/settings/manage_settings.html:1145
 msgid "Recipient"
 msgstr "Recipient"
 
 #: app/templates/admin/communication/_insights.html:60
 #: app/templates/admin/communication/center.html:138
 #: app/templates/admin/communication/center.html:1382
-#: app/templates/admin/settings/manage_settings.html:1507
+#: app/templates/admin/settings/manage_settings.html:1529
 #: app/utils/form_localization.py:148
 msgid "Recipients"
 msgstr "Recipients"
@@ -20862,8 +20894,8 @@ msgstr "Repeat Group"
 msgid "Repeat/dynamic data stays archived"
 msgstr "Repeat/dynamic data stays archived"
 
-#: app/templates/admin/settings/manage_settings.html:502
-#: app/templates/admin/settings/manage_settings.html:547
+#: app/templates/admin/settings/manage_settings.html:524
+#: app/templates/admin/settings/manage_settings.html:569
 msgid "Replace"
 msgstr "Replace"
 
@@ -20871,7 +20903,7 @@ msgstr "Replace"
 msgid "Replace Document"
 msgstr "Replace Document"
 
-#: app/templates/admin/settings/manage_settings.html:1521
+#: app/templates/admin/settings/manage_settings.html:1543
 msgid ""
 "Replace every system email template with the built-in defaults from this "
 "version? Custom HTML will be lost."
@@ -20879,7 +20911,7 @@ msgstr ""
 "Replace every system email template with the built-in defaults from this "
 "version? Custom HTML will be lost."
 
-#: app/templates/admin/settings/manage_settings.html:546
+#: app/templates/admin/settings/manage_settings.html:568
 msgid "Replace favicon"
 msgstr "Replace favicon"
 
@@ -20887,7 +20919,7 @@ msgstr "Replace favicon"
 msgid "Replace file"
 msgstr "Replace file"
 
-#: app/templates/admin/settings/manage_settings.html:501
+#: app/templates/admin/settings/manage_settings.html:523
 msgid "Replace organization logo"
 msgstr "Replace organization logo"
 
@@ -21213,12 +21245,12 @@ msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:137
 #: app/templates/admin/assignments/gantt_chart.html:177
-#: app/templates/admin/settings/manage_settings.html:1490
+#: app/templates/admin/settings/manage_settings.html:1512
 #: app/templates/components/ag_grid_i18n_js.html:20
 msgid "Reset"
 msgstr "Reset"
 
-#: app/templates/admin/settings/manage_settings.html:1492
+#: app/templates/admin/settings/manage_settings.html:1514
 msgid "Reset AI Settings?"
 msgstr "Reset AI Settings?"
 
@@ -21230,7 +21262,7 @@ msgstr "Reset Filter"
 msgid "Reset Password"
 msgstr "Reset Password"
 
-#: app/templates/admin/settings/manage_settings.html:1487
+#: app/templates/admin/settings/manage_settings.html:1509
 msgid ""
 "Reset all AI settings to their defaults? This will remove all database-saved"
 " overrides."
@@ -21239,7 +21271,7 @@ msgstr ""
 " overrides."
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:175
-#: app/templates/admin/settings/manage_settings.html:1109
+#: app/templates/admin/settings/manage_settings.html:1131
 msgid "Reset all to built-in defaults"
 msgstr "Reset all to built-in defaults"
 
@@ -21247,7 +21279,7 @@ msgstr "Reset all to built-in defaults"
 msgid "Reset camera"
 msgstr "Reset camera"
 
-#: app/templates/admin/settings/manage_settings.html:1488
+#: app/templates/admin/settings/manage_settings.html:1510
 msgid "Reset failed."
 msgstr "Reset failed."
 
@@ -21255,7 +21287,7 @@ msgstr "Reset failed."
 msgid "Reset to Default"
 msgstr "Reset to Default"
 
-#: app/templates/admin/settings/manage_settings.html:1336
+#: app/templates/admin/settings/manage_settings.html:1358
 msgid "Reset to defaults"
 msgstr "Reset to defaults"
 
@@ -21335,7 +21367,7 @@ msgstr "Response"
 msgid "Responses to automatic data checks"
 msgstr "Responses to automatic data checks"
 
-#: app/templates/admin/settings/manage_settings.html:1450
+#: app/templates/admin/settings/manage_settings.html:1472
 msgid "Restart app after saving (recommended to apply across all processes)"
 msgstr "Restart app after saving (recommended to apply across all processes)"
 
@@ -21945,7 +21977,7 @@ msgstr "Save Note"
 msgid "Save Preferences"
 msgstr "Save Preferences"
 
-#: app/templates/admin/settings/manage_settings.html:1452
+#: app/templates/admin/settings/manage_settings.html:1474
 msgid "Save Settings"
 msgstr "Save Settings"
 
@@ -22016,10 +22048,10 @@ msgstr ""
 #: app/templates/admin/ai/review_detail.html:221
 #: app/templates/admin/common_words/manage_common_words.html:528
 #: app/templates/admin/indicator_bank/_panel_common_words_scripts.html:135
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:828
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:837
 #: app/templates/admin/organization/_countries_component.html:265
 #: app/templates/admin/organization/_nss_component.html:289
-#: app/templates/admin/settings/manage_settings.html:1543
+#: app/templates/admin/settings/manage_settings.html:1565
 #: app/templates/admin/translations/manage_translations.html:728
 msgid "Saving..."
 msgstr "Saving..."
@@ -22415,7 +22447,7 @@ msgid "Search…"
 msgstr "Search…"
 
 #: app/templates/admin/organization/index.html:98
-#: app/templates/admin/settings/manage_settings.html:155
+#: app/templates/admin/settings/manage_settings.html:177
 #: app/templates/admin/user_management/user_form.html:910
 msgid "Secretariat"
 msgstr "Secretariat"
@@ -22591,7 +22623,7 @@ msgstr "Sectors display mode"
 msgid "Security"
 msgstr "Security"
 
-#: app/templates/admin/settings/manage_settings.html:933
+#: app/templates/admin/settings/manage_settings.html:955
 msgid "Security Alert"
 msgstr "Security Alert"
 
@@ -22675,11 +22707,11 @@ msgstr "Seed from Indicator Bank"
 msgid "Seed glossary"
 msgstr "Seed glossary"
 
-#: app/templates/admin/settings/manage_settings.html:1538
+#: app/templates/admin/settings/manage_settings.html:1560
 msgid "Seeding completed."
 msgstr "Seeding completed."
 
-#: app/templates/admin/settings/manage_settings.html:1539
+#: app/templates/admin/settings/manage_settings.html:1561
 msgid "Seeding failed"
 msgstr "Seeding failed"
 
@@ -22772,7 +22804,7 @@ msgid "Select Question Type..."
 msgstr "Select Question Type..."
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:42
-#: app/templates/admin/settings/manage_settings.html:954
+#: app/templates/admin/settings/manage_settings.html:976
 msgid "Select Template to Edit"
 msgstr "Select Template to Edit"
 
@@ -22866,7 +22898,7 @@ msgstr ""
 msgid "Select a translation service"
 msgstr "Select a translation service"
 
-#: app/templates/admin/settings/manage_settings.html:1527
+#: app/templates/admin/settings/manage_settings.html:1549
 msgid "Select a user to receive the test email."
 msgstr "Select a user to receive the test email."
 
@@ -23127,7 +23159,7 @@ msgstr ""
 msgid "Select the time when you want to receive your digest"
 msgstr "Select the time when you want to receive your digest"
 
-#: app/templates/admin/settings/manage_settings.html:1145
+#: app/templates/admin/settings/manage_settings.html:1167
 msgid "Select user to receive test email"
 msgstr "Select user to receive test email"
 
@@ -23135,11 +23167,11 @@ msgstr "Select user to receive test email"
 msgid "Select users..."
 msgstr "Select users..."
 
-#: app/templates/admin/settings/manage_settings.html:1493
+#: app/templates/admin/settings/manage_settings.html:1515
 msgid "Select users…"
 msgstr "Select users…"
 
-#: app/templates/admin/settings/manage_settings.html:1146
+#: app/templates/admin/settings/manage_settings.html:1168
 msgid "Select user…"
 msgstr "Select user…"
 
@@ -23286,7 +23318,7 @@ msgstr ""
 "Send a message to one or more users by email and/or mobile push. Configure "
 "recipients, content, delivery, and optional attachments below."
 
-#: app/templates/admin/settings/manage_settings.html:1004
+#: app/templates/admin/settings/manage_settings.html:1026
 msgid "Send a test email using the current template content."
 msgstr "Send a test email using the current template content."
 
@@ -23335,9 +23367,9 @@ msgstr ""
 "Send open validation questions to focal points for the selected country?"
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:79
-#: app/templates/admin/settings/manage_settings.html:1005
-#: app/templates/admin/settings/manage_settings.html:1117
-#: app/templates/admin/settings/manage_settings.html:1161
+#: app/templates/admin/settings/manage_settings.html:1027
+#: app/templates/admin/settings/manage_settings.html:1139
+#: app/templates/admin/settings/manage_settings.html:1183
 msgid "Send test email"
 msgstr "Send test email"
 
@@ -23354,11 +23386,11 @@ msgstr ""
 msgid "Send time (%(tz)s)"
 msgstr "Send time (%(tz)s)"
 
-#: app/templates/admin/settings/manage_settings.html:1139
+#: app/templates/admin/settings/manage_settings.html:1161
 msgid "Send to another user"
 msgstr "Send to another user"
 
-#: app/templates/admin/settings/manage_settings.html:1131
+#: app/templates/admin/settings/manage_settings.html:1153
 msgid "Send to me"
 msgstr "Send to me"
 
@@ -23389,7 +23421,7 @@ msgstr "Sensitive information detected"
 msgid "Sensitive information detected. Please remove it before sending."
 msgstr "Sensitive information detected. Please remove it before sending."
 
-#: app/templates/admin/settings/manage_settings.html:1264
+#: app/templates/admin/settings/manage_settings.html:1286
 msgid "Sensitive; not stored in database. Set in environment."
 msgstr "Sensitive; not stored in database. Set in environment."
 
@@ -23572,7 +23604,7 @@ msgstr ""
 "their selected language. You can use built-in system variables in labels, "
 "e.g. [assignment_period], [entity_name], [template_name]."
 
-#: app/templates/admin/settings/manage_settings.html:1262
+#: app/templates/admin/settings/manage_settings.html:1284
 msgid "Set via environment variable"
 msgstr "Set via environment variable"
 
@@ -23593,11 +23625,11 @@ msgstr ""
 "Settings changed since the last preview — click Preview import for updated "
 "counts."
 
-#: app/templates/admin/settings/manage_settings.html:1542
+#: app/templates/admin/settings/manage_settings.html:1564
 msgid "Settings saved successfully."
 msgstr "Settings saved successfully."
 
-#: app/templates/admin/settings/manage_settings.html:49
+#: app/templates/admin/settings/manage_settings.html:71
 msgid "Settings sections"
 msgstr "Settings sections"
 
@@ -23631,7 +23663,7 @@ msgstr "Severity"
 msgid "Sex"
 msgstr "Sex"
 
-#: app/templates/admin/settings/manage_settings.html:272
+#: app/templates/admin/settings/manage_settings.html:294
 msgid "Sex Categories"
 msgstr "Sex Categories"
 
@@ -23950,7 +23982,7 @@ msgstr ""
 msgid "Show the Export PDF button on the entry form."
 msgstr "Show the Export PDF button on the entry form."
 
-#: app/templates/admin/settings/manage_settings.html:151
+#: app/templates/admin/settings/manage_settings.html:173
 msgid ""
 "Show the hierarchical NS Branch/Sub-branch/Local Unit selector (mirrors the "
 "tabs in user_form.html and manage_assignment.html)."
@@ -23962,7 +23994,7 @@ msgstr ""
 msgid "Show/Hide Columns"
 msgstr "Show/Hide Columns"
 
-#: app/templates/admin/settings/manage_settings.html:1273
+#: app/templates/admin/settings/manage_settings.html:1295
 msgid "Show/hide"
 msgstr "Show/hide"
 
@@ -24845,7 +24877,7 @@ msgid "Submitted value label"
 msgstr "Submitted value label"
 
 #: app/services/notification/preview.py:19
-#: app/templates/admin/settings/manage_settings.html:992
+#: app/templates/admin/settings/manage_settings.html:1014
 msgid "Submitter"
 msgstr "Submitter"
 
@@ -24983,7 +25015,7 @@ msgstr "Summary table"
 msgid "Sunday"
 msgstr "Sunday"
 
-#: app/templates/admin/settings/manage_settings.html:86
+#: app/templates/admin/settings/manage_settings.html:108
 msgid "Supported Languages"
 msgstr "Supported Languages"
 
@@ -25049,7 +25081,7 @@ msgstr "Suspicious only"
 msgid "Suspicious query content"
 msgstr "Suspicious query content"
 
-#: app/templates/admin/settings/manage_settings.html:1008
+#: app/templates/admin/settings/manage_settings.html:1030
 msgid "Switch between HTML and visual editor"
 msgstr "Switch between HTML and visual editor"
 
@@ -25165,7 +25197,7 @@ msgid "System Configuration"
 msgstr "System Configuration"
 
 #. Email templates are saved via JSON (base64) to avoid WAF false positives.
-#: app/templates/admin/settings/manage_settings.html:913
+#: app/templates/admin/settings/manage_settings.html:935
 msgid "System Email Templates"
 msgstr "System Email Templates"
 
@@ -25188,7 +25220,7 @@ msgstr "System Manager"
 msgid "System Managers"
 msgstr "System Managers"
 
-#: app/routes/admin/monitoring.py:83 app/routes/admin/monitoring.py:105
+#: app/routes/admin/monitoring.py:84 app/routes/admin/monitoring.py:106
 #: app/templates/admin/monitoring/system_monitoring.html:13
 #: app/templates/admin/monitoring/system_monitoring.html:58
 #: app/templates/components/_sidebar_nav_categories.html:241
@@ -25210,7 +25242,7 @@ msgstr "System dataset generated."
 msgid "System documents"
 msgstr "System documents"
 
-#: app/templates/admin/settings/manage_settings.html:1510
+#: app/templates/admin/settings/manage_settings.html:1532
 msgid "System managers"
 msgstr "System managers"
 
@@ -25247,7 +25279,7 @@ msgstr ""
 "System-only notifications (for example welcome emails and digest receipts) "
 "are not listed here and cannot be disabled."
 
-#: app/templates/admin/settings/manage_settings.html:1511
+#: app/templates/admin/settings/manage_settings.html:1533
 msgid "TTL"
 msgstr "TTL"
 
@@ -25322,7 +25354,7 @@ msgstr "Target term is required"
 msgid "Teachers"
 msgstr "Teachers"
 
-#: app/templates/admin/settings/manage_settings.html:368
+#: app/templates/admin/settings/manage_settings.html:390
 msgid "Team contact email"
 msgstr "Team contact email"
 
@@ -25430,7 +25462,7 @@ msgstr "Template Duplicated"
 msgid "Template Exported"
 msgstr "Template Exported"
 
-#: app/templates/admin/settings/manage_settings.html:1522
+#: app/templates/admin/settings/manage_settings.html:1544
 msgid "Template HTML"
 msgstr "Template HTML"
 
@@ -25600,13 +25632,13 @@ msgstr "Test Alert"
 msgid "Test a query…"
 msgstr "Test a query…"
 
-#: app/templates/admin/settings/manage_settings.html:1529
+#: app/templates/admin/settings/manage_settings.html:1551
 msgid ""
 "Test email could not be sent. Check the message below or your mail settings."
 msgstr ""
 "Test email could not be sent. Check the message below or your mail settings."
 
-#: app/templates/admin/settings/manage_settings.html:1528
+#: app/templates/admin/settings/manage_settings.html:1550
 msgid "Test email sent to"
 msgstr "Test email sent to"
 
@@ -25698,7 +25730,7 @@ msgstr ""
 "The Email API gave no response before our timeout — delivery could not be "
 "confirmed. It may have already been sent."
 
-#: app/templates/admin/settings/manage_settings.html:1525
+#: app/templates/admin/settings/manage_settings.html:1547
 msgid ""
 "The English version of this template is empty. Add or save English text "
 "first, then try again."
@@ -25875,7 +25907,7 @@ msgstr ""
 "select one/many, date, note, and file uploads. Unsupported types (e.g. GPS, "
 "calculate) are skipped."
 
-#: app/templates/admin/settings/manage_settings.html:1530
+#: app/templates/admin/settings/manage_settings.html:1552
 msgid ""
 "The visual editor could not be loaded. Check your network, then refresh the "
 "page."
@@ -25883,7 +25915,7 @@ msgstr ""
 "The visual editor could not be loaded. Check your network, then refresh the "
 "page."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:792
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:801
 msgid "Their sector references will be cleared on deletion."
 msgstr "Their sector references will be cleared on deletion."
 
@@ -26268,7 +26300,7 @@ msgstr ""
 msgid "This key will be able to read sensitive or personal data"
 msgstr "This key will be able to read sensitive or personal data"
 
-#: app/templates/admin/settings/manage_settings.html:1535
+#: app/templates/admin/settings/manage_settings.html:1557
 msgid ""
 "This language has no template content to send. Add HTML in the editor or "
 "pick another language tab."
@@ -27092,7 +27124,7 @@ msgstr "Translate all blank translation fields to all languages"
 msgid "Translate blank multilingual names for all sectors and sub-sectors"
 msgstr "Translate blank multilingual names for all sectors and sub-sectors"
 
-#: app/templates/admin/settings/manage_settings.html:286
+#: app/templates/admin/settings/manage_settings.html:308
 msgid ""
 "Translate each item into supported languages. Use Auto Translate to fill all"
 " fields at once."
@@ -27100,7 +27132,7 @@ msgstr ""
 "Translate each item into supported languages. Use Auto Translate to fill all"
 " fields at once."
 
-#: app/templates/admin/settings/manage_settings.html:674
+#: app/templates/admin/settings/manage_settings.html:696
 msgid ""
 "Translate the organization name and short name shown across the application."
 msgstr ""
@@ -27133,8 +27165,8 @@ msgstr "Translating the form…"
 msgid "Translating visuals… {done} of {total}"
 msgstr "Translating visuals… {done} of {total}"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:934
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1385
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:943
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1394
 #: app/templates/admin/translations/manage_translations.html:744
 msgid "Translating..."
 msgstr "Translating..."
@@ -27211,7 +27243,7 @@ msgstr "Translation failed"
 msgid "Translation failed."
 msgstr "Translation failed."
 
-#: app/templates/admin/settings/manage_settings.html:1532
+#: app/templates/admin/settings/manage_settings.html:1554
 msgid "Translation failed: invalid response from the server."
 msgstr "Translation failed: invalid response from the server."
 
@@ -27238,8 +27270,8 @@ msgstr "Translation is in progress. Are you sure you want to close?"
 msgid "Translation is in progress. Leaving will stop it."
 msgstr "Translation is in progress. Leaving will stop it."
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:956
-#: app/templates/admin/indicator_bank/sectors_subsectors.html:1407
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:965
+#: app/templates/admin/indicator_bank/sectors_subsectors.html:1416
 msgid "Translation is not available on this page."
 msgstr "Translation is not available on this page."
 
@@ -27268,7 +27300,7 @@ msgstr "Translation quality"
 msgid "Translation reloading is only available in development mode."
 msgstr "Translation reloading is only available in development mode."
 
-#: app/templates/admin/settings/manage_settings.html:1534
+#: app/templates/admin/settings/manage_settings.html:1556
 msgid "Translation request failed."
 msgstr "Translation request failed."
 
@@ -27325,8 +27357,8 @@ msgid "Translation updated successfully for: %(languages)s"
 msgstr "Translation updated successfully for: %(languages)s"
 
 #: app/templates/admin/indicator_bank/_indicator_bank_translation_helpers.html:8
-#: app/templates/admin/settings/manage_settings.html:207
-#: app/templates/admin/settings/manage_settings.html:208
+#: app/templates/admin/settings/manage_settings.html:229
+#: app/templates/admin/settings/manage_settings.html:230
 #: app/templates/admin/templates/new_template.html:125
 #: app/templates/forms/form_builder/partials/_item_modal.html:329
 #: app/templates/forms/form_builder/partials/_item_modal.html:743
@@ -27425,7 +27457,7 @@ msgstr "Try selecting a different template."
 msgid "Tuesday"
 msgstr "Tuesday"
 
-#: app/templates/admin/settings/manage_settings.html:1330
+#: app/templates/admin/settings/manage_settings.html:1352
 msgid ""
 "Tune models, limits, RAG, agent behaviour, and chat retention here. Values "
 "are stored in the database and override code defaults. API keys and other "
@@ -27463,7 +27495,7 @@ msgstr "Two-letter locale code for localization"
 #: app/templates/admin/indicator_bank/neural_map.html:191
 #: app/templates/admin/security/alerts.html:25
 #: app/templates/admin/security/event_detail.html:83
-#: app/templates/admin/settings/manage_settings.html:1506
+#: app/templates/admin/settings/manage_settings.html:1528
 #: app/templates/admin/templates/data_sync_imputation.html:261
 #: app/templates/admin/user_management/user_form.html:1128
 #: app/templates/components/_builder_items.html:49
@@ -27913,7 +27945,7 @@ msgstr "Unreviewed machine strings"
 msgid "Untitled report"
 msgstr "Untitled report"
 
-#: app/templates/admin/settings/manage_settings.html:1497
+#: app/templates/admin/settings/manage_settings.html:1519
 msgid "Up to date"
 msgstr "Up to date"
 
@@ -27988,7 +28020,7 @@ msgid "Updated %(count)d field in %(template)s"
 msgstr "Updated %(count)d field in %(template)s"
 
 #: app/templates/admin/settings/manage_settings.html:17
-#: app/templates/admin/settings/manage_settings.html:1499
+#: app/templates/admin/settings/manage_settings.html:1521
 msgid "Updates"
 msgstr "Updates"
 
@@ -28000,8 +28032,8 @@ msgstr "Updating insights…"
 #: app/templates/admin/ai/knowledge_base.html:462
 #: app/templates/admin/documents/documents.html:516
 #: app/templates/admin/documents/documents.html:519
-#: app/templates/admin/settings/manage_settings.html:502
-#: app/templates/admin/settings/manage_settings.html:547
+#: app/templates/admin/settings/manage_settings.html:524
+#: app/templates/admin/settings/manage_settings.html:569
 #: app/templates/forms/entry_form/entry_form.html:3193
 #: app/templates/forms/form_builder/partials/_item_modal.html:1139
 #: app/templates/macros/unified_country_plan_excel_instructions.html:24
@@ -28109,7 +28141,7 @@ msgstr "Upload failed"
 msgid "Upload failed:"
 msgstr "Upload failed:"
 
-#: app/templates/admin/settings/manage_settings.html:546
+#: app/templates/admin/settings/manage_settings.html:568
 msgid "Upload favicon"
 msgstr "Upload favicon"
 
@@ -28135,7 +28167,7 @@ msgstr ""
 msgid "Upload one or more files to attach to every email."
 msgstr "Upload one or more files to attach to every email."
 
-#: app/templates/admin/settings/manage_settings.html:501
+#: app/templates/admin/settings/manage_settings.html:523
 msgid "Upload organization logo"
 msgstr "Upload organization logo"
 
@@ -28219,7 +28251,7 @@ msgstr ""
 "matches the type set above."
 
 #: app/services/communication/insights_service.py:112
-#: app/templates/admin/settings/manage_settings.html:1502
+#: app/templates/admin/settings/manage_settings.html:1524
 msgid "Urgent"
 msgstr "Urgent"
 
@@ -28258,6 +28290,14 @@ msgid ""
 msgstr ""
 "Use Sync catalog from .po on Translation Management to import coverage data."
 
+#: app/templates/admin/settings/manage_settings.html:47
+msgid ""
+"Use a different value for MOBILE_JWT_SECRET so a leaked session secret does "
+"not sign mobile tokens."
+msgstr ""
+"Use a different value for MOBILE_JWT_SECRET so a leaked session secret does "
+"not sign mobile tokens."
+
 #: app/templates/admin/translations/quality_dashboard.html:373
 msgid "Use approved"
 msgstr "Use approved"
@@ -28265,6 +28305,10 @@ msgstr "Use approved"
 #: app/templates/forms/form_builder/partials/_item_modal.html:1317
 msgid "Use as repeat entry title (dropdown in header)"
 msgstr "Use as repeat entry title (dropdown in header)"
+
+#: app/templates/admin/settings/manage_settings.html:50
+msgid "Use at least 32 characters."
+msgstr "Use at least 32 characters."
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:232
 msgid "Use cached imputed values (recommended)"
@@ -28288,7 +28332,7 @@ msgstr ""
 msgid "Use filters above to see matching users"
 msgstr "Use filters above to see matching users"
 
-#: app/templates/admin/settings/manage_settings.html:583
+#: app/templates/admin/settings/manage_settings.html:605
 msgid ""
 "Use image file names under the static folder — upload from this page is "
 "unavailable until Azure Blob is configured for application uploads "
@@ -28302,7 +28346,7 @@ msgstr ""
 "Enter names such as logo.svg or img/org-logo.png and deploy those files with"
 " your build."
 
-#: app/templates/admin/settings/manage_settings.html:585
+#: app/templates/admin/settings/manage_settings.html:607
 msgid ""
 "Use image file names under the static folder; upload from this page is off "
 "because the app is not using Azure Blob for uploads (for example "
@@ -28376,7 +28420,7 @@ msgstr "Use this key in the Authorization header: Bearer YOUR_KEY"
 msgid "Use your National Society or IFRC single sign-on account to continue."
 msgstr "Use your National Society or IFRC single sign-on account to continue."
 
-#: app/templates/admin/settings/manage_settings.html:655
+#: app/templates/admin/settings/manage_settings.html:677
 #, python-brace-format
 msgid "Use {id} as placeholder for indicator bank id."
 msgstr "Use {id} as placeholder for indicator bank id."
@@ -28499,7 +28543,7 @@ msgstr "User Modified"
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:24
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:68
-#: app/templates/admin/settings/manage_settings.html:991
+#: app/templates/admin/settings/manage_settings.html:1013
 msgid "User Name"
 msgstr "User Name"
 
@@ -28616,7 +28660,7 @@ msgstr ""
 msgid "Users will be able to select rows from this list during data entry."
 msgstr "Users will be able to select rows from this list during data entry."
 
-#: app/templates/admin/settings/manage_settings.html:976
+#: app/templates/admin/settings/manage_settings.html:998
 msgid ""
 "Uses the English template text for this form as the source. Jinja variables "
 "like org_name are preserved."
@@ -28861,7 +28905,7 @@ msgid "Variable value for"
 msgstr "Variable value for"
 
 #: app/templates/admin/communication/center.html:1495
-#: app/templates/admin/settings/manage_settings.html:1518
+#: app/templates/admin/settings/manage_settings.html:1540
 #: app/templates/forms/form_builder/partials/_sections_container.html:517
 #: app/templates/forms/form_builder/partials/_sections_container.html:530
 msgid "Variables"
@@ -29192,17 +29236,17 @@ msgstr "Viewer"
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:40
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:91
-#: app/templates/admin/settings/manage_settings.html:1018
+#: app/templates/admin/settings/manage_settings.html:1040
 msgid "Visual"
 msgstr "Visual"
 
-#: app/templates/admin/settings/manage_settings.html:383
+#: app/templates/admin/settings/manage_settings.html:405
 msgid "Visual Assets"
 msgstr "Visual Assets"
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:68
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:133
-#: app/templates/admin/settings/manage_settings.html:1064
+#: app/templates/admin/settings/manage_settings.html:1086
 msgid "Visual email editor"
 msgstr "Visual email editor"
 
@@ -29359,7 +29403,7 @@ msgstr ""
 "We use system traces and telemetry to improve the assistant. Your messages "
 "may be processed by external AI providers."
 
-#: app/templates/admin/settings/manage_settings.html:1195
+#: app/templates/admin/settings/manage_settings.html:1217
 msgid "Webhooks"
 msgstr "Webhooks"
 
@@ -29385,7 +29429,7 @@ msgstr "Weekly digest"
 msgid "Weight"
 msgstr "Weight"
 
-#: app/templates/admin/settings/manage_settings.html:938
+#: app/templates/admin/settings/manage_settings.html:960
 msgid "Welcome Email"
 msgstr "Welcome Email"
 
@@ -29442,7 +29486,7 @@ msgstr "What will be removed:"
 msgid "What you can do"
 msgstr "What you can do"
 
-#: app/templates/admin/settings/manage_settings.html:1348
+#: app/templates/admin/settings/manage_settings.html:1370
 msgid ""
 "When OFF, all users have access to the AI assistant — no restriction is "
 "applied. When ON, only the users added below can access AI (including system"
@@ -29581,7 +29625,7 @@ msgstr "Widget style for each indicator"
 msgid "Width"
 msgstr "Width"
 
-#: app/templates/admin/settings/manage_settings.html:1483
+#: app/templates/admin/settings/manage_settings.html:1505
 msgid "Will be cleared on save"
 msgstr "Will be cleared on save"
 
@@ -29681,7 +29725,7 @@ msgstr "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 #: app/templates/admin/ai/knowledge_base.html:840
 #: app/templates/admin/assignments/manage_assignment.html:231
 #: app/templates/admin/data_exploration/explore_data.html:240
-#: app/templates/admin/settings/manage_settings.html:990
+#: app/templates/admin/settings/manage_settings.html:1012
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:49
 #: app/templates/forms/form_builder/partials/_item_modal.html:545
 #: app/templates/macros/year_picker.html:24
@@ -30119,7 +30163,7 @@ msgstr ""
 "Your session needed a refresh, so your last submission was not saved. Please"
 " try again."
 
-#: app/templates/admin/settings/manage_settings.html:1526
+#: app/templates/admin/settings/manage_settings.html:1548
 msgid ""
 "Your user account has no email address. Add one in your profile, then try "
 "again."
@@ -30199,7 +30243,7 @@ msgstr "at this time."
 msgid "at:"
 msgstr "at:"
 
-#: app/templates/admin/settings/manage_settings.html:1496
+#: app/templates/admin/settings/manage_settings.html:1518
 #: app/templates/forms/entry_form/entry_form.html:4113
 msgid "available"
 msgstr "available"
@@ -30290,7 +30334,7 @@ msgid "days"
 msgstr "days"
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:103
-#: app/templates/admin/settings/manage_settings.html:1031
+#: app/templates/admin/settings/manage_settings.html:1053
 msgid "default"
 msgstr "default"
 
@@ -30400,16 +30444,16 @@ msgstr "e.g., 123 or [some_variable]"
 msgid "e.g., 2023, 2024"
 msgstr "e.g., 2023, 2024"
 
-#: app/templates/admin/settings/manage_settings.html:567
-#: app/templates/admin/settings/manage_settings.html:621
+#: app/templates/admin/settings/manage_settings.html:589
+#: app/templates/admin/settings/manage_settings.html:643
 msgid "e.g., 2024"
 msgstr "e.g., 2024"
 
-#: app/templates/admin/settings/manage_settings.html:319
+#: app/templates/admin/settings/manage_settings.html:341
 msgid "e.g., Humanitarian Databank"
 msgstr "e.g., Humanitarian Databank"
 
-#: app/templates/admin/settings/manage_settings.html:333
+#: app/templates/admin/settings/manage_settings.html:355
 msgid "e.g., IFRC"
 msgstr "e.g., IFRC"
 
@@ -30441,29 +30485,29 @@ msgstr "e.g., Reporting period now open"
 msgid "e.g., fas fa-home"
 msgstr "e.g., fas fa-home"
 
-#: app/templates/admin/settings/manage_settings.html:611
+#: app/templates/admin/settings/manage_settings.html:633
 msgid "e.g., favicon.svg"
 msgstr "e.g., favicon.svg"
 
-#: app/templates/admin/settings/manage_settings.html:664
+#: app/templates/admin/settings/manage_settings.html:686
 msgid "e.g., https://example.org/indicator-bank"
 msgstr "e.g., https://example.org/indicator-bank"
 
-#: app/templates/admin/settings/manage_settings.html:654
+#: app/templates/admin/settings/manage_settings.html:676
 #, python-brace-format
 msgid "e.g., https://example.org/{id}"
 msgstr "e.g., https://example.org/{id}"
 
-#: app/templates/admin/settings/manage_settings.html:355
-#: app/templates/admin/settings/manage_settings.html:364
+#: app/templates/admin/settings/manage_settings.html:377
+#: app/templates/admin/settings/manage_settings.html:386
 msgid "e.g., humdatabank.org"
 msgstr "e.g., humdatabank.org"
 
-#: app/templates/admin/settings/manage_settings.html:602
+#: app/templates/admin/settings/manage_settings.html:624
 msgid "e.g., logo.svg"
 msgstr "e.g., logo.svg"
 
-#: app/templates/admin/settings/manage_settings.html:375
+#: app/templates/admin/settings/manage_settings.html:397
 msgid "e.g., support@humdatabank.org"
 msgstr "e.g., support@humdatabank.org"
 
@@ -30484,7 +30528,7 @@ msgstr "endpoints visible"
 msgid "entity/entities"
 msgstr "entity/entities"
 
-#: app/templates/admin/settings/manage_settings.html:1256
+#: app/templates/admin/settings/manage_settings.html:1278
 msgid "env"
 msgstr "env"
 
@@ -30597,7 +30641,7 @@ msgstr "indicators"
 msgid "indicators available"
 msgstr "indicators available"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:792
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:801
 msgid "indicators reference this"
 msgstr "indicators reference this"
 
@@ -30633,7 +30677,7 @@ msgstr "last 100"
 msgid "layout=star"
 msgstr "layout=star"
 
-#: app/templates/admin/settings/manage_settings.html:1524
+#: app/templates/admin/settings/manage_settings.html:1546
 msgid "left unchanged"
 msgstr "left unchanged"
 
@@ -30986,7 +31030,7 @@ msgstr "section(s)"
 msgid "sections"
 msgstr "sections"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:789
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:798
 #: app/templates/admin/indicator_bank/indicator_bank.html:285
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:151
 msgid "sector"
@@ -31026,7 +31070,7 @@ msgstr "sent"
 msgid "sessions in period"
 msgstr "sessions in period"
 
-#: app/templates/admin/settings/manage_settings.html:1382
+#: app/templates/admin/settings/manage_settings.html:1404
 msgid "settings"
 msgstr "settings"
 
@@ -31051,7 +31095,7 @@ msgstr "steps"
 msgid "sub-branches"
 msgstr "sub-branches"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:789
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:798
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:218
 msgid "sub-sector"
 msgstr "sub-sector"
@@ -31060,7 +31104,7 @@ msgstr "sub-sector"
 msgid "sub-sectors"
 msgstr "sub-sectors"
 
-#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:783
+#: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:792
 msgid "sub-sectors first."
 msgstr "sub-sectors first."
 
@@ -31194,7 +31238,7 @@ msgstr "unread"
 msgid "update"
 msgstr "update"
 
-#: app/templates/admin/settings/manage_settings.html:1523
+#: app/templates/admin/settings/manage_settings.html:1545
 msgid "updated from defaults"
 msgstr "updated from defaults"
 

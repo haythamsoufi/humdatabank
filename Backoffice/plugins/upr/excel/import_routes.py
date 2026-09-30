@@ -8,7 +8,6 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from pathlib import Path
-from urllib.parse import quote
 
 from flask import Blueprint, redirect, request, send_file, current_app, url_for
 from flask_login import current_user
@@ -26,7 +25,6 @@ from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_accepted, json_bad_request, json_ok, json_server_error
 from app.utils.file_parsing import EXCEL_EXTENSIONS
-from app.utils.redirect_utils import get_safe_redirect_url
 
 from app.routes.admin.data_sync_imputation import (
     _DATA_SYNC_CANCEL_EVENTS,
@@ -61,10 +59,8 @@ legacy_bp = Blueprint("upr_excel_import_legacy", __name__, url_prefix="/admin/te
 @admin_permission_required("admin.templates.view")
 @system_manager_required
 def legacy_redirect(subpath: str = ""):
-    if not subpath:
-        return redirect(url_for("upr_excel_import.wizard"), code=301)
-    target = f"{bp.url_prefix}/{quote(subpath.lstrip('/'), safe='/')}"
-    return redirect(get_safe_redirect_url(target, "upr_excel_import.wizard"), code=301)
+    # Only the wizard page is worth bookmarking; job status/download URLs are ephemeral.
+    return redirect(url_for("upr_excel_import.wizard"), code=301)
 
 UPR_TEMPLATE_CHOICES = [
     # Planning (rounds P*)

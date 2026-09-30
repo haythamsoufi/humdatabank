@@ -33,9 +33,8 @@ class TestConfigureCors:
         with patch.dict('sys.modules', {'flask_cors': None}), \
              patch.object(flask_app.logger, 'warning') as mock_warn:
             _configure_cors(flask_app, 'production')
-        mock_warn.assert_called_once()
-        # CORS() should NOT have been called
-        assert True  # If we reach here without AttributeError, it's correct
+        messages = [str(call.args[0]) for call in mock_warn.call_args_list]
+        assert any('Flask-CORS package not available' in m for m in messages)
 
     def test_cors_uses_env_origins(self):
         """CORS_ALLOWED_ORIGINS env var should override defaults."""

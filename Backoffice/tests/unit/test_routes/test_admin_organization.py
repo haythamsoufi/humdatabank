@@ -3,6 +3,7 @@ Comprehensive tests for app/routes/admin/organization/ package.
 Targeting 100% code coverage of organization management routes.
 """
 import io
+from contextlib import ExitStack, contextmanager
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -20,11 +21,26 @@ def _json_headers():
     return {"Content-Type": "application/json", "Accept": "application/json"}
 
 
+_ORG_ROUTE_MODULES = (
+    "countries",
+    "import_export",
+    "ns_structure",
+    "secretariat",
+)
+
+
+@contextmanager
 def _mock_render(return_value="<html>ok</html>"):
-    return patch(
-        "flask.render_template",
-        return_value=return_value,
-    )
+    shared_mock = MagicMock(return_value=return_value)
+    with ExitStack() as stack:
+        for module in _ORG_ROUTE_MODULES:
+            stack.enter_context(
+                patch(
+                    f"app.routes.admin.organization.{module}.render_template",
+                    new=shared_mock,
+                )
+            )
+        yield shared_mock
 
 
 def _make_country_data(**overrides):

@@ -165,7 +165,7 @@ class APIKeyForm(APIKeyPermissionsForm):
 
     def validate_expires_at(self, field):
         """Ensure expiration date is in the future if provided"""
-        if field.data and ensure_utc(field.data) <= utcnow():
+        if field.data and ensure_utc(field.data) <= ensure_utc(utcnow()):
             from wtforms.validators import ValidationError
             raise ValidationError('Expiration date must be in the future')
 
@@ -203,7 +203,7 @@ class APIKeyEditForm(APIKeyPermissionsForm):
 
     def validate_expires_at(self, field):
         unchanged = self.original_expires_at is not None and field.data == self.original_expires_at
-        if field.data and ensure_utc(field.data) <= utcnow() and not unchanged:
+        if field.data and ensure_utc(field.data) <= ensure_utc(utcnow()) and not unchanged:
             from wtforms.validators import ValidationError
             raise ValidationError('Expiration date must be in the future')
 

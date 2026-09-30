@@ -8,6 +8,7 @@ import io
 
 from app.models import FormItem, FormTemplate, IndicatorBank
 from app import db
+from app.utils.sql_utils import ilike_contains
 from app.routes.admin.shared import permission_required, permission_required_any
 from app.services.data_quality.helpers import list_exploration_period_names
 from app.services.organization.authorization_service import AuthorizationService
@@ -24,7 +25,9 @@ from app.services.reports.definition_service import (
 from app.services.reports.export_service import ReportExportService
 from app.services.reports.schema import default_definition
 from app.utils.api_helpers import get_json_safe
-from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
 from app.utils.request_validation import enforce_csrf_json
 
 bp = Blueprint("reports", __name__, url_prefix="/admin/reports")
@@ -454,7 +457,7 @@ def api_export_report(report_id: int):
     except ReportDefinitionError:
         return json_not_found("Report not found")
     except Exception as exc:
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/api/<int:report_id>/publish", methods=["POST"])
@@ -565,8 +568,7 @@ def api_metadata_indicators():
     else:
         q = IndicatorBank.query.filter(IndicatorBank.archived.isnot(True))
         if q_text:
-            like = f"%{q_text}%"
-            q = q.filter(IndicatorBank.name.ilike(like))
+            q = q.filter(ilike_contains(IndicatorBank.name, q_text))
         for ib in q.order_by(IndicatorBank.name.asc()).limit(100).all():
             indicators_map[ib.id] = _serialize_indicator(ib)
 

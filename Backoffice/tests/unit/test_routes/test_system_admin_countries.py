@@ -281,6 +281,13 @@ class TestEditCountry:
 # ---------------------------------------------------------------------------
 
 class TestDeleteCountry:
+    @pytest.fixture(autouse=True)
+    def _grant_country_delete(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.countries.delete")
+        db_session.commit()
+
     def test_delete_country_without_dependencies_redirects(self, logged_in_client, db_session, app):
         with app.app_context():
             country = create_test_country(db_session, name="DeleteMeCountry", iso3="DMC")
@@ -291,21 +298,19 @@ class TestDeleteCountry:
         assert resp.status_code == 302
 
     def test_delete_country_with_users_shows_danger_flash(self, logged_in_client, db_session, app):
+        from app.models import Country, UserEntityPermission
+        from tests.factories import create_test_user
+
         with app.app_context():
             country = create_test_country(db_session, name="HasUsersCountry", iso3="HUC")
-        # Mock the country.users.first() to return a truthy value
-        with patch("app.routes.admin.system_admin.countries.Country") as mock_country_class:
-            mock_country = MagicMock()
-            mock_country.id = country.id
-            mock_country.name = country.name
-            mock_country.users.first.return_value = MagicMock()  # has users
-            mock_country.assignment_statuses.first.return_value = None
-            mock_country_class.query.get_or_404.return_value = mock_country
-            resp = logged_in_client.post(
-                f"/admin/countries/delete/{country.id}",
-                follow_redirects=False,
-            )
+            holder = create_test_user(db_session)
+            db_session.add(UserEntityPermission(user_id=holder.id, entity_type="country", entity_id=country.id))
+            db_session.commit()
+            country_id = country.id
+        resp = logged_in_client.post(f"/admin/countries/delete/{country_id}", follow_redirects=False)
         assert resp.status_code == 302
+        db_session.expire_all()
+        assert db_session.get(Country, country_id) is not None
 
     def test_delete_country_with_assignment_statuses_shows_danger_flash(
         self, logged_in_client, db_session, app

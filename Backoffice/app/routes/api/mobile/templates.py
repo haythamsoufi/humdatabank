@@ -2,10 +2,12 @@
 """Mobile template structure endpoints (published version + stable_key)."""
 
 from flask import current_app
+from flask_login import current_user
 
 from app import db
 from app.models import FormItem, FormPage, FormSection, FormTemplate
 from app.routes.api.mobile import mobile_bp
+from app.utils.form_authorization import user_can_access_template
 from app.utils.mobile_auth import mobile_auth_required
 from app.utils.mobile_responses import mobile_bad_request, mobile_not_found, mobile_ok, mobile_server_error
 from app.utils.stable_key import normalize_stable_key, resolve_form_item_refs, resolve_published_form_item_id
@@ -65,7 +67,7 @@ def template_structure(template_id):
     """Return published-version form structure including stable_key for mobile clients."""
     try:
         template = db.session.get(FormTemplate, template_id)
-        if not template:
+        if not template or not user_can_access_template(current_user, template.id):
             return mobile_not_found('Template not found.')
         return mobile_ok(data=_serialize_published_structure(template))
     except Exception as exc:
@@ -81,7 +83,7 @@ def resolve_template_fields(template_id):
 
     try:
         template = db.session.get(FormTemplate, template_id)
-        if not template:
+        if not template or not user_can_access_template(current_user, template.id):
             return mobile_not_found('Template not found.')
 
         payload = request.get_json(silent=True) or {}
@@ -104,6 +106,8 @@ def resolve_template_fields(template_id):
 def item_by_stable_key(template_id, stable_key):
     """Lookup a single published form_item id by stable_key."""
     try:
+        if not user_can_access_template(current_user, template_id):
+            return mobile_not_found('No published field matches this stable_key.')
         key = normalize_stable_key(stable_key)
         if not key:
             return mobile_bad_request('Invalid stable_key.')

@@ -42,6 +42,7 @@ from .helpers import (
     _compute_role_type_for_user_id,
     _filter_requested_admin_roles_for_actor,
     _filter_role_choices_for_actor,
+    apply_scoped_entity_replace,
     _get_countries_by_region,
     _set_user_rbac_roles,
     _ensure_user_has_default_rbac_role,
@@ -819,7 +820,15 @@ def new_user():
 
                     # Assign countries to the new user (requires grants permission).
                     if 'countries' in enabled_entity_groups and assigned_country_ids and can_manage_entity_grants_create:
-                        selected_countries = Country.query.filter(Country.id.in_(assigned_country_ids)).all()
+                        selected_countries = [
+                            c for c in Country.query.filter(Country.id.in_(assigned_country_ids)).all()
+                            if AuthorizationService.can_delegate_entity_access(
+                                current_user, EntityType.country.value, c.id
+                            )
+                        ]
+                        if len(selected_countries) != len(set(assigned_country_ids)):
+                            flash("Some countries were not assigned because they are outside your scope.", "warning")
+                        assigned_country_ids = [c.id for c in selected_countries]
                         for country in selected_countries:
                             db.session.add(UserEntityPermission(
                                 user_id=new_user.id,
@@ -878,6 +887,11 @@ def new_user():
                                     continue
                         for entity_type, entity_ids in permissions_by_type.items():
                             for entity_id in entity_ids:
+                                if not AuthorizationService.can_delegate_entity_access(
+                                    current_user, entity_type, entity_id
+                                ):
+                                    flash("Some entities were not assigned because they are outside your scope.", "warning")
+                                    continue
                                 db.session.add(UserEntityPermission(
                                     user_id=new_user.id,
                                     entity_type=entity_type,
@@ -1138,26 +1152,12 @@ def edit_user(user_id):
             # Update country assignments — requires entity grants permission.
             if 'countries' in enabled_entity_groups:
                 if not entity_grants_locked:
-                    selected_country_ids = form.countries.data or []
-                    if selected_country_ids:
-                        selected_countries = Country.query.filter(Country.id.in_(selected_country_ids)).all()
-                        UserEntityPermission.query.filter_by(
-                            user_id=user.id,
-                            entity_type=EntityType.country.value
-                        ).delete()
-                        for country in selected_countries:
-                            perm = UserEntityPermission(
-                                user_id=user.id,
-                                entity_type=EntityType.country.value,
-                                entity_id=country.id
-                            )
-                            db.session.add(perm)
-                    else:
-                        selected_country_ids = []
-                        UserEntityPermission.query.filter_by(
-                            user_id=user.id,
-                            entity_type=EntityType.country.value
-                        ).delete()
+                    country_result = apply_scoped_entity_replace(
+                        current_user, user, EntityType.country.value, form.countries.data or []
+                    )
+                    selected_country_ids = country_result["final_ids"]
+                    if country_result["skipped_add"] or country_result["skipped_remove"]:
+                        flash("Some country changes were not applied because they are outside your scope.", "warning")
                 else:
                     # Preserve existing country assignments when the actor lacks grants permission
                     # or is editing themselves.
@@ -1227,31 +1227,23 @@ def edit_user(user_id):
                 entity_permissions = request.form.getlist('entity_permissions')
                 all_entity_types = allowed_non_country_entity_types
 
-                # Replace all non-country entity permissions for this user.
-                for entity_type in all_entity_types:
-                    UserEntityPermission.query.filter_by(
-                        user_id=user.id,
-                        entity_type=entity_type
-                    ).delete()
-
-                permissions_by_type = {}
+                permissions_by_type = {entity_type: [] for entity_type in all_entity_types}
                 for perm_str in entity_permissions:
                     if ':' in perm_str:
                         entity_type, entity_id = perm_str.split(':', 1)
                         try:
                             entity_id = int(entity_id)
                             if entity_type != EntityType.country.value and entity_type in all_entity_types:
-                                permissions_by_type.setdefault(entity_type, []).append(entity_id)
+                                permissions_by_type[entity_type].append(entity_id)
                         except (ValueError, TypeError):
                             continue
 
+                entity_scope_skipped = False
                 for entity_type, entity_ids in permissions_by_type.items():
-                    for entity_id in entity_ids:
-                        db.session.add(UserEntityPermission(
-                            user_id=user.id,
-                            entity_type=entity_type,
-                            entity_id=entity_id
-                        ))
+                    result = apply_scoped_entity_replace(current_user, user, entity_type, entity_ids)
+                    entity_scope_skipped = entity_scope_skipped or bool(result["skipped_add"] or result["skipped_remove"])
+                if entity_scope_skipped:
+                    flash("Some entity changes were not applied because they are outside your scope.", "warning")
 
             # Prepare new values for audit logging
             try:

@@ -81,29 +81,23 @@ class TestIsAccountLockedOut:
         assert result is False
 
     def test_locked_when_many_failures_no_success(self, app, db_session):
-        from app.models.core import UserLoginLog
         from app.routes.auth import _is_account_locked_out
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
 
         with app.app_context():
-            for _ in range(10):
-                db_session.add(
-                    UserLoginLog(
-                        email_attempted="locked@example.com",
-                        event_type="login_failed",
-                        timestamp=utcnow(),
-                        ip_address="127.0.0.1",
-                    )
-                )
-            db_session.commit()
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
+                record_login_failure("locked@example.com")
             result = _is_account_locked_out("locked@example.com")
         assert result is True
 
     def test_lockout_check_exception_returns_true(self, app):
         from app.routes.auth import _is_account_locked_out
+        from app.utils.auth_state import AuthStateUnavailable
         with app.app_context():
-            with patch("app.models.core.UserLoginLog.query") as MockQuery:
-                MockQuery.filter.side_effect = Exception("db boom")
+            with patch(
+                "app.utils.auth_state.DbAuthStateBackend.get_counter",
+                side_effect=AuthStateUnavailable("db boom"),
+            ):
                 result = _is_account_locked_out("any@example.com")
         assert result is True
 
@@ -342,6 +336,7 @@ class TestForgotPasswordEdgeCases:
             with patch("app.routes.auth.ForgotPasswordForm", return_value=mock_form), \
                  patch("app.routes.auth.LoginForm"), \
                  patch("app.routes.auth.RegisterForm"), \
+                 patch("app.routes.auth.is_azure_b2c_configured", return_value=False), \
                  patch("app.routes.auth.render_template", return_value=_mock_html_response()) as mock_render:
                 resp, status = _view_result(forgot_password())
         assert status == 200

@@ -484,22 +484,22 @@ class TestDownloadMonitoringLogs:
 # ---------------------------------------------------------------------------
 
 class TestClearMonitoringLogs:
-    def test_no_log_files_returns_404(self, logged_in_client, db_session, app):
+    def test_no_log_files_returns_404(self, logged_in_sm_client, db_session, app):
         with patch("app.routes.admin.monitoring.memory_monitor") as mock_mem, \
              patch("app.routes.admin.monitoring.system_monitor") as mock_sys:
             mock_mem.get_log_file_path.return_value = None
             mock_sys.get_log_file_path.return_value = None
-            resp = logged_in_client.post("/admin/monitoring/logs/clear")
+            resp = logged_in_sm_client.post("/admin/monitoring/logs/clear")
         assert resp.status_code == 404
 
-    def test_clears_memory_log(self, logged_in_client, db_session, app):
+    def test_clears_memory_log(self, logged_in_sm_client, db_session, app):
         log_path = _make_log_file("some memory content\n")
         try:
             with patch("app.routes.admin.monitoring.memory_monitor") as mock_mem, \
                  patch("app.routes.admin.monitoring.system_monitor") as mock_sys:
                 mock_mem.get_log_file_path.return_value = log_path
                 mock_sys.get_log_file_path.return_value = None
-                resp = logged_in_client.post("/admin/monitoring/logs/clear")
+                resp = logged_in_sm_client.post("/admin/monitoring/logs/clear")
             assert resp.status_code == 200
             data = _json(resp)
             assert data.get("success") is True
@@ -511,14 +511,14 @@ class TestClearMonitoringLogs:
             if os.path.exists(log_path):
                 os.unlink(log_path)
 
-    def test_clears_system_log(self, logged_in_client, db_session, app):
+    def test_clears_system_log(self, logged_in_sm_client, db_session, app):
         log_path = _make_log_file("system content\n")
         try:
             with patch("app.routes.admin.monitoring.memory_monitor") as mock_mem, \
                  patch("app.routes.admin.monitoring.system_monitor") as mock_sys:
                 mock_mem.get_log_file_path.return_value = None
                 mock_sys.get_log_file_path.return_value = log_path
-                resp = logged_in_client.post("/admin/monitoring/logs/clear")
+                resp = logged_in_sm_client.post("/admin/monitoring/logs/clear")
             assert resp.status_code == 200
             data = _json(resp)
             assert "system" in data.get("message", "")
@@ -526,7 +526,7 @@ class TestClearMonitoringLogs:
             if os.path.exists(log_path):
                 os.unlink(log_path)
 
-    def test_clears_application_log(self, logged_in_client, db_session, app):
+    def test_clears_application_log(self, logged_in_sm_client, db_session, app):
         log_path = _make_log_file("application content\n")
         try:
             with patch("app.routes.admin.monitoring.memory_monitor") as mock_mem, \
@@ -534,7 +534,7 @@ class TestClearMonitoringLogs:
                 mock_mem.get_log_file_path.return_value = None
                 mock_sys.get_log_file_path.return_value = None
                 app.application_log_file_path = log_path
-                resp = logged_in_client.post("/admin/monitoring/logs/clear")
+                resp = logged_in_sm_client.post("/admin/monitoring/logs/clear")
             data = _json(resp)
             assert "application" in data.get("message", "")
         finally:
@@ -543,7 +543,7 @@ class TestClearMonitoringLogs:
             if hasattr(app, "application_log_file_path"):
                 del app.application_log_file_path
 
-    def test_clears_all_three_logs(self, logged_in_client, db_session, app):
+    def test_clears_all_three_logs(self, logged_in_sm_client, db_session, app):
         mem_log = _make_log_file("memory\n")
         sys_log = _make_log_file("system\n")
         app_log = _make_log_file("application\n")
@@ -553,7 +553,7 @@ class TestClearMonitoringLogs:
                 mock_mem.get_log_file_path.return_value = mem_log
                 mock_sys.get_log_file_path.return_value = sys_log
                 app.application_log_file_path = app_log
-                resp = logged_in_client.post("/admin/monitoring/logs/clear")
+                resp = logged_in_sm_client.post("/admin/monitoring/logs/clear")
             assert resp.status_code == 200
             data = _json(resp)
             assert "memory" in data.get("message", "")
@@ -566,6 +566,38 @@ class TestClearMonitoringLogs:
             if hasattr(app, "application_log_file_path"):
                 del app.application_log_file_path
 
+
+
+class TestClearMonitoringLogsAuthorization:
+    def test_admin_with_only_analytics_view_is_denied(self, logged_in_client, db_session):
+        with patch("app.routes.admin.monitoring.memory_monitor") as mock_mem, \
+             patch("app.routes.admin.monitoring.system_monitor") as mock_sys:
+            mock_mem.get_log_file_path.return_value = None
+            mock_sys.get_log_file_path.return_value = None
+            resp = logged_in_client.post(
+                "/admin/monitoring/logs/clear", headers={"Accept": "application/json"}
+            )
+        assert resp.status_code == 403
+
+    def test_admin_with_maintain_permission_is_allowed(self, logged_in_client, db_session):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.system.maintain")
+        db_session.commit()
+        log_path = _make_log_file("content\n")
+        try:
+            with patch("app.routes.admin.monitoring.memory_monitor") as mock_mem, \
+                 patch("app.routes.admin.monitoring.system_monitor") as mock_sys:
+                mock_mem.get_log_file_path.return_value = log_path
+                mock_sys.get_log_file_path.return_value = None
+                resp = logged_in_client.post("/admin/monitoring/logs/clear")
+            assert resp.status_code == 200
+        finally:
+            if os.path.exists(log_path):
+                os.unlink(log_path)
+
+    def test_get_is_not_allowed(self, logged_in_sm_client):
+        assert logged_in_sm_client.get("/admin/monitoring/logs/clear").status_code == 405
 
 # ---------------------------------------------------------------------------
 # get_current_memory
@@ -695,49 +727,42 @@ class TestGetSystemLogs:
 # ---------------------------------------------------------------------------
 
 class TestTestErrorNotification:
-    def _mock_imports(self):
-        """Return patcher context for all imports used by test_error_notification."""
-        return [
-            patch("app.routes.admin.monitoring.SecurityMonitor"),
-            patch("app.routes.admin.monitoring.send_security_alert", return_value=True),
-        ]
+    """POST-only, System Manager only: it emails every System Manager and raises a 500."""
 
-    def test_get_raises_and_returns_500(self, logged_in_client, db_session, app):
-        """The endpoint always raises an exception — Flask returns 500."""
-        from app.services.security.monitoring import SecurityMonitor
-        from app.services.email.service import send_security_alert
-
-        with patch.object(SecurityMonitor, "log_security_event", return_value=None), \
-             patch("app.services.email.service.send_security_alert", return_value=False):
-            resp = logged_in_client.get("/admin/monitoring/test-error")
-        assert resp.status_code == 500
-
-    def test_post_raises_and_returns_500(self, logged_in_client, db_session, app):
+    def test_post_as_system_manager_raises_and_returns_500(self, logged_in_sm_client, db_session, app):
         from app.services.security.monitoring import SecurityMonitor
 
         with patch.object(SecurityMonitor, "log_security_event", return_value=None):
-            resp = logged_in_client.post("/admin/monitoring/test-error")
+            resp = logged_in_sm_client.post("/admin/monitoring/test-error")
         assert resp.status_code == 500
 
-    def test_json_format_parameter_triggers_json_response(self, logged_in_client, db_session, app):
-        """format=json parameter should still raise (and return 500)."""
-        from app.services.security.monitoring import SecurityMonitor
-
-        with patch.object(SecurityMonitor, "log_security_event", return_value=None):
-            resp = logged_in_client.get("/admin/monitoring/test-error?format=json")
-        assert resp.status_code == 500
-
-    def test_security_event_log_failure_doesnt_prevent_raise(self, logged_in_client, db_session, app):
-        """Even if SecurityMonitor.log_security_event fails, the main exception is still raised."""
+    def test_security_event_log_failure_doesnt_prevent_raise(self, logged_in_sm_client, db_session, app):
         from app.services.security.monitoring import SecurityMonitor
 
         with patch.object(SecurityMonitor, "log_security_event", side_effect=Exception("sec monitor fail")):
-            resp = logged_in_client.get("/admin/monitoring/test-error")
+            resp = logged_in_sm_client.post("/admin/monitoring/test-error")
         assert resp.status_code == 500
 
+    @pytest.mark.parametrize("url", ["/admin/monitoring/test-error", "/admin/monitoring/test-error?format=json"])
+    def test_get_has_no_side_effects(self, logged_in_sm_client, db_session, url):
+        from app.services.security.monitoring import SecurityMonitor
+
+        with patch.object(SecurityMonitor, "log_security_event") as log_event, \
+             patch("app.routes.admin.monitoring.send_security_alert") as alert:
+            resp = logged_in_sm_client.get(url)
+        assert resp.status_code == 405
+        log_event.assert_not_called()
+        alert.assert_not_called()
+
+    def test_non_system_manager_admin_is_denied_without_side_effects(self, logged_in_client, db_session):
+        with patch("app.routes.admin.monitoring.send_security_alert") as alert:
+            resp = logged_in_client.post("/admin/monitoring/test-error")
+        assert resp.status_code in (302, 403)
+        alert.assert_not_called()
+
     def test_unauthenticated_redirects(self, client, db_session, app):
-        resp = client.get("/admin/monitoring/test-error")
-        assert resp.status_code == 302
+        resp = client.post("/admin/monitoring/test-error")
+        assert resp.status_code in (302, 401)
 
 
 # ---------------------------------------------------------------------------

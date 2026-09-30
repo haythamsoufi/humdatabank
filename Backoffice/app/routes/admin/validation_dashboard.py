@@ -20,7 +20,9 @@ from app.services.validation.dashboard_service import (
     template_tab_options,
 )
 from app.services.validation.tracker_service import build_tracker_data
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api_responses import json_bad_request, json_ok
 from app.utils.api_helpers import get_json_safe
 from app.utils.request_validation import enforce_csrf_json
 
@@ -82,7 +84,7 @@ def validation_dashboard_preview_api():
     except ValueError as exc:
         return json_bad_request(str(exc))
     except Exception as exc:
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/validation-dashboard/run-checks", methods=["POST"])
@@ -154,7 +156,7 @@ def validation_dashboard_dispatch_send():
         return json_ok(batch_id=batch.id, status=batch.status, summary=batch.summary)
     except Exception as exc:
         db.session.rollback()
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/validation-dashboard/dispatch/preview", methods=["POST"])

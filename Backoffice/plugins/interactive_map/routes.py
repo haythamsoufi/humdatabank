@@ -17,9 +17,12 @@ from app.plugins.plugin_utils import (
     clear_plugin_cache,
 )
 from app.utils.api_helpers import get_json_safe
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_error, json_not_found, json_ok, json_server_error
 
 from pathlib import Path
+
 
 plugin_config = load_plugin_config(Path(__file__).parent, "interactive_map")
 
@@ -104,11 +107,20 @@ def create_blueprint():
                 )
                 return Response(status=upstream.status_code)
 
+            upstream_type = (upstream.headers.get('Content-Type') or '').split(';')[0].strip().lower()
             headers = {
-                'Content-Type': upstream.headers.get('Content-Type', 'image/png'),
                 'Cache-Control': 'public, max-age=86400',
+                'X-Content-Type-Options': 'nosniff',
+                'Content-Security-Policy': "default-src 'none'; sandbox",
             }
-            return Response(upstream.content, status=200, headers=headers)
+            if upstream_type == 'image/png':
+                return Response(upstream.content, status=200, headers=headers, mimetype='image/png')
+            if upstream_type == 'image/jpeg':
+                return Response(upstream.content, status=200, headers=headers, mimetype='image/jpeg')
+            if upstream_type == 'image/webp':
+                return Response(upstream.content, status=200, headers=headers, mimetype='image/webp')
+            current_app.logger.warning('Mapbox tile proxy rejected upstream content type %r', upstream_type)
+            return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
         except requests.exceptions.RequestException as exc:
             current_app.logger.error('Mapbox tile proxy request failed: %s', exc)
             return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
@@ -137,7 +149,7 @@ def create_blueprint():
 
         except Exception as e:
             current_app.logger.error(f"Error getting field config: {e}")
-            return json_server_error(str(e), success=False, error=str(e))
+            return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/geocode', methods=['POST'])
     @plugin_route_wrapper('Interactive Map Plugin')
@@ -318,7 +330,7 @@ def create_blueprint():
             return json_ok(success=True, settings=config)
         except Exception as e:
             current_app.logger.error(f"Error getting settings: {e}")
-            return json_server_error(str(e), success=False, error=str(e))
+            return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/settings', methods=['POST'])
     @plugin_admin_route_wrapper('Interactive Map Plugin')
@@ -420,7 +432,7 @@ def create_blueprint():
             return json_ok(success=True, cleared_count=cleared_count, message=f'Cleared {cleared_count} cached entries')
         except Exception as e:
             current_app.logger.error(f"Error clearing cache: {e}")
-            return json_server_error(str(e), success=False, error=str(e))
+            return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE)
 
     @bp.route('/api/stats', methods=['GET'])
     @plugin_route_wrapper('Interactive Map Plugin')

@@ -32,7 +32,13 @@ def _reset_service_state() -> None:
 
 
 def _dummy_workbook_bytes() -> bytes:
-    return b"PK dummy xlsx"
+    import openpyxl
+
+    buf = io.BytesIO()
+    workbook = openpyxl.Workbook()
+    workbook.active.append(["dummy"])
+    workbook.save(buf)
+    return buf.getvalue()
 
 
 def _file_storage(name: str = "SG Report.xlsx") -> FileStorage:

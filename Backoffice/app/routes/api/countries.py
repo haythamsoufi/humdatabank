@@ -20,6 +20,7 @@ from app.models import Country, AssignedForm, PublicSubmission
 from app.models.organization import NationalSociety
 from app.models.assignments import AssignmentEntityStatus
 from app.utils.auth import require_api_key, require_api_key_or_session
+from app.services.security.api_key_permissions import REFERENCE_READ
 from app.utils.rate_limiting import rate_limit, api_rate_limit
 from app.services.platform.user_analytics_service import get_client_ip
 from app import db
@@ -116,7 +117,7 @@ def _countrymap_rate_limit_fallback():
 
 
 @api_bp.route('/countrymap', methods=['GET'])
-@require_api_key_or_session  # SECURITY: Allow session auth for internal admin use
+@require_api_key_or_session(capability=REFERENCE_READ)  # SECURITY: Allow session auth for internal admin use
 @rate_limit(
     requests_per_minute=60,
     key_func=lambda: f"countrymap_{get_client_ip()}",
@@ -266,7 +267,7 @@ def get_countries():
 
 
 @api_bp.route('/periods', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_periods():
     """Lightweight endpoint returning distinct period names present in data.
@@ -329,7 +330,7 @@ def get_periods():
 
 
 @api_bp.route('/nationalsocietymap', methods=['GET'])
-@require_api_key
+@require_api_key(capability=REFERENCE_READ)
 @api_rate_limit()
 def get_national_societies():
     """

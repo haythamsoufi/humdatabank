@@ -212,6 +212,18 @@ def matrix_portrait_column_widths_mm(
             widths.append((spec['name'], tick_mm))
         else:
             widths.append((spec['name'], round(number_mm, 1)))
+    # Rounding can drift a tenth of a mm over the budget; shrink the last
+    # numeric column so the colgroup never exceeds the page width.
+    total = sum(w for _, w in widths)
+    if total > table_width_mm and widths:
+        overflow = total - table_width_mm
+        for idx in range(len(widths) - 1, -1, -1):
+            name, width = widths[idx]
+            if name == '__row__':
+                continue
+            adjusted = max(min_number_mm if name != '__total__' else min_number_mm, round(width - overflow, 1))
+            widths[idx] = (name, adjusted)
+            break
     return widths
 
 
@@ -1808,6 +1820,8 @@ def _export_excel_impl(aes_id):
                 data_sheet.column_dimensions[get_column_letter(col_idx)].autosize = True
 
     output = io.BytesIO()
+    from app.utils.export_safety import sanitize_workbook
+    sanitize_workbook(workbook)
     workbook.save(output)
     output.seek(0)
     filename = f"data_entry_{country.iso3}_{str(assignment.period_name).replace(' ', '_')}.xlsx"

@@ -23,7 +23,7 @@ from flask import current_app, request
 from contextlib import suppress
 
 # Constants
-MAX_PER_PAGE = 100000  # Maximum items per page for API requests
+MAX_PER_PAGE = 10000  # Hard ceiling for any API page size (per-key ceiling: API_KEY_MAX_PER_PAGE)
 DEFAULT_PER_PAGE = 20
 DEFAULT_PAGE = 1
 PAST_ASSIGNMENT_DAYS = 60  # Days after approval before an assignment is treated as "past"

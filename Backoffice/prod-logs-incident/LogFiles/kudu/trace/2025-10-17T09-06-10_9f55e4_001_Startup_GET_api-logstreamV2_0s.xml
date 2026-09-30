@@ -1,3 +1,0 @@
-<step title="Startup Request" date="2025-10-17T09:06:10.671" instance="9f55e4" url="/api/logstreamV2/?max=50&amp;nextToken=eyJmaWQiOjYzODk2Mjg4NzU5OTgzMzgyMSwicG9zIjo0ODgzNTMsImZpcnN0bG9ndXRjIjo2Mzg5NjE5NTE3MzY1OTY3Njl9&amp;api-version=2016-09-01" method="GET" type="request" pid="772,1,7" ScmType="None" >
-  <step title="Cleanup Xml Logs" date="2025-10-17T09:06:10.674" /><!-- duration: 6ms -->
-</step><!-- duration: 20ms -->

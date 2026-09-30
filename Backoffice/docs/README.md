@@ -21,7 +21,9 @@ Detailed setup for optional features and production:
 - [Setup & configuration index](setup/README.md)
 - [LibreTranslate](setup/libretranslate.md) – Optional translation service
 - [AI chat and RAG](setup/ai-configuration.md) – AI chatbot and document search
+- [API keys and permissions](setup/api-keys-and-permissions.md) – Capabilities, data scope, legacy key migration
 - [Security](setup/security.md) – SECRET_KEY, CORS, rate limiting, deployment checklist
+- [Security review and hardening (Sept 2026)](security/backoffice-security-review-2026-09.md) – Findings, fixes per area, rollout checklist, open items
 
 ## User guides (by role)
 

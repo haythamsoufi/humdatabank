@@ -459,7 +459,7 @@ class TestActivateUser:
         _, status = _parse(resp)
         assert status == 400
 
-    def test_non_sysmanager_cannot_activate_admin_returns_400(self, app, db_session, route_admin, route_user):
+    def test_non_sysmanager_cannot_activate_admin_returns_403(self, app, db_session, route_admin, route_user):
         from app.routes.api.mobile.admin_users import activate_user
 
         with app.test_request_context(
@@ -474,7 +474,7 @@ class TestActivateUser:
                 resp = activate_user(route_user.id)
 
         _, status = _parse(resp)
-        assert status == 400
+        assert status == 403
 
     def test_success(self, app, db_session, route_admin, route_user):
         from app.routes.api.mobile.admin_users import activate_user
@@ -521,7 +521,7 @@ class TestDeactivateUser:
         _, status = _parse(resp)
         assert status == 400
 
-    def test_non_sysmanager_cannot_deactivate_admin_returns_400(self, app, db_session, route_admin, route_user):
+    def test_non_sysmanager_cannot_deactivate_admin_returns_403(self, app, db_session, route_admin, route_user):
         from app.routes.api.mobile.admin_users import deactivate_user
 
         with app.test_request_context(
@@ -536,7 +536,7 @@ class TestDeactivateUser:
                 resp = deactivate_user(route_user.id)
 
         _, status = _parse(resp)
-        assert status == 400
+        assert status == 403
 
     def test_success(self, app, db_session, route_admin, route_user):
         from app.routes.api.mobile.admin_users import deactivate_user

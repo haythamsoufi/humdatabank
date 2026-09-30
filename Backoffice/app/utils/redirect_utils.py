@@ -7,7 +7,8 @@ by the user without proper validation, allowing attackers to redirect users to
 malicious sites.
 """
 
-from urllib.parse import urlparse
+import unicodedata
+from urllib.parse import unquote, urlparse
 from flask import request, url_for, current_app
 from typing import Optional
 
@@ -73,16 +74,62 @@ def _is_same_origin_netloc(target_netloc: str) -> bool:
     return False
 
 
+_MAX_DECODE_ROUNDS = 4
+_ALLOWED_ABSOLUTE_SCHEMES = ("http", "https")
+
+
+def _has_control_chars(value: str) -> bool:
+    return any((ord(c) < 32) or (ord(c) == 127) for c in value)
+
+
+def _log_blocked_redirect(reason: str, target_url: str) -> None:
+    current_app.logger.warning("Blocked unsafe redirect (%s): %.200r", reason, target_url)
+
+
+def _decoded_variants(value: str) -> Optional[list[str]]:
+    """
+    Return the value plus each successive percent-decoded / NFKC-normalised form.
+
+    Returns None when the value is still changing after ``_MAX_DECODE_ROUNDS``
+    (deliberate multi-encoding) so callers can reject it outright.
+    """
+    variants = [value]
+    current = value
+    for _ in range(_MAX_DECODE_ROUNDS):
+        decoded = unicodedata.normalize("NFKC", unquote(current))
+        if decoded == current:
+            return variants
+        variants.append(decoded)
+        current = decoded
+    return None
+
+
+def _is_dangerous_path_form(candidate: str) -> Optional[str]:
+    """Return a reason string when a (decoded) URL form can escape the origin."""
+    if _has_control_chars(candidate):
+        return "control characters"
+    if "\\" in candidate:
+        return "backslash"
+    if candidate != candidate.strip():
+        return "leading/trailing whitespace"
+    return None
+
+
 def is_safe_redirect_url(target_url: str) -> bool:
     """
     Validate that a redirect URL is safe (internal only, no external redirects).
 
-    Security checks:
-    - Must be a relative URL (starts with /), OR an absolute http(s) URL to the same origin
-    - No protocol-relative URLs (//evil.com)
-    - No external domains
-    - No javascript: or data: schemes
-    - No null bytes or control characters
+    Returns True only for:
+    - a root-relative path (``/x``) whose path component contains no ``//``, or
+    - an absolute http(s) URL whose host matches the current origin (same rule
+      applied to its path).
+
+    Everything else is rejected, including (after repeated percent-decoding and
+    NFKC normalisation): protocol-relative ``//host``, ``/\\host`` and other
+    backslash forms, ``/%2f/host``, control characters / tab / newline anywhere,
+    leading or trailing whitespace, ``javascript:`` / ``data:`` / ``vbscript:``
+    or any other scheme, user-info tricks (``http://good@evil``), and values
+    that are still changing after several decode rounds.
 
     Args:
         target_url: The URL to validate
@@ -93,59 +140,52 @@ def is_safe_redirect_url(target_url: str) -> bool:
     if not target_url or not isinstance(target_url, str):
         return False
 
-    # Reject control characters (prevents header injection / request smuggling vectors)
-    if any((ord(c) < 32) or (ord(c) == 127) for c in target_url):
-        current_app.logger.warning(f"Unsafe redirect URL contains control characters: {target_url}")
+    if not target_url.strip():
         return False
 
-    # Strip whitespace
-    target_url = target_url.strip()
-
-    # Reject empty URLs
-    if not target_url:
+    variants = _decoded_variants(target_url)
+    if variants is None:
+        _log_blocked_redirect("excessive encoding", target_url)
         return False
 
-    # Reject protocol-relative URLs (//evil.com) - these are external
-    if target_url.startswith('//'):
-        current_app.logger.warning(f"Blocked protocol-relative redirect URL: {target_url}")
-        return False
+    for form in variants:
+        reason = _is_dangerous_path_form(form)
+        if reason:
+            _log_blocked_redirect(reason, target_url)
+            return False
+        if form.startswith("//"):
+            _log_blocked_redirect("protocol-relative", target_url)
+            return False
 
-    # Reject dangerous schemes (javascript:, data:, etc.)
     parsed = urlparse(target_url)
-    if parsed.scheme and parsed.scheme.lower() not in ("http", "https", ""):
-        current_app.logger.warning(f"Blocked redirect URL with dangerous scheme '{parsed.scheme}': {target_url}")
+    scheme = (parsed.scheme or "").lower()
+
+    if scheme and scheme not in _ALLOWED_ABSOLUTE_SCHEMES:
+        _log_blocked_redirect(f"scheme {scheme}", target_url)
         return False
 
-    # Allow relative URLs (must start with /)
     if target_url.startswith("/"):
-        # Reject protocol-relative URLs (//evil.com) - these are external
-        if target_url.startswith("//"):
-            current_app.logger.warning(f"Blocked protocol-relative redirect URL: {target_url}")
+        if parsed.netloc or scheme:
+            _log_blocked_redirect("unexpected authority", target_url)
             return False
     else:
-        # For non-relative targets, allow only absolute same-origin http(s) URLs.
-        parsed = urlparse(target_url)
-        scheme = (parsed.scheme or "").lower()
-        if parsed.netloc:
-            if scheme not in ("http", "https"):
-                current_app.logger.warning(f"Blocked redirect URL with non-http scheme '{parsed.scheme}': {target_url}")
-                return False
-            if not _is_same_origin_netloc(parsed.netloc):
-                current_app.logger.warning(f"Blocked external redirect URL: {target_url}")
-                return False
-            # Ensure it has an internal path
-            if parsed.path and not parsed.path.startswith("/"):
-                current_app.logger.warning(f"Blocked redirect URL with invalid path: {target_url}")
-                return False
-        else:
-            # Not relative and not a parseable absolute URL -> unsafe (e.g. "admin/page" or "localhost:5000/x")
-            current_app.logger.warning(f"Blocked non-relative redirect URL: {target_url}")
+        if not parsed.netloc or scheme not in _ALLOWED_ABSOLUTE_SCHEMES:
+            _log_blocked_redirect("non-relative", target_url)
+            return False
+        if "@" in parsed.netloc:
+            _log_blocked_redirect("userinfo in authority", target_url)
+            return False
+        if not _is_same_origin_netloc(parsed.netloc):
+            _log_blocked_redirect("external host", target_url)
+            return False
+        if parsed.path and not parsed.path.startswith("/"):
+            _log_blocked_redirect("invalid path", target_url)
             return False
 
-    # Additional check: double slashes inside the PATH can be suspicious (avoid flagging "http://")
-    check_path = parsed.path if parsed else target_url
-    if isinstance(check_path, str) and "//" in check_path:
-        current_app.logger.warning(f"Suspicious redirect URL path with double slashes: {target_url}")
+    for form in variants:
+        if "//" in urlparse(form).path:
+            _log_blocked_redirect("double slash in path", target_url)
+            return False
 
     return True
 

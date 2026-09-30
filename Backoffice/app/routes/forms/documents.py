@@ -4,7 +4,10 @@ from __future__ import annotations
 from flask import abort, current_app, flash, redirect, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
+from werkzeug.exceptions import HTTPException
 
+from app.extensions import limiter
+from app.services.documents import public_access
 from app.services.documents.service import DocumentService
 from app.utils.redirect_utils import is_safe_redirect_url
 
@@ -52,14 +55,34 @@ def register_document_routes(bp):
             flash("Error deleting document.", "danger")
         return redirect(safe_referrer or url_for("main.dashboard"))
 
-    @bp.route("/public-document/<int:document_id>/download", methods=["GET"])
-    def download_public_document_public(document_id):
-        """Download a document from a public submission (public access)."""
+    def _stream_public_document(identifier):
         try:
-            return DocumentService.stream_public_download_response(document_id)
-        except PermissionError:
+            return DocumentService.stream_public_download_response(identifier)
+        except (PermissionError, FileNotFoundError):
             abort(404)
+        except HTTPException:
+            raise
         except Exception as e:
-            current_app.logger.error(f"Error serving public document {document_id}: {e}", exc_info=True)
+            current_app.logger.error("Error serving public document %s: %s", identifier, e, exc_info=True)
             flash("An error occurred while trying to download the file.", "danger")
             return redirect(url_for("main.dashboard"))
+
+    @bp.route("/public-document/<uuid:public_id>/download", methods=["GET"])
+    @limiter.limit(public_access.public_download_rate_limit)
+    def download_public_document_by_public_id(public_id):
+        """Download a document from a public submission (public access, opaque id)."""
+        return _stream_public_document(public_id)
+
+    @bp.route("/public-document/<int:document_id>/download", methods=["GET"])
+    @limiter.limit(public_access.public_download_rate_limit)
+    def download_public_document_public(document_id):
+        """Deprecated integer-id URL: re-checks the public policy, then redirects to the opaque URL."""
+        try:
+            document = DocumentService.load_public_download_document(document_id)
+        except PermissionError:
+            abort(404)
+        target = url_for("forms.download_public_document_by_public_id", public_id=document.public_id)
+        response = redirect(target, code=302)
+        response.headers["Deprecation"] = "true"
+        response.headers["Link"] = f'<{target}>; rel="successor-version"'
+        return response

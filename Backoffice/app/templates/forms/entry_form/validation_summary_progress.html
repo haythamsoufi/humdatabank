@@ -376,6 +376,7 @@
      data-label-rerun-confirm="{{ _('All items already have AI opinions. Re-run all validations and overwrite them?')|forceescape }}">
 </div>
 
+<script src="{{ static_url('js/lib/safe-dom.js') }}"></script>
 <script src="{{ url_for('static', filename='js/forms/validation-summary-progress.js') }}"></script>
 
 <!-- AI Details Popup -->
@@ -443,12 +444,12 @@
             d.sources.slice(0, 5).forEach(function (s) {
                 if (!s || typeof s !== 'object') return;
                 var title = s.document_title ? String(s.document_title) : (s.document_id ? 'Document ' + String(s.document_id) : 'Document');
-                var url = s.document_url ? String(s.document_url) : '';
+                var url = window.SafeDom ? window.SafeDom.safeUrl(s.document_url, { allowSameOrigin: false }) : '';
                 var page = (s.page_number != null && !isNaN(Number(s.page_number))) ? Number(s.page_number) : null;
                 var quote = s.quote ? String(s.quote) : '';
                 var pageTxt = (page !== null && page > 0) ? ' (p. ' + page + ')' : '';
                 var titleHtml = url
-                    ? '<a class="ai-popup-src-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(title) + '</a>'
+                    ? '<a class="ai-popup-src-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(title) + '</a>'
                     : '<span>' + esc(title) + '</span>';
                 html += '<div class="ai-popup-src-item"><div class="ai-popup-src-dot"></div><div>' + titleHtml + esc(pageTxt);
                 if (quote) html += '<span class="ai-popup-src-quote">&ldquo;' + esc(quote) + '&rdquo;</span>';
@@ -460,8 +461,12 @@
     }
 
     function openPopup(data) {
-        var _sanitize = (window.SafeDom && window.SafeDom.sanitizeHtml) || window.sanitizeHtml || function(h) { return h; };
-        body.innerHTML = _sanitize(buildHtml(data));
+        var popupHtml = buildHtml(data);
+        if (window.SafeDom && window.SafeDom.setHtml) {
+            window.SafeDom.setHtml(body, popupHtml);
+        } else {
+            body.textContent = popupHtml;
+        }
         overlay.classList.remove('ai-popup-hidden');
         overlay.style.display = 'flex';
         document.body.style.overflow = 'hidden';

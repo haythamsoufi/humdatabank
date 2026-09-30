@@ -21,6 +21,56 @@ load_dotenv(backoffice_env_path, override=False)
 basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 _ALLOWED_FLASK_CONFIGS = {"development", "production", "staging", "testing", "default", ""}
+_LOCAL_BIND_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _launched_via_local_run_py() -> bool:
+    """True only for an interactive ``python run.py`` bound to a loopback address."""
+    main_file = getattr(sys.modules.get("__main__"), "__file__", None) or ""
+    argv0 = sys.argv[0] if sys.argv else ""
+    if os.path.basename(main_file) != "run.py" or os.path.basename(argv0) != "run.py":
+        return False
+    host = (os.environ.get("FLASK_RUN_HOST") or "127.0.0.1").strip().lower()
+    return host in _LOCAL_BIND_HOSTS
+
+
+def resolve_flask_config_name(raw: str | None = None) -> str:
+    """Resolve the effective config name, failing closed when FLASK_CONFIG is unset.
+
+    An unset/empty value used to select DevelopmentConfig (DEBUG on, insecure
+    cookies), so a deployment that lost the variable silently ran in debug mode.
+    Now it selects ``production`` unless the process is an interactive
+    ``python run.py`` on loopback. The result is written back to
+    ``os.environ['FLASK_CONFIG']`` so the many modules that read the variable
+    directly agree with the config class in use.
+    """
+    explicit = raw if raw is not None else os.environ.get("FLASK_CONFIG")
+    normalized = (explicit or "").strip().lower()
+    if normalized:
+        if normalized == "default":
+            _config_logger.warning(
+                "FLASK_CONFIG=default is a deprecated alias of 'development'; set FLASK_CONFIG explicitly."
+            )
+        return normalized
+
+    if _launched_via_local_run_py():
+        resolved = "development"
+        _config_logger.warning(
+            "FLASK_CONFIG is not set; `python run.py` on loopback runs as 'development'. "
+            "Set FLASK_CONFIG=development in Backoffice/.env to silence this."
+        )
+    else:
+        resolved = "production"
+        _config_logger.warning(
+            "FLASK_CONFIG is not set; defaulting to 'production' (fail closed). "
+            "Set FLASK_CONFIG=development in Backoffice/.env for local development."
+        )
+    if raw is None:
+        os.environ["FLASK_CONFIG"] = resolved
+    return resolved
+
+
+_RESOLVED_FLASK_CONFIG = resolve_flask_config_name()
 
 
 def _parse_bool(value, default: bool = False) -> bool:
@@ -32,6 +82,14 @@ def _parse_bool(value, default: bool = False) -> bool:
     if normalized == "false":
         return False
     return default
+
+
+def _parse_proxy_hops(name: str, default: int = 1) -> int:
+    """Number of trusted proxy hops for a ProxyFix header (0-10)."""
+    try:
+        return max(0, min(10, int((os.environ.get(name) or str(default)).strip())))
+    except (TypeError, ValueError):
+        return default
 
 
 def _parse_log_mode(value, default: str = "normal") -> str:
@@ -77,11 +135,10 @@ def _is_development_mode() -> bool:
     """
     Determine if we're in development mode based on FLASK_CONFIG.
 
-    Returns True if FLASK_CONFIG is 'development' or 'default' (or unset).
-    Returns False otherwise (production, staging, testing, etc.)
+    Returns True only if the resolved FLASK_CONFIG is 'development' (or the
+    deprecated 'default' alias). An unset value resolves to 'production'.
     """
-    flask_config = os.environ.get("FLASK_CONFIG", "").lower()
-    return flask_config in {"development", "default", ""}
+    return _RESOLVED_FLASK_CONFIG in {"development", "default"}
 
 
 def _should_strict_validate(flask_config: str) -> bool:
@@ -192,7 +249,7 @@ class Config:
     # SECRET_KEY is critical for session security, CSRF protection, and token generation
     # In production, it MUST be set via environment variable
     _secret_key = os.environ.get("SECRET_KEY")
-    _flask_config = os.environ.get("FLASK_CONFIG", "").lower()
+    _flask_config = _RESOLVED_FLASK_CONFIG
 
     if _flask_config not in _ALLOWED_FLASK_CONFIGS:
         # Fail fast for unknown config names; otherwise callers often fall back to DevelopmentConfig (DEBUG=True).
@@ -245,10 +302,105 @@ class Config:
 
     SECRET_KEY = _secret_key
 
-    # Dedicated signing key for mobile JWT tokens. Falls back to SECRET_KEY when
-    # not set.  Using a separate secret limits blast radius: rotating one key
-    # does not invalidate the other.
-    MOBILE_JWT_SECRET = os.environ.get("MOBILE_JWT_SECRET") or _secret_key
+    # Dedicated signing key for mobile JWT tokens. Falls back to SECRET_KEY only in
+    # development/testing; production/staging startup validation requires an explicit,
+    # distinct value (app/utils/security_startup.py). Using a separate secret limits
+    # blast radius: rotating one key does not invalidate the other.
+    _mobile_jwt_secret_env = (os.environ.get("MOBILE_JWT_SECRET") or "").strip()
+    MOBILE_JWT_SECRET = _mobile_jwt_secret_env or _secret_key
+    MOBILE_JWT_SECRET_EXPLICIT = bool(_mobile_jwt_secret_env)
+    # Verify-only keys (comma-separated) accepted while rotating MOBILE_JWT_SECRET.
+    MOBILE_JWT_SECRET_PREVIOUS: list[str] = [
+        s.strip() for s in (os.environ.get("MOBILE_JWT_SECRET_PREVIOUS") or "").split(",") if s.strip()
+    ]
+    # Transition: tokens minted before MOBILE_JWT_SECRET was split from SECRET_KEY are
+    # still accepted (verify-only) until they expire. Disable once the refresh-token
+    # TTL (MOBILE_REFRESH_TOKEN_TTL_DAYS) has elapsed since the secrets were split.
+    MOBILE_JWT_ACCEPT_LEGACY_SECRET_KEY = _parse_bool(
+        os.environ.get("MOBILE_JWT_ACCEPT_LEGACY_SECRET_KEY"), default=True
+    )
+
+    # Dedicated signing key for short-lived AI (Website/Mobile chat) JWTs. Falls back to
+    # SECRET_KEY with a deprecation warning during the transition; tokens signed with the
+    # old key stay valid for their remaining (short) TTL.
+    AI_JWT_SECRET = (os.environ.get("AI_JWT_SECRET") or "").strip() or None
+    AI_JWT_ACCEPT_LEGACY_SECRET_KEY = _parse_bool(
+        os.environ.get("AI_JWT_ACCEPT_LEGACY_SECRET_KEY"), default=True
+    )
+
+    # Bearer mobile JWTs authenticate requests only under these path prefixes (comma-separated).
+    # Every other route (server-rendered admin pages, cookie/CSRF routes) ignores Bearer JWTs.
+    MOBILE_JWT_BEARER_PATH_PREFIXES: list[str] = [
+        p.strip() for p in (os.environ.get("MOBILE_JWT_BEARER_PATH_PREFIXES") or "/api/mobile/v1/").split(",")
+        if p.strip()
+    ]
+    # Escape hatch for old app builds that send their JWT to other JSON routes. Empty by default.
+    MOBILE_JWT_LEGACY_BEARER_PATH_PREFIXES: list[str] = [
+        p.strip() for p in (os.environ.get("MOBILE_JWT_LEGACY_BEARER_PATH_PREFIXES") or "").split(",")
+        if p.strip()
+    ]
+    # Mobile Azure sign-in hands the app a single-use authorization code (exchanged over
+    # POST) instead of putting JWTs in the humdatabank:// deep link. The legacy
+    # tokens-in-URL delivery remains for app builds that predate the code flow; turn it
+    # off (false) once those builds are retired.
+    MOBILE_OAUTH_CODE_TTL_SECONDS = int(os.environ.get("MOBILE_OAUTH_CODE_TTL_SECONDS", "60"))
+    MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK = _parse_bool(
+        os.environ.get("MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK"), default=True
+    )
+
+    # Reverse-proxy trust. ProxyFix is applied when TRUST_PROXY_HEADERS is true; each
+    # PROXY_FIX_X_* value is the number of trusted proxy hops that append that header
+    # (get_client_ip() reads request.remote_addr, so these counts define who the "client" is).
+    TRUST_PROXY_HEADERS = _parse_bool(
+        os.environ.get("TRUST_PROXY_HEADERS"), default=_flask_config in ("production", "staging")
+    )
+    TRUST_PROXY_HEADERS_EXPLICIT = (os.environ.get("TRUST_PROXY_HEADERS") or "").strip() != ""
+
+    PROXY_FIX_X_FOR = _parse_proxy_hops("PROXY_FIX_X_FOR")
+    PROXY_FIX_X_PROTO = _parse_proxy_hops("PROXY_FIX_X_PROTO")
+    PROXY_FIX_X_HOST = _parse_proxy_hops("PROXY_FIX_X_HOST")
+    PROXY_FIX_X_PORT = _parse_proxy_hops("PROXY_FIX_X_PORT")
+    PROXY_FIX_X_PREFIX = _parse_proxy_hops("PROXY_FIX_X_PREFIX")
+
+    # Shared rate-limit / auth-state storage. RATELIMIT_STORAGE_URI (redis://...) is shared
+    # across workers. Without it, security-critical limiters (login, password reset, token
+    # refresh) fall back to the database in production/staging (RATE_LIMIT_SHARED_FALLBACK=db)
+    # instead of per-process memory. RATE_LIMIT_REQUIRE_SHARED_STORAGE=true refuses to start
+    # a multi-worker deployment that has neither Redis nor the DB fallback.
+    RATELIMIT_STORAGE_URI = (os.environ.get("RATELIMIT_STORAGE_URI") or "").strip() or None
+    RATE_LIMIT_SHARED_FALLBACK = (
+        (os.environ.get("RATE_LIMIT_SHARED_FALLBACK") or "").strip().lower()
+        or ("db" if _flask_config in ("production", "staging") else "memory")
+    )
+    RATE_LIMIT_REQUIRE_SHARED_STORAGE = _parse_bool(
+        os.environ.get("RATE_LIMIT_REQUIRE_SHARED_STORAGE"), default=False
+    )
+    # auto = Redis when a redis:// URL is configured, else the auth_state_entry table.
+    AUTH_STATE_BACKEND = (os.environ.get("AUTH_STATE_BACKEND") or "auto").strip().lower()
+    # Mobile /auth/token answers a deactivated account with the same generic 401 as a wrong
+    # password. Set true to return the explicit "account is deactivated" 403 instead.
+    MOBILE_REVEAL_DEACTIVATED_ACCOUNT = _parse_bool(
+        os.environ.get("MOBILE_REVEAL_DEACTIVATED_ACCOUNT"), default=False
+    )
+
+    # Self-service registration hardening (B2C disabled deployments).
+    REGISTRATION_EMAIL_CHECK_ENABLED = _parse_bool(os.environ.get("REGISTRATION_EMAIL_CHECK_ENABLED"), default=False)
+    REGISTRATION_REVEAL_EXISTING_EMAIL = _parse_bool(os.environ.get("REGISTRATION_REVEAL_EXISTING_EMAIL"), default=False)
+
+    # Runtime plugin ZIP upload executes arbitrary Python in-process: off outside dev/test.
+    PLUGIN_UPLOAD_ENABLED = _parse_bool(
+        os.environ.get("PLUGIN_UPLOAD_ENABLED"), default=_flask_config in ("development", "testing")
+    )
+
+    # Extra accounts (comma-separated e-mails) the dev-only "Act as" panel may sign in as, in
+    # addition to the seeded test_sys / test_admin / test_focal users.
+    DEV_ACT_AS_EXTRA_EMAILS: list[str] = [
+        e.strip().lower() for e in (os.environ.get("DEV_ACT_AS_EXTRA_EMAILS") or "").split(",") if e.strip()
+    ]
+
+    # Dev-only auto-login shortcut for admin routes; startup refuses it unless DEBUG and
+    # FLASK_CONFIG=development (see create_app / security_startup).
+    DEBUG_SKIP_LOGIN = _parse_bool(os.environ.get("DEBUG_SKIP_LOGIN"), default=False)
 
     # Optional shared plaintext for Flutter `MOBILE_APP_API_KEY` (X-Mobile-Auth / Bearer on /api/v1).
     # When set, requests match this key even if no `api_keys` row exists (e.g. Fly without seeding DB keys).
@@ -260,6 +412,21 @@ class Config:
         MOBILE_APP_API_KEY_RATE_LIMIT_PER_MINUTE = _rl if _rl > 0 else 300
     except (TypeError, ValueError):
         MOBILE_APP_API_KEY_RATE_LIMIT_PER_MINUTE = 300
+    # Capabilities granted to the env key above (comma-separated codes, see
+    # app/services/security/api_key_permissions.py). Default is read-only reference + public content;
+    # it never receives data, submission, user or template access unless listed here explicitly.
+    MOBILE_APP_API_KEY_CAPABILITIES = (
+        os.environ.get("MOBILE_APP_API_KEY_CAPABILITIES") or "reference:read,content:read,mobile:client"
+    ).strip()
+    # Emergency kill switch: false makes every legacy full-access DB key deny everything until re-scoped.
+    API_KEY_ALLOW_LEGACY_FULL_ACCESS = _parse_bool(
+        os.environ.get("API_KEY_ALLOW_LEGACY_FULL_ACCESS"), default=True
+    )
+    try:
+        _key_max_pp = int((os.environ.get("API_KEY_MAX_PER_PAGE") or "10000").strip())
+        API_KEY_MAX_PER_PAGE = _key_max_pp if _key_max_pp > 0 else 10000
+    except (TypeError, ValueError):
+        API_KEY_MAX_PER_PAGE = 10000
 
     # reCAPTCHA Enterprise (IFRC Indicator Bank public suggestion compat route)
     RECAPTCHA_PROJECT_ID = (os.environ.get("RECAPTCHA_PROJECT_ID") or "").strip() or None
@@ -270,6 +437,12 @@ class Config:
         RECAPTCHA_MIN_SCORE = float((os.environ.get("RECAPTCHA_MIN_SCORE") or "0.5").strip())
     except (TypeError, ValueError):
         RECAPTCHA_MIN_SCORE = 0.5
+
+    # Anonymous POST /api/mobile/v1/data/indicator-suggestions: require a reCAPTCHA token and
+    # cap persisted submissions (DB-backed, so the caps hold across workers).
+    MOBILE_SUGGESTION_REQUIRE_CAPTCHA = _parse_bool(os.environ.get("MOBILE_SUGGESTION_REQUIRE_CAPTCHA"), default=False)
+    SUGGESTION_PER_EMAIL_DAILY_LIMIT = int((os.environ.get("SUGGESTION_PER_EMAIL_DAILY_LIMIT") or "3").strip())
+    SUGGESTION_GLOBAL_HOURLY_LIMIT = int((os.environ.get("SUGGESTION_GLOBAL_HOURLY_LIMIT") or "100").strip())
 
     # Comma-separated IPs that bypass all in-process rate limiting.
     # Useful for CI pipelines and dedicated load-test runner IPs so they never
@@ -897,6 +1070,21 @@ class Config:
     AI_CHAT_PURGE_AFTER_DAYS = int(os.environ.get('AI_CHAT_PURGE_AFTER_DAYS', '365'))
     AI_CHAT_ARCHIVE_DIR = (os.environ.get('AI_CHAT_ARCHIVE_DIR', 'ai_chat_archives') or 'ai_chat_archives').strip()
     AI_CHAT_MAINTENANCE_BATCH_SIZE = int(os.environ.get('AI_CHAT_MAINTENANCE_BATCH_SIZE', '200'))
+
+    # Reasoning-trace privacy (app/services/ai/quality/trace_privacy.py) and daily usage budgets
+    # (app/services/ai/policies/usage_budget.py). Unset values fall back to the module defaults.
+    AI_TRACE_STORE_MODE = (os.environ.get('AI_TRACE_STORE_MODE', 'redacted') or 'redacted').strip().lower()
+    AI_TRACE_RETENTION_DAYS = os.environ.get('AI_TRACE_RETENTION_DAYS')
+    AI_TOOL_USAGE_PAYLOAD_RETENTION_DAYS = os.environ.get('AI_TOOL_USAGE_PAYLOAD_RETENTION_DAYS')
+    AI_TRACE_RAW_OUTPUT_PERMISSION = (os.environ.get('AI_TRACE_RAW_OUTPUT_PERMISSION') or '').strip()
+    AI_CHAT_DAILY_USER_LIMIT = os.environ.get('AI_CHAT_DAILY_USER_LIMIT')
+    AI_CHAT_DAILY_MANAGER_LIMIT = os.environ.get('AI_CHAT_DAILY_MANAGER_LIMIT')
+    AI_CHAT_DAILY_ANON_IP_LIMIT = os.environ.get('AI_CHAT_DAILY_ANON_IP_LIMIT')
+    AI_CHAT_DAILY_ANON_LIMIT = os.environ.get('AI_CHAT_DAILY_ANON_LIMIT')
+    AI_CHAT_DAILY_SYSTEM_LIMIT = os.environ.get('AI_CHAT_DAILY_SYSTEM_LIMIT')
+    AI_DAILY_COST_BUDGET_USER_USD = os.environ.get('AI_DAILY_COST_BUDGET_USER_USD')
+    AI_DAILY_COST_BUDGET_ANON_USD = os.environ.get('AI_DAILY_COST_BUDGET_ANON_USD')
+    AI_DAILY_COST_BUDGET_SYSTEM_USD = os.environ.get('AI_DAILY_COST_BUDGET_SYSTEM_USD')
 
     # HTTP timeouts for outbound AI calls (embedding, LLM). Prevents hung requests.
     AI_HTTP_TIMEOUT_SECONDS = int(os.environ.get('AI_HTTP_TIMEOUT_SECONDS', '120'))

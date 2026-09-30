@@ -2,8 +2,10 @@
 Document-related models for file uploads and resource management.
 """
 import logging
+import uuid
 from datetime import datetime
 from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, Date, Table, func, event
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship, backref, Session, attributes
 from ..extensions import db
 from app.utils.datetime_helpers import utcnow
@@ -28,6 +30,8 @@ submitted_document_countries = Table(
 class SubmittedDocument(db.Model):
     __tablename__ = 'submitted_document'
     id = db.Column(db.Integer, primary_key=True)
+    # Opaque identifier for unauthenticated URLs; the integer id must never appear in public links.
+    public_id = db.Column(PGUUID(as_uuid=True), nullable=False, default=uuid.uuid4)
     assignment_entity_status_id = db.Column(db.Integer, db.ForeignKey('assignment_entity_status.id'), nullable=True)
     public_submission_id = db.Column(db.Integer, db.ForeignKey('public_submission.id'), nullable=True)
     country_id = db.Column(db.Integer, db.ForeignKey('country.id'), nullable=True)
@@ -86,6 +90,7 @@ class SubmittedDocument(db.Model):
         db.Index('ix_submitted_doc_is_public', 'is_public'),
         db.Index('ix_submitted_doc_language', 'language'),
         db.Index('ix_submitted_doc_fdrs_import_key', 'fdrs_import_key', unique=True),
+        db.Index('uq_submitted_doc_public_id', 'public_id', unique=True),
     )
 
     @property

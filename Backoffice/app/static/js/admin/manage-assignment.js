@@ -733,7 +733,7 @@
                 filter: 'customSetFilter',
                 sortable: true,
                 cellRenderer: function(params) {
-                    return '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">' + (params.value || '') + '</span>';
+                    return '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">' + ((window.SafeDom && window.SafeDom.escapeHtml) ? window.SafeDom.escapeHtml(String(params.value || '')) : '') + '</span>';
                 }
             },
             {
@@ -4044,9 +4044,17 @@
         selectedUsers.forEach(function (user) {
             var chip = document.createElement('div');
             chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-sm text-gray-800';
-            chip.innerHTML = '<span><strong>' + (user.name || user.email) + '</strong>'
-                + (user.email ? ' <span class="text-gray-500">(' + user.email + ')</span>' : '')
-                + '</span>';
+            var chipMain = document.createElement('strong');
+            chipMain.textContent = user.name || user.email || '';
+            var chipWrap = document.createElement('span');
+            chipWrap.appendChild(chipMain);
+            if (user.email) {
+                var chipEmail = document.createElement('span');
+                chipEmail.className = 'text-gray-500';
+                chipEmail.textContent = ' (' + user.email + ')';
+                chipWrap.appendChild(chipEmail);
+            }
+            chip.appendChild(chipWrap);
             var removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'text-red-600 hover:text-red-800 text-xs font-medium';
@@ -4081,8 +4089,13 @@
             var row = document.createElement('button');
             row.type = 'button';
             row.className = 'w-full text-left p-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0';
-            row.innerHTML = '<div class="text-sm font-medium text-gray-900">' + (user.name || user.email) + '</div>'
-                + '<div class="text-xs text-gray-500">' + user.email + '</div>';
+            var rowName = document.createElement('div');
+            rowName.className = 'text-sm font-medium text-gray-900';
+            rowName.textContent = user.name || user.email || '';
+            var rowEmail = document.createElement('div');
+            rowEmail.className = 'text-xs text-gray-500';
+            rowEmail.textContent = user.email || '';
+            row.append(rowName, rowEmail);
             row.addEventListener('click', function () {
                 if (!isSelected(user.id)) {
                     selectedUsers.push(user);

@@ -115,7 +115,7 @@ class TestApprovePublicSubmission:
             app.config["WTF_CSRF_ENABLED"] = True
             try:
                 with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
-                     patch("flask_wtf.FlaskForm.validate_on_submit", return_value=False):
+                     patch("app.routes.forms.submission.FlaskForm.validate_on_submit", lambda self, extra_validators=None: False):
                     mock_sub = _make_mock_submission(1)
                     mock_q.get_or_404.return_value = mock_sub
                     resp = client.post("/forms/public-submission/1/approve")
@@ -178,7 +178,7 @@ class TestRejectPublicSubmission:
         _login(client, admin_user.id)
 
         with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
-             patch("flask_wtf.FlaskForm.validate_on_submit", return_value=False):
+             patch("app.routes.forms.submission.FlaskForm.validate_on_submit", lambda self, extra_validators=None: False):
             mock_sub = _make_mock_submission(1)
             mock_q.get_or_404.return_value = mock_sub
             resp = client.post("/forms/public-submission/1/reject")
@@ -258,14 +258,19 @@ class TestDeletePublicSubmission:
 
         assert resp.status_code == 302
 
-    def test_delete_csrf_fail_flashes(self, client, admin_user):
+    def test_delete_csrf_fail_flashes(self, client, admin_user, app):
         _login(client, admin_user.id)
 
-        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
-             patch("flask_wtf.FlaskForm.validate_on_submit", return_value=False):
-            mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-            resp = client.post("/forms/public-submission/1/delete")
+        with app.app_context():
+            app.config["WTF_CSRF_ENABLED"] = True
+            try:
+                with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
+                     patch("app.routes.forms.submission.FlaskForm.validate_on_submit", lambda self, extra_validators=None: False):
+                    mock_sub = _make_mock_submission(1)
+                    mock_q.get_or_404.return_value = mock_sub
+                    resp = client.post("/forms/public-submission/1/delete")
+            finally:
+                app.config["WTF_CSRF_ENABLED"] = False
 
         assert resp.status_code == 302
 
@@ -351,7 +356,7 @@ class TestUpdatePublicSubmissionStatus:
         _login(client, admin_user.id)
 
         with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
-             patch("flask_wtf.FlaskForm.validate_on_submit", return_value=False):
+             patch("app.routes.forms.submission.FlaskForm.validate_on_submit", lambda self, extra_validators=None: False):
             mock_sub = _make_mock_submission(1)
             mock_q.get_or_404.return_value = mock_sub
 
@@ -921,22 +926,27 @@ class TestDeleteSelfReportAssignment:
 
         assert resp.status_code == 302
 
-    def test_delete_self_report_csrf_fail(self, client, admin_user):
+    def test_delete_self_report_csrf_fail(self, client, admin_user, app):
         _login(client, admin_user.id)
 
         from app.utils.constants import SELF_REPORT_PERIOD_NAME
 
-        with patch(
-            "app.routes.forms.submission.AuthorizationService.check_self_report_access",
-            return_value=True,
-        ), patch("flask_wtf.FlaskForm.validate_on_submit", return_value=False):
-            with patch("app.routes.forms.submission.AssignmentEntityStatus.query") as mock_q:
-                mock_aes = MagicMock()
-                mock_aes.id = 1
-                mock_aes.assigned_form.period_name = SELF_REPORT_PERIOD_NAME
-                mock_q.get_or_404.return_value = mock_aes
+        with app.app_context():
+            app.config["WTF_CSRF_ENABLED"] = True
+            try:
+                with patch(
+                    "app.routes.forms.submission.AuthorizationService.check_self_report_access",
+                    return_value=True,
+                ), patch("app.routes.forms.submission.FlaskForm.validate_on_submit", lambda self, extra_validators=None: False):
+                    with patch("app.routes.forms.submission.AssignmentEntityStatus.query") as mock_q:
+                        mock_aes = MagicMock()
+                        mock_aes.id = 1
+                        mock_aes.assigned_form.period_name = SELF_REPORT_PERIOD_NAME
+                        mock_q.get_or_404.return_value = mock_aes
 
-                resp = client.post("/forms/delete_self_report_assignment/1")
+                        resp = client.post("/forms/delete_self_report_assignment/1")
+            finally:
+                app.config["WTF_CSRF_ENABLED"] = False
 
         assert resp.status_code == 302
 
@@ -1084,8 +1094,22 @@ class TestViewAndEditPublicSubmission:
 
     def test_edit_submission_can_edit_false(self, client, admin_user):
         """When user has no edit permission, can_edit=False and POST is skipped."""
+        from app.utils.form_authorization import (
+            AUTH_FORBIDDEN,
+            AUTH_OK,
+            PUBLIC_SUBMISSION_ACTION_EDIT,
+            PUBLIC_SUBMISSION_ACTION_VIEW,
+        )
+
         _login(client, admin_user.id)
         mock_sub, mock_section = self._setup_mocks()
+
+        def _access(_submission, _user, action=PUBLIC_SUBMISSION_ACTION_VIEW):
+            if action == PUBLIC_SUBMISSION_ACTION_VIEW:
+                return AUTH_OK
+            if action == PUBLIC_SUBMISSION_ACTION_EDIT:
+                return AUTH_FORBIDDEN
+            return AUTH_FORBIDDEN
 
         with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
              patch("app.routes.forms.submission.FormSection.query") as mock_sec_q, \
@@ -1093,10 +1117,8 @@ class TestViewAndEditPublicSubmission:
              patch("app.routes.forms.submission.get_form_items_for_section", return_value=[]), \
              patch("app.routes.forms.submission._load_existing_data_for_public_submission", return_value={}), \
              patch("app.routes.forms.submission._prepare_submitted_documents_for_template", return_value={}), \
-             patch("app.routes.forms.submission.render_template", return_value="<html>view</html>"), \
-             patch("app.routes.forms.submission.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.routes.forms.submission.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.routes.forms.submission.AuthorizationService.has_country_access", return_value=False):
+             patch("app.routes.forms.submission.render_template", return_value="<html>view</html>") as mock_render, \
+             patch("app.routes.forms.submission.public_submission_access", side_effect=_access):
             mock_q.options.return_value.get_or_404.return_value = mock_sub
             mock_sec_q.filter_by.return_value.order_by.return_value.all.return_value = [mock_section]
             mock_page_q.filter_by.return_value.order_by.return_value.all.return_value = []
@@ -1104,11 +1126,26 @@ class TestViewAndEditPublicSubmission:
             resp = client.get("/forms/public-submission/1/edit?edit=false")
 
         assert resp.status_code == 200
+        assert mock_render.call_args.kwargs.get("can_edit") is False
 
     def test_edit_forced_via_query_param(self, client, admin_user):
-        """?edit=true forces can_edit=True."""
+        """?edit=true no longer elevates privilege when EDIT is denied."""
+        from app.utils.form_authorization import (
+            AUTH_FORBIDDEN,
+            AUTH_OK,
+            PUBLIC_SUBMISSION_ACTION_EDIT,
+            PUBLIC_SUBMISSION_ACTION_VIEW,
+        )
+
         _login(client, admin_user.id)
         mock_sub, mock_section = self._setup_mocks()
+
+        def _access(_submission, _user, action=PUBLIC_SUBMISSION_ACTION_VIEW):
+            if action == PUBLIC_SUBMISSION_ACTION_VIEW:
+                return AUTH_OK
+            if action == PUBLIC_SUBMISSION_ACTION_EDIT:
+                return AUTH_FORBIDDEN
+            return AUTH_FORBIDDEN
 
         with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
              patch("app.routes.forms.submission.FormSection.query") as mock_sec_q, \
@@ -1116,10 +1153,8 @@ class TestViewAndEditPublicSubmission:
              patch("app.routes.forms.submission.get_form_items_for_section", return_value=[]), \
              patch("app.routes.forms.submission._load_existing_data_for_public_submission", return_value={}), \
              patch("app.routes.forms.submission._prepare_submitted_documents_for_template", return_value={}), \
-             patch("app.routes.forms.submission.render_template", return_value="<html>view</html>"), \
-             patch("app.routes.forms.submission.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.routes.forms.submission.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.routes.forms.submission.AuthorizationService.has_country_access", return_value=False):
+             patch("app.routes.forms.submission.render_template", return_value="<html>view</html>") as mock_render, \
+             patch("app.routes.forms.submission.public_submission_access", side_effect=_access):
             mock_q.options.return_value.get_or_404.return_value = mock_sub
             mock_sec_q.filter_by.return_value.order_by.return_value.all.return_value = [mock_section]
             mock_page_q.filter_by.return_value.order_by.return_value.all.return_value = []
@@ -1127,6 +1162,7 @@ class TestViewAndEditPublicSubmission:
             resp = client.get("/forms/public-submission/1/view?edit=true")
 
         assert resp.status_code == 200
+        assert mock_render.call_args.kwargs.get("can_edit") is False
 
     def test_edit_post_with_country_change(self, client, admin_user):
         """POST with a new country_id changes the submission country."""

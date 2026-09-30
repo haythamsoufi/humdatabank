@@ -526,7 +526,7 @@ class TestGetFormdataMap:
             mock_user = MagicMock()
             mock_user.is_authenticated = True
             with patch("app.services.data_retrieval.service.current_user", mock_user), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=False):
                 result = get_formdata_map(aes.id)
                 assert result == {}
@@ -542,7 +542,7 @@ class TestGetFormdataMap:
             mock_user = MagicMock()
             mock_user.is_authenticated = True
             with patch("app.services.data_retrieval.service.current_user", mock_user), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True):
                 result = get_formdata_map(aes.id)
                 assert isinstance(result, dict)
@@ -558,7 +558,7 @@ class TestGetFormdataMap:
             mock_user = MagicMock()
             mock_user.is_authenticated = True
             with patch("app.services.data_retrieval.service.current_user", mock_user), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True):
                 result = get_formdata_map(aes.id, item_ids=[1, 2, 3])
                 assert isinstance(result, dict)
@@ -596,7 +596,7 @@ class TestGetAesWithJoins:
             )
             mock_user = MagicMock()
             with patch("app.services.data_retrieval.service.current_user", mock_user), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=False):
                 result = get_aes_with_joins(aes.id)
                 assert result is None
@@ -611,7 +611,7 @@ class TestGetAesWithJoins:
             )
             mock_user = MagicMock()
             with patch("app.services.data_retrieval.service.current_user", mock_user), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True):
                 result = get_aes_with_joins(aes.id)
                 assert result is not None
@@ -650,7 +650,7 @@ class TestEnsureAesAccess:
             )
             mock_user = MagicMock()
             with patch("app.services.data_retrieval.service.current_user", mock_user), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True):
                 result = ensure_aes_access(aes.id)
                 assert "aes" in result
@@ -700,7 +700,7 @@ class TestCheckAesAccessLight:
             )
             with patch("app.services.data_retrieval.service.current_user",
                        self._mock_user(7)), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True) as mock_check:
                 assert check_aes_access_light(aes.id) is True
                 assert check_aes_access_light(aes.id) is True
@@ -719,7 +719,7 @@ class TestCheckAesAccessLight:
             )
             with patch("app.services.data_retrieval.service.current_user",
                        self._mock_user(7)), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=False) as mock_check:
                 assert check_aes_access_light(aes.id) is False
                 assert check_aes_access_light(aes.id) is False
@@ -737,7 +737,7 @@ class TestCheckAesAccessLight:
             aes = create_test_assignment_entity_status(
                 db_session, country=country, template=template
             )
-            with patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+            with patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True) as mock_check:
                 with patch("app.services.data_retrieval.service.current_user",
                            self._mock_user(7)):
@@ -758,7 +758,7 @@ class TestCheckAesAccessLight:
             )
             with patch("app.services.data_retrieval.service.current_user",
                        self._mock_user(7)), \
-                 patch("app.services.organization.entity_service.EntityService.check_user_entity_access",
+                 patch("app.services.data_retrieval.service._current_user_can_view_aes",
                        return_value=True) as mock_check:
                 assert drs.check_aes_access_light(aes.id) is True
                 # Force the entry to be expired, then confirm a fresh DB check.

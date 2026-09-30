@@ -260,7 +260,7 @@ class TestChatImmersive:
 
     def test_redirects_when_no_ai_beta_access(self, logged_in_client, app):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=False):
+        with patch("app.routes.main.views.user_has_ai_beta_access", return_value=False):
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 302
 
@@ -347,15 +347,12 @@ class TestDownloadSubmissionPdf:
         mock_submission.submitter_email = "tester@example.com"
 
         with patch("app.models.PublicSubmission.query") as mock_q, \
-             patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=False):
+             patch(
+                 "app.utils.form_authorization.public_submission_access",
+                 return_value="denied",
+             ):
             mock_q.get_or_404.return_value = mock_submission
-            # entity_permissions is empty
-            mock_submission_user = MagicMock()
-            mock_submission_user.entity_permissions = []
-            with patch("flask_login.utils._get_user") as mock_gu:
-                mock_gu.return_value = mock_submission_user
-                mock_gu.return_value.is_authenticated = True
-                resp = logged_in_client.get("/download_submission_pdf/1")
+            resp = logged_in_client.get("/download_submission_pdf/1")
         assert resp.status_code in (403, 302, 404)
 
     def test_weasyprint_unavailable_returns_503(self, logged_in_client, db_session, app, admin_user):
@@ -476,10 +473,12 @@ class TestManageNsHierarchy:
              patch("app.models.NSBranch") as mock_branch, \
              patch("app.models.NSSubBranch") as mock_sub, \
              patch("app.models.NSLocalUnit") as mock_lu, \
+             patch("app.routes.main.views.db") as mock_db, \
              patch("app.routes.main.views.render_template", return_value="<html>ns</html>") as mock_rt:
             mock_branch.query.order_by.return_value.all.return_value = []
             mock_sub.query.order_by.return_value.all.return_value = []
             mock_lu.query.order_by.return_value.all.return_value = []
+            mock_db.session.query.return_value.join.return_value.distinct.return_value.order_by.return_value.all.return_value = []
             resp = logged_in_client.get("/ns_structure")
         assert resp.status_code == 200
         mock_rt.assert_called_once()
@@ -491,10 +490,12 @@ class TestManageNsHierarchy:
              patch("app.models.NSBranch") as mock_branch, \
              patch("app.models.NSSubBranch") as mock_sub, \
              patch("app.models.NSLocalUnit") as mock_lu, \
+             patch("app.routes.main.views.db") as mock_db, \
              patch("app.routes.main.views.render_template", return_value="<html>ns</html>"):
             mock_branch.query.order_by.return_value.all.return_value = []
             mock_sub.query.order_by.return_value.all.return_value = []
             mock_lu.query.order_by.return_value.all.return_value = []
+            mock_db.session.query.return_value.join.return_value.distinct.return_value.order_by.return_value.all.return_value = []
             resp = logged_in_client.get("/ns_structure")
         assert resp.status_code == 200
 

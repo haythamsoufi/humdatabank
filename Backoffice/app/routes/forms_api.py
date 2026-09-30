@@ -1,6 +1,7 @@
+from contextlib import suppress
 from app.routes.forms.helpers import parse_csv_id_set
 from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.sql_utils import like_contains, safe_ilike_pattern
 """
 API endpoints for form-related operations.
 Extracted from forms.py for better organization and separation of concerns.
@@ -27,7 +28,7 @@ from app.utils.form_localization import (
     get_localized_indicator_definition, get_localized_indicator_type, get_localized_indicator_unit,
     get_translation_key
 )
-from sqlalchemy import or_, inspect
+from sqlalchemy import Text, cast, or_, inspect
 from sqlalchemy.orm import joinedload
 from datetime import datetime
 import base64
@@ -45,8 +46,14 @@ from app.models import (
     FormItem, FormData,
 )
 from app.services import check_aes_access_light
-from app.services import check_country_access
-from app.services import ensure_aes_access
+from app.utils.form_authorization import (
+    AES_ACTION_EDIT,
+    AES_ACTION_VIEW,
+    authorize_aes_json,
+    authorize_child_json,
+    load_aes_for_user,
+    user_can_read_lookup_list,
+)
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
@@ -65,6 +72,7 @@ from app.utils.discussion_comments import (
 )
 
 DISCUSSION_COMMENT_MAX_LENGTH = 2000
+MAX_LOOKUP_OPTIONS_ROWS = 5000
 
 # Create the API blueprint
 # Changed from /forms to /api/forms to avoid prefix conflict with forms.py
@@ -161,8 +169,8 @@ def api_search_indicator_bank():
         if sector_filter:
             indicators_query = indicators_query.filter(
                 or_(
-                    IndicatorBank.sector.like(f'%"{sector_filter}"%'),
-                    IndicatorBank.sub_sector.like(f'%"{sector_filter}"%')
+                    like_contains(cast(IndicatorBank.sector, Text), f'"{sector_filter}"'),
+                    like_contains(cast(IndicatorBank.sub_sector, Text), f'"{sector_filter}"')
                 )
             )
 
@@ -220,16 +228,20 @@ def api_add_dynamic_indicator():
         repeat_instance_number_raw = data.get('repeat_instance_number')
         repeat_instance_number = int(repeat_instance_number_raw) if repeat_instance_number_raw is not None else None
 
-        # Verify the assignment exists and user has access
-        access_result = ensure_aes_access(assignment_entity_status_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-        assignment_entity_status = access_result['aes']
+        assignment_entity_status, access_error = authorize_aes_json(
+            assignment_entity_status_id, AES_ACTION_EDIT,
+            forbidden_message='Cannot add indicators to this assignment',
+        )
+        if access_error is not None:
+            return access_error
 
-        # Verify the section exists and is a dynamic section
+        # Verify the section exists, is a dynamic section and belongs to this assignment's template
         section = FormSection.query.get_or_404(section_id)
         if section.section_type != 'dynamic_indicators':
             return json_bad_request('Section is not a dynamic indicators section')
+        assigned_form = assignment_entity_status.assigned_form
+        if not assigned_form or section.template_id != assigned_form.template_id:
+            return json_bad_request('Section does not belong to this assignment')
 
         # Verify the indicator exists
         indicator = IndicatorBank.query.get_or_404(indicator_bank_id)
@@ -307,11 +319,12 @@ def api_render_pending_dynamic_indicator():
         repeat_instance_number_raw = data.get('repeat_instance_number')
         repeat_instance_number = int(repeat_instance_number_raw) if repeat_instance_number_raw is not None else None
 
-        # Verify the assignment exists and user has access
-        access_result = ensure_aes_access(assignment_entity_status_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-        assignment_entity_status = access_result['aes']
+        assignment_entity_status, access_error = authorize_aes_json(
+            assignment_entity_status_id, AES_ACTION_EDIT,
+            forbidden_message='Cannot add indicators to this assignment',
+        )
+        if access_error is not None:
+            return access_error
 
         # Optimize: Load section with template relationship to reduce queries
         section = FormSection.query.options(
@@ -319,6 +332,9 @@ def api_render_pending_dynamic_indicator():
         ).get_or_404(section_id)
         if section.section_type != 'dynamic_indicators':
             return json_bad_request('Section is not a dynamic indicators section')
+        assigned_form = assignment_entity_status.assigned_form
+        if not assigned_form or section.template_id != assigned_form.template_id:
+            return json_bad_request('Section does not belong to this assignment')
 
         # Verify the indicator exists
         indicator = IndicatorBank.query.get_or_404(indicator_bank_id)
@@ -391,16 +407,17 @@ def api_render_pending_dynamic_indicator():
 def api_render_dynamic_indicator(assignment_id):
     """API endpoint to render a dynamic indicator form item."""
     try:
-        dynamic_assignment = DynamicIndicatorData.query.get_or_404(assignment_id)
+        access, access_error = authorize_child_json(
+            DynamicIndicatorData, assignment_id, AES_ACTION_VIEW, label='Dynamic indicator'
+        )
+        if access_error is not None:
+            return access_error
+        dynamic_assignment = access.obj
 
-        if not dynamic_assignment.assignment_entity_status_id:
+        if not access.aes:
             return json_bad_request('Dynamic indicator rendering requires a valid assignment.')
 
-        access_result = ensure_aes_access(dynamic_assignment.assignment_entity_status_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-
-        assignment_entity_status = access_result['aes']
+        assignment_entity_status = access.aes
         section = FormSection.query.get_or_404(dynamic_assignment.section_id)
 
         html = render_dynamic_indicator_item_html(
@@ -420,14 +437,12 @@ def api_render_dynamic_indicator(assignment_id):
 def api_remove_dynamic_indicator(assignment_id):
     """API endpoint to remove a dynamic indicator assignment."""
     try:
-        # Find the assignment
-        assignment = DynamicIndicatorData.query.get_or_404(assignment_id)
-
-        # Check user access
-        from app.utils.api_serialization import _country_for_aes
-        aes_country = _country_for_aes(assignment.assignment_entity_status)
-        if not check_country_access(aes_country.id if aes_country else None):
-            return json_forbidden('Access denied')
+        access, access_error = authorize_child_json(
+            DynamicIndicatorData, assignment_id, AES_ACTION_EDIT, label='Dynamic indicator'
+        )
+        if access_error is not None:
+            return access_error
+        assignment = access.obj
 
         # Delete the assignment (data is now stored directly in the assignment)
         db.session.delete(assignment)
@@ -444,21 +459,20 @@ def api_remove_dynamic_indicator(assignment_id):
 def api_update_dynamic_indicator(assignment_id):
     """API endpoint to update a dynamic indicator assignment."""
     try:
-        # Find the assignment
-        assignment = DynamicIndicatorData.query.get_or_404(assignment_id)
-
-        # Check user access
-        from app.utils.api_serialization import _country_for_aes
-        aes_country = _country_for_aes(assignment.assignment_entity_status)
-        if not check_country_access(aes_country.id if aes_country else None):
-            return json_forbidden('Access denied')
+        access, access_error = authorize_child_json(
+            DynamicIndicatorData, assignment_id, AES_ACTION_EDIT, label='Dynamic indicator'
+        )
+        if access_error is not None:
+            return access_error
+        assignment = access.obj
 
         # Get update data
         data = get_json_or_form()
 
         # Update fields
         if 'custom_label' in data:
-            assignment.custom_label = data['custom_label'].strip() if data['custom_label'].strip() else None
+            custom_label = str(data['custom_label'] or '').strip()
+            assignment.custom_label = custom_label[:255] if custom_label else None
 
         if 'order' in data:
             assignment.order = int(data['order'])
@@ -477,13 +491,13 @@ def api_update_dynamic_indicator(assignment_id):
 @login_required
 def api_toggle_repeat_instance_hide(instance_id):
     """Toggle the is_hidden flag for a repeat group instance."""
-    instance = RepeatGroupInstance.query.get_or_404(instance_id)
+    access, access_error = authorize_child_json(
+        RepeatGroupInstance, instance_id, AES_ACTION_EDIT, label='Repeat instance'
+    )
+    if access_error is not None:
+        return access_error
+    instance = access.obj
 
-    # Permission check: ensure current user is part of assignment country status
-    if not current_user.is_authenticated:
-        return json_forbidden('Not authenticated')
-
-    # Additional checks could be added here for role/access
     try:
         instance.is_hidden = not instance.is_hidden
         db.session.flush()
@@ -527,6 +541,13 @@ def get_lookup_list_config_ui(list_id):
         JSON response with success flag and html string
     """
     try:
+        if not (
+            AuthorizationService.is_system_manager(current_user)
+            or AuthorizationService.has_rbac_permission(current_user, 'admin.templates.edit')
+            or AuthorizationService.has_rbac_permission(current_user, 'admin.templates.create')
+        ):
+            return json_forbidden('Template editing permission required.')
+
         # Check if form integration is available
         if not hasattr(current_app, 'form_integration'):
             return json_server_error('Form integration not available')
@@ -639,7 +660,7 @@ def _detect_country_context_from_request():
         iso = (request.args.get('iso') or request.args.get('country')).strip().upper() if (request.args.get('iso') or request.args.get('country')) else None
 
         if aes_id:
-            aes = AssignmentEntityStatus.query.get(aes_id)
+            aes = load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW)
             if aes:
                 from app.utils.api_serialization import _country_for_aes
                 country = _country_for_aes(aes)
@@ -657,8 +678,7 @@ def _detect_country_context_from_request():
         m = re.search(r"/forms/entry/(\d+)", referer)
         if m:
             with suppress(Exception):
-                aes_id_ref = int(m.group(1))
-                aes = AssignmentEntityStatus.query.get(aes_id_ref)
+                aes = load_aes_for_user(int(m.group(1)), current_user, AES_ACTION_VIEW)
                 if aes:
                     from app.utils.api_serialization import _country_for_aes
                     country = _country_for_aes(aes)
@@ -746,10 +766,11 @@ def get_lookup_list_options(list_id):
             current_app.logger.warning(f"Invalid lookup list ID: {list_id}")
             return json_bad_request('Invalid lookup list ID')
 
-        # Get the lookup list
-        lookup_list = LookupList.query.get(list_id_int)
-        if not lookup_list:
-            current_app.logger.warning(f"Lookup list {list_id_int} not found")
+        # Lists are global reference data: only expose those the caller's forms/templates use.
+        # Same 404 for missing and out-of-scope lists so ids cannot be enumerated.
+        lookup_list = db.session.get(LookupList, list_id_int)
+        if not lookup_list or not user_can_read_lookup_list(current_user, list_id_int):
+            current_app.logger.warning(f"Lookup list {list_id_int} not found or not accessible")
             return json_not_found('Lookup list not found')
 
         # Parse query parameters
@@ -766,7 +787,6 @@ def get_lookup_list_options(list_id):
         current_app.logger.debug(f"Filters: {filters}")
         current_app.logger.debug(f"Field values: {field_values}")
 
-        # Get all rows for this list
         all_rows = lookup_list.rows.order_by(LookupListRow.order).all()
         current_app.logger.debug(f"Found {len(all_rows)} total rows")
 
@@ -777,15 +797,16 @@ def get_lookup_list_options(list_id):
             current_app.logger.debug(f"After filtering: {len(filtered_rows)} rows")
 
         # Convert rows to the format expected by the frontend
+        truncated = len(filtered_rows) > MAX_LOOKUP_OPTIONS_ROWS
         rows_data = []
-        for row in filtered_rows:
+        for row in filtered_rows[:MAX_LOOKUP_OPTIONS_ROWS]:
             # row.data is a JSON object containing the row data
             row_dict = row.data if isinstance(row.data, dict) else {}
             rows_data.append(row_dict)
 
         current_app.logger.debug(f"Returning {len(rows_data)} rows")
 
-        return json_ok(rows=rows_data)
+        return json_ok(rows=rows_data, truncated=truncated)
 
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -1031,12 +1052,9 @@ def evaluate_filter_condition(field_value, operator, filter_value):
 def api_assignment_completion_rate(aes_id):
     """Return the persisted completion rate for a given AssignmentEntityStatus."""
     try:
-        if not check_aes_access_light(aes_id):
+        aes = load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW)
+        if aes is None:
             return json_forbidden('Assignment not found or access denied')
-
-        aes = db.session.get(AssignmentEntityStatus, aes_id)
-        if not aes:
-            return json_not_found('Assignment form not found')
 
         from app.services.assignments.completion_service import AssignmentCompletionService
 
@@ -1055,7 +1073,7 @@ def api_assignment_completion_rate(aes_id):
 def api_assignment_completion_gaps(aes_id):
     """Return form items that count toward completion rate but are not yet filled."""
     try:
-        if not check_aes_access_light(aes_id):
+        if load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW) is None:
             return json_forbidden('Assignment not found or access denied')
 
         row = db.session.execute(
@@ -1281,7 +1299,7 @@ def api_assignment_entry_bootstrap(aes_id):
     (adding rows later) continue to use the individual endpoints.
     """
     try:
-        if not check_aes_access_light(aes_id):
+        if load_aes_for_user(aes_id, current_user, AES_ACTION_VIEW) is None:
             return json_forbidden('Assignment not found or access denied')
 
         row = db.session.execute(
@@ -1451,13 +1469,12 @@ def _discussion_comment_mutation_context(comment_id):
     if not aes_id:
         return None, json_forbidden('Cannot modify this comment')
 
-    access_result = ensure_aes_access(aes_id)
-    if 'error' in access_result:
-        return None, json_forbidden(access_result['error'])
-
-    aes = access_result['aes']
-    if not AuthorizationService.can_edit_assignment(aes, current_user):
-        return None, json_forbidden('Cannot modify comments on this assignment')
+    aes, access_error = authorize_aes_json(
+        aes_id, AES_ACTION_EDIT,
+        forbidden_message='Cannot modify comments on this assignment',
+    )
+    if access_error is not None:
+        return None, access_error
 
     if not discussion_comment_can_be_managed_by(comment, current_user):
         return None, json_forbidden('Can only modify your own comments')
@@ -1500,9 +1517,9 @@ def api_get_discussion_comments():
         if not aes_id:
             return json_bad_request('Missing assignment_entity_status_id')
 
-        access_result = ensure_aes_access(aes_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
+        _, access_error = authorize_aes_json(aes_id, AES_ACTION_VIEW)
+        if access_error is not None:
+            return access_error
 
         comments = (
             SubmissionDiscussionComment.query
@@ -1527,13 +1544,12 @@ def api_add_discussion_comment():
             return json_bad_request('Missing assignment_entity_status_id')
 
         aes_id = int(aes_id_raw)
-        access_result = ensure_aes_access(aes_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-
-        aes = access_result['aes']
-        if not AuthorizationService.can_edit_assignment(aes, current_user):
-            return json_forbidden('Cannot add comment to this assignment')
+        aes, access_error = authorize_aes_json(
+            aes_id, AES_ACTION_EDIT,
+            forbidden_message='Cannot add comment to this assignment',
+        )
+        if access_error is not None:
+            return access_error
 
         body = (data.get('body') or '').strip()
         if not body:

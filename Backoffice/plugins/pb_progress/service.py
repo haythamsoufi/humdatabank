@@ -995,7 +995,10 @@ class PBProgressService:
                 tmp.write(file_bytes)
                 temp_path = tmp.name
 
+            from app.utils.safe_workbook import inspect_xlsx
             from plugins.pb_progress.db_source import WorkbookValidationError, validate_uploaded_workbook
+
+            inspect_xlsx(file_bytes)
 
             validation = validate_uploaded_workbook(temp_path)
         except WorkbookValidationError as exc:

@@ -9,16 +9,19 @@ import pytest
 
 from pb_figures.data import load_mapping
 from pre_render import _render_language_assets
-from workbook_fixtures import sp1_mapping_row, write_test_workbook
+from workbook_fixtures import apply_section_order_env, sp1_mapping_row, write_test_workbook
 
 
 @pytest.fixture
-def staging_workbook(tmp_path):
+def staging_workbook(tmp_path, monkeypatch):
     path = tmp_path / "staging_gap.xlsx"
     write_test_workbook(
         path,
         mapping_rows=[sp1_mapping_row()],
-        section_order={"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
+    )
+    apply_section_order_env(
+        monkeypatch,
+        {"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
     )
     return path
 

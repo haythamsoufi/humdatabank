@@ -24,7 +24,9 @@ from plugins.pb_progress.service import PBProgressService
 from plugins.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, validate_version
 from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api_responses import json_bad_request, json_ok
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +98,7 @@ def upload_excel(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress Excel upload failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/excel-info", methods=["GET"])
@@ -127,7 +129,7 @@ def download_workbook(version: str):
         raise
     except Exception as exc:
         logger.exception("P&B progress workbook download failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/generate", methods=["POST"])
@@ -152,7 +154,7 @@ def generate(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress generation start failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/cancel", methods=["POST"])
@@ -173,7 +175,7 @@ def cancel_generation(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress cancel failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/status", methods=["GET"])
@@ -203,7 +205,7 @@ def serve_output(version: str, filename: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress output serve failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/mapping", methods=["GET", "PUT"])
@@ -251,7 +253,7 @@ def mapping_sync(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress mapping sync failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/translations", methods=["GET", "PUT"])
@@ -302,7 +304,7 @@ def config_import_from_excel(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress config import failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/years", methods=["GET", "PUT"])
@@ -366,7 +368,7 @@ def data_source(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress data source update failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/generate-system-dataset", methods=["POST"])
@@ -383,7 +385,7 @@ def generate_system_dataset(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress system dataset generation failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/system-dataset/download", methods=["GET"])
@@ -400,7 +402,7 @@ def download_system_dataset(version: str):
         raise
     except Exception as exc:
         logger.exception("P&B progress system dataset download failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/pb-progress/<version>/compare-system-dataset", methods=["GET"])
@@ -417,4 +419,4 @@ def compare_system_dataset(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress dataset comparison failed")
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)

@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/deep_link_service.dart';
 import '../../services/jwt_token_service.dart';
 import '../../services/session_service.dart';
+import '../../services/storage_service.dart';
 import '../../services/auth_service.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../config/app_config.dart';
@@ -24,14 +28,18 @@ import '../../utils/debug_logger.dart';
 /// return HTTP 403 for embedded-browser OAuth flows.
 ///
 /// Flow:
-///   1. This screen launches `/login/azure?mobile_return_scheme=humdatabank`
+///   1. This screen creates a PKCE verifier (kept in secure storage) and launches
+///      `/login/azure?mobile_return_scheme=humdatabank&app_code_challenge=<S256>`
 ///      in a Chrome Custom Tab.
-///   2. The backend embeds `mobile: true` in the signed OAuth state JWT.
-///   3. After successful Azure B2C login the backend issues JWT tokens and
-///      redirects to `humdatabank://oauth-success?access_token=...&refresh_token=...`.
+///   2. The backend embeds `mobile: true` and the challenge in the signed OAuth state JWT.
+///   3. After successful Azure B2C login the backend redirects to
+///      `humdatabank://oauth-success?code=<single-use code>` (no tokens in the URL).
 ///   4. Android delivers that URI to the app as a deep link.
 ///   5. [DeepLinkService] broadcasts it on [DeepLinkService.oauthTokenStream].
-///   6. This screen receives the tokens, saves them, and navigates to the dashboard.
+///   6. This screen POSTs the code and the verifier to the backend, receives the
+///      tokens in the response body, saves them, and navigates to the dashboard.
+///
+/// A `humdatabank://oauth-error?error=...` link reports a failed hand-off.
 class AzureLoginScreen extends StatefulWidget {
   const AzureLoginScreen({super.key});
 
@@ -51,10 +59,28 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
   StreamSubscription<Map<String, String>>? _oauthSub;
   Timer? _timeoutTimer;
 
-  /// The URL sent to Chrome Custom Tab — includes the mobile deep-link flag.
-  String get _azureLoginUrl =>
-      '${AppConfig.baseApiUrl}${AppConfig.azureLoginEndpoint}'
-      '?mobile_return_scheme=humdatabank';
+  static const String _pkceVerifierStorageKey = 'azure_oauth_pkce_verifier_v1';
+
+  /// Creates a fresh PKCE pair, persists the verifier and returns the S256 challenge.
+  /// The verifier is stored so a cold start (app killed while the browser was open)
+  /// can still redeem the code.
+  Future<String> _prepareChallenge() async {
+    final random = Random.secure();
+    final verifier = base64Url
+        .encode(List<int>.generate(48, (_) => random.nextInt(256)))
+        .replaceAll('=', '');
+    await StorageService().setSecure(_pkceVerifierStorageKey, verifier);
+    return base64Url
+        .encode(sha256.convert(ascii.encode(verifier)).bytes)
+        .replaceAll('=', '');
+  }
+
+  Future<String?> _takeVerifier() async {
+    final storage = StorageService();
+    final verifier = await storage.getSecure(_pkceVerifierStorageKey);
+    await storage.deleteSecure(_pkceVerifierStorageKey);
+    return verifier;
+  }
 
   @override
   void initState() {
@@ -115,7 +141,13 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
     });
 
     try {
-      final uri = Uri.parse(_azureLoginUrl);
+      final challenge = await _prepareChallenge();
+      final uri = Uri.parse(
+        '${AppConfig.baseApiUrl}${AppConfig.azureLoginEndpoint}'
+        '?mobile_return_scheme=humdatabank'
+        '&app_code_challenge=$challenge'
+        '&app_code_challenge_method=S256',
+      );
       DebugLogger.logInfo('AZURE LOGIN', 'Launching Chrome Custom Tab: $uri');
 
       // LaunchMode.inAppBrowserView → Chrome Custom Tab on Android.
@@ -158,23 +190,53 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
   Future<void> _handleOAuthDeepLink(Map<String, String> params) async {
     _timeoutTimer?.cancel();
 
-    final accessToken = params['access_token'];
-    final refreshToken = params['refresh_token'];
-    final expiresInStr = params['expires_in'];
-    final expiresIn = int.tryParse(expiresInStr ?? '') ?? 1800;
+    final errorCode = params['error'];
+    if (errorCode != null && errorCode.isNotEmpty) {
+      DebugLogger.logWarn('AZURE LOGIN', 'OAuth hand-off reported error: $errorCode');
+      await _takeVerifier();
+      AuthService.oauthFlowPending = false;
+      if (mounted) {
+        setState(() {
+          _waiting = false;
+          _error = errorCode == 'app_update_required'
+              ? 'Please update the app to sign in.'
+              : 'Sign-in failed. Please try again.';
+        });
+      }
+      return;
+    }
 
+    final code = params['code'];
+    String? accessToken = params['access_token'];
+    String? refreshToken = params['refresh_token'];
+    final expiresIn = int.tryParse(params['expires_in'] ?? '') ?? 1800;
+
+    if (code != null && code.isNotEmpty) {
+      final verifier = await _takeVerifier();
+      final redeemed = verifier != null &&
+          verifier.isNotEmpty &&
+          await AuthService().exchangeOAuthCode(code: code, codeVerifier: verifier);
+      if (!redeemed) {
+        AuthService.oauthFlowPending = false;
+        if (mounted) {
+          setState(() {
+            _waiting = false;
+            _error = 'Sign-in failed. Please try again.';
+          });
+        }
+        return;
+      }
+      accessToken = null;
+      refreshToken = null;
+    }
+
+    final tokensAlreadySaved = code != null && code.isNotEmpty;
     DebugLogger.logInfo('AZURE LOGIN',
-        'OAuth deep link received — '
-        'access_token present: ${accessToken != null}, '
-        'refresh_token present: ${refreshToken != null}, '
-        'expires_in: ${expiresIn}s');
+        'OAuth deep link received — code flow: $tokensAlreadySaved');
 
-    if (accessToken == null || accessToken.isEmpty ||
-        refreshToken == null || refreshToken.isEmpty) {
-      DebugLogger.logWarn('AZURE LOGIN',
-          'Deep link missing tokens — '
-          'access_token empty: ${accessToken == null || accessToken.isEmpty}, '
-          'refresh_token empty: ${refreshToken == null || refreshToken.isEmpty}');
+    if (!tokensAlreadySaved &&
+        (accessToken == null || accessToken.isEmpty ||
+            refreshToken == null || refreshToken.isEmpty)) {
       if (mounted) {
         setState(() {
           _waiting = false;
@@ -199,11 +261,14 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
       // by the AppLifecycleState.resumed event that fires when the CCT closes)
       // sees no refresh token and schedules clearTokens(), which then executes
       // after this save — wiping the just-persisted tokens.
-      await _jwtService.saveTokens(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
-        expiresIn: expiresIn,
-      );
+      if (!tokensAlreadySaved) {
+        // Legacy backend: tokens arrived in the URL (deprecated server flow).
+        await _jwtService.saveTokens(
+          accessToken: accessToken!,
+          refreshToken: refreshToken!,
+          expiresIn: expiresIn,
+        );
+      }
       // Keep session timestamps in sync for pre-request expiry guard.
       await _sessionService.updateLastValidation();
 

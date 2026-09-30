@@ -105,6 +105,8 @@ from .system import (
     EmailDeliveryLog
 )
 
+from .auth_state import AuthStateEntry
+
 from .api_key_management import (
     APIKey,
     APIKeyUsage
@@ -308,6 +310,7 @@ __all__ = [
     'SystemSettings',
     'UserDevice',
     'EmailDeliveryLog',
+    'AuthStateEntry',
 
     # API Key Management models
     'APIKey',

@@ -800,6 +800,115 @@ class AuthorizationService:
         user_country_ids = [c.id for c in user.countries.all()]
         return [cid for cid in country_ids if cid in user_country_ids]
 
+    # ========== Delegated administration scope ==========
+    #
+    # Admin permissions (admin.*) are global by default: holding one is not limited to
+    # the actor's own entities. Delegation actions (granting entity access to other
+    # users) must therefore be bounded explicitly so an actor can never hand out, or
+    # take away, reach that they do not have themselves.
+
+    COUNTRY_LINKED_ENTITY_TYPES = frozenset(
+        {"country", "national_society", "ns_branch", "ns_subbranch", "ns_localunit"}
+    )
+    GLOBAL_COUNTRY_SCOPE_PERMISSIONS = (
+        "admin.countries.view",
+        "admin.countries.edit",
+        "admin.organization.manage",
+    )
+
+    @staticmethod
+    def has_global_country_scope(user) -> bool:
+        """True when the user administers every country (System Manager or a global country/org permission)."""
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if AuthorizationService.is_system_manager(user):
+            return True
+        return any(
+            AuthorizationService.has_rbac_permission(user, code)
+            for code in AuthorizationService.GLOBAL_COUNTRY_SCOPE_PERMISSIONS
+        )
+
+    @staticmethod
+    def _entity_scope_chain(entity_type: str, entity_id: int) -> List[tuple]:
+        """Return (entity_type, entity_id) for the entity and each ancestor that would cover it."""
+        from app.services.organization.entity_service import EntityService
+
+        chain: List[tuple] = [(entity_type, int(entity_id))]
+        entity = EntityService.get_entity(entity_type, int(entity_id))
+        if entity is None:
+            return chain
+
+        if entity_type == "national_society":
+            country_id = getattr(entity, "country_id", None)
+            if country_id:
+                chain.append(("country", int(country_id)))
+        elif entity_type in ("ns_branch", "ns_subbranch", "ns_localunit"):
+            branch = entity if entity_type == "ns_branch" else getattr(entity, "branch", None)
+            if entity_type != "ns_branch" and branch is not None and getattr(branch, "id", None):
+                chain.append(("ns_branch", int(branch.id)))
+            country = EntityService.get_country_from_entity(entity_type, entity)
+            if country is not None and getattr(country, "id", None):
+                chain.append(("country", int(country.id)))
+        elif entity_type == "department":
+            division_id = getattr(entity, "division_id", None)
+            if division_id:
+                chain.append(("division", int(division_id)))
+        elif entity_type == "cluster_office":
+            regional_office_id = getattr(entity, "regional_office_id", None)
+            if regional_office_id:
+                chain.append(("regional_office", int(regional_office_id)))
+        return chain
+
+    @staticmethod
+    def can_delegate_entity_access(actor, entity_type: str, entity_id: int) -> bool:
+        """
+        May ``actor`` grant or revoke entity access (UserEntityPermission) for this entity?
+
+        System Managers: always. Country-linked entities: actors with global country scope, or
+        actors who themselves hold the entity or an ancestor (e.g. its country). Secretariat
+        entities: actors with ``admin.organization.manage``, or who hold the entity or its parent.
+        """
+        if not actor or not getattr(actor, "is_authenticated", False):
+            return False
+        if AuthorizationService.is_system_manager(actor):
+            return True
+
+        entity_type = str(entity_type or "").strip()
+        try:
+            entity_id = int(entity_id)
+        except (TypeError, ValueError):
+            return False
+
+        if entity_type in AuthorizationService.COUNTRY_LINKED_ENTITY_TYPES:
+            if AuthorizationService.has_global_country_scope(actor):
+                return True
+        elif AuthorizationService.has_rbac_permission(actor, "admin.organization.manage"):
+            return True
+
+        from app.models.core import UserEntityPermission
+
+        held = {
+            (str(p.entity_type), int(p.entity_id))
+            for p in UserEntityPermission.query.filter_by(user_id=int(actor.id)).all()
+        }
+        if not held:
+            return False
+        return any(node in held for node in AuthorizationService._entity_scope_chain(entity_type, entity_id))
+
+    @staticmethod
+    def has_country_scoped_permission(user, permission_code: str, country_id: int) -> bool:
+        """
+        Permission check bound to one country, honoring entity-scoped RbacAccessGrant rows.
+
+        A role/global grant of ``permission_code`` is required first; an entity-scoped deny on
+        the country then wins over it (most-specific scope wins, deny wins ties).
+        """
+        return AuthorizationService.has_rbac_permission(
+            user,
+            permission_code,
+            scope={"entity_type": "country", "entity_id": int(country_id)},
+        )
+
     # ========== Assignment Access ==========
 
     @staticmethod

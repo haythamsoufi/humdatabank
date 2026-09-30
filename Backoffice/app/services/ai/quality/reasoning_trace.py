@@ -11,6 +11,7 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.models.enums import AIReasoningTraceStatusValue
+from app.services.ai.quality.trace_privacy import redact_text, redact_trace_steps
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,8 @@ class AIReasoningTraceService:
             trace = AIReasoningTrace(
                 conversation_id=conversation_id,
                 user_id=user_id,
-                query=query,
-                original_query=original_query if (original_query and (original_query or "").strip() != (query or "").strip()) else None,
+                query=redact_text(query),
+                original_query=redact_text(original_query) if (original_query and (original_query or "").strip() != (query or "").strip()) else None,
                 query_language=lang,
                 agent_mode=agent_mode,
                 max_iterations=max_iterations or 10,
@@ -193,8 +194,8 @@ class AIReasoningTraceService:
                 trace = AIReasoningTrace(
                     conversation_id=conversation_id,
                     user_id=user_id,
-                    query=query,
-                    original_query=original_query if (original_query and (original_query or "").strip() != (query or "").strip()) else None,
+                    query=redact_text(query),
+                    original_query=redact_text(original_query) if (original_query and (original_query or "").strip() != (query or "").strip()) else None,
                     query_language=lang,
                     agent_mode=agent_mode,
                     max_iterations=max_iterations or 10,
@@ -220,11 +221,11 @@ class AIReasoningTraceService:
                 db.session.flush()  # get ID without committing yet
 
             if original_query is not None and (original_query or "").strip() != (query or "").strip():
-                trace.original_query = (original_query or "").strip() or None
-            trace.steps = normalized_steps
+                trace.original_query = redact_text((original_query or "").strip()) or None
+            trace.steps = redact_trace_steps(normalized_steps)
             trace.actual_iterations = len(normalized_steps)
             trace.status = _normalize_trace_status(status)
-            trace.error_message = error_message
+            trace.error_message = redact_text(error_message, max_length=4000)
             trace.tools_used = tools_used
             trace.tool_call_count = tool_call_count
             trace.total_input_tokens = input_tokens
@@ -250,7 +251,7 @@ class AIReasoningTraceService:
                 platform_context=platform_context,
             )
             # Set final_answer last so it is never overwritten by optional fields; always persist the answer
-            trace.final_answer = final_answer
+            trace.final_answer = redact_text(final_answer)
 
             db.session.commit()
             logger.info(
@@ -291,17 +292,17 @@ class AIReasoningTraceService:
             trace = AIReasoningTrace(
                 conversation_id=conversation_id,
                 user_id=user_id,
-                query=query,
+                query=redact_text(query),
                 agent_mode='react',
                 actual_iterations=len(steps),
                 status=_normalize_trace_status(status),
-                steps=steps,
+                steps=redact_trace_steps(steps),
                 tools_used=tools_used,
                 tool_call_count=len([s for s in steps if s.get('action') != 'finish']),
                 total_input_tokens=int(total_input_tokens),
                 total_output_tokens=int(total_output_tokens),
                 total_cost_usd=total_cost,
-                final_answer=final_answer,
+                final_answer=redact_text(final_answer),
                 llm_provider=llm_provider,
                 llm_model=llm_model
             )

@@ -667,7 +667,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const url = params.data.download_url || '#';
-                return '<a href="' + url + '" class="text-blue-600 hover:text-blue-800 break-words">' + (params.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</a>';
+                return '<a href="' + SafeDom.safeHrefAttr(url) + '" class="text-blue-600 hover:text-blue-800 break-words">' + SafeDom.escapeHtml(params.value || '') + '</a>';
             },
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
         },

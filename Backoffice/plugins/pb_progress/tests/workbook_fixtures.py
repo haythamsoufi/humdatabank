@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 import pandas as pd
 
 from pb_figures.defaults import default_translations_bundle
+from pb_figures.translations import clear_cache
 
 
 def _translations_sheet() -> pd.DataFrame:
@@ -47,6 +51,7 @@ def write_test_workbook(
     *,
     mapping_rows: list[dict[str, object]],
     final_rows: list[dict[str, object]] | None = None,
+    total_reported_rows: list[dict[str, object]] | None = None,
 ) -> Path:
     """Write a minimal valid SG Report workbook for pipeline integration tests."""
     mapping = pd.DataFrame(mapping_rows)
@@ -65,13 +70,13 @@ def write_test_workbook(
             for index, row in enumerate(mapping_rows)
         ]
     final = pd.DataFrame(final_rows)
-    total_reported = pd.DataFrame(
-        {
-            "Source": ["Manual", "FDRS", "UPR"],
-            "Year": ["2027", "2027", "2027"],
-            "TotalReported": [10, 84, 143],
-        }
-    )
+    if total_reported_rows is None:
+        total_reported_rows = [
+            {"Source": "Manual", "Year": "2027", "TotalReported": 10},
+            {"Source": "FDRS", "Year": "2027", "TotalReported": 84},
+            {"Source": "UPR", "Year": "2027", "TotalReported": 143},
+        ]
+    total_reported = pd.DataFrame(total_reported_rows)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
@@ -82,6 +87,41 @@ def write_test_workbook(
         total_reported.to_excel(writer, sheet_name="TotalReported", index=False)
         _translations_sheet().to_excel(writer, sheet_name="Translations", index=False)
     return path
+
+
+@contextmanager
+def temporary_report_excel(
+    path: Path,
+    *,
+    mapping_rows: list[dict[str, object]] | None = None,
+    total_reported_rows: list[dict[str, object]] | None = None,
+    year: str | None = None,
+) -> Iterator[Path]:
+    """Write a synthetic workbook and point PB_REPORT_EXCEL at it for the duration."""
+    write_test_workbook(
+        path,
+        mapping_rows=mapping_rows or [sp1_mapping_row()],
+        total_reported_rows=total_reported_rows,
+    )
+    previous = os.environ.get("PB_REPORT_EXCEL")
+    previous_year = os.environ.get("PB_REPORT_YEAR")
+    os.environ["PB_REPORT_EXCEL"] = str(path)
+    if year is not None:
+        os.environ["PB_REPORT_YEAR"] = year
+    clear_cache()
+    try:
+        yield path
+    finally:
+        if previous is None:
+            os.environ.pop("PB_REPORT_EXCEL", None)
+        else:
+            os.environ["PB_REPORT_EXCEL"] = previous
+        if year is not None:
+            if previous_year is None:
+                os.environ.pop("PB_REPORT_YEAR", None)
+            else:
+                os.environ["PB_REPORT_YEAR"] = previous_year
+        clear_cache()
 
 
 def sp1_mapping_row(**overrides: object) -> dict[str, object]:

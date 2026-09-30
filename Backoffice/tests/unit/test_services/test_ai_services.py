@@ -425,6 +425,9 @@ class TestAIAgentExecutor:
                 from app.services.ai.agent import AIAgentExecutor
                 from flask import g
 
+                from app.services.ai.policies.access_policy import record_form_builder_authorization
+
+                record_form_builder_authorization({"enabled": True, "template_id": 5})
                 agent = AIAgentExecutor()
                 captured = {}
 

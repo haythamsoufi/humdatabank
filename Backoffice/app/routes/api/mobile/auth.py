@@ -17,6 +17,50 @@ from app.utils.rate_limiting import auth_rate_limit, mobile_rate_limit
 from app.routes.api.mobile import mobile_bp
 
 
+def _user_payload(user):
+    return {
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'title': user.title,
+    }
+
+
+def _token_response(tokens, user=None):
+    data = {
+        'access_token': tokens['access_token'],
+        'refresh_token': tokens['refresh_token'],
+        'token_type': tokens['token_type'],
+        'expires_in': tokens['expires_in'],
+    }
+    if user is not None:
+        data['user'] = _user_payload(user)
+    return mobile_ok(data=data)
+
+
+def _record_failed_login(email, reason):
+    """Count the failure and persist its audit row.
+
+    The audit row is committed explicitly: the transaction middleware rolls back every
+    >= 400 response, which would otherwise discard the record of the failed attempt.
+    """
+    from app.services.platform.user_analytics_service import log_login_attempt
+    from app.utils.login_security import record_login_failure
+
+    record_login_failure(email)
+    log_login_attempt(email, success=False, failure_reason=reason)
+    with suppress(Exception):
+        db.session.commit()
+
+
+def _store_unavailable():
+    return mobile_error(
+        'Authentication service temporarily unavailable. Please try again shortly.',
+        503,
+        'SERVICE_UNAVAILABLE',
+    )
+
+
 @mobile_bp.route('/auth/token', methods=['POST'])
 @auth_rate_limit()
 def issue_tokens():
@@ -28,7 +72,7 @@ def issue_tokens():
         get_client_info, end_other_active_sessions_for_device,
     )
     from app.services import UserService
-    from app.routes.auth import _is_account_locked_out
+    from app.utils.login_security import burn_password_check, clear_login_failures, is_login_locked_out
 
     data = get_json_safe()
     email = (data.get('email') or '').strip().lower()
@@ -37,19 +81,26 @@ def issue_tokens():
     if not email or not password:
         return mobile_bad_request('Email and password are required.')
 
-    if _is_account_locked_out(email):
+    if is_login_locked_out(email):
         log_login_attempt(email, success=False, failure_reason='account_locked')
         return mobile_error('Too many failed login attempts. Please try again later.', 429, 'ACCOUNT_LOCKED')
 
     user = UserService.get_by_email(email)
-    if not user or not user.check_password(password):
-        log_login_attempt(email, success=False, failure_reason='wrong_password' if user else 'user_not_found')
+    if user is None:
+        burn_password_check(password)
+        _record_failed_login(email, 'user_not_found')
+        return mobile_auth_error('Invalid email or password.')
+    if not user.check_password(password):
+        _record_failed_login(email, 'wrong_password')
         return mobile_auth_error('Invalid email or password.')
 
     if not user.is_active:
-        log_login_attempt(email, success=False, failure_reason='account_disabled')
-        return mobile_forbidden('Your account is deactivated. Please contact an administrator.')
+        _record_failed_login(email, 'account_disabled')
+        if current_app.config.get('MOBILE_REVEAL_DEACTIVATED_ACCOUNT'):
+            return mobile_forbidden('Your account is deactivated. Please contact an administrator.')
+        return mobile_auth_error('Invalid email or password.')
 
+    clear_login_failures(email)
     log_login_attempt(email, success=True, user=user)
     jwt_session_id = str(_uuid.uuid4())
     client_info = get_client_info()
@@ -63,31 +114,27 @@ def issue_tokens():
         context_data={'user_id': user.id, 'auth_method': 'jwt', 'jwt_session_id': jwt_session_id},
     )
 
-    tokens = issue_token_pair(user.id, session_id=jwt_session_id)
-    return mobile_ok(data={
-        'access_token': tokens['access_token'],
-        'refresh_token': tokens['refresh_token'],
-        'token_type': tokens['token_type'],
-        'expires_in': tokens['expires_in'],
-        'user': {
-            'id': user.id,
-            'email': user.email,
-            'name': user.name,
-            'title': user.title,
-        },
-    })
+    return _token_response(issue_token_pair(user.id, session_id=jwt_session_id), user)
 
 
 @mobile_bp.route('/auth/refresh', methods=['POST'])
-@mobile_rate_limit(requests_per_minute=10)
+@mobile_rate_limit(requests_per_minute=10, shared=True)
 def refresh_token():
-    """Refresh an expired access token using a valid refresh token."""
+    """Rotate a refresh token: the presented token is consumed, a new pair is issued.
+
+    Consumption is an atomic shared-store operation, so two workers can never both accept
+    the same token. Presenting a token twice revokes its whole family (and session): the
+    second presenter is either an attacker replaying a stolen token or a client that lost
+    the rotation response, and in both cases forcing a fresh login is the safe outcome.
+    """
     import uuid as _uuid
+    from app.utils.auth_state import AuthStateUnavailable
     from app.utils.mobile_jwt import (
-        decode_mobile_token, issue_token_pair,
-        blacklist_refresh_jti, is_refresh_jti_used,
+        consume_refresh_token, decode_mobile_token, is_token_family_revoked,
+        issue_token_pair, revoke_session_id, revoke_token_family,
     )
     from app.models import User, UserSessionLog
+    from app.services.platform.user_analytics_service import should_block_mobile_jwt_session
 
     data = get_json_safe()
     refresh = data.get('refresh_token', '')
@@ -100,30 +147,32 @@ def refresh_token():
     except Exception:
         return mobile_auth_error('Invalid or expired refresh token.')
 
-    # Refresh token rotation: reject previously consumed tokens.
-    if claims.jti and is_refresh_jti_used(claims.jti):
-        current_app.logger.warning(
-            "SECURITY: Refresh token reuse detected (jti=%s, user=%s, sid=%s). "
-            "Possible token theft — blacklisting session.",
-            claims.jti, claims.user_id, claims.sid,
-        )
-        if claims.sid:
-            from app.services.platform.user_analytics_service import add_session_to_blacklist
-            add_session_to_blacklist(claims.sid)
-        return mobile_auth_error('Refresh token has already been used. Please log in again.')
+    if not claims.jti:
+        return mobile_auth_error('Invalid or expired refresh token.')
 
-    if claims.sid:
-        from app.services.platform.user_analytics_service import should_block_mobile_jwt_session
-        if should_block_mobile_jwt_session(claims.sid):
+    try:
+        if is_token_family_revoked(claims.family_id):
             return mobile_auth_error('Session has been revoked.')
 
-    user = User.query.get(claims.user_id)
-    if not user or not user.is_active:
-        return mobile_auth_error('User account not found or deactivated.')
+        if claims.sid and should_block_mobile_jwt_session(claims.sid):
+            return mobile_auth_error('Session has been revoked.')
 
-    # Consume the old refresh token so it cannot be replayed.
-    if claims.jti:
-        blacklist_refresh_jti(claims.jti)
+        user = db.session.get(User, claims.user_id)
+        if not user or not user.is_active:
+            return mobile_auth_error('Invalid or expired refresh token.')
+
+        if not consume_refresh_token(claims):
+            current_app.logger.warning(
+                "SECURITY: Refresh token reuse detected (jti=%s, user=%s, sid=%s, family=%s). "
+                "Revoking token family and session.",
+                claims.jti, claims.user_id, claims.sid, claims.family_id,
+            )
+            revoke_token_family(claims.family_id)
+            if claims.sid:
+                revoke_session_id(claims.sid)
+            return mobile_auth_error('Refresh token has already been used. Please log in again.')
+    except AuthStateUnavailable:
+        return _store_unavailable()
 
     session_id = claims.sid
     if session_id:
@@ -151,24 +200,65 @@ def refresh_token():
                 },
             )
 
-    tokens = issue_token_pair(user.id, session_id=session_id)
-    return mobile_ok(data={
-        'access_token': tokens['access_token'],
-        'refresh_token': tokens['refresh_token'],
-        'token_type': tokens['token_type'],
-        'expires_in': tokens['expires_in'],
-    })
+    tokens = issue_token_pair(user.id, session_id=session_id, family_id=claims.family_id)
+    return _token_response(tokens)
+
+
+@mobile_bp.route('/auth/oauth/exchange', methods=['POST'])
+@mobile_rate_limit(requests_per_minute=10, shared=True)
+def exchange_oauth_code():
+    """Redeem the single-use code from the ``humdatabank://oauth-success`` deep link.
+
+    Body: ``{"code": "...", "code_verifier": "..."}`` where the verifier is the PKCE secret
+    whose S256 challenge the app sent to ``/login/azure``. All failures return the same
+    generic 401 so the endpoint reveals nothing about codes.
+    """
+    from app.models import User
+    from app.services.platform.user_analytics_service import should_block_mobile_jwt_session
+    from app.utils.auth_state import AuthStateUnavailable
+    from app.utils.mobile_jwt import issue_token_pair
+    from app.utils.mobile_oauth_code import redeem_oauth_code
+
+    data = get_json_safe()
+    code = str(data.get('code') or '').strip()
+    verifier = str(data.get('code_verifier') or '').strip()
+    if not code or not verifier:
+        return mobile_bad_request('code and code_verifier are required.')
+
+    try:
+        redeemed = redeem_oauth_code(code, verifier)
+        if redeemed is None:
+            return mobile_auth_error('Invalid or expired authorization code.')
+        sid = redeemed['session_id']
+        if sid and should_block_mobile_jwt_session(sid):
+            return mobile_auth_error('Invalid or expired authorization code.')
+    except AuthStateUnavailable:
+        return _store_unavailable()
+
+    user = db.session.get(User, redeemed['user_id'])
+    if not user or not user.is_active:
+        return mobile_auth_error('Invalid or expired authorization code.')
+
+    return _token_response(issue_token_pair(user.id, session_id=sid), user)
 
 
 @mobile_bp.route('/auth/exchange-session', methods=['POST'])
 @auth_rate_limit()
 @mobile_auth_required
 def exchange_session_for_tokens():
-    """Exchange a valid Flask session cookie for a JWT token pair (Azure SSO bridge)."""
+    """Exchange a valid Flask session cookie for a JWT token pair (legacy Azure SSO bridge).
+
+    Cookie-authenticated callers only: an access token must not be able to mint a
+    long-lived refresh token for itself.
+    """
     import uuid as _uuid
+    from app.utils.mobile_auth import request_authenticated_by_jwt
     from app.utils.mobile_jwt import issue_token_pair
     from app.services.platform.user_analytics_service import start_user_session, log_user_activity
     from flask import session as flask_session
+
+    if request_authenticated_by_jwt():
+        return mobile_forbidden('Session exchange requires a cookie session.')
 
     jwt_session_id = flask_session.get('session_id') or str(_uuid.uuid4())
 
@@ -180,19 +270,7 @@ def exchange_session_for_tokens():
             context_data={'user_id': current_user.id, 'auth_method': 'jwt_exchange'},
         )
 
-    tokens = issue_token_pair(current_user.id, session_id=jwt_session_id)
-    return mobile_ok(data={
-        'access_token': tokens['access_token'],
-        'refresh_token': tokens['refresh_token'],
-        'token_type': tokens['token_type'],
-        'expires_in': tokens['expires_in'],
-        'user': {
-            'id': current_user.id,
-            'email': current_user.email,
-            'name': current_user.name,
-            'title': current_user.title,
-        },
-    })
+    return _token_response(issue_token_pair(current_user.id, session_id=jwt_session_id), current_user)
 
 
 @mobile_bp.route('/auth/session', methods=['GET'])
@@ -256,6 +334,9 @@ def mobile_logout():
 
     # Blacklist the JWT session so any outstanding tokens for this session are rejected.
     if jwt_sid:
+        with suppress(Exception):
+            from app.utils.mobile_jwt import revoke_token_family
+            revoke_token_family(jwt_sid)
         try:
             add_session_to_blacklist(jwt_sid)
         except Exception as _e:

@@ -1,9 +1,12 @@
 # Backoffice/app/plugins/form_integration.py
 
 import logging
+import re
 from typing import Dict, List, Any, Optional
 from contextlib import suppress
 from flask import render_template, current_app
+from jinja2.utils import htmlsafe_json_dumps
+from markupsafe import Markup, escape
 from .manager import PluginManager
 import threading
 from functools import lru_cache
@@ -159,14 +162,14 @@ class FormIntegration:
             field_type_config = self.plugin_manager.get_field_type_config(field_type)
             if not field_type_config:
                 current_app.logger.error(f"Field type config not found for: {field_type}")
-                return f"<p class='text-red-500'>Unknown field type: {field_type}</p>"
+                return f"<p class='text-red-500'>Unknown field type: {escape(field_type)}</p>"
 
             current_app.logger.info(f"Field type config found: {field_type_config.keys()}")
 
             # Get the form builder configuration
             if 'form_builder_config' not in field_type_config:
                 current_app.logger.error(f"Form builder config not found for field type: {field_type}")
-                return f"<p class='text-red-500'>No form builder configuration available for {field_type}</p>"
+                return f"<p class='text-red-500'>No form builder configuration available for {escape(field_type)}</p>"
 
             builder_config = field_type_config['form_builder_config']
             current_app.logger.info(f"Builder config: {builder_config}")
@@ -247,10 +250,10 @@ class FormIntegration:
             fields_html += self._render_condition_types(field_type, current_config)
 
         return f"""
-        <div class="custom-field-config" data-field-type="{field_type}">
+        <div class="custom-field-config" data-field-type="{escape(field_type)}">
             <h4 class="text-lg font-semibold mb-4 text-gray-700">
-                <i class="{builder_config.get('icon', 'fas fa-cog')} mr-2"></i>
-                {builder_config.get('title', 'Field Configuration')}
+                <i class="{escape(builder_config.get('icon', 'fas fa-cog'))} mr-2"></i>
+                {escape(builder_config.get('title', 'Field Configuration'))}
             </h4>
             {fields_html}
         </div>
@@ -258,13 +261,15 @@ class FormIntegration:
 
     def _render_config_field(self, field: Dict[str, Any], current_value: Any) -> str:
         """Render a single configuration field."""
-        field_type = field.get('type', 'text')
-        field_name = field['name']
-        field_label = field.get('label', field_name.title())
+        field_type = escape(field.get('type', 'text'))
+        raw_type = field.get('type', 'text')
+        field_name = escape(field['name'])
+        field_label = escape(field.get('label', str(field['name']).title()))
         field_required = field.get('required', False)
-        field_placeholder = field.get('placeholder', '')
+        field_placeholder = escape(field.get('placeholder', ''))
+        cv = escape(current_value or '')
 
-        if field_type == 'text':
+        if raw_type == 'text':
             return f"""
             <div class="mb-4">
                 <label for="{field_name}" class="block text-sm font-medium text-gray-700 mb-2">
@@ -274,14 +279,14 @@ class FormIntegration:
                 <input type="text"
                        id="{field_name}"
                        name="{field_name}"
-                       value="{current_value or ''}"
+                       value="{cv}"
                        placeholder="{field_placeholder}"
                        class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
                        {f'required' if field_required else ''}>
             </div>
             """
 
-        elif field_type == 'select':
+        elif raw_type == 'select':
             options = field.get('options', [])
             options_html = ""
             for option in options:
@@ -293,7 +298,7 @@ class FormIntegration:
                     label = str(option)
 
                 selected = 'selected' if str(current_value) == str(value) else ''
-                options_html += f'<option value="{value}" {selected}>{label}</option>'
+                options_html += f'<option value="{escape(value)}" {selected}>{escape(label)}</option>'
 
             return f"""
             <div class="mb-4">
@@ -310,14 +315,14 @@ class FormIntegration:
             </div>
             """
 
-        elif field_type == 'number':
+        elif raw_type == 'number':
             min_val = field.get('min')
             max_val = field.get('max')
             step_val = field.get('step', '1')
 
-            min_attr = f'min="{min_val}"' if min_val is not None else ''
-            max_attr = f'max="{max_val}"' if max_val is not None else ''
-            step_attr = f'step="{step_val}"'
+            min_attr = f'min="{escape(min_val)}"' if min_val is not None else ''
+            max_attr = f'max="{escape(max_val)}"' if max_val is not None else ''
+            step_attr = f'step="{escape(step_val)}"'
 
             return f"""
             <div class="mb-4">
@@ -328,7 +333,7 @@ class FormIntegration:
                 <input type="number"
                        id="{field_name}"
                        name="{field_name}"
-                       value="{current_value or ''}"
+                       value="{cv}"
                        placeholder="{field_placeholder}"
                        {min_attr} {max_attr} {step_attr}
                        class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
@@ -336,7 +341,7 @@ class FormIntegration:
             </div>
             """
 
-        elif field_type == 'checkbox':
+        elif raw_type == 'checkbox':
             checked = 'checked' if current_value else ''
             return f"""
             <div class="mb-4">
@@ -352,7 +357,7 @@ class FormIntegration:
             </div>
             """
 
-        elif field_type == 'textarea':
+        elif raw_type == 'textarea':
             rows = field.get('rows', 3)
             return f"""
             <div class="mb-4">
@@ -362,10 +367,10 @@ class FormIntegration:
                 </label>
                 <textarea id="{field_name}"
                           name="{field_name}"
-                          rows="{rows}"
+                          rows="{escape(rows)}"
                           placeholder="{field_placeholder}"
                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
-                          {f'required' if field_required else ''}>{current_value or ''}</textarea>
+                          {f'required' if field_required else ''}>{cv}</textarea>
             </div>
             """
 
@@ -424,10 +429,10 @@ class FormIntegration:
         if resolved_template:
             try:
                 try:
-                    config_json = json.dumps(field_config or {}, ensure_ascii=False)
+                    config_json = htmlsafe_json_dumps(field_config or {})
                 except Exception as e:
                     logger.debug("render_custom_field_entry_form: config_json dumps failed: %s", e)
-                    config_json = "{}"
+                    config_json = Markup("{}")
 
                 existing_payload = field_value if isinstance(field_value, (dict, list)) else ({'value': field_value} if field_value is not None else {})
                 try:
@@ -438,7 +443,7 @@ class FormIntegration:
 
                 field_name = str(field_id) if field_id is not None else field_config.get('field_name', f'{field_type}_field')
 
-                return render_template(
+                return Markup(render_template(
                     resolved_template,
                     field_id=field_name,
                     field_name=field_name,
@@ -450,76 +455,87 @@ class FormIntegration:
                     field_value=field_value,
                     can_edit=bool(can_edit),
                     country_iso=country_iso,
-                )
+                ))
             except Exception as e:
                 current_app.logger.warning(f"Failed to render plugin template for {field_type} ({resolved_template}): {e}", exc_info=True)
 
         # Fallback to generic field rendering
         return self._render_entry_form_field(field_type, entry_config, field_config, field_value)
 
-    def _render_entry_form_field(self, field_type: str, entry_config: Dict[str, Any], field_config: Dict[str, Any], field_value: Any) -> str:
-        """Render a custom field in the entry form."""
-        template = entry_config.get('template')
-        js_module = entry_config.get('js_module')
-        css_files = entry_config.get('css_files', [])
+    def _render_entry_form_field(self, field_type: str, entry_config: Dict[str, Any], field_config: Dict[str, Any], field_value: Any) -> Markup:
+        """Render a custom field in the entry form (fallback when no plugin template renders).
 
-        # Basic field rendering
+        Every interpolated value is escaped for its context (HTML text/attribute or JS string
+        literal); the return value is ``Markup`` because the result is trusted only after that.
+        """
+        css_files = entry_config.get('css_files', [])
+        field_config = field_config if isinstance(field_config, dict) else {}
+
+        type_html = escape(field_type)
+        field_name_raw = str(field_config.get('field_name', field_type))
+        try:
+            config_attr = escape(json.dumps(field_config, ensure_ascii=False, default=str))
+        except (TypeError, ValueError):
+            config_attr = escape("{}")
+        value_html = escape('' if field_value is None or field_value is False else field_value)
+        required_html = '<span class="text-red-500">*</span>' if field_config.get('required') else ''
+
         field_html = f"""
-        <div class="custom-field-entry" data-field-type="{field_type}" data-field-config='{field_config}'>
+        <div class="custom-field-entry" data-field-type="{type_html}" data-field-config="{config_attr}">
             <label class="block text-sm font-medium text-gray-700 mb-2">
-                {field_config.get('label', 'Custom Field')}
-                {f'<span class="text-red-500">*</span>' if field_config.get('required') else ''}
+                {escape(field_config.get('label', 'Custom Field'))}
+                {required_html}
             </label>
             <div class="field-container">
                 <!-- Custom field content will be rendered here -->
-                <p class="text-sm text-gray-500">Loading {field_type} field...</p>
+                <p class="text-sm text-gray-500">Loading {type_html} field...</p>
             </div>
-            <input type="hidden" name="{field_config.get('field_name', field_type)}" value="{field_value or ''}" />
+            <input type="hidden" name="{escape(field_name_raw)}" value="{value_html}" />
         </div>
         """
 
-        # Add CSS dependencies
         for css_file in css_files:
-            # Handle both absolute and relative CSS paths
+            css_file = str(css_file)
             if css_file.startswith('/') or css_file.startswith('http'):
                 css_href = css_file
             else:
                 css_href = f'/plugins/static/{css_file}'
-            field_html += f'<link rel="stylesheet" href="{css_href}">'
+            field_html += f'<link rel="stylesheet" href="{escape(css_href)}">'
 
-        # Add JavaScript initialization (ES modules only)
         es_module_path = entry_config.get('es_module_path')
         es_module_class = entry_config.get('es_module_class')
 
         if es_module_path and es_module_class:
-            # ES Module approach
+            if not re.fullmatch(r"[A-Za-z_$][\w$]*", str(es_module_class)):
+                raise ValueError("Invalid es_module_class in plugin entry_form_config")
+            module_path_js = htmlsafe_json_dumps(str(es_module_path))
+            field_type_js = htmlsafe_json_dumps(str(field_type))
+            field_name_js = htmlsafe_json_dumps(field_name_raw)
             field_html += f"""
             <script type="module">
-                import {{ {es_module_class} }} from '{es_module_path}';
+                import {{ {es_module_class} }} from {module_path_js};
 
                 document.addEventListener('DOMContentLoaded', function() {{
-                    // Make ES module class available globally for compatibility
                     window.{es_module_class} = {es_module_class};
 
-                    // Initialize the field
-                    const fieldContainer = document.querySelector('[data-field-type="{field_type}"]');
+                    const fieldContainer = Array.from(document.querySelectorAll('[data-field-type]'))
+                        .find(function (el) {{ return el.getAttribute('data-field-type') === {field_type_js}; }});
                     if (fieldContainer) {{
-                        const fieldName = fieldContainer.dataset.fieldName || '{field_config.get('field_name', field_type)}';
+                        const fieldName = fieldContainer.dataset.fieldName || {field_name_js};
                         const instance = new {es_module_class}(fieldName);
                         fieldContainer.pluginInstance = instance;
 
                         if (typeof instance.initialize === 'function') {{
                             instance.initialize();
                         }} else if (typeof instance.initField === 'function') {{
-                            instance.initField('{field_type}', fieldName);
+                            instance.initField({field_type_js}, fieldName);
                         }}
                     }}
                 }});
             </script>
             """
 
-
-        return field_html
+        return Markup(field_html)
 
     # NOTE: `_render_plugin_template` and `_get_template_content` were removed in favor of
     # deterministic Jinja template loading via PluginManager.register_template_loader().

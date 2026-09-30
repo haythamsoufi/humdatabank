@@ -10,7 +10,8 @@ import logging
 from flask import request, flash, redirect, url_for, current_app, render_template, send_file
 from flask_login import current_user
 from flask_babel import _, ngettext
-from openpyxl import load_workbook, Workbook
+from openpyxl import Workbook
+from app.utils.safe_workbook import load_workbook_safe, safe_iter_rows
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side, Protection
 from openpyxl.utils import get_column_letter
 from werkzeug.utils import secure_filename
@@ -709,6 +710,8 @@ def export_translations():
         logger.debug("translation export auto_filter failed: %s", e)
 
     out = io.BytesIO()
+    from app.utils.export_safety import sanitize_workbook
+    sanitize_workbook(wb)
     wb.save(out)
     out.seek(0)
     return send_file(
@@ -1023,7 +1026,7 @@ def import_translations():
         logger.debug("file.stream.seek failed: %s", e)
 
     try:
-        wb = load_workbook(file, read_only=True, data_only=True)
+        wb = load_workbook_safe(file, read_only=True, data_only=True)
         ws = wb["translations"] if "translations" in wb.sheetnames else wb.active
 
         # Detect header row: check if row 1 has "msgid", otherwise try row 2 (new format has note in row 1)
@@ -1064,7 +1067,7 @@ def import_translations():
 
         # Data rows start after header (row 2 if header is row 1, row 3 if header is row 2)
         data_start_row = header_row_num + 1
-        for row in ws.iter_rows(min_row=data_start_row, values_only=True):
+        for row in safe_iter_rows(ws, min_row=data_start_row, values_only=True):
             if not row:
                 continue
             raw_msgid = row[msgid_col_idx] if msgid_col_idx < len(row) else None

@@ -289,6 +289,7 @@ class AppConfig {
   static const String mobileRefreshEndpoint = '$mobileApiPrefix/auth/refresh';
   static const String mobileSessionCheckEndpoint = '$mobileApiPrefix/auth/session';
   static const String mobileExchangeSessionEndpoint = '$mobileApiPrefix/auth/exchange-session';
+  static const String mobileOAuthExchangeEndpoint = '$mobileApiPrefix/auth/oauth/exchange';
   static const String logoutEndpoint = '$mobileApiPrefix/auth/logout';
   static const String changePasswordEndpoint = '$mobileApiPrefix/auth/change-password';
   static const String profileEndpoint = '$mobileApiPrefix/auth/profile';

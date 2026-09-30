@@ -617,7 +617,7 @@ class NotificationCenter {
         const timeDisplay = this.formatNotificationTimeDisplay(notification);
         const priorityLabel = (notification.priority || '').toUpperCase();
         const relatedUrlRaw = notification.related_url;
-        const safeRelatedUrl = (window.SafeDom && relatedUrlRaw) ? window.SafeDom.safeUrl(relatedUrlRaw, { allowSameOrigin: true }) : relatedUrlRaw;
+        const safeRelatedUrl = (window.SafeDom && relatedUrlRaw) ? window.SafeDom.safeUrl(relatedUrlRaw, { allowSameOrigin: true }) : '';
 
         // Build notification card using DOM construction
         const card = document.createElement('div');
@@ -1377,9 +1377,7 @@ class NotificationCenter {
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     safeCssClasses(value) {

@@ -496,6 +496,7 @@ class LibreTranslateService(TranslationService):
         super().__init__(api_key)
         self.service_name = "libre"
         self.base_url = base_url.rstrip('/')
+        self.session.max_redirects = 0
         # Cache supported languages to avoid calling /languages repeatedly during bulk operations.
         self._supported_languages: Optional[set[str]] = None
         self._supported_languages_fetched_at: float = 0.0
@@ -517,12 +518,41 @@ class LibreTranslateService(TranslationService):
         )
 
     def _is_localhost(self) -> bool:
-        """Return True if base_url points to localhost or 127.0.0.1 (any port)."""
+        """True when base_url must not be contacted: loopback, or rejected by the outbound URL policy.
+
+        Private / link-local / metadata targets are refused unless listed in
+        ``LIBRE_TRANSLATE_ALLOWED_NETWORKS`` (comma-separated CIDRs / IPs). Plain ``http`` is only
+        accepted in explicit local dev.
+        """
+        cached = getattr(self, "_endpoint_verdict", None)
+        now = time.time()
+        if cached is not None and now - cached[0] < 300:
+            return cached[1]
+        verdict = self._compute_endpoint_blocked()
+        self._endpoint_verdict = (now, verdict)
+        return verdict
+
+    def _compute_endpoint_blocked(self) -> bool:
         try:
             host = urllib.parse.urlparse(self.base_url).hostname or ""
-            return host in ("localhost", "127.0.0.1", "::1")
+            if host in ("localhost", "127.0.0.1", "::1"):
+                return True
+            from app.utils.outbound_url import (
+                is_local_dev_environment,
+                parse_network_allowlist,
+                validate_outbound_url,
+            )
+
+            result = validate_outbound_url(
+                self.base_url,
+                allow_http=is_local_dev_environment(),
+                allowed_networks=parse_network_allowlist(os.getenv("LIBRE_TRANSLATE_ALLOWED_NETWORKS")),
+            )
+            if not result.ok:
+                logger.warning("LibreTranslate base URL rejected by outbound policy: %s", result.reason)
+            return not result.ok
         except Exception:
-            return False
+            return True
 
     def _get_supported_languages(self) -> Optional[set[str]]:
         """
@@ -690,6 +720,7 @@ class LibreTranslateService(TranslationService):
             response = requests.get(
                 f"{self.base_url}/languages",
                 timeout=STATUS_PROBE_TIMEOUT_SECONDS,
+                allow_redirects=False,
             )
         except requests.exceptions.ConnectionError:
             self._trip_circuit()

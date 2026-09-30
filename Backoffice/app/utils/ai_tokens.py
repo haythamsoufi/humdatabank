@@ -8,6 +8,7 @@ Design goals:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
@@ -16,6 +17,8 @@ import jwt
 from flask import current_app
 
 from app.utils.datetime_helpers import utcnow
+
+logger = logging.getLogger(__name__)
 
 
 # Default to a shorter TTL; can be overridden by AI_TOKEN_TTL_MINUTES in config/env.
@@ -38,10 +41,28 @@ class AITokenClaims:
 
 
 def _jwt_secret() -> str:
+    """Signing key: AI_JWT_SECRET, or SECRET_KEY as a deprecated fallback."""
+    secret = current_app.config.get("AI_JWT_SECRET")
+    if secret:
+        return secret
     secret = current_app.config.get("SECRET_KEY")
     if not secret:
-        raise RuntimeError("SECRET_KEY is required for AI token signing")
+        raise RuntimeError("AI_JWT_SECRET (or SECRET_KEY) is required for AI token signing")
+    if not current_app.extensions.get("ai_jwt_fallback_warned"):
+        current_app.extensions["ai_jwt_fallback_warned"] = True
+        logger.warning(
+            "AI_JWT_SECRET is not set; signing AI tokens with SECRET_KEY (deprecated). "
+            "Set a dedicated AI_JWT_SECRET."
+        )
     return secret
+
+
+def _verification_secrets() -> list[str]:
+    keys = [_jwt_secret()]
+    legacy = current_app.config.get("SECRET_KEY")
+    if legacy and legacy not in keys and current_app.config.get("AI_JWT_ACCEPT_LEGACY_SECRET_KEY", True):
+        keys.append(legacy)
+    return keys
 
 
 def issue_ai_token(*, user_id: int, role: str, ttl_minutes: Optional[int] = None) -> str:
@@ -61,14 +82,23 @@ def issue_ai_token(*, user_id: int, role: str, ttl_minutes: Optional[int] = None
 
 
 def decode_ai_token(token: str) -> AITokenClaims:
-    payload = jwt.decode(
-        token,
-        _jwt_secret(),
-        algorithms=[AI_TOKEN_ALGORITHM],
-        audience=AI_TOKEN_AUDIENCE,
-        issuer=AI_TOKEN_ISSUER,
-        options={"require": ["exp", "iat", "sub"]},
-    )
+    payload = None
+    last_error: Optional[Exception] = None
+    for secret in _verification_secrets():
+        try:
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=[AI_TOKEN_ALGORITHM],
+                audience=AI_TOKEN_AUDIENCE,
+                issuer=AI_TOKEN_ISSUER,
+                options={"require": ["exp", "iat", "sub"]},
+            )
+            break
+        except jwt.InvalidSignatureError as exc:
+            last_error = exc
+    if payload is None:
+        raise last_error or jwt.InvalidTokenError("Invalid AI token")
 
     return AITokenClaims(
         user_id=int(payload["sub"]),

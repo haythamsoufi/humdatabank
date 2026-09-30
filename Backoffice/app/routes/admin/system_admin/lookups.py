@@ -392,13 +392,13 @@ def import_into_lookup_list(list_id):
 def export_lookup_list(list_id):
     """Export a lookup list to CSV for download with proper Arabic encoding."""
     lookup_list = LookupList.query.get_or_404(list_id)
-    import csv
     from io import StringIO, BytesIO
     import codecs
+    from app.utils.export_safety import safe_csv_dict_writer
 
     output = StringIO()
     columns = [c.get('name') for c in (lookup_list.columns_config or [])]
-    writer = csv.DictWriter(output, fieldnames=columns)
+    writer = safe_csv_dict_writer(output, columns)
     writer.writeheader()
 
     for row in lookup_list.rows.order_by(LookupListRow.order).all():

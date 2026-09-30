@@ -101,6 +101,7 @@ class TestCreateApiKey:
                 "client_name": "New Integration Client",
                 "client_description": "Created in test",
                 "rate_limit_per_minute": "60",
+                "capabilities": ["reference:read"],
             },
         )
         # On success, renders create_success template (200)
@@ -113,6 +114,7 @@ class TestCreateApiKey:
             data={
                 "client_name": "Expiring Client",
                 "rate_limit_per_minute": "60",
+                "capabilities": ["reference:read"],
                 "expires_at": future,
             },
         )
@@ -122,7 +124,7 @@ class TestCreateApiKey:
         """Omitting rate limit uses default of 60."""
         resp = logged_in_client.post(
             "/admin/api-management/api-keys/create",
-            data={"client_name": "Default Rate Client"},
+            data={"client_name": "Default Rate Client", "capabilities": ["reference:read"]},
         )
         assert resp.status_code == 200
 
@@ -131,7 +133,7 @@ class TestCreateApiKey:
                    side_effect=Exception("keygen failure")):
             resp = logged_in_client.post(
                 "/admin/api-management/api-keys/create",
-                data={"client_name": "Error Client", "rate_limit_per_minute": "60"},
+                data={"client_name": "Error Client", "rate_limit_per_minute": "60", "capabilities": ["reference:read"]},
             )
         assert resp.status_code == 200
 
@@ -202,6 +204,7 @@ class TestEditApiKey:
                 "client_name": "Updated Name",
                 "client_description": "Updated description",
                 "rate_limit_per_minute": "120",
+                "capabilities": ["reference:read"],
             },
         )
         assert resp.status_code == 302  # redirect to view
@@ -216,6 +219,7 @@ class TestEditApiKey:
             data={
                 "client_name": "Key With Expiry",
                 "rate_limit_per_minute": "60",
+                "capabilities": ["reference:read"],
                 "expires_at": future,
             },
         )
@@ -232,6 +236,7 @@ class TestEditApiKey:
                 data={
                     "client_name": "Error Edit Key",
                     "rate_limit_per_minute": "60",
+                    "capabilities": ["reference:read"],
                 },
             )
         assert resp.status_code == 200

@@ -1,0 +1,52 @@
+# Keep secrets, local state and operational artifacts out of the image (`COPY . /app`).
+# NOTE: docs/ is intentionally NOT excluded: the in-app documentation viewer serves it at runtime.
+
+.git
+.gitignore
+.github
+.cursor
+.vscode
+.idea
+
+# Secrets and local environment files (env.example / env.quickstart.example stay)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+key.properties
+
+# Local runtime state, caches and uploads
+instance/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+coverage/
+.coverage*
+test_results.*
+node_modules/
+
+# Production operational artifacts and dumps (never ship these)
+prod-logs*/
+prod-*.log
+prod_data*.json
+*_data_sample.json
+LogFiles/
+deployments/
+*.har
+*.log
+*.dump
+*.backup
+*.sql
+azure/loadtest/logs/
+
+# Tests and developer-only tooling are not needed at runtime
+tests/
+vitest.config.js

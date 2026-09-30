@@ -973,21 +973,13 @@ class AIToolsRegistry:
         file_type = (file_type or "").strip() or None
         country_hint = (country_identifier or "").strip() or None
 
-        user_id, _, is_admin = resolve_ai_user_context()
+        from app.services.ai.documents.access import apply_document_read_filter
+        from app.services.ai.policies.access_policy import resolve_ai_access_policy
 
-        docs_query = AIDocument.query.filter(AIDocument.searchable == True)
-
-        # Permission filter: non-admins can only see public docs or their own.
-        if not is_admin:
-            if user_id:
-                docs_query = docs_query.filter(
-                    or_(
-                        AIDocument.is_public == True,
-                        AIDocument.user_id == int(user_id),
-                    )
-                )
-            else:
-                docs_query = docs_query.filter(AIDocument.is_public == True)
+        docs_query = apply_document_read_filter(
+            AIDocument.query.filter(AIDocument.searchable == True),
+            resolve_ai_access_policy().documents,
+        )
 
         # Filters.
         if status:
@@ -1089,20 +1081,16 @@ class AIToolsRegistry:
         )
 
         # Phase 2: User context & document query
-        user_id, _, is_admin = resolve_ai_user_context()
+        from app.services.ai.documents.access import apply_document_read_filter
+        from app.services.ai.policies.access_policy import resolve_ai_access_policy
 
-        docs_query = AIDocument.query.filter(
-            AIDocument.searchable == True,
-            AIDocument.processing_status == "completed",
+        docs_query = apply_document_read_filter(
+            AIDocument.query.filter(
+                AIDocument.searchable == True,
+                AIDocument.processing_status == "completed",
+            ),
+            resolve_ai_access_policy().documents,
         )
-
-        if not is_admin:
-            if user_id:
-                docs_query = docs_query.filter(
-                    or_(AIDocument.is_public == True, AIDocument.user_id == int(user_id))
-                )
-            else:
-                docs_query = docs_query.filter(AIDocument.is_public == True)
 
         # Source selection
         sources_norm = resolve_source_config()
@@ -1929,9 +1917,15 @@ class AIToolsRegistry:
         """
         Get tool definitions in OpenAI function calling format.
 
-        Returns:
-            List of tool definitions
+        The request's :class:`AIAccessPolicy` has the final say: anonymous (public proxy) callers only
+        ever see the public allow-list, whatever the source toggles or page context claim.
         """
+        from app.services.ai.policies.access_policy import resolve_ai_access_policy
+
+        defs = self._build_tool_definitions_openai()
+        return resolve_ai_access_policy().filter_tool_definitions(defs)
+
+    def _build_tool_definitions_openai(self) -> List[Dict[str, Any]]:
         tool_defs: List[Dict[str, Any]] = [
             {
                 "type": "function",
@@ -2594,10 +2588,10 @@ class AIToolsRegistry:
             defs = self.get_tool_definitions_openai() or []
             exposed: Set[str] = {n for n in (openapi_function_name(td) for td in defs) if n}
         except Exception as e:
-            logger.debug("execute_tool: could not resolve OpenAI tool list: %s", e)
+            logger.warning("execute_tool: could not resolve tool list, denying %r: %s", tool_name, e)
             exposed = set()
 
-        if exposed and tn not in exposed:
+        if tn not in exposed:
             raise ToolExecutionError(f"Unknown or disallowed tool for this request: {tool_name!r}")
 
         # Get the tool method

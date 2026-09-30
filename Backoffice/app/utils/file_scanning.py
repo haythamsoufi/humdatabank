@@ -20,6 +20,9 @@ from contextlib import suppress
 logger = logging.getLogger(__name__)
 
 
+_fail_open_warned = False
+
+
 class FileScanError(RuntimeError):
     """Raised when a file cannot be scanned and fail-open is disabled."""
 
@@ -37,16 +40,34 @@ class FileScanner:
         overridden via FILE_SCANNER_FAIL_OPEN=true.
         """
         cfg = current_app.config
+        debug = bool(cfg.get('DEBUG', False))
         explicit = cfg.get('FILE_SCANNER_FAIL_OPEN')
         if explicit is not None:
-            return str(explicit).lower() in ('true', '1', 'yes')
-        return bool(cfg.get('DEBUG', False))
+            fail_open = str(explicit).lower() in ('true', '1', 'yes')
+            if fail_open and not debug:
+                FileScanner._warn_fail_open_outside_debug()
+            return fail_open
+        return debug
+
+    @staticmethod
+    def _warn_fail_open_outside_debug() -> None:
+        """Log (once per process) that uploads are accepted unscanned when the scanner errors."""
+        global _fail_open_warned
+        if _fail_open_warned:
+            return
+        _fail_open_warned = True
+        logger.critical(
+            "FILE_SCANNER_FAIL_OPEN is enabled while DEBUG is off: uploads will be ACCEPTED "
+            "UNSCANNED whenever the file scanner is disabled, misconfigured or unreachable. "
+            "Unset FILE_SCANNER_FAIL_OPEN (fail-closed) unless this is an accepted risk."
+        )
 
     @staticmethod
     def _handle_failure(scanner: str, message: str, fail_open: bool) -> Dict[str, any]:
         """Centralized handler for scanner failures respecting fail-open policy."""
         if fail_open:
-            logger.warning("File scanner fail-open (%s): %s", scanner, message)
+            level = logging.WARNING if current_app.config.get('DEBUG', False) else logging.ERROR
+            logger.log(level, "File scanner fail-open (%s): %s -- upload proceeds unscanned", scanner, message)
             return {
                 'clean': False,
                 'infected': None,
@@ -166,7 +187,8 @@ class FileScanner:
                         'fail_open': False
                     }
                 else:
-                    return FileScanner._handle_failure('clamav', f'ClamAV scan error: {result.stderr}', fail_open)
+                    logger.error("ClamAV scan error (exit %s): %.500s", result.returncode, result.stderr)
+                    return FileScanner._handle_failure('clamav', 'ClamAV scan error', fail_open)
 
             finally:
                 # Clean up temporary file
@@ -263,6 +285,23 @@ class FileScanner:
                 fail_open
             )
 
+        from app.utils.outbound_url import (
+            is_local_dev_environment,
+            parse_network_allowlist,
+            validate_outbound_url,
+        )
+
+        # The scanner receives the API key and every uploaded file, so the configured URL
+        # is held to the same SSRF policy as any other operator-supplied outbound URL.
+        url_check = validate_outbound_url(
+            cloud_service_url,
+            allow_http=is_local_dev_environment(),
+            allowed_networks=parse_network_allowlist(current_app.config.get('CLOUD_SCANNER_ALLOWED_NETWORKS')),
+        )
+        if not url_check.ok:
+            logger.error("CLOUD_SCANNER_URL rejected by outbound policy: %s", url_check.reason)
+            return FileScanner._handle_failure('cloud', 'Cloud scanner URL is not permitted', fail_open)
+
         timeout = current_app.config.get('CLOUD_SCANNER_TIMEOUT', 30)
         auth_header = current_app.config.get('CLOUD_SCANNER_AUTH_HEADER', 'Authorization')
         auth_scheme = current_app.config.get('CLOUD_SCANNER_AUTH_SCHEME', 'Bearer')
@@ -292,14 +331,15 @@ class FileScanner:
                 data=payload,
                 files=files,
                 headers=headers,
-                timeout=timeout
+                timeout=timeout,
+                allow_redirects=False,
             )
             response.raise_for_status()
         except requests.exceptions.Timeout:
             return FileScanner._handle_failure('cloud', 'Cloud scanner request timed out', fail_open)
         except requests.exceptions.RequestException as exc:
             logger.error(f"Cloud scanner request error: {exc}", exc_info=True)
-            return FileScanner._handle_failure('cloud', f'Cloud scanner request failed: {exc}', fail_open)
+            return FileScanner._handle_failure('cloud', 'Cloud scanner request failed', fail_open)
 
         try:
             result = response.json()

@@ -1,7 +1,8 @@
 # Backoffice/app/routes/admin/plugin_management.py
 
 from flask import Blueprint, request, current_app, render_template, redirect, send_file, url_for, flash
-from app.routes.admin.shared import permission_required
+from flask_login import current_user
+from app.routes.admin.shared import permission_required, system_manager_required, rbac_guard_audit_exempt
 from app.plugins import PluginManager
 from app.plugins.form_integration import FormIntegration
 # Do not import csrf_exempt; these API routes are protected by auth/permissions
@@ -9,13 +10,18 @@ from app.utils.rate_limiting import plugin_management_rate_limit, plugin_install
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_request_data
 from app.utils.constants import CACHE_MAX_AGE_ONE_HOUR
-from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error, require_json_data
+from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error, require_json_data
 from app.utils.error_handling import handle_json_view_exception
 from typing import Optional
 import json
 import io
+import os
+import re
+import stat
 import zipfile
 from pathlib import Path
+
+from werkzeug.security import safe_join
 
 # Create blueprint
 plugin_bp = Blueprint('plugin_management', __name__, url_prefix='/admin/api/plugins')
@@ -25,6 +31,46 @@ plugin_static_bp = Blueprint('plugin_static', __name__, url_prefix='/plugins/sta
 
 # Create blueprint for plugin settings pages
 plugin_settings_bp = Blueprint('plugin_settings', __name__, url_prefix='/admin/plugins')
+
+_PLUGIN_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9_]{0,63}$')
+_MAX_PLUGIN_UNCOMPRESSED_BYTES = 300 * 1024 * 1024
+_PLUGIN_STATIC_EXTENSIONS = {
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.mjs': 'application/javascript',
+    '.json': 'application/json',
+    '.map': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.ico': 'image/x-icon',
+    '.svg': 'image/svg+xml',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+}
+
+
+def plugin_upload_enabled() -> bool:
+    """Kill switch for ZIP uploads (RCE-equivalent: the archive is imported as Python code).
+
+    Reads ``PLUGIN_UPLOAD_ENABLED`` from app config, falling back to the environment. Defaults to off.
+    """
+    configured = current_app.config.get('PLUGIN_UPLOAD_ENABLED')
+    if configured is None:
+        configured = os.environ.get('PLUGIN_UPLOAD_ENABLED', '')
+    if isinstance(configured, str):
+        return configured.strip().lower() in ('1', 'true', 'yes', 'on')
+    return bool(configured)
+
+
+def _public_static_plugins() -> set:
+    configured = current_app.config.get('PLUGIN_PUBLIC_STATIC_PLUGINS') or ()
+    if isinstance(configured, str):
+        configured = configured.split(',')
+    return {str(name).strip() for name in configured if str(name).strip()}
 
 
 
@@ -200,6 +246,7 @@ def get_plugin_info(plugin_name):
 
 @plugin_bp.route('/<plugin_name>/install', methods=['POST'])
 @permission_required('admin.plugins.manage')
+@system_manager_required
 @plugin_install_rate_limit()
 def install_plugin(plugin_name):
     """Install a specific plugin."""
@@ -217,6 +264,7 @@ def install_plugin(plugin_name):
 
 @plugin_bp.route('/<plugin_name>/uninstall', methods=['POST'])
 @permission_required('admin.plugins.manage')
+@system_manager_required
 @plugin_management_rate_limit()
 def uninstall_plugin(plugin_name):
     """Uninstall a specific plugin."""
@@ -297,10 +345,21 @@ def plugin_settings(plugin_name):
 
 @plugin_bp.route('/<plugin_name>/upload', methods=['POST'])
 @permission_required('admin.plugins.manage')
+@system_manager_required
 @plugin_install_rate_limit()
 def upload_plugin(plugin_name):
-    """Upload and install a plugin from a ZIP file."""
+    """Upload and install a plugin from a ZIP file.
+
+    Uploaded archives are extracted into the plugins directory and imported as Python, so this is
+    remote code execution by design: System Manager only, and off unless PLUGIN_UPLOAD_ENABLED is set.
+    """
     try:
+        if not plugin_upload_enabled():
+            return json_forbidden('Plugin upload is disabled on this deployment.')
+
+        if not _PLUGIN_NAME_RE.match(plugin_name or ''):
+            return json_bad_request('Invalid plugin name')
+
         if 'plugin_file' not in request.files:
             return json_bad_request('No plugin file provided')
 
@@ -386,6 +445,14 @@ def upload_plugin(plugin_name):
             if member.lower().endswith(('.exe', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.ps1')):
                 return json_bad_request(f'Invalid ZIP entry: dangerous file type not allowed ({member})')
 
+        total_uncompressed = 0
+        for info in zip_file.infolist():
+            if stat.S_ISLNK(info.external_attr >> 16):
+                return json_bad_request(f'Invalid ZIP entry: symbolic links are not allowed ({info.filename})')
+            total_uncompressed += info.file_size
+        if total_uncompressed > _MAX_PLUGIN_UNCOMPRESSED_BYTES:
+            return json_bad_request('Plugin archive expands to too much data')
+
         # Safe to extract after validation
         zip_file.extractall(plugin_dir)
 
@@ -441,10 +508,15 @@ def plugin_settings_page(plugin_name):
 
 
 @plugin_static_bp.route('/<plugin_name>/<path:filename>')
+@rbac_guard_audit_exempt("Plugin static assets: login required unless the plugin is in PLUGIN_PUBLIC_STATIC_PLUGINS")
 def serve_plugin_static(plugin_name, filename):
-    """Serve static files for plugins."""
+    """Serve static files for plugins (authenticated unless the plugin is explicitly allowlisted as public)."""
     try:
         from flask import request as req
+        is_public_plugin = plugin_name in _public_static_plugins()
+        if not is_public_plugin and not current_user.is_authenticated:
+            return current_app.response_class("Authentication required", status=401, mimetype='text/plain')
+
         # Deterministic resolution via PluginManager registration (no path searching)
         plugin_manager = getattr(current_app, "plugin_manager", None)
         static_dir = None
@@ -459,42 +531,25 @@ def serve_plugin_static(plugin_name, filename):
             )
 
         static_dir = Path(static_dir).resolve()
-        static_file = (static_dir / filename).resolve()
+        joined = safe_join(str(static_dir), filename)
+        if joined is None:
+            return current_app.response_class("Access denied", status=403, mimetype='text/plain')
+        static_file = Path(joined).resolve()
 
-        # Security check: ensure file is within static directory
+        # Symlinks may still point outside the directory after the lexical join.
         try:
             static_file.relative_to(static_dir)
         except ValueError:
             current_app.logger.error(f"Security violation: attempted access outside plugin static directory: {static_file}")
             return current_app.response_class("Access denied", status=403, mimetype='text/plain')
 
-        if not static_file.exists() or not static_file.is_file():
+        mimetype = _PLUGIN_STATIC_EXTENSIONS.get(static_file.suffix.lower())
+        if mimetype is None or not static_file.exists() or not static_file.is_file():
             return current_app.response_class(
                 f"Plugin static file not found: {plugin_name}/{filename}",
                 status=404,
                 mimetype='text/plain'
             )
-
-        # Determine MIME type based on file extension
-        mimetype = None
-        if filename.endswith('.css'):
-            mimetype = 'text/css'
-        elif filename.endswith('.js'):
-            mimetype = 'application/javascript'
-        elif filename.endswith('.json'):
-            mimetype = 'application/json'
-        elif filename.endswith('.png'):
-            mimetype = 'image/png'
-        elif filename.endswith('.jpg') or filename.endswith('.jpeg'):
-            mimetype = 'image/jpeg'
-        elif filename.endswith('.svg'):
-            mimetype = 'image/svg+xml'
-        elif filename.endswith('.woff'):
-            mimetype = 'font/woff'
-        elif filename.endswith('.woff2'):
-            mimetype = 'font/woff2'
-        elif filename.endswith('.ttf'):
-            mimetype = 'font/ttf'
 
         # Send file with explicit MIME type
         response = send_file(str(static_file), mimetype=mimetype, as_attachment=False)
@@ -513,12 +568,14 @@ def serve_plugin_static(plugin_name, filename):
             query_string = req.query_string.decode('utf-8', errors='ignore')
             if 'v=' in query_string:
                 response.cache_control.max_age = 31536000  # 1 year
-                response.cache_control.public = True
                 response.cache_control.immutable = True
             else:
                 response.cache_control.max_age = CACHE_MAX_AGE_ONE_HOUR
-                response.cache_control.public = True
                 response.cache_control.must_revalidate = True
+            if is_public_plugin:
+                response.cache_control.public = True
+            else:
+                response.cache_control.private = True
         elif response.status_code == 200 and is_development:
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'

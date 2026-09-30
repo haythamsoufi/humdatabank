@@ -249,14 +249,19 @@ class TestRenderPluginFieldEntry:
 class TestInteractiveMapPluginSecurity:
     def test_field_config_does_not_expose_raw_api_keys(self, client, app):
         mock_user = MagicMock(is_authenticated=True)
-        mock_config = MagicMock()
-        mock_config.get_all_config.return_value = {
+        config_payload = {
             "global_settings": {"default_map_provider": "mapbox"},
             "api_keys": {"mapbox": "pk.secret-token-should-not-leak"},
         }
+        # Plugin blueprints are loaded under a short module name, so patch the
+        # plugin_config object actually closed over by the view function.
+        view = app.view_functions["interactive_map_plugin.get_field_config"]
+        while hasattr(view, "__wrapped__"):
+            view = view.__wrapped__
+        real_config = view.__globals__["plugin_config"]
 
         with patch("flask_login.utils._get_user", return_value=mock_user), \
-             patch("plugins.interactive_map.routes.plugin_config", mock_config):
+             patch.object(real_config, "get_all_config", return_value=config_payload):
             with client.session_transaction() as sess:
                 sess["_user_id"] = "1"
                 sess["_fresh"] = True
@@ -339,29 +344,29 @@ class TestGetPluginInfo:
 # ---------------------------------------------------------------------------
 
 class TestInstallPlugin:
-    def test_install_success(self, logged_in_client, db_session, app):
+    def test_install_success(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager(install_result=True)
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/my_plugin/install")
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/install")
         _assert_status(resp, 200, 302)
         if resp.status_code == 200:
             data = _get_json(resp)
             assert data.get("success") is True
 
-    def test_install_failure(self, logged_in_client, db_session, app):
+    def test_install_failure(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager(install_result=False)
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/my_plugin/install")
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/install")
         _assert_status(resp, 200, 302, 400)
         if resp.status_code == 200:
             data = _get_json(resp)
             assert not data.get("success")
 
-    def test_install_exception(self, logged_in_client, db_session, app):
+    def test_install_exception(self, logged_in_sm_client, db_session, app):
         pm = MagicMock()
         pm.install_plugin.side_effect = Exception("install error")
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/my_plugin/install")
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/install")
         _assert_status(resp, 200, 302, 500)
 
     def test_unauthenticated(self, client, db_session):
@@ -374,26 +379,26 @@ class TestInstallPlugin:
 # ---------------------------------------------------------------------------
 
 class TestUninstallPlugin:
-    def test_uninstall_success(self, logged_in_client, db_session, app):
+    def test_uninstall_success(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager(uninstall_result=True)
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/my_plugin/uninstall")
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
         _assert_status(resp, 200, 302)
         if resp.status_code == 200:
             data = _get_json(resp)
             assert data.get("success") is True
 
-    def test_uninstall_failure(self, logged_in_client, db_session, app):
+    def test_uninstall_failure(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager(uninstall_result=False)
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/my_plugin/uninstall")
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
         _assert_status(resp, 200, 302, 400)
 
-    def test_uninstall_exception(self, logged_in_client, db_session, app):
+    def test_uninstall_exception(self, logged_in_sm_client, db_session, app):
         pm = MagicMock()
         pm.uninstall_plugin.side_effect = Exception("uninstall error")
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/my_plugin/uninstall")
+            resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
         _assert_status(resp, 200, 302, 500)
 
 
@@ -528,69 +533,75 @@ class TestPluginSettings:
 # ---------------------------------------------------------------------------
 
 class TestUploadPlugin:
-    def test_no_file(self, logged_in_client, db_session, app):
+    @pytest.fixture(autouse=True)
+    def _upload_enabled(self, app):
+        app.config["PLUGIN_UPLOAD_ENABLED"] = True
+        yield
+        app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
+
+    def test_no_file(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager()
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post("/admin/api/plugins/test_plugin/upload")
+            resp = logged_in_sm_client.post("/admin/api/plugins/test_plugin/upload")
         _assert_status(resp, 200, 302, 400)
         if resp.status_code == 200:
             data = _get_json(resp)
             assert not data.get("success")
 
-    def test_empty_filename(self, logged_in_client, db_session, app):
+    def test_empty_filename(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager()
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(b""), "")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_non_zip_file(self, logged_in_client, db_session, app):
+    def test_non_zip_file(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager()
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(b"hello"), "plugin.txt")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_invalid_zip_magic_bytes(self, logged_in_client, db_session, app):
+    def test_invalid_zip_magic_bytes(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager()
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(b"not-a-zip-file"), "plugin.zip")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_valid_zip_wrong_plugin_name(self, logged_in_client, db_session, app, tmp_path):
+    def test_valid_zip_wrong_plugin_name(self, logged_in_sm_client, db_session, app, tmp_path):
         zip_data = _make_valid_zip("wrong_plugin")
         pm = _make_plugin_manager(install_result=True)
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "plugin.zip")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_valid_zip_name_match_install_success(self, logged_in_client, db_session, app, tmp_path):
+    def test_valid_zip_name_match_install_success(self, logged_in_sm_client, db_session, app, tmp_path):
         zip_data = _make_valid_zip("test_plugin")
         pm = _make_plugin_manager(install_result=True)
-        with patch.object(app, "plugin_manager", pm), \
-             patch.object(app.config, "get", return_value=str(tmp_path)):
-            resp = logged_in_client.post(
+        app.config["PLUGINS_DIR"] = str(tmp_path)
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "test_plugin.zip")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302)
 
-    def test_file_too_large(self, logged_in_client, db_session, app):
+    def test_file_too_large(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager()
         # Create a zip that reports a large size via seek
         large_buf = MagicMock()
@@ -599,7 +610,7 @@ class TestUploadPlugin:
         large_buf.seek.return_value = None
         large_buf.read.return_value = b""
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(b"PK\x03\x04" + b"x" * 100), "plugin.zip")},
                 content_type="multipart/form-data",
@@ -607,7 +618,7 @@ class TestUploadPlugin:
         # File size check happens after reading - just ensure no crash
         _assert_status(resp, 200, 302, 400)
 
-    def test_missing_required_files_in_zip(self, logged_in_client, db_session, app, tmp_path):
+    def test_missing_required_files_in_zip(self, logged_in_sm_client, db_session, app, tmp_path):
         # Create a zip without plugin.py
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
@@ -616,14 +627,14 @@ class TestUploadPlugin:
         zip_data = buf.read()
         pm = _make_plugin_manager()
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "plugin.zip")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_invalid_plugin_json(self, logged_in_client, db_session, app, tmp_path):
+    def test_invalid_plugin_json(self, logged_in_sm_client, db_session, app, tmp_path):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             zf.writestr("plugin.py", "# plugin")
@@ -632,14 +643,14 @@ class TestUploadPlugin:
         zip_data = buf.read()
         pm = _make_plugin_manager()
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "plugin.zip")},
                 content_type="multipart/form-data",
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_valid_zip_install_failure(self, logged_in_client, db_session, app, tmp_path):
+    def test_valid_zip_install_failure(self, logged_in_sm_client, db_session, app, tmp_path):
         zip_data = _make_valid_zip("test_plugin")
         pm = _make_plugin_manager(install_result=False)
         with patch.object(app, "plugin_manager", pm), \
@@ -649,7 +660,7 @@ class TestUploadPlugin:
             mock_path_inst.mkdir = MagicMock()
             mock_path_inst.resolve.return_value = mock_path_inst
             mock_path_cls.return_value = mock_path_inst
-            resp = logged_in_client.post(
+            resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "test_plugin.zip")},
                 content_type="multipart/form-data",
@@ -782,3 +793,129 @@ class TestServePluginStatic:
              patch("app.routes.admin.plugin_management.Path", side_effect=Exception("path error")):
             resp = logged_in_client.get("/plugins/static/my_plugin/style.css")
         _assert_status(resp, 200, 302, 404, 500)
+
+
+# ---------------------------------------------------------------------------
+# Authorization hardening: code-changing operations are System Manager only
+# ---------------------------------------------------------------------------
+
+class TestPluginCodeChangesAreSystemManagerOnly:
+    @pytest.mark.parametrize("action", ["install", "uninstall", "upload"])
+    def test_plugin_manager_admin_is_denied(self, logged_in_client, db_session, app, action):
+        pm = _make_plugin_manager()
+        app.config["PLUGIN_UPLOAD_ENABLED"] = True
+        try:
+            with patch.object(app, "plugin_manager", pm):
+                resp = logged_in_client.post(
+                    f"/admin/api/plugins/my_plugin/{action}",
+                    headers={"Accept": "application/json"},
+                )
+        finally:
+            app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
+        assert resp.status_code == 403
+        pm.install_plugin.assert_not_called()
+        pm.uninstall_plugin.assert_not_called()
+
+    def test_admin_can_still_activate_and_list(self, logged_in_client, db_session, app):
+        pm = _make_plugin_manager(activate_result=True)
+        with patch.object(app, "plugin_manager", pm):
+            assert logged_in_client.get("/admin/api/plugins/").status_code == 200
+            assert logged_in_client.post("/admin/api/plugins/my_plugin/activate").status_code == 200
+
+    def test_upload_kill_switch_defaults_to_disabled(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager()
+        app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
+        with patch.object(app, "plugin_manager", pm), patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("PLUGIN_UPLOAD_ENABLED", None)
+            resp = logged_in_sm_client.post(
+                "/admin/api/plugins/test_plugin/upload",
+                data={"plugin_file": (io.BytesIO(_make_valid_zip()), "plugin.zip")},
+                content_type="multipart/form-data",
+            )
+        assert resp.status_code == 403
+        pm.install_plugin.assert_not_called()
+
+    @pytest.mark.parametrize("bad_name", ["..", "Bad-Name", "a" * 80])
+    def test_upload_rejects_invalid_plugin_names(self, logged_in_sm_client, db_session, app, bad_name):
+        pm = _make_plugin_manager()
+        app.config["PLUGIN_UPLOAD_ENABLED"] = True
+        try:
+            with patch.object(app, "plugin_manager", pm):
+                resp = logged_in_sm_client.post(
+                    f"/admin/api/plugins/{bad_name}/upload",
+                    data={"plugin_file": (io.BytesIO(_make_valid_zip(bad_name)), "plugin.zip")},
+                    content_type="multipart/form-data",
+                )
+        finally:
+            app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
+        assert resp.status_code in (400, 404)
+        pm.install_plugin.assert_not_called()
+
+    def test_upload_rejects_symlink_entries(self, logged_in_sm_client, db_session, app, tmp_path):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("plugin.py", "# plugin")
+            zf.writestr("plugin.json", json.dumps({"name": "test_plugin"}))
+            link = zipfile.ZipInfo("static/link")
+            link.external_attr = 0o120777 << 16
+            zf.writestr(link, "/etc/passwd")
+        pm = _make_plugin_manager()
+        app.config["PLUGIN_UPLOAD_ENABLED"] = True
+        app.config["PLUGINS_DIR"] = str(tmp_path)
+        try:
+            with patch.object(app, "plugin_manager", pm):
+                resp = logged_in_sm_client.post(
+                    "/admin/api/plugins/test_plugin/upload",
+                    data={"plugin_file": (io.BytesIO(buf.getvalue()), "plugin.zip")},
+                    content_type="multipart/form-data",
+                )
+        finally:
+            app.config.pop("PLUGIN_UPLOAD_ENABLED", None)
+            app.config.pop("PLUGINS_DIR", None)
+        assert resp.status_code == 400
+        assert not (tmp_path / "test_plugin" / "static" / "link").exists()
+        pm.install_plugin.assert_not_called()
+
+
+class TestPluginStaticAuthentication:
+    def _static_dir(self, tmp_path):
+        (tmp_path / "js").mkdir()
+        (tmp_path / "js" / "field.js").write_text("export default 1;")
+        (tmp_path / "secret.py").write_text("SECRET = 1")
+        return tmp_path
+
+    def test_anonymous_request_is_rejected(self, client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(static_dirs={"my_plugin": self._static_dir(tmp_path)})
+        with patch.object(app, "plugin_manager", pm):
+            resp = client.get("/plugins/static/my_plugin/js/field.js")
+        assert resp.status_code == 401
+
+    def test_logged_in_user_gets_private_cacheable_asset(self, logged_in_client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(static_dirs={"my_plugin": self._static_dir(tmp_path)})
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/plugins/static/my_plugin/js/field.js?v=1")
+        assert resp.status_code == 200
+        assert "public" not in (resp.headers.get("Cache-Control") or "")
+
+    def test_non_asset_extensions_are_not_served(self, logged_in_client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(static_dirs={"my_plugin": self._static_dir(tmp_path)})
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/plugins/static/my_plugin/secret.py")
+        assert resp.status_code == 404
+
+    def test_explicit_public_allowlist_allows_anonymous(self, client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(static_dirs={"my_plugin": self._static_dir(tmp_path)})
+        app.config["PLUGIN_PUBLIC_STATIC_PLUGINS"] = ["my_plugin"]
+        try:
+            with patch.object(app, "plugin_manager", pm):
+                resp = client.get("/plugins/static/my_plugin/js/field.js")
+        finally:
+            app.config.pop("PLUGIN_PUBLIC_STATIC_PLUGINS", None)
+        assert resp.status_code == 200
+
+    def test_path_traversal_is_rejected(self, logged_in_client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(static_dirs={"my_plugin": self._static_dir(tmp_path)})
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/plugins/static/my_plugin/..%2f..%2fetc%2fpasswd")
+        assert resp.status_code in (403, 404)

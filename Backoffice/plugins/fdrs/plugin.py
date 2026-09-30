@@ -35,13 +35,16 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
         return []
 
     def get_blueprint(self):
-        from plugins.fdrs import bp
+        from plugins.fdrs import bp, load_routes
 
+        load_routes()
         return bp
 
     def get_api_endpoints(self):
+        from plugins.fdrs import load_routes
         from plugins.fdrs.public_api_routes import API_ENDPOINTS
 
+        load_routes()
         return list(API_ENDPOINTS)
 
     def is_admin_feature(self) -> bool:

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-24 17:50+0000\n"
+"POT-Creation-Date: 2026-09-30 00:08+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ar <LL@li.org>\n"
@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: app/routes/admin/utilities/translations.py:1669
+#: app/routes/admin/utilities/translations.py:1672
 #, python-format
 msgid " (and %(count)d more)"
 msgstr "%(count)d (وأكثر)"
@@ -80,14 +80,14 @@ msgstr ""
 msgid "%(count)s email delivery failure(s) need attention."
 msgstr "IFRC يحتاج إلى اهتمام بسبب فشل تسليم البريد الإلكتروني. %(count)s"
 
-#: app/routes/admin/assignment_management.py:137
+#: app/routes/admin/assignment_management.py:138
 #, python-format
 msgid ""
 "%(count)s entit(ies) already submitted, sent for review, approved, or "
 "cancelled keep that assignment status."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:132
+#: app/routes/admin/assignment_management.py:133
 #, python-format
 msgid ""
 "%(count)s entit(ies) had some pages submitted. Those pages can be edited "
@@ -99,7 +99,7 @@ msgstr ""
 msgid "%(count)s field(s) orphaned"
 msgstr "IFRC حقل أو حقل يتيمة %(count)s"
 
-#: app/routes/admin/assignment_management.py:127
+#: app/routes/admin/assignment_management.py:128
 #, python-format
 msgid ""
 "%(count)s in-progress entit(ies) had every page submitted and were marked "
@@ -128,8 +128,8 @@ msgid ""
 "deleted."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2121
-#: app/routes/admin/utilities/translations.py:2134
+#: app/routes/admin/utilities/translations.py:2124
+#: app/routes/admin/utilities/translations.py:2137
 #, python-format
 msgid "%(count)s string was skipped because it is already human-approved."
 msgstr ""
@@ -325,8 +325,8 @@ msgstr ""
 msgid "(optional)"
 msgstr "(اختياري)"
 
-#: app/templates/admin/api_management.html:1316
-#: app/templates/admin/api_management.html:1318
+#: app/templates/admin/api_management.html:1365
+#: app/templates/admin/api_management.html:1367
 msgid "-- none --"
 msgstr "-- لا شيء --"
 
@@ -464,6 +464,13 @@ msgid ""
 "version."
 msgstr "نسخة مسودة موجودة بالفعل. افتحها أو تخلص منها قبل إنشاء نسخة جديدة."
 
+#: app/templates/admin/api_keys/_permissions_fields.html:7
+msgid ""
+"A key can only call the endpoints that belong to the permissions ticked "
+"below. Nothing ticked means nothing is allowed. Every request is checked "
+"against these permissions on the server."
+msgstr ""
+
 #: app/services/notification/core.py:85
 #, python-format
 msgid ""
@@ -504,7 +511,7 @@ msgstr "جولة سريعة ستساعدك على التنقل في المنصة
 msgid "A server error occurred. Please try again later."
 msgstr "حدث خطأ في الخادم حاول مرة أخرى لاحقاً."
 
-#: app/routes/admin/utilities/translations.py:336
+#: app/routes/admin/utilities/translations.py:337
 msgid "A term with this English source and language already exists."
 msgstr ""
 
@@ -562,7 +569,7 @@ msgstr "خطوات استدلال الذكاء الاصطناعي"
 msgid "AI Review Queue"
 msgstr "قائمة المراجعة الذكية"
 
-#: app/templates/admin/api_management.html:1772
+#: app/templates/admin/api_management.html:1832
 msgid "AI Session"
 msgstr "جلسة الذكاء الاصطناعي"
 
@@ -625,7 +632,7 @@ msgid "AI found 1 discrepancy across %(total)s reviewed fields."
 msgstr ""
 
 #: app/templates/admin/api_management.html:517
-#: app/templates/admin/api_management.html:1784
+#: app/templates/admin/api_management.html:1844
 msgid ""
 "AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) "
 "short-lived AI JWT in Authorization: Bearer (often from GET "
@@ -674,16 +681,16 @@ msgstr "API"
 msgid "API Documentation"
 msgstr "مستند عام"
 
-#: app/templates/admin/api_keys/create_success.html:48
-#: app/templates/admin/api_keys/details.html:8
+#: app/templates/admin/api_keys/create_success.html:49
+#: app/templates/admin/api_keys/details.html:9
 #: app/templates/admin/api_management.html:657
-#: app/templates/admin/api_management.html:1135
-#: app/templates/admin/api_management.html:1138
-#: app/templates/admin/api_management.html:1141
-#: app/templates/admin/api_management.html:1147
-#: app/templates/admin/api_management.html:1155
-#: app/templates/admin/api_management.html:1164
-#: app/templates/admin/api_management.html:1769
+#: app/templates/admin/api_management.html:1137
+#: app/templates/admin/api_management.html:1140
+#: app/templates/admin/api_management.html:1143
+#: app/templates/admin/api_management.html:1149
+#: app/templates/admin/api_management.html:1157
+#: app/templates/admin/api_management.html:1166
+#: app/templates/admin/api_management.html:1829
 msgid "API Key"
 msgstr "مفتاح API"
 
@@ -692,13 +699,13 @@ msgid "API Key - Paginated with date range and sorting"
 msgstr "مفتاح API - مركب مع نطاق زمني وفرز"
 
 #: app/templates/admin/analytics/audit_trail.html:424
-#: app/templates/admin/api_keys/create_success.html:5
-#: app/templates/admin/api_keys/create_success.html:15
+#: app/templates/admin/api_keys/create_success.html:6
+#: app/templates/admin/api_keys/create_success.html:16
 msgid "API Key Created"
 msgstr "تم إنشاء المهمة"
 
-#: app/templates/admin/api_keys/create_success.html:9
-#: app/templates/admin/api_keys/create_success.html:26
+#: app/templates/admin/api_keys/create_success.html:10
+#: app/templates/admin/api_keys/create_success.html:27
 msgid "API Key Created Successfully"
 msgstr "تمت إعادة تحميل جميع الإضافات بنجاح"
 
@@ -707,12 +714,12 @@ msgid "API Key Information"
 msgstr "معلومات الجمعية الوطنية"
 
 #: app/templates/admin/api_keys/create.html:14
-#: app/templates/admin/api_keys/create_success.html:14
-#: app/templates/admin/api_keys/details.html:17
+#: app/templates/admin/api_keys/create_success.html:15
+#: app/templates/admin/api_keys/details.html:18
 #: app/templates/admin/api_keys/edit.html:14
-#: app/templates/admin/api_keys/list.html:9
-#: app/templates/admin/api_keys/list.html:13
-#: app/templates/admin/api_keys/list.html:18
+#: app/templates/admin/api_keys/list.html:10
+#: app/templates/admin/api_keys/list.html:14
+#: app/templates/admin/api_keys/list.html:19
 #: app/templates/admin/api_keys/revoke.html:14
 #: app/templates/admin/api_keys/rotate_success.html:13
 #: app/templates/admin/api_management.html:204
@@ -742,10 +749,10 @@ msgid "API Key:"
 msgstr "مفتاح واجهة برمجة التطبيقات:"
 
 #: app/templates/admin/api_keys/create.html:13
-#: app/templates/admin/api_keys/create_success.html:13
-#: app/templates/admin/api_keys/details.html:16
+#: app/templates/admin/api_keys/create_success.html:14
+#: app/templates/admin/api_keys/details.html:17
 #: app/templates/admin/api_keys/edit.html:13
-#: app/templates/admin/api_keys/list.html:17
+#: app/templates/admin/api_keys/list.html:18
 #: app/templates/admin/api_keys/revoke.html:13
 #: app/templates/admin/api_keys/rotate_success.html:12
 #: app/templates/admin/api_management.html:4
@@ -774,15 +781,14 @@ msgstr ""
 msgid "API key for URL builder"
 msgstr "مفتاح API لمنشئ الروابط"
 
-#: app/templates/admin/api_management.html:730
-msgid ""
-"API key is sent as api_key in the query string. Choose Anonymous when "
-"prompted."
-msgstr ""
-"يتم إرسال مفتاح API ك api_key في سلسلة الاستعلام. اختر المجهول عند الطلب."
-
 #: app/utils/audit_trail_labels.py:70
 msgid "API key revoked"
+msgstr ""
+
+#: app/templates/admin/api_management.html:730
+msgid ""
+"API-key endpoints send Authorization: Bearer. Public and session endpoints "
+"do not. Choose Anonymous when prompted."
 msgstr ""
 
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:338
@@ -825,6 +831,11 @@ msgstr ""
 msgid "Acceptable Use"
 msgstr "الاستخدام المقبول"
 
+#: app/templates/admin/api_keys/details.html:260
+#: app/templates/admin/api_keys/list.html:115
+msgid "Access"
+msgstr ""
+
 #: app/templates/admin/analytics/audit_trail.html:392
 msgid "Access Approved"
 msgstr "تمت الموافقة على المهمة"
@@ -854,7 +865,7 @@ msgstr ""
 msgid "Access auto-resolved"
 msgstr ""
 
-#: app/routes/forms/entry.py:1299 app/routes/forms/entry.py:1302
+#: app/routes/forms/entry.py:1313 app/routes/forms/entry.py:1316
 #: app/routes/main/documents.py:45
 msgid "Access denied."
 msgstr "الدخول مرفوض."
@@ -867,6 +878,12 @@ msgstr "الدخول مرفوض ليس لديك إذن للوصول إلى هذ�
 #: app/templates/core/dashboard/_access_requests.html:152
 msgid "Access granted"
 msgstr "تم منح الوصول"
+
+#: app/templates/admin/api_management.html:570
+msgid ""
+"Access is limited to the permissions granted to the key (see API Key "
+"Management) and responses are always paginated. Send it as"
+msgstr ""
 
 #: app/templates/admin/rbac/_rbac_tabs.html:18
 msgid "Access management sections"
@@ -984,8 +1001,8 @@ msgstr "النوع"
 #: app/templates/admin/analytics/dashboard.html:231
 #: app/templates/admin/analytics/security_events.html:188
 #: app/templates/admin/analytics/sessions.html:165
-#: app/templates/admin/api_keys/details.html:293
-#: app/templates/admin/api_keys/list.html:118
+#: app/templates/admin/api_keys/details.html:308
+#: app/templates/admin/api_keys/list.html:120
 #: app/templates/admin/assignments/assignments.html:124
 #: app/templates/admin/assignments/public_submissions.html:255
 #: app/templates/admin/common_words/manage_common_words.html:800
@@ -1044,7 +1061,7 @@ msgstr ""
 msgid "Activate"
 msgstr "تفعيل"
 
-#: app/routes/admin/communication.py:280
+#: app/routes/admin/communication.py:281
 #: app/templates/admin/analytics/sessions.html:160
 #: app/templates/admin/assignments/_assignment_status_overview.html:36
 #: app/templates/admin/communication/center.html:991
@@ -1090,11 +1107,11 @@ msgstr "نشط (مرئي على الموقع الإلكتروني)"
 msgid "Active Alerts"
 msgstr "إنذار نشط"
 
-#: app/templates/admin/api_keys/list.html:45
+#: app/templates/admin/api_keys/list.html:46
 msgid "Active Keys"
 msgstr "نشط"
 
-#: app/templates/admin/api_keys/list.html:84
+#: app/templates/admin/api_keys/list.html:85
 msgid "Active Only"
 msgstr "نشط"
 
@@ -1113,7 +1130,7 @@ msgstr "عام"
 msgid "Active Sessions"
 msgstr "الجلسات النشطة"
 
-#: app/templates/admin/monitoring/system_monitoring.html:560
+#: app/templates/admin/monitoring/system_monitoring.html:562
 msgid "Active Threads"
 msgstr "الأنشطة"
 
@@ -1194,7 +1211,7 @@ msgstr "كتالوج الأنشطة"
 msgid "Activity endpoint catalog"
 msgstr "كتالوج نقاط نهاية النشاط"
 
-#: app/routes/admin/analytics.py:1299
+#: app/routes/admin/analytics.py:1301
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:62
 msgid "Activity type"
 msgstr "نوع النشاط"
@@ -1662,10 +1679,10 @@ msgstr "إضافة..."
 #: app/templates/admin/analytics/user_detail.html:15
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/api_keys/create.html:12
-#: app/templates/admin/api_keys/create_success.html:12
-#: app/templates/admin/api_keys/details.html:15
+#: app/templates/admin/api_keys/create_success.html:13
+#: app/templates/admin/api_keys/details.html:16
 #: app/templates/admin/api_keys/edit.html:12
-#: app/templates/admin/api_keys/list.html:16
+#: app/templates/admin/api_keys/list.html:17
 #: app/templates/admin/api_keys/revoke.html:12
 #: app/templates/admin/api_keys/rotate_success.html:11
 #: app/templates/admin/api_management.html:197
@@ -2012,12 +2029,12 @@ msgstr "جميع المؤشرات"
 msgid "All Items"
 msgstr "جميع العناصر"
 
-#: app/templates/admin/api_keys/list.html:83
+#: app/templates/admin/api_keys/list.html:84
 #: app/templates/admin/api_keys/rotate_success.html:80
 msgid "All Keys"
 msgstr "جميع السنوات"
 
-#: app/templates/admin/monitoring/system_monitoring.html:207
+#: app/templates/admin/monitoring/system_monitoring.html:209
 msgid "All Levels"
 msgstr "جميع المستويات"
 
@@ -2037,7 +2054,7 @@ msgstr "الفترة"
 msgid "All Public Submissions"
 msgstr "تقديم عام"
 
-#: app/templates/admin/monitoring/system_monitoring.html:198
+#: app/templates/admin/monitoring/system_monitoring.html:200
 msgid "All Sources"
 msgstr "جميع المصادر"
 
@@ -2115,7 +2132,7 @@ msgid ""
 "them?"
 msgstr ""
 
-#: app/templates/admin/api_keys/details.html:311
+#: app/templates/admin/api_keys/details.html:326
 msgid "All keys"
 msgstr "جميع المفاتيح"
 
@@ -2129,7 +2146,7 @@ msgstr "جميع حقول اللغة ممتلئة بالفعل."
 msgid "All languages"
 msgstr "جميع اللغات"
 
-#: app/templates/admin/monitoring/system_monitoring.html:428
+#: app/templates/admin/monitoring/system_monitoring.html:430
 msgid "All monitoring logs cleared successfully."
 msgstr "جميع سجلات المراقبة تم تطهيرها بنجاح."
 
@@ -2181,7 +2198,7 @@ msgstr "جميع الحقوق محفوظة."
 msgid "All sections completed."
 msgstr "جميع الأقسام اكتملت."
 
-#: app/routes/admin/assignment_management.py:326
+#: app/routes/admin/assignment_management.py:327
 msgid "All selected reviewers must be active IFRC admins."
 msgstr ""
 
@@ -2320,7 +2337,7 @@ msgstr "أيضا:"
 msgid "Alt text"
 msgstr "النص البديل"
 
-#: app/routes/auth.py:1288
+#: app/routes/auth.py:1333
 msgid "An account with this email already exists."
 msgstr "هناك حساب يحتوي على هذا البريد الإلكتروني موجودا بالفعل."
 
@@ -2328,7 +2345,7 @@ msgstr "هناك حساب يحتوي على هذا البريد الإلكترو
 msgid "An administrator will review your request."
 msgstr "سيراجع المسؤول طلبك."
 
-#: app/routes/admin/assignment_management.py:716
+#: app/routes/admin/assignment_management.py:717
 #, python-format
 msgid ""
 "An assignment already exists for this template and period (ID %(id)s). "
@@ -2346,7 +2363,7 @@ msgstr "حدث خطأ أثناء تحميل بيانات الامتثال"
 msgid "An error occurred while loading data"
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:1581
+#: app/routes/auth.py:1633
 msgid ""
 "An error occurred while updating your account settings. Please try again."
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
@@ -2359,15 +2376,15 @@ msgid "An error occurred."
 msgstr "حدث خطأ."
 
 #: app/routes/admin/form_builder/sections.py:264
-#: app/routes/admin/utilities/translations.py:341
-#: app/routes/admin/utilities/translations.py:943
-#: app/routes/admin/utilities/translations.py:1007
-#: app/routes/admin/utilities/translations.py:1148
-#: app/routes/admin/utilities/translations.py:1547
-#: app/routes/admin/utilities/translations.py:1561
-#: app/routes/admin/utilities/translations.py:1589
-#: app/routes/admin/utilities/translations.py:1608
-#: app/routes/admin/utilities/translations.py:1684
+#: app/routes/admin/utilities/translations.py:342
+#: app/routes/admin/utilities/translations.py:946
+#: app/routes/admin/utilities/translations.py:1010
+#: app/routes/admin/utilities/translations.py:1151
+#: app/routes/admin/utilities/translations.py:1550
+#: app/routes/admin/utilities/translations.py:1564
+#: app/routes/admin/utilities/translations.py:1592
+#: app/routes/admin/utilities/translations.py:1611
+#: app/routes/admin/utilities/translations.py:1687
 #: app/routes/main/dashboard.py:464 app/routes/main/views.py:117
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:845
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1274
@@ -2512,7 +2529,7 @@ msgstr "تمت الإجابة"
 msgid "Any"
 msgstr "أي"
 
-#: app/templates/admin/api_keys/details.html:55
+#: app/templates/admin/api_keys/details.html:56
 msgid ""
 "Any client still using the old key will receive 401 errors until updated."
 msgstr ""
@@ -2550,13 +2567,20 @@ msgstr "أضف لاحقة ديناميكية (النسبة المئوية، عد
 msgid "Applicable but data not available"
 msgstr "قابل للتطبيق ولكن البيانات غير متوفرة"
 
-#: app/templates/admin/monitoring/system_monitoring.html:201
+#: app/templates/admin/monitoring/system_monitoring.html:203
 msgid "Application"
 msgstr "التطبيق"
 
 #: app/templates/admin/monitoring/system_monitoring.html:87
 msgid "Application Log"
 msgstr "الطلب"
+
+#: app/templates/admin/api_keys/_permissions_fields.html:104
+msgid ""
+"Applies to Form data, Submissions and Form templates. Leave both lists empty"
+" on one side to allow everything on that side. Users, reference data and "
+"content are not affected."
+msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:316
 msgid "Applies to all entities on this assignment."
@@ -2754,7 +2778,7 @@ msgstr "هل أنت متأكد من أنك تريد الموافقة على هذ
 msgid "Are you sure you want to archive this indicator?"
 msgstr "هل أنت متأكد من أنك تريد حذف هذا المؤشر؟"
 
-#: app/templates/admin/monitoring/system_monitoring.html:417
+#: app/templates/admin/monitoring/system_monitoring.html:419
 msgid ""
 "Are you sure you want to clear all monitoring logs? This action cannot be "
 "undone."
@@ -3123,17 +3147,17 @@ msgstr ""
 msgid "Assignment"
 msgstr "المهام"
 
-#: app/routes/admin/assignment_management.py:1775
+#: app/routes/admin/assignment_management.py:1778
 #, python-format
 msgid "Assignment '%(name)s' has been closed."
 msgstr "تم إغلاق مهمة '%(name)s'."
 
-#: app/routes/main/assignments.py:154
+#: app/routes/main/assignments.py:175
 #, python-format
 msgid "Assignment '%(template)s' for %(entity)s has been reopened."
 msgstr "تم إعادة فتح التعيين '%(template)s' ل %(entity)s."
 
-#: app/routes/main/assignments.py:146
+#: app/routes/main/assignments.py:167
 #, python-format
 msgid "Assignment '%(template)s' has been reopened for %(entity)s only."
 msgstr "تم إعادة فتح التعيين '%(template)s' ل %(entity)s فقط."
@@ -3267,7 +3291,7 @@ msgstr "إعادة فتح المهمة: %(template)s"
 msgid "Assignment returned for revision: %(template)s"
 msgstr "تم إعادة التعيين للمراجعة: %(template)s"
 
-#: app/routes/main/assignments.py:381
+#: app/routes/main/assignments.py:444
 msgid "Assignment returned to the National Society for changes."
 msgstr "عاد التعيين إلى الجمعية الوطنية للتغييرات."
 
@@ -3279,7 +3303,7 @@ msgstr ""
 msgid "Assignment sections"
 msgstr ""
 
-#: app/routes/forms/entry.py:983 app/routes/forms/entry.py:987
+#: app/routes/forms/entry.py:997 app/routes/forms/entry.py:1001
 msgid "Assignment sent for review successfully."
 msgstr "تم إرسال المهمة للمراجعة بنجاح."
 
@@ -3317,7 +3341,7 @@ msgstr "سير عمل حالة التعيين"
 msgid "Assignment submission"
 msgstr ""
 
-#: app/routes/forms/entry.py:994 app/routes/forms/entry.py:999
+#: app/routes/forms/entry.py:1008 app/routes/forms/entry.py:1013
 msgid "Assignment submitted successfully!"
 msgstr "تم تسليم الواجب بنجاح!"
 
@@ -3453,11 +3477,11 @@ msgstr "البيان المالي المدقق"
 msgid "Aug"
 msgstr "أغسطس"
 
-#: app/templates/admin/api_management.html:1793
+#: app/templates/admin/api_management.html:1853
 msgid "Auth"
 msgstr "المصادقة"
 
-#: app/templates/admin/api_management.html:1779
+#: app/templates/admin/api_management.html:1839
 msgid ""
 "Auth mode could not be inferred from route metadata; review the view or "
 "decorator tags."
@@ -3717,11 +3741,11 @@ msgstr ""
 msgid "Avg Cost"
 msgstr "Avg Cost"
 
-#: app/templates/admin/api_keys/details.html:104
+#: app/templates/admin/api_keys/details.html:105
 msgid "Avg Response"
 msgstr "الاستجابة المتوسطة"
 
-#: app/templates/admin/api_keys/details.html:144
+#: app/templates/admin/api_keys/details.html:145
 msgid "Avg ms"
 msgstr "متوسط مللي ثانية"
 
@@ -3766,7 +3790,7 @@ msgstr ""
 msgid "Back"
 msgstr "فارغ"
 
-#: app/templates/admin/api_keys/create_success.html:85
+#: app/templates/admin/api_keys/create_success.html:91
 msgid "Back to API Keys"
 msgstr "العودة إلى مفاتيح API"
 
@@ -3866,7 +3890,7 @@ msgid "Batch size"
 msgstr "حجم الدفعة"
 
 #: app/templates/admin/api_management.html:511
-#: app/templates/admin/api_management.html:1781
+#: app/templates/admin/api_management.html:1841
 msgid ""
 "Bearer token using a database-managed API key (Authorization: Bearer …). "
 "Typical for external integrations."
@@ -4130,7 +4154,7 @@ msgstr ""
 msgid "CC"
 msgstr "CC"
 
-#: app/templates/admin/monitoring/system_monitoring.html:482
+#: app/templates/admin/monitoring/system_monitoring.html:484
 msgid "CPU Usage"
 msgstr "الصفحة"
 
@@ -4190,6 +4214,10 @@ msgstr "رسائل البريد الإلكتروني للحملة"
 msgid "Campaigns"
 msgstr "المديرون"
 
+#: app/templates/admin/api_keys/_permissions_fields.html:76
+msgid "Can be limited to templates / countries"
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:4097
 msgid "Can't find an indicator? Propose a new one here"
 msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جديد هنا"
@@ -4201,9 +4229,9 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/admin/ai/knowledge_base.html:653
 #: app/templates/admin/ai/reasoning_traces.html:726
 #: app/templates/admin/analytics/security_events.html:133
-#: app/templates/admin/api_keys/create.html:90
-#: app/templates/admin/api_keys/details.html:66
-#: app/templates/admin/api_keys/edit.html:91
+#: app/templates/admin/api_keys/create.html:94
+#: app/templates/admin/api_keys/details.html:67
+#: app/templates/admin/api_keys/edit.html:95
 #: app/templates/admin/api_keys/revoke.html:21
 #: app/templates/admin/api_keys/revoke.html:80
 #: app/templates/admin/assignments/gantt_chart.html:246
@@ -4242,7 +4270,7 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:524
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:608
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:704
-#: app/templates/admin/monitoring/system_monitoring.html:441
+#: app/templates/admin/monitoring/system_monitoring.html:443
 #: app/templates/admin/organization/_countries_component.html:134
 #: app/templates/admin/organization/_nss_component.html:122
 #: app/templates/admin/organization/_nss_component.html:204
@@ -4334,7 +4362,7 @@ msgstr "الإلغاء..."
 msgid "Cancelling…"
 msgstr "الإلغاء..."
 
-#: app/routes/admin/utilities/translations.py:391
+#: app/routes/admin/utilities/translations.py:392
 #: app/routes/translation_review/__init__.py:277
 msgid "Candidate not found or already reviewed"
 msgstr ""
@@ -4389,7 +4417,7 @@ msgstr "الانتقال من الجولة السابقة"
 msgid "Carry-forward data"
 msgstr "بيانات النقل إلى الأمام"
 
-#: app/routes/admin/utilities/translations.py:1581
+#: app/routes/admin/utilities/translations.py:1584
 #, python-format
 msgid ""
 "Catalog synced from .po files. New rows: %(inserted)d. Empty rows filled: "
@@ -4621,7 +4649,7 @@ msgstr "الاختيار"
 msgid "Choose a form template under Setup first."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:333
+#: app/routes/admin/utilities/translations.py:334
 msgid "Choose a target language."
 msgstr ""
 
@@ -4733,12 +4761,12 @@ msgstr "%(count)d نظفت الجلسات المنتهية صلاحيتها."
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:34
 #: app/templates/admin/analytics/audit_trail.html:289
 #: app/templates/admin/analytics/page_path_analytics.html:54
-#: app/templates/admin/api_keys/list.html:97
+#: app/templates/admin/api_keys/list.html:98
 #: app/templates/admin/communication/center.html:551
 #: app/templates/admin/communication/center.html:736
 #: app/templates/admin/communication/registry.html:34
-#: app/templates/admin/monitoring/system_monitoring.html:184
-#: app/templates/admin/monitoring/system_monitoring.html:441
+#: app/templates/admin/monitoring/system_monitoring.html:185
+#: app/templates/admin/monitoring/system_monitoring.html:443
 #: app/templates/admin/settings/manage_settings.html:1279
 #: app/templates/admin/validation_dashboard.html:254
 #: app/templates/components/ag_grid_i18n_js.html:19
@@ -4766,7 +4794,7 @@ msgstr "فلتر شفاف"
 msgid "Clear Filters"
 msgstr "المرشحات الشفافة"
 
-#: app/templates/admin/monitoring/system_monitoring.html:441
+#: app/templates/admin/monitoring/system_monitoring.html:443
 msgid "Clear Logs?"
 msgstr "إزالة السجلات؟"
 
@@ -4778,6 +4806,7 @@ msgstr "معاملات الاستعلام"
 msgid "Clear Translations"
 msgstr "ترجمات واضحة"
 
+#: app/templates/admin/api_keys/_permissions_fields.html:42
 #: app/templates/core/chat_immersive.html:45
 msgid "Clear all"
 msgstr "مسح الكل"
@@ -5020,13 +5049,13 @@ msgstr "انقر على ▲ للاستعادة"
 msgid "Client"
 msgstr "العميل"
 
-#: app/templates/admin/api_keys/create_success.html:36
-#: app/templates/admin/api_keys/list.html:111
+#: app/templates/admin/api_keys/create_success.html:37
+#: app/templates/admin/api_keys/list.html:112
 #: app/templates/admin/api_keys/revoke.html:48
 msgid "Client Name"
 msgstr "أدخل الاسم"
 
-#: app/templates/admin/api_keys/details.html:60
+#: app/templates/admin/api_keys/details.html:61
 msgid "Client:"
 msgstr "العميل:"
 
@@ -5235,7 +5264,7 @@ msgstr "اللون"
 msgid "Column Visibility"
 msgstr "إظهار/إخفاء الأعمدة"
 
-#: app/templates/admin/api_management.html:1787
+#: app/templates/admin/api_management.html:1847
 msgid "Column filters are hiding some rows that match this chip."
 msgstr "فلاتر الأعمدة تخفي بعض الصفوف التي تطابق هذه الشريحة."
 
@@ -5414,7 +5443,7 @@ msgstr "اكتملت المقارنة · مراجعة..."
 msgid "Comparison complete."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1488
+#: app/routes/admin/utilities/translations.py:1491
 msgid ""
 "Compilation script not found. Please ensure "
 "scripts/i18n/compile_translations.py exists."
@@ -5711,7 +5740,7 @@ msgstr "الاتصال مفقود. يرجى إبقاء هذه النافذة م�
 msgid "Consider backing up your data before proceeding."
 msgstr "يُنصح بعمل نسخة احتياطية من بياناتك قبل المتابعة."
 
-#: app/templates/admin/api_management.html:1796
+#: app/templates/admin/api_management.html:1856
 msgid "Consumers"
 msgstr "المستهلكون"
 
@@ -5808,9 +5837,9 @@ msgstr "المحادثات"
 #: app/templates/admin/ai/conversation_traces.html:474
 #: app/templates/admin/ai/trace_detail.html:633
 #: app/templates/admin/api_keys/rotate_success.html:108
-#: app/templates/admin/api_management.html:1586
-#: app/templates/admin/api_management.html:1685
-#: app/templates/admin/api_management.html:1691
+#: app/templates/admin/api_management.html:1651
+#: app/templates/admin/api_management.html:1745
+#: app/templates/admin/api_management.html:1751
 #: app/templates/core/chat_immersive.html:54
 msgid "Copied!"
 msgstr "تم النسخ!"
@@ -5832,7 +5861,7 @@ msgstr "نسخ"
 msgid "Copy Summarised"
 msgstr "ملخص النص"
 
-#: app/templates/admin/api_management.html:1800
+#: app/templates/admin/api_management.html:1860
 #: app/templates/admin/assignments/public_submissions.html:83
 msgid "Copy URL"
 msgstr "نسخ الرابط"
@@ -5949,7 +5978,7 @@ msgstr "التكلفة:"
 msgid "Could not check for existing data. Please try again."
 msgstr "لم أتمكن من التحقق من البيانات الموجودة. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:842
+#: app/routes/auth.py:883
 msgid "Could not complete Azure sign-in."
 msgstr "لم أتمكن من إكمال تسجيل الدخول إلى Azure."
 
@@ -5958,7 +5987,7 @@ msgstr "لم أتمكن من إكمال تسجيل الدخول إلى Azure."
 msgid "Could not create SP/EF entry."
 msgstr "لم أتمكن من إنشاء مدخل SP/EF."
 
-#: app/routes/auth.py:1372
+#: app/routes/auth.py:1422
 msgid "Could not create account. Please try again."
 msgstr "فشل في إرسال النموذج. يرجى المحاولة مرة أخرى."
 
@@ -5974,7 +6003,7 @@ msgstr "لم أتمكن من إنشاء النوع."
 msgid "Could not create unit."
 msgstr "لم أتمكن من إنشاء وحدة."
 
-#: app/routes/auth.py:982 app/routes/auth.py:987
+#: app/routes/auth.py:1023 app/routes/auth.py:1028
 msgid "Could not create user from Azure login."
 msgstr "لم أتمكن من إنشاء مستخدم من تسجيل الدخول إلى Azure."
 
@@ -6093,7 +6122,7 @@ msgstr "لم أتمكن من إعادة إجراء التغييرات."
 msgid "Could not save SP/EF entry."
 msgstr "لم أتمكن من حفظ إدخال SP/EF."
 
-#: app/routes/admin/utilities/translations.py:339
+#: app/routes/admin/utilities/translations.py:340
 msgid "Could not save this glossary term."
 msgstr ""
 
@@ -6113,7 +6142,7 @@ msgstr "لم أتمكن من إنقاذ الوحدة."
 msgid "Could not start export."
 msgstr ""
 
-#: app/routes/main/assignments.py:618
+#: app/routes/main/assignments.py:681
 msgid "Could not submit request. Please try again."
 msgstr "فشل في إرسال النموذج. يرجى المحاولة مرة أخرى."
 
@@ -6129,12 +6158,12 @@ msgstr ""
 msgid "Could not update this candidate. Try again."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1412
-#: app/routes/admin/utilities/translations.py:1450
+#: app/routes/admin/utilities/translations.py:1415
+#: app/routes/admin/utilities/translations.py:1453
 msgid "Could not update translation files."
 msgstr "لم أتمكن من تحديث ملفات الترجمة."
 
-#: app/templates/admin/templates/kobo_data_import.html:1157
+#: app/templates/admin/templates/kobo_data_import.html:1155
 #: app/templates/admin/templates/new_template.html:1131
 #: app/templates/forms/form_builder/form_builder.html:1158
 msgid "Could not validate the file. Please try again."
@@ -6366,8 +6395,8 @@ msgstr "إنشاء"
 #: app/templates/admin/api_keys/create.html:5
 #: app/templates/admin/api_keys/create.html:9
 #: app/templates/admin/api_keys/create.html:15
-#: app/templates/admin/api_keys/create.html:94
-#: app/templates/admin/api_keys/list.html:195
+#: app/templates/admin/api_keys/create.html:98
+#: app/templates/admin/api_keys/list.html:200
 msgid "Create API Key"
 msgstr "إنشاء تقرير"
 
@@ -6396,7 +6425,7 @@ msgstr "إنشاء المنحة"
 msgid "Create Manual List"
 msgstr "إنشاء قائمة يدوية"
 
-#: app/templates/admin/api_keys/list.html:23
+#: app/templates/admin/api_keys/list.html:24
 msgid "Create New API Key"
 msgstr "إنشاء مهمة جديدة"
 
@@ -6542,7 +6571,7 @@ msgstr "إنشاء باستخدام الذكاء الاصطناعي"
 msgid "Create your account"
 msgstr "سجل الدخول إلى حسابك"
 
-#: app/templates/admin/api_keys/list.html:191
+#: app/templates/admin/api_keys/list.html:196
 msgid "Create your first API key to get started"
 msgstr "أنشئ قطاعك الأول"
 
@@ -6567,8 +6596,8 @@ msgstr "أنشئ قطاعك الفرعي الأول"
 #: app/templates/admin/ai/knowledge_base.html:669
 #: app/templates/admin/ai/reasoning_traces.html:439
 #: app/templates/admin/analytics/audit_trail.html:385
-#: app/templates/admin/api_keys/details.html:264
-#: app/templates/admin/api_keys/list.html:115
+#: app/templates/admin/api_keys/details.html:279
+#: app/templates/admin/api_keys/list.html:117
 #: app/templates/admin/assignments/_assignment_status_overview.html:30
 #: app/templates/admin/common_words/manage_common_words.html:790
 #: app/templates/admin/indicator_bank/_panel_common_words_scripts.html:374
@@ -6586,6 +6615,12 @@ msgstr "تم الإنشاء في"
 #: app/templates/admin/communication/center.html:1380
 msgid "Created By"
 msgstr "تم الإنشاء"
+
+#: app/templates/admin/api_keys/_access_summary.html:10
+msgid ""
+"Created before permissions existed: unrestricted access including personal "
+"data"
+msgstr ""
 
 #: app/templates/admin/templates/new_template.html:322
 msgid ""
@@ -6615,11 +6650,11 @@ msgstr "حرج"
 msgid "Critical Events"
 msgstr "الأحداث الحرجة"
 
-#: app/templates/admin/api_management.html:1756
+#: app/templates/admin/api_management.html:1816
 msgid "Critical error"
 msgstr "حرج"
 
-#: app/templates/admin/api_management.html:1293
+#: app/templates/admin/api_management.html:1342
 msgid "Ctrl+click or Shift+click to select multiple"
 msgstr ""
 
@@ -6661,7 +6696,7 @@ msgstr "رمز العملة"
 msgid "Current name:"
 msgstr "الاسم الحالي:"
 
-#: app/templates/admin/api_keys/details.html:61
+#: app/templates/admin/api_keys/details.html:62
 msgid "Current prefix:"
 msgstr "البادئة الحالية:"
 
@@ -6988,6 +7023,12 @@ msgstr "منهجية جودة البيانات"
 msgid "Data quality templates"
 msgstr "قوالب جودة البيانات"
 
+#: app/templates/admin/api_keys/_access_summary.html:38
+msgid ""
+"Data restriction is active but lists no template or country, so data "
+"endpoints return nothing."
+msgstr ""
+
 #: plugins/pb_progress/templates/pb_progress/manage.html:54
 msgid "Data source"
 msgstr ""
@@ -7020,7 +7061,7 @@ msgstr "ستظهر البيانات هنا بعد تطبيق المعايير."
 msgid "Databank"
 msgstr "قاعدة البيانات"
 
-#: app/templates/admin/monitoring/system_monitoring.html:537
+#: app/templates/admin/monitoring/system_monitoring.html:539
 msgid "Database Pool"
 msgstr "جداول قاعدة البيانات:"
 
@@ -7155,7 +7196,7 @@ msgstr "الرسالة الافتراضية"
 msgid "Default notification email"
 msgstr "البريد الإلكتروني الافتراضي للإشعار"
 
-#: app/routes/admin/communication.py:295
+#: app/routes/admin/communication.py:296
 #: app/templates/admin/communication/registry.html:65
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:147
 msgid "Default priority"
@@ -7622,15 +7663,15 @@ msgid ""
 msgstr "صف نموذجك أو أرفق استبيانا. المساعد يكتب الأقسام والأسئلة لمراجعتها."
 
 #: app/forms/form_builder/template_forms.py:21
-#: app/routes/admin/analytics.py:1298 app/routes/admin/communication.py:297
+#: app/routes/admin/analytics.py:1300 app/routes/admin/communication.py:298
 #: app/templates/admin/analytics/_user_detail_partial.html:225
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:61
 #: app/templates/admin/analytics/audit_trail.html:268
 #: app/templates/admin/analytics/audit_trail.html:455
 #: app/templates/admin/analytics/security_events.html:184
-#: app/templates/admin/api_keys/create_success.html:42
-#: app/templates/admin/api_keys/details.html:253
-#: app/templates/admin/api_management.html:1795
+#: app/templates/admin/api_keys/create_success.html:43
+#: app/templates/admin/api_keys/details.html:254
+#: app/templates/admin/api_management.html:1855
 #: app/templates/admin/communication/center.html:798
 #: app/templates/admin/communication/center.html:1322
 #: app/templates/admin/communication/registry.html:67
@@ -7702,7 +7743,7 @@ msgstr "إلغاء اختيار الكل"
 msgid "Designated FDS member"
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:263
+#: app/routes/admin/assignment_management.py:264
 msgid "Designated FDS member for the submitting country"
 msgstr ""
 
@@ -7813,7 +7854,7 @@ msgstr "تعطيل التقارير العامة"
 
 #: app/templates/admin/ai/dashboard.html:38
 #: app/templates/admin/ai/dashboard.html:54
-#: app/templates/admin/api_keys/details.html:241
+#: app/templates/admin/api_keys/details.html:242
 #: app/templates/admin/api_keys/edit.html:44
 #: app/templates/admin/monitoring/system_monitoring.html:35
 #: app/templates/admin/monitoring/system_monitoring.html:64
@@ -7968,7 +8009,7 @@ msgstr ""
 msgid "Disk Space:"
 msgstr "مساحة القرص:"
 
-#: app/templates/admin/monitoring/system_monitoring.html:509
+#: app/templates/admin/monitoring/system_monitoring.html:511
 msgid "Disk Usage"
 msgstr "مساحة القرص:"
 
@@ -8151,7 +8192,7 @@ msgstr "لا تشارك كلمات المرور أو بيانات الاعتما
 msgid "Do it later"
 msgstr "افعلها لاحقا"
 
-#: app/templates/admin/api_keys/create_success.html:74
+#: app/templates/admin/api_keys/create_success.html:80
 msgid "Do not share this key or commit it to version control"
 msgstr "لا تشارك هذا المفتاح أو تلتزم به في التحكم بالإصدارات"
 
@@ -8215,7 +8256,7 @@ msgid "Document Status"
 msgstr "حالة المستند"
 
 #: app/templates/admin/ai/knowledge_base.html:823
-#: app/templates/admin/api_management.html:1192
+#: app/templates/admin/api_management.html:1194
 #: app/templates/admin/documents/documents.html:184
 #: app/templates/admin/documents/documents.html:655
 msgid "Document Type"
@@ -8612,13 +8653,13 @@ msgstr "تاريخ الاستحقاق"
 msgid "Due Date:"
 msgstr "تاريخ الاستحقاق:"
 
-#: app/routes/admin/assignment_management.py:1246
+#: app/routes/admin/assignment_management.py:1247
 msgid ""
 "Due date was not changed because some entities already have their own due "
 "dates."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1258
+#: app/routes/admin/assignment_management.py:1259
 msgid "Due date was not saved because this assignment has no entities yet."
 msgstr ""
 
@@ -8808,9 +8849,9 @@ msgstr ""
 msgid "Earliest:"
 msgstr "الأقدم:"
 
-#: app/templates/admin/api_keys/details.html:23
+#: app/templates/admin/api_keys/details.html:24
 #: app/templates/admin/api_keys/edit.html:16
-#: app/templates/admin/api_keys/list.html:166
+#: app/templates/admin/api_keys/list.html:171
 #: app/templates/admin/assignments/assignments.html:133
 #: app/templates/admin/assignments/public_submissions.html:269
 #: app/templates/admin/communication/center.html:1384
@@ -8997,7 +9038,7 @@ msgstr ""
 msgid "Edit message"
 msgstr "تعديل الرسالة"
 
-#: app/templates/admin/api_keys/details.html:298
+#: app/templates/admin/api_keys/details.html:313
 msgid "Edit metadata"
 msgstr "تعديل البيانات الوصفية"
 
@@ -9294,11 +9335,11 @@ msgstr "التفضيلات"
 msgid "Emergency only"
 msgstr "للطوارئ فقط"
 
-#: app/templates/admin/api_management.html:1171
+#: app/templates/admin/api_management.html:1173
 msgid "Emergency type"
 msgstr "نوع الطوارئ"
 
-#: app/routes/admin/communication.py:294
+#: app/routes/admin/communication.py:295
 msgid "Emitter active"
 msgstr "الباعث نشط"
 
@@ -9424,12 +9465,12 @@ msgstr "نهاية الجولة"
 msgid "Ended"
 msgstr "انتهى"
 
-#: app/routes/admin/analytics.py:1297
+#: app/routes/admin/analytics.py:1299
 #: app/templates/admin/analytics/_user_detail_partial.html:226
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:60
 #: app/templates/admin/analytics/audit_trail.html:462
-#: app/templates/admin/api_keys/details.html:142
-#: app/templates/admin/api_keys/details.html:184
+#: app/templates/admin/api_keys/details.html:143
+#: app/templates/admin/api_keys/details.html:185
 msgid "Endpoint"
 msgstr "نقطة النهاية"
 
@@ -9437,6 +9478,10 @@ msgstr "نقطة النهاية"
 #: app/templates/admin/api_management.html:302
 msgid "Endpoint Registry"
 msgstr "سجل نقاط النهاية"
+
+#: app/templates/admin/api_keys/_permissions_fields.html:84
+msgid "Endpoints unlocked"
+msgstr ""
 
 #: app/templates/admin/api_management.html:369
 msgid ""
@@ -9456,7 +9501,7 @@ msgstr ""
 msgid "English"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:960
+#: app/routes/admin/utilities/translations.py:963
 msgid "English (en) is the source language and should not be imported."
 msgstr "(ن) اللغة الإنكليزية هي لغة المصدر ولا ينبغي استيرادها."
 
@@ -9501,11 +9546,11 @@ msgstr ""
 msgid "Enter a target year and click \"Load Data\" to preview imputation results."
 msgstr "أدخل سنة مستهدفة وانقر على \"تحميل البيانات\" لمعاينة نتائج الحساب."
 
-#: app/routes/admin/utilities/translations.py:331
+#: app/routes/admin/utilities/translations.py:332
 msgid "Enter a valid English source term."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:332
+#: app/routes/admin/utilities/translations.py:333
 msgid "Enter a valid target term."
 msgstr ""
 
@@ -9662,15 +9707,15 @@ msgstr "المتساوون"
 #: app/templates/admin/ai/reasoning_traces.html:249
 #: app/templates/admin/analytics/audit_trail.html:441
 #: app/templates/admin/monitoring/system_monitoring.html:19
-#: app/templates/admin/monitoring/system_monitoring.html:208
-#: app/templates/admin/monitoring/system_monitoring.html:432
-#: app/templates/admin/monitoring/system_monitoring.html:437
+#: app/templates/admin/monitoring/system_monitoring.html:210
+#: app/templates/admin/monitoring/system_monitoring.html:434
+#: app/templates/admin/monitoring/system_monitoring.html:439
 #: app/templates/admin/settings/manage_settings.html:1495
 #: app/templates/admin/validation_questions.html:139
 msgid "Error"
 msgstr "خطأ"
 
-#: app/templates/admin/api_keys/details.html:146
+#: app/templates/admin/api_keys/details.html:147
 #, python-format
 msgid "Error %%"
 msgstr "خطأ ٪٪"
@@ -9700,7 +9745,7 @@ msgstr "خطأ في تطبيق الاستيراد."
 msgid "Error approving document:"
 msgstr "وثيقة الموافقة الخاطئة:"
 
-#: app/routes/admin/utilities/translations.py:1544
+#: app/routes/admin/utilities/translations.py:1547
 #, python-format
 msgid "Error compiling translations: %(error)s"
 msgstr "الترجمة التحريرية: %(error)s"
@@ -9722,7 +9767,7 @@ msgstr "خطأ في تحميل خدمات الترجمة"
 msgid "Error during session cleanup."
 msgstr "خطأ في تحميل خدمات الترجمة"
 
-#: app/routes/admin/utilities/translations.py:1678
+#: app/routes/admin/utilities/translations.py:1681
 #, python-format
 msgid "Error extracting/updating translations: %(error)s"
 msgstr "الترجمة التحريرية: %(error)s"
@@ -9735,7 +9780,7 @@ msgstr "خطأ في تحميل بيانات البلد. يرجى المحاول�
 msgid "Error loading National Society data. Please try again."
 msgstr ""
 
-#: app/templates/admin/api_management.html:1031
+#: app/templates/admin/api_management.html:1033
 msgid "Error loading chart data"
 msgstr "خطأ في تحميل الإشعارات"
 
@@ -9776,7 +9821,7 @@ msgstr "سنوات تحميل الأخطاء"
 msgid "Error processing documents:"
 msgstr "وثائق تجهيز الأخطاء:"
 
-#: app/routes/main/assignments.py:227
+#: app/routes/main/assignments.py:260
 msgid "Error reopening page."
 msgstr ""
 
@@ -9784,11 +9829,11 @@ msgstr ""
 msgid "Error retrieving session data."
 msgstr "خطأ في استرجاع بيانات الجلسة."
 
-#: app/routes/main/assignments.py:384
+#: app/routes/main/assignments.py:447
 msgid "Error returning assignment for revision."
 msgstr "خطأ في إعادة التعيين للمراجعة."
 
-#: app/routes/main/assignments.py:282
+#: app/routes/main/assignments.py:327
 msgid "Error returning page for revision."
 msgstr ""
 
@@ -9823,8 +9868,8 @@ msgstr ""
 "مع الدعم."
 
 #: app/templates/admin/analytics/import_change_log.html:50
-#: app/templates/admin/api_keys/details.html:145
-#: app/templates/admin/api_keys/details.html:358
+#: app/templates/admin/api_keys/details.html:146
+#: app/templates/admin/api_keys/details.html:373
 #: app/templates/components/auto_translate_modal.html:477
 msgid "Errors"
 msgstr "أخطاء"
@@ -9893,7 +9938,7 @@ msgstr "كل شيء مترجم أوتوماتيكياً. سيتم إجراء م�
 msgid "Evidence"
 msgstr "الأدلة"
 
-#: app/templates/admin/api_management.html:1181
+#: app/templates/admin/api_management.html:1183
 msgid "Exact FDRS reporting period name"
 msgstr ""
 
@@ -9974,11 +10019,11 @@ msgstr ""
 "ملف إكسل (.xlsx) مع الأعمدة: المصطلح، المعنى، الفرنسية، الإسبانية، العربية، "
 "الصينية، الروسية، الهندية، النشطة"
 
-#: app/routes/admin/utilities/translations.py:1041
+#: app/routes/admin/utilities/translations.py:1044
 msgid "Excel file is empty or header row not found."
 msgstr "ملف (إكسل) فارغ أو لم يعثر على صف رئيسي."
 
-#: app/routes/admin/utilities/translations.py:1140
+#: app/routes/admin/utilities/translations.py:1143
 #, python-format
 msgid ""
 "Excel import finished. Updated: %(u)d, skipped missing msgids: %(m)d. (Empty"
@@ -9987,7 +10032,7 @@ msgstr ""
 "%(m)d %(u)d إستيراد (إكسل) انتهى آخر المستجدات: (تم تجاهل التحديثات الفارغة "
 "عن طريق التقصير)"
 
-#: app/routes/admin/utilities/translations.py:1047
+#: app/routes/admin/utilities/translations.py:1050
 msgid "Excel import requires a 'msgid' column header."
 msgstr "إستيراد \"إكسل\" يتطلب رأس عمود."
 
@@ -10093,8 +10138,8 @@ msgstr ""
 msgid "Expand to fill content area"
 msgstr "التوسيع لملء منطقة المحتوى"
 
-#: app/routes/admin/utilities/translations.py:1391
-#: app/routes/admin/utilities/translations.py:1437
+#: app/routes/admin/utilities/translations.py:1394
+#: app/routes/admin/utilities/translations.py:1440
 msgid "Expected JSON body"
 msgstr "الجسم المتوقع JSON"
 
@@ -10111,23 +10156,23 @@ msgstr ""
 msgid "Experts"
 msgstr "خبراء"
 
-#: app/templates/admin/api_keys/details.html:239
+#: app/templates/admin/api_keys/details.html:240
 #: app/templates/admin/api_keys/edit.html:46
-#: app/templates/admin/api_keys/list.html:137
+#: app/templates/admin/api_keys/list.html:139
 #: app/templates/admin/assignments/_assignment_status_overview.html:41
 msgid "Expired"
 msgstr "استكشاف البيانات"
 
-#: app/templates/admin/api_keys/list.html:63
+#: app/templates/admin/api_keys/list.html:64
 msgid "Expired Keys"
 msgstr "المفاتيح المنتهية الصلاحية"
 
-#: app/templates/admin/api_keys/list.html:86
+#: app/templates/admin/api_keys/list.html:87
 msgid "Expired Only"
 msgstr "للقراءة فقط"
 
-#: app/templates/admin/api_keys/details.html:269
-#: app/templates/admin/api_keys/list.html:117
+#: app/templates/admin/api_keys/details.html:284
+#: app/templates/admin/api_keys/list.html:119
 #: app/templates/admin/assignments/_assignment_status_overview.html:131
 msgid "Expires"
 msgstr "خبراء"
@@ -10138,8 +10183,8 @@ msgstr "خبراء"
 msgid "Expiry Date"
 msgstr "تاريخ الانتهاء"
 
-#: app/routes/admin/data_exploration.py:257
-#: app/routes/admin/data_exploration.py:277
+#: app/routes/admin/data_exploration.py:280
+#: app/routes/admin/data_exploration.py:300
 #: app/templates/admin/_validation_admin_shell.html:55
 #: app/templates/admin/data_exploration/explore_data.html:4
 #: app/templates/admin/data_exploration/explore_data.html:19
@@ -10372,7 +10417,7 @@ msgstr ""
 "استخرج سلاسل نصية قابلة للترجمة من القوالب وملفات بايثون، ثم قم بتحديث جميع "
 "ملفات PO"
 
-#: app/templates/admin/templates/kobo_data_import.html:1158
+#: app/templates/admin/templates/kobo_data_import.html:1156
 #: app/templates/admin/templates/new_template.html:1132
 #: app/templates/forms/form_builder/form_builder.html:1159
 msgid "Extracted details"
@@ -10382,13 +10427,13 @@ msgstr "تفاصيل مستخرجة"
 msgid "Extracting text from document…"
 msgstr "استخراج النص من المستند..."
 
-#: app/routes/admin/utilities/translations.py:1629
+#: app/routes/admin/utilities/translations.py:1632
 msgid ""
 "Extraction script not found. Please ensure "
 "scripts/i18n/extract_update_translations.py exists."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1682
+#: app/routes/admin/utilities/translations.py:1685
 msgid ""
 "Extraction timed out after 5 minutes. The process may still be running."
 msgstr "انتهى وقت الاستخلاص بعد 5 دقائق. قد تكون العملية لا تزال جارية."
@@ -10487,7 +10532,7 @@ msgstr "فشل في إضافة المؤشر"
 msgid "Failed to auto-queue."
 msgstr "فشل في الانتظار التلقائي."
 
-#: app/templates/admin/monitoring/system_monitoring.html:432
+#: app/templates/admin/monitoring/system_monitoring.html:434
 msgid "Failed to clear logs"
 msgstr "فشل فحص الإضافات"
 
@@ -10618,11 +10663,12 @@ msgid "Failed to save"
 msgstr "فشل في الترجمة"
 
 #: app/templates/admin/indicator_bank/_indicator_bank_form_submit.js.html:118
-#: app/templates/admin/indicator_bank/_indicator_bank_form_submit.js.html:133
+#: app/templates/admin/indicator_bank/_indicator_bank_form_submit.js.html:131
+#: app/templates/admin/indicator_bank/_indicator_bank_form_submit.js.html:136
 msgid "Failed to save indicator"
 msgstr "فشل في حفظ مؤشر"
 
-#: app/routes/auth.py:1706
+#: app/routes/auth.py:1758
 msgid "Failed to save profile. Please try again."
 msgstr "فشل في حفظ الملف الشخصي. يرجى المحاولة مرة أخرى."
 
@@ -10728,7 +10774,7 @@ msgstr "مسار فافيكون"
 msgid "Feature flags come from environment variables (see Config.FEATURES)."
 msgstr "تأتي علامات الميزات من متغيرات البيئة (انظر Config.FEATURES)."
 
-#: app/templates/admin/api_management.html:1776
+#: app/templates/admin/api_management.html:1836
 msgid "Featured endpoint"
 msgstr "البحث في نقطة النهاية"
 
@@ -10833,7 +10879,7 @@ msgstr "تم حذف الملف"
 msgid "File input changed"
 msgstr "تغيير إدخال الملف"
 
-#: app/templates/admin/templates/kobo_data_import.html:1161
+#: app/templates/admin/templates/kobo_data_import.html:1159
 msgid "File is too large (max 50 MB)"
 msgstr "الملف كبير جدا (الحد الأقصى 50 ميجابايت)"
 
@@ -10907,7 +10953,7 @@ msgstr "خيارات المرشح"
 msgid "Filter by Assignment"
 msgstr "مهمة جديدة"
 
-#: app/templates/admin/api_management.html:1186
+#: app/templates/admin/api_management.html:1188
 msgid "Filter by FDRS form item ID"
 msgstr ""
 
@@ -10915,11 +10961,11 @@ msgstr ""
 msgid "Filter by ID, user, or date…"
 msgstr "فلتر حسب المعرف، المستخدم، أو التاريخ..."
 
-#: app/templates/admin/api_management.html:1184
+#: app/templates/admin/api_management.html:1186
 msgid "Filter by ISO 3166-1 alpha-2"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1185
+#: app/templates/admin/api_management.html:1187
 msgid "Filter by ISO 3166-1 alpha-3"
 msgstr ""
 
@@ -10932,20 +10978,20 @@ msgstr "قوالب النماذج"
 msgid "Filter by User"
 msgstr "مفلتر بواسطة"
 
-#: app/templates/admin/api_management.html:1152
+#: app/templates/admin/api_management.html:1154
 msgid "Filter by active status"
 msgstr "التصفية حسب الحالة النشطة"
 
-#: app/templates/admin/api_management.html:1195
+#: app/templates/admin/api_management.html:1197
 msgid "Filter by approval status"
 msgstr "التصفية حسب حالة الموافقة"
 
-#: app/templates/admin/api_management.html:1172
+#: app/templates/admin/api_management.html:1174
 msgid "Filter by archived status"
 msgstr "التصفية حسب الحالة المؤرشفة"
 
-#: app/templates/admin/api_management.html:1176
-#: app/templates/admin/api_management.html:1182
+#: app/templates/admin/api_management.html:1178
+#: app/templates/admin/api_management.html:1184
 msgid "Filter by assignment ID"
 msgstr "التصفية حسب معرف التعيين"
 
@@ -10953,55 +10999,55 @@ msgstr "التصفية حسب معرف التعيين"
 msgid "Filter by condition or search values..."
 msgstr "تصفية حسب الشروط أو قيم البحث..."
 
-#: app/templates/admin/api_management.html:1100
-#: app/templates/admin/api_management.html:1118
-#: app/templates/admin/api_management.html:1131
-#: app/templates/admin/api_management.html:1151
-#: app/templates/admin/api_management.html:1183
-#: app/templates/admin/api_management.html:1191
+#: app/templates/admin/api_management.html:1102
+#: app/templates/admin/api_management.html:1120
+#: app/templates/admin/api_management.html:1133
+#: app/templates/admin/api_management.html:1153
+#: app/templates/admin/api_management.html:1185
+#: app/templates/admin/api_management.html:1193
 msgid "Filter by country ID"
 msgstr "تصفية العمود"
 
-#: app/templates/admin/api_management.html:1192
+#: app/templates/admin/api_management.html:1194
 msgid "Filter by document type"
 msgstr "نوع المستند"
 
-#: app/templates/admin/api_management.html:1171
+#: app/templates/admin/api_management.html:1173
 msgid "Filter by emergency type"
 msgstr "التصفية حسب نوع الطوارئ"
 
-#: app/templates/admin/api_management.html:1098
-#: app/templates/admin/api_management.html:1115
+#: app/templates/admin/api_management.html:1100
+#: app/templates/admin/api_management.html:1117
 msgid "Filter by form item ID"
 msgstr "التصفية حسب معرف بند النموذج"
 
-#: app/templates/admin/api_management.html:1116
+#: app/templates/admin/api_management.html:1118
 msgid "Filter by indicator bank ID"
 msgstr "بنك المؤشرات"
 
-#: app/templates/admin/api_management.html:1168
+#: app/templates/admin/api_management.html:1170
 msgid "Filter by indicator type"
 msgstr "نوع المؤشر"
 
-#: app/templates/admin/api_management.html:1097
-#: app/templates/admin/api_management.html:1114
+#: app/templates/admin/api_management.html:1099
+#: app/templates/admin/api_management.html:1116
 msgid "Filter by item type"
 msgstr "اختر نوع العنصر"
 
-#: app/templates/admin/api_management.html:1193
+#: app/templates/admin/api_management.html:1195
 msgid "Filter by language code"
 msgstr "التصفية حسب شفرة اللغة"
 
-#: app/templates/admin/api_management.html:1099
-#: app/templates/admin/api_management.html:1117
+#: app/templates/admin/api_management.html:1101
+#: app/templates/admin/api_management.html:1119
 msgid "Filter by one or more assignment IDs (comma-separated in the URL)"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1194
+#: app/templates/admin/api_management.html:1196
 msgid "Filter by public status"
 msgstr "التصفية حسب الحالة العامة"
 
-#: app/templates/admin/api_management.html:1169
+#: app/templates/admin/api_management.html:1171
 msgid "Filter by sector"
 msgstr "مفلتر بواسطة"
 
@@ -11009,38 +11055,38 @@ msgstr "مفلتر بواسطة"
 msgid "Filter by status"
 msgstr "التصفية حسب الحالة"
 
-#: app/templates/admin/api_management.html:1170
+#: app/templates/admin/api_management.html:1172
 msgid "Filter by sub-sector"
 msgstr "تحديث القطاع الفرعي"
 
-#: app/templates/admin/api_management.html:1096
-#: app/templates/admin/api_management.html:1113
+#: app/templates/admin/api_management.html:1098
+#: app/templates/admin/api_management.html:1115
 msgid "Filter by submission ID"
 msgstr "آخر تقديم"
 
-#: app/templates/admin/api_management.html:1102
-#: app/templates/admin/api_management.html:1120
+#: app/templates/admin/api_management.html:1104
+#: app/templates/admin/api_management.html:1122
 msgid "Filter by submission date from (ISO format)"
 msgstr "تصفية حسب تاريخ التقديم من (تنسيق ISO)"
 
-#: app/templates/admin/api_management.html:1103
-#: app/templates/admin/api_management.html:1121
+#: app/templates/admin/api_management.html:1105
+#: app/templates/admin/api_management.html:1123
 msgid "Filter by submission date to (ISO format)"
 msgstr "تصفية حسب تاريخ التقديم إلى (تنسيق ISO)"
 
-#: app/templates/admin/api_management.html:1101
-#: app/templates/admin/api_management.html:1119
-#: app/templates/admin/api_management.html:1132
+#: app/templates/admin/api_management.html:1103
+#: app/templates/admin/api_management.html:1121
+#: app/templates/admin/api_management.html:1134
 msgid "Filter by submission type"
 msgstr "آخر تقديم"
 
-#: app/templates/admin/api_management.html:1095
-#: app/templates/admin/api_management.html:1112
-#: app/templates/admin/api_management.html:1130
+#: app/templates/admin/api_management.html:1097
+#: app/templates/admin/api_management.html:1114
+#: app/templates/admin/api_management.html:1132
 msgid "Filter by template ID"
 msgstr "قوالب النماذج"
 
-#: app/templates/admin/api_management.html:1158
+#: app/templates/admin/api_management.html:1160
 msgid "Filter by user role"
 msgstr "مفلتر بواسطة"
 
@@ -11153,12 +11199,12 @@ msgstr ""
 "يتم الإشارة عندما يتطابق وكيل المستخدم مع كلمات مفتاحية الأتمتة (مثل bot، "
 "curl)، أو يكون أقل من 10 أحرف، أو يفتقر إلى رموز المتصفح النموذجية."
 
-#: app/templates/admin/api_management.html:1799
+#: app/templates/admin/api_management.html:1859
 msgid "Flags"
 msgstr "الأعلام"
 
 #: app/templates/admin/api_management.html:515
-#: app/templates/admin/api_management.html:1783
+#: app/templates/admin/api_management.html:1843
 msgid ""
 "Flask-Login session only (@login_required). The user is already signed into "
 "the Backoffice in the browser."
@@ -11294,7 +11340,7 @@ msgstr "تقديم النموذج"
 msgid "Form Submitted"
 msgstr "النموذج المقدم"
 
-#: app/routes/forms/submission.py:531
+#: app/routes/forms/submission.py:558
 msgid "Form Unavailable"
 msgstr "النموذج غير متاح"
 
@@ -11344,7 +11390,7 @@ msgstr "فشل التحقق: "
 msgid "Form initialization timeout - some modules may have failed to load"
 msgstr "مهلة تهيئة النموذج - قد تكون بعض الوحدات فشلت في التحميل"
 
-#: app/templates/admin/api_management.html:1186
+#: app/templates/admin/api_management.html:1188
 msgid "Form item ID"
 msgstr ""
 
@@ -11403,11 +11449,10 @@ msgstr "الشكل"
 
 #: app/templates/admin/settings/manage_settings.html:463
 msgid ""
-"Formats: PNG, JPEG, GIF, WebP, and SVG for the logo; favicon also accepts "
-"ICO. Maximum 2 MB per file."
+"Formats: PNG, JPEG, GIF, and WebP for the logo; favicon also accepts ICO. "
+"SVG uploads are not accepted (use a bundled static SVG via the path field). "
+"Maximum 2 MB per file."
 msgstr ""
-"الصيغ: PNG، JPEG، GIF، WebP، وSVG للشعار؛ كما تقبل favicon ICO. الحد الأقصى "
-"2 ميجابايت لكل ملف."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:210
 msgid "Formatting toolbar"
@@ -11522,17 +11567,13 @@ msgstr "Admin الكاملة"
 msgid "Full Name"
 msgstr "الاسم الكامل"
 
-#: app/templates/admin/api_keys/details.html:320
+#: app/templates/admin/api_keys/details.html:335
 msgid "Full key cannot be retrieved — only the prefix and hash are stored."
 msgstr "لا يمكن استرجاع المفتاح الكامل — فقط البادئة والهاش مخزنين."
 
 #: app/templates/admin/ai/_trace_card.html:297
 msgid "Full quality_debug payload"
 msgstr "الحمولة الكاملة quality_debug"
-
-#: app/templates/admin/api_management.html:570
-msgid "Full system access with paginated responses. Use"
-msgstr "وصول كامل للنظام مع ردود مرسومة على الصفحات. الاستخدام"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1125
 msgid "Full width"
@@ -11546,7 +11587,7 @@ msgstr "ملء الشاشة"
 msgid "Gaps"
 msgstr "الفجوات"
 
-#: app/services/ai/agent/executor.py:1822
+#: app/services/ai/agent/executor.py:1826
 msgid "Gathering additional sources…"
 msgstr ""
 
@@ -11720,12 +11761,12 @@ msgstr ""
 msgid "Glossary candidate inbox"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1603
+#: app/routes/admin/utilities/translations.py:1606
 #, python-format
 msgid "Glossary seed finished. New must-terms: %(added)d."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:335
+#: app/routes/admin/utilities/translations.py:336
 msgid "Glossary term not found."
 msgstr ""
 
@@ -11821,7 +11862,7 @@ msgstr "نتيجة التأريض"
 msgid "Grounding:"
 msgstr "التأريض:"
 
-#: app/routes/admin/communication.py:291
+#: app/routes/admin/communication.py:292
 #: app/templates/admin/communication/center.html:1404
 #: app/templates/admin/communication/registry.html:60
 #: app/templates/admin/settings/manage_settings.html:1505
@@ -12120,6 +12161,12 @@ msgid ""
 "Hit-rate is counted on new machine-translation calls that match a must-term."
 msgstr ""
 
+#: app/templates/admin/api_keys/_permissions_fields.html:119
+msgid ""
+"Hold Ctrl (Cmd on Mac) to select several. If you pick both, the key can only"
+" see rows that match a chosen template and a chosen country."
+msgstr ""
+
 #: app/utils/form_localization.py:139
 msgid "Hospitals"
 msgstr "مستشفيات"
@@ -12132,7 +12179,7 @@ msgstr "أسر"
 msgid "Hover a step for details"
 msgstr "مرر المؤشر خطوة للتفاصيل"
 
-#: app/templates/admin/api_management.html:1794
+#: app/templates/admin/api_management.html:1854
 msgid ""
 "How callers are authenticated. Hover an icon in each row for details. AI "
 "Session uses resolve_ai_identity() (Backoffice session or AI Bearer JWT, "
@@ -12224,7 +12271,7 @@ msgstr "هجينة (الكلمات الرئيسية والضمانات)"
 msgid "Hygiene Promotion"
 msgstr "ترويج النظافة"
 
-#: app/routes/admin/communication.py:280
+#: app/routes/admin/communication.py:281
 msgid "Hypothetical"
 msgstr "افتراضي"
 
@@ -12295,7 +12342,7 @@ msgstr "عنوان IP"
 msgid "IP address"
 msgstr "عنوان IP"
 
-#: app/templates/admin/api_management.html:1184
+#: app/templates/admin/api_management.html:1186
 msgid "ISO2 (e.g. BD)"
 msgstr ""
 
@@ -12303,7 +12350,7 @@ msgstr ""
 msgid "ISO3"
 msgstr "ISO3"
 
-#: app/templates/admin/api_management.html:1185
+#: app/templates/admin/api_management.html:1187
 msgid "ISO3 (e.g. BGD)"
 msgstr ""
 
@@ -12312,7 +12359,7 @@ msgstr ""
 msgid "ISO3 Code"
 msgstr "رمز ISO3"
 
-#: app/routes/admin/communication.py:298
+#: app/routes/admin/communication.py:299
 #: app/templates/admin/communication/registry.html:64
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:117
 msgid "Icon"
@@ -12333,7 +12380,7 @@ msgstr "فئة الأيقونة"
 msgid "Identity confirmed"
 msgstr "تأكيد الهوية"
 
-#: app/routes/auth.py:1438
+#: app/routes/auth.py:1490
 msgid "If an account exists for that email, a reset link has been sent."
 msgstr ""
 "إذا كان هناك حساب لهذا البريد الإلكتروني، فقد تم إرسال رابط إعادة الضبط."
@@ -12652,7 +12699,7 @@ msgstr ""
 msgid "Import/Export"
 msgstr "الواردات/الاستيراد"
 
-#: app/templates/admin/api_keys/create.html:75
+#: app/templates/admin/api_keys/create.html:79
 #: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:23
 msgid "Important"
 msgstr "استيراد البيانات"
@@ -12850,8 +12897,8 @@ msgstr "تضمين المرفقات"
 msgid "Include Calculated Totals in API"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1106
-#: app/templates/admin/api_management.html:1124
+#: app/templates/admin/api_management.html:1108
+#: app/templates/admin/api_management.html:1126
 msgid "Include disaggregation data (default: excluded)"
 msgstr "تضمين بيانات التفكيك (افتراضي: مستبعد)"
 
@@ -12924,7 +12971,7 @@ msgstr "بنك المؤشرات (تشابه دلالي؛ وليس القيم ا�
 msgid "Indicator Bank Admin"
 msgstr "بنك المؤشرات"
 
-#: app/templates/admin/api_management.html:1116
+#: app/templates/admin/api_management.html:1118
 msgid "Indicator Bank ID"
 msgstr "بنك المؤشرات"
 
@@ -13110,7 +13157,7 @@ msgid "Indirect reach:"
 msgstr "الوصول غير المباشر:"
 
 #: app/templates/admin/analytics/audit_trail.html:443
-#: app/templates/admin/monitoring/system_monitoring.html:210
+#: app/templates/admin/monitoring/system_monitoring.html:212
 #: app/templates/admin/validation_questions.html:141
 #: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:20
 msgid "Info"
@@ -13205,7 +13252,7 @@ msgstr ""
 msgid "Introductions"
 msgstr ""
 
-#: app/routes/auth.py:760
+#: app/routes/auth.py:798
 msgid "Invalid Azure callback."
 msgstr "إعادة استدعاء Azure غير صالحة."
 
@@ -13221,7 +13268,7 @@ msgstr "صيغة تعريف الدولة غير صالحة."
 msgid "Invalid country selection or country not assigned to you."
 msgstr "اختيار الدولة غير صالح أو الدولة غير المخصصة لك."
 
-#: app/routes/auth.py:362 app/routes/auth.py:417 app/routes/auth.py:481
+#: app/routes/auth.py:360 app/routes/auth.py:420 app/routes/auth.py:485
 msgid "Invalid email or password."
 msgstr "بريد إلكتروني أو كلمة مرور غير صالحة."
 
@@ -13273,12 +13320,12 @@ msgstr "تم حذف نوع الملف غير الصحيح"
 msgid "Invalid placeholders"
 msgstr "البدائل غير الصالحة"
 
-#: app/routes/main/assignments.py:189 app/routes/main/assignments.py:251
-#: app/routes/main/assignments.py:365
+#: app/routes/main/assignments.py:210 app/routes/main/assignments.py:284
+#: app/routes/main/assignments.py:418
 msgid "Invalid request. Please try again."
 msgstr "طلب غير صحيح. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:1471
+#: app/routes/auth.py:1523
 msgid "Invalid reset link."
 msgstr "رابط إعادة التعيين غير صالح."
 
@@ -13294,12 +13341,12 @@ msgstr "جاري تحميل بيانات المستخدمين..."
 msgid "Invalid template selection or country not assigned to you."
 msgstr "اختيار القالب غير الصحيح أو الدولة غير المخصصة لك."
 
-#: app/routes/admin/utilities/translations.py:190
-#: app/routes/admin/utilities/translations.py:193
+#: app/routes/admin/utilities/translations.py:191
+#: app/routes/admin/utilities/translations.py:194
 msgid "Invalid translation payload"
 msgstr "حمولة الترجمة غير صالحة"
 
-#: app/routes/admin/utilities/translations.py:2209
+#: app/routes/admin/utilities/translations.py:2212
 msgid "Invalid translation type"
 msgstr "نوع الترجمة غير صالح"
 
@@ -13354,8 +13401,8 @@ msgstr "حذف"
 msgid "Item Duplicated"
 msgstr "العنصر مكرر"
 
-#: app/templates/admin/api_management.html:1098
-#: app/templates/admin/api_management.html:1115
+#: app/templates/admin/api_management.html:1100
+#: app/templates/admin/api_management.html:1117
 #: app/templates/forms/form_builder/partials/_sections_container.html:408
 msgid "Item ID"
 msgstr "عنصر"
@@ -13403,36 +13450,36 @@ msgstr "عناصر"
 msgid "Items Requiring Attention"
 msgstr "العناصر التي تحتاج إلى اهتمام"
 
-#: app/templates/admin/api_management.html:1109
-#: app/templates/admin/api_management.html:1127
-#: app/templates/admin/api_management.html:1146
-#: app/templates/admin/api_management.html:1154
-#: app/templates/admin/api_management.html:1160
-#: app/templates/admin/api_management.html:1178
-#: app/templates/admin/api_management.html:1188
-#: app/templates/admin/api_management.html:1197
-#: app/templates/admin/api_management.html:1204
+#: app/templates/admin/api_management.html:1111
+#: app/templates/admin/api_management.html:1129
+#: app/templates/admin/api_management.html:1148
+#: app/templates/admin/api_management.html:1156
+#: app/templates/admin/api_management.html:1162
+#: app/templates/admin/api_management.html:1180
+#: app/templates/admin/api_management.html:1190
+#: app/templates/admin/api_management.html:1199
+#: app/templates/admin/api_management.html:1206
 msgid "Items per page"
 msgstr "إزالة الصفحة"
 
-#: app/templates/admin/api_management.html:1160
-#: app/templates/admin/api_management.html:1178
-#: app/templates/admin/api_management.html:1197
+#: app/templates/admin/api_management.html:1162
+#: app/templates/admin/api_management.html:1180
+#: app/templates/admin/api_management.html:1199
 msgid "Items per page (default: 20)"
 msgstr "العناصر في الصفحة (الافتراضي: 20)"
 
-#: app/templates/admin/api_management.html:1109
-#: app/templates/admin/api_management.html:1127
+#: app/templates/admin/api_management.html:1111
+#: app/templates/admin/api_management.html:1129
 msgid "Items per page (default: 20, max 1000, API key auth only)"
 msgstr ""
 "العناصر في الصفحة (الافتراضي: 20، الحد الأقصى 1000، مصادقة مفاتيح API فقط)"
 
-#: app/templates/admin/api_management.html:1188
+#: app/templates/admin/api_management.html:1190
 msgid "Items per page (default: 20, max 100000)"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1146
-#: app/templates/admin/api_management.html:1154
+#: app/templates/admin/api_management.html:1148
+#: app/templates/admin/api_management.html:1156
 msgid "Items per page (default: all)"
 msgstr "العناصر في الصفحة (الافتراضي: كلها)"
 
@@ -13449,11 +13496,11 @@ msgstr "المطالعات"
 msgid "Its sector reference will be cleared on deletion."
 msgstr "سيتم مسح مرجع قطاعه عند الحذف."
 
-#: app/routes/admin/utilities/translations.py:371
-#: app/routes/admin/utilities/translations.py:400
-#: app/routes/admin/utilities/translations.py:422
-#: app/routes/admin/utilities/translations.py:443
-#: app/routes/admin/utilities/translations.py:461
+#: app/routes/admin/utilities/translations.py:372
+#: app/routes/admin/utilities/translations.py:401
+#: app/routes/admin/utilities/translations.py:423
+#: app/routes/admin/utilities/translations.py:444
+#: app/routes/admin/utilities/translations.py:462
 #: app/routes/translation_review/__init__.py:158
 #: app/routes/translation_review/__init__.py:257
 msgid "JSON request required"
@@ -13480,7 +13527,7 @@ msgstr "نمط sink جافا سكريبت (مثل eval() أو document.cookie)"
 msgid "Job Title"
 msgstr "المسمى الوظيفي"
 
-#: app/routes/auth.py:1689
+#: app/routes/auth.py:1741
 #: app/templates/components/_profile_completion_modal.html:125
 msgid "Job title is required."
 msgstr "المسمى الوظيفي مطلوب."
@@ -13566,7 +13613,7 @@ msgstr "احتفظ بمدخلات البيانات ولكن قم بأرشفة"
 msgid "Key"
 msgstr "المفتاح"
 
-#: app/templates/admin/api_management.html:1770
+#: app/templates/admin/api_management.html:1830
 msgid "Key / Session"
 msgstr "مفتاح / جلسة"
 
@@ -13574,12 +13621,12 @@ msgstr "مفتاح / جلسة"
 msgid "Key / Session — either works"
 msgstr "مفتاح / جلسة — أي منهما يعمل"
 
-#: app/templates/admin/api_keys/details.html:229
+#: app/templates/admin/api_keys/details.html:230
 msgid "Key Information"
 msgstr "معلومات رئيسية"
 
-#: app/templates/admin/api_keys/details.html:247
-#: app/templates/admin/api_keys/list.html:112
+#: app/templates/admin/api_keys/details.html:248
+#: app/templates/admin/api_keys/list.html:113
 #: app/templates/admin/api_keys/revoke.html:52
 msgid "Key Prefix"
 msgstr "بادئة المفتاح"
@@ -13652,7 +13699,7 @@ msgstr "تصحيح أخطاء توليف النماذج الكبيرة"
 msgid "LLM Synthesis Used"
 msgstr "استخدام توليف LLM"
 
-#: app/routes/admin/communication.py:293
+#: app/routes/admin/communication.py:294
 #: app/templates/admin/communication/registry.html:62
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:111
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:207
@@ -13706,7 +13753,7 @@ msgstr ""
 msgid "Language"
 msgstr "اللغة"
 
-#: app/templates/admin/api_management.html:1193
+#: app/templates/admin/api_management.html:1195
 msgid "Language Code"
 msgstr "اللغة"
 
@@ -13783,8 +13830,8 @@ msgstr "الصفحة الأخيرة"
 msgid "Last Quarter"
 msgstr "الربع الأخير"
 
-#: app/templates/admin/api_keys/details.html:112
-#: app/templates/admin/api_keys/list.html:116
+#: app/templates/admin/api_keys/details.html:113
+#: app/templates/admin/api_keys/list.html:118
 #: app/templates/admin/api_keys/revoke.html:58
 msgid "Last Used"
 msgstr "آخر تعديل"
@@ -13945,6 +13992,14 @@ msgstr "يسار"
 msgid "Left Trace ID"
 msgstr "معرف التتبع الأيسر"
 
+#: app/templates/admin/api_keys/_permissions_fields.html:16
+msgid "Legacy full access"
+msgstr ""
+
+#: app/templates/admin/api_keys/_access_summary.html:11
+msgid "Legacy: full access"
+msgstr ""
+
 #: app/templates/admin/indicator_bank/neural_map.html:236
 #: app/templates/admin/validation_dashboard.html:139
 msgid "Legend"
@@ -14007,6 +14062,10 @@ msgstr "مثل"
 msgid "Limit repeat section entries to the number of options"
 msgstr "حدد عدد الإدخالات في الأقسام المتكررة بعدد الخيارات"
 
+#: app/templates/admin/api_keys/_access_summary.html:22
+msgid "Limited scope"
+msgstr ""
+
 #: app/templates/admin/reports/partials/_widget_palette.html:4
 msgid "Line"
 msgstr ""
@@ -14019,7 +14078,7 @@ msgstr ""
 msgid "Line chart with year and NS table"
 msgstr ""
 
-#: app/templates/admin/monitoring/system_monitoring.html:215
+#: app/templates/admin/monitoring/system_monitoring.html:217
 msgid "Lines per Page"
 msgstr "الصفحة التالية"
 
@@ -14485,8 +14544,8 @@ msgstr "جميع الوحدات"
 msgid "Locale"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1144
-#: app/templates/admin/api_management.html:1150
+#: app/templates/admin/api_management.html:1146
+#: app/templates/admin/api_management.html:1152
 msgid "Locale code (en, fr, es, etc.)"
 msgstr "رمز الموقع (en, fr, es, إلخ)"
 
@@ -14506,11 +14565,11 @@ msgstr ""
 msgid "Location & Access"
 msgstr "الوصول إلى القالب"
 
-#: app/templates/admin/monitoring/system_monitoring.html:205
+#: app/templates/admin/monitoring/system_monitoring.html:207
 msgid "Log Level"
 msgstr "الرتبة"
 
-#: app/templates/admin/monitoring/system_monitoring.html:196
+#: app/templates/admin/monitoring/system_monitoring.html:198
 msgid "Log Source"
 msgstr "المصدر"
 
@@ -14568,7 +14627,7 @@ msgstr "سجلات تسجيل الدخول"
 msgid "Login events"
 msgstr "فعاليات تسجيل الدخول"
 
-#: app/routes/auth.py:789
+#: app/routes/auth.py:829
 msgid "Login session expired. Please try signing in again."
 msgstr "انتهت صلاحية جلسة تسجيل الدخول. يرجى محاولة تسجيل الدخول مرة أخرى."
 
@@ -15166,7 +15225,7 @@ msgstr "أنواع القياس والوحدات"
 msgid "Medium"
 msgstr "متوسط"
 
-#: app/templates/admin/monitoring/system_monitoring.html:199
+#: app/templates/admin/monitoring/system_monitoring.html:201
 msgid "Memory"
 msgstr "الذاكرة"
 
@@ -15210,8 +15269,8 @@ msgstr "معرف الرسالة"
 msgid "Message ID"
 msgstr "معرف الرسالة"
 
-#: app/routes/admin/utilities/translations.py:2035
 #: app/routes/admin/utilities/translations.py:2038
+#: app/routes/admin/utilities/translations.py:2041
 msgid "Message ID is required for translation type"
 msgstr "مطلوب معرف رسالة لنوع الترجمة"
 
@@ -15248,16 +15307,16 @@ msgstr "تم إلغاء إعادة معالجة البيانات الوصفية"
 msgid "Metadata reprocess complete"
 msgstr "اكتملت إعادة معالجة البيانات الوصفية"
 
-#: app/routes/admin/analytics.py:1296
+#: app/routes/admin/analytics.py:1298
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:59
 #: app/templates/admin/analytics/audit_trail.html:461
-#: app/templates/admin/api_keys/details.html:185
+#: app/templates/admin/api_keys/details.html:186
 #: app/templates/admin/templates/data_sync_imputation.html:263
 #: app/templates/admin/templates/data_sync_imputation.html:1232
 msgid "Method"
 msgstr "الطريقة"
 
-#: app/templates/admin/api_management.html:1792
+#: app/templates/admin/api_management.html:1852
 msgid "Methods"
 msgstr "الطرق"
 
@@ -15344,7 +15403,7 @@ msgstr ""
 "مسؤول الجوال: @mobile_auth_required بالإضافة إلى إذن واحد من RBAC. يظهر رمز "
 "الإذن الدقيق في عمود الأذونات."
 
-#: app/templates/admin/api_management.html:1786
+#: app/templates/admin/api_management.html:1846
 msgid ""
 "Mobile admin: @mobile_auth_required plus one RBAC permission. The exact "
 "permission code is appended below when known."
@@ -15357,7 +15416,7 @@ msgid "Mobile push options"
 msgstr "خيارات الدفع المحمول"
 
 #: app/templates/admin/api_management.html:525
-#: app/templates/admin/api_management.html:1785
+#: app/templates/admin/api_management.html:1845
 msgid ""
 "Mobile user JWT or compatible session via @mobile_auth_required, without "
 "requiring a specific RBAC permission on the route."
@@ -15768,7 +15827,7 @@ msgstr "يحتاج فقط إلى مراجعة"
 msgid "Needs suffix"
 msgstr "يحتاج إلى لاحقة"
 
-#: app/templates/admin/monitoring/system_monitoring.html:573
+#: app/templates/admin/monitoring/system_monitoring.html:575
 msgid "Network I/O"
 msgstr "الإدخال/الإخراج الشبكي"
 
@@ -15820,10 +15879,10 @@ msgstr "خطأ في الشبكة. يرجى المحاولة مرة أخرى."
 msgid "Neural Map"
 msgstr "الخريطة العصبية"
 
-#: app/templates/admin/api_keys/details.html:114
-#: app/templates/admin/api_keys/details.html:271
-#: app/templates/admin/api_keys/list.html:151
-#: app/templates/admin/api_keys/list.html:154
+#: app/templates/admin/api_keys/details.html:115
+#: app/templates/admin/api_keys/details.html:286
+#: app/templates/admin/api_keys/list.html:156
+#: app/templates/admin/api_keys/list.html:159
 #: app/templates/admin/api_keys/revoke.html:59
 #: app/templates/admin/user_management/users.html:375
 msgid "Never"
@@ -15957,7 +16016,7 @@ msgstr ""
 #: app/templates/admin/analytics/sessions.html:124
 #: app/templates/admin/analytics/sessions.html:181
 #: app/templates/admin/communication/center.html:1140
-#: app/templates/admin/monitoring/system_monitoring.html:241
+#: app/templates/admin/monitoring/system_monitoring.html:243
 #: app/templates/admin/templates/new_template.html:557
 #: app/templates/components/pagination.html:42
 #: app/templates/components/pagination.html:46
@@ -15978,7 +16037,7 @@ msgstr "الصفحة التالية"
 msgid "Next year"
 msgstr "العام القادم"
 
-#: app/routes/admin/communication.py:307 app/routes/main/helpers.py:363
+#: app/routes/admin/communication.py:308 app/routes/main/helpers.py:363
 #: app/templates/admin/ai/review_detail.html:126
 #: app/templates/admin/analytics/audit_trail.html:334
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:12
@@ -16017,7 +16076,7 @@ msgid ""
 " them."
 msgstr ""
 
-#: app/templates/admin/api_keys/list.html:190
+#: app/templates/admin/api_keys/list.html:195
 msgid "No API keys found"
 msgstr "لا توجد إضافات"
 
@@ -16086,7 +16145,7 @@ msgstr "لا تحتاج رموز SP/EF إلى ترجمة"
 msgid "No URL"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1742
+#: app/templates/admin/api_management.html:1802
 msgid "No URL!"
 msgstr "لا يوجد URL!"
 
@@ -16094,9 +16153,13 @@ msgstr "لا يوجد URL!"
 msgid "No Unified Plan or Report assignments found."
 msgstr ""
 
-#: app/services/platform/user_analytics_service.py:289
+#: app/services/platform/user_analytics_service.py:258
 msgid "No User-Agent header was sent."
 msgstr "لم يتم إرسال أي رأس وكيل مستخدم."
+
+#: app/templates/admin/api_keys/_access_summary.html:4
+msgid "No access"
+msgstr ""
 
 #: app/templates/admin/rbac/grants.html:135
 msgid "No access rules defined yet."
@@ -16141,7 +16204,7 @@ msgid "No audit entries found matching your criteria."
 msgstr "لم يتم العثور على إدخالات تدقيق تطابق معاييرك."
 
 #: app/templates/admin/api_management.html:509
-#: app/templates/admin/api_management.html:1780
+#: app/templates/admin/api_management.html:1840
 msgid ""
 "No authentication. Anyone who can reach the server may call the route (rate "
 "limits may still apply)."
@@ -16277,7 +16340,7 @@ msgstr ""
 msgid "No data owner set — governance gap."
 msgstr "لا توجد مجموعة بيانات مالكة — فجوة الحوكمة."
 
-#: app/routes/admin/assignment_management.py:744
+#: app/routes/admin/assignment_management.py:745
 msgid ""
 "No data owner was set for this assignment. Consider assigning one for "
 "governance accountability."
@@ -16422,7 +16485,7 @@ msgstr "لم يتم اختيار ملف لاستيراد Kobo."
 
 #: app/routes/admin/form_builder/templates.py:360
 #: app/routes/admin/form_builder/templates.py:388
-#: app/routes/admin/utilities/translations.py:745
+#: app/routes/admin/utilities/translations.py:748
 msgid "No file selected."
 msgstr "لا يوجد ملف مختار."
 
@@ -16514,12 +16577,12 @@ msgstr "لم يتم العثور على إدخالات تدقيق تطابق م�
 msgid "No items found that need translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2163
-#: app/routes/admin/utilities/translations.py:2305
+#: app/routes/admin/utilities/translations.py:2166
+#: app/routes/admin/utilities/translations.py:2308
 msgid "No items provided"
 msgstr "لم يتم توفير أي عناصر"
 
-#: app/routes/admin/utilities/translations.py:1059
+#: app/routes/admin/utilities/translations.py:1062
 msgid "No language columns found in Excel header."
 msgstr "لا توجد أعمدة لغوية في رأس إكسل."
 
@@ -16531,7 +16594,7 @@ msgstr "لا حدود"
 msgid "No local units found."
 msgstr "لم يتم العثور على مستندات"
 
-#: app/templates/admin/monitoring/system_monitoring.html:248
+#: app/templates/admin/monitoring/system_monitoring.html:250
 msgid ""
 "No log files found. Monitoring logs will appear here once monitoring starts "
 "recording."
@@ -16564,7 +16627,7 @@ msgstr "لم يتم إرجاع أي مؤشرات مطابقة لهذا الاس�
 msgid "No measurement unit"
 msgstr "لا يوجد وحدة قياس"
 
-#: app/templates/admin/monitoring/system_monitoring.html:583
+#: app/templates/admin/monitoring/system_monitoring.html:585
 msgid "No metrics available"
 msgstr "مؤشرات متاحة"
 
@@ -16688,14 +16751,14 @@ msgstr "لا توجد أقسام محددة."
 msgid "No related events found."
 msgstr "لم يتم العثور على أي أحداث ذات صلة."
 
-#: app/routes/admin/utilities/translations.py:1414
+#: app/routes/admin/utilities/translations.py:1417
 msgid ""
 "No removed (obsolete) entries found for this message. Try refreshing the "
 "page."
 msgstr ""
 "لم يتم العثور على أي إدخالات (قديمة) محذفة لهذه الرسالة. حاول تحديث الصفحة."
 
-#: app/routes/admin/utilities/translations.py:1452
+#: app/routes/admin/utilities/translations.py:1455
 msgid "No removed (obsolete) entries found. Try refreshing the page."
 msgstr "لم يتم العثور على أي إدخالات تمت إزالتها (قديمة). حاول تحديث الصفحة."
 
@@ -16882,7 +16945,7 @@ msgstr "لا توجد آثار تتطابق مع المرشحات الحالية
 msgid "No translation fields found that need translation"
 msgstr "لم يتم العثور على عناصر تحتاج إلى ترجمة"
 
-#: app/routes/admin/utilities/translations.py:1863
+#: app/routes/admin/utilities/translations.py:1866
 msgid ""
 "No translation service available. Please configure translation API keys."
 msgstr ""
@@ -16910,7 +16973,7 @@ msgstr "لم يتم العثور على ترجمات"
 msgid "No translations received for indicator"
 msgstr "لم يتم استقبال أي ترجمات للمؤشر"
 
-#: app/routes/admin/utilities/translations.py:67
+#: app/routes/admin/utilities/translations.py:68
 msgid "No translations were added. Please provide at least one translation."
 msgstr "لم يتم العثور على عناصر تحتاج إلى ترجمة"
 
@@ -16918,7 +16981,7 @@ msgstr "لم يتم العثور على عناصر تحتاج إلى ترجمة"
 msgid "No translations were received."
 msgstr "لم يتم استلام أي ترجمات."
 
-#: app/routes/admin/utilities/translations.py:57
+#: app/routes/admin/utilities/translations.py:58
 #: app/routes/translation_review/__init__.py:189
 msgid "No translations were updated"
 msgstr "لم يتم العثور على ترجمات"
@@ -16946,7 +17009,7 @@ msgstr ""
 msgid "No unreviewed strings in the catalog yet."
 msgstr ""
 
-#: app/templates/admin/api_keys/details.html:219
+#: app/templates/admin/api_keys/details.html:220
 msgid "No usage data recorded yet for this key."
 msgstr "لم يتم تسجيل بيانات الاستخدام لهذا المفتاح حتى الآن."
 
@@ -16963,11 +17026,11 @@ msgstr "لم يجد أي مستخدم لتلك الرسالة الإلكترون
 msgid "No users found."
 msgstr "لم يتم العثور على مستخدمين."
 
-#: app/routes/main/assignments.py:604
+#: app/routes/main/assignments.py:667
 msgid "No valid countries were selected. Please try again."
 msgstr "ولم يتم اختيار بلدان صالحة. حاول مرة أخرى."
 
-#: app/routes/admin/utilities/translations.py:922
+#: app/routes/admin/utilities/translations.py:925
 msgid ""
 "No valid locale PO files found in ZIP. Expected files like: "
 "<lang>/LC_MESSAGES/messages.po"
@@ -17178,7 +17241,7 @@ msgstr "ملاحظه"
 msgid "Note:"
 msgstr "ملاحظه:"
 
-#: app/routes/admin/utilities/translations.py:1675
+#: app/routes/admin/utilities/translations.py:1678
 #, python-format
 msgid "Note: %(note)s"
 msgstr "ملاحظة: %(note)s"
@@ -17535,7 +17598,7 @@ msgstr "اطلب الوصول فقط للدول التي تتولى إدارة �
 msgid "Only routes under /api/v1 (public and partner REST API)."
 msgstr "فقط التوجيهات تحت /api/v1 (واجهة REST العامة والشريكة)."
 
-#: app/routes/main/assignments.py:415
+#: app/routes/main/assignments.py:478
 msgid ""
 "Only users with an organization email can request access to multiple "
 "countries at once. Please select a single country."
@@ -17543,7 +17606,7 @@ msgstr ""
 "فقط المستخدمون الذين لديهم بريد إلكتروني للمنظمة يمكنهم طلب الوصول إلى عدة "
 "دول في نفس الوقت. يرجى اختيار دولة واحدة."
 
-#: app/routes/auth.py:750
+#: app/routes/auth.py:788
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -17635,7 +17698,7 @@ msgstr "فتح القائمة"
 msgid "Open questions"
 msgstr "أسئلة مفتوحة"
 
-#: app/services/ai/chat/engine.py:1334
+#: app/services/ai/chat/engine.py:1340
 msgid "Open the template in the form builder"
 msgstr "افتح القالب في منشئ النماذج"
 
@@ -17671,7 +17734,7 @@ msgstr ""
 msgid "OpenAI API"
 msgstr "OpenAI API"
 
-#: app/templates/admin/api_management.html:1732
+#: app/templates/admin/api_management.html:1792
 msgid "Opened!"
 msgstr "تم الفتح!"
 
@@ -18083,7 +18146,7 @@ msgstr "PO Import Tabs"
 msgid "PO ZIP (all languages)"
 msgstr "PO ZIP (all languages)"
 
-#: app/routes/admin/utilities/translations.py:932
+#: app/routes/admin/utilities/translations.py:935
 #, python-format
 msgid ""
 "PO ZIP import finished. Locales processed: %(p)d, skipped: %(s)d. Updated: "
@@ -18092,13 +18155,13 @@ msgstr ""
 "%(e)d %(m)d %(u)d %(s)d %(p)d لقد انتهى استيراد (بي زي بي) المحليون مجهزون: "
 "آخر المستجدات:."
 
-#: app/routes/admin/utilities/translations.py:516
-#: app/routes/admin/utilities/translations.py:969
+#: app/routes/admin/utilities/translations.py:517
+#: app/routes/admin/utilities/translations.py:972
 #, python-format
 msgid "PO file not found for %(lang)s."
 msgstr "%(lang)s لم يعثر على ملف لـ (بو)."
 
-#: app/routes/admin/utilities/translations.py:997
+#: app/routes/admin/utilities/translations.py:1000
 #, python-format
 msgid ""
 "PO import finished for %(lang)s. Updated: %(u)d, skipped missing: %(m)d, "
@@ -18114,15 +18177,15 @@ msgstr ""
 #: app/routes/forms_validation_summary.py:1833
 #: app/services/documentation/pdf_service.py:121
 #: app/templates/admin/ai/knowledge_base.html:748
-#: app/templates/admin/api_management.html:1108
-#: app/templates/admin/api_management.html:1126
-#: app/templates/admin/api_management.html:1145
-#: app/templates/admin/api_management.html:1153
-#: app/templates/admin/api_management.html:1159
-#: app/templates/admin/api_management.html:1177
-#: app/templates/admin/api_management.html:1187
-#: app/templates/admin/api_management.html:1196
-#: app/templates/admin/api_management.html:1203
+#: app/templates/admin/api_management.html:1110
+#: app/templates/admin/api_management.html:1128
+#: app/templates/admin/api_management.html:1147
+#: app/templates/admin/api_management.html:1155
+#: app/templates/admin/api_management.html:1161
+#: app/templates/admin/api_management.html:1179
+#: app/templates/admin/api_management.html:1189
+#: app/templates/admin/api_management.html:1198
+#: app/templates/admin/api_management.html:1205
 #: app/templates/components/ag_grid_i18n_js.html:58
 #: app/templates/forms/entry_form/validation_summary_progress.html:331
 #: app/templates/forms/form_builder/partials/_section_modal.html:59
@@ -18167,21 +18230,21 @@ msgstr "الصفحة موروثة من القسم الأب."
 msgid "Page name"
 msgstr "اسم الصفحة"
 
-#: app/templates/admin/api_management.html:1203
+#: app/templates/admin/api_management.html:1205
 msgid "Page number"
 msgstr "اسم الصفحة"
 
-#: app/templates/admin/api_management.html:1145
-#: app/templates/admin/api_management.html:1153
-#: app/templates/admin/api_management.html:1159
-#: app/templates/admin/api_management.html:1177
-#: app/templates/admin/api_management.html:1187
-#: app/templates/admin/api_management.html:1196
+#: app/templates/admin/api_management.html:1147
+#: app/templates/admin/api_management.html:1155
+#: app/templates/admin/api_management.html:1161
+#: app/templates/admin/api_management.html:1179
+#: app/templates/admin/api_management.html:1189
+#: app/templates/admin/api_management.html:1198
 msgid "Page number (default: 1)"
 msgstr "رقم الصفحة (الافتراضي: 1)"
 
-#: app/templates/admin/api_management.html:1108
-#: app/templates/admin/api_management.html:1126
+#: app/templates/admin/api_management.html:1110
+#: app/templates/admin/api_management.html:1128
 msgid "Page number (default: 1, API key auth only)"
 msgstr "رقم الصفحة (الافتراضي: 1، مصدق مفاتيح API فقط)"
 
@@ -18192,15 +18255,15 @@ msgstr "رقم الصفحة (الافتراضي: 1، مصدق مفاتيح API �
 msgid "Page path analytics"
 msgstr "تحليلات مسار الصفحة"
 
-#: app/routes/main/assignments.py:224
+#: app/routes/main/assignments.py:257
 msgid "Page reopened. Other submitted pages remain locked."
 msgstr ""
 
-#: app/routes/main/assignments.py:279
+#: app/routes/main/assignments.py:324
 msgid "Page returned for revision. Other submitted pages remain locked."
 msgstr ""
 
-#: app/routes/forms/entry.py:1005 app/routes/forms/entry.py:1014
+#: app/routes/forms/entry.py:1019 app/routes/forms/entry.py:1028
 msgid "Page submitted successfully."
 msgstr ""
 
@@ -18285,12 +18348,18 @@ msgstr "مشاركين"
 msgid "Partnerships"
 msgstr "الشراكات"
 
+#: app/templates/admin/api_management.html:570
+msgid ""
+"Passing it in the URL (?api_key=) only works for keys that were explicitly "
+"allowed to and is discouraged."
+msgstr ""
+
 #: app/templates/admin/analytics/audit_trail.html:328
 #: app/templates/auth/login.html:788 app/templates/auth/register.html:21
 msgid "Password"
 msgstr "كلمة المرور"
 
-#: app/routes/auth.py:1443
+#: app/routes/auth.py:1495
 msgid ""
 "Password reset is not available. Please sign in with your organization "
 "account."
@@ -18338,7 +18407,7 @@ msgstr "لصق الصورة"
 msgid "Paste the view or embed URL (HTTPS only)"
 msgstr "الصق رابط العرض أو تضمين URL (فقط HTTPS)"
 
-#: app/templates/admin/api_management.html:1569
+#: app/templates/admin/api_management.html:1634
 msgid ""
 "Paste your API key above to embed it in the M query, or replace YOUR_API_KEY"
 " in the copied code."
@@ -18348,7 +18417,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/page_path_analytics.html:83
 #: app/templates/admin/analytics/sessions.html:175
-#: app/templates/admin/api_management.html:1791
+#: app/templates/admin/api_management.html:1851
 msgid "Path"
 msgstr "المسار"
 
@@ -18444,15 +18513,15 @@ msgstr ""
 msgid "Per-language coverage"
 msgstr ""
 
-#: app/routes/main/assignments.py:193 app/routes/main/assignments.py:255
+#: app/routes/main/assignments.py:214 app/routes/main/assignments.py:288
 msgid "Per-page submission is not enabled for this assignment."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:120
+#: app/routes/admin/assignment_management.py:121
 msgid "Per-page submit is off. The assignment now uses whole-form submit."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:109
+#: app/routes/admin/assignment_management.py:110
 #, python-format
 msgid ""
 "Per-page submit is on. %(count)s page status(es) were created or aligned "
@@ -18460,7 +18529,7 @@ msgid ""
 "kept."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:115
+#: app/routes/admin/assignment_management.py:116
 msgid ""
 "Per-page submit is on. Existing page statuses were kept; new pages inherit "
 "each entity's assignment status when first saved."
@@ -18555,7 +18624,7 @@ msgstr "الإذن المنحى"
 msgid "Permission Removed"
 msgstr "تم إزالة الإذن"
 
-#: app/templates/admin/api_management.html:1788
+#: app/templates/admin/api_management.html:1848
 msgid "Permission:"
 msgstr "الإذن:"
 
@@ -18573,6 +18642,20 @@ msgstr "الأذونات (من الأدوار المخصصة)"
 #: app/templates/auth/account_settings.html:57
 msgid "Personal Information"
 msgstr "معلومات شخصية"
+
+#: app/templates/admin/api_keys/_access_summary.html:19
+#: app/templates/admin/api_keys/_access_summary.html:29
+#: app/templates/admin/api_keys/_permissions_fields.html:71
+msgid "Personal data"
+msgstr ""
+
+#: app/templates/admin/api_keys/_permissions_fields.html:126
+msgid ""
+"Personal data includes names and email addresses of users, quiz "
+"participants, public submitters and indicator-suggestion authors. Prefer the"
+" narrowest set of permissions, set an expiry date, and never embed this key "
+"in a website or mobile app."
+msgstr ""
 
 #: app/templates/admin/templates/new_template.html:39
 msgid ""
@@ -18634,11 +18717,12 @@ msgstr "يرجى الاعتراف بسياسة الذكاء الاصطناعي �
 msgid "Please contact your"
 msgstr "يرجى الاتصال بالمدير."
 
-#: app/routes/admin/system_admin/indicator_bank.py:719
+#: app/routes/admin/system_admin/indicator_bank.py:530
+#: app/routes/admin/system_admin/indicator_bank.py:731
 msgid "Please correct the errors in the form."
 msgstr "يرجى تصحيح الأخطاء في النموذج."
 
-#: app/routes/auth.py:1384 app/routes/auth.py:1447
+#: app/routes/auth.py:1434 app/routes/auth.py:1499
 msgid "Please correct the highlighted fields and try again."
 msgstr ""
 
@@ -18706,11 +18790,11 @@ msgstr "يُرجى اختيار سنة/شهر للوثيقة."
 msgid "Please select a file"
 msgstr "يرجى اختيار ملف"
 
-#: app/routes/admin/utilities/translations.py:954
+#: app/routes/admin/utilities/translations.py:957
 msgid "Please select a language for PO import."
 msgstr "يرجى اختيار لغة لاستيراد PO."
 
-#: app/routes/admin/utilities/translations.py:508
+#: app/routes/admin/utilities/translations.py:509
 msgid "Please select a language to export."
 msgstr "يرجى اختيار لغة للتصدير."
 
@@ -18738,7 +18822,7 @@ msgstr "يرجى اختيار مستخدم أولا."
 msgid "Please select a valid period (year or date range) before submitting."
 msgstr "يرجى اختيار فترة صالحة (سنة أو نطاق تاريخي) قبل التقديم."
 
-#: app/routes/main/assignments.py:615
+#: app/routes/main/assignments.py:678
 msgid "Please select at least one country."
 msgstr "يرجى اختيار بلد واحد على الأقل."
 
@@ -18768,11 +18852,11 @@ msgstr "اختر..."
 msgid "Please specify..."
 msgstr "يرجى تحديد الموضوع..."
 
-#: app/routes/admin/utilities/translations.py:964
+#: app/routes/admin/utilities/translations.py:967
 msgid "Please upload a .po file for PO import."
 msgstr "من فضلك ارفع ملف \"بو\" لاستيراد \"بو\"."
 
-#: app/routes/admin/utilities/translations.py:834
+#: app/routes/admin/utilities/translations.py:837
 msgid "Please upload a .zip file for PO ZIP import."
 msgstr "الرجاء تحميل ملف زبدة لاستيراد PO ZIP."
 
@@ -18780,7 +18864,7 @@ msgstr "الرجاء تحميل ملف زبدة لاستيراد PO ZIP."
 msgid "Please upload a supported guidance file"
 msgstr ""
 
-#: app/templates/admin/templates/kobo_data_import.html:1160
+#: app/templates/admin/templates/kobo_data_import.html:1158
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:384
 msgid "Please upload a valid Excel file (.xlsx or .xls)"
 msgstr "يرجى رفع ملف إكسل صالح (.xlsx أو .xls)"
@@ -18793,7 +18877,7 @@ msgstr "يرجى رفع ملف إكسل صالح (.xlsx أو .xls)."
 msgid "Please upload an Excel file (.xlsx or .xls)"
 msgstr "يرجى رفع ملف إكسل (.xlsx أو .xls)"
 
-#: app/routes/admin/utilities/translations.py:1017
+#: app/routes/admin/utilities/translations.py:1020
 msgid "Please upload an Excel file (.xlsx or .xls)."
 msgstr "يرجى تحميل ملف إكسل (xx) أو (xx)."
 
@@ -18990,6 +19074,10 @@ msgstr "الحاضر"
 msgid "Presets"
 msgstr "Presets"
 
+#: app/templates/admin/api_keys/_permissions_fields.html:45
+msgid "Presets only tick the boxes for you; you can adjust them afterwards."
+msgstr ""
+
 #: app/templates/admin/communication/center.html:1089
 #: app/templates/admin/communication/registry.html:68
 #: app/templates/admin/communication/registry.html:98
@@ -19089,7 +19177,7 @@ msgstr "النسخ المفتوحة"
 msgid "Preview:"
 msgstr "معاينة"
 
-#: app/routes/forms/entry.py:1652
+#: app/routes/forms/entry.py:1666
 #, python-format
 msgid "Preview: %(name)s"
 msgstr "معاينة: %(name)s"
@@ -19099,7 +19187,7 @@ msgstr "معاينة: %(name)s"
 #: app/templates/admin/analytics/sessions.html:120
 #: app/templates/admin/analytics/sessions.html:180
 #: app/templates/admin/communication/center.html:1136
-#: app/templates/admin/monitoring/system_monitoring.html:237
+#: app/templates/admin/monitoring/system_monitoring.html:239
 #: app/templates/components/pagination.html:27
 #: app/templates/components/pagination.html:31
 #: app/templates/components/pagination.html:70
@@ -19122,7 +19210,7 @@ msgstr "الإجابة السابقة"
 msgid "Previous key material is permanently invalidated."
 msgstr "المواد الرئيسية السابقة تبطل بشكل دائم."
 
-#: app/routes/admin/assignment_management.py:140
+#: app/routes/admin/assignment_management.py:141
 msgid ""
 "Previous page statuses were kept in case you turn per-page mode back on."
 msgstr ""
@@ -19293,7 +19381,7 @@ msgstr "يجب أن يكون لون الملف الشخصي قيمة #RRGGBB."
 msgid "Profile updated"
 msgstr ""
 
-#: app/routes/auth.py:1702
+#: app/routes/auth.py:1754
 msgid "Profile updated successfully."
 msgstr "تم تحديث الملف الشخصي بنجاح."
 
@@ -19351,7 +19439,7 @@ msgstr "أولوية المزود"
 
 #: app/templates/admin/ai/knowledge_base.html:326
 #: app/templates/admin/ai/knowledge_base.html:773
-#: app/templates/admin/api_management.html:1768
+#: app/templates/admin/api_management.html:1828
 #: app/templates/components/ag_grid_i18n_js.html:39
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:275
 msgid "Public"
@@ -19512,8 +19600,8 @@ msgstr "عنوان الدفع"
 msgid "Putting the summary together…"
 msgstr ""
 
-#: app/services/ai/agent/executor.py:1838
-#: app/services/ai/agent/executor.py:1840 app/services/ai/chat/engine.py:1370
+#: app/services/ai/agent/executor.py:1842
+#: app/services/ai/agent/executor.py:1844 app/services/ai/chat/engine.py:1376
 msgid "Putting together your answer…"
 msgstr "أجمع إجابتك..."
 
@@ -19651,7 +19739,7 @@ msgstr "الوصول السريع"
 msgid "Quick Actions"
 msgstr "الإجراءات السريعة"
 
-#: app/templates/admin/api_management.html:1774
+#: app/templates/admin/api_management.html:1834
 msgid "RBAC"
 msgstr "RBAC"
 
@@ -19672,13 +19760,13 @@ msgstr "RBAC — @mobile_auth_required(إذن=...)"
 msgid "RSS (Resident Set Size)"
 msgstr "RSS (حجم المجموعة المقيمة)"
 
-#: app/templates/admin/api_keys/details.html:259
-#: app/templates/admin/api_keys/list.html:114
+#: app/templates/admin/api_keys/details.html:274
+#: app/templates/admin/api_keys/list.html:116
 msgid "Rate Limit"
 msgstr "لا حدود"
 
 #: app/templates/admin/api_management.html:530
-#: app/templates/admin/api_management.html:1775
+#: app/templates/admin/api_management.html:1835
 msgid "Rate limited"
 msgstr "الحد المحدود للسعر"
 
@@ -19881,7 +19969,7 @@ msgstr ""
 msgid "Reading the form structure…"
 msgstr ""
 
-#: app/services/ai/chat/engine.py:1066
+#: app/services/ai/chat/engine.py:1070
 msgid "Reading your request…"
 msgstr ""
 
@@ -19890,7 +19978,7 @@ msgstr ""
 msgid "Ready for deploy"
 msgstr "جاهز للنشر"
 
-#: app/templates/admin/api_keys/details.html:282
+#: app/templates/admin/api_keys/details.html:297
 msgid "Reason"
 msgstr "السبب"
 
@@ -19941,7 +20029,7 @@ msgstr "الإجراءات التي اتخذت مؤخرا بشأن المخاط�
 msgid "Recent Queries"
 msgstr "الاستفسارات الأخيرة"
 
-#: app/templates/admin/api_keys/details.html:175
+#: app/templates/admin/api_keys/details.html:176
 msgid "Recent Requests"
 msgstr "الطلبات الأخيرة"
 
@@ -19976,6 +20064,21 @@ msgstr "مستلمين"
 #: app/templates/admin/plugin_management.html:251
 msgid "Recommendation:"
 msgstr "توصية:"
+
+#: app/templates/admin/api_keys/_permissions_fields.html:139
+msgid ""
+"Recommended: leave off and send the key as \"Authorization: Bearer <key>\". "
+"Keys in the URL end up in server logs, browser history and Referer headers. "
+"Only enable for a client that cannot set headers (e.g. some BI connectors)."
+msgstr ""
+
+#: app/templates/admin/api_keys/details.html:266
+msgid "Recommended: narrow this key to the permissions its client needs."
+msgstr ""
+
+#: app/templates/admin/api_keys/details.html:267
+msgid "Recommended: set an expiry date for keys with sensitive access."
+msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:3602
 msgid "Reconnected!"
@@ -20121,6 +20224,14 @@ msgstr "تسجيل"
 msgid "Registered Devices"
 msgstr "الأجهزة المسجلة"
 
+#: app/routes/auth.py:1299
+msgid ""
+"Registration request received. If this email was not already registered, "
+"your account has been created and your country access request is pending "
+"admin approval. If you already have an account, please sign in or use "
+"\"Forgot password\"."
+msgstr ""
+
 #: app/templates/admin/api_management.html:231
 msgid "Registry coverage"
 msgstr "تغطية السجل"
@@ -20187,8 +20298,8 @@ msgstr ""
 msgid "Related programs"
 msgstr "برامج ذات صلة"
 
-#: app/templates/admin/api_management.html:1107
-#: app/templates/admin/api_management.html:1125
+#: app/templates/admin/api_management.html:1109
+#: app/templates/admin/api_management.html:1127
 msgid "Related tables scope: page (current page) or all (full dataset)"
 msgstr ""
 "نطاق الجداول ذات الصلة: الصفحة (الصفحة الحالية) أو الجميع (مجموعة بيانات "
@@ -20344,7 +20455,7 @@ msgstr "إزالة"
 msgid "Removed %(count)d field in %(template)s"
 msgstr "%(count)d نقل الحقل في %(template)s"
 
-#: app/routes/admin/utilities/translations.py:1456
+#: app/routes/admin/utilities/translations.py:1459
 #, python-format
 msgid ""
 "Removed %(entries)d obsolete translation entries from %(count)d file(s)"
@@ -20360,7 +20471,7 @@ msgstr "تم حذفه من المسودة"
 msgid "Removed obsolete entries"
 msgstr "تم إزالة الإدخالات القديمة"
 
-#: app/routes/admin/utilities/translations.py:1417
+#: app/routes/admin/utilities/translations.py:1420
 #, python-format
 msgid "Removed obsolete translation entries from %(count)d file(s)"
 msgstr "تمت إزالة مدخلات الترجمة القديمة من ملف %(count)d"
@@ -20373,7 +20484,7 @@ msgstr "سلاسل الترجمة المحجوزة"
 msgid "Removing drag highlight"
 msgstr "إزالة تمييز السحب"
 
-#: app/templates/admin/api_management.html:1572
+#: app/templates/admin/api_management.html:1637
 msgid ""
 "Rename this query (e.g. Databank_Source), then reference it from child "
 "queries that expand each array."
@@ -20564,7 +20675,7 @@ msgstr "حالة الإبلاغ"
 msgid "Reporting period"
 msgstr "فترة التقرير"
 
-#: app/templates/admin/api_management.html:1181
+#: app/templates/admin/api_management.html:1183
 msgid "Reporting period (e.g. 2024)"
 msgstr ""
 
@@ -20722,15 +20833,15 @@ msgstr "الطلب فشل. تحقق من بياناتك وحاول مرة أخر
 msgid "Requested at"
 msgstr ""
 
-#: app/templates/admin/api_keys/details.html:143
-#: app/templates/admin/api_keys/details.html:350
-#: app/templates/admin/api_management.html:931
-#: app/templates/admin/api_management.html:981
-#: app/templates/admin/api_management.html:1797
+#: app/templates/admin/api_keys/details.html:144
+#: app/templates/admin/api_keys/details.html:365
+#: app/templates/admin/api_management.html:933
+#: app/templates/admin/api_management.html:983
+#: app/templates/admin/api_management.html:1857
 msgid "Requests"
 msgstr "الطلبات"
 
-#: app/templates/admin/api_keys/details.html:122
+#: app/templates/admin/api_keys/details.html:123
 msgid "Requests — Last 30 Days"
 msgstr "الطلبات — آخر 30 يوما"
 
@@ -20747,12 +20858,12 @@ msgstr "الطلبات — آخر 30 يوما"
 msgid "Required"
 msgstr "المطلوبة"
 
-#: app/templates/admin/api_management.html:1135
-#: app/templates/admin/api_management.html:1138
-#: app/templates/admin/api_management.html:1141
-#: app/templates/admin/api_management.html:1147
-#: app/templates/admin/api_management.html:1155
-#: app/templates/admin/api_management.html:1164
+#: app/templates/admin/api_management.html:1137
+#: app/templates/admin/api_management.html:1140
+#: app/templates/admin/api_management.html:1143
+#: app/templates/admin/api_management.html:1149
+#: app/templates/admin/api_management.html:1157
+#: app/templates/admin/api_management.html:1166
 msgid "Required API key for authentication"
 msgstr "تتطلب انتباه"
 
@@ -20934,6 +21045,10 @@ msgstr "الاستعادة"
 #: app/templates/forms/form_builder/form_builder.html:424
 msgid "Restore or create a draft from another version to make changes."
 msgstr "استعاد أو أنشئ مسودة من نسخة أخرى لإجراء التعديلات."
+
+#: app/templates/admin/api_keys/_access_summary.html:40
+msgid "Restricted to the selected templates/countries for:"
+msgstr ""
 
 #: app/templates/admin/translations/quality_dashboard.html:118
 msgid "Result cache rows"
@@ -21144,8 +21259,8 @@ msgstr "مراجعة الخطط الموحدة..."
 msgid "Reviewing indicator suggestions…"
 msgstr "مراجعة اقتراحات المؤشرات..."
 
-#: app/services/ai/agent/executor.py:1199
-#: app/services/ai/agent/executor.py:1718
+#: app/services/ai/agent/executor.py:1201
+#: app/services/ai/agent/executor.py:1722
 msgid "Reviewing what I found…"
 msgstr "مراجعة ما وجدته..."
 
@@ -21153,11 +21268,11 @@ msgstr "مراجعة ما وجدته..."
 msgid "Reviews"
 msgstr "المراجعات"
 
-#: app/templates/admin/api_keys/details.html:322
+#: app/templates/admin/api_keys/details.html:337
 msgid "Revocation is permanent. Rotate instead of revoke to keep history."
 msgstr "الإلغاء دائم. قم بالتدوير بدلا من الإلغاء للحفاظ على التاريخ."
 
-#: app/templates/admin/api_keys/details.html:37
+#: app/templates/admin/api_keys/details.html:38
 #: app/templates/admin/api_keys/revoke.html:16
 msgid "Revoke"
 msgstr "إعادة فتح"
@@ -21168,25 +21283,25 @@ msgstr "إعادة فتح"
 msgid "Revoke API Key"
 msgstr "Revoke API Key"
 
-#: app/templates/admin/api_keys/list.html:176
+#: app/templates/admin/api_keys/list.html:181
 msgid "Revoke Key"
 msgstr "مفتاح الإلغاء"
 
-#: app/templates/admin/api_keys/details.html:306
+#: app/templates/admin/api_keys/details.html:321
 msgid "Revoke key"
 msgstr "مفتاح الإلغاء"
 
-#: app/templates/admin/api_keys/details.html:237
-#: app/templates/admin/api_keys/details.html:277
-#: app/templates/admin/api_keys/list.html:135
+#: app/templates/admin/api_keys/details.html:238
+#: app/templates/admin/api_keys/details.html:292
+#: app/templates/admin/api_keys/list.html:137
 msgid "Revoked"
 msgstr "تم الحل"
 
-#: app/templates/admin/api_keys/list.html:54
+#: app/templates/admin/api_keys/list.html:55
 msgid "Revoked Keys"
 msgstr "المفاتيح الملغاة"
 
-#: app/templates/admin/api_keys/list.html:85
+#: app/templates/admin/api_keys/list.html:86
 msgid "Revoked Only"
 msgstr "للقراءة فقط"
 
@@ -21267,23 +21382,23 @@ msgstr "الأدوار"
 msgid "Rotate"
 msgstr "تدوير"
 
-#: app/templates/admin/api_keys/details.html:52
+#: app/templates/admin/api_keys/details.html:53
 msgid "Rotate API Key?"
 msgstr "تدوير مفتاح API؟"
 
-#: app/templates/admin/api_keys/details.html:30
+#: app/templates/admin/api_keys/details.html:31
 msgid "Rotate Key"
 msgstr "مفتاح الدوران"
 
-#: app/templates/admin/api_keys/list.html:171
+#: app/templates/admin/api_keys/list.html:176
 msgid "Rotate Key — opens key details"
 msgstr "تدوير المفتاح — يفتح التفاصيل الرئيسية"
 
-#: app/templates/admin/api_keys/details.html:302
+#: app/templates/admin/api_keys/details.html:317
 msgid "Rotate key material"
 msgstr "تدوير مواد المفاتيح"
 
-#: app/templates/admin/api_keys/details.html:321
+#: app/templates/admin/api_keys/details.html:336
 msgid "Rotate the key regularly or immediately if compromise is suspected."
 msgstr "قم بتدوير المفتاح بانتظام أو فورا إذا اشتبه في وجود تشويق."
 
@@ -21502,7 +21617,7 @@ msgstr "حفظ جميع التغييرات"
 msgid "Save All Translations"
 msgstr "حفظ جميع الترجمات"
 
-#: app/templates/admin/api_keys/edit.html:94
+#: app/templates/admin/api_keys/edit.html:98
 #: app/templates/admin/organization/_countries_component.html:131
 #: app/templates/admin/organization/_nss_component.html:207
 msgid "Save Changes"
@@ -21689,13 +21804,13 @@ msgstr "لفافة"
 
 #: app/templates/admin/ai/knowledge_base.html:414
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:24
-#: app/templates/admin/api_keys/list.html:91
+#: app/templates/admin/api_keys/list.html:92
 #: app/templates/admin/communication/registry.html:22
 #: app/templates/admin/communication/registry.html:24
 #: app/templates/admin/indicator_bank/indicator_bank.html:289
 #: app/templates/admin/indicator_bank/neural_map.html:181
 #: app/templates/admin/indicator_bank/neural_map.html:237
-#: app/templates/admin/monitoring/system_monitoring.html:192
+#: app/templates/admin/monitoring/system_monitoring.html:194
 #: app/templates/notifications/center.html:139
 msgid "Search"
 msgstr "بحث"
@@ -21783,7 +21898,7 @@ msgstr "ابحث عن الفروع، الفروع الفرعية، أو الوح
 msgid "Search branches, sub-branches, or local units…"
 msgstr "ابحث عن الفروع، الفروع الفرعية، أو الوحدات المحلية..."
 
-#: app/templates/admin/api_keys/list.html:78
+#: app/templates/admin/api_keys/list.html:79
 msgid "Search by client name, description, or key prefix..."
 msgstr "ابحث حسب اسم العميل أو وصفه أو بادئة المفتاح..."
 
@@ -21796,11 +21911,11 @@ msgstr "البحث عبر البريد الإلكتروني"
 msgid "Search by indicator name…"
 msgstr "ابحث حسب اسم المؤشر..."
 
-#: app/templates/admin/api_management.html:1167
+#: app/templates/admin/api_management.html:1169
 msgid "Search by name or definition"
 msgstr "تعريف البحث"
 
-#: app/templates/admin/api_management.html:1161
+#: app/templates/admin/api_management.html:1163
 msgid "Search by name or email"
 msgstr "ابحث بالاسم أو البريد الإلكتروني"
 
@@ -21885,7 +22000,7 @@ msgstr ""
 msgid "Search indicators"
 msgstr ""
 
-#: app/templates/admin/monitoring/system_monitoring.html:193
+#: app/templates/admin/monitoring/system_monitoring.html:195
 msgid "Search logs..."
 msgstr "البحث عن القيم..."
 
@@ -21921,8 +22036,8 @@ msgstr "البحث في أمانة"
 msgid "Search sectors or sub-sectors..."
 msgstr "ابحث عن قطاعات أو قطاعات فرعية..."
 
-#: app/templates/admin/api_management.html:1161
-#: app/templates/admin/api_management.html:1167
+#: app/templates/admin/api_management.html:1163
+#: app/templates/admin/api_management.html:1169
 msgid "Search term"
 msgstr "بحث"
 
@@ -22197,7 +22312,7 @@ msgstr "تم حل حدث الأمان"
 msgid "Security Events"
 msgstr "أحداث الأمان"
 
-#: app/templates/admin/api_keys/create_success.html:70
+#: app/templates/admin/api_keys/create_success.html:76
 msgid "Security Reminder"
 msgstr "أحداث الأمان"
 
@@ -22210,7 +22325,7 @@ msgstr "إعدادات الأمان"
 msgid "Security event resolved"
 msgstr ""
 
-#: app/templates/admin/api_keys/details.html:319
+#: app/templates/admin/api_keys/details.html:334
 msgid "Security notes"
 msgstr "ملاحظات أمنية"
 
@@ -22501,7 +22616,7 @@ msgstr "اختر كيانا"
 msgid "Select an export type."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:315
+#: app/routes/admin/assignment_management.py:316
 msgid "Select at least one IFRC admin to notify when submissions arrive."
 msgstr ""
 
@@ -22535,8 +22650,8 @@ msgstr "اختر على الأقل مؤشرا واحدا للمتابعة."
 msgid "Select at least one reporting year."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:337
-#: app/routes/admin/utilities/translations.py:450
+#: app/routes/admin/utilities/translations.py:338
+#: app/routes/admin/utilities/translations.py:451
 msgid "Select at least one row and a bulk action."
 msgstr ""
 
@@ -22775,8 +22890,8 @@ msgstr "المختار"
 msgid "Selected Indicators"
 msgstr "المؤشرات المحددة"
 
-#: app/services/ai/data/form_retrieval.py:111
-#: app/services/ai/data/form_retrieval.py:1644
+#: app/services/ai/data/form_retrieval.py:112
+#: app/services/ai/data/form_retrieval.py:1642
 #, python-format
 msgid "Selected indicator: %(name)s"
 msgstr "مؤشر مختار: %(name)s"
@@ -22809,7 +22924,7 @@ msgstr "مبلغ عنه ذاتياً"
 msgid "Self-report created: %(template)s"
 msgstr "تقرير المصير: %(template)s"
 
-#: app/routes/auth.py:1279
+#: app/routes/auth.py:1323
 msgid ""
 "Self-service registration is not available. Please sign in with your "
 "organization account."
@@ -22937,6 +23052,11 @@ msgstr ""
 msgid "Sending…"
 msgstr "أرسل..."
 
+#: app/templates/admin/api_keys/_access_summary.html:30
+#: app/templates/admin/api_keys/_permissions_fields.html:73
+msgid "Sensitive"
+msgstr ""
+
 #: app/templates/components/_fb_ai_config.html:31
 msgid "Sensitive information detected"
 msgstr "المعلومات الحساسة التي تم اكتشافها"
@@ -22996,7 +23116,7 @@ msgid "Server error"
 msgstr "خطأ في الخادم"
 
 #: app/templates/admin/analytics/audit_trail.html:459
-#: app/templates/admin/api_management.html:1771
+#: app/templates/admin/api_management.html:1831
 msgid "Session"
 msgstr "الجلسة"
 
@@ -23233,7 +23353,7 @@ msgstr "تم تحديث النموذج"
 msgid "Sharing updated"
 msgstr ""
 
-#: app/templates/admin/templates/kobo_data_import.html:1164
+#: app/templates/admin/templates/kobo_data_import.html:1162
 msgid "Sheet"
 msgstr "الورقة"
 
@@ -23695,7 +23815,7 @@ msgid ""
 "clusters"
 msgstr "أبطأ لكن المؤشرات المتشابهة أقرب إلى بعضها — أفضل للرصد"
 
-#: app/routes/main/assignments.py:600
+#: app/routes/main/assignments.py:663
 msgid "Some countries could not be processed. Please try again."
 msgstr "ولا يمكن معالجة بعض البلدان. حاول مرة أخرى."
 
@@ -23733,8 +23853,8 @@ msgstr ""
 "تعرض بعض الحقول البيانات المنقولة من مصدر بيانات سابق تم تكوينه (مميزة "
 "باللون الأصفر). يرجى مراجعة وتحديث أي أرقام تغيرت قبل الحفظ."
 
-#: app/routes/admin/utilities/translations.py:1420
-#: app/routes/admin/utilities/translations.py:1462
+#: app/routes/admin/utilities/translations.py:1423
+#: app/routes/admin/utilities/translations.py:1465
 #, python-format
 msgid "Some languages could not be updated: %(langs)s"
 msgstr "بعض اللغات لم يتم تحديثها: %(langs)s"
@@ -23743,8 +23863,8 @@ msgstr "بعض اللغات لم يتم تحديثها: %(langs)s"
 msgid "Something went wrong. Please try again."
 msgstr "حدث خطأ ما. يرجى المحاولة مرة أخرى."
 
-#: app/templates/admin/api_management.html:1104
-#: app/templates/admin/api_management.html:1122
+#: app/templates/admin/api_management.html:1106
+#: app/templates/admin/api_management.html:1124
 msgid "Sort field (default: submitted_at)"
 msgstr "حقل الفرز (الافتراضي: submitted_at)"
 
@@ -23752,8 +23872,8 @@ msgstr "حقل الفرز (الافتراضي: submitted_at)"
 msgid "Sort order (asc or desc, default: desc)"
 msgstr "ترتيب الترتيب (asc أو desc، الافتراضي: desc)"
 
-#: app/templates/admin/api_management.html:1105
-#: app/templates/admin/api_management.html:1123
+#: app/templates/admin/api_management.html:1107
+#: app/templates/admin/api_management.html:1125
 msgid "Sort order: desc (default) or asc"
 msgstr "ترتيب الترتيب: desc (افتراضي) أو ASC"
 
@@ -23783,7 +23903,7 @@ msgstr "فترة المصدر"
 msgid "Source Template"
 msgstr "حفظ القالب"
 
-#: app/routes/admin/utilities/translations.py:378
+#: app/routes/admin/utilities/translations.py:379
 #: app/routes/translation_review/__init__.py:264
 msgid "Source term is required"
 msgstr ""
@@ -23815,7 +23935,7 @@ msgstr ""
 msgid "Specialists"
 msgstr "متخصصين"
 
-#: app/routes/admin/assignment_management.py:264
+#: app/routes/admin/assignment_management.py:265
 #: app/templates/admin/assignments/manage_assignment.html:368
 msgid "Specific IFRC admin(s)"
 msgstr ""
@@ -23910,6 +24030,10 @@ msgstr ""
 "ابدأ من قالب فارغ، أو استنسخت قالب موجود، أو استورد هيكلا من Kobo XLSForm أو"
 " Excel."
 
+#: app/templates/admin/api_keys/_permissions_fields.html:29
+msgid "Start from a preset"
+msgstr ""
+
 #: app/templates/admin/docs/documentation.html:1224
 msgid "Start interactive tour for this guide"
 msgstr "بدء جولة تفاعلية لهذا الدليل"
@@ -23972,7 +24096,7 @@ msgstr "يبدأ..."
 msgid "Starts with"
 msgstr "يبدأ ب"
 
-#: app/routes/auth.py:807
+#: app/routes/auth.py:847
 msgid "State mismatch. Please try signing in again."
 msgstr "عدم تطابق الولاية. يرجى محاولة تسجيل الدخول مرة أخرى."
 
@@ -23995,9 +24119,9 @@ msgstr "الملحقات الثابتة"
 #: app/templates/admin/analytics/security_events.html:187
 #: app/templates/admin/analytics/sessions.html:159
 #: app/templates/admin/analytics/user_detail.html:57
-#: app/templates/admin/api_keys/details.html:186
-#: app/templates/admin/api_keys/details.html:232
-#: app/templates/admin/api_keys/list.html:113
+#: app/templates/admin/api_keys/details.html:187
+#: app/templates/admin/api_keys/details.html:233
+#: app/templates/admin/api_keys/list.html:114
 #: app/templates/admin/assignments/gantt_chart.html:107
 #: app/templates/admin/assignments/public_submissions.html:70
 #: app/templates/admin/assignments/public_submissions.html:243
@@ -24161,7 +24285,7 @@ msgstr "توقفت"
 msgid "Stopping..."
 msgstr "يتوقف..."
 
-#: app/templates/admin/api_keys/create.html:79
+#: app/templates/admin/api_keys/create.html:83
 msgid "Store the key securely - it cannot be retrieved later."
 msgstr "تخزين المفتاح بأمان - لا يمكن استرجاعها لاحقا."
 
@@ -24170,11 +24294,11 @@ msgid "Store this key in a secrets manager, not in code or config files."
 msgstr ""
 "قم بتخزين هذا المفتاح في مدير الأسرار، وليس في الكود أو ملفات الإعدادات."
 
-#: app/templates/admin/api_keys/create_success.html:73
-msgid "Store this key securely - it provides full API access"
+#: app/templates/admin/api_keys/create_success.html:79
+msgid ""
+"Store this key securely - anyone who has it can do everything listed under "
+"\"What this key can do\""
 msgstr ""
-"تخزين هذا المفتاح بأمان - فهو يوفر وصولا كاملا إلى واجهة برمجة التطبيقات "
-"(API)"
 
 #: app/templates/admin/ai/knowledge_base.html:812
 msgid "Strategic Plan"
@@ -24254,8 +24378,8 @@ msgstr "تقديم"
 msgid "Submission History and Data Quality for"
 msgstr "تاريخ التقديم وجودة البيانات لـ"
 
-#: app/templates/admin/api_management.html:1096
-#: app/templates/admin/api_management.html:1113
+#: app/templates/admin/api_management.html:1098
+#: app/templates/admin/api_management.html:1115
 msgid "Submission ID"
 msgstr "تقديم"
 
@@ -24398,12 +24522,12 @@ msgstr "القطاعات الفرعية المنشأة:"
 #: app/templates/admin/analytics/_user_detail_partial.html:365
 #: app/templates/admin/analytics/audit_trail.html:439
 #: app/templates/admin/analytics/login_logs.html:137
-#: app/templates/admin/api_management.html:1798
+#: app/templates/admin/api_management.html:1858
 #: app/templates/components/auto_translate_modal.html:463
 msgid "Success"
 msgstr "نجح"
 
-#: app/templates/admin/api_keys/details.html:94
+#: app/templates/admin/api_keys/details.html:95
 #: app/templates/admin/api_management.html:255
 msgid "Success Rate"
 msgstr "معدل النجاح"
@@ -24539,7 +24663,7 @@ msgid ""
 "Supported: PDF, Word, Excel, Text, Markdown, HTML — multiple files allowed"
 msgstr ""
 
-#: app/templates/admin/api_management.html:1790
+#: app/templates/admin/api_management.html:1850
 msgid "Surface"
 msgstr "السطح"
 
@@ -24661,7 +24785,7 @@ msgstr "..."
 #: app/templates/admin/analytics/audit_trail.html:362
 #: app/templates/admin/communication/center.html:694
 #: app/templates/admin/lists/manage_lists.html:58
-#: app/templates/admin/monitoring/system_monitoring.html:200
+#: app/templates/admin/monitoring/system_monitoring.html:202
 #: app/templates/notifications/center.html:108
 msgid "System"
 msgstr "مدير النظام"
@@ -24760,7 +24884,7 @@ msgstr ""
 msgid "TTL"
 msgstr "TTL"
 
-#: app/routes/admin/communication.py:296
+#: app/routes/admin/communication.py:297
 #: app/templates/admin/communication/registry.html:66
 msgid "TTL (days)"
 msgstr "TTL (الأيام)"
@@ -24822,7 +24946,7 @@ msgstr "الهدف"
 msgid "Target Period"
 msgstr "فترة الهدف"
 
-#: app/routes/admin/utilities/translations.py:380
+#: app/routes/admin/utilities/translations.py:381
 #: app/routes/translation_review/__init__.py:266
 msgid "Target term is required"
 msgstr ""
@@ -25143,8 +25267,8 @@ msgstr "نص"
 msgid "Text content"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1820
-#: app/routes/admin/utilities/translations.py:1856
+#: app/routes/admin/utilities/translations.py:1823
+#: app/routes/admin/utilities/translations.py:1859
 msgid "Text is required"
 msgstr "النص مطلوب"
 
@@ -25161,11 +25285,11 @@ msgstr "نص يعرض في الأسطوانة عند تمييز الصفوف ا�
 msgid "Thanks, feedback received."
 msgstr "شكرا، تم تلقي الملاحظات."
 
-#: app/routes/main/assignments.py:261
+#: app/routes/main/assignments.py:306
 msgid "That page cannot be returned for revision."
 msgstr ""
 
-#: app/routes/main/assignments.py:199
+#: app/routes/main/assignments.py:232
 msgid "That page has not been submitted."
 msgstr ""
 
@@ -25186,7 +25310,7 @@ msgstr ""
 msgid "The AI assistant helps you explore data and documents on the"
 msgstr "يساعدك مساعد الذكاء الاصطناعي على استكشاف البيانات والوثائق على"
 
-#: app/templates/admin/api_keys/create.html:78
+#: app/templates/admin/api_keys/create.html:82
 msgid ""
 "The API key will be shown only once after creation. Make sure to copy it "
 "immediately."
@@ -25247,7 +25371,7 @@ msgid ""
 "The form is taking longer than expected to load. Please reload the page."
 msgstr "ويستغرق الشكل وقتا أطول مما كان متوقعا. من فضلك أعد تحميل الصفحة."
 
-#: app/routes/admin/assignment_management.py:102
+#: app/routes/admin/assignment_management.py:103
 msgid ""
 "The form template changed, so previous per-page submission statuses were "
 "cleared."
@@ -25283,7 +25407,7 @@ msgstr ""
 "تعمل المهمة في بداية كل ساعة وترسل عندما تتطابق هذه الساعة مع وقت %(tz)s "
 "(CET/CEST)."
 
-#: app/templates/admin/api_keys/create.html:80
+#: app/templates/admin/api_keys/create.html:84
 msgid "The key will be hashed and stored securely in the database."
 msgstr "سيتم تجزئة المفتاح وتخزينه بشكل آمن في قاعدة البيانات."
 
@@ -25438,7 +25562,7 @@ msgstr "هذا"
 msgid "This action cannot be undone."
 msgstr "لا يمكن التراجع عن هذا الفعل."
 
-#: app/routes/admin/assignment_management.py:1238
+#: app/routes/admin/assignment_management.py:1239
 msgid ""
 "This active assignment has no data owner. Consider assigning one for "
 "governance accountability."
@@ -25479,6 +25603,17 @@ msgstr "هذه المهمة غير نشطة حاليا."
 #: app/routes/main/helpers.py:1287
 msgid ""
 "This assignment was cancelled and is no longer required for submission."
+msgstr ""
+
+#: app/routes/forms/entry.py:787 app/routes/forms/entry.py:790
+msgid ""
+"This assignment was changed by someone else and can no longer be edited."
+msgstr ""
+
+#: app/routes/main/assignments.py:71
+msgid ""
+"This assignment was changed by someone else. Review its current status and "
+"try again."
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1316
@@ -25553,11 +25688,11 @@ msgstr ""
 "تم التحقق من صحة هذا النموذج وهو للقراءة فقط. لطلب التغييرات، يرجى الكتابة "
 "إلى %(email)s وذكر سبب الطلب."
 
-#: app/routes/forms/submission.py:529
+#: app/routes/forms/submission.py:556
 msgid "This form is closed."
 msgstr "هذا النموذج مغلق."
 
-#: app/routes/forms/submission.py:527
+#: app/routes/forms/submission.py:554
 msgid "This form is currently inactive."
 msgstr "هذا النموذج غير نشط حاليا."
 
@@ -25572,7 +25707,7 @@ msgid ""
 "This functionality is only available when working with actual assignments."
 msgstr "هذه الوظيفة متوفرة فقط عند العمل مع مهام فعلية."
 
-#: app/templates/admin/api_keys/details.html:54
+#: app/templates/admin/api_keys/details.html:55
 msgid ""
 "This generates new key material immediately. The current key becomes invalid"
 " the moment you confirm."
@@ -25684,6 +25819,12 @@ msgstr "هنا يمكنك الوصول إلى بيانات بلدك وتقديم
 msgid "This item has %(count)s saved data entries."
 msgstr "%(count)s وقد وفر هذا البند قيود البيانات."
 
+#: app/templates/admin/api_keys/_access_summary.html:6
+msgid ""
+"This key has no valid permissions, so every request with it is refused. Edit"
+" the key to grant permissions."
+msgstr ""
+
 #: app/templates/admin/api_management.html:672
 msgid ""
 "This key is kept only in your browser session (session storage) to help "
@@ -25691,6 +25832,24 @@ msgid ""
 msgstr ""
 "يتم الاحتفاظ بهذا المفتاح فقط في جلسة المتصفح (تخزين الجلسة) للمساعدة في "
 "بناء عناوين URL. لا يتم عرضها بواسطة الخادم."
+
+#: app/templates/admin/api_keys/_access_summary.html:45
+msgid ""
+"This key may also be sent in the URL (?api_key=...). Prefer the "
+"Authorization header."
+msgstr ""
+
+#: app/templates/admin/api_keys/_permissions_fields.html:17
+msgid ""
+"This key was created before permissions existed and keeps unrestricted "
+"access to every key-protected endpoint, including user names and email "
+"addresses. Untick the option below and choose only what this client needs. "
+"If a lower-privilege key is enough, rotate to a new key and revoke this one."
+msgstr ""
+
+#: app/templates/admin/api_keys/_permissions_fields.html:125
+msgid "This key will be able to read sensitive or personal data"
+msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:1535
 msgid ""
@@ -25756,12 +25915,12 @@ msgid ""
 msgstr ""
 "تمت الموافقة على هذا الطلب، لكن وصولك إلى هذا البلد قد أزال من قبل مدير."
 
-#: app/routes/auth.py:1466 app/routes/auth.py:1474
+#: app/routes/auth.py:1518 app/routes/auth.py:1526
 msgid "This reset link is invalid or has expired."
 msgstr "رابط إعادة التعيين هذا غير صالح أو منتهي الصلاحية."
 
 #: app/templates/admin/api_management.html:529
-#: app/templates/admin/api_management.html:1789
+#: app/templates/admin/api_management.html:1849
 msgid ""
 "This route applies request throttling (for example a maximum number of "
 "requests per minute)."
@@ -25998,14 +26157,14 @@ msgstr "علامة على"
 msgid "Tier"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:334
+#: app/routes/admin/utilities/translations.py:335
 msgid "Tier must be Must or Preferred."
 msgstr ""
 
 #: app/templates/admin/ai/_trace_card.html:419
 #: app/templates/admin/ai/conversation_traces.html:222
 #: app/templates/admin/ai/reasoning_traces.html:430
-#: app/templates/admin/api_keys/details.html:183
+#: app/templates/admin/api_keys/details.html:184
 #: app/templates/admin/security/alerts.html:24
 #: app/templates/admin/security/dashboard.html:161
 #: app/templates/admin/security/dashboard.html:246
@@ -26149,7 +26308,7 @@ msgstr "التعريف بالأقسام"
 msgid "Toggle sidebar"
 msgstr "تبديل الشريط الجانبي"
 
-#: app/routes/auth.py:382
+#: app/routes/auth.py:380
 msgid "Too many failed login attempts. Please try again later."
 msgstr "محاولات تسجيل الدخول فاشلة كثيرة جدا. يرجى المحاولة مرة أخرى لاحقا."
 
@@ -26191,7 +26350,7 @@ msgstr "الأدوات المستخدمة"
 msgid "Top Countries by Disaggregation Coverage"
 msgstr "أفضل الدول حسب تغطية التفكيك"
 
-#: app/templates/admin/api_keys/details.html:135
+#: app/templates/admin/api_keys/details.html:136
 msgid "Top Endpoints"
 msgstr "نقاط النهاية العليا"
 
@@ -26266,7 +26425,7 @@ msgstr "المجموع المباشر:"
 msgid "Total Events"
 msgstr "مجموع الأحداث"
 
-#: app/templates/admin/api_keys/list.html:36
+#: app/templates/admin/api_keys/list.html:37
 msgid "Total Keys"
 msgstr "الإجمالي فقط"
 
@@ -26286,7 +26445,7 @@ msgstr "إجمالي الإضافات"
 msgid "Total Public Submissions"
 msgstr "تقديم عام"
 
-#: app/templates/admin/api_keys/details.html:88
+#: app/templates/admin/api_keys/details.html:89
 msgid "Total Requests"
 msgstr "إجمالي الطلبات"
 
@@ -26581,12 +26740,12 @@ msgstr "ملخص الترجمة"
 msgid "Translation Validation Error"
 msgstr "الخطأ في تقييم الترجمة التحريرية"
 
-#: app/routes/admin/utilities/translations.py:70
+#: app/routes/admin/utilities/translations.py:71
 #, python-format
 msgid "Translation added successfully for %(language)s."
 msgstr "تمت إضافة الترجمة بنجاح ل %(language)s."
 
-#: app/routes/admin/utilities/translations.py:71
+#: app/routes/admin/utilities/translations.py:72
 #, python-format
 msgid "Translation added successfully for: %(languages)s"
 msgstr "تمت إضافة الترجمة بنجاح ل: %(languages)s"
@@ -26712,12 +26871,12 @@ msgstr "تم إيقاف الترجمة بواسطة المستخدم."
 msgid "Translation updated successfully"
 msgstr "تم تحديث الترجمة بنجاح"
 
-#: app/routes/admin/utilities/translations.py:60
+#: app/routes/admin/utilities/translations.py:61
 #, python-format
 msgid "Translation updated successfully for %(language)s."
 msgstr "تم تحديث الترجمة بنجاح ل %(language)s."
 
-#: app/routes/admin/utilities/translations.py:61
+#: app/routes/admin/utilities/translations.py:62
 #, python-format
 msgid "Translation updated successfully for: %(languages)s"
 msgstr "تم تحديث الترجمة بنجاح ل: %(languages)s"
@@ -26735,11 +26894,11 @@ msgstr "تم تحديث الترجمة بنجاح ل: %(languages)s"
 msgid "Translations"
 msgstr "تراجم"
 
-#: app/routes/admin/utilities/translations.py:1542
+#: app/routes/admin/utilities/translations.py:1545
 msgid "Translations compiled and reloaded successfully!"
 msgstr "تمت إعادة تحميل جميع الإضافات بنجاح"
 
-#: app/routes/admin/utilities/translations.py:1535
+#: app/routes/admin/utilities/translations.py:1538
 msgid ""
 "Translations compiled successfully! Application context refreshed. Please "
 "restart the application via your process manager to apply changes across all"
@@ -26748,11 +26907,11 @@ msgstr ""
 "تم تجميع الترجمات بنجاح! تم تحديث سياق التطبيق. يرجى إعادة بدء الطلب عبر "
 "مدير العمليات الخاص بك لتطبيق التغييرات على جميع الموظفين."
 
-#: app/routes/admin/utilities/translations.py:1523
+#: app/routes/admin/utilities/translations.py:1526
 msgid "Translations compiled successfully! Application restart triggered."
 msgstr "تم تجميع الترجمات بنجاح! تم تفعيل إعادة تشغيل التطبيق."
 
-#: app/routes/admin/utilities/translations.py:1540
+#: app/routes/admin/utilities/translations.py:1543
 msgid ""
 "Translations compiled successfully! However, automatic restart failed. "
 "Please restart the application manually."
@@ -26760,14 +26919,14 @@ msgstr ""
 "تم تجميع الترجمات بنجاح! ومع ذلك، فشل إعادة التشغيل التلقائية. يرجى إعادة "
 "تشغيل التطبيق يدويا."
 
-#: app/routes/admin/utilities/translations.py:1525
+#: app/routes/admin/utilities/translations.py:1528
 msgid ""
 "Translations compiled successfully! Please restart the application manually "
 "to apply changes."
 msgstr ""
 "تم تجميع الترجمات بنجاح! يرجى إعادة تشغيل التطبيق يدويا لتطبيق التغييرات."
 
-#: app/routes/admin/utilities/translations.py:1538
+#: app/routes/admin/utilities/translations.py:1541
 msgid ""
 "Translations compiled successfully! Please restart the application via your "
 "process manager to apply changes."
@@ -26775,11 +26934,11 @@ msgstr ""
 "تم تجميع الترجمات بنجاح! يرجى إعادة بدء الطلب عبر مدير العمليات لتطبيق "
 "التغييرات."
 
-#: app/routes/admin/utilities/translations.py:1665
+#: app/routes/admin/utilities/translations.py:1668
 msgid "Translations extracted and updated successfully!"
 msgstr "تمت إعادة تحميل جميع الإضافات بنجاح"
 
-#: app/routes/admin/utilities/translations.py:1559
+#: app/routes/admin/utilities/translations.py:1562
 #: app/routes/main/views.py:115
 msgid "Translations reloaded successfully!"
 msgstr "تمت إعادة تحميل جميع الإضافات بنجاح"
@@ -26844,8 +27003,8 @@ msgstr "طريقتان للمصادقة:"
 msgid "Two thirds (8/12)"
 msgstr "ثلثان (8/12)"
 
-#: app/templates/admin/api_management.html:1144
-#: app/templates/admin/api_management.html:1150
+#: app/templates/admin/api_management.html:1146
+#: app/templates/admin/api_management.html:1152
 msgid "Two-letter locale code for localization"
 msgstr "رمز الموقع المكون من حرفين للتوطين"
 
@@ -26895,7 +27054,7 @@ msgstr ""
 msgid "Type details"
 msgstr "تفاصيل النوع"
 
-#: app/routes/admin/communication.py:292
+#: app/routes/admin/communication.py:293
 #: app/templates/admin/communication/registry.html:61
 msgid "Type key"
 msgstr "مفتاح النوع"
@@ -27052,7 +27211,7 @@ msgstr ""
 msgid "Under Maintenance"
 msgstr ""
 
-#: app/services/ai/chat/engine.py:1067
+#: app/services/ai/chat/engine.py:1071
 msgid "Understanding your question…"
 msgstr "فهمت سؤالك..."
 
@@ -27182,7 +27341,7 @@ msgstr "وحدات"
 #: app/templates/admin/analytics/_user_detail_partial.html:358
 #: app/templates/admin/analytics/dashboard.html:31
 #: app/templates/admin/analytics/login_logs.html:140
-#: app/templates/admin/api_management.html:1767
+#: app/templates/admin/api_management.html:1827
 #: app/templates/admin/security/dashboard.html:283
 #: app/templates/admin/security/event_detail.html:37
 #: app/templates/admin/templates/new_template.html:267
@@ -27246,7 +27405,7 @@ msgstr "قالب غير معروف"
 msgid "Unknown User"
 msgstr "مستخدم غير معروف"
 
-#: app/routes/admin/utilities/translations.py:1677
+#: app/routes/admin/utilities/translations.py:1680
 #: app/templates/admin/documents/documents.html:1025
 #: app/templates/admin/documents/documents.html:1065
 #: app/templates/admin/indicator_bank/indicator_bank.html:268
@@ -27265,8 +27424,8 @@ msgstr "خطأ غير معروف أثناء استيراد إكسل"
 msgid "Unknown user"
 msgstr "مستخدم غير معروف"
 
-#: app/routes/admin/utilities/translations.py:511
-#: app/routes/admin/utilities/translations.py:957
+#: app/routes/admin/utilities/translations.py:512
+#: app/routes/admin/utilities/translations.py:960
 #, python-format
 msgid "Unknown/disabled language: %(lang)s"
 msgstr "اللغة غير المعروفة/الغير معروفة: %(lang)s"
@@ -27753,7 +27912,7 @@ msgstr ""
 "استخدم هذا الزر لاستيراد البيانات من Excel أو لتصدير قالب. هذا مفيد لإدخال "
 "البيانات الجماعية أو العمل خارج الإنترنت."
 
-#: app/templates/admin/api_keys/create_success.html:75
+#: app/templates/admin/api_keys/create_success.html:81
 msgid "Use this key in the Authorization header: Bearer YOUR_KEY"
 msgstr "استخدم هذا المفتاح في رأس التفويض: حامل YOUR_KEY"
 
@@ -27858,7 +28017,7 @@ msgstr "دليل المستخدم"
 msgid "User Guides"
 msgstr "دليل المستعملين"
 
-#: app/templates/admin/api_management.html:1773
+#: app/templates/admin/api_management.html:1833
 msgid "User JWT"
 msgstr "المستخدم JWT"
 
@@ -27933,7 +28092,7 @@ msgstr ""
 msgid "User not found"
 msgstr "لم يتم العثور على المستخدم"
 
-#: app/routes/auth.py:310
+#: app/routes/auth.py:308
 msgid "User not found."
 msgstr "المستخدم غير موجود."
 
@@ -27945,12 +28104,12 @@ msgstr "ملاحظة المستخدم"
 msgid "User rating"
 msgstr "تقييم المستخدم"
 
-#: app/services/platform/user_analytics_service.py:308
+#: app/services/platform/user_analytics_service.py:277
 #, python-format
 msgid "User-Agent contains an automation-related keyword: \"%(keyword)s\"."
 msgstr "يحتوي User-Agent على كلمة مفتاحية متعلقة بأتمتة: \"%(keyword)s\"."
 
-#: app/services/platform/user_analytics_service.py:322
+#: app/services/platform/user_analytics_service.py:291
 msgid ""
 "User-Agent does not include typical browser tokens (Mozilla, WebKit, Chrome,"
 " Safari, Firefox, Edge, etc.)."
@@ -27958,7 +28117,7 @@ msgstr ""
 "لا يشمل User-Agent رموز المتصفح التقليدية (مثل Mozilla، WebKit، Chrome، "
 "Safari، Firefox، Edge، إلخ)."
 
-#: app/services/platform/user_analytics_service.py:314
+#: app/services/platform/user_analytics_service.py:283
 msgid ""
 "User-Agent is very short (under 10 characters), which often indicates an "
 "automated client."
@@ -28037,7 +28196,7 @@ msgid "VMS (Virtual Memory)"
 msgstr "VMS (الذاكرة الافتراضية)"
 
 #: app/templates/admin/api_management.html:513
-#: app/templates/admin/api_management.html:1782
+#: app/templates/admin/api_management.html:1842
 msgid ""
 "Valid API key (Bearer) or an authenticated Backoffice session, depending on "
 "the client. Pagination and response shape may differ by mode."
@@ -28045,7 +28204,7 @@ msgstr ""
 "مفتاح API صالح (حامل) أو جلسة Backoffice مصادقة، حسب العميل. قد يختلف "
 "الترقيم وشكل الاستجابة حسب الوضع."
 
-#: app/templates/admin/templates/kobo_data_import.html:1159
+#: app/templates/admin/templates/kobo_data_import.html:1157
 msgid "Valid KoBo data export"
 msgstr "تصدير بيانات KoBo الصالح"
 
@@ -28080,7 +28239,7 @@ msgstr "تم التحقق منه"
 msgid "Validated now:"
 msgstr "تم التحقق منه الآن:"
 
-#: app/templates/admin/templates/kobo_data_import.html:1155
+#: app/templates/admin/templates/kobo_data_import.html:1153
 #: app/templates/admin/templates/new_template.html:1129
 #: app/templates/forms/form_builder/form_builder.html:1156
 msgid "Validating file…"
@@ -28150,7 +28309,7 @@ msgstr "فشل التحقق. يرجى مراجعة النموذج."
 msgid "Validation failed. Please choose a different file."
 msgstr "فشل التحقق. يرجى اختيار ملف مختلف."
 
-#: app/templates/admin/templates/kobo_data_import.html:1156
+#: app/templates/admin/templates/kobo_data_import.html:1154
 #: app/templates/admin/templates/new_template.html:1130
 #: app/templates/forms/form_builder/form_builder.html:1157
 msgid "Validation failed. Please fix the file and try again."
@@ -28276,7 +28435,7 @@ msgstr "أشبال ناقلات"
 msgid "Vector only"
 msgstr "ناقل فقط"
 
-#: app/templates/admin/monitoring/system_monitoring.html:211
+#: app/templates/admin/monitoring/system_monitoring.html:213
 msgid "Verbose"
 msgstr "الجرعة"
 
@@ -28427,7 +28586,7 @@ msgstr "عرض السجلات التفصيلية"
 #: app/templates/admin/analytics/audit_trail.html:456
 #: app/templates/admin/analytics/dashboard.html:143
 #: app/templates/admin/analytics/dashboard.html:258
-#: app/templates/admin/api_keys/list.html:160
+#: app/templates/admin/api_keys/list.html:165
 #: app/templates/admin/communication/center.html:198
 #: app/templates/admin/plugin_management.html:210
 msgid "View Details"
@@ -28642,7 +28801,7 @@ msgstr ""
 "ساعة الحائط من تسجيل الدخول إلى إغلاق الجلسة، بما في ذلك الخمول بعد آخر نشاط"
 " حتى انتهاء الوقت أو تسجيل الخروج."
 
-#: app/templates/admin/monitoring/system_monitoring.html:209
+#: app/templates/admin/monitoring/system_monitoring.html:211
 #: app/templates/admin/validation_questions.html:140
 #: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:21
 msgid "Warning"
@@ -28662,7 +28821,7 @@ msgstr "هل أحذف هذه النسخة؟ لا يمكن التراجع عن ه
 msgid "Warning: This action cannot be undone!"
 msgstr "هل أحذف هذه النسخة؟ لا يمكن التراجع عن هذا."
 
-#: app/routes/admin/utilities/translations.py:221
+#: app/routes/admin/utilities/translations.py:222
 msgid ""
 "Warning: polib package not available. Translation file management will be "
 "limited. Install with: pip install polib"
@@ -28697,25 +28856,25 @@ msgid ""
 "launch preparations are complete — thank you for your patience."
 msgstr ""
 
-#: app/routes/auth.py:1433
+#: app/routes/auth.py:1485
 msgid ""
 "We could not process the reset request at this time. Please try again later."
 msgstr ""
 "لم نتمكن من معالجة طلب إعادة الضبط في هذا الوقت. يرجى المحاولة مرة أخرى "
 "لاحقا."
 
-#: app/routes/auth.py:902
+#: app/routes/auth.py:943
 msgid "We could not retrieve your email from Azure."
 msgstr "لم نتمكن من استرجاع بريدك الإلكتروني من Azure."
 
-#: app/routes/auth.py:1437
+#: app/routes/auth.py:1489
 msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
 "خطأ: لم أتمكن من استخراج معرفات المؤشرات. يرجى المحاولة مرة أخرى أو التواصل "
 "مع الدعم."
 
-#: app/error_handlers.py:93
+#: app/error_handlers.py:194
 msgid "We could not switch your selection. Please try again."
 msgstr ""
 
@@ -28792,8 +28951,16 @@ msgid ""
 msgstr ""
 "مرحبا بكم في نموذج إدخال البيانات! سترشدك هذه الجولة عبر الميزات الرئيسية."
 
+#: app/templates/admin/api_keys/_permissions_fields.html:5
+msgid "What can this key do?"
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:156
 msgid "What is completion?"
+msgstr ""
+
+#: app/templates/admin/api_keys/create_success.html:66
+msgid "What this key can do"
 msgstr ""
 
 #: app/templates/admin/plugin_management.html:256
@@ -28997,7 +29164,7 @@ msgstr "تدفقات العمل"
 msgid "Working Offline"
 msgstr "العمل خارج الإنترنت"
 
-#: app/services/ai/agent/executor.py:1088
+#: app/services/ai/agent/executor.py:1090
 msgid "Working on your form…"
 msgstr ""
 
@@ -29021,10 +29188,10 @@ msgstr "خريطة العالم ملونة حسب حالة تقديم FDRS"
 msgid "Wrong password / unknown account"
 msgstr "كلمة مرور خاطئة / حساب غير معروف"
 
-#: app/templates/admin/api_management.html:1102
-#: app/templates/admin/api_management.html:1103
-#: app/templates/admin/api_management.html:1120
-#: app/templates/admin/api_management.html:1121
+#: app/templates/admin/api_management.html:1104
+#: app/templates/admin/api_management.html:1105
+#: app/templates/admin/api_management.html:1122
+#: app/templates/admin/api_management.html:1123
 msgid "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 msgstr "ييي-مم-دد أو يي-مم-دثث:مم:إس إس"
 
@@ -29057,7 +29224,7 @@ msgstr "السنوات"
 msgid "Yellow"
 msgstr "الأصفر"
 
-#: app/routes/admin/communication.py:307 app/routes/main/helpers.py:361
+#: app/routes/admin/communication.py:308 app/routes/main/helpers.py:361
 #: app/templates/admin/ai/review_detail.html:124
 #: app/templates/admin/analytics/audit_trail.html:333
 #: app/templates/admin/analytics/import_change_log.html:59
@@ -29104,7 +29271,7 @@ msgstr "نعم"
 msgid "Yes or No answer."
 msgstr "إجابة نعم أو لا."
 
-#: app/templates/admin/api_keys/details.html:72
+#: app/templates/admin/api_keys/details.html:73
 msgid "Yes, rotate key"
 msgstr "نعم، تدوير المفتاح"
 
@@ -29113,7 +29280,7 @@ msgstr "نعم، تدوير المفتاح"
 msgid "Yes/No"
 msgstr "نعم/لا"
 
-#: app/routes/main/assignments.py:589
+#: app/routes/main/assignments.py:652
 #, python-format
 msgid "You already have a pending request for: %(country)s"
 msgstr "لديك بالفعل طلب معلق %(country)s"
@@ -29123,17 +29290,17 @@ msgstr "لديك بالفعل طلب معلق %(country)s"
 msgid "You already have access"
 msgstr "لديك بالفعل إمكانية الوصول"
 
-#: app/routes/main/assignments.py:597
+#: app/routes/main/assignments.py:660
 #, python-format
 msgid "You already have access to: %(countries)s"
 msgstr "لديك بالفعل الوصول إلى: %(countries)s"
 
-#: app/routes/main/assignments.py:595
+#: app/routes/main/assignments.py:658
 #, python-format
 msgid "You already have access to: %(country)s"
 msgstr "لديك بالفعل الوصول إلى: %(country)s"
 
-#: app/routes/main/assignments.py:591
+#: app/routes/main/assignments.py:654
 #, python-format
 msgid "You already have pending requests for: %(countries)s"
 msgstr "لديك بالفعل طلبات معلقة: %(countries)s"
@@ -29203,7 +29370,7 @@ msgstr ""
 "يمكنك إدخال قيمة أو استخدام متغير قالب مثل [variable_name]. بالنسبة للمؤشرات"
 " المفصولة، ينطبق هذا فقط على الوضع الكلي."
 
-#: app/routes/main/assignments.py:440
+#: app/routes/main/assignments.py:503
 #: app/templates/core/dashboard/_access_requests.html:122
 #: app/templates/core/dashboard/_access_requests.html:278
 msgid ""
@@ -29259,19 +29426,19 @@ msgstr "ليس لديك إذن بتحرير الترجمات لهذه اللغة
 msgid "You do not have permission to import indicators."
 msgstr "ليس لديك إذن لاستيراد المؤشرات."
 
-#: app/routes/main/assignments.py:184
+#: app/routes/main/assignments.py:205 app/routes/main/assignments.py:226
 msgid "You do not have permission to reopen this assignment."
 msgstr ""
 
-#: app/routes/main/assignments.py:360
+#: app/routes/main/assignments.py:413 app/routes/main/assignments.py:430
 msgid "You do not have permission to return this assignment for revision."
 msgstr "ليس لديك إذن بإعادة هذا التعيين للمراجعة."
 
-#: app/routes/main/assignments.py:246
+#: app/routes/main/assignments.py:279 app/routes/main/assignments.py:300
 msgid "You do not have permission to return this page for revision."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1189
+#: app/routes/admin/assignment_management.py:1190
 msgid "You do not have permission to update assignment details."
 msgstr ""
 
@@ -29330,7 +29497,7 @@ msgstr "لقد انتهيت من كل شيء!"
 msgid "You're here"
 msgstr "أنت هنا"
 
-#: app/templates/admin/api_keys/create_success.html:28
+#: app/templates/admin/api_keys/create_success.html:29
 msgid ""
 "Your API key has been created. Please copy it now - it will not be shown "
 "again."
@@ -29347,12 +29514,12 @@ msgstr "طلبات الوصول الخاصة بك"
 msgid "Your Responsibilities"
 msgstr "مسؤولياتك"
 
-#: app/routes/main/assignments.py:575
+#: app/routes/main/assignments.py:638
 #, python-format
 msgid "Your access requests for %(count)d countries have been approved."
 msgstr "طلبات الوصول الخاصة بك إلى دول IFRC تم الموافقة عليها. %(count)d"
 
-#: app/routes/main/assignments.py:579
+#: app/routes/main/assignments.py:642
 #, python-format
 msgid ""
 "Your access requests for %(count)d countries have been submitted. An admin "
@@ -29360,13 +29527,13 @@ msgid ""
 msgstr ""
 "%(count)d لقد تم تقديم طلبات دخولك إلى البلدان سيراجعهم أحد الحكام قريباً."
 
-#: app/routes/auth.py:1367
+#: app/routes/auth.py:1415
 msgid ""
 "Your account has been created. Your country access request is pending admin "
 "approval."
 msgstr "تم إنشاء حسابك. طلب الوصول إلى بلدك ينتظر موافقة المسؤول."
 
-#: app/routes/auth.py:413 app/routes/auth.py:999
+#: app/routes/auth.py:416 app/routes/auth.py:1040
 msgid ""
 "Your account is deactivated. Please contact an administrator to reactivate "
 "it."
@@ -29384,7 +29551,7 @@ msgid ""
 "under review."
 msgstr "حسابك غير مرتبط بدولة بعد. لديك طلبات معلقة قيد المراجعة."
 
-#: app/routes/auth.py:1558
+#: app/routes/auth.py:1610
 msgid "Your account settings have been updated successfully."
 msgstr "تم تحديث إعدادات حسابك بنجاح."
 
@@ -29392,11 +29559,11 @@ msgstr "تم تحديث إعدادات حسابك بنجاح."
 msgid "Your answer…"
 msgstr "إجابتك..."
 
-#: app/routes/main/assignments.py:573
+#: app/routes/main/assignments.py:636
 msgid "Your country access request has been approved. You now have access."
 msgstr "تمت الموافقة على طلب الوصول إلى بلدك. لديك الآن حق الوصول."
 
-#: app/routes/main/assignments.py:577
+#: app/routes/main/assignments.py:640
 msgid ""
 "Your country access request has been submitted. An admin will review it "
 "shortly."
@@ -29420,7 +29587,7 @@ msgstr ""
 "(مثل OpenAI، Gemini، Azure) لتوليد ردود. نستخدم تتبع النظام والقياس عن بعد "
 "لتحسين المساعد."
 
-#: app/routes/auth.py:1519
+#: app/routes/auth.py:1571
 msgid "Your password has been reset. You can now log in."
 msgstr "تم إعادة تعيين كلمة المرور الخاصة بك. يمكنك الآن تسجيل الدخول."
 
@@ -29433,12 +29600,12 @@ msgstr ""
 "ملفك الشخصي يفتقد مسمى وظيفي. إضافة هذا الاسم تساعد الإداريين ونقاط اتصال "
 "على التعرف عليك. يمكنك تحديث هذا في أي وقت في إعدادات حسابك."
 
-#: app/routes/auth.py:336
+#: app/routes/auth.py:334
 #: app/templates/admin/user_management/user_form.html:806
 msgid "Your session has expired."
 msgstr "انتهت جلستك."
 
-#: app/error_handlers.py:96
+#: app/error_handlers.py:197
 msgid ""
 "Your session needed a refresh, so your last submission was not saved. Please"
 " try again."
@@ -29575,7 +29742,7 @@ msgstr "مكاتب العنقود"
 msgid "clusters"
 msgstr "مستخدمين"
 
-#: app/templates/admin/templates/kobo_data_import.html:1163
+#: app/templates/admin/templates/kobo_data_import.html:1161
 #: app/templates/components/_builder_items.html:100
 #: app/templates/forms/form_builder/partials/_sections_container.html:500
 msgid "columns"
@@ -29635,7 +29802,7 @@ msgstr "تنكر"
 msgid "departments"
 msgstr "مشاركين"
 
-#: app/routes/admin/communication.py:278
+#: app/routes/admin/communication.py:279
 msgid "description"
 msgstr "الوصف"
 
@@ -29879,7 +30046,7 @@ msgstr "جيد"
 msgid "granted directly"
 msgstr "يمنح مباشرة"
 
-#: app/routes/admin/communication.py:277
+#: app/routes/admin/communication.py:278
 msgid "group"
 msgstr "المجموعة"
 
@@ -29949,7 +30116,7 @@ msgstr "اللغة أو اللغات مترجمة."
 msgid "languages"
 msgstr "لغات"
 
-#: app/templates/admin/api_keys/details.html:176
+#: app/templates/admin/api_keys/details.html:177
 msgid "last 100"
 msgstr "آخر 100"
 
@@ -29969,7 +30136,7 @@ msgstr "المسارات الحية موثقة"
 msgid "local units"
 msgstr "جميع الوحدات"
 
-#: app/templates/admin/monitoring/system_monitoring.html:233
+#: app/templates/admin/monitoring/system_monitoring.html:235
 msgid "log entries"
 msgstr "بلدان"
 
@@ -30039,12 +30206,12 @@ msgstr "المزيد من الصفوف"
 msgid "more sources"
 msgstr "مصادر إضافية"
 
-#: app/templates/admin/api_keys/details.html:187
+#: app/templates/admin/api_keys/details.html:188
 msgid "ms"
 msgstr "الماستر"
 
-#: app/routes/admin/utilities/translations.py:1217
-#: app/routes/admin/utilities/translations.py:1400
+#: app/routes/admin/utilities/translations.py:1220
+#: app/routes/admin/utilities/translations.py:1403
 #: app/routes/translation_review/__init__.py:109
 #: app/routes/translation_review/__init__.py:163
 msgid "msgid is required"
@@ -30179,6 +30346,7 @@ msgstr ""
 msgid "periods"
 msgstr "الفترات"
 
+#: app/templates/admin/api_keys/_access_summary.html:16
 #: app/templates/admin/rbac/permissions.html:29
 msgid "permissions"
 msgstr "إذن"
@@ -30192,11 +30360,11 @@ msgstr ""
 "منصة. يمكنه الإجابة على أسئلة حول المؤشرات، والدول، والتعيينات، والبحث في "
 "الوثائق المرفوعة. تشرح هذه السياسة الاستخدام المقبول والقيود المهمة."
 
-#: app/routes/admin/utilities/translations.py:500
+#: app/routes/admin/utilities/translations.py:501
 msgid "polib is not installed; export is unavailable."
 msgstr "ولا يتم تركيب البوليب؛ فالصادرات غير متاحة."
 
-#: app/routes/admin/utilities/translations.py:751
+#: app/routes/admin/utilities/translations.py:754
 msgid "polib is not installed; import is unavailable."
 msgstr "ولا يتم تركيب البوليب؛ فالواردات غير متاحة."
 
@@ -30245,7 +30413,7 @@ msgstr "تم رفضه"
 msgid "repeat group data entries"
 msgstr "مجموعة التكرار"
 
-#: app/templates/admin/api_keys/details.html:260
+#: app/templates/admin/api_keys/details.html:275
 msgid "req / min"
 msgstr "المتطلبات / الدقيقة"
 
@@ -30269,7 +30437,7 @@ msgstr "الصفوف المختارة"
 
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:45
 #: app/templates/admin/communication/registry.html:44
-#: app/templates/admin/templates/kobo_data_import.html:1162
+#: app/templates/admin/templates/kobo_data_import.html:1160
 #: app/templates/components/_builder_items.html:100
 #: app/templates/forms/form_builder/partials/_sections_container.html:500
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:333
@@ -30361,7 +30529,7 @@ msgstr ""
 msgid "source(s)"
 msgstr "المصدر (المصدر)"
 
-#: app/templates/admin/api_management.html:1778
+#: app/templates/admin/api_management.html:1838
 msgid "stale"
 msgstr "قديم"
 
@@ -30496,7 +30664,7 @@ msgstr "تراجم"
 msgid "uncertain"
 msgstr "غير مؤكد"
 
-#: app/templates/admin/api_management.html:1777
+#: app/templates/admin/api_management.html:1837
 msgid "undocumented"
 msgstr "غير موثق"
 
@@ -30690,7 +30858,7 @@ msgstr ""
 msgid "⚠ This is the only time the full key will be displayed."
 msgstr "⚠ هذه هي المرة الوحيدة التي سيتم فيها عرض المفتاح الكامل."
 
-#: app/templates/admin/api_keys/create_success.html:61
+#: app/templates/admin/api_keys/create_success.html:62
 msgid "⚠️ Copy this key now - it will not be shown again!"
 msgstr "⚠️ انسخ هذا المفتاح الآن - لن يعرض مرة أخرى!"
 
@@ -30779,3 +30947,28 @@ msgstr "✓"
 #~ "عرض كل إشعار وإرسال بريد إلكتروني مرتبط في النظام، وأرسل رسائل البريد "
 #~ "الإلكتروني ورسائل الدفع عبر الهاتف المحمول إلى مستخدمين أو جهات محددة، "
 #~ "وإدارة حملات التواصل المجدولة أو المسودة."
+
+# [Removed] was: app/templates/admin/api_management.html:730
+#~ msgid ""
+#~ "API key is sent as api_key in the query string. Choose Anonymous when "
+#~ "prompted."
+#~ msgstr ""
+#~ "يتم إرسال مفتاح API ك api_key في سلسلة الاستعلام. اختر المجهول عند الطلب."
+
+# [Removed] was: app/templates/admin/settings/manage_settings.html:463
+#~ msgid ""
+#~ "Formats: PNG, JPEG, GIF, WebP, and SVG for the logo; favicon also accepts "
+#~ "ICO. Maximum 2 MB per file."
+#~ msgstr ""
+#~ "الصيغ: PNG، JPEG، GIF، WebP، وSVG للشعار؛ كما تقبل favicon ICO. الحد الأقصى "
+#~ "2 ميجابايت لكل ملف."
+
+# [Removed] was: app/templates/admin/api_management.html:570
+#~ msgid "Full system access with paginated responses. Use"
+#~ msgstr "وصول كامل للنظام مع ردود مرسومة على الصفحات. الاستخدام"
+
+# [Removed] was: app/templates/admin/api_keys/create_success.html:73
+#~ msgid "Store this key securely - it provides full API access"
+#~ msgstr ""
+#~ "تخزين هذا المفتاح بأمان - فهو يوفر وصولا كاملا إلى واجهة برمجة التطبيقات "
+#~ "(API)"

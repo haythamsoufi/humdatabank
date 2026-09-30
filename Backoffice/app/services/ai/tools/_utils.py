@@ -125,14 +125,15 @@ def log_tool_usage(
     try:
         from app.extensions import db
         from app.models import AIToolUsage
+        from app.services.ai.quality.trace_privacy import redact_text, redact_tool_input, redact_tool_output
 
         usage = AIToolUsage(
             trace_id=int(trace_id),
             tool_name=str(tool_name),
-            tool_input=truncate_json_value(tool_input),
-            tool_output=truncate_json_value(tool_output),
+            tool_input=redact_tool_input(truncate_json_value(tool_input)),
+            tool_output=redact_tool_output(truncate_json_value(tool_output)),
             success=bool(success),
-            error_message=str(error_message)[:4_000] if error_message else None,
+            error_message=redact_text(str(error_message)[:4_000]) if error_message else None,
             execution_time_ms=int(execution_time_ms) if execution_time_ms is not None else None,
             user_id=int(user_id) if user_id else None,
         )
@@ -251,6 +252,8 @@ def resolve_ai_user_context():
         except Exception as exc:
             logger.debug("resolve_ai_user_context: ai_user_role failed: %s", exc)
         is_admin = str(user_role or "").strip().lower() in {"admin", "system_manager"}
+        if not user_id:
+            user_role, is_admin = "public", False
 
     return user_id, user_role, is_admin
 

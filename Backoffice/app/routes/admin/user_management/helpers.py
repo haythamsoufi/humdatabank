@@ -344,6 +344,68 @@ def _get_role_ids_by_code_for_user(user: User) -> dict:
         return {}
 
 
+def _role_ids_blocked_for_actor(role_ids, actor: User) -> set:
+    """
+    Role ids among ``role_ids`` that ``actor`` must not hand out (privilege-escalation guard).
+
+    System Managers may assign anything. Everyone else is blocked from:
+    * roles in ``_RESTRICTED_RBAC_ROLE_CODES``;
+    * ``admin_*`` roles they do not hold themselves;
+    * any other role that bundles an ``admin.*`` permission the actor does not hold
+      (e.g. a custom role), unless the actor already holds that very role.
+    """
+    from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission
+    from app.services.organization.authorization_service import AuthorizationService
+
+    ids = set()
+    for rid in role_ids or []:
+        try:
+            ids.add(int(rid))
+        except (TypeError, ValueError):
+            continue
+    if not ids or AuthorizationService.is_system_manager(actor):
+        return set()
+
+    actor_role_ids_by_code = _get_role_ids_by_code_for_user(actor)
+    actor_role_ids = set(actor_role_ids_by_code.values())
+    actor_admin_role_ids = {rid for code, rid in actor_role_ids_by_code.items() if str(code).startswith("admin_")}
+
+    rows = RbacRole.query.with_entities(RbacRole.id, RbacRole.code).filter(RbacRole.id.in_(ids)).all()
+    code_by_id = {int(rid): str(code) for rid, code in rows if rid and code}
+
+    admin_perm_rows = (
+        db.session.query(RbacRolePermission.role_id, RbacPermission.code)
+        .join(RbacPermission, RbacPermission.id == RbacRolePermission.permission_id)
+        .filter(RbacRolePermission.role_id.in_(ids), RbacPermission.code.like("admin.%"))
+        .all()
+    )
+    admin_codes_by_role = defaultdict(set)
+    for role_id, perm_code in admin_perm_rows:
+        admin_codes_by_role[int(role_id)].add(str(perm_code))
+
+    held_cache = {}
+
+    def _actor_holds(perm_code: str) -> bool:
+        if perm_code not in held_cache:
+            held_cache[perm_code] = AuthorizationService.has_rbac_permission(actor, perm_code)
+        return held_cache[perm_code]
+
+    blocked = set()
+    for rid in ids:
+        code = code_by_id.get(rid, "")
+        if code in _RESTRICTED_RBAC_ROLE_CODES:
+            blocked.add(rid)
+            continue
+        if code.startswith("admin_") and rid not in actor_admin_role_ids:
+            blocked.add(rid)
+            continue
+        if rid in actor_role_ids:
+            continue
+        if any(not _actor_holds(perm_code) for perm_code in admin_codes_by_role.get(rid, ())):
+            blocked.add(rid)
+    return blocked
+
+
 def _filter_requested_admin_roles_for_actor(requested_role_ids, actor: User):
     """
     Enforce: non-system-managers may only assign admin_* roles that they already have.
@@ -365,18 +427,12 @@ def _filter_requested_admin_roles_for_actor(requested_role_ids, actor: User):
     if not cleaned:
         return [], []
 
-    actor_role_ids_by_code = _get_role_ids_by_code_for_user(actor)
-    actor_admin_role_ids = {rid for code, rid in actor_role_ids_by_code.items() if str(code).startswith("admin_")}
-
-    # Resolve requested role codes
-    role_rows = RbacRole.query.with_entities(RbacRole.id, RbacRole.code).filter(RbacRole.id.in_(cleaned)).all()
-    code_by_id = {int(rid): str(code) for rid, code in role_rows if rid and code}
+    blocked = _role_ids_blocked_for_actor(cleaned, actor)
 
     dropped = []
     kept = []
     for rid in cleaned:
-        code = code_by_id.get(int(rid), "")
-        if code.startswith("admin_") and int(rid) not in actor_admin_role_ids:
+        if int(rid) in blocked:
             dropped.append(int(rid))
             continue
         kept.append(int(rid))
@@ -394,9 +450,6 @@ def _filter_role_choices_for_actor(choices, actor: User):
         current_app.logger.debug("RbacRole import failed (_role_choices): %s", e)
         return list(choices or [])
 
-    actor_role_ids_by_code = _get_role_ids_by_code_for_user(actor)
-    actor_admin_role_ids = {rid for code, rid in actor_role_ids_by_code.items() if str(code).startswith("admin_")}
-
     ids = []
     for rid, _label in (choices or []):
         try:
@@ -407,8 +460,7 @@ def _filter_role_choices_for_actor(choices, actor: User):
     if not ids:
         return list(choices or [])
 
-    rows = RbacRole.query.with_entities(RbacRole.id, RbacRole.code).filter(RbacRole.id.in_(ids)).all()
-    code_by_id = {int(rid): str(code) for rid, code in rows if rid and code}
+    blocked = _role_ids_blocked_for_actor(ids, actor)
 
     filtered = []
     for rid, label in (choices or []):
@@ -417,11 +469,98 @@ def _filter_role_choices_for_actor(choices, actor: User):
         except Exception as e:
             current_app.logger.debug("rid_int parse failed: %s", e)
             continue
-        code = code_by_id.get(rid_int, "")
-        if code.startswith("admin_") and rid_int not in actor_admin_role_ids:
+        if rid_int in blocked:
             continue
         filtered.append((rid_int, label))
     return filtered
+
+
+def filter_role_catalog_for_actor(roles, actor: User):
+    """Return the RbacRole rows ``actor`` may hand out (System Managers: all)."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    roles = list(roles or [])
+    if AuthorizationService.is_system_manager(actor):
+        return roles
+    blocked = _role_ids_blocked_for_actor([r.id for r in roles], actor)
+    return [r for r in roles if int(r.id) not in blocked]
+
+
+def entity_grant_target_denial(actor: User, target: User) -> str | None:
+    """
+    Reason ``actor`` may not manage entity grants of ``target`` at all, else None.
+
+    Mirrors the edit_user / api_user_update rules: only a System Manager may change their own
+    grants or those of another admin.
+    """
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if AuthorizationService.is_system_manager(actor):
+        return None
+    if int(getattr(actor, "id", 0) or 0) == int(getattr(target, "id", 0) or 0):
+        return "You cannot change your own entity access."
+    if AuthorizationService.is_admin(target):
+        return "Only a System Manager can change entity access of an admin user."
+    return None
+
+
+def entity_grant_scope_denial(actor: User, target: User, entity_type: str, entity_id: int) -> str | None:
+    """Reason ``actor`` may not grant/revoke this specific entity for ``target``, else None."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    reason = entity_grant_target_denial(actor, target)
+    if reason:
+        return reason
+    if not AuthorizationService.can_delegate_entity_access(actor, entity_type, entity_id):
+        return "You can only grant or revoke access to entities within your own scope."
+    return None
+
+
+def apply_scoped_entity_replace(actor: User, target: User, entity_type: str, desired_ids) -> dict:
+    """
+    Replace ``target``'s UserEntityPermission rows of one type with ``desired_ids``, but only
+    touch rows that ``actor`` may delegate. Out-of-scope existing rows are kept and
+    out-of-scope additions are skipped.
+
+    Returns ``{"final_ids": [...], "skipped_add": [...], "skipped_remove": [...]}``.
+    """
+    from app.services.organization.authorization_service import AuthorizationService
+
+    desired = set()
+    for value in desired_ids or []:
+        try:
+            desired.add(int(value))
+        except (TypeError, ValueError):
+            continue
+
+    existing_rows = UserEntityPermission.query.filter_by(user_id=target.id, entity_type=entity_type).all()
+    existing = {int(r.entity_id): r for r in existing_rows}
+
+    def _allowed(entity_id: int) -> bool:
+        return AuthorizationService.can_delegate_entity_access(actor, entity_type, entity_id)
+
+    skipped_add, skipped_remove = [], []
+    for entity_id, row in existing.items():
+        if entity_id in desired:
+            continue
+        if _allowed(entity_id):
+            db.session.delete(row)
+        else:
+            skipped_remove.append(entity_id)
+    for entity_id in sorted(desired - set(existing)):
+        if _allowed(entity_id):
+            db.session.add(UserEntityPermission(user_id=target.id, entity_type=entity_type, entity_id=entity_id))
+        else:
+            skipped_add.append(entity_id)
+
+    final_ids = (set(existing) - {e for e in existing if e not in desired and e not in skipped_remove}) | (
+        desired - set(skipped_add)
+    )
+    return {
+        "final_ids": sorted(final_ids),
+        "skipped_add": skipped_add,
+        "skipped_remove": skipped_remove,
+    }
 
 
 def _country_access_request_to_dict(req: CountryAccessRequest) -> dict:

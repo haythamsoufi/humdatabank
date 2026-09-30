@@ -1055,7 +1055,9 @@ class AIAgentExecutor:
                     # would have it silently reactivated here, gating in the RBAC-sensitive
                     # form-template write tools it explicitly said were not active.
                     if isinstance(fb_ctx, dict) and fb_ctx.get("enabled", True):
-                        g.ai_form_builder_ctx = {**fb_ctx, "enabled": True}
+                        from app.services.ai.policies.access_policy import trusted_form_builder_context
+
+                        g.ai_form_builder_ctx = trusted_form_builder_context()
                     else:
                         g.ai_form_builder_ctx = None
                 except Exception as e:
@@ -1489,10 +1491,12 @@ class AIAgentExecutor:
                 from app.extensions import db
                 _trace_obj = db.session.get(AIReasoningTrace, trace_id) if trace_id else None
                 if _trace_obj is not None:
+                    from app.services.ai.quality.trace_privacy import redact_text, redact_trace_steps
+
                     if _answer_was_verified:
-                        _trace_obj.final_answer = final_answer_for_trace
+                        _trace_obj.final_answer = redact_text(final_answer_for_trace)
                     if _trace_needs_update:
-                        _trace_obj.steps = steps_for_trace
+                        _trace_obj.steps = redact_trace_steps(steps_for_trace)
                     _trace_obj.output_payloads = output_payloads if output_payloads else None
                     db.session.commit()
             except Exception as _trace_upd_err:

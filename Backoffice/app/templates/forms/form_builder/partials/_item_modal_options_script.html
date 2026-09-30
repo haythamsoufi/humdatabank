@@ -1,0 +1,131 @@
+<script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function() {
+        const questionTypeSelect = document.getElementById('item-question-type-select');
+        const optionsSourceContainer = document.getElementById('options-source-container');
+        const manualOptionsContainer = document.getElementById('item-question-options-container');
+        const calculatedListContainer = document.getElementById('item-question-calculated-list-container');
+        const allowOtherWrapper = document.getElementById('item-question-allow-other-wrapper');
+        const optionsSourceRadios = document.getElementsByName('options_source');
+        // Remember original parent so we can move container back when needed
+        const manualOriginalParent = manualOptionsContainer.parentElement;
+        const calculatedOriginalParent = calculatedListContainer.parentElement;
+        const allowOtherOriginalParent = allowOtherWrapper ? allowOtherWrapper.parentElement : null;
+        const gridContainer = optionsSourceContainer.closest('.modal-grid-container');
+        const rightHalf = gridContainer ? gridContainer.querySelector('.modal-right-half') : null;
+
+        function placeAllowOtherAfter(activeContainer) {
+            if (!allowOtherWrapper || !activeContainer) return;
+            if (activeContainer.nextElementSibling !== allowOtherWrapper) {
+                activeContainer.insertAdjacentElement('afterend', allowOtherWrapper);
+            }
+        }
+
+        function restoreAllowOtherToOriginalParent() {
+            if (!allowOtherWrapper || !allowOtherOriginalParent) return;
+            if (!allowOtherOriginalParent.contains(allowOtherWrapper)) {
+                allowOtherOriginalParent.appendChild(allowOtherWrapper);
+            }
+        }
+
+        function syncRightPanelLayout() {
+            if (window.ItemModal && typeof window.ItemModal.syncRightPanel === 'function') {
+                window.ItemModal.modalElement = window.ItemModal.modalElement || document.getElementById('item-modal');
+                window.ItemModal.syncRightPanel();
+            }
+        }
+
+        // Function to check if question type is choice-based
+        function isChoiceType(type) {
+            return type === 'single_choice' || type === 'multiple_choice';
+        }
+
+        // Function to handle options containers visibility.
+        // Uses Utils.showElement / Utils.hideElement (available as window.Utils)
+        // so that inline style set by those helpers is also cleared/restored,
+        // not just the Tailwind 'hidden' CSS class.
+        function updateOptionsVisibility() {
+            if (!window.Utils) return;
+            const selectedType = questionTypeSelect.value;
+            const isChoice = isChoiceType(selectedType);
+
+            // Show/hide options source section (class-only; no Utils call touches this element)
+            optionsSourceContainer.classList.toggle('hidden', !isChoice);
+
+            // If it's not a choice type, hide both options containers
+            if (!isChoice) {
+                Utils.hideElement(manualOptionsContainer);
+                Utils.hideElement(calculatedListContainer);
+                if (allowOtherWrapper) Utils.hideElement(allowOtherWrapper);
+                restoreAllowOtherToOriginalParent();
+                if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
+                    manualOriginalParent.appendChild(manualOptionsContainer);
+                }
+                if (calculatedOriginalParent && !calculatedOriginalParent.contains(calculatedListContainer)) {
+                    calculatedOriginalParent.appendChild(calculatedListContainer);
+                }
+                syncRightPanelLayout();
+                return;
+            }
+
+            // If it is a choice type, show the appropriate container based on selected source
+            const selectedSource = Array.from(optionsSourceRadios).find(radio => radio.checked)?.value;
+
+            const isManual = selectedSource === 'manual';
+            const isListLibrary = selectedSource === 'calculated';
+
+            if (isListLibrary) {
+                if (rightHalf && !rightHalf.contains(calculatedListContainer)) {
+                    rightHalf.appendChild(calculatedListContainer);
+                }
+                Utils.showElement(calculatedListContainer);
+            } else {
+                Utils.hideElement(calculatedListContainer);
+                if (calculatedOriginalParent && !calculatedOriginalParent.contains(calculatedListContainer)) {
+                    calculatedOriginalParent.appendChild(calculatedListContainer);
+                }
+            }
+
+            if (isManual) {
+                if (rightHalf && !rightHalf.contains(manualOptionsContainer)) {
+                    rightHalf.appendChild(manualOptionsContainer);
+                }
+                Utils.showElement(manualOptionsContainer);
+
+                const optionsList = document.getElementById('item-question-options-list');
+                if (optionsList && optionsList.children.length === 0) {
+                    if (window.addOptionField) {
+                        window.addOptionField(optionsList);
+                    }
+                }
+            } else {
+                Utils.hideElement(manualOptionsContainer);
+                if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
+                    manualOriginalParent.appendChild(manualOptionsContainer);
+                }
+            }
+
+            if (allowOtherWrapper) {
+                Utils.showElement(allowOtherWrapper);
+                const activeContainer = isManual
+                    ? manualOptionsContainer
+                    : (isListLibrary ? calculatedListContainer : null);
+                if (activeContainer) {
+                    placeAllowOtherAfter(activeContainer);
+                }
+            }
+
+            syncRightPanelLayout();
+        }
+
+        // Add event listeners
+        questionTypeSelect.addEventListener('change', updateOptionsVisibility);
+        optionsSourceRadios.forEach(radio => {
+            radio.addEventListener('change', updateOptionsVisibility);
+        });
+
+        window.updateOptionsVisibility = updateOptionsVisibility;
+
+        // Initial visibility check
+        updateOptionsVisibility();
+    });
+</script>

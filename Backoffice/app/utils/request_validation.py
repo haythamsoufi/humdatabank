@@ -102,11 +102,27 @@ def enforce_csrf_json(*, methods: Optional[Iterable[str]] = None):
         )
 
 
+def reject_cross_site_request() -> bool:
+    """Return True when the browser marks this request as cross-site.
+
+    Used by cookie-authenticated beacons that cannot send a CSRF token (presence leave).
+    Same-origin ``sendBeacon`` reports ``same-origin`` or omits the header. A cross-site
+    form or fetch reports ``cross-site`` and is ignored.
+    """
+    site = (request.headers.get("Sec-Fetch-Site") or "").strip().lower()
+    return site == "cross-site"
+
+
 def enforce_api_or_csrf_protection() -> None:
     """
     Require CSRF for browser session requests, or accept ``X-Mobile-Auth`` when it
     matches an active DB ``api_keys`` row or the optional ``MOBILE_APP_API_KEY``
     env value (same plaintext as ``Authorization: Bearer`` for /api/v1).
+
+    Honors ``WTF_CSRF_ENABLED`` the same way Flask-WTF's before-request hook does.
+    ``csrf.protect()`` itself does not, so an explicit call would otherwise reject
+    requests in tests and any process that has turned CSRF off. A presented
+    ``X-Mobile-Auth`` value is still checked when CSRF is disabled.
     """
     from app.services.security.api_authentication import validate_plaintext_db_api_key_for_mobile_auth
 
@@ -122,6 +138,9 @@ def enforce_api_or_csrf_protection() -> None:
             request.path,
         )
         raise Forbidden("Invalid mobile authentication token.")
+
+    if not current_app.config.get("WTF_CSRF_ENABLED", True):
+        return
 
     try:
         csrf.protect()

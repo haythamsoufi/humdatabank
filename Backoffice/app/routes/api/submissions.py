@@ -16,7 +16,7 @@ from app.routes.api import api_bp
 # Import models
 from app.models import FormData, PublicSubmission, AssignedForm
 from app.models.assignments import AssignmentEntityStatus
-from app.utils.auth import api_capability, require_api_key
+from app.utils.auth import api_capability
 from app.services.security.api_key_permissions import DOCUMENTS_READ, SUBMISSIONS_READ
 from app.utils.rate_limiting import api_rate_limit
 from app import db
@@ -320,16 +320,22 @@ def get_submissions():
 
 
 @api_bp.route('/submissions/<int:submission_id>', methods=['GET'])
-@require_api_key(capability=SUBMISSIONS_READ, scope_aware=True)
+@api_capability(SUBMISSIONS_READ, scope_aware=True)
 @api_rate_limit()
 def get_submission_details(submission_id):
     """
     API endpoint to retrieve details and data for a specific submission.
 
-    Requires ``submissions:read``. A data-scoped key only sees submissions inside its
-    template/country scope (others return 404). Public-submitter contact fields need
-    ``users:read``; the ``documents`` list needs ``documents:read``.
+    Authentication matches ``GET /submissions``: API key with ``submissions:read``,
+    HTTP Basic, or a session. A data-scoped key or a country-scoped session only sees
+    submissions inside that scope (others return 404). Public-submitter contact fields
+    need ``users:read`` on an API key; the ``documents`` list needs ``documents:read``.
     """
+    auth_result = authenticate_api_request()
+    if hasattr(auth_result, 'status_code'):
+        return auth_result
+    elevated_access, auth_user, api_key_record = auth_result
+
     assigned_submission_status = AssignmentEntityStatus.query.get(submission_id)
     submission = None
     submission_type = None
@@ -346,14 +352,24 @@ def get_submission_details(submission_id):
     if not submission:
         return api_error('Submission not found', 404)
 
-    key_scope = get_api_key_data_scope()
+    scope_template_id = submission.assigned_form.template_id if submission.assigned_form else None
+    if submission_type == 'assigned':
+        scope_country_id = submission.country.id if submission.country else None
+    else:
+        scope_country_id = submission.country_id
+
+    key_scope = get_api_key_data_scope() if api_key_record is not None else None
     if key_scope is not None:
-        scope_template_id = submission.assigned_form.template_id if submission.assigned_form else None
-        if submission_type == 'assigned':
-            scope_country_id = submission.country.id if submission.country else None
-        else:
-            scope_country_id = submission.country_id
         if not api_key_scope_allows(key_scope, scope_template_id, scope_country_id):
+            return api_error('Submission not found', 404)
+    elif not elevated_access and auth_user is not None:
+        allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
+        allowed_country_ids = _get_user_allowed_country_ids(auth_user)
+        template_ok = scope_template_id in set(allowed_template_ids or [])
+        country_ok = allowed_country_ids is None or (
+            scope_country_id is not None and scope_country_id in allowed_country_ids
+        )
+        if not template_ok or not country_ok:
             return api_error('Submission not found', 404)
 
     include_contacts = api_key_can_read_personal_data()

@@ -1397,6 +1397,12 @@ class DevelopmentConfig(Config):
     AI_TOOL_CACHE_ENABLED = False
 
 class ProductionConfig(Config):
+    # Tokens-in-URL mobile sign-in is off unless an operator opts in. Development
+    # keeps the base default so local builds that predate the code exchange still work.
+    MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK = _parse_bool(
+        os.environ.get("MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK"), default=False
+    )
+
     # DEBUG is inherited from Config base class (automatically False for production)
     # DATABASE_URL must be PostgreSQL. No SQLite fallback.
     SQLALCHEMY_DATABASE_URI = _normalize_database_uri(os.environ.get('DATABASE_URL'))

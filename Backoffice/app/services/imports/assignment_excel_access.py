@@ -55,6 +55,28 @@ def assignment_excel_export_enabled(assigned_form) -> bool:
     )
 
 
+MAX_ASSIGNMENT_EXCEL_BYTES = 10 * 1024 * 1024
+
+
+def assignment_excel_upload_error(excel_file, *, max_bytes: int = MAX_ASSIGNMENT_EXCEL_BYTES) -> str | None:
+    """Return an error message when an assignment Excel upload is empty, not xlsx, or over ``max_bytes``."""
+    if not excel_file or not getattr(excel_file, "filename", ""):
+        return "No Excel file selected."
+    if not excel_file.filename.lower().endswith(".xlsx"):
+        return "Invalid file type. Please upload a .xlsx file."
+    file_size = excel_file.content_length
+    if file_size is None:
+        excel_file.seek(0, 2)
+        file_size = excel_file.tell()
+        excel_file.seek(0)
+    if file_size > max_bytes:
+        limit_mb = max_bytes / (1024 * 1024)
+        return (
+            f"File size ({file_size / (1024 * 1024):.2f}MB) exceeds the maximum allowed size of {limit_mb:.0f}MB."
+        )
+    return None
+
+
 def assignment_excel_import_enabled(assigned_form) -> bool:
     """Return True when the assignment should offer Excel import."""
     if not assigned_form:

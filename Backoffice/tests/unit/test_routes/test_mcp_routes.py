@@ -198,8 +198,17 @@ class TestMcpProxyRequiredMode:
         assert resp.headers.get("WWW-Authenticate", "").startswith("Bearer")
         mock_request.assert_not_called()
 
-    def test_session_user_is_allowed(self, logged_in_client):
-        with patch("app.routes.mcp.requests.request", return_value=_upstream_response()) as mock_request:
+    def test_session_user_without_mcp_permission_is_forbidden(self, logged_in_client):
+        with patch("app.routes.mcp.requests.request") as mock_request:
+            resp = logged_in_client.post("/mcp", json={"jsonrpc": "2.0", "id": 1})
+        assert resp.status_code == 403
+        mock_request.assert_not_called()
+
+    def test_session_user_with_mcp_permission_is_allowed(self, logged_in_client):
+        with patch(
+            "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+            return_value=True,
+        ), patch("app.routes.mcp.requests.request", return_value=_upstream_response()) as mock_request:
             resp = logged_in_client.post("/mcp", json={"jsonrpc": "2.0", "id": 1})
         assert resp.status_code == 200
         mock_request.assert_called_once()

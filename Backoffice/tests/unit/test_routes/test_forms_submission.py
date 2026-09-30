@@ -9,7 +9,7 @@ Covers all routes registered by register_submission_routes:
   - POST     /forms/public-submission/<id>/status
   - GET/POST /forms/debug/public-form-test
   - GET/POST /forms/public/<uuid>/
-  - GET      /forms/public-submission/<id>/success
+  - GET      /forms/public-submission/success/<token>
   - POST     /forms/delete_self_report_assignment/<id>
 
 And the standalone functions:
@@ -796,18 +796,30 @@ class TestFillPublicFormPost:
 # ---------------------------------------------------------------------------
 
 class TestPublicSubmissionSuccess:
-    def test_success_page_renders(self, client):
+    def test_success_page_renders(self, client, app):
+        with app.app_context():
+            from app.services.public.submission_receipt import public_submission_success_token
+            token = public_submission_success_token(1)
         with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
              patch("app.routes.forms.submission.render_template", return_value="<html>success</html>"):
             mock_sub = _make_mock_submission(1)
-            mock_q.get_or_404.return_value = mock_sub
-            resp = client.get("/forms/public-submission/1/success")
+            mock_q.get.return_value = mock_sub
+            resp = client.get(f"/forms/public-submission/success/{token}")
 
         assert resp.status_code == 200
+        mock_q.get.assert_called_once_with(1)
+
+    def test_integer_success_url_is_404(self, client):
+        resp = client.get("/forms/public-submission/1/success")
+        assert resp.status_code == 404
 
     def test_success_page_404_if_not_found(self, client, app):
         with app.app_context():
-            resp = client.get("/forms/public-submission/99999/success")
+            from app.services.public.submission_receipt import public_submission_success_token
+            token = public_submission_success_token(99999)
+        with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q:
+            mock_q.get.return_value = None
+            resp = client.get(f"/forms/public-submission/success/{token}")
         assert resp.status_code == 404
 
 

@@ -267,6 +267,7 @@ class TestGetQuizLeaderboard:
         assert entry["rank"] == 1
         assert entry["name"] == "Alice"
         assert entry["score"] == 100
+        assert "user_id" not in entry
 
     def test_user_without_name_uses_email_prefix(self, client, app):
         """User with name=None falls back to email prefix."""
@@ -282,14 +283,14 @@ class TestGetQuizLeaderboard:
         entry = resp.get_json()["leaderboard"][0]
         assert entry["name"] == "noname"
 
-    def test_default_limit_is_5(self, client, app):
-        """Default limit of 5 is applied when not specified."""
+    def test_default_limit_is_20(self, client, app):
+        """Default limit of 20 matches the mobile leaderboard."""
         q = self._mock_query([])
         with patch(_API_KEY_PATCH, return_value=_FakeKey()), \
              patch("app.routes.api.quiz.User.query", q):
             resp = client.get("/api/v1/quiz/leaderboard", headers=_API_HEADERS)
         assert resp.status_code == 200
-        q.limit.assert_called_with(5)
+        q.limit.assert_called_with(20)
 
     def test_custom_valid_limit(self, client, app):
         """Custom valid limit (1-100) is used."""
@@ -301,22 +302,22 @@ class TestGetQuizLeaderboard:
         q.limit.assert_called_with(10)
 
     def test_limit_zero_resets_to_default(self, client, app):
-        """Limit 0 (< 1) resets to default 5."""
+        """Limit 0 (< 1) resets to the default of 20."""
         q = self._mock_query([])
         with patch(_API_KEY_PATCH, return_value=_FakeKey()), \
              patch("app.routes.api.quiz.User.query", q):
             resp = client.get("/api/v1/quiz/leaderboard?limit=0", headers=_API_HEADERS)
         assert resp.status_code == 200
-        q.limit.assert_called_with(5)
+        q.limit.assert_called_with(20)
 
     def test_limit_over_100_resets_to_default(self, client, app):
-        """Limit > 100 resets to default 5."""
+        """Limit > 100 resets to the default of 20."""
         q = self._mock_query([])
         with patch(_API_KEY_PATCH, return_value=_FakeKey()), \
              patch("app.routes.api.quiz.User.query", q):
             resp = client.get("/api/v1/quiz/leaderboard?limit=999", headers=_API_HEADERS)
         assert resp.status_code == 200
-        q.limit.assert_called_with(5)
+        q.limit.assert_called_with(20)
 
     def test_unauthenticated_returns_401(self, client, app):
         """Request without valid API key returns 401."""

@@ -1,0 +1,506 @@
+                    {# Matrix Fields (Initially Hidden) #}
+                    <div id="item-matrix-fields" class="hidden">
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-matrix-label" class="text-gray-700 text-sm font-semibold">{{ _('Matrix Title') }}</label>
+                                <button type="button" id="matrix-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-matrix-label" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Matrix Title')|forceescape }}">
+                        </div>
+
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" data-enable-variables="true" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional) — supports [assignment_period], etc.')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
+                        </div>
+
+                        {# Matrix table config (rows + columns) — moves to the right column in fill-content mode #}
+                        <div id="matrix-table-config-anchor" class="hidden" aria-hidden="true"></div>
+                        <div id="matrix-table-config-panel">
+                        <div id="matrix-config-rows-section" class="mb-4 border-t border-gray-200 pt-4">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-4">{{ _('Table rows') }}</h4>
+
+                            {# Row Mode Selection #}
+                            <div class="mb-4">
+                                <div class="flex items-center gap-2 flex-wrap mb-2">
+                                    <label id="matrix-row-mode-label" class="text-gray-700 text-sm font-semibold">{{ _('Row Configuration Mode') }}</label>
+                                    {{ field_help(_('Manual: Define fixed row headers. Advanced: Allow dynamic rows from list library during data entry.')) }}
+                                </div>
+                                <div class="flex items-center space-x-4" role="radiogroup" aria-labelledby="matrix-row-mode-label">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="matrix_row_mode" value="manual" class="form-radio h-4 w-4 text-orange-600" checked>
+                                        <span class="ml-2 text-sm text-gray-700">{{ _('Manual') }}</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="matrix_row_mode" value="list_library" class="form-radio h-4 w-4 text-orange-600">
+                                        <span class="ml-2 text-sm text-gray-700">{{ _('Advanced (List Library)') }}</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="matrix_row_mode" value="hybrid" class="form-radio h-4 w-4 text-orange-600">
+                                        <span class="ml-2 text-sm text-gray-700">{{ _('Hybrid (Fixed + List Library)') }}</span>
+                                        {{ field_help(_('Renders pre-defined static rows at the top, plus a search-and-add interface for list library rows below.')) }}
+                                    </label>
+                                </div>
+                            </div>
+
+                            {# Hybrid mode tab bar — shown by JS when row_mode=hybrid is active #}
+                            <div id="matrix-hybrid-tab-bar" class="hidden -mb-px mt-3 flex border-b border-gray-200">
+                                <button type="button" id="matrix-hybrid-tab-fixed"
+                                        class="matrix-hybrid-tab flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-orange-600 border-b-2 border-orange-500 bg-white focus:outline-none"
+                                        data-target="matrix-manual-rows-section">
+                                    <i class="fas fa-list w-3.5 h-3.5"></i>
+                                    {{ _('Fixed Rows') }}
+                                </button>
+                                <button type="button" id="matrix-hybrid-tab-list"
+                                        class="matrix-hybrid-tab flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent bg-transparent focus:outline-none"
+                                        data-target="matrix-list-library-section">
+                                    <i class="fas fa-database w-3.5 h-3.5"></i>
+                                    {{ _('List Config') }}
+                                </button>
+                            </div>
+
+                            {# Manual Row Headers #}
+                            <div id="matrix-manual-rows-section" class="mb-4">
+                                <div class="flex items-center gap-2 flex-wrap mb-2">
+                                    <label class="text-gray-700 text-sm font-semibold">{{ _('Row Headers') }}</label>
+                                    <button type="button" id="matrix-row-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage row header translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
+                                        <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div id="matrix-rows-container" class="space-y-2">
+                                    <!-- Row headers will be added here dynamically -->
+                                </div>
+                                <button type="button" id="add-matrix-row-btn" class="text-sm font-medium text-green-700 hover:text-green-900 focus:outline-none focus:underline inline-flex items-center mt-2">
+                                    <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                                    {{ _('Add Row') }}
+                                </button>
+                            </div>
+
+                            {# Advanced List Library Row Configuration #}
+                            <div id="matrix-list-library-section" class="mb-4 hidden">
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <div class="flex items-center gap-2 flex-wrap mb-2">
+                                            <label for="matrix-list-select" class="text-gray-700 text-sm font-semibold">{{ _('Select List for Rows') }}</label>
+                                            {{ field_help(_('Users will be able to select rows from this list during data entry.')) }}
+                                        </div>
+                                        <select id="matrix-list-select" name="matrix_lookup_list_id" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                            <option value="">{{ _('Select List...') }}</option>
+                                            {% for lst in lookup_lists_for_js %}
+                                                <option value="{{ lst.id }}"
+                                                        data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "[]" }}'
+                                                        {% if lst.has_config_ui | default(false) %}data-has-config-ui="true"{% endif %}
+                                                        {% if lst.config_js_handler | default(none) %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div id="matrix-display-column-wrapper" class="hidden">
+                                        <div class="flex items-center gap-2 flex-wrap mb-2">
+                                            <label for="matrix-list-display-column" class="text-gray-700 text-sm font-semibold">{{ _('Row Label Column') }}</label>
+                                            {{ field_help(_("Values from this column will appear as row headers. Fields marked as [Multilingual] will display in the user's selected language.")) }}
+                                        </div>
+                                        <select id="matrix-list-display-column" name="matrix_list_display_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                            <option value="">{{ _('Select Column...') }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="matrix-group-by-wrapper" class="mt-4 hidden">
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="matrix-group-by-column" class="text-gray-700 text-sm font-semibold">{{ _('Group Rows By Column') }} <span class="text-gray-400 font-normal">{{ _('(optional)') }}</span></label>
+                                        {{ field_help(_("Rows will be grouped under collapsible headers based on this column's values (e.g. group countries by region).")) }}
+                                    </div>
+                                    <select id="matrix-group-by-column" name="matrix_group_by_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                        <option value="">{{ _('No grouping') }}</option>
+                                    </select>
+                                    <div id="matrix-group-controls-wrapper" class="mt-2 space-y-1 hidden">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-group-dropdown-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                            <span class="ml-2 text-sm text-gray-700">{{ _('Group dropdown options') }}</span>
+                                        </label>
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-group-table-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                            <span class="ml-2 text-sm text-gray-700">{{ _('Group matrix table rows') }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="matrix-search-placeholder" class="text-gray-700 text-sm font-semibold">{{ _('Search Placeholder Text') }}</label>
+                                        {{ field_help(_('Customize the placeholder text shown in the search input when users add rows.')) }}
+                                        <button type="button" id="matrix-search-placeholder-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <input type="text"
+                                           id="matrix-search-placeholder"
+                                           name="matrix_search_placeholder"
+                                           class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                           placeholder="{{ _('Search and select a row to add...')|forceescape }}"
+                                           value="{{ _('Search and select a row to add...') }}">
+                                    <input type="hidden" id="matrix-search-placeholder-translations" value="{}">
+                                </div>
+                                {# Allow Other row (free-text entry) #}
+                                <div class="mt-4">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-allow-other"
+                                                   class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                            <span class="ml-2 text-sm text-gray-700">{{ _('Allow "Other" row') }}</span>
+                                        </label>
+                                        {{ field_help(_('When enabled, users can add a row with a custom name not found in the list library.')) }}
+                                    </div>
+                                </div>
+
+                                <button type="button" id="matrix-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2">
+                                    <i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}
+                                </button>
+                                <div id="matrix-list-filters-container" class="mt-2 space-y-2"></div>
+                                <input type="hidden" name="matrix_list_filters_json" id="matrix-list-filters-json">
+
+                                {# Plugin-specific configuration UI (e.g., emergency operations) #}
+                                <div id="matrix-plugin-config-container" class="mt-4"></div>
+                            </div>
+
+                        </div>
+
+                        <div id="matrix-columns-section" class="mb-4 border-t border-gray-200 pt-4 mt-2">
+                            <div class="flex items-center gap-2 flex-wrap mb-3">
+                                <h4 class="text-sm font-semibold text-gray-700">{{ _('Table columns') }}</h4>
+                                {{ field_help(_('Enter a stable code for each column (e.g. total_beneficiaries). Use the translations button to set display labels in English and other languages.')) }}
+                                <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div id="matrix-columns-container" class="space-y-2">
+                                <!-- Column headers will be added here dynamically -->
+                            </div>
+                            <div class="flex items-center gap-4 mt-2">
+                                <button type="button" id="add-matrix-column-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center">
+                                    <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                                    {{ _('Add Column') }}
+                                </button>
+                                <button type="button" id="add-matrix-group-btn" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
+                                    <i class="fas fa-layer-group w-3 h-3 mr-1"></i>
+                                    {{ _('Add Group') }}
+                                </button>
+                            </div>
+
+                            <div id="matrix-variable-tooltip-labels-wrapper" class="mt-4 pt-4 space-y-3 border-t border-gray-200">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="text-xs font-medium text-gray-700">{{ _('Variable column tooltip labels') }}</p>
+                                    {{ field_help(_('Labels shown in the tooltip when a saved variable value differs from the current lookup.')) }}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                                        <label for="matrix-variable-lookup-tooltip-label" class="text-sm text-gray-700">{{ _('Lookup value label') }}</label>
+                                        <button type="button" id="matrix-variable-lookup-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <input type="text" id="matrix-variable-lookup-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Lookup value')|forceescape }}" value="{{ _('Lookup value') }}">
+                                    <input type="hidden" id="matrix-variable-lookup-tooltip-label-translations" value="{}">
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                                        <label for="matrix-variable-submitted-tooltip-label" class="text-sm text-gray-700">{{ _('Submitted value label') }}</label>
+                                        <button type="button" id="matrix-variable-submitted-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <input type="text" id="matrix-variable-submitted-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Submitted value')|forceescape }}" value="{{ _('Submitted value') }}">
+                                    <input type="hidden" id="matrix-variable-submitted-tooltip-label-translations" value="{}">
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+
+                        {# Hidden inputs for matrix configuration #}
+                        <input type="hidden" name="matrix_config" id="item-matrix-config" value="{}">
+                        {# Translation fields handled by shared fields above #}
+
+                        {# Hidden template for matrix row #}
+                        <template id="matrix-row-template">
+                            <div class="matrix-row flex items-center space-x-2">
+                                <input type="text" class="row-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter row header')|forceescape }}" data-field-type="label">
+                                <input type="hidden" class="row-name-translations" value="{}">
+                                <button type="button" class="move-row-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up')|forceescape }}">
+                                    <i class="fas fa-arrow-up w-4 h-4"></i>
+                                </button>
+                                <button type="button" class="move-row-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down')|forceescape }}">
+                                    <i class="fas fa-arrow-down w-4 h-4"></i>
+                                </button>
+                                <button type="button" class="remove-row-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Row')|forceescape }}">
+                                    <i class="fas fa-trash w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </template>
+
+                        {# Hidden template for matrix column #}
+                        <template id="matrix-column-template">
+                            <div class="matrix-column">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-300 hover:text-gray-500 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder')|forceescape }}" draggable="false">
+                                        <i class="fas fa-grip-vertical"></i>
+                                    </span>
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}">
+                                    <input type="hidden" class="column-name-translations" value="{}">
+                                    <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md">
+                                        <option value="number_whole">{{ _('Number (Whole)') }}</option>
+                                        <option value="number_decimal">{{ _('Number (Decimal)') }}</option>
+                                        <option value="tick">{{ _('Tick (✓)') }}</option>
+                                    </select>
+                                    <label class="column-decimals-label flex items-center text-xs text-gray-600 whitespace-nowrap shrink-0" style="display: none;">
+                                        <span class="mr-1">{{ _('Decimals') }}</span>
+                                        <input type="number" class="column-decimals shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-14 sm:text-sm border-gray-300 rounded-md" min="0" max="6" step="1" value="2">
+                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                            <span class="tooltip-text">{{ _('Maximum decimal places accepted for this column. Values are rounded on save; use "." for decimals and "," for thousands when entering or pasting.') }}</span>
+                                        </span>
+                                    </label>
+                                    <select class="column-variable-select shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md" style="display: none;">
+                                        <option value="">{{ _('Select Variable...') }}</option>
+                                    </select>
+                                    {# Kept inline next to the column code field instead of on its own row #}
+                                    <div class="column-variable-options flex items-center gap-3 flex-wrap shrink-0">
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap">
+                                            <input type="checkbox" class="column-is-variable mr-1">
+                                            <span>{{ _('Is Variable') }}</span>
+                                        </label>
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-readonly-label" style="display: none;">
+                                            <input type="checkbox" class="column-variable-readonly mr-1" checked>
+                                            <span>{{ _('Read-only') }}</span>
+                                        </label>
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-save-value-label" style="display: none;">
+                                            <input type="checkbox" class="column-variable-save-value mr-1" checked>
+                                            <span>{{ _('Save value') }}</span>
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                                <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                                <span class="tooltip-text">{{ _('When checked, the variable column value is saved with the form and restored when the form is reopened. When unchecked, the value is always resolved fresh from the variable (e.g. template variable) and not stored.') }}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column')|forceescape }}">
+                                        <i class="fas fa-trash w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                {# ── Selectable header config ── #}
+                                <div class="column-selectable-header-wrapper mt-1.5 pt-1.5 border-t border-gray-100 text-xs">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <label class="inline-flex items-center cursor-pointer flex-1 min-w-0">
+                                            <input type="checkbox" class="column-selectable-header form-checkbox h-3 w-3 text-orange-600 border-gray-300 rounded focus:ring-orange-500 mr-1.5">
+                                            <span class="text-gray-700">{{ _('Selectable header (dropdown)') }}</span>
+                                        </label>
+                                        <button type="button"
+                                                class="column-selectable-header-toggle inline-flex items-center justify-center p-0.5 min-w-[1.25rem] min-h-[1.25rem] text-gray-500 hover:text-gray-700 rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-300 disabled:opacity-40 disabled:pointer-events-none"
+                                                aria-expanded="false"
+                                                aria-label="{{ _('Expand selectable header options')|forceescape }}"
+                                                disabled>
+                                            <i class="fas fa-chevron-down column-selectable-header-chevron text-[10px] transition-transform duration-200" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="column-selectable-header-options hidden mt-2 p-2 bg-amber-50 rounded border border-amber-200 space-y-2">
+                                        <div>
+                                            <label class="block text-gray-600 mb-0.5">{{ _('Placeholder text') }}</label>
+                                            <input type="text" class="column-header-placeholder w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" placeholder="{{ _('Select...')|forceescape }}">
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <span class="text-gray-600 font-medium">{{ _('Source:') }}</span>
+                                            <label class="inline-flex items-center">
+                                                {# name is re-assigned to a per-column-unique value in JS right after
+                                                   cloning (addColumn), since every column clones this same template and
+                                                   radios must share a name only with their own column's sibling radio #}
+                                                <input type="radio" class="column-header-source form-radio h-3 w-3 text-orange-600" name="column-header-source-template" value="manual" checked>
+                                                <span class="ml-1">{{ _('Manual') }}</span>
+                                            </label>
+                                            <label class="inline-flex items-center">
+                                                <input type="radio" class="column-header-source form-radio h-3 w-3 text-orange-600" name="column-header-source-template" value="list_library">
+                                                <span class="ml-1">{{ _('List Library') }}</span>
+                                            </label>
+                                        </div>
+                                        {# Manual options -- mirrors the single/multi choice question options UI #}
+                                        <div class="column-header-manual-section space-y-1">
+                                            <label class="block text-gray-600 mb-0.5">{{ _('Options') }}</label>
+                                            <div class="column-header-manual-options-list space-y-1">
+                                                {# Option rows added dynamically #}
+                                            </div>
+                                        </div>
+                                        {# List Library options #}
+                                        <div class="column-header-list-library-section hidden space-y-2">
+                                            <div>
+                                                <label class="block text-gray-600 mb-0.5">{{ _('Select List') }}</label>
+                                                <select class="column-header-list-select w-full py-1 pl-2 pr-6 border border-gray-300 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-400">
+                                                    <option value="">{{ _('Select List...') }}</option>
+                                                    {% for lst in lookup_lists_for_js %}
+                                                        <option value="{{ lst.id }}"
+                                                                data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "[]" }}'
+                                                                {% if lst.has_config_ui | default(false) %}data-has-config-ui="true"{% endif %}
+                                                                {% if lst.config_js_handler | default(none) %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="column-header-display-col-wrapper hidden">
+                                                <label class="block text-gray-600 mb-0.5">{{ _('Row Label Column') }}</label>
+                                                <select class="column-header-list-display-column w-full py-1 pl-2 pr-6 border border-gray-300 bg-white rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-400">
+                                                    <option value="">{{ _('Select Column...') }}</option>
+                                                </select>
+                                            </div>
+                                            {# Plugin-specific configuration UI (e.g., emergency operations) for this column's header list #}
+                                            <div class="column-header-plugin-config-container"></div>
+                                        </div>
+                                        <label class="inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="column-header-allow-other form-checkbox h-3 w-3 text-orange-600 border-gray-300 rounded focus:ring-orange-500 mr-1.5">
+                                            <span class="text-gray-600">{{ _('Allow "Other" (free text)') }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        {# Hidden template for a single "Selectable header" manual option row (mirrors the single/multi choice question options UI) #}
+                        <template id="matrix-column-header-option-template">
+                            <div class="column-header-option-row flex items-center space-x-1">
+                                <input type="text" class="column-header-option-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full text-xs border-gray-300 rounded-md py-1 px-2" placeholder="{{ _('Enter option text')|forceescape }}">
+                                <button type="button" class="column-header-option-move-up-btn inline-flex items-center justify-center p-1 min-w-[1.5rem] min-h-[1.5rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up')|forceescape }}">
+                                    <i class="fas fa-arrow-up w-3 h-3"></i>
+                                </button>
+                                <button type="button" class="column-header-option-move-down-btn inline-flex items-center justify-center p-1 min-w-[1.5rem] min-h-[1.5rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down')|forceescape }}">
+                                    <i class="fas fa-arrow-down w-3 h-3"></i>
+                                </button>
+                                <button type="button" class="column-header-option-remove-btn inline-flex items-center justify-center p-1 min-w-[1.5rem] min-h-[1.5rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Option')|forceescape }}">
+                                    <i class="fas fa-trash w-3 h-3"></i>
+                                </button>
+                                <button type="button" class="column-header-option-add-btn inline-flex items-center justify-center p-1 min-w-[1.5rem] min-h-[1.5rem] text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-green-300" title="{{ _('Add Option')|forceescape }}">
+                                    <i class="fas fa-plus w-3 h-3"></i>
+                                </button>
+                            </div>
+                        </template>
+
+                        {# Hidden template for column group #}
+                        <template id="matrix-group-template">
+                            <div class="matrix-group border border-indigo-200 rounded-md">
+                                <div class="matrix-group-header flex items-center gap-2 px-2 py-1.5 bg-indigo-50 rounded-t-md">
+                                    <span class="matrix-drag-handle inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-600 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder group')|forceescape }}" draggable="false">
+                                        <i class="fas fa-grip-vertical text-xs"></i>
+                                        <i class="fas fa-layer-group text-xs"></i>
+                                    </span>
+                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}">
+                                    <input type="hidden" class="group-label-translations" value="{}">
+                                    <button type="button" class="remove-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Group')|forceescape }}">
+                                        <i class="fas fa-trash w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                <div class="matrix-group-columns space-y-2 px-2 pt-2 pb-1 border-l-2 border-indigo-200 ml-2">
+                                    {# grouped .matrix-column items inserted here #}
+                                </div>
+                                <div class="px-2 pb-2 pt-1">
+                                    <button type="button" class="add-column-to-group-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
+                                        <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                                        {{ _('Add Column inside Group') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    {# Image Fields (Initially Hidden) #}
+                    <div id="item-image-fields" class="hidden">
+                        <input type="hidden" id="item-image-config" name="image_config" value="{}">
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-image-caption" class="text-gray-700 text-sm font-semibold">{{ _('Caption (optional)') }}</label>
+                                <button type="button" id="image-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-image-caption" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Caption shown below the image')|forceescape }}">
+                        </div>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" id="item-image-alt" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Describe the image for screen readers')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
+                        </div>
+                        <div class="mb-4 grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="item-image-alignment" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Alignment') }}</label>
+                                <select id="item-image-alignment" class="block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <option value="left">{{ _('Left') }}</option>
+                                    <option value="center" selected>{{ _('Center') }}</option>
+                                    <option value="right">{{ _('Right') }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="item-image-max-width" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Max width') }}</label>
+                                <select id="item-image-max-width" class="block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <option value="100%" selected>{{ _('Full width') }}</option>
+                                    <option value="75%">{{ _('75%') }}</option>
+                                    <option value="50%">{{ _('50%') }}</option>
+                                    <option value="auto">{{ _('Auto') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <p class="text-gray-700 text-sm font-semibold mb-2">{{ _('Image source by language') }}</p>
+                            <div id="item-image-locale-tabs" class="flex flex-wrap gap-2 mb-3"></div>
+                            <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+                                <div class="flex items-center gap-4 mb-3">
+                                    <label class="inline-flex items-center text-sm">
+                                        <input type="radio" name="image_source_type" value="upload" class="image-source-type-radio form-radio h-4 w-4 text-teal-600" checked>
+                                        <span class="ml-2">{{ _('Upload') }}</span>
+                                    </label>
+                                    <label class="inline-flex items-center text-sm">
+                                        <input type="radio" name="image_source_type" value="url" class="image-source-type-radio form-radio h-4 w-4 text-teal-600">
+                                        <span class="ml-2">{{ _('URL / path') }}</span>
+                                    </label>
+                                </div>
+                                <div id="item-image-upload-block">
+                                    <button type="button" id="item-image-paste-zone" class="item-image-paste-zone inline-flex items-center gap-1.5 px-3 py-1.5 mb-3 text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-md hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-teal-400" title="{{ _('Paste a screenshot from the clipboard (Ctrl+V)')|forceescape }}" aria-label="{{ _('Paste image')|forceescape }}">
+                                        <i class="fas fa-paste w-4 h-4" aria-hidden="true"></i>
+                                        <span>{{ _('Paste') }}</span>
+                                    </button>
+                                    <label class="block text-sm text-gray-700 mb-1">{{ _('Image file') }}</label>
+                                    <input type="file" id="item-image-file-input" accept="image/png,image/jpeg,image/webp,image/gif" class="block w-full text-sm text-gray-600">
+                                    <p id="item-image-file-name" class="mt-1 text-xs text-gray-500"></p>
+                                </div>
+                                <div id="item-image-url-block" class="hidden">
+                                    <label for="item-image-url-input" class="block text-sm text-gray-700 mb-1">{{ _('Image URL or site path') }}</label>
+                                    <div class="flex gap-2">
+                                        <input type="url" id="item-image-url-input" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="https://... or /static/...">
+                                        <button type="button" id="item-image-apply-url-btn" class="px-3 py-2 text-sm bg-teal-600 text-white rounded-md hover:bg-teal-700">{{ _('Preview') }}</button>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <img id="item-image-preview" alt="" class="hidden max-h-48 rounded border border-gray-200 bg-white">
+                                </div>
+                            </div>
+                        </div>
+                    </div>

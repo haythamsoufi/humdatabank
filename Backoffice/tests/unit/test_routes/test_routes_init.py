@@ -60,9 +60,9 @@ class TestRegisterAllBlueprints:
 
         mock_app = self._make_mock_app()
         mock_csrf = self._make_mock_csrf()
-        # csrf.exempt is called unprotected twice (indicator_bank_compat_bp, mobile_bp)
-        # before the try/except block that wraps csrf.exempt(ai_bp) — raise only on 3rd call
-        mock_csrf.exempt.side_effect = [None, None, Exception("csrf error")]
+        # Unprotected csrf.exempt calls (mcp, indicator_bank_compat, mobile) run
+        # before the try/except around csrf.exempt(ai_bp). Raise only on that call.
+        mock_csrf.exempt.side_effect = [None, None, None, Exception("csrf error")]
 
         with patch("app.routes.auth"), \
              patch("app.routes.main"), \

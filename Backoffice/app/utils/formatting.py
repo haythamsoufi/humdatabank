@@ -8,6 +8,38 @@ import json
 from typing import Any, Dict, Optional, Callable
 
 
+AGE_GROUP_LABELS = {
+    '_5': '>5',
+    '5_17': '5-17',
+    '18_49': '18-49',
+    '50_': '50+',
+    'unknown': 'Unknown',
+    'male': 'Male',
+    'female': 'Female',
+    'total': 'Total',
+}
+
+_AGE_GROUP_SORT = {
+    'total': 0,
+    '_5': 1,
+    '5_17': 2,
+    '18_49': 3,
+    '50_': 4,
+    'unknown': 999,
+}
+
+
+def age_group_label(age_group: str) -> str:
+    """Convert an age-group code to the label used in dashboards and activity text."""
+    return AGE_GROUP_LABELS.get(age_group, str(age_group).replace('_', '-'))
+
+
+def age_group_sort_key(item):
+    """Sort key for ``(age_group, count)`` pairs: total, then age bands, then unknown."""
+    age_group = item[0]
+    return (_AGE_GROUP_SORT.get(age_group, 100), age_group)
+
+
 def format_age_group_breakdown(age_groups: Dict[str, int], fmt_number_func: Callable[[Any], str]) -> str:
     """
     Format age group breakdown with visual hierarchy and clear labels.
@@ -19,20 +51,6 @@ def format_age_group_breakdown(age_groups: Dict[str, int], fmt_number_func: Call
     Returns:
         HTML-formatted string with age group breakdown
     """
-    def _format_age_group_label(age_group: str) -> str:
-        """Convert age group codes to more readable labels."""
-        age_group_mapping = {
-            '_5': '>5',
-            '5_17': '5-17',
-            '18_49': '18-49',
-            '50_': '50+',
-            'unknown': 'Unknown',
-            'male': 'Male',
-            'female': 'Female',
-            'total': 'Total'
-        }
-        return age_group_mapping.get(age_group, age_group.replace('_', '-'))
-
     # Filter out zero values
     non_zero_groups = [(age_group, count) for age_group, count in age_groups.items()
                       if count and count != 0]
@@ -40,30 +58,12 @@ def format_age_group_breakdown(age_groups: Dict[str, int], fmt_number_func: Call
     if not non_zero_groups:
         return "0"
 
-    # Sort by logical order: total first, then by age ranges
-    def sort_key(item):
-        age_group, _ = item
-        if age_group == 'total':
-            return (0, age_group)
-        elif age_group == 'unknown':
-            return (999, age_group)
-        elif age_group == '_5':
-            return (1, age_group)
-        elif age_group == '5_17':
-            return (2, age_group)
-        elif age_group == '18_49':
-            return (3, age_group)
-        elif age_group == '50_':
-            return (4, age_group)
-        else:
-            return (100, age_group)
-
-    non_zero_groups.sort(key=sort_key)
+    non_zero_groups.sort(key=age_group_sort_key)
 
     # Format with HTML for better visual hierarchy
     parts = []
     for age_group, count in non_zero_groups:
-        label = _format_age_group_label(age_group)
+        label = age_group_label(age_group)
         formatted_count = fmt_number_func(count)
         parts.append(f'<span class="text-gray-600">{label}:</span> <span class="font-semibold text-green-600">{formatted_count}</span>')
 

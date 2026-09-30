@@ -28,6 +28,7 @@ class TestEnforceCsrfJson:
     def test_post_with_csrf_error_returns_error_response(self, app):
         from app.utils.request_validation import enforce_csrf_json
         from flask_wtf.csrf import CSRFError
+        app.config["WTF_CSRF_ENABLED"] = True
         with app.test_request_context("/test", method="POST"):
             with patch("app.utils.request_validation.csrf") as mock_csrf:
                 exc = CSRFError("CSRF token missing")
@@ -40,6 +41,7 @@ class TestEnforceCsrfJson:
     def test_put_with_csrf_error_returns_error_response(self, app):
         from app.utils.request_validation import enforce_csrf_json
         from flask_wtf.csrf import CSRFError
+        app.config["WTF_CSRF_ENABLED"] = True
         with app.test_request_context("/test", method="PUT"):
             with patch("app.utils.request_validation.csrf") as mock_csrf:
                 exc = CSRFError("CSRF invalid")
@@ -67,6 +69,7 @@ class TestEnforceCsrfJson:
         """Ensure we handle CSRFError with no description attribute gracefully."""
         from app.utils.request_validation import enforce_csrf_json
         from flask_wtf.csrf import CSRFError
+        app.config["WTF_CSRF_ENABLED"] = True
         with app.test_request_context("/test", method="POST"):
             with patch("app.utils.request_validation.csrf") as mock_csrf:
                 exc = CSRFError()
@@ -89,11 +92,15 @@ class TestEnforceCsrfJson:
 class TestEnforceApiOrCsrfProtection:
     def test_no_mobile_auth_valid_csrf_passes(self, app):
         from app.utils.request_validation import enforce_api_or_csrf_protection
-        with app.test_request_context("/test", method="POST"):
-            with patch("app.utils.request_validation.csrf") as mock_csrf:
-                mock_csrf.protect.return_value = None
-                # Should not raise
-                enforce_api_or_csrf_protection()
+        app.config["WTF_CSRF_ENABLED"] = True
+        try:
+            with app.test_request_context("/test", method="POST"):
+                with patch("app.utils.request_validation.csrf") as mock_csrf:
+                    mock_csrf.protect.return_value = None
+                    enforce_api_or_csrf_protection()
+                    mock_csrf.protect.assert_called_once()
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False
 
     def test_valid_mobile_auth_token_passes(self, app):
         from app.utils.request_validation import enforce_api_or_csrf_protection
@@ -126,21 +133,37 @@ class TestEnforceApiOrCsrfProtection:
     def test_csrf_error_propagates_when_no_mobile_auth(self, app):
         from app.utils.request_validation import enforce_api_or_csrf_protection
         from flask_wtf.csrf import CSRFError
+        app.config["WTF_CSRF_ENABLED"] = True
+        try:
+            with app.test_request_context("/test", method="POST"):
+                with patch("app.utils.request_validation.csrf") as mock_csrf:
+                    mock_csrf.protect.side_effect = CSRFError("bad token")
+                    with pytest.raises(CSRFError):
+                        enforce_api_or_csrf_protection()
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False
+
+    def test_csrf_skipped_when_disabled(self, app):
+        from app.utils.request_validation import enforce_api_or_csrf_protection
+        app.config["WTF_CSRF_ENABLED"] = False
         with app.test_request_context("/test", method="POST"):
             with patch("app.utils.request_validation.csrf") as mock_csrf:
-                mock_csrf.protect.side_effect = CSRFError("bad token")
-                with pytest.raises(CSRFError):
-                    enforce_api_or_csrf_protection()
+                enforce_api_or_csrf_protection()
+                mock_csrf.protect.assert_not_called()
 
     def test_whitespace_only_mobile_auth_header_treated_as_missing(self, app):
         """Whitespace-only X-Mobile-Auth should fall through to CSRF."""
         from app.utils.request_validation import enforce_api_or_csrf_protection
-        with app.test_request_context(
-            "/test",
-            method="POST",
-            headers={"X-Mobile-Auth": "   "},
-        ):
-            with patch("app.utils.request_validation.csrf") as mock_csrf:
-                mock_csrf.protect.return_value = None
-                # Should not raise; strips to empty string -> no mobile auth -> CSRF
-                enforce_api_or_csrf_protection()
+        app.config["WTF_CSRF_ENABLED"] = True
+        try:
+            with app.test_request_context(
+                "/test",
+                method="POST",
+                headers={"X-Mobile-Auth": "   "},
+            ):
+                with patch("app.utils.request_validation.csrf") as mock_csrf:
+                    mock_csrf.protect.return_value = None
+                    enforce_api_or_csrf_protection()
+                    mock_csrf.protect.assert_called_once()
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False

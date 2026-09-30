@@ -556,18 +556,9 @@ class EntityService:
         Returns:
             bool: True if user has access
         """
-        # Admins and system managers have access to everything
         from app.services.organization.authorization_service import AuthorizationService
-        if AuthorizationService.is_admin(user):
-            return True
 
-        from app.models.core import UserEntityPermission
-
-        return UserEntityPermission.query.filter_by(
-            user_id=user.id,
-            entity_type=entity_type,
-            entity_id=entity_id
-        ).first() is not None
+        return AuthorizationService.user_can_access_entity(user, entity_type, entity_id)
 
     @staticmethod
     def get_all_entities_by_type(entity_type, filter_active=True):

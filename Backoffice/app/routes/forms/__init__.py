@@ -8,7 +8,7 @@ from flask import Blueprint, current_app
 bp = Blueprint("forms", __name__, url_prefix="/forms")
 
 # Register additional route modules (validation summary was already separate)
-from app.routes.forms_validation_summary import register_validation_summary_routes  # noqa: E402
+from app.routes.forms.validation_summary import register_validation_summary_routes  # noqa: E402
 register_validation_summary_routes(bp)
 
 # Template global for getting frontend URL

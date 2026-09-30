@@ -86,30 +86,53 @@ def get_users():
         # Order by name and paginate
         paginated_users = query.order_by(User.name.asc(), User.email.asc()).paginate(page=page, per_page=per_page, error_out=False)
 
-        # Serialize user data
-        users_data = []
-        for user in paginated_users.items:
-            # Get user's countries
-            user_countries = []
-            for country in user.countries:
-                user_countries.append({
+        page_users = list(paginated_users.items)
+        page_user_ids = [user.id for user in page_users]
+        countries_by_user = {user_id: [] for user_id in page_user_ids}
+        roles_by_user = {user_id: [] for user_id in page_user_ids}
+        if page_user_ids:
+            country_perms = UserEntityPermission.query.filter(
+                UserEntityPermission.user_id.in_(page_user_ids),
+                UserEntityPermission.entity_type == 'country',
+            ).all()
+            country_ids = {perm.entity_id for perm in country_perms}
+            countries_by_id = {
+                country.id: country
+                for country in Country.query.filter(Country.id.in_(country_ids)).all()
+            } if country_ids else {}
+            for perm in country_perms:
+                country = countries_by_id.get(perm.entity_id)
+                if country is None:
+                    continue
+                countries_by_user.setdefault(perm.user_id, []).append({
                     'id': country.id,
                     'name': country.name,
-                    'iso3': country.iso3
+                    'iso3': country.iso3,
                 })
-
-            # Get RBAC roles for this user
-            rbac_roles = []
             try:
                 from app.models.rbac import RbacUserRole, RbacRole
-                user_roles = RbacUserRole.query.filter_by(user_id=user.id).all()
-                role_ids = [ur.role_id for ur in user_roles]
-                if role_ids:
-                    roles = RbacRole.query.filter(RbacRole.id.in_(role_ids)).all()
-                    rbac_roles = [{'code': r.code, 'name': r.name} for r in roles]
+                user_roles = RbacUserRole.query.filter(RbacUserRole.user_id.in_(page_user_ids)).all()
+                role_ids = {link.role_id for link in user_roles}
+                roles_by_id = {
+                    role.id: role
+                    for role in RbacRole.query.filter(RbacRole.id.in_(role_ids)).all()
+                } if role_ids else {}
+                for link in user_roles:
+                    role = roles_by_id.get(link.role_id)
+                    if role is None:
+                        continue
+                    roles_by_user.setdefault(link.user_id, []).append({
+                        'code': role.code,
+                        'name': role.name,
+                    })
             except Exception as e:
-                current_app.logger.debug("Could not fetch RBAC roles for user %s: %s", user.id, e)
-                rbac_roles = []
+                current_app.logger.debug("Could not fetch RBAC roles for user page: %s", e)
+
+        # Serialize user data
+        users_data = []
+        for user in page_users:
+            user_countries = countries_by_user.get(user.id, [])
+            rbac_roles = roles_by_user.get(user.id, [])
 
             users_data.append({
                 'id': user.id,

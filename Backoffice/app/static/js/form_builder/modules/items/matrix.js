@@ -1,8 +1,10 @@
 // Matrix item logic extracted from item-modal.js
 // Depends on global Utils and standard DOM APIs
 
-const truthyMatrixValues = new Set(['true', '1', 'yes', 'on']);
-const falsyMatrixValues = new Set(['false', '0', 'no', 'off', '']);
+import { FALSY_CONFIG_STRINGS, TRUTHY_CONFIG_STRINGS } from '../../../lib/matrix-boolean.js';
+
+const truthyMatrixValues = TRUTHY_CONFIG_STRINGS;
+const falsyMatrixValues = FALSY_CONFIG_STRINGS;
 
 const isTruthyMatrixValue = (value) => {
     if (typeof value === 'boolean') return value;

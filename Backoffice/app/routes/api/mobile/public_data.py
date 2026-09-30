@@ -38,7 +38,11 @@ from app.routes.api.mobile import mobile_bp
 @mobile_bp.route('/data/countrymap', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def countrymap():
-    """Country map data (mirrors /api/v1/countrymap)."""
+    """Country map data for the mobile shell.
+
+    Intentionally public and rate-limited. ``GET /api/v1/countrymap`` stays behind
+    an API key or session because that prefix is the integration API.
+    """
     from app.models import Country
 
     locale = request.args.get('locale', 'en')
@@ -715,8 +719,8 @@ def submit_quiz_score():
     score = data.get('score')
     if score is None:
         return mobile_bad_request('score is required')
-    if not isinstance(score, int) or score < 0:
-        return mobile_bad_request('Invalid score. Must be a non-negative integer.')
+    if not isinstance(score, int) or score < 0 or score > 100:
+        return mobile_bad_request('Invalid score. Must be an integer from 0 to 100.')
 
     try:
         user = current_user

@@ -10,7 +10,7 @@ from app.utils.datetime_helpers import utcnow
 Assignment Management Module - Form assignments and public assignments
 """
 
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
+from flask import Blueprint, abort, render_template, request, flash, redirect, url_for, current_app
 from app.utils.redirect_utils import get_safe_redirect_url
 from flask_babel import _
 from flask_login import current_user
@@ -92,6 +92,21 @@ def _can_manage_assignment_entities():
 
 def _can_update_assignment_entity_status():
     return _can_manage_assignment_entities() or _has_assignment_perm(ASSIGNMENT_ENTITY_STATUS_PERMISSION)
+
+
+def _assignment_entity_in_actor_scope(aes) -> bool:
+    """Status editors without global assignment view must hold the entity.
+
+    ``admin.assignments.view`` is an intentional global grant (see
+    ``AuthorizationService.can_access_assignment``). Roles that only carry
+    entity-status or entity-manage permissions are limited to entities they hold.
+    """
+    if AuthorizationService.is_system_manager(current_user):
+        return True
+    if AuthorizationService.has_rbac_permission(current_user, "admin.assignments.view"):
+        return True
+    from app.services.organization.entity_service import EntityService
+    return EntityService.check_user_entity_access(current_user, aes.entity_type, aes.entity_id)
 
 
 def _flash_page_mode_change(summary: dict, *, template_changed: bool = False) -> None:
@@ -1585,6 +1600,8 @@ def remove_entity_from_assignment(assignment_id, status_id):
 def update_entity_status(assignment_id, status_id):
     """Update the status of an entity assignment."""
     aes = AssignmentEntityStatus.query.filter_by(id=status_id, assigned_form_id=assignment_id).first_or_404()
+    if not _assignment_entity_in_actor_scope(aes):
+        return json_not_found("Assignment entity not found")
 
     data = get_json_safe()
     status = data.get('status')
@@ -1673,6 +1690,8 @@ def bulk_update_entity_status(assignment_id):
                 include_hierarchy=True,
             )
         for aes in rows:
+            if not _assignment_entity_in_actor_scope(aes):
+                continue
             audit_change = {
                 'entity_type': aes.entity_type,
                 'entity_id': aes.entity_id,
@@ -1704,6 +1723,8 @@ def bulk_update_entity_status(assignment_id):
 @permission_required_any(ASSIGNMENT_ENTITY_STATUS_PERMISSION, ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
 def edit_assignment_entity_status(aes_id):
     aes = AssignmentEntityStatus.query.get_or_404(aes_id)
+    if not _assignment_entity_in_actor_scope(aes):
+        abort(404)
     form = AssignmentEntityStatusForm(request.form)
 
     if form.validate():
@@ -2057,8 +2078,19 @@ def bulk_update_due_date_selected(assignment_id):
 @permission_required('admin.assignments.public_submissions.manage')
 def update_public_submission_status(submission_id):
     """Update the status of a public submission."""
+    from app.utils.form_authorization import (
+        AUTH_OK,
+        PUBLIC_SUBMISSION_ACTION_MANAGE,
+        lock_public_submission,
+        public_submission_access,
+    )
+
     try:
-        submission = PublicSubmission.query.get_or_404(submission_id)
+        submission = lock_public_submission(submission_id)
+        if submission is None or public_submission_access(
+            submission, current_user, PUBLIC_SUBMISSION_ACTION_MANAGE
+        ) != AUTH_OK:
+            abort(404)
         new_status = request.form.get('status')
 
         if new_status not in ['pending', 'approved', 'rejected']:

@@ -159,40 +159,54 @@ npm run lint
 
 ### Backoffice Core Components
 
-#### Models (`Backoffice/app/models/models.py`)
-- **FormItem**: Unified model for indicators, questions, and document fields
-- **User**: Authentication with role-based access and country assignments
-- **Country**: Country data with multilingual support
-- **FormTemplate**: Dynamic form templates with sections
-- **IndicatorBank**: Centralized indicator repository
+#### Models (`Backoffice/app/models/`)
+There is no single `models.py`. Domain modules are re-exported from `app/models/__init__.py`:
+
+- `core.py` — users, sessions, and account state
+- `organization.py` — countries, entities, and org structure
+- `forms.py` / `form_items.py` — templates, sections, and the unified form-item model (indicators, questions, document fields)
+- `assignments.py` — assigned forms and entity status
+- `indicator_bank.py` — centralized indicator repository
+- `documents.py`, `rbac.py`, and the `ai_*.py` modules — documents, permissions, and AI jobs
 
 #### Routes (`Backoffice/app/routes/`)
-- `forms.py` - Form management and data entry
-- `forms_api.py` - REST API for forms
-- `public.py` - Public-facing endpoints
-- `api.py` - Main API endpoints
-- `analytics.py` - Analytics and reporting
-- `admin/` - Modular administrative interface:
-  - `__init__.py` - Main admin dashboard and blueprint registration
-  - `form_builder.py` - Form template and section management (40+ routes)
-  - `user_management.py` - User CRUD operations (4 routes)
-  - `assignment_management.py` - Form and public assignments (25+ routes)
-  - `content_management.py` - Resources, publications, documents (20+ routes)
-  - `system_admin.py` - Countries, sectors, indicator bank (30+ routes)
-  - `analytics.py` - Dashboard APIs and reporting (13+ routes)
-  - `utilities.py` - Import/export, translations, sessions (20+ routes)
-  - `shared.py` - Common decorators and utilities
+Packages, not the old flat modules (`forms.py`, `api.py`, `analytics.py` are gone):
+
+- `forms/` — entry, submission, documents, matrix API, export, and validation summary (`forms/validation_summary.py`; `forms_validation_summary.py` is a shim)
+- `forms_api.py` — authenticated form JSON API (still one module)
+- `api/` — `/api/v1` plus `api/mobile/` for `/api/mobile/v1`
+- `main/` — dashboard, assignments, and document views
+- `public.py` — unauthenticated pages and legacy URL redirects
+- `auth.py`, `ai.py`, `ai_ws.py`, `notifications.py`, `notifications_ws.py`, `excel.py`, `mcp.py` — still flat because each is one request surface
+
+`admin/` is a mix of packages and remaining monoliths:
+
+- Packages: `form_builder/`, `user_management/`, `organization/`, `system_admin/`, `reports/`, `utilities/`
+- Still large single files: `assignment_management.py`, `content_management.py`, `ai_management.py`, `settings.py`, `api_management.py`, `data_sync_imputation.py`
+- `notifications.py` serves the signed-in user until `/api/admin/assignments` (about line 1190); routes after that are the admin communication surface
+- `shared.py` — decorators used by admin routes
+- `route_policy.py` — CSRF and permission allowlists checked at startup
+
+Public form templates live under `app/templates/forms/public/` (success and unavailable pages).
 
 #### Services (`Backoffice/app/services/`)
-- Form data processing and validation
-- Public form management
-- Excel import/export functionality
+Domain packages (`forms`, `organization`, `documents`, `security`, `imports`, `public`, `ai`). A few large modules are cohesive and should stay together: assignment-entity variable resolution, `FormDataService`, and `AIAgentExecutor`. Chat page copy and workflow replies are `ai/chat/page_explanations.py` and `ai/chat/workflow_responses.py`, re-exported from `ai/chat/helpers.py`.
 
 #### Utilities (`Backoffice/app/utils/`)
-- `form_processing.py` - Form logic and calculations
-- `form_localization.py` - Translation management
-- `excel_service.py` - Excel operations
-- `user_analytics.py` - Session and user tracking
+Prefer `app/services/` for new domain logic. `utils/` holds request helpers, formatting, and authorization checks used by routes (`form_authorization.py`, `formatting.py`, `language_labels.py`, `request_validation.py`).
+
+Three JSON envelopes are intentional and should not be merged:
+
+| Module | Callers |
+|---|---|
+| `api_helpers.py` | External `/api/v1` (`json_response`, `api_error`, `error_id`) |
+| `api_responses.py` | Admin and in-app AJAX (`json_ok`, `json_forbidden`, `json_not_found`) |
+| `mobile_responses.py` | `/api/mobile/v1` only (`success` / `data` / `meta`) |
+
+`/api/mobile/v1/data/countrymap` and the mobile sectors list are public reference data (rate-limited). The matching `/api/v1` routes stay API-key authenticated.
+
+#### Plugins
+Shipped plugins live in `Backoffice/plugins/` (FDRS, UPR, emergency operations, interactive map, PB progress). `Backoffice/app/plugins/` is the loader, not a place to add plugin packages.
 
 ### Website Components
 

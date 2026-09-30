@@ -3,9 +3,10 @@
 import { setHiddenField } from '../rules/form-serialization.js';
 import { mountEntryFormHintPanel, populateDescriptionVisibility } from '../modal/description-hint-ui.js';
 import { fetchBaseTemplate, fetchFieldBuilderConfig } from '../plugin-api.js';
+import { FALSY_CONFIG_STRINGS, TRUTHY_CONFIG_STRINGS } from '../../../lib/matrix-boolean.js';
 
-const truthyStrings = new Set(['true', '1', 'yes', 'on']);
-const falsyStrings = new Set(['false', '0', 'no', 'off', '']);
+const truthyStrings = TRUTHY_CONFIG_STRINGS;
+const falsyStrings = FALSY_CONFIG_STRINGS;
 const browserConsole = window.console;
 const pluginDebug = (...args) => {
     if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('plugin-item')) {

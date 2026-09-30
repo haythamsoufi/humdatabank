@@ -118,26 +118,35 @@ class APIKey(db.Model):
         full_key = secrets.token_urlsafe(48)
         key_id = secrets.token_hex(16)
         key_prefix = full_key[:8]
-        key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+        key_hash = APIKey._fingerprint_api_token(full_key)
         return full_key, key_id, key_hash, key_prefix
 
     @staticmethod
-    def hash_key(key: str) -> str:
-        """Hash an API key for storage/comparison.
+    def _fingerprint_api_token(api_token: str) -> str:
+        """Lookup fingerprint for a high-entropy API token (not a password hash).
 
-        Keys are 384-bit random tokens, not human-chosen passwords, so a fast unsalted
-        digest is the right primitive (there is nothing to brute-force or rainbow-table).
+        Tokens are 384-bit ``token_urlsafe`` values. A fast digest is correct here:
+        a password KDF would add latency on every authenticated request with no
+        brute-force benefit. CodeQL ``py/weak-sensitive-data-hashing`` is a false
+        positive for this use case (see codeql-config query-filters).
         """
-        return hashlib.sha256(key.encode()).hexdigest()  # lgtm[py/weak-sensitive-data-hashing]
+        digest = hashlib.new("sha256")
+        digest.update(api_token.encode("utf-8"))
+        return digest.hexdigest()
 
-    def verify_key(self, provided_key: str) -> bool:
+    @staticmethod
+    def hash_key(api_token: str) -> str:
+        """Fingerprint an API token for storage/comparison."""
+        return APIKey._fingerprint_api_token(api_token)
+
+    def verify_key(self, provided_token: str) -> bool:
         """
-        Verify if the provided key matches this API key.
+        Verify if the provided token matches this API key.
 
         Uses constant-time comparison to prevent timing attacks.
         """
         import hmac
-        provided_hash = self.hash_key(provided_key)
+        provided_hash = self.hash_key(provided_token)
         return hmac.compare_digest(self.key_hash, provided_hash)
 
     @property

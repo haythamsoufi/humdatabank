@@ -158,9 +158,9 @@ def test_read_excel_safe_rejects_bomb():
         read_excel_safe(bomb)
 
 
-def test_limits_from_config_override(app):
-    app.config["WORKBOOK_MAX_ROWS"] = 7
-    app.config["WORKBOOK_MAX_COLS"] = "bad"
+def test_limits_from_config_override(app, monkeypatch):
+    monkeypatch.setitem(app.config, "WORKBOOK_MAX_ROWS", 7)
+    monkeypatch.setitem(app.config, "WORKBOOK_MAX_COLS", "bad")
     with app.app_context():
         limits = WorkbookLimits.from_config()
     assert limits.max_rows == 7

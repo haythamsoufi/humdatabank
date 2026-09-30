@@ -120,10 +120,12 @@ def edit_country(country_id):
                     country,
                     parse_fds_member_user_id(request.form.get('fds_member_user_id')),
                 )
-            except ValueError as exc:
+            except ValueError:
+                # Do not echo exception text into JSON (CodeQL stack-trace exposure).
+                user_message = "Invalid FDRS member user selection."
                 if is_json_request():
-                    return json_bad_request(str(exc))
-                flash(str(exc), 'danger')
+                    return json_bad_request(user_message)
+                flash(user_message, 'danger')
                 return render_template("admin/countries/manage_country.html",
                                      form=form,
                                      country=country,

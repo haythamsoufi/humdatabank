@@ -40,7 +40,7 @@ ARG LATEST_RELEASE_TAG=""
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    FLASK_CONFIG=development \
+    FLASK_CONFIG=production \
     FLASK_APP="run:app"
 
 # Only runtime dependencies (no build tools)
@@ -58,9 +58,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     fontconfig \
     openssh-server \
-    && echo "root:Docker!" | chpasswd \
-    && mkdir -p /var/run/sshd \
-    && ssh-keygen -A \
+    && mkdir -p /run/sshd \
+    && rm -f /etc/ssh/ssh_host_* \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -100,7 +99,10 @@ RUN mkdir -p /usr/local/share/fonts/upr-visuals && \
 RUN mkdir -p /data/uploads && \
     chmod 755 /data/uploads
 
-# Entrypoint script (runs migrations at container startup, not at build time)
+# Entrypoint script (runs migrations at container startup, not at build time).
+# SSH is opt-in (ENABLE_SSH=true at runtime): no root password and no host keys are baked into the
+# image; docker/start-ssh.sh creates them when sshd is enabled. See
+# docs/runbooks/operations/container-ssh-access.md.
 COPY entrypoint.sh /app/entrypoint.sh
 COPY sshd_config /etc/ssh/sshd_config
 COPY docker/azure-ssh-profile.sh /etc/profile.d/azure-ssh.sh
@@ -110,6 +112,7 @@ RUN chmod +x /app/entrypoint.sh /etc/profile.d/azure-ssh.sh \
        '[ -f /etc/profile.d/azure-ssh.sh ] && . /etc/profile.d/azure-ssh.sh' \
        >> /root/.bashrc
 
+# 2222 (sshd) is only listened on when ENABLE_SSH=true; App Service does not publish it publicly.
 EXPOSE 5000 2222
 
 # Set version identifiers last so they don't invalidate cached layers above.

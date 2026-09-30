@@ -12,6 +12,7 @@ from app.extensions import csrf, db
 from app.models import User, NotificationType, Notification, NotificationCampaign
 from app.routes.admin.shared import permission_required
 from app.utils.datetime_helpers import ensure_utc
+from app.utils.export_safety import safe_csv_writer
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
 from app.utils.request_validation import enforce_api_or_csrf_protection
@@ -285,7 +286,7 @@ def communication_registry():
 
     if request.args.get("export") == "csv":
         buf = io.StringIO()
-        writer = csv.writer(buf)
+        writer = safe_csv_writer(buf)
         writer.writerow(
             [
                 _("Group"),

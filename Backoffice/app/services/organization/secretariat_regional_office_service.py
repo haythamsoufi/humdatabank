@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.extensions import db
+from app.utils.sql_utils import ilike_equals
 
 # Canonical IFRC statutory regions (SecretariatRegionalOffice rows).
 IFRC_REGION_SEED: List[dict] = [
@@ -105,14 +106,61 @@ def normalize_region_label(label: str | None) -> Optional[str]:
     return raw
 
 
-def ensure_secretariat_regional_offices(session: Session | None = None) -> Dict[str, int]:
-    """Ensure canonical IFRC regional offices exist. Returns mapping code -> id."""
+def ensure_secretariat_regional_offices(
+    session: Session | None = None,
+    connection=None,
+) -> Dict[str, int]:
+    """Ensure canonical IFRC regional offices exist. Returns mapping code -> id.
+
+    When called from a SQLAlchemy ``before_insert``/``before_update`` flush
+    (``session._flushing``), new rows are inserted via ``connection`` so we never
+    nest ``session.flush()``.
+    """
+    from sqlalchemy import insert, select
+
     from app.models.organization import SecretariatRegionalOffice
 
     sess = session or db.session
+    table = SecretariatRegionalOffice.__table__
+    flushing = bool(getattr(sess, "_flushing", False))
+    conn = connection
+    if conn is None and flushing:
+        conn = sess.connection()
     code_to_id: Dict[str, int] = {}
 
     for seed in IFRC_REGION_SEED:
+        # Prefer the raw connection whenever one is available (esp. during an
+        # active flush) so we never nest ``session.flush()``.
+        if conn is not None:
+            row = conn.execute(
+                select(table.c.id, table.c.code, table.c.name).where(table.c.code == seed["code"])
+            ).first()
+            if row is None:
+                row = conn.execute(
+                    select(table.c.id, table.c.code, table.c.name).where(table.c.name == seed["name"])
+                ).first()
+            if row is None:
+                translations = _load_name_translations(seed["name"])
+                office_id = conn.execute(
+                    insert(table).values(
+                        code=seed["code"],
+                        name=seed["name"],
+                        short_name=seed.get("short_name"),
+                        name_translations=translations,
+                        short_name_translations=seed.get("short_name_translations"),
+                        display_order=seed.get("display_order", 0),
+                        is_active=True,
+                    ).returning(table.c.id)
+                ).scalar_one()
+            else:
+                office_id = row.id
+            code_to_id[seed["code"]] = office_id
+            continue
+
+        if flushing:
+            # Flushing without a usable connection — skip ORM writes.
+            continue
+
         office = sess.query(SecretariatRegionalOffice).filter_by(code=seed["code"]).one_or_none()
         if office is None:
             office = sess.query(SecretariatRegionalOffice).filter_by(name=seed["name"]).one_or_none()
@@ -150,8 +198,11 @@ def ensure_secretariat_regional_offices(session: Session | None = None) -> Dict[
 def resolve_secretariat_regional_office_by_label(
     label: str | None,
     session: Session | None = None,
+    connection=None,
 ) -> Optional["SecretariatRegionalOffice"]:
     """Resolve a region label to a ``SecretariatRegionalOffice`` row."""
+    from sqlalchemy import select
+
     from app.models.organization import SecretariatRegionalOffice
 
     canonical = normalize_region_label(label)
@@ -159,39 +210,83 @@ def resolve_secretariat_regional_office_by_label(
         return None
 
     sess = session or db.session
-    ensure_secretariat_regional_offices(sess)
+    ensure_secretariat_regional_offices(sess, connection=connection)
+
+    flushing = bool(getattr(sess, "_flushing", False))
+    conn = connection
+    if conn is None and flushing:
+        conn = sess.connection()
+    if conn is not None and flushing:
+        table = SecretariatRegionalOffice.__table__
+        row = conn.execute(
+            select(table).where(ilike_equals(table.c.name, canonical))
+        ).mappings().first()
+        if row is None:
+            return None
+        # Lightweight stand-in: only id/name are needed by assign_*.
+        office = SecretariatRegionalOffice(
+            code=row["code"],
+            name=row["name"],
+            short_name=row.get("short_name"),
+            display_order=row.get("display_order") or 0,
+            is_active=bool(row.get("is_active", True)),
+        )
+        office.id = row["id"]
+        return office
 
     office = sess.query(SecretariatRegionalOffice).filter(
-        SecretariatRegionalOffice.name.ilike(canonical),
+        ilike_equals(SecretariatRegionalOffice.name, canonical),
     ).one_or_none()
     return office
 
 
-def sync_country_region_fields(country) -> None:
+def sync_country_region_fields(country, connection=None) -> None:
     """Keep denormalized ``country.region`` aligned with the linked regional office."""
     office = getattr(country, "secretariat_regional_office", None)
     if office is not None:
         country.region = office.name
-    elif getattr(country, "secretariat_regional_office_id", None):
-        from app.models.organization import SecretariatRegionalOffice
+        return
+    office_id = getattr(country, "secretariat_regional_office_id", None)
+    if not office_id:
+        return
+    from sqlalchemy import select
 
-        office = db.session.get(SecretariatRegionalOffice, country.secretariat_regional_office_id)
-        if office is not None:
-            country.region = office.name
+    from app.models.organization import SecretariatRegionalOffice
+
+    sess = db.session
+    flushing = bool(getattr(sess, "_flushing", False))
+    conn = connection
+    if conn is None and flushing:
+        conn = sess.connection()
+    if conn is not None and flushing:
+        table = SecretariatRegionalOffice.__table__
+        name = conn.execute(
+            select(table.c.name).where(table.c.id == office_id)
+        ).scalar_one_or_none()
+        if name is not None:
+            country.region = name
+        return
+
+    office = db.session.get(SecretariatRegionalOffice, office_id)
+    if office is not None:
+        country.region = office.name
 
 
 def assign_country_secretariat_regional_office(
     country,
     label: str | None,
+    connection=None,
 ) -> Optional["SecretariatRegionalOffice"]:
     """Resolve label and assign ``secretariat_regional_office_id`` on a country."""
     if label:
-        office = resolve_secretariat_regional_office_by_label(label)
+        office = resolve_secretariat_regional_office_by_label(label, connection=connection)
         if office is not None:
             country.secretariat_regional_office_id = office.id
-            country.secretariat_regional_office = office
+            # Avoid relationship assignment during flush (can re-enter the UOW).
+            if not bool(getattr(db.session, "_flushing", False)):
+                country.secretariat_regional_office = office
             country.region = office.name
         return office
 
-    sync_country_region_fields(country)
+    sync_country_region_fields(country, connection=connection)
     return getattr(country, "secretariat_regional_office", None)

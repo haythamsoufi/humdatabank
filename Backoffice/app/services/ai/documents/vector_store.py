@@ -278,32 +278,20 @@ class AIVectorStore:
         return out
 
     @staticmethod
-    def _apply_document_permission_filters(query, user_id: Optional[int], user_role: Optional[str]):
+    def _apply_document_permission_filters(query, user_id: Optional[int], user_role: Optional[str], principal=None):
         """
-        Apply document visibility filters (is_public, user_id, allowed_roles).
-        Use for any query that joins AIDocument. Returns the modified query.
+        Restrict a query that joins AIDocument to documents the caller may read.
+
+        Delegates to ``app.services.ai.documents.access`` (the single ACL authority). ``user_role`` is only
+        honoured as the internal ``system_manager`` marker when no ``user_id`` is given; otherwise the
+        principal is recomputed from the database.
         """
-        if user_role in ("admin", "system_manager"):
-            return query
-        if user_id:
-            query = query.filter(
-                db.or_(
-                    AIDocument.is_public == True,
-                    AIDocument.user_id == user_id,
-                )
-            )
-        else:
-            query = query.filter(AIDocument.is_public == True)
-        role = (user_role or "public").strip().lower()
-        role_json = json.dumps([role])
-        query = query.filter(
-            db.or_(
-                AIDocument.is_public == True,
-                AIDocument.allowed_roles.is_(None),
-                text("(ai_documents.allowed_roles::jsonb @> CAST(:role_json AS jsonb))").bindparams(role_json=role_json),
-            )
+        from app.services.ai.documents.access import (
+            apply_document_read_filter,
+            principal_for_legacy_args,
         )
-        return query
+
+        return apply_document_read_filter(query, principal or principal_for_legacy_args(user_id, user_role))
 
     def store_document_embeddings(
         self,

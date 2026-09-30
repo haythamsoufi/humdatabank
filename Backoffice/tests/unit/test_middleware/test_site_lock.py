@@ -9,6 +9,7 @@ from flask import g
 
 from app.middleware.site_lock import (
     _active_mode,
+    _bypass_cookie_value,
     _bypass_secret,
     _is_anonymous_root_health_probe,
     _is_api_path,
@@ -142,18 +143,17 @@ class TestIsApiPath:
         with app.test_request_context("/api/v1/users"):
             assert _is_api_path() is True
 
-    def test_x_api_key_header_returns_true(self, app):
+    def test_x_api_key_header_does_not_make_a_page_an_api_path(self, app):
         with app.test_request_context("/dashboard",
                                        headers={"X-API-Key": "some-key-value"}):
-            assert _is_api_path() is True
+            assert _is_api_path() is False
 
-    def test_bearer_token_returns_true(self, app):
+    def test_bearer_token_does_not_make_a_page_an_api_path(self, app):
         with app.test_request_context("/dashboard",
                                        headers={"Authorization": "Bearer abc123token"}):
-            assert _is_api_path() is True
+            assert _is_api_path() is False
 
-    def test_bearer_too_short_returns_false(self, app):
-        """'Bearer ' with nothing after is too short."""
+    def test_bearer_empty_returns_false(self, app):
         with app.test_request_context("/dashboard",
                                        headers={"Authorization": "Bearer "}):
             assert _is_api_path() is False
@@ -235,12 +235,22 @@ class TestHasBypass:
     def test_cookie_bypass_matches(self, app):
         with app.app_context():
             app.config["MAINTENANCE_BYPASS_SECRET"] = "bypass-token-123"
+            mode = _MODES["maintenance"]
+            digest = _bypass_cookie_value(mode)
+            with app.test_request_context(
+                "/dashboard",
+                headers={"Cookie": f"maintenance_bypass={digest}"},
+            ):
+                assert _has_bypass(mode) is True
+
+    def test_raw_secret_in_cookie_is_not_accepted(self, app):
+        with app.app_context():
+            app.config["MAINTENANCE_BYPASS_SECRET"] = "bypass-token-123"
             with app.test_request_context(
                 "/dashboard",
                 headers={"Cookie": "maintenance_bypass=bypass-token-123"},
             ):
-                mode = _MODES["maintenance"]
-                assert _has_bypass(mode) is True
+                assert _has_bypass(_MODES["maintenance"]) is False
 
     def test_query_param_bypass_matches(self, app):
         with app.app_context():
@@ -319,11 +329,24 @@ class TestRegisterSiteLockMiddleware:
         # The API path should be exempt
         assert resp.status_code != 200 or b"Maintenance" not in resp.data
 
-    def test_bearer_token_bypasses_lock(self, app, client):
+    @pytest.mark.parametrize("header", [
+        {"Authorization": "Bearer valid-token-xyz"},
+        {"X-API-Key": "anything"},
+        {"Authorization": "Bearer x", "X-API-Key": "y"},
+    ])
+    def test_credential_header_does_not_bypass_lock_on_page_routes(self, app, client, header):
         app.config["MAINTENANCE_LOCK"] = True
-        resp = client.get("/dashboard", headers={"Authorization": "Bearer valid-token-xyz"})
-        # bearer token → _is_api_path → exempt
-        assert b"Maintenance" not in resp.data
+        with patch("app.middleware.site_lock.render_template",
+                   return_value="<h1>Maintenance</h1>"):
+            resp = client.get("/dashboard", headers=header)
+        assert b"Maintenance" in resp.data
+
+    def test_bearer_header_does_not_bypass_lock_on_admin_routes(self, app, client):
+        app.config["MAINTENANCE_LOCK"] = True
+        with patch("app.middleware.site_lock.render_template",
+                   return_value="<h1>Maintenance</h1>"):
+            resp = client.get("/admin/users", headers={"Authorization": "Bearer x"})
+        assert b"Maintenance" in resp.data
 
     def test_query_param_bypass_sets_cookie(self, app, client):
         app.config["MAINTENANCE_LOCK"] = True
@@ -335,10 +358,28 @@ class TestRegisterSiteLockMiddleware:
     def test_bypass_cookie_skips_lock(self, app, client):
         app.config["MAINTENANCE_LOCK"] = True
         app.config["MAINTENANCE_BYPASS_SECRET"] = "s3cr3t"
-        client.set_cookie("maintenance_bypass", "s3cr3t")
-        resp = client.get("/dashboard")
-        # Should not show lock page
+        with app.app_context():
+            digest = _bypass_cookie_value(_MODES["maintenance"])
+        client.set_cookie("maintenance_bypass", digest)
+        with patch("app.middleware.site_lock.render_template",
+                   return_value="<h1>Maintenance</h1>"):
+            resp = client.get("/dashboard")
         assert b"Maintenance" not in resp.data
+
+    def test_raw_secret_cookie_does_not_skip_lock(self, app, client):
+        app.config["MAINTENANCE_LOCK"] = True
+        app.config["MAINTENANCE_BYPASS_SECRET"] = "s3cr3t"
+        client.set_cookie("maintenance_bypass", "s3cr3t")
+        with patch("app.middleware.site_lock.render_template",
+                   return_value="<h1>Maintenance</h1>"):
+            resp = client.get("/dashboard")
+        assert b"Maintenance" in resp.data
+
+    def test_bypass_cookie_value_is_not_the_secret(self, app, client):
+        app.config["MAINTENANCE_LOCK"] = True
+        app.config["MAINTENANCE_BYPASS_SECRET"] = "secret123"
+        resp = client.get("/dashboard?maintenance_bypass=secret123")
+        assert "secret123" not in resp.headers.get("Set-Cookie", "")
 
     def test_persist_cookie_skips_when_no_secret(self, app, client):
         """When bypass secret is empty, cookie is not set even if flag is True."""

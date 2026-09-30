@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,12 +11,15 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "tests"))
 
 from pb_figures.calculations import not_available  # noqa: E402
 from pb_figures.layouts import build_section_layout, indicator_has_values  # noqa: E402
 from pb_figures.payload import build_sp_payload  # noqa: E402
 from pb_figures.render_embed import build_dashboard_html  # noqa: E402
 from pb_figures.render_html import _dashboard_height  # noqa: E402
+from pb_figures.translations import clear_cache  # noqa: E402
+from workbook_fixtures import sp1_mapping_row, temporary_report_excel  # noqa: E402
 
 
 def _mapping_frame() -> pd.DataFrame:
@@ -55,6 +59,21 @@ def _model_frame() -> pd.DataFrame:
 
 
 class UnavailableIndicatorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        clear_cache()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._excel = Path(self._tmpdir.name) / "SG Report.xlsx"
+        self._ctx = temporary_report_excel(
+            self._excel,
+            mapping_rows=[sp1_mapping_row()],
+        )
+        self._ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._ctx.__exit__(None, None, None)
+        self._tmpdir.cleanup()
+        clear_cache()
+
     def test_layout_keeps_mapping_only_indicators(self) -> None:
         mapping = _mapping_frame()
         layout = build_section_layout("SP2", mapping)

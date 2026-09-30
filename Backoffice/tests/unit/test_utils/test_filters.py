@@ -357,3 +357,41 @@ class TestRegisterFilters:
         assert flask_app.jinja_env.filters["normalize_type"] is normalize_type
         assert flask_app.jinja_env.filters["escapejs"] is escapejs
         assert flask_app.jinja_env.filters["nl2br"] is nl2br
+
+
+class TestRichTextAndEscapingFilters:
+    def test_rich_text_strips_active_content_and_keeps_formatting(self):
+        from markupsafe import Markup
+
+        from app.utils.filters import rich_text
+
+        out = rich_text('<b>ok</b><script>alert(1)</script><img src=x onerror=alert(1)>'
+                        '<a href="javascript:alert(1)">x</a><a href="https://e.org">y</a>')
+        assert isinstance(out, Markup)
+        assert "<b>ok</b>" in out
+        assert "<script" not in out and "<img" not in out and "javascript:" not in out
+        assert 'href="https://e.org"' in out
+        assert 'rel="noopener noreferrer"' in out
+
+    def test_rich_text_handles_none_and_plain_text(self):
+        from app.utils.filters import rich_text
+
+        assert rich_text(None) == ""
+        assert rich_text("a\nb") == "a<br>b"
+
+    def test_escapejs_neutralises_script_breakout(self):
+        from app.utils.filters import escapejs
+
+        out = str(escapejs("</script><b>'x'&\u2028"))
+        assert "<" not in out and ">" not in out and "'" not in out and "&" not in out
+        assert "\\u003c/script\\u003e" in out
+
+    def test_safe_json_attr_escapes_all_html_metacharacters(self):
+        from app.utils.filters import safe_json_attr
+
+        out = str(safe_json_attr({"a": "<x>&\"'"}))
+        assert '"' not in out and "<" not in out and ">" not in out
+        assert "&amp;" in out
+
+    def test_registered_on_app(self, app):
+        assert "rich_text" in app.jinja_env.filters

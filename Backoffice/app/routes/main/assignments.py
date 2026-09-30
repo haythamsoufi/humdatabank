@@ -13,6 +13,11 @@ from app.forms.auth_forms import RequestCountryAccessForm
 from flask_babel import _
 from app.utils.transactions import request_transaction_rollback
 from app.services.assignments.workflow_service import apply_entity_status_change
+from app.utils.form_authorization import (
+    TRANSITION_GONE,
+    TRANSITION_STALE,
+    begin_aes_transition,
+)
 from app.services.platform.app_settings_service import is_organization_email
 from app.utils.audit_context import set_audit_details
 
@@ -60,6 +65,15 @@ def select_country(country_id):
     current_app.logger.warning("select_country route was called, but dashboard route handles POST. This route might be redundant.")
     return redirect(url_for("main.dashboard"))
 
+def _reject_transition(transition, denied_message, *, endpoint="main.dashboard", **endpoint_values):
+    """Flash why a locked re-validation refused a status transition and redirect."""
+    if transition.changed or transition.reason in (TRANSITION_GONE, TRANSITION_STALE):
+        flash(_("This assignment was changed by someone else. Review its current status and try again."), "warning")
+    else:
+        flash(denied_message, "danger")
+    return redirect(url_for(endpoint, **endpoint_values))
+
+
 # NEW: Route to handle reopening an assignment
 @bp.route("/reopen_assignment/<int:aes_id>", methods=["POST"])
 @login_required
@@ -90,6 +104,13 @@ def reopen_assignment(aes_id):
 
     if assignment_entity_status:
         try:
+            transition = begin_aes_transition(
+                assignment_entity_status,
+                current_user,
+                permission=AuthorizationService.can_reopen_assignment,
+            )
+            if not transition.ok:
+                return _reject_transition(transition, "You do not have permission to reopen this assignment.")
             assigned_form = assignment_entity_status.assigned_form
             round_was_closed = bool(
                 assigned_form
@@ -194,6 +215,18 @@ def reopen_assignment_page(aes_id, page_id):
         return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
+        transition = begin_aes_transition(
+            assignment_entity_status,
+            current_user,
+            permission=AuthorizationService.can_reopen_assignment_page,
+        )
+        if not transition.ok:
+            return _reject_transition(
+                transition,
+                _("You do not have permission to reopen this assignment."),
+                endpoint="assignments.view_assignment",
+                aes_id=aes_id,
+            )
         row = reset_page_status(aes_id, page_id, current_user.id)
         if row is None:
             flash(_("That page has not been submitted."), "warning")
@@ -256,6 +289,18 @@ def return_assignment_page_for_revision(aes_id, page_id):
         return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
+        transition = begin_aes_transition(
+            assignment_entity_status,
+            current_user,
+            permission=AuthorizationService.can_return_assignment_page,
+        )
+        if not transition.ok:
+            return _reject_transition(
+                transition,
+                _("You do not have permission to return this page for revision."),
+                endpoint="assignments.view_assignment",
+                aes_id=aes_id,
+            )
         row = mark_page_requires_revision(aes_id, page_id, current_user.id)
         if row is None:
             flash(_("That page cannot be returned for revision."), "warning")
@@ -313,6 +358,14 @@ def approve_assignment(aes_id):
 
     if assignment_entity_status:
         try:
+            transition = begin_aes_transition(
+                assignment_entity_status,
+                current_user,
+                permission=AuthorizationService.can_approve_assignment,
+                allowed_from={AssignmentEntityStatusValue.submitted},
+            )
+            if not transition.ok:
+                return _reject_transition(transition, "You do not have permission to approve this assignment.")
             apply_entity_status_change(
                 assignment_entity_status,
                 AssignmentEntityStatusValue.approved,
@@ -366,6 +419,16 @@ def return_assignment_for_revision(aes_id):
         return redirect(url_for("main.dashboard"))
 
     try:
+        transition = begin_aes_transition(
+            assignment_entity_status,
+            current_user,
+            permission=AuthorizationService.can_return_for_revision,
+            allowed_from={AssignmentEntityStatusValue.sent_for_review},
+        )
+        if not transition.ok:
+            return _reject_transition(
+                transition, _("You do not have permission to return this assignment for revision.")
+            )
         apply_entity_status_change(
             assignment_entity_status,
             AssignmentEntityStatusValue.requires_revision,

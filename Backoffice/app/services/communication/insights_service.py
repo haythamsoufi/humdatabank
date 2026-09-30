@@ -203,7 +203,7 @@ def build_communications_insights(days: int = DEFAULT_INSIGHTS_DAYS) -> Dict[str
     )
     skipped_count = EmailDeliveryLog.query.filter(
         email_in_period,
-        EmailDeliveryLog.error_message.startswith(SKIP_ERROR_PREFIX),
+        EmailDeliveryLog.error_message.startswith(SKIP_ERROR_PREFIX, autoescape=True),
     ).count()
 
     email_by_status_raw: Dict[str, int] = {}

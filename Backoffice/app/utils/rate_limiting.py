@@ -1,46 +1,73 @@
 # Backoffice/app/utils/rate_limiting.py
 
+import logging
+import threading
 import time
+from collections import defaultdict, deque
 from functools import wraps
+
 from flask import request, current_app, flash, redirect, url_for
 
 from app.utils.api_responses import json_error
+from app.utils.client_ip import get_client_ip
 from app.utils.request_utils import is_json_request
-from collections import defaultdict, deque
-import threading
-from app.services.platform.user_analytics_service import get_client_ip
 
-# In-memory rate limiting storage.
-# SECURITY NOTE: This storage is per-process. In multi-worker deployments (e.g.
-# Gunicorn with multiple workers), each worker maintains its own counters,
-# effectively multiplying the allowed rate by the number of workers. For
-# production, configure RATELIMIT_STORAGE_URI to a shared Redis instance so
-# Flask-Limiter (used on other routes) shares state. The custom deque-based
-# limiter below would also need a Redis backend for cross-worker enforcement.
+_rl_logger = logging.getLogger(__name__)
+
+# In-memory limiter storage (per process). Used for high-volume, low-risk limits and as
+# the degraded mode when the shared store is unreachable. Security-critical limiters
+# (login, password reset, mobile token endpoints) opt in with ``shared=True`` and then
+# count in the shared auth-state store (Redis, or the auth_state_entry table) so the
+# limit holds across Gunicorn workers.
 _rate_limit_storage = defaultdict(lambda: deque(maxlen=100))
 _rate_limit_lock = threading.Lock()
 
-import logging as _logging
-_rl_logger = _logging.getLogger(__name__)
+_WINDOW_SECONDS = 60
 
 
-def warn_if_multi_worker_without_redis(app) -> None:
-    """Emit a startup warning when Gunicorn workers > 1 and no Redis is configured.
+def _use_shared_store() -> bool:
+    from app.utils.security_startup import redis_configured
 
-    Call this from create_app() after extensions are initialised.
-    """
-    workers = int(app.config.get("WEB_CONCURRENCY", 1))
-    redis_url = app.config.get("RATELIMIT_STORAGE_URI") or app.config.get("REDIS_URL")
-    if workers > 1 and not redis_url:
-        _rl_logger.warning(
-            "RATE-LIMIT WARNING: %d Gunicorn workers detected but no RATELIMIT_STORAGE_URI / "
-            "REDIS_URL configured. In-memory rate limits are per-process; effective limit is "
-            "%d× the configured value. Set RATELIMIT_STORAGE_URI=redis://... to enforce "
-            "shared rate limits across all workers.",
-            workers, workers,
-        )
+    if redis_configured(current_app):
+        return True
+    return str(current_app.config.get("RATE_LIMIT_SHARED_FALLBACK") or "memory").lower() == "db"
 
-def rate_limit(requests_per_minute=10, key_func=None, flash_message=None, redirect_to=None, methods=None, on_limit=None):
+
+def _shared_limit_exceeded(key: str, limit: int, now: float) -> bool | None:
+    """Count one hit in the shared store. ``None`` means the store is unavailable."""
+    from app.utils.auth_state import NS_RATE_LIMIT, AuthStateUnavailable, get_auth_state
+
+    window = int(now // _WINDOW_SECONDS)
+    try:
+        count = get_auth_state().incr(NS_RATE_LIMIT, f"{key}:{window}", _WINDOW_SECONDS * 2)
+    except AuthStateUnavailable:
+        _rl_logger.error("Shared rate-limit store unavailable; using per-process limiter for %s", key)
+        return None
+    return count > limit
+
+
+def _memory_limit_exceeded(key: str, limit: int, now: float) -> bool:
+    with _rate_limit_lock:
+        bucket = _rate_limit_storage[key]
+        while bucket and bucket[0] < now - _WINDOW_SECONDS:
+            bucket.popleft()
+        if len(bucket) >= limit:
+            return True
+        bucket.append(now)
+        return False
+
+
+def hit_rate_limit(key: str, limit: int, *, shared: bool = False) -> bool:
+    """Record one hit for ``key``; True when the per-minute ``limit`` is exceeded."""
+    now = time.time()
+    if shared and _use_shared_store():
+        exceeded = _shared_limit_exceeded(key, limit, now)
+        if exceeded is not None:
+            return exceeded
+    return _memory_limit_exceeded(key, limit, now)
+
+
+def rate_limit(requests_per_minute=10, key_func=None, flash_message=None, redirect_to=None, methods=None, on_limit=None, shared=False):
     """
     Rate limiting decorator for Flask routes.
 
@@ -55,6 +82,8 @@ def rate_limit(requests_per_minute=10, key_func=None, flash_message=None, redire
             client instead of 429.  If it returns None, the normal 429 / redirect
             behaviour applies.  Use this for graceful degradation (e.g. serving a
             stale cache entry rather than an error).
+        shared: Count in the shared auth-state store (cross-worker) instead of process
+            memory. Use for login/reset/token endpoints.
 
     Returns:
         Decorator function
@@ -88,58 +117,41 @@ def rate_limit(requests_per_minute=10, key_func=None, flash_message=None, redire
                 # Use get_client_ip() to properly handle proxies
                 key = get_client_ip()
 
-            # Get current timestamp
-            now = time.time()
+            if hit_rate_limit(key, requests_per_minute, shared=shared):
+                current_app.logger.warning(f"Rate limit exceeded for {key} on {request.endpoint}")
 
-            with _rate_limit_lock:
-                # Clean old entries (older than 1 minute)
-                while _rate_limit_storage[key] and _rate_limit_storage[key][0] < now - 60:
-                    _rate_limit_storage[key].popleft()
+                # Give the caller a chance to return a graceful fallback response
+                # (e.g. a stale cache entry) instead of the hard 429 / redirect.
+                if on_limit is not None:
+                    fallback_response = on_limit()
+                    if fallback_response is not None:
+                        return fallback_response
 
-                # Check if rate limit exceeded
-                if len(_rate_limit_storage[key]) >= requests_per_minute:
-                    current_app.logger.warning(f"Rate limit exceeded for {key} on {request.endpoint}")
+                if is_json_request():
+                    return json_error(
+                        'Rate limit exceeded. Please try again later.',
+                        429,
+                        success=False,
+                        error='Rate limit exceeded. Please try again later.',
+                        retry_after=60,
+                    )
 
-                    # Give the caller a chance to return a graceful fallback response
-                    # (e.g. a stale cache entry) instead of the hard 429 / redirect.
-                    if on_limit is not None:
-                        fallback_response = on_limit()
-                        if fallback_response is not None:
-                            return fallback_response
+                message = flash_message or f'Rate limit exceeded. Please wait {60} seconds before trying again.'
+                flash(message, 'warning')
 
-                    # Check if this is a JSON/API request
-                    if is_json_request():
-                        # Return JSON response for API requests
-                        return json_error(
-                            'Rate limit exceeded. Please try again later.',
-                            429,
-                            success=False,
-                            error='Rate limit exceeded. Please try again later.',
-                            retry_after=60,
-                        )
-                    else:
-                        # Flash message and redirect for web requests
-                        message = flash_message or f'Rate limit exceeded. Please wait {60} seconds before trying again.'
-                        flash(message, 'warning')
+                if redirect_to:
+                    return redirect(url_for(redirect_to))
+                elif request.endpoint:
+                    # Path only (no query string) to avoid redirect loops.
+                    from app.utils.redirect_utils import safe_redirect
 
-                        # Redirect to specified route or back to the same endpoint
-                        if redirect_to:
-                            # For POST requests, redirect to GET the same page to show flash message
-                            return redirect(url_for(redirect_to))
-                        elif request.endpoint:
-                            # For POST requests, redirect to GET the same endpoint
-                            # Extract just the path without query params to avoid redirect loops
-                            return redirect(request.path)
-                        else:
-                            # Fallback: redirect to main page
-                            try:
-                                return redirect(url_for('main.dashboard'))
-                            except Exception as e:
-                                current_app.logger.debug("Rate limit redirect fallback failed; redirecting to '/': %s", e, exc_info=True)
-                                return redirect('/')
-
-                # Add current request timestamp
-                _rate_limit_storage[key].append(now)
+                    return safe_redirect(request.path)
+                else:
+                    try:
+                        return redirect(url_for('main.dashboard'))
+                    except Exception as e:
+                        current_app.logger.debug("Rate limit redirect fallback failed; redirecting to '/': %s", e, exc_info=True)
+                        return redirect('/')
 
             return f(*args, **kwargs)
         return decorated_function
@@ -168,6 +180,7 @@ def auth_rate_limit():
         flash_message='Too many login attempts. Please wait 60 seconds before trying again.',
         redirect_to='auth.login',
         methods=['POST'],
+        shared=True,
     )
 
 def password_reset_rate_limit():
@@ -181,6 +194,7 @@ def password_reset_rate_limit():
         flash_message='Too many password reset requests. Please wait 60 seconds before trying again.',
         redirect_to='auth.login',
         methods=['POST'],
+        shared=True,
     )
 
 def _api_rate_limit_identity_key() -> str:
@@ -213,7 +227,7 @@ def api_rate_limit(requests_per_minute=60):
     return rate_limit(requests_per_minute=requests_per_minute, key_func=_api_rate_limit_identity_key)
 
 
-def mobile_rate_limit(requests_per_minute=30):
+def mobile_rate_limit(requests_per_minute=30, shared=False):
     """Rate limiting for mobile API endpoints (JSON-only, no flash/redirect).
 
     Applies to **all** HTTP methods (GET, POST, PUT, PATCH, DELETE).
@@ -233,27 +247,19 @@ def mobile_rate_limit(requests_per_minute=30):
             if client_ip in exempt_ips_cfg:
                 return f(*args, **kwargs)
 
-            key = f"mobile_{client_ip}"
-            now = time.time()
-
-            with _rate_limit_lock:
-                while _rate_limit_storage[key] and _rate_limit_storage[key][0] < now - 60:
-                    _rate_limit_storage[key].popleft()
-
-                if len(_rate_limit_storage[key]) >= requests_per_minute:
-                    _rl_logger.warning(
-                        "Mobile rate limit exceeded for %s on %s",
-                        key, request.endpoint,
-                    )
-                    from app.utils.mobile_responses import mobile_error
-                    return mobile_error(
-                        'Rate limit exceeded. Please try again later.',
-                        429,
-                        error_code='RATE_LIMIT_EXCEEDED',
-                        retry_after=60,
-                    )
-
-                _rate_limit_storage[key].append(now)
+            key = f"mobile_{client_ip}:{request.endpoint}" if shared else f"mobile_{client_ip}"
+            if hit_rate_limit(key, requests_per_minute, shared=shared):
+                _rl_logger.warning(
+                    "Mobile rate limit exceeded for %s on %s",
+                    key, request.endpoint,
+                )
+                from app.utils.mobile_responses import mobile_error
+                return mobile_error(
+                    'Rate limit exceeded. Please try again later.',
+                    429,
+                    error_code='RATE_LIMIT_EXCEEDED',
+                    retry_after=60,
+                )
 
             return f(*args, **kwargs)
         return decorated_function

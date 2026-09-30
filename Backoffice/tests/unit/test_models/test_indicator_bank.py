@@ -468,12 +468,9 @@ class TestIndicatorBank:
         """Test sync_type_unit_string_columns updates type from measurement_type."""
         with app.app_context():
             ind = self._create_indicator(db_session)
-            mock_type = MagicMock()
-            mock_type.code = 'percentage'
-            ind.measurement_type = mock_type
-            mock_unit = MagicMock()
-            mock_unit.code = 'percent'
-            ind.measurement_unit = mock_unit
+            from app.models.indicator_bank import IndicatorBankType, IndicatorBankUnit
+            ind.measurement_type = IndicatorBankType(code='percentage', name='Percentage')
+            ind.measurement_unit = IndicatorBankUnit(code='percent', name='Percent')
             ind.indicator_unit_id = 1
             ind.sync_type_unit_string_columns()
             assert ind.type == 'percentage'

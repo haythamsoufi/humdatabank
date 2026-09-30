@@ -12,6 +12,7 @@ from app.extensions import db
 from app.models import AssignedForm, Country, FormData, FormItem, IndicatorBank
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue
+from app.utils.sql_utils import ilike_contains
 
 
 @dataclass
@@ -28,7 +29,7 @@ def _period_filter(column, period_names: list[str]):
     if not period_names:
         return True
     clauses = [column == name for name in period_names]
-    clauses.extend(column.ilike(f"%{name}%") for name in period_names)
+    clauses.extend(ilike_contains(column, name) for name in period_names)
     return or_(*clauses)
 
 

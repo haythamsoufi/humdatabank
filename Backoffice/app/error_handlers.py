@@ -1,17 +1,106 @@
 """HTTP error handlers for the Flask application."""
 
+import hashlib
+import re
+import sys
+import traceback
+import uuid
 from contextlib import suppress
 
-from flask import render_template, request, session, current_app, url_for, redirect, flash, jsonify
+from flask import g, render_template, request, session, current_app, url_for, redirect, flash, jsonify
 from flask_babel import _
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError, generate_csrf
 
-from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_server_error
 from app.utils.csp_nonce import get_style_nonce
-from app.utils.redirect_utils import get_current_relative_url
+from app.utils.logging_security import redact_url
+from app.utils.redirect_utils import get_current_relative_url, safe_redirect
 from app.utils.request_utils import is_json_request
 from app.utils.session_persistence import suppress_session_cookie_for_request
+
+REQUEST_ID_HEADER = "X-Request-ID"
+_VALID_INBOUND_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
+_MAX_TRACEBACK_FRAMES = 8
+
+
+def get_request_id():
+    """Correlation ID for the current request (reuses a well-formed inbound X-Request-ID)."""
+    request_id = getattr(g, "request_id", None)
+    if request_id:
+        return request_id
+    inbound = (request.headers.get(REQUEST_ID_HEADER) or "").strip()
+    request_id = inbound if _VALID_INBOUND_REQUEST_ID.match(inbound) else uuid.uuid4().hex
+    g.request_id = request_id
+    return request_id
+
+
+def _json_error_response(status, title, message, **extra):
+    """Single JSON error envelope for every handler (detail stays server-side, keyed by request_id)."""
+    body = {
+        "success": False,
+        "error": title,
+        "message": message,
+        "error_code": status,
+        "request_id": get_request_id(),
+    }
+    body.update(extra)
+    response = jsonify(body)
+    response.status_code = status
+    return response
+
+
+def _html_error_response(app, error, status, title, message):
+    return render_template(
+        "errors/error.html",
+        error_code=status,
+        error_title=title,
+        error_message=message,
+        error_details=str(error) if app.config.get("DEBUG") else None,
+        current_user=current_user,
+        style_nonce=get_style_nonce(),
+    ), status
+
+
+def _current_user_id():
+    if not getattr(current_user, "is_authenticated", False):
+        return None
+    user_id = None
+    raw_user_id = session.get("_user_id")
+    if raw_user_id is None:
+        with suppress(Exception):
+            raw_user_id = current_user.get_id()
+    with suppress(Exception):
+        user_id = int(raw_user_id) if raw_user_id is not None else None
+    if user_id is None:
+        with suppress(Exception):
+            user_id = getattr(current_user, "id", None)
+    return user_id
+
+
+def _summarize_exception_for_storage(error):
+    """
+    Persistable description of a 500 that carries no exception text or local data.
+
+    Exception messages routinely embed SQL parameters, file contents or user input, so only the
+    exception type, a stable hash of the full traceback (to group recurrences) and the
+    ``file:line function`` frames are stored. The full traceback goes to the application log only.
+    """
+    original = getattr(error, "original_exception", None) or error
+    tb = getattr(original, "__traceback__", None)
+    if tb is None:
+        exc_type, exc_value, tb = sys.exc_info()
+        original = exc_value or original
+    frames = traceback.extract_tb(tb) if tb is not None else []
+    rendered = "".join(traceback.format_list(frames))
+    summary = {
+        "exception_type": type(original).__name__,
+        "traceback_hash": hashlib.sha256(rendered.encode("utf-8", "replace")).hexdigest()[:32] if rendered else None,
+        "traceback_frames": [
+            f"{frame.filename.replace(chr(92), '/').rsplit('/app/', 1)[-1]}:{frame.lineno} {frame.name}"
+            for frame in frames[-_MAX_TRACEBACK_FRAMES:]
+        ],
+    }
+    return summary
 
 
 def _safe_csrf_reload_url():
@@ -38,14 +127,25 @@ def _suppress_anonymous_session_cookie():
 def register_error_handlers(app):
     """Register all HTTP error handlers on the Flask app."""
 
+    @app.before_request
+    def _assign_request_id():
+        get_request_id()
+
+    @app.after_request
+    def _echo_request_id(response):
+        with suppress(Exception):
+            response.headers[REQUEST_ID_HEADER] = get_request_id()
+        return response
+
     @app.errorhandler(CSRFError)
     def csrf_error(error):
         desc = getattr(error, "description", None) or "CSRF token missing or invalid"
         current_app.logger.warning(
-            "CSRF validation failed: %s | %s %s",
+            "CSRF validation failed: %s | %s %s | request_id=%s",
             desc,
             request.method,
             request.path,
+            get_request_id(),
         )
 
         if is_json_request():
@@ -63,6 +163,7 @@ def register_error_handlers(app):
                 "error": "CSRF validation failed",
                 "message": "Your session needed a refresh. Please try again.",
                 "error_code": 400,
+                "request_id": get_request_id(),
                 "csrf_refresh_required": True,
             })
             response.status_code = 400
@@ -99,39 +200,33 @@ def register_error_handlers(app):
             flash(flash_message, "warning")
         with suppress(Exception):
             generate_csrf()
-        return redirect(_safe_csrf_reload_url())
+        return safe_redirect(_safe_csrf_reload_url())
 
     @app.errorhandler(400)
     def bad_request(error):
+        detail = str(getattr(error, "description", None) or error or "").strip()
+        with suppress(Exception):
+            current_app.logger.warning(
+                "HTTP 400: %s | %s %s | request_id=%s",
+                detail[:500],
+                request.method,
+                request.path,
+                get_request_id(),
+            )
+        message = "The request was invalid or malformed."
         if is_json_request():
-            # Do not pass error='…' as extra kwarg: json_error uses key "error" for the message
-            # and kwargs would overwrite it. Surface Werkzeug/CSRF description when present.
-            desc = getattr(error, "description", None) or str(error) or ""
-            desc = desc.strip() if isinstance(desc, str) else str(desc)
-            if not desc:
-                desc = "The request was invalid or malformed."
-            try:
-                current_app.logger.warning(
-                    "HTTP 400 (JSON client): %s | %s %s",
-                    desc,
-                    request.method,
-                    request.path,
-                )
-            except Exception:
-                pass
-            return json_bad_request(desc, success=False, error_code=400)
-        return render_template('errors/error.html',
-                               error_code=400, error_title='Bad Request',
-                               error_message='The request was invalid or malformed. Please check your input and try again.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 400
+            extra = {"detail": detail} if app.config.get("DEBUG") and detail else {}
+            return _json_error_response(400, "Bad Request", message, **extra)
+        return _html_error_response(
+            app, error, 400, "Bad Request",
+            "The request was invalid or malformed. Please check your input and try again.",
+        )
 
     @app.errorhandler(401)
     def unauthorized(error):
         if is_json_request():
-            return json_error(
-                'Authentication required to access this resource.',
-                401, success=False, error='Unauthorized', error_code=401,
+            return _json_error_response(
+                401, "Unauthorized", "Authentication required to access this resource.",
             )
         # For browser requests, redirect to login so the user can continue
         # their session rather than seeing a dead-end error page.
@@ -144,130 +239,142 @@ def register_error_handlers(app):
             try:
                 from app.services.security.monitoring import SecurityMonitor
 
-                user_id = None
-                if getattr(current_user, 'is_authenticated', False):
-                    raw_user_id = session.get('_user_id')
-                    if raw_user_id is None:
-                        with suppress(Exception):
-                            raw_user_id = current_user.get_id()
-                    with suppress(Exception):
-                        user_id = int(raw_user_id) if raw_user_id is not None else None
-                    if user_id is None:
-                        with suppress(Exception):
-                            user_id = getattr(current_user, 'id', None)
-
                 SecurityMonitor.log_security_event(
                     event_type='http_403_forbidden',
                     severity='medium',
                     description=f'Access forbidden: {request.method} {request.path}'[:500],
                     context_data={
-                        'url': request.url[:2000] if request else None,
+                        'url': (redact_url(request.url) or '')[:2000] if request else None,
                         'endpoint': request.endpoint if request else None,
                         'method': request.method if request else None,
+                        'request_id': get_request_id(),
                     },
-                    user_id=user_id,
+                    user_id=_current_user_id(),
                 )
             except Exception:
                 app.logger.debug('Failed to log 403 security event', exc_info=True)
 
         if is_json_request():
-            return json_forbidden(
-                'You do not have permission to access this resource. If you have been on this page a long time, refresh the page and try again.',
-                success=False, error='Forbidden', error_code=403,
+            return _json_error_response(
+                403, "Forbidden",
+                "You do not have permission to access this resource. If you have been on this page a long time, refresh the page and try again.",
             )
-        return render_template('errors/error.html',
-                               error_code=403, error_title='Access Forbidden',
-                               error_message='You do not have permission to access this resource. Please contact an administrator if you believe this is an error.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 403
+        return _html_error_response(
+            app, error, 403, "Access Forbidden",
+            "You do not have permission to access this resource. Please contact an administrator if you believe this is an error.",
+        )
 
     @app.errorhandler(404)
     def not_found(error):
         if is_json_request():
-            return json_not_found(
-                'The requested resource could not be found.',
-                success=False, error='Not Found', error_code=404,
+            return _json_error_response(404, "Not Found", "The requested resource could not be found.")
+        return _html_error_response(
+            app, error, 404, "Page Not Found",
+            "The page you are looking for does not exist. It may have been moved or deleted.",
+        )
+
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        allowed = ", ".join(sorted(getattr(error, "valid_methods", None) or []))
+        if is_json_request():
+            response = _json_error_response(
+                405, "Method Not Allowed", "This resource does not support the requested method.",
             )
-        return render_template('errors/error.html',
-                               error_code=404, error_title='Page Not Found',
-                               error_message='The page you are looking for does not exist. It may have been moved or deleted.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 404
+        else:
+            response, _ = _html_error_response(
+                app, error, 405, "Method Not Allowed",
+                "This page does not support the requested action.",
+            )
+            response = current_app.make_response((response, 405))
+        if allowed:
+            response.headers["Allow"] = allowed
+        return response
+
+    @app.errorhandler(413)
+    def payload_too_large(error):
+        if is_json_request():
+            return _json_error_response(413, "Payload Too Large", "The submitted content is too large.")
+        return _html_error_response(
+            app, error, 413, "Payload Too Large",
+            "The submitted content is too large. Please reduce its size and try again.",
+        )
+
+    @app.errorhandler(429)
+    def too_many_requests(error):
+        retry_after = getattr(error, "retry_after", None)
+        if is_json_request():
+            extra = {"retry_after": int(retry_after)} if retry_after else {}
+            response = _json_error_response(
+                429, "Too Many Requests", "Too many requests. Please wait a moment and try again.", **extra,
+            )
+        else:
+            response, _ = _html_error_response(
+                app, error, 429, "Too Many Requests",
+                "Too many requests. Please wait a moment and try again.",
+            )
+            response = current_app.make_response((response, 429))
+        if retry_after:
+            response.headers["Retry-After"] = str(int(retry_after))
+        return response
 
     @app.errorhandler(500)
     def internal_error(error):
-        import traceback
-
-        error_traceback = traceback.format_exc()
-        app.logger.error(f'Server Error: {error}', exc_info=True)
+        request_id = get_request_id()
+        app.logger.error(
+            'Server Error [request_id=%s] %s %s: %s',
+            request_id, request.method, request.path, error, exc_info=True,
+        )
 
         if not app.config.get('DEBUG'):
             try:
                 from app.services.security.monitoring import SecurityMonitor
 
-                error_message = str(error)
-                error_url = request.url if request else 'Unknown URL'
-                user_id = None
-                if getattr(current_user, 'is_authenticated', False):
-                    raw_user_id = session.get('_user_id')
-                    if raw_user_id is None:
-                        with suppress(Exception):
-                            raw_user_id = current_user.get_id()
-                    with suppress(Exception):
-                        user_id = int(raw_user_id) if raw_user_id is not None else None
-                    if user_id is None:
-                        with suppress(Exception):
-                            user_id = getattr(current_user, 'id', None)
-
+                context_data = {
+                    'url': redact_url(request.url) if request else 'Unknown URL',
+                    'endpoint': request.endpoint if request else None,
+                    'method': request.method if request else None,
+                    'request_id': request_id,
+                }
+                context_data.update(_summarize_exception_for_storage(error))
                 SecurityMonitor.log_security_event(
                     event_type='internal_server_error',
                     severity='critical',
-                    description=f'Internal Server Error: {error_message[:200]}',
-                    context_data={
-                        'url': error_url,
-                        'endpoint': request.endpoint if request else None,
-                        'method': request.method if request else None,
-                        'traceback': error_traceback[:1000]
-                    },
-                    user_id=user_id
+                    description=f'Internal Server Error: {request.method} {request.path}'[:200],
+                    context_data=context_data,
+                    user_id=_current_user_id(),
                 )
 
             except Exception as notify_error:
                 app.logger.error(f"Failed to notify system managers of error: {notify_error}")
 
         if is_json_request():
-            return json_server_error(
-                'An unexpected error occurred. Please try again later.',
-                success=False, error='Internal Server Error', error_code=500,
+            return _json_error_response(
+                500, "Internal Server Error", "An unexpected error occurred. Please try again later.",
             )
-        return render_template('errors/error.html',
-                               error_code=500, error_title='Internal Server Error',
-                               error_message='An unexpected error occurred on our end. We have been notified and are working to fix it. Please try again later.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 500
+        return _html_error_response(
+            app, error, 500, "Internal Server Error",
+            f"An unexpected error occurred on our end. We have been notified and are working to fix it. "
+            f"Please try again later. Reference: {request_id}",
+        )
 
     @app.errorhandler(502)
     def bad_gateway(error):
         if is_json_request():
-            return json_error(
-                'The server received an invalid response from an upstream server.',
-                502, success=False, error='Bad Gateway', error_code=502,
+            return _json_error_response(
+                502, "Bad Gateway", "The server received an invalid response from an upstream server.",
             )
-        return render_template('errors/error.html',
-                               error_code=502, error_title='Bad Gateway',
-                               error_message='The server received an invalid response. Please try again in a few moments.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 502
+        return _html_error_response(
+            app, error, 502, "Bad Gateway",
+            "The server received an invalid response. Please try again in a few moments.",
+        )
 
     @app.errorhandler(503)
     def service_unavailable(error):
         if is_json_request():
-            return json_error(
-                'The service is temporarily unavailable. Please try again later.',
-                503, success=False, error='Service Unavailable', error_code=503,
+            return _json_error_response(
+                503, "Service Unavailable", "The service is temporarily unavailable. Please try again later.",
             )
-        return render_template('errors/error.html',
-                               error_code=503, error_title='Service Unavailable',
-                               error_message='The service is temporarily unavailable due to maintenance or high load. Please try again later.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 503
+        return _html_error_response(
+            app, error, 503, "Service Unavailable",
+            "The service is temporarily unavailable due to maintenance or high load. Please try again later.",
+        )

@@ -7,7 +7,7 @@ import uuid
 
 from flask import Flask
 from config import Config
-from config.config import config as config_map
+from config.config import config as config_map, resolve_flask_config_name
 
 from .extensions import babel, csrf, db, login, migrate
 from .i18n import get_locale  # noqa: F401 — re-export for callers that do `from app import get_locale`
@@ -29,13 +29,17 @@ def create_app(config_name=None):
     from app.static_serving import register_static_route
     register_static_route(app, static_folder_path)
 
-    selected_config_name = config_name or os.getenv('FLASK_CONFIG', 'default')
-    config_class = config_map.get(selected_config_name, Config)
+    selected_config_name = config_name or resolve_flask_config_name()
+    if selected_config_name not in config_map:
+        raise RuntimeError(
+            f"Unknown config '{selected_config_name}'. Allowed: {sorted(config_map)}"
+        )
+    config_class = config_map[selected_config_name]
     app.config.from_object(config_class)
     app.config['FLASK_CONFIG'] = selected_config_name
 
-    if app.config.get("DEBUG_SKIP_LOGIN") and not app.config.get("DEBUG", False):
-        raise RuntimeError("DEBUG_SKIP_LOGIN is enabled but DEBUG is false. Refusing to start.")
+    from app.utils.security_startup import validate_security_settings
+    validate_security_settings(app)
 
     env_asset_version = (
         os.environ.get('ASSET_VERSION')
@@ -73,19 +77,19 @@ def create_app(config_name=None):
     app.jinja_env.trim_blocks = True
     app.jinja_env.lstrip_blocks = True
 
-    try:
+    if app.config.get('TRUST_PROXY_HEADERS'):
         from werkzeug.middleware.proxy_fix import ProxyFix
-        trust_proxy_raw = os.environ.get(
-            'TRUST_PROXY_HEADERS',
-            'true' if selected_config_name == 'production' else 'false',
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=app.config['PROXY_FIX_X_FOR'],
+            x_proto=app.config['PROXY_FIX_X_PROTO'],
+            x_host=app.config['PROXY_FIX_X_HOST'],
+            x_port=app.config['PROXY_FIX_X_PORT'],
+            x_prefix=app.config['PROXY_FIX_X_PREFIX'],
         )
-        if str(trust_proxy_raw).strip().lower() == 'true':
-            app.wsgi_app = ProxyFix(
-                app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1
-            )
-            app.logger.info("ProxyFix enabled: trusting X-Forwarded-* headers")
-    except Exception as e:
-        app.logger.warning("ProxyFix not enabled: %s", e)
+        app.logger.info(
+            "ProxyFix enabled: trusting %d X-Forwarded-For hop(s)", app.config['PROXY_FIX_X_FOR']
+        )
 
     db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
     if not db_uri:
@@ -210,12 +214,6 @@ def create_app(config_name=None):
     total_startup_time = time.time() - startup_start
     if total_startup_time > 1.0:
         app.logger.debug("Application initialization completed in %.3fs", total_startup_time)
-
-    try:
-        from app.utils.rate_limiting import warn_if_multi_worker_without_redis
-        warn_if_multi_worker_without_redis(app)
-    except Exception:
-        pass
 
     return app
 

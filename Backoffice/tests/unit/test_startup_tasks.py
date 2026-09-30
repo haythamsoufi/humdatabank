@@ -532,12 +532,8 @@ class TestAuditAdminRouteGuards:
 
         mock_app.logger.warning.assert_called()
 
-    def test_error_mode_logs_debug_when_runtime_error_raised(self):
-        """In 'error' mode with unprotected routes, RuntimeError is caught by outer handler.
-
-        The outer try/except in audit_admin_route_guards catches the RuntimeError and
-        logs it at debug level instead of propagating it.
-        """
+    def test_error_mode_raises_runtime_error(self):
+        """In 'error' mode unguarded routes fail startup."""
         fn = self._import()
 
         mock_view = MagicMock()
@@ -557,12 +553,11 @@ class TestAuditAdminRouteGuards:
         mock_app.view_functions.get.return_value = mock_view
 
         with patch.dict(os.environ, {"RBAC_ADMIN_ROUTE_GUARD_MODE": "error"}):
-            fn(mock_app)  # should NOT raise — outer except catches RuntimeError
+            with pytest.raises(RuntimeError):
+                fn(mock_app)
 
-        mock_app.logger.debug.assert_called()
-
-    def test_strict_mode_logs_debug_when_runtime_error_raised(self):
-        """In 'strict' mode with unprotected routes, RuntimeError is caught by outer handler."""
+    def test_strict_mode_raises_runtime_error(self):
+        """In 'strict' mode unguarded routes fail startup."""
         fn = self._import()
 
         mock_view = MagicMock()
@@ -582,9 +577,8 @@ class TestAuditAdminRouteGuards:
         mock_app.view_functions.get.return_value = mock_view
 
         with patch.dict(os.environ, {"RBAC_ADMIN_ROUTE_GUARD_MODE": "strict"}):
-            fn(mock_app)  # should NOT raise
-
-        mock_app.logger.debug.assert_called()
+            with pytest.raises(RuntimeError):
+                fn(mock_app)
 
     def test_exempt_view_is_skipped(self):
         fn = self._import()
@@ -704,7 +698,7 @@ class TestAuditAdminRouteGuards:
         mock_view._rbac_guard_audit_exempt = False
         mock_view._rbac_admin_required = False
         mock_view._rbac_system_manager_required = False
-        mock_view._rbac_permissions_required = ["some_permission"]
+        mock_view._rbac_permissions_required = ["admin.some_permission"]
         mock_view._rbac_permissions_any_required = None
 
         mock_rule = MagicMock()

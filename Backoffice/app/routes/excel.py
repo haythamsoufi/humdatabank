@@ -8,6 +8,7 @@ from app.services.monitoring.memory import memory_tracker
 import openpyxl
 import io
 import time
+from app.services.imports.excel_service import ExcelService
 from app.services.imports.assignment_excel_access import (
     assignment_uses_export_excel,
     assignment_uses_import_excel,
@@ -48,6 +49,17 @@ def _validate_generic_excel_import_assignment(aes, *, is_ajax: bool):
         flash(msg, "warning")
         return None, redirect(url_for("assignments.view_assignment", aes_id=aes.id))
     return aes, None
+
+
+def _validate_assignment_editable_state(aes, *, is_ajax: bool):
+    """Imports write form data, so they need the same edit rights as the entry form."""
+    if not AuthorizationService.can_edit_assignment(aes, current_user):
+        error_msg = "This assignment is no longer in an editable state."
+        flash(error_msg, "warning")
+        if is_ajax:
+            return json_forbidden(error_msg)
+        return redirect(url_for("assignments.view_assignment", aes_id=aes.id))
+    return None
 
 
 @excel_bp.route("/assignment/<int:aes_id>/export", methods=["GET"])

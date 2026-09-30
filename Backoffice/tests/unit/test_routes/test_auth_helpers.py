@@ -27,7 +27,7 @@ from app.routes.auth import (
     _generate_reset_token,
     _verify_reset_token,
     _send_password_reset_email,
-    _mobile_deep_link_for_user,
+    _mobile_oauth_redirect,
 )
 from app.utils.datetime_helpers import utcnow
 from tests.factories import create_test_user
@@ -41,42 +41,39 @@ class TestAccountLockout:
             assert _is_account_locked_out(email) is False
 
     def test_locked_after_threshold_failures(self, app, db_session):
+        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
             email = 'locked@example.com'
-            for _ in range(10):
-                db_session.add(UserLoginLog(
-                    email_attempted=email,
-                    event_type='login_failed',
-                    timestamp=utcnow(),
-                    ip_address='127.0.0.1',
-                ))
-            db_session.commit()
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD - 1):
+                record_login_failure(email)
+            assert _is_account_locked_out(email) is False
+            record_login_failure(email)
             assert _is_account_locked_out(email) is True
 
+    def test_lockout_is_case_insensitive(self, app, db_session):
+        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
+        with app.app_context():
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
+                record_login_failure('Mixed.Case@Example.com')
+            assert _is_account_locked_out('mixed.case@example.com') is True
+
     def test_success_after_failures_resets_lockout(self, app, db_session):
+        from app.utils.login_security import (
+            ACCOUNT_LOCKOUT_THRESHOLD, clear_login_failures, record_login_failure,
+        )
         with app.app_context():
             email = 'reset-lock@example.com'
-            for _ in range(10):
-                db_session.add(UserLoginLog(
-                    email_attempted=email,
-                    event_type='login_failed',
-                    timestamp=utcnow(),
-                    ip_address='127.0.0.1',
-                ))
-            db_session.add(UserLoginLog(
-                email_attempted=email,
-                event_type='login',
-                timestamp=utcnow(),
-                ip_address='127.0.0.1',
-            ))
-            db_session.commit()
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
+                record_login_failure(email)
+            assert _is_account_locked_out(email) is True
+            clear_login_failures(email)
             assert _is_account_locked_out(email) is False
 
-    def test_db_error_fails_closed(self, app):
-        from app.models.core import UserLoginLog
+    def test_store_error_fails_closed(self, app):
+        from app.utils.auth_state import AuthStateUnavailable
         with app.app_context():
-            with patch.object(UserLoginLog, 'query') as mock_query:
-                mock_query.filter.side_effect = RuntimeError('db')
+            with patch('app.utils.login_security.get_auth_state') as mock_state:
+                mock_state.return_value.get_counter.side_effect = AuthStateUnavailable('down')
                 assert _is_account_locked_out('any@example.com') is True
 
 
@@ -154,12 +151,30 @@ class TestDevActAsHelpers:
             assert _is_dev_act_as_enabled(require_loopback=True) is True
 
     def test_get_dev_act_as_users_includes_access_label(self, app, db_session):
-        user = create_test_user(db_session, email='act-as-user@example.com', name='Act As User')
+        user = create_test_user(db_session, email='test_focal@humdatabank.org', name='Act As User')
         with app.test_request_context('/'):
             users = _get_dev_act_as_users()
         match = [u for u in users if u['id'] == user.id]
         assert len(match) == 1
         assert match[0]['access_label'] == 'User'
+
+    def test_get_dev_act_as_users_excludes_non_seeded_users(self, app, db_session):
+        seeded = create_test_user(db_session, email='test_admin@humdatabank.org', name='Seeded')
+        real = create_test_user(db_session, email='real.person@example.org', name='Real Person')
+        with app.test_request_context('/'):
+            ids = {u['id'] for u in _get_dev_act_as_users()}
+        assert seeded.id in ids
+        assert real.id not in ids
+
+    def test_extra_emails_config_extends_allow_list(self, app, db_session):
+        extra = create_test_user(db_session, email='dev.helper@example.org', name='Dev Helper')
+        app.config['DEV_ACT_AS_EXTRA_EMAILS'] = ['dev.helper@example.org']
+        try:
+            with app.test_request_context('/'):
+                ids = {u['id'] for u in _get_dev_act_as_users()}
+        finally:
+            app.config['DEV_ACT_AS_EXTRA_EMAILS'] = []
+        assert extra.id in ids
 
     def test_resolve_preset_by_email(self, app, db_session, monkeypatch):
         monkeypatch.setenv('FLASK_CONFIG', 'development')
@@ -202,7 +217,7 @@ class TestDevActAsHelpers:
 
         monkeypatch.setenv('FLASK_CONFIG', 'development')
         app.config['DEBUG'] = True
-        user = create_test_user(db_session, email='route-act-as@example.com', name='Route User')
+        user = create_test_user(db_session, email='test_admin@humdatabank.org', name='Route User')
 
         with app.test_request_context(
             '/login/dev-act-as',
@@ -216,6 +231,40 @@ class TestDevActAsHelpers:
         mock_complete.assert_called_once()
         assert mock_complete.call_args.args[0].id == user.id
         assert resp.status_code == 302
+
+    def test_dev_act_as_route_refuses_non_seeded_user_id(self, app, db_session, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        victim = create_test_user(db_session, email='real.admin@example.org', name='Real Admin')
+
+        with app.test_request_context(
+            '/login/dev-act-as',
+            method='POST',
+            data={'user_id': str(victim.id)},
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            with patch('app.routes.auth._complete_dev_act_as_login') as mock_complete:
+                resp = dev_act_as_login()
+        mock_complete.assert_not_called()
+        assert resp.status_code == 302
+
+    def test_dev_act_as_route_404_when_forwarding_header_present(self, app, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+        from werkzeug.exceptions import NotFound
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+
+        with app.test_request_context(
+            '/login/dev-act-as',
+            method='POST',
+            headers={'X-Forwarded-For': '203.0.113.9'},
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            with pytest.raises(NotFound):
+                dev_act_as_login()
 
     def test_dev_act_as_route_prefers_preset_over_invalid_user_id(self, app, db_session, monkeypatch):
         from app.routes.auth import dev_act_as_login
@@ -333,15 +382,36 @@ class TestPasswordResetHelpers:
 
 
 @pytest.mark.unit
-class TestMobileDeepLinkForUser:
-    def test_returns_oauth_success_redirect(self, app, db_session, test_user):
-        with app.app_context():
-            with app.test_request_context():
-                session['session_id'] = 'web-session-123'
-                response = _mobile_deep_link_for_user(test_user)
-        assert response.status_code in (301, 302, 303, 307, 308)
+class TestMobileOAuthRedirect:
+    def test_challenge_yields_code_only_redirect(self, app, db_session, test_user):
+        from app.utils.mobile_oauth_code import _challenge_for
+        challenge = _challenge_for('v' * 64)
+        with app.test_request_context():
+            session['session_id'] = 'web-session-123'
+            response = _mobile_oauth_redirect(test_user, session.get('session_id'), challenge)
         location = response.headers.get('Location', '')
-        assert location.startswith('humdatabank://oauth-success')
+        assert location.startswith('humdatabank://oauth-success?code=')
+        assert 'access_token' not in location
+        assert 'refresh_token' not in location
+
+    def test_legacy_client_gets_tokens_while_flag_on(self, app, db_session, test_user):
+        app.config['MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK'] = True
+        with app.test_request_context():
+            response = _mobile_oauth_redirect(test_user, 'web-session-123', None)
+        location = response.headers.get('Location', '')
+        assert location.startswith('humdatabank://oauth-success?')
+        assert 'access_token=' in location
+
+    def test_legacy_client_rejected_when_flag_off(self, app, db_session, test_user):
+        app.config['MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK'] = False
+        try:
+            with app.test_request_context():
+                response = _mobile_oauth_redirect(test_user, 'web-session-123', None)
+        finally:
+            app.config['MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK'] = True
+        location = response.headers.get('Location', '')
+        assert location.startswith('humdatabank://oauth-error?')
+        assert 'access_token' not in location
 
 
 @pytest.mark.unit

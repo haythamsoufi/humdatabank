@@ -81,6 +81,8 @@ def _local_abs(category: str, rel_path: str) -> str:
 def _blob_name(category: str, rel_path: str) -> str:
     """Build the blob name: category/rel_path (forward-slash), or *rel_path* when category is empty."""
     safe_rel = _normalize_rel(rel_path)
+    if any(seg in (".", "..") for seg in safe_rel.split("/")):
+        raise PermissionError("Blob name must not contain relative path segments")
     if category:
         return f"{category}/{safe_rel}"
     return safe_rel
@@ -105,6 +107,47 @@ def _get_container_client():
 def _guess_mimetype(filename: str) -> str:
     mt, _ = mimetypes.guess_type(filename or "")
     return mt or "application/octet-stream"
+
+
+# Types a browser executes or renders as a document when navigated to directly. Serving them
+# inline from the app origin turns any user-supplied file into stored XSS, so they are always
+# delivered as attachments regardless of what the caller asked for.
+_ACTIVE_CONTENT_MIMETYPES = frozenset({
+    "text/html",
+    "application/xhtml+xml",
+    "image/svg+xml",
+    "text/xml",
+    "application/xml",
+    "text/javascript",
+    "application/javascript",
+    "application/x-javascript",
+    "text/css",
+})
+_ACTIVE_CONTENT_EXTENSIONS = (".svg", ".svgz", ".html", ".htm", ".xhtml", ".xml", ".js", ".mjs", ".css")
+
+UPLOAD_RESPONSE_CSP = "default-src 'none'; sandbox"
+
+
+def is_active_content(mimetype: Optional[str], filename: Optional[str] = None) -> bool:
+    """True when a browser would execute or render *mimetype*/*filename* as a document."""
+    mt = (mimetype or "").split(";", 1)[0].strip().lower()
+    if mt in _ACTIVE_CONTENT_MIMETYPES or mt.endswith("+xml"):
+        return True
+    return (filename or "").lower().endswith(_ACTIVE_CONTENT_EXTENSIONS)
+
+
+def harden_upload_response(response, *, mimetype: Optional[str], as_attachment: bool):
+    """Apply the standard defensive headers to a response that serves user-supplied bytes.
+
+    ``nosniff`` stops content-type guessing; the ``default-src 'none'; sandbox`` policy
+    neutralises scripts if a file is opened directly. Inline PDFs are exempt from the
+    sandbox policy because Chrome refuses to render them under it.
+    """
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    inline_pdf = (not as_attachment) and (mimetype or "").split(";", 1)[0].strip().lower() == "application/pdf"
+    if not inline_pdf:
+        response.headers["Content-Security-Policy"] = UPLOAD_RESPONSE_CSP
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -171,9 +214,15 @@ def stream_response(
     This replaces direct ``send_file`` / ``send_from_directory`` calls.
     For Azure Blob, files larger than ``_AZURE_STREAM_THRESHOLD`` are
     streamed in chunks to avoid buffering the entire blob in memory.
+
+    Every response carries ``nosniff`` and a locked-down CSP (see
+    :func:`harden_upload_response`), and active content (HTML, SVG, XML, JS) is always
+    sent as an attachment even when ``as_attachment=False`` was requested.
     """
     safe_rel = _normalize_rel(rel_path)
     effective_mime = mimetype or _guess_mimetype(filename)
+    if not as_attachment and is_active_content(effective_mime, filename):
+        as_attachment = True
 
     if not exists(category, safe_rel):
         from werkzeug.exceptions import NotFound
@@ -204,11 +253,15 @@ def stream_response(
                 headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{dump_header(filename)}"
             else:
                 headers["Content-Disposition"] = f"inline; filename*=UTF-8''{dump_header(filename)}"
-            return FlaskResponse(_generate(), headers=headers)
+            return harden_upload_response(
+                FlaskResponse(_generate(), headers=headers),
+                mimetype=effective_mime,
+                as_attachment=as_attachment,
+            )
 
         content = blob.download_blob().readall()
         buf = io.BytesIO(content)
-        return send_file(
+        response = send_file(
             buf,
             mimetype=effective_mime,
             as_attachment=as_attachment,
@@ -216,12 +269,13 @@ def stream_response(
         )
     else:
         abs_path = _local_abs(category, safe_rel)
-        return send_file(
+        response = send_file(
             abs_path,
             mimetype=effective_mime,
             as_attachment=as_attachment,
             download_name=filename,
         )
+    return harden_upload_response(response, mimetype=effective_mime, as_attachment=as_attachment)
 
 
 def delete(category: str, rel_path: str) -> bool:
@@ -393,13 +447,20 @@ def submitted_document_rel_storage_category(rel_path: str | None) -> str:
 
 def _is_effectively_absolute_stored_path(sp: str) -> bool:
     """True for normal OS absolute paths and for POSIX /foo/... (Linux deploy paths
-    on Windows return False for :func:`os.path.isabs`, so we need this for Azure-style paths)."""
+    on Windows return False for :func:`os.path.isabs`, so we need this for Azure-style paths).
+
+    UNC / network-share style paths (``//host/...``) are intentionally *not*
+    treated as local absolute paths — callers must not ``send_file`` them.
+    """
     if not sp or not (sp.strip()):
+        return False
+    s = (sp or "").replace("\\", "/")
+    # os.path.isabs('//share') is True on POSIX; reject UNC before that check.
+    if s.startswith("//"):
         return False
     if os.path.isabs(sp):
         return True
-    s = (sp or "").replace("\\", "/")
-    if s.startswith("/") and not s.startswith("//"):
+    if s.startswith("/"):
         return True
     return False
 

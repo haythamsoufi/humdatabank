@@ -11,6 +11,8 @@ class TestGeneratePdfThumbnailToStorage:
         from app.services.content.thumbnail_service import ThumbnailService
 
         mock_page = MagicMock()
+        mock_page.rect.width = 612
+        mock_page.rect.height = 792
         mock_pix = MagicMock()
         mock_pix.tobytes.return_value = b"fake-png"
         mock_page.get_pixmap.return_value = mock_pix
@@ -35,6 +37,10 @@ class TestGeneratePdfThumbnailToStorage:
              ), \
              patch.dict("sys.modules", {"fitz": mock_fitz}), \
              patch("PIL.Image", mock_pil), \
+             patch(
+                 "app.services.content.thumbnail_service.open_image_safe",
+                 return_value=mock_image,
+             ), \
              patch("app.services.platform.storage_service.upload", return_value="thumb/path.png"):
             result = ThumbnailService.generate_pdf_thumbnail_to_storage(
                 "/tmp/test.pdf", "folder123", language_code="en",

@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_page_header.html" import page_header %}
+{% from "admin/api_keys/_access_summary.html" import access_summary %}
 {% from "components/_status_label.html" import status_label, status_label_for_active, status_label_for_generic_status %}
 
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
@@ -111,6 +112,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Client Name') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Key Prefix') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Access') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Rate Limit') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Created') }}</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Last Used') }}</th>
@@ -140,6 +142,9 @@
                         {% else %}
                             {{ status_label_for_active(false) }}
                         {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap items-center gap-1">{{ access_summary(access_by_key[key.id], compact=True) }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {{ key.rate_limit_per_minute }}/min

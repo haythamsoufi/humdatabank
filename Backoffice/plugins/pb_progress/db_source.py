@@ -15,6 +15,7 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
+from app.utils.sql_utils import ilike_contains
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.form_items import FormItem
 from app.models.forms import FormData
@@ -87,7 +88,7 @@ def validate_uploaded_workbook(path: Path | str) -> dict[str, Any]:
     try:
         excel_file = pd.ExcelFile(workbook_path)
     except Exception as exc:
-        raise WorkbookValidationError(f"Cannot read Excel file: {exc}") from exc
+        raise WorkbookValidationError("Cannot read the Excel file. Check that it is a valid .xlsx workbook.") from exc
 
     missing_required = [sheet for sheet in REQUIRED_UPLOAD_SHEETS if sheet not in excel_file.sheet_names]
     if missing_required:
@@ -1042,7 +1043,7 @@ def _build_total_reported(final_df: pd.DataFrame) -> pd.DataFrame:
                 AssignmentEntityStatus.entity_type == "country",
                 or_(
                     AssignedForm.period_name == str(year),
-                    AssignedForm.period_name.ilike(f"%{year}%"),
+                    ilike_contains(AssignedForm.period_name, year),
                 ),
                 AssignmentEntityStatus.status.in_(("approved", "submitted")),
             )

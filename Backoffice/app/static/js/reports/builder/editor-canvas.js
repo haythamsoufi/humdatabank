@@ -154,7 +154,14 @@ export class EditorCanvas {
 
         const header = document.createElement('div');
         header.className = 'rb-editor-section-header';
-        header.innerHTML = '<div class="rb-editor-section-title">' + title + '</div><div class="rb-editor-section-meta">' + this.builder.describeSection(section) + '</div>';
+        const titleEl = document.createElement('div');
+        titleEl.className = 'rb-editor-section-title';
+        titleEl.textContent = title;
+        const metaEl = document.createElement('div');
+        metaEl.className = 'rb-editor-section-meta';
+        metaEl.textContent = this.builder.describeSection(section);
+        header.appendChild(titleEl);
+        header.appendChild(metaEl);
         header.addEventListener('click', (e) => {
             if (e.target.closest('.rb-editor-slot')) return;
             this.builder.selectSection(section.id);
@@ -194,7 +201,19 @@ export class EditorCanvas {
 
         const toolbar = document.createElement('div');
         toolbar.className = 'rb-editor-slot-toolbar';
-        toolbar.innerHTML = '<span class="rb-editor-slot-type">' + (localized.type || 'widget') + '</span><button type="button" class="rb-editor-slot-action" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>';
+        const typeEl = document.createElement('span');
+        typeEl.className = 'rb-editor-slot-type';
+        typeEl.textContent = localized.type || 'widget';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'rb-editor-slot-action';
+        deleteBtn.dataset.action = 'delete';
+        deleteBtn.title = 'Delete';
+        const trashIcon = document.createElement('i');
+        trashIcon.className = 'fas fa-trash';
+        deleteBtn.appendChild(trashIcon);
+        toolbar.appendChild(typeEl);
+        toolbar.appendChild(deleteBtn);
         toolbar.addEventListener('click', (e) => {
             e.stopPropagation();
             if (e.target.closest('[data-action="delete"]')) this.builder.deleteWidgetById(widget.id);
@@ -268,7 +287,11 @@ export class EditorCanvas {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'rb-editor-insert-option';
-            btn.innerHTML = '<i class="fas ' + item.icon + '" aria-hidden="true"></i> ' + item.label;
+            const icon = document.createElement('i');
+            icon.className = 'fas ' + item.icon;
+            icon.setAttribute('aria-hidden', 'true');
+            btn.appendChild(icon);
+            btn.appendChild(document.createTextNode(' ' + item.label));
             btn.addEventListener('click', () => {
                 this.closeMenus();
                 this.builder.insertWidgetAt(sectionId, item.type, index);
@@ -286,11 +309,15 @@ export class EditorCanvas {
         try {
             const payload = await this.fetchPreviewPayload(widgetId);
             this._slotPayloadCache[widgetId] = payload;
-            previewHost.innerHTML = '';
+            previewHost.replaceChildren();
             await renderWidget(previewHost, payload);
             if (titleEl && payload.title) titleEl.textContent = payload.title;
         } catch (err) {
-            previewHost.innerHTML = '<div class="rb-editor-slot-error">' + (err.message || 'Preview failed') + '</div>';
+            previewHost.replaceChildren();
+            const errEl = document.createElement('div');
+            errEl.className = 'rb-editor-slot-error';
+            errEl.textContent = (err && err.message) || 'Preview failed';
+            previewHost.appendChild(errEl);
         } finally {
             this._loadingWidgets.delete(widgetId);
         }

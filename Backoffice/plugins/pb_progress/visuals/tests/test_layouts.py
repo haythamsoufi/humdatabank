@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT.parent / "tests"))
 
 from pb_figures.layouts import (  # noqa: E402
     NS_TABLE_IMPLEMENTING_COUNT,
@@ -27,6 +29,8 @@ from pb_figures.layouts import (  # noqa: E402
     visible_indicator_ids,
 )
 from pb_figures.payload import build_sp_payload  # noqa: E402
+from pb_figures.translations import clear_cache  # noqa: E402
+from workbook_fixtures import sp1_mapping_row, temporary_report_excel  # noqa: E402
 
 
 def _sample_mapping() -> pd.DataFrame:
@@ -46,6 +50,21 @@ def _sample_mapping() -> pd.DataFrame:
 
 
 class DynamicLayoutTests(unittest.TestCase):
+    def setUp(self) -> None:
+        clear_cache()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._excel = Path(self._tmpdir.name) / "SG Report.xlsx"
+        self._ctx = temporary_report_excel(
+            self._excel,
+            mapping_rows=[sp1_mapping_row()],
+        )
+        self._ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._ctx.__exit__(None, None, None)
+        self._tmpdir.cleanup()
+        clear_cache()
+
     def test_normalize_section_code_maps_cross_cutting_to_cc1(self) -> None:
         self.assertEqual(normalize_section_code("Cross-cutting"), "CC1")
         self.assertEqual(normalize_section_code("CC1"), "CC1")

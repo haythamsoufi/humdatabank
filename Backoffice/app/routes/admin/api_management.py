@@ -139,8 +139,10 @@ bp = Blueprint('api_management', __name__, url_prefix='/admin')
 #
 # auth values (consistent vocabulary across surfaces):
 #   'public'             – no auth required
-#   'api_key'            – @require_api_key (Bearer: DB api_keys row, or MOBILE_APP_API_KEY env if no row)
-#   'api_key_or_session' – @require_api_key_or_session or runtime authenticate_api_request()
+#   'api_key'            – @require_api_key(capability=...): DB api_keys row holding that capability
+#                          (the deprecated MOBILE_APP_API_KEY env key only gets MOBILE_APP_API_KEY_CAPABILITIES)
+#   'api_key_or_session' – @require_api_key_or_session(capability=...) or @api_capability(...) +
+#                          runtime authenticate_api_request(); a session user is checked by RBAC instead
 #   'session'            – @login_required (Flask-Login session)
 #   'ai_session'         – resolve_ai_identity() (session or AI Bearer JWT)
 #   'user'               – @mobile_auth_required (mobile JWT or session)
@@ -836,6 +838,18 @@ def _auth_for_view(view_fn) -> tuple[str, str | None]:
     return auth, perm
 
 
+def _capability_for_view(view_fn) -> str | None:
+    """API-key capability declared on a view (see app.utils.auth), following ``__wrapped__``."""
+    seen = 0
+    while view_fn is not None and seen < 20:
+        capability = getattr(view_fn, '_ep_capability', None)
+        if capability is not None:
+            return capability
+        view_fn = getattr(view_fn, '__wrapped__', None)
+        seen += 1
+    return None
+
+
 def _collect_plugin_api_endpoints() -> list[dict]:
     """Registry rows contributed by loaded plugins via ``get_api_endpoints()``."""
     try:
@@ -902,6 +916,7 @@ def scan_flask_routes(app) -> dict:
 
         view_fn  = app.view_functions.get(rule.endpoint)
         ep_auth, ep_perm = _auth_for_view(view_fn) if view_fn else (None, None)
+        ep_capability = _capability_for_view(view_fn)
 
         # For AI routes without a decorator tag, fall back to heuristic
         if ep_auth is None and surface == 'ai':
@@ -914,6 +929,7 @@ def scan_flask_routes(app) -> dict:
             'surface':    surface,
             'ep_auth':    ep_auth,    # None means "not tagged"
             'ep_perm':    ep_perm,
+            'ep_capability': ep_capability,
             'endpoint':   rule.endpoint,
             'in_registry': norm in registry_paths,
         })
@@ -1043,6 +1059,15 @@ def api_management():
         if _normalize_path(ep['path']) in stale_paths:
             ep['stale'] = True
 
+    # Show the API-key capability each key-protected route enforces (declared in code, not hand-maintained)
+    capability_by_path = {
+        r['path']: r['ep_capability'] for r in scan['live'] if r.get('ep_capability')
+    }
+    for ep in all_endpoints:
+        capability = capability_by_path.get(_normalize_path(ep['path']))
+        if capability and ep.get('auth') in ('api_key', 'api_key_or_session') and not ep.get('permission'):
+            ep['permission'] = capability
+
     # Append undocumented live routes at the end (shown with warning badge)
     for live_ep in scan['undocumented']:
         # Best-guess auth from decorator tag; fall back to '?' for truly unknown
@@ -1053,7 +1078,7 @@ def api_management():
             'path':         live_ep['path'],
             'methods':      live_ep['methods'],
             'auth':         auth,
-            'permission':   live_ep['ep_perm'] or '',
+            'permission':   live_ep['ep_perm'] or live_ep.get('ep_capability') or '',
             'description':  '⚠ Route exists in Flask url_map but is not in the registry.',
             'consumers':    '',
             'rate_limited': False,

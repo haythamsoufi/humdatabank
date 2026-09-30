@@ -216,10 +216,13 @@ class TestGetPeriods:
         """Returns distinct period names from assigned forms."""
         from tests.factories import create_test_template
         with app.app_context():
-            tmpl = create_test_template(db_session)
-            db_session.add(AssignedForm(template_id=tmpl.id, period_name="2023"))
-            db_session.add(AssignedForm(template_id=tmpl.id, period_name="2024"))
-            db_session.add(AssignedForm(template_id=tmpl.id, period_name="2024"))  # duplicate
+            tmpl1 = create_test_template(db_session)
+            tmpl2 = create_test_template(db_session)
+            db_session.add(AssignedForm(template_id=tmpl1.id, period_name="2023"))
+            db_session.add(AssignedForm(template_id=tmpl1.id, period_name="2024"))
+            # Same period on another template — distinct API must still return "2024" once.
+            # (template_id, period_name) is unique, so duplicates cannot share one template.)
+            db_session.add(AssignedForm(template_id=tmpl2.id, period_name="2024"))
             db_session.commit()
 
         resp = client.get(_api("/periods"), headers=auth_headers)

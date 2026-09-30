@@ -39,6 +39,20 @@ class TestIssueTokens:
         resp = client.post(f'{PREFIX}/auth/token', json={
             'email': 'inactive@test.com', 'password': 'Pass123!',
         })
+        assert resp.status_code == 401
+        assert 'deactivated' not in resp.get_data(as_text=True).lower()
+
+    def test_inactive_user_reveal_flag_returns_403(self, client, db_session, app):
+        from tests.factories import create_test_user
+        with app.app_context():
+            create_test_user(db_session, email='inactive2@test.com', password='Pass123!', active=False)
+        app.config['MOBILE_REVEAL_DEACTIVATED_ACCOUNT'] = True
+        try:
+            resp = client.post(f'{PREFIX}/auth/token', json={
+                'email': 'inactive2@test.com', 'password': 'Pass123!',
+            })
+        finally:
+            app.config['MOBILE_REVEAL_DEACTIVATED_ACCOUNT'] = False
         assert resp.status_code == 403
 
 
@@ -150,17 +164,10 @@ class TestExchangeSession:
 @pytest.mark.integration
 class TestIssueTokensLockout:
     def test_account_locked_returns_429(self, client, mobile_user, db_session, app):
-        from app.models.core import UserLoginLog
-        from app.utils.datetime_helpers import utcnow
+        from app.utils.login_security import ACCOUNT_LOCKOUT_THRESHOLD, record_login_failure
         with app.app_context():
-            for _ in range(10):
-                db_session.add(UserLoginLog(
-                    email_attempted='mobile@test.com',
-                    event_type='login_failed',
-                    timestamp=utcnow(),
-                    ip_address='127.0.0.1',
-                ))
-            db_session.commit()
+            for _ in range(ACCOUNT_LOCKOUT_THRESHOLD):
+                record_login_failure('mobile@test.com')
         resp = client.post(f'{PREFIX}/auth/token', json={
             'email': 'mobile@test.com', 'password': 'MobilePass123!',
         })
@@ -269,7 +276,7 @@ class TestMobileAuthRoutesExtended:
             'email': 'mobile@test.com', 'password': 'MobilePass123!',
         })
         refresh_token = login_resp.get_json()['data']['refresh_token']
-        with patch('app.services.platform.user_analytics_service.is_session_blacklisted', return_value=True):
+        with patch('app.services.platform.user_analytics_service.should_block_mobile_jwt_session', return_value=True):
             resp = client.post(f'{PREFIX}/auth/refresh', json={'refresh_token': refresh_token})
         assert resp.status_code == 401
 
@@ -285,6 +292,7 @@ class TestMobileAuthRoutesExtended:
             sess = UserSessionLog.query.filter_by(session_id=claims.sid).first()
             if sess:
                 sess.is_active = False
+                sess.ended_by = 'inactivity_timeout'
                 db_session.commit()
         resp = client.post(f'{PREFIX}/auth/refresh', json={'refresh_token': refresh_token})
         assert resp.status_code == 200

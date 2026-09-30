@@ -18,6 +18,7 @@ from app.models.indicator_bank import IndicatorBank
 from contextlib import suppress
 from app.services.monitoring.memory import memory_tracker
 import openpyxl
+from app.utils.safe_workbook import load_workbook_safe
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -81,7 +82,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
         preview = {'name': None, 'pages': 0, 'sections': 0, 'items': 0}
 
         try:
-            workbook = openpyxl.load_workbook(io.BytesIO(excel_file.read()), data_only=True)
+            workbook = load_workbook_safe(excel_file, read_only=False, data_only=True)
         except Exception as e:
             current_app.logger.error(f"Failed to load Excel file for validation: {e}", exc_info=True)
             cls._matrix_import_log(f"validate: failed to load workbook: {e}", level='error')
@@ -302,7 +303,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
         try:
             # Load workbook
             current_app.logger.info("Loading Excel workbook...")
-            workbook = openpyxl.load_workbook(io.BytesIO(excel_file.read()), data_only=True)
+            workbook = load_workbook_safe(excel_file, read_only=False, data_only=True)
             current_app.logger.info(f"Workbook loaded. Sheets found: {workbook.sheetnames}")
             cls._scan_workbook_matrix_items(workbook, stage='import-pre-scan')
 

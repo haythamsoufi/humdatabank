@@ -7,6 +7,7 @@ Detailed setup and configuration for optional Backoffice features and production
 - **[LibreTranslate](libretranslate.md)** – Optional translation service (Docker, env vars, enabling).
 - **[Azure storage mounts](azure-storage.md)** – Path mappings (Azure Files) for persistent files (e.g., translations).
 - **[AI chat and RAG](ai-configuration.md)** – AI chatbot and document search: providers, env vars, migrations, health checks.
+- **[API keys and permissions](api-keys-and-permissions.md)** – Capability model, data scoping, presets, legacy key migration, route classification.
 - **[Security](security.md)** – SECRET_KEY, API keys, CORS, rate limiting, deployment checklist.
 
 For day-to-day use and quick start, see the [Backoffice README](../../README.md).

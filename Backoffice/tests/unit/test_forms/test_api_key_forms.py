@@ -25,7 +25,7 @@ class TestAPIKeyForm:
     def test_valid_minimal(self, app):
         with app.app_context():
             from app.forms.system.api_key_forms import APIKeyForm
-            form = APIKeyForm(data={'client_name': 'Mobile App'})
+            form = APIKeyForm(data={'client_name': 'Mobile App', 'capabilities': ['reference:read']})
             assert form.validate() is True
 
     def test_missing_client_name(self, app):
@@ -47,6 +47,7 @@ class TestAPIKeyForm:
             from app.forms.system.api_key_forms import APIKeyForm
             form = APIKeyForm(formdata=ImmutableMultiDict([
                 ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                 ('client_description', 'A nice description'),
             ]))
             assert form.validate() is True
@@ -56,6 +57,7 @@ class TestAPIKeyForm:
             from app.forms.system.api_key_forms import APIKeyForm
             form = APIKeyForm(formdata=ImmutableMultiDict([
                 ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                 ('client_description', 'x' * 1001),
             ]))
             assert form.validate() is False
@@ -66,6 +68,7 @@ class TestAPIKeyForm:
             from app.forms.system.api_key_forms import APIKeyForm
             form = APIKeyForm(formdata=ImmutableMultiDict([
                 ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                 ('rate_limit_per_minute', '100'),
             ]))
             assert form.validate() is True
@@ -75,6 +78,7 @@ class TestAPIKeyForm:
             from app.forms.system.api_key_forms import APIKeyForm
             form = APIKeyForm(formdata=ImmutableMultiDict([
                 ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                 ('rate_limit_per_minute', '0'),
             ]))
             assert form.validate() is False
@@ -85,6 +89,7 @@ class TestAPIKeyForm:
             from app.forms.system.api_key_forms import APIKeyForm
             form = APIKeyForm(formdata=ImmutableMultiDict([
                 ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                 ('rate_limit_per_minute', '10001'),
             ]))
             assert form.validate() is False
@@ -98,6 +103,7 @@ class TestAPIKeyForm:
             with patch('app.forms.system.api_key_forms.utcnow', return_value=datetime.utcnow()):
                 form = APIKeyForm(formdata=ImmutableMultiDict([
                     ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                     ('expires_at', future.strftime('%Y-%m-%dT%H:%M')),
                 ]))
                 assert form.validate() is True
@@ -109,6 +115,7 @@ class TestAPIKeyForm:
             with patch('app.forms.system.api_key_forms.utcnow', return_value=datetime.utcnow()):
                 form = APIKeyForm(formdata=ImmutableMultiDict([
                     ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                     ('expires_at', past.strftime('%Y-%m-%dT%H:%M')),
                 ]))
                 result = form.validate()
@@ -147,7 +154,7 @@ class TestAPIKeyEditForm:
     def test_valid_minimal(self, app):
         with app.app_context():
             from app.forms.system.api_key_forms import APIKeyEditForm
-            form = APIKeyEditForm(data={'client_name': 'Updated App'})
+            form = APIKeyEditForm(data={'client_name': 'Updated App', 'capabilities': ['reference:read']})
             assert form.validate() is True
 
     def test_missing_client_name(self, app):
@@ -164,6 +171,7 @@ class TestAPIKeyEditForm:
             with patch('app.forms.system.api_key_forms.utcnow', return_value=datetime.utcnow()):
                 form = APIKeyEditForm(formdata=ImmutableMultiDict([
                     ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                     ('expires_at', future.strftime('%Y-%m-%dT%H:%M')),
                 ]))
                 assert form.validate() is True
@@ -175,6 +183,7 @@ class TestAPIKeyEditForm:
             with patch('app.forms.system.api_key_forms.utcnow', return_value=datetime.utcnow()):
                 form = APIKeyEditForm(formdata=ImmutableMultiDict([
                     ('client_name', 'App'),
+                ('capabilities', 'reference:read'),
                     ('expires_at', past.strftime('%Y-%m-%dT%H:%M')),
                 ]))
                 result = form.validate()

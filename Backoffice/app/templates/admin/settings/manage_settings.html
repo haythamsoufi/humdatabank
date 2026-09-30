@@ -35,6 +35,28 @@
     ]
 ) }}
 
+{% if security_config_flags %}
+<div class="mb-4 space-y-3">
+  {% for flag in security_config_flags %}
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900" role="status">
+    {% if flag == 'mobile_jwt_missing' %}
+      <p class="font-medium">{{ _('MOBILE_JWT_SECRET is not set') }}</p>
+      <p class="mt-1">{{ _('Mobile tokens are signed with SECRET_KEY. Set a dedicated secret of at least 32 characters that is different from SECRET_KEY.') }}</p>
+    {% elif flag == 'mobile_jwt_same' %}
+      <p class="font-medium">{{ _('MOBILE_JWT_SECRET matches SECRET_KEY') }}</p>
+      <p class="mt-1">{{ _('Use a different value for MOBILE_JWT_SECRET so a leaked session secret does not sign mobile tokens.') }}</p>
+    {% elif flag == 'mobile_jwt_short' %}
+      <p class="font-medium">{{ _('MOBILE_JWT_SECRET is too short') }}</p>
+      <p class="mt-1">{{ _('Use at least 32 characters.') }}</p>
+    {% elif flag == 'enable_ssh' %}
+      <p class="font-medium">{{ _('Container SSH is disabled') }}</p>
+      <p class="mt-1">{{ _('ENABLE_SSH is not true, so Azure portal SSH will not connect. Set ENABLE_SSH=true on the app if break-glass SSH is required.') }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="bg-white shadow-md border border-gray-200">
   {# no-submit-guard: async save calls preventDefault(); global FormSubmitGuard would reset the button in bubble phase.
      enctype is pinned to urlencoded so a no-JS / failed-orchestrator fallback never silently flips the
@@ -460,7 +482,7 @@
       <div class="branding-visual-upload-box">
       <div class="mb-3 max-w-4xl space-y-1.5">
         <p class="text-xs text-gray-400">{{ _('Azure Blob uploads are enabled. Choose image files below; they are stored in your configured Azure Blob container (same as other uploads), under system/branding/. After uploading, click Save so the paths are recorded in branding settings.') }}</p>
-        <p class="text-xs text-gray-400">{{ _('Formats: PNG, JPEG, GIF, WebP, and SVG for the logo; favicon also accepts ICO. Maximum 2 MB per file.') }}</p>
+        <p class="text-xs text-gray-400">{{ _('Formats: PNG, JPEG, GIF, and WebP for the logo; favicon also accepts ICO. SVG uploads are not accepted (use a bundled static SVG via the path field). Maximum 2 MB per file.') }}</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -493,7 +515,7 @@
           <input type="file"
                  id="branding-logo-file"
                  class="file-input-hidden"
-                 accept=".png,.jpg,.jpeg,.gif,.webp,.svg,image/png,image/jpeg,image/gif,image/webp,image/svg+xml" />
+                 accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp" />
 
           <div class="flex items-center gap-2 flex-wrap">
             <label for="branding-logo-file"
@@ -538,7 +560,7 @@
           <input type="file"
                  id="branding-favicon-file"
                  class="file-input-hidden"
-                 accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.ico,image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon" />
+                 accept=".png,.jpg,.jpeg,.gif,.webp,.ico,image/png,image/jpeg,image/gif,image/webp,image/x-icon" />
 
           <div class="flex items-center gap-2 flex-wrap">
             <label for="branding-favicon-file"

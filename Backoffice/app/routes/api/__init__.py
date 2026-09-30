@@ -36,3 +36,16 @@ def register_api_blueprints(app):
     # NOW register the blueprint with all routes already added
     # All modules above register their routes directly to api_bp during import
     app.register_blueprint(api_bp)
+
+    @app.after_request
+    def _harden_query_string_api_key_responses(response):
+        """Keys sent as ``?api_key=`` leak via URLs, logs and Referer; make that visible and limit it."""
+        from flask import g
+
+        if getattr(g, 'api_key_via_query', False):
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['Warning'] = (
+                '299 - "API key sent in the query string is deprecated; '
+                'send it in the Authorization: Bearer header"'
+            )
+        return response

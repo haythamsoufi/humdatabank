@@ -5,11 +5,26 @@ from flask import request, current_app
 from flask_login import current_user
 
 from app import db
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.mobile_auth import mobile_auth_required
 from app.utils.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_not_found, mobile_server_error,
 )
 from app.routes.api.mobile import mobile_bp
+
+
+def _notify_added_to_countries(user_id, country_ids):
+    try:
+        if len(country_ids) == 1:
+            from app.services.notification.core import notify_user_added_to_country
+
+            notify_user_added_to_country(user_id, country_ids[0])
+        else:
+            from app.services.notification.core import notify_user_added_to_countries
+
+            notify_user_added_to_countries(user_id, country_ids)
+    except Exception as e:
+        current_app.logger.error("notify_user_added_to_country(ies) failed: %s", e, exc_info=True)
 
 
 @mobile_bp.route('/admin/access-requests', methods=['GET'])
@@ -57,7 +72,7 @@ def list_access_requests():
 
 
 @mobile_bp.route('/admin/access-requests/<int:request_id>/approve', methods=['POST'])
-@mobile_auth_required(permissions=('admin.access_requests.approve', 'admin.users.edit'))
+@mobile_auth_required(permission='admin.access_requests.approve')
 def approve_access_request(request_id):
     """Approve a country access request (admin)."""
     from app.models import CountryAccessRequest, Country
@@ -79,6 +94,23 @@ def approve_access_request(request_id):
         req.processed_by_user_id = current_user.id
         req.processed_at = db.func.now()
         db.session.flush()
+        log_admin_action(
+            action_type='access_request_approve',
+            description=f'Approved country access request for {user.email} to {country.name}',
+            target_type='country_access_request',
+            target_id=request_id,
+            target_description=f'User: {user.email}, Country: {country.name}',
+            new_values={
+                'user_id': user.id,
+                'user_email': user.email,
+                'country_id': country.id,
+                'country_name': country.name,
+                'status': 'approved',
+            },
+            risk_level='low',
+        )
+        db.session.flush()
+        _notify_added_to_countries(user.id, [country.id])
         return mobile_ok(message='Access request approved')
     except Exception as e:
         current_app.logger.error("approve_access_request: %s", e, exc_info=True)
@@ -88,7 +120,7 @@ def approve_access_request(request_id):
 
 
 @mobile_bp.route('/admin/access-requests/<int:request_id>/reject', methods=['POST'])
-@mobile_auth_required(permissions=('admin.access_requests.reject', 'admin.users.edit'))
+@mobile_auth_required(permission='admin.access_requests.reject')
 def reject_access_request(request_id):
     """Reject a country access request (admin)."""
     from app.models import CountryAccessRequest
@@ -100,9 +132,32 @@ def reject_access_request(request_id):
         return mobile_bad_request('This request has already been processed.')
 
     try:
+        from app.models import Country
+        from app.models import User as UserModel
+
+        user = UserModel.query.get(req.user_id)
+        country = Country.query.get(req.country_id)
         req.status = 'rejected'
         req.processed_by_user_id = current_user.id
         req.processed_at = db.func.now()
+        db.session.flush()
+        user_email = user.email if user else 'unknown'
+        country_name = country.name if country else 'unknown'
+        log_admin_action(
+            action_type='access_request_reject',
+            description=f'Rejected country access request for {user_email} to {country_name}',
+            target_type='country_access_request',
+            target_id=request_id,
+            target_description=f'User: {user_email}, Country: {country_name}',
+            new_values={
+                'user_id': req.user_id,
+                'user_email': user.email if user else None,
+                'country_id': req.country_id,
+                'country_name': country.name if country else None,
+                'status': 'rejected',
+            },
+            risk_level='low',
+        )
         db.session.flush()
         return mobile_ok(message='Access request rejected')
     except Exception as e:
@@ -113,7 +168,7 @@ def reject_access_request(request_id):
 
 
 @mobile_bp.route('/admin/access-requests/approve-all', methods=['POST'])
-@mobile_auth_required(permissions=('admin.access_requests.approve', 'admin.users.edit'))
+@mobile_auth_required(permission='admin.access_requests.approve')
 def approve_all_access_requests():
     """Bulk-approve all pending access requests."""
     from app.models import CountryAccessRequest, Country
@@ -138,6 +193,7 @@ def approve_all_access_requests():
     } if country_ids else {}
 
     approved_count = 0
+    approved_country_ids_by_user = {}
     try:
         for req in pending:
             user = users_by_id.get(req.user_id)
@@ -147,8 +203,27 @@ def approve_all_access_requests():
                 req.status = 'approved'
                 req.processed_by_user_id = current_user.id
                 req.processed_at = db.func.now()
+                db.session.flush()
+                log_admin_action(
+                    action_type='access_request_approve',
+                    description=f'Bulk-approved country access request for {user.email} to {country.name}',
+                    target_type='country_access_request',
+                    target_id=req.id,
+                    target_description=f'User: {user.email}, Country: {country.name}',
+                    new_values={
+                        'user_id': user.id,
+                        'user_email': user.email,
+                        'country_id': country.id,
+                        'country_name': country.name,
+                        'status': 'approved',
+                    },
+                    risk_level='low',
+                )
+                approved_country_ids_by_user.setdefault(user.id, []).append(country.id)
                 approved_count += 1
         db.session.flush()
+        for user_id, country_ids in approved_country_ids_by_user.items():
+            _notify_added_to_countries(user_id, country_ids)
         return mobile_ok(message=f'{approved_count} request(s) approved', data={'approved_count': approved_count})
     except Exception as e:
         current_app.logger.error("approve_all_access_requests: %s", e, exc_info=True)

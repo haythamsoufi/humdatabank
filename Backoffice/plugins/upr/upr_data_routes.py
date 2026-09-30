@@ -21,6 +21,7 @@ from app.utils.api_helpers import (
     json_response,
 )
 from app.utils.auth import require_api_key_or_session
+from app.services.security.api_key_permissions import DATA_READ
 from app.utils.error_handling import handle_json_view_exception
 from plugins.upr import bp
 from plugins.upr.api_cache import get_or_build_upr_payload
@@ -231,14 +232,14 @@ def _extract_response(body, *, cache_hit: bool):
 
 
 @bp.route("/api/v1/upr", methods=["GET"])
-@require_api_key_or_session(browser_login_redirect=True)
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_docs():
     """Query parameters and response columns for the UPR extracts."""
     return json_response(upr_api_documentation())
 
 
 @bp.route("/api/v1/upr/data", methods=["GET"])
-@require_api_key_or_session(browser_login_redirect=True)
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_data():
     """Long-form UPR facts and submissions. Comment answers are rows in data."""
     try:
@@ -283,7 +284,7 @@ def get_upr_data():
 
 
 @bp.route("/api/v1/upr/submissions", methods=["GET"])
-@require_api_key_or_session(browser_login_redirect=True)
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_submissions():
     """Country assignment statuses across all UPR rounds."""
     try:
@@ -323,7 +324,7 @@ def get_upr_submissions():
 
 
 @bp.route("/api/v1/upr/master", methods=["GET"])
-@require_api_key_or_session(browser_login_redirect=True)
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
 def get_upr_master():
     """Flat rows matching the UPR Master workbook sheet ``UPR Data``."""
     try:

@@ -11,9 +11,10 @@ from app.models import User, Country, UserEntityPermission, NSBranch, NSSubBranc
 from app.models.organization import SecretariatRegionalOffice, SecretariatClusterOffice
 from app.models.enums import EntityType
 from app.routes.admin.shared import permission_required
+from app.routes.admin.user_management.helpers import entity_grant_scope_denial
 from app.services.organization.entity_service import EntityService
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_ok_result, json_server_error, json_error, require_json_keys
+from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_ok_result, json_server_error, json_error, require_json_keys
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.sql_utils import safe_ilike_pattern
 
@@ -110,6 +111,10 @@ def add_user_entity(user_id):
         if not entity:
             return json_not_found('Entity not found')
 
+        denial = entity_grant_scope_denial(current_user, user, entity_type, entity_id)
+        if denial:
+            return json_forbidden(denial)
+
         # Check if permission already exists
         existing_perm = UserEntityPermission.query.filter_by(
             user_id=user_id,
@@ -162,6 +167,10 @@ def remove_user_entity(user_id, permission_id):
     try:
         user = User.query.get_or_404(user_id)
         perm = UserEntityPermission.query.filter_by(id=permission_id, user_id=user_id).first_or_404()
+
+        denial = entity_grant_scope_denial(current_user, user, perm.entity_type, perm.entity_id)
+        if denial:
+            return json_forbidden(denial)
 
         # For country entities, also remove from legacy user.countries
         if perm.entity_type == EntityType.country.value:

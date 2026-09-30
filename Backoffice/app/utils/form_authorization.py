@@ -283,6 +283,427 @@ def check_document_access(f):
     return decorated_function
 
 
+# ========== Object-level authorization for child objects ==========
+#
+# Every object that hangs off an AssignmentEntityStatus (repeat instances, dynamic
+# indicators, discussion comments, form data, ...) or a PublicSubmission inherits the
+# access rules of its owner. Routes that receive the *child* id must resolve the owner
+# and authorize with the right verb instead of relying on @login_required or a coarse
+# country check. All of that lives here so routes stay one-liners:
+#
+#   ctx, err = authorize_child_json(RepeatGroupInstance, instance_id, AES_ACTION_EDIT,
+#                                   label="Repeat instance")
+#   if err is not None:
+#       return err
+#
+# Verbs map onto AuthorizationService (same rules as the entry form itself):
+#   view   -> can_access_assignment
+#   edit   -> can_edit_assignment   (status / round / delegation aware)
+#   submit -> can_submit_assignment
+#
+# Error policy:
+#   * Child addressed by its own id: missing and out-of-scope are indistinguishable (404);
+#     a caller who may view but not perform the verb gets 403.
+#   * Assignment addressed by id in the request (AES-scoped endpoints): 403 with the
+#     generic "Assignment not found or access denied" message, as ensure_aes_access did.
+
+AES_ACTION_VIEW = "view"
+AES_ACTION_EDIT = "edit"
+AES_ACTION_SUBMIT = "submit"
+PUBLIC_SUBMISSION_ACTION_VIEW = "view"
+PUBLIC_SUBMISSION_ACTION_EDIT = "edit"
+PUBLIC_SUBMISSION_ACTION_MANAGE = "manage"
+
+AUTH_OK = "ok"
+AUTH_HIDDEN = "hidden"
+AUTH_FORBIDDEN = "forbidden"
+
+ASSIGNMENT_NOT_FOUND_MESSAGE = "Assignment not found or access denied"
+
+_PUBLIC_SUBMISSION_MANAGE_PERMISSION = "admin.assignments.public_submissions.manage"
+
+
+def aes_action_allowed(aes, user, action: str = AES_ACTION_VIEW) -> bool:
+    """True when ``user`` may perform ``action`` (view/edit/submit) on ``aes``."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if aes is None or user is None:
+        return False
+    if action == AES_ACTION_VIEW:
+        return AuthorizationService.can_access_assignment(aes, user)
+    if action == AES_ACTION_EDIT:
+        return AuthorizationService.can_edit_assignment(aes, user)
+    if action == AES_ACTION_SUBMIT:
+        return AuthorizationService.can_submit_assignment(aes, user)
+    raise ValueError(f"Unknown assignment action: {action!r}")
+
+
+def check_aes_action(aes, user, action: str = AES_ACTION_VIEW) -> str:
+    """Tri-state decision: ``AUTH_OK``, ``AUTH_HIDDEN`` (cannot even view) or ``AUTH_FORBIDDEN``."""
+    if aes is None or not aes_action_allowed(aes, user, AES_ACTION_VIEW):
+        return AUTH_HIDDEN
+    if action != AES_ACTION_VIEW and not aes_action_allowed(aes, user, action):
+        return AUTH_FORBIDDEN
+    return AUTH_OK
+
+
+def load_aes_for_user(aes_id, user, action: str = AES_ACTION_VIEW):
+    """Return the AES when ``user`` may perform ``action`` on it, else ``None``.
+
+    For non-response contexts (HTML redirects, optional request hints such as an
+    ``aes_id`` query parameter) where the caller only needs allowed-or-not.
+    """
+    try:
+        aes_pk = int(aes_id)
+    except (TypeError, ValueError):
+        return None
+    from app.extensions import db
+
+    aes = db.session.get(AssignmentEntityStatus, aes_pk)
+    if check_aes_action(aes, user, action) != AUTH_OK:
+        return None
+    return aes
+
+
+def authorize_aes_json(aes_id, action: str = AES_ACTION_EDIT, *, forbidden_message: Optional[str] = None):
+    """JSON guard for endpoints that receive an assignment id in the request.
+
+    Returns ``(aes, None)`` on success or ``(None, response)``.
+    """
+    from app.extensions import db
+    from app.utils.api_responses import json_forbidden
+
+    try:
+        aes_pk = int(aes_id)
+    except (TypeError, ValueError):
+        return None, json_forbidden(ASSIGNMENT_NOT_FOUND_MESSAGE)
+
+    aes = db.session.get(AssignmentEntityStatus, aes_pk)
+    decision = check_aes_action(aes, current_user, action)
+    if decision == AUTH_HIDDEN:
+        return None, json_forbidden(ASSIGNMENT_NOT_FOUND_MESSAGE)
+    if decision == AUTH_FORBIDDEN:
+        return None, json_forbidden(forbidden_message or "You cannot modify this assignment")
+    return aes, None
+
+
+def public_submission_access(submission, user, action: str = PUBLIC_SUBMISSION_ACTION_VIEW) -> str:
+    """Tri-state decision for a PublicSubmission.
+
+    view   -> System Manager, ``admin.assignments.public_submissions.manage`` or access to the
+              submission's country.
+    edit   -> manage permission, or country access plus ``assignment.enter``.
+    manage -> System Manager or the manage permission (approve / reject / delete / status).
+    """
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if submission is None or user is None or not getattr(user, "is_authenticated", False):
+        return AUTH_HIDDEN
+
+    can_manage = AuthorizationService.is_system_manager(user) or AuthorizationService.has_rbac_permission(
+        user, _PUBLIC_SUBMISSION_MANAGE_PERMISSION
+    )
+    country_ok = can_manage or AuthorizationService.has_country_access(user, submission.country_id)
+    if not country_ok:
+        return AUTH_HIDDEN
+    if action == PUBLIC_SUBMISSION_ACTION_VIEW or can_manage:
+        return AUTH_OK
+    if action == PUBLIC_SUBMISSION_ACTION_EDIT and AuthorizationService.has_rbac_permission(user, "assignment.enter"):
+        return AUTH_OK
+    return AUTH_FORBIDDEN
+
+
+class ChildAccess:
+    """Resolved owner of a child object after a successful authorization."""
+
+    __slots__ = ("obj", "aes", "public_submission")
+
+    def __init__(self, obj, aes=None, public_submission=None):
+        self.obj = obj
+        self.aes = aes
+        self.public_submission = public_submission
+
+
+def resolve_child_owner(obj):
+    """Return ``(aes, public_submission)`` that own ``obj`` (either may be ``None``)."""
+    aes = getattr(obj, "assignment_entity_status", None)
+    if aes is None and getattr(obj, "assignment_entity_status_id", None):
+        from app.extensions import db
+
+        aes = db.session.get(AssignmentEntityStatus, obj.assignment_entity_status_id)
+    submission = None
+    if aes is None and getattr(obj, "public_submission_id", None):
+        submission = getattr(obj, "public_submission", None)
+        if submission is None:
+            from app.extensions import db
+
+            submission = db.session.get(PublicSubmission, obj.public_submission_id)
+    return aes, submission
+
+
+def authorize_child(obj, user, action: str = AES_ACTION_EDIT) -> str:
+    """Tri-state decision for ``action`` on a child object via its owning AES / public submission."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    aes, submission = resolve_child_owner(obj)
+    if aes is not None:
+        return check_aes_action(aes, user, action)
+    if submission is not None:
+        ps_action = PUBLIC_SUBMISSION_ACTION_VIEW if action == AES_ACTION_VIEW else PUBLIC_SUBMISSION_ACTION_EDIT
+        return public_submission_access(submission, user, ps_action)
+    # Orphans have no owner to inherit rules from: only the RBAC superuser may touch them.
+    return AUTH_OK if AuthorizationService.is_system_manager(user) else AUTH_HIDDEN
+
+
+def authorize_child_json(model, object_id, action: str = AES_ACTION_EDIT, *, label: str = "Item"):
+    """Load ``model`` by primary key and authorize ``action`` against its owning assignment.
+
+    Returns ``(ChildAccess, None)`` on success or ``(None, response)`` where the response is
+    404 (missing or outside the caller's scope) / 403 (visible but verb not permitted).
+    """
+    from app.extensions import db
+    from app.utils.api_responses import json_forbidden, json_not_found
+
+    obj = db.session.get(model, object_id)
+    if obj is None:
+        return None, json_not_found(f"{label} not found")
+
+    decision = authorize_child(obj, current_user, action)
+    if decision == AUTH_HIDDEN:
+        return None, json_not_found(f"{label} not found")
+    if decision == AUTH_FORBIDDEN:
+        return None, json_forbidden(f"You cannot modify this {label.lower()}")
+
+    aes, submission = resolve_child_owner(obj)
+    return ChildAccess(obj, aes=aes, public_submission=submission), None
+
+
+AES_LOCK_UNCHANGED = "unchanged"
+AES_LOCK_CHANGED = "changed"
+AES_LOCK_GONE = "gone"
+
+TRANSITION_OK = "ok"
+TRANSITION_GONE = "gone"
+TRANSITION_STALE = "stale_status"
+TRANSITION_FORBIDDEN = "forbidden"
+
+
+def _naive_timestamp(value):
+    if value is None or getattr(value, "tzinfo", None) is None:
+        return value
+    return value.replace(tzinfo=None)
+
+
+def _lock_aes_row(aes) -> str:
+    """Take ``SELECT ... FOR UPDATE`` on the row behind ``aes`` and reload ``aes`` if it moved.
+
+    Under READ COMMITTED a lock that had to wait returns the latest committed row version,
+    so comparing status and status timestamp with the in-memory instance reveals whether
+    another transaction transitioned it after this request loaded it.
+    """
+    from app.extensions import db
+    from sqlalchemy import select
+
+    before = (_assignment_status_value(aes), _naive_timestamp(getattr(aes, "status_timestamp", None)))
+    row = db.session.execute(
+        select(AssignmentEntityStatus.status, AssignmentEntityStatus.status_timestamp)
+        .where(AssignmentEntityStatus.id == aes.id)
+        .with_for_update()
+    ).one_or_none()
+    if row is None:
+        return AES_LOCK_GONE
+    current_status = row[0].value if hasattr(row[0], "value") else str(row[0])
+    if (current_status, _naive_timestamp(row[1])) == before:
+        return AES_LOCK_UNCHANGED
+    db.session.refresh(aes)
+    return AES_LOCK_CHANGED
+
+
+def lock_aes_for_update(aes) -> bool:
+    """Take a row lock on ``aes`` and reload it. Returns True if it changed (or vanished) meanwhile.
+
+    Workflow transitions must serialize on the assignment row, otherwise two concurrent
+    requests both pass the "allowed from this status" check and transition twice (double
+    notifications, double audit rows, approve over a just-reopened form). The lock lasts
+    until the request transaction ends (transaction middleware commit / rollback), so call
+    it immediately before the transition and never commit between the lock and the write.
+    Callers that must also re-validate use ``begin_aes_transition``.
+    """
+    return _lock_aes_row(aes) != AES_LOCK_UNCHANGED
+
+
+def lock_aes_rows_for_update(ids, *, assigned_form_id: Optional[int] = None) -> list:
+    """Lock several AES rows in ascending id order and return them freshly loaded.
+
+    Every bulk path must go through here: two bulk requests over overlapping sets would
+    otherwise lock in different orders and deadlock. Lock order across tables is always
+    AssignmentEntityStatus first, then AssignmentPageStatus / child rows.
+    """
+    from app.extensions import db
+    from sqlalchemy import select
+
+    unique_ids = sorted({int(i) for i in ids})
+    if not unique_ids:
+        return []
+    stmt = select(AssignmentEntityStatus).where(AssignmentEntityStatus.id.in_(unique_ids))
+    if assigned_form_id is not None:
+        stmt = stmt.where(AssignmentEntityStatus.assigned_form_id == assigned_form_id)
+    stmt = (
+        stmt.order_by(AssignmentEntityStatus.id)
+        .with_for_update(of=AssignmentEntityStatus)
+        .execution_options(populate_existing=True)
+    )
+    return list(db.session.execute(stmt).scalars().all())
+
+
+class AesTransition:
+    """Outcome of ``begin_aes_transition``; ``ok`` means the caller holds the lock and may write."""
+
+    __slots__ = ("reason", "status", "changed")
+
+    def __init__(self, reason: str, status: str, changed: bool = False):
+        self.reason = reason
+        self.status = status
+        self.changed = changed
+
+    @property
+    def ok(self) -> bool:
+        return self.reason == TRANSITION_OK
+
+    def __bool__(self) -> bool:
+        return self.ok
+
+
+def begin_aes_transition(aes, user, *, permission=None, allowed_from=None) -> AesTransition:
+    """Lock ``aes`` and re-validate the transition against the locked, current row.
+
+    ``permission`` is an ``AuthorizationService.can_*`` style callable ``(aes, user) -> bool``
+    evaluated after the lock so that status-dependent predicates see the fresh status.
+    ``allowed_from`` is an optional iterable of source statuses (enum members or strings).
+    """
+    state = _lock_aes_row(aes)
+    changed = state == AES_LOCK_CHANGED
+    if state == AES_LOCK_GONE:
+        return AesTransition(TRANSITION_GONE, "", True)
+    current = _assignment_status_value(aes)
+    if allowed_from is not None:
+        allowed = {s.value if hasattr(s, "value") else str(s) for s in allowed_from}
+        if current not in allowed:
+            return AesTransition(TRANSITION_STALE, current, changed)
+    if permission is not None and not permission(aes, user):
+        return AesTransition(TRANSITION_FORBIDDEN, current, changed)
+    return AesTransition(TRANSITION_OK, current, changed)
+
+
+_LOOKUP_LIST_ADMIN_PERMISSIONS = (
+    "admin.templates.view",
+    "admin.templates.edit",
+    "admin.templates.create",
+    "admin.assignments.view",
+    "admin.assignments.edit",
+)
+
+
+def _has_template_admin_permission(user) -> bool:
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if AuthorizationService.is_system_manager(user):
+        return True
+    return any(AuthorizationService.has_rbac_permission(user, code) for code in _LOOKUP_LIST_ADMIN_PERMISSIONS)
+
+
+def _reachable_template_filters(user, template_column) -> list:
+    """SQL filters restricting ``template_column`` to templates the non-admin ``user`` can reach.
+
+    Reachable means: assigned for one of the user's entities (needs ``assignment.view``), or
+    owned by / shared with the user (``get_user_allowed_template_ids``).
+    """
+    from app.models.assignments import AssignedForm
+    from app.models.core import UserEntityPermission
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.security.api_authentication import get_user_allowed_template_ids
+    from sqlalchemy import and_, select
+
+    filters = []
+    if AuthorizationService.has_rbac_permission(user, "assignment.view"):
+        entity_templates = (
+            select(AssignedForm.template_id)
+            .join(AssignmentEntityStatus, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+            .join(
+                UserEntityPermission,
+                and_(
+                    UserEntityPermission.entity_type == AssignmentEntityStatus.entity_type,
+                    UserEntityPermission.entity_id == AssignmentEntityStatus.entity_id,
+                    UserEntityPermission.user_id == user.id,
+                ),
+            )
+        )
+        filters.append(template_column.in_(entity_templates))
+
+    owned_or_shared = get_user_allowed_template_ids(user.id)
+    if owned_or_shared:
+        filters.append(template_column.in_(owned_or_shared))
+    return filters
+
+
+def user_can_access_template(user, template_id) -> bool:
+    """Whether ``user`` may read the structure of template ``template_id``.
+
+    System Managers and template/assignment admins may read any template; everyone else
+    needs an assignment for one of their entities or template ownership/share.
+    """
+    from app.extensions import db
+    from app.models import FormTemplate
+    from sqlalchemy import or_
+
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if _has_template_admin_permission(user):
+        return True
+    filters = _reachable_template_filters(user, FormTemplate.id)
+    if not filters:
+        return False
+    return db.session.query(
+        db.session.query(FormTemplate.id)
+        .filter(FormTemplate.id == template_id, or_(*filters))
+        .exists()
+    ).scalar() is True
+
+
+def user_can_read_lookup_list(user, list_id) -> bool:
+    """Whether ``user`` may read the rows of an admin-managed (numeric-id) lookup list.
+
+    Lookup lists are global reference data with no owner column, so access is derived from
+    use: the list must be referenced by a (non-archived) form item of a template the user
+    can reach - via an assignment for one of their entities, or template ownership/share -
+    unless the user is a System Manager or holds a template/assignment admin permission
+    (form builder, assignment admins).
+    """
+    from app.extensions import db
+    from app.models import FormItem
+    from sqlalchemy import or_
+
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if _has_template_admin_permission(user):
+        return True
+
+    list_key = str(list_id).strip()
+    if not list_key:
+        return False
+
+    template_filters = _reachable_template_filters(user, FormItem.template_id)
+    if not template_filters:
+        return False
+
+    referenced = db.session.query(FormItem.id).filter(
+        FormItem.lookup_list_id == list_key,
+        FormItem.archived.is_(False),
+        or_(*template_filters),
+    )
+    return db.session.query(referenced.exists()).scalar() is True
+
+
 def validate_country_list_access(user, country_ids: List[int]) -> List[int]:
     """
     Validate and filter a list of country IDs based on user access.

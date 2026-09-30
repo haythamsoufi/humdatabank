@@ -1,40 +1,29 @@
 """
 Redaction and trimming for activity log ``context_data['form_data']``.
 
-Policy: drop known-sensitive keys (passwords, tokens, secrets, CSRF) and
-truncate string values so large payloads are not stored verbatim. Keys are
-matched case-insensitively for substrings (e.g. ``password_confirm``).
+Policy: drop sensitive keys and truncate string values so large payloads are not
+stored verbatim. Which keys are sensitive is decided by the shared policy in
+``app.utils.logging_security`` (case-, separator- and camelCase-insensitive, e.g.
+``password_confirm``, ``newPassword``, ``X-Api-Key``), so activity logs, API usage
+rows and error/security events all redact the same way.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Optional
 
-# Substrings; if any appears in the lowercased key, the field is omitted.
-_SENSITIVE_KEY_SUBSTRINGS: tuple[str, ...] = (
-    "password",
-    "passwd",
-    "secret",
-    "token",
-    "csrf",
-    "api_key",
-    "apikey",
-    "authorization",
-    "credit_card",
-    "creditcard",
-    "cvv",
-    "ssn",
-    "otp",
-    "recovery_code",
-    "private_key",
-)
+from app.utils.logging_security import is_sensitive_key, sanitize_for_logging
 
 _DEFAULT_MAX_LEN = 100
 
 
 def _is_sensitive_key(key: str) -> bool:
-    k = (key or "").lower()
-    return any(s in k for s in _SENSITIVE_KEY_SUBSTRINGS)
+    return is_sensitive_key(key)
+
+
+def _clip(value: Any, cap: int) -> str:
+    text = sanitize_for_logging(value, max_length=10**9) if isinstance(value, str) else str(value)
+    return text[:cap] + ("..." if len(text) > cap else "")
 
 
 def redact_activity_form_data(
@@ -46,6 +35,7 @@ def redact_activity_form_data(
     Build a safe ``form_data`` dict from Werkzeug form pairs (or any key/value iterable).
 
     - Drops sensitive keys (see module docstring).
+    - Masks inline credentials (bearer tokens, JWTs, ``password=...``) inside values.
     - Truncates string values to ``max_value_len``; non-strings are stringified then truncated.
     """
     out: Dict[str, Any] = {}
@@ -55,11 +45,7 @@ def redact_activity_form_data(
     for key, value in form_items:
         if not key or _is_sensitive_key(key):
             continue
-        if isinstance(value, str):
-            out[key] = value[:cap] + ("..." if len(value) > cap else "")
-        else:
-            s = str(value)
-            out[key] = s[:cap] + ("..." if len(s) > cap else "")
+        out[key] = _clip(value, cap)
     return out
 
 

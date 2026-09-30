@@ -124,6 +124,7 @@ pnpm-debug.log*
 # Local tool/config files (do not track)
 .cursorignore
 .dockerignore
+!Backoffice/.dockerignore
 .gitattributes
 .claude/
 # Playwright MCP: keep screenshots/traces under here (see .cursor/mcp.json --output-dir)
@@ -156,6 +157,7 @@ pnpm-debug.log*
 /*.py
 /*.ps1
 /*.png
+/*.pdf
 
 # Accidental files
 .tmp/
@@ -168,6 +170,22 @@ pnpm-debug.log*
 
 # Local prod log extraction scratch space
 _prod_logs_temp/
+
+# Production operational artifacts: Kudu/App Service log downloads (client IPs, hostnames, request
+# URLs), API data exports and DB dumps must never be committed. See
+# Backoffice/docs/runbooks/security/committed-artifacts-history-purge.md
+Backoffice/prod-logs-incident/
+Backoffice/prod-logs*/
+Backoffice/prod-*.log
+Backoffice/prod_data*.json
+Backoffice/*_data_sample.json
+Backoffice/LogFiles/
+Backoffice/deployments/
+**/LogFiles/kudu/
+**/prod_data_sample.json
+*.dump.gz
+*.pgdump
+azure-credentials-*.txt
 
 # Local test / probe scratch output
 Backoffice/_nav_test.txt

@@ -368,13 +368,14 @@ print_info "2. Migrate your database using pg_restore"
 print_info "3. Deploy your application from Backoffice directory:"
 print_info "   cd .. (to Backoffice root)"
 print_info "   git push azure main:master"
-print_info "4. Create admin user: az webapp ssh and run 'flask create-admin'"
+print_info "4. Create admin user: set ENABLE_SSH=true on the app, then 'az webapp ssh' and run 'flask create-admin' (see docs/runbooks/operations/container-ssh-access.md); unset ENABLE_SSH afterwards"
 echo ""
 print_info "For detailed instructions, see azure/AZURE_DEPLOYMENT_GUIDE.md"
 echo ""
 
 # Save credentials to file
 CREDS_FILE="azure-credentials-$TIMESTAMP.txt"
+(umask 077 && : > "$CREDS_FILE")
 cat > "$CREDS_FILE" << EOF
 ========================================
 Azure Deployment Credentials

@@ -8,6 +8,7 @@ from flask import session, redirect, url_for, request
 from flask_login import logout_user, current_user
 from app.utils.request_utils import is_static_asset_request, is_json_request
 from app.utils.api_responses import json_auth_required
+from app.utils.mobile_auth import request_authenticated_by_jwt
 from app.utils.redirect_utils import get_current_relative_url
 from datetime import datetime, timezone
 from config import Config
@@ -21,7 +22,7 @@ from contextlib import suppress
 
 def _session_auth_failure_response():
     """Return JSON 401 for AJAX/API requests; HTML redirect for normal navigation."""
-    if is_json_request():
+    if is_json_request() or request.path.startswith('/api/'):
         return json_auth_required('Your session has expired. Please log in again.')
     return redirect(url_for('auth.login', next=get_current_relative_url()))
 
@@ -49,8 +50,10 @@ def handle_session_timeout():
     if is_static_asset_request(request):
         return None
 
-    # Skip session timeout check for JSON API routes (mobile app uses both prefixes)
-    if request.path.startswith('/api/v1/') or request.path.startswith('/api/mobile/v1/'):
+    # Bearer-JWT requests are bounded by the token's own expiry and session revocation
+    # (checked when the token was accepted). Everything else -- including cookie-
+    # authenticated calls to /api/ routes -- is subject to the idle timeout and blacklist.
+    if request_authenticated_by_jwt():
         return None
 
     # Skip auth-related routes that must be accessible without a valid session.
@@ -59,6 +62,9 @@ def handle_session_timeout():
     # still carries the blacklisted session_id cookie, triggering the same check.
     _auth_prefixes = ('/login', '/auth/', '/register', '/forgot-password', '/reset-password')
     if request.path == '/login' or request.path.startswith(_auth_prefixes):
+        return None
+
+    if request.path.startswith('/api/') and not current_user.is_authenticated:
         return None
 
     # Check if the session is blacklisted

@@ -42,6 +42,14 @@ az webapp log download --name <webapp-name> --resource-group <rg-name> --log-fil
 | `ERROR ... CSRF` | CSRF token mismatch. Common after session expiry or behind a misconfigured load balancer. |
 | `INFO ... cleaned up N sessions` | Normal — session cleanup ran. |
 
+### Request IDs and error responses
+
+Every response carries an `X-Request-ID` header (an inbound value is honoured if it is a safe token, otherwise one is generated). JSON errors (400/401/403/404/405/413/429/500/502/503) use one envelope: `success`, `error`, `message`, `error_code`, `request_id`; HTML error pages show `Reference: <id>`. In production the message is generic; ask the reporter for the reference ID and search the logs / the `security_events` record for it. Unhandled 500s persist only the exception type, a traceback hash, the top frames and the request ID, not the raw traceback or exception text.
+
+### Redaction in logs and stored payloads
+
+Sensitive keys (passwords, tokens, API keys, cookies, CSRF, secrets, JWT/Bearer values, OTP/SSN, ...) are masked by one shared policy (`app/utils/logging_security.py`) for API usage tracking, activity form data and security events. Gunicorn access and werkzeug logs mask sensitive query-string parameters. Stored API request bodies are capped at 8 KB and fall back to a keys-only summary.
+
 ### Enabling verbose form debugging
 
 For deep investigation of form save/load issues only — **disable after investigation**:

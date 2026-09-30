@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Country, IndicatorBank
+from app.utils.sql_utils import ilike_contains
 
 
 def _normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
@@ -63,8 +64,13 @@ def build_indicator_rule_query(rule: dict[str, Any] | None):
         )
 
     if normalized["search_text"]:
-        like = f"%{normalized['search_text']}%"
-        query = query.filter(or_(IndicatorBank.name.ilike(like), IndicatorBank.definition.ilike(like)))
+        search_text = normalized["search_text"]
+        query = query.filter(
+            or_(
+                ilike_contains(IndicatorBank.name, search_text),
+                ilike_contains(IndicatorBank.definition, search_text),
+            )
+        )
 
     programmes = normalized["related_programs_any"]
     tags = normalized["tags_any"]

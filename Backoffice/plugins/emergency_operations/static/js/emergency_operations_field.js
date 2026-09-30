@@ -547,11 +547,12 @@ export class EmergencyOperationsField {
         const linkEnabled = this.config?.enable_link !== false;
 
         // Helper function to escape HTML to prevent XSS
-        const escapeHtml = (text) => {
-          const div = document.createElement('div');
-          div.textContent = text;
-          return div.innerHTML;
-        };
+        const escapeHtml = (text) => String(text == null ? '' : text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
 
         const row = document.createElement('div');
         row.className = 'emops-item border border-gray-200 rounded-md p-3 bg-white';

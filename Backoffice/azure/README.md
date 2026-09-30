@@ -80,7 +80,8 @@ cd Backoffice/azure
 # View logs
 az webapp log tail --resource-group <rg> --name <app>
 
-# SSH into app
+# SSH into app (opt-in: set ENABLE_SSH=true first, unset after; see
+# docs/runbooks/operations/container-ssh-access.md)
 az webapp ssh --resource-group <rg> --name <app>
 
 # Restart app
@@ -108,7 +109,7 @@ az webapp log tail --resource-group <rg> --name <app>
 
 ### CSS not loading
 ```powershell
-# SSH and rebuild
+# SSH (requires ENABLE_SSH=true on the app) and rebuild
 az webapp ssh --resource-group <rg> --name <app>
 npm install && npm run build:css
 ```

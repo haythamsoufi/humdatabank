@@ -4,6 +4,7 @@ from flask import request, g, current_app
 from app.models.api_usage import APIUsage
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_usage_logging_skip import should_skip_api_usage_path
+from app.utils.logging_security import redact_payload_for_storage
 from app import db
 
 
@@ -56,18 +57,7 @@ def track_api_response(response):
             from sqlalchemy.orm import sessionmaker
             temp_db = sessionmaker(bind=db.engine)()
             try:
-                raw_data = get_json_safe()
-                if raw_data and isinstance(raw_data, dict):
-                    _REDACT_KEYS = {
-                        'password', 'password_hash', 'secret', 'token',
-                        'api_key', 'apikey', 'access_token', 'refresh_token',
-                        'secret_key', 'authorization', 'credit_card',
-                        'ssn', 'social_security',
-                    }
-                    raw_data = {
-                        k: '***REDACTED***' if k.lower() in _REDACT_KEYS else v
-                        for k, v in raw_data.items()
-                    }
+                stored_request_data = redact_payload_for_storage(get_json_safe())
 
                 # Also track API key usage if a database-managed key was used
                 api_key_id = getattr(g, 'api_key_usage_id', None)
@@ -88,7 +78,7 @@ def track_api_response(response):
                     status_code=response.status_code,
                     response_time=response_time,
                     user_agent=request.user_agent.string if request.user_agent else None,
-                    request_data=raw_data,
+                    request_data=stored_request_data,
                     api_key_id=api_key_id,
                 )
 
@@ -105,7 +95,7 @@ def track_api_response(response):
                         user_agent=request.user_agent.string if request.user_agent else None,
                         status_code=response.status_code,
                         response_time_ms=response_time,
-                        request_data=get_json_safe()
+                        request_data=stored_request_data,
                     )
 
                     temp_db.add(key_usage)

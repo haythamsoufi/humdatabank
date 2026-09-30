@@ -1379,6 +1379,8 @@ def export_preview_excel(template_id: int):
 
         # Save and return
         output = io.BytesIO()
+        from app.utils.export_safety import sanitize_workbook
+        sanitize_workbook(workbook)
         workbook.save(output)
         output.seek(0)
 

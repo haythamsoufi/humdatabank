@@ -433,9 +433,9 @@ class TestFailureWarrantsSecurityEvent:
         assert _failure_warrants_security_event({"code": "email_api_request_error"}) is True
 
     def test_no_api_key_only_in_prod(self):
-        with patch.dict(os.environ, {"FLASK_CONFIG": "testing"}):
+        with patch("app.services.email.protection._resolve_flask_config", return_value="testing"):
             assert _failure_warrants_security_event({"code": "no_email_api_key"}) is False
-        with patch.dict(os.environ, {"FLASK_CONFIG": "production"}):
+        with patch("app.services.email.protection._resolve_flask_config", return_value="production"):
             assert _failure_warrants_security_event({"code": "no_email_api_key"}) is True
 
     def test_no_sender_only_in_prod(self):

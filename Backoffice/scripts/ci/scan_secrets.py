@@ -48,6 +48,13 @@ class Finding:
 
 # Secret patterns to detect
 SECRET_PATTERNS: List[SecretPattern] = [
+    SecretPattern(
+        name="Hardcoded password passed to set_password()",
+        pattern=r'set_password\(\s*["\'][^"\']{3,}["\']\s*\)',
+        severity="critical",
+        description="Literal password used to create an account (seed scripts must not ship known credentials)",
+        fix_suggestion="Read it from an env var and fall back to secrets.token_urlsafe(16), printing it once",
+    ),
     # API Keys
     SecretPattern(
         name="Generic API Key",
@@ -239,7 +246,6 @@ FALSE_POSITIVE_PATTERNS = [
     r'example\.com',
     r'localhost',
     r'127\.0\.0\.1',
-    r'test123',
     r'password123',
     r'dummy',
     r'xxxxx',

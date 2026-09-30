@@ -297,7 +297,12 @@ class TestPasswordResetFlow:
 class TestAuthRouteHelpers:
     """Additional web auth route coverage."""
 
-    def test_check_register_email_available(self, client, db_session, app):
+    def test_check_register_email_disabled_by_default(self, client, app):
+        resp = client.get('/register/check-email?email=exists@example.com')
+        assert resp.status_code == 404
+
+    def test_check_register_email_available(self, client, db_session, app, monkeypatch):
+        monkeypatch.setitem(app.config, 'REGISTRATION_EMAIL_CHECK_ENABLED', True)
         with app.app_context():
             create_test_user(db_session, email='exists@example.com')
         with patch('app.routes.auth.is_azure_b2c_configured', return_value=False):
@@ -305,7 +310,8 @@ class TestAuthRouteHelpers:
         assert resp.status_code == 200
         assert resp.get_json()['exists'] is False
 
-    def test_check_register_email_taken(self, client, db_session, app):
+    def test_check_register_email_taken(self, client, db_session, app, monkeypatch):
+        monkeypatch.setitem(app.config, 'REGISTRATION_EMAIL_CHECK_ENABLED', True)
         with app.app_context():
             create_test_user(db_session, email='exists@example.com')
         with patch('app.routes.auth.is_azure_b2c_configured', return_value=False):

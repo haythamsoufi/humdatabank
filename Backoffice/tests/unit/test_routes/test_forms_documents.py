@@ -3,7 +3,8 @@
 All three routes are tested:
   - GET  /forms/download_document/<id>
   - POST /forms/delete_document/<id>
-  - GET  /forms/public-document/<id>/download
+  - GET  /forms/public-document/<uuid>/download
+  - GET  /forms/public-document/<id>/download  (deprecated redirect)
 """
 from __future__ import annotations
 
@@ -23,6 +24,14 @@ def _login(client, user_id):
     with client.session_transaction() as sess:
         sess["_user_id"] = str(user_id)
         sess["_fresh"] = True
+
+
+def _is_dashboard_location(location: str) -> bool:
+    """main.dashboard is mounted at `/` (not `/dashboard`)."""
+    from urllib.parse import urlparse
+
+    path = urlparse(location or "").path or "/"
+    return path == "/"
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +64,7 @@ class TestDownloadDocument:
         ):
             resp = client.get("/forms/download_document/99")
         assert resp.status_code == 302
-        assert "/dashboard" in resp.headers["Location"] or "dashboard" in resp.headers["Location"]
+        assert _is_dashboard_location(resp.headers["Location"])
 
     def test_file_not_found_returns_404(self, client, admin_user):
         """FileNotFoundError → 404."""
@@ -128,7 +137,7 @@ class TestDeleteDocument:
         ):
             resp = self._post(client)
         assert resp.status_code == 302
-        assert "dashboard" in resp.headers["Location"]
+        assert _is_dashboard_location(resp.headers["Location"])
 
     def test_permission_error_flashes_warning(self, client, admin_user):
         """PermissionError during delete → flash warning."""
@@ -174,7 +183,7 @@ class TestDeleteDocument:
             )
         assert resp.status_code == 302
         location = resp.headers["Location"]
-        assert "section=2" in location or "/forms/entry/3" in location or "dashboard" in location
+        assert "section=2" in location or "/forms/entry/3" in location or _is_dashboard_location(location)
 
     def test_unsafe_referrer_falls_back_to_dashboard(self, client, admin_user):
         """Referrer that fails is_safe_redirect_url → dashboard fallback."""
@@ -192,53 +201,77 @@ class TestDeleteDocument:
                 referrer="https://evil.example.com/steal",
             )
         assert resp.status_code == 302
-        assert "dashboard" in resp.headers["Location"]
+        assert _is_dashboard_location(resp.headers["Location"])
 
 
 # ---------------------------------------------------------------------------
-# download_public_document_public
+# download_public_document_by_public_id
 # ---------------------------------------------------------------------------
+
+_PUBLIC_ID = "8f14e45f-ceea-467a-9575-1c2d6b8e3a10"
+
 
 class TestDownloadPublicDocument:
-    """GET /forms/public-document/<id>/download"""
+    """GET /forms/public-document/<uuid>/download"""
+
+    def _url(self):
+        return f"/forms/public-document/{_PUBLIC_ID}/download"
 
     def test_success_returns_file(self, client, app):
-        """stream_public_download_response returns a valid response."""
         fake_resp = app.make_response("public file")
         fake_resp.headers["Content-Type"] = "application/pdf"
 
         with patch(
             "app.routes.forms.documents.DocumentService.stream_public_download_response",
             return_value=fake_resp,
-        ):
-            resp = client.get("/forms/public-document/5/download")
+        ) as mock_stream:
+            resp = client.get(self._url())
         assert resp.status_code == 200
+        (identifier,), _ = mock_stream.call_args
+        assert str(identifier) == _PUBLIC_ID
 
     def test_permission_error_returns_404(self, client):
-        """PermissionError → abort(404)."""
         with patch(
             "app.routes.forms.documents.DocumentService.stream_public_download_response",
             side_effect=PermissionError("private"),
         ):
-            resp = client.get("/forms/public-document/5/download")
+            resp = client.get(self._url())
+        assert resp.status_code == 404
+
+    def test_file_not_found_returns_404(self, client):
+        with patch(
+            "app.routes.forms.documents.DocumentService.stream_public_download_response",
+            side_effect=FileNotFoundError("missing"),
+        ):
+            resp = client.get(self._url())
+        assert resp.status_code == 404
+
+    def test_http_exception_propagates(self, client):
+        from werkzeug.exceptions import NotFound
+
+        with patch(
+            "app.routes.forms.documents.DocumentService.stream_public_download_response",
+            side_effect=NotFound(),
+        ):
+            resp = client.get(self._url())
         assert resp.status_code == 404
 
     def test_generic_exception_redirects_to_dashboard(self, client):
-        """Unexpected exception → flash danger + redirect to dashboard."""
         with patch(
             "app.routes.forms.documents.DocumentService.stream_public_download_response",
             side_effect=RuntimeError("storage offline"),
         ):
-            resp = client.get("/forms/public-document/99/download")
+            resp = client.get(self._url())
         assert resp.status_code == 302
 
     def test_public_route_no_login_required(self, client, app):
-        """Route is accessible without authentication."""
         fake_resp = app.make_response("data")
         with patch(
             "app.routes.forms.documents.DocumentService.stream_public_download_response",
             return_value=fake_resp,
         ):
-            resp = client.get("/forms/public-document/1/download")
-        # Should not redirect to login
+            resp = client.get(self._url())
         assert resp.status_code != 401
+
+    def test_non_uuid_segment_is_not_routed(self, client):
+        assert client.get("/forms/public-document/not-a-uuid/download").status_code == 404

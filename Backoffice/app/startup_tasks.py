@@ -116,57 +116,157 @@ def deferred_rbac_seed(app, selected_config_name, is_reloader):
     app.logger.info("RBAC auto-seed deferred to background thread")
 
 
-def audit_admin_route_guards(app):
+_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _view_guard_metadata(view):
+    permissions = list(getattr(view, "_rbac_permissions_required", None) or [])
+    permissions_any = list(getattr(view, "_rbac_permissions_any_required", None) or [])
+    return {
+        "admin_required": bool(getattr(view, "_rbac_admin_required", False)),
+        "system_manager": bool(getattr(view, "_rbac_system_manager_required", False)),
+        "permissions": permissions,
+        "permissions_any": permissions_any,
+        "exempt": bool(getattr(view, "_rbac_guard_audit_exempt", False)),
+    }
+
+
+def collect_admin_route_guard_findings(app):
     """
-    Lightweight static check that /admin routes have RBAC guard decorators.
+    Static check of guard decorators on /admin routes (and other privileged prefixes).
+
+    Returns a list of ``{"kind", "path", "endpoint", "detail"}`` dicts. Kinds:
+
+    * ``missing_guard`` - no RBAC decorator at all.
+    * ``non_admin_permission`` - guarded only by a non-``admin.*`` permission (no admin gate).
+    * ``read_permission_on_mutating_route`` - POST/PUT/PATCH/DELETE guarded only by ``*.view``.
+    * ``policy_system_manager`` / ``policy_post_only`` / ``policy_required_permission`` -
+      violations of ``app.routes.admin.route_policy``.
+    * ``get_side_effect_name`` - view named like a side effect that still accepts GET.
+    * ``csrf_exempt_mutation`` - CSRF-exempt mutating route not in the reviewed allowlist.
     """
+    from app.routes.admin import route_policy as policy
+
+    findings = []
+    csrf_exempt_names = set()
     try:
-        mode_raw = os.environ.get("RBAC_ADMIN_ROUTE_GUARD_MODE", "").strip().lower()
-        mode = mode_raw or ("warn" if app.debug else "warn")
-        if mode in {"off", "disabled", "0", "false", "no"}:
-            return
+        from app.extensions import csrf
 
-        problems = []
-        for rule in app.url_map.iter_rules():
-            try:
-                path = str(rule.rule or "")
-                if not path.startswith("/admin"):
-                    continue
-                endpoint = str(rule.endpoint or "")
-                view = app.view_functions.get(endpoint)
-                if view is None:
-                    continue
-                if bool(getattr(view, "_rbac_guard_audit_exempt", False)):
-                    continue
+        csrf_exempt_names = set(getattr(csrf, "_exempt_views", set()) or set())
+    except Exception:
+        csrf_exempt_names = set()
 
-                protected = bool(
-                    getattr(view, "_rbac_admin_required", False)
-                    or getattr(view, "_rbac_system_manager_required", False)
-                    or (getattr(view, "_rbac_permissions_required", None) not in (None, [], ()))
-                    or (getattr(view, "_rbac_permissions_any_required", None) not in (None, [], ()))
-                )
-                if not protected:
-                    problems.append((path, endpoint))
-            except Exception as e:
-                app.logger.debug("RBAC audit: skip rule %s: %s", getattr(rule, 'rule', ''), e)
+    prefixes = ("/admin",) + tuple(policy.EXTRA_AUDITED_PATH_PREFIXES)
+    for rule in app.url_map.iter_rules():
+        try:
+            path = str(rule.rule or "")
+            if not path.startswith(prefixes):
+                continue
+            endpoint = str(rule.endpoint or "")
+            view = app.view_functions.get(endpoint)
+            if view is None:
+                continue
+            meta = _view_guard_metadata(view)
+            methods = set(rule.methods or ()) - {"HEAD", "OPTIONS"}
+            mutating = bool(methods & _MUTATING_METHODS)
+
+            def _add(kind, detail=""):
+                findings.append({"kind": kind, "path": path, "endpoint": endpoint, "detail": detail})
+
+            if endpoint in policy.SYSTEM_MANAGER_ONLY_ENDPOINTS and not meta["system_manager"]:
+                _add("policy_system_manager", "endpoint must be System Manager only")
+            if endpoint in policy.POST_ONLY_ENDPOINTS and (methods - {"POST"}):
+                _add("policy_post_only", f"accepts {sorted(methods - {'POST'})}")
+            required_permission = policy.REQUIRED_PERMISSION_BY_ENDPOINT.get(endpoint)
+            if required_permission and required_permission not in (
+                meta["permissions"] + meta["permissions_any"]
+            ):
+                _add("policy_required_permission", f"requires {required_permission}")
+
+            if meta["exempt"]:
                 continue
 
-        if not problems:
-            return
+            permissions = meta["permissions"] + meta["permissions_any"]
+            protected = bool(meta["admin_required"] or meta["system_manager"] or permissions)
+            if not protected:
+                if path.startswith(policy.LOGIN_ONLY_READ_PATH_PREFIXES) and (
+                    not mutating or endpoint in policy.LOGIN_ONLY_POST_ALLOWLIST
+                ):
+                    continue
+                _add("missing_guard")
+                continue
 
-        details = "; ".join([f"{p} -> {e}" for p, e in problems[:50]])
-        msg = (
-            f"RBAC: detected {len(problems)} /admin route(s) without an RBAC guard decorator. "
+            if permissions and not (meta["admin_required"] or meta["system_manager"]):
+                non_admin = [
+                    p for p in permissions
+                    if not p.startswith(policy.ADMIN_PERMISSION_PREFIX)
+                    and not p.startswith(policy.NON_ADMIN_PERMISSION_ALLOWLIST_PREFIXES)
+                ]
+                if non_admin:
+                    _add("non_admin_permission", ", ".join(sorted(non_admin)))
+
+            if (
+                mutating
+                and permissions
+                and not meta["system_manager"]
+                and endpoint not in policy.READ_ONLY_POST_ALLOWLIST
+                and all(p.endswith(".view") for p in permissions)
+            ):
+                _add("read_permission_on_mutating_route", ", ".join(sorted(permissions)))
+
+            view_name = getattr(view, "__name__", "")
+            if (
+                methods == {"GET"}
+                and view_name.startswith(policy.SIDE_EFFECT_VIEW_PREFIXES)
+                and endpoint not in policy.GET_SIDE_EFFECT_NAME_ALLOWLIST
+            ):
+                _add("get_side_effect_name", view_name)
+
+            if (
+                mutating
+                and f"{getattr(view, '__module__', '')}.{view_name}" in csrf_exempt_names
+                and endpoint not in policy.CSRF_EXEMPT_MUTATION_ALLOWLIST
+            ):
+                _add("csrf_exempt_mutation")
+        except Exception as e:
+            app.logger.debug("RBAC audit: skip rule %s: %s", getattr(rule, "rule", ""), e)
+    return findings
+
+
+def audit_admin_route_guards(app):
+    """
+    Lightweight static check that /admin routes have RBAC guard decorators and follow route_policy.
+
+    ``RBAC_ADMIN_ROUTE_GUARD_MODE=error`` raises instead of logging a warning.
+    """
+    mode = os.environ.get("RBAC_ADMIN_ROUTE_GUARD_MODE", "").strip().lower() or "warn"
+    if mode in {"off", "disabled", "0", "false", "no"}:
+        return
+
+    try:
+        findings = collect_admin_route_guard_findings(app)
+    except Exception as e:
+        app.logger.debug("RBAC admin-route audit skipped/failed: %s", e)
+        return
+    if not findings:
+        return
+
+    missing = [f for f in findings if f["kind"] == "missing_guard"]
+    other = [f for f in findings if f["kind"] != "missing_guard"]
+    messages = []
+    if missing:
+        details = "; ".join(f"{f['path']} -> {f['endpoint']}" for f in missing[:50])
+        messages.append(
+            f"RBAC: detected {len(missing)} /admin route(s) without an RBAC guard decorator. "
             f"These routes may be unintentionally exposed. Examples: {details}"
         )
-        if mode in {"error", "strict", "raise"}:
-            raise RuntimeError(msg)
-        app.logger.warning(msg)
-    except Exception as e:
-        try:
-            app.logger.debug("RBAC admin-route audit skipped/failed: %s", e)
-        except Exception:
-            pass
+    if other:
+        details = "; ".join(f"[{f['kind']}] {f['path']} -> {f['endpoint']} {f['detail']}".strip() for f in other[:50])
+        messages.append(f"RBAC: {len(other)} route guard policy finding(s). Examples: {details}")
+    msg = " | ".join(messages)
+    if mode in {"error", "strict", "raise"}:
+        raise RuntimeError(msg)
+    app.logger.warning(msg)
 
 
 def run_startup_tasks(app, selected_config_name, is_reloader):

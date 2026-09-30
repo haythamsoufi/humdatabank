@@ -180,9 +180,11 @@
             <a href="{{ url_for('monitoring.download_monitoring_logs') }}" class="btn btn-secondary btn-sm">
                 <i class="fas fa-download mr-1"></i>{{ _('Download') }}
             </a>
+            {% if current_user_has_role('system_manager') or has_permission('admin.system.maintain') %}
             <button id="clear-logs" class="btn btn-danger">
                 <i class="fas fa-trash mr-1"></i>{{ _('Clear') }}
             </button>
+            {% endif %}
         </div>
     </div>
 

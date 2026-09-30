@@ -567,7 +567,7 @@
                         <div class="bg-blue-50 p-4 rounded-lg">
                             <p class="text-sm text-gray-700 mb-2"><strong>{{ _('Two Authentication Methods:') }}</strong></p>
                             <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
-                                <li><strong>{{ _('API Key:') }}</strong> {{ _('Full system access with paginated responses. Use') }} <code class="bg-gray-200 px-1 rounded">?api_key=YOUR_API_KEY</code></li>
+                                <li><strong>{{ _('API Key:') }}</strong> {{ _('Access is limited to the permissions granted to the key (see API Key Management) and responses are always paginated. Send it as') }} <code class="bg-gray-200 px-1 rounded">Authorization: Bearer YOUR_API_KEY</code>. {{ _('Passing it in the URL (?api_key=) only works for keys that were explicitly allowed to and is discouraged.') }}</li>
                                 <li><strong>{{ _('User Auth:') }}</strong> {{ _('HTTP Basic Auth or Flask-Login session. Returns all accessible data (no pagination) with access control filtering.') }}</li>
                             </ul>
                         </div>
@@ -1477,17 +1477,12 @@ try {
         window.getApiManagementApiKey = getApiKeyValue;
 
         function updateEndpointLinks() {
-            const apiKey = getApiKeyValue();
             const links = document.querySelectorAll('a.api-endpoint-link[data-endpoint-path]');
             links.forEach(a => {
                 const path = a.getAttribute('data-endpoint-path') || '';
                 if (!path) return;
                 const u = new URL(path, window.location.origin);
-                if (apiKey) {
-                    u.searchParams.set('api_key', apiKey);
-                } else {
-                    u.searchParams.delete('api_key');
-                }
+                u.searchParams.delete('api_key');
                 a.href = u.toString();
             });
         }
@@ -1689,12 +1684,7 @@ try {
             let baseEndpoint = document.getElementById('baseEndpoint').value;
             const params = collectEnabledQueryParams();
 
-            // Include API key only if provided by user
-            const apiKey = getApiKeyValue();
-            if (apiKey) {
-                params.append('api_key', apiKey);
-            }
-
+            // The key is never put in the URL (logs, history, Referer); send it as a Bearer header.
             // Final URL
             const finalUrl = `${window.location.origin}${baseEndpoint}${params.toString() ? '?' + params.toString() : ''}`;
             document.getElementById('generatedUrl').value = finalUrl;

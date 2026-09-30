@@ -281,7 +281,7 @@ Cross-guide: [Export and download data](user-guides/admin/export-download-data.m
 
 **Who:** `admin.api.manage` (or System Manager).
 
-**What you get:** Create, label, rotate, and revoke **database-backed API keys** used by external integrations (`Authorization: Bearer …`). Operational practices: [Security — API key security](setup/security.md#api-key-security).
+**What you get:** Create, label, rotate, and revoke **database-backed API keys** used by external integrations (`Authorization: Bearer …`). Each key is granted plain-language **capabilities** (form data, submissions, templates, personal data, reference data, public content, ...), optionally limited to specific templates/countries; the list and details pages show the key's effective access, and keys migrated from the old model are flagged **Legacy: full access**. Model and migration: [API keys and permissions](setup/api-keys-and-permissions.md). Operational practices: [Security — API key security](setup/security.md#api-key-security).
 
 ---
 

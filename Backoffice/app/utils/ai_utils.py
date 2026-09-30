@@ -80,6 +80,67 @@ def sanitize_page_context(value: Any) -> Dict[str, Any]:
     return out
 
 
+def authorize_form_builder_context(
+    form_builder: Any,
+    *,
+    user_id: Optional[int],
+    auth_source: Optional[str] = "cookie",
+) -> Optional[Dict[str, Any]]:
+    """
+    Server-side binding for the client-asserted ``page_context.formBuilder``.
+
+    The context switches the request into form-builder mode (DLP / PII-scrub exemptions, restricted
+    tool catalog, write tools). It is honoured only when ALL hold:
+
+    - the caller is an authenticated user on a Backoffice browser session (``auth_source == "cookie"``),
+    - the user holds an ``admin.templates.{create,edit}`` permission,
+    - ``template_id`` (when given) passes ``AuthorizationService.check_template_access``,
+    - ``version_id`` (when given) belongs to that template.
+
+    Returns the validated context (``enabled`` + validated ids) or ``None`` when it must be ignored.
+    """
+    if not isinstance(form_builder, dict) or not form_builder.get("enabled", True):
+        return None
+    if not user_id or auth_source != "cookie":
+        return None
+    try:
+        from app.extensions import db
+        from app.models import FormTemplate, User
+        from app.services.organization.authorization_service import AuthorizationService
+
+        user = db.session.get(User, int(user_id))
+        if user is None or getattr(user, "active", True) is False:
+            return None
+        can_write = bool(
+            AuthorizationService.has_rbac_permission(user, "admin.templates.edit")
+            or AuthorizationService.has_rbac_permission(user, "admin.templates.create")
+        )
+        if not can_write:
+            return None
+
+        bound: Dict[str, Any] = {"enabled": True}
+        template_id = form_builder.get("template_id")
+        if template_id is not None:
+            template_id = int(template_id)
+            if not AuthorizationService.check_template_access(template_id, int(user_id)):
+                return None
+            bound["template_id"] = template_id
+            version_id = form_builder.get("version_id")
+            if version_id is not None:
+                version_id = int(version_id)
+                from app.models import FormTemplateVersion
+
+                version = db.session.get(FormTemplateVersion, version_id)
+                if version is None or int(version.template_id) != template_id:
+                    return None
+                bound["version_id"] = version_id
+        elif form_builder.get("version_id") is not None:
+            return None
+        return bound
+    except Exception:
+        return None
+
+
 def is_form_builder_assistant_context(page_context: Any) -> bool:
     """
     True when `page_context` (sanitized via sanitize_page_context, or any dict

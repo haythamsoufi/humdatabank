@@ -17,19 +17,21 @@ pytestmark = [pytest.mark.unit]
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_mock_session(user=None, last_activity=None, started_at=None):
+def _make_mock_session(user=None, last_activity=None, session_start=None):
     """Build a mock UserSessionLog-like object."""
     sess = MagicMock()
     sess.id = 1
     sess.user_id = 42
-    sess.user = user or MagicMock(name="Test User")
-    sess.user.name = "Test User"
-    sess.started_at = started_at or datetime(2024, 1, 1, 10, 0, 0)
+    if user is None:
+        user = MagicMock()
+        user.name = "Test User"
+    sess.user = user
+    sess.session_start = session_start or datetime(2024, 1, 1, 10, 0, 0)
     sess.last_activity = last_activity or datetime(2024, 1, 1, 10, 0, 0)
     sess.ip_address = "127.0.0.1"
     sess.user_agent = "Mozilla/5.0"
-    sess.ended_at = None
-    sess.end_reason = None
+    sess.session_end = None
+    sess.ended_by = None
     return sess
 
 
@@ -39,6 +41,30 @@ def _make_mock_session(user=None, last_activity=None, started_at=None):
 
 class TestCleanupSessions:
     """Tests for cleanup_sessions (POST /admin/utilities/sessions/cleanup)."""
+
+    @pytest.fixture(autouse=True)
+    def _grant_maintain(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.system.maintain")
+        db_session.commit()
+
+    def test_admin_without_maintain_permission_is_denied(self, logged_in_client, db_session):
+        from app.models.rbac import RbacPermission, RbacRolePermission, RbacRole
+
+        role = RbacRole.query.filter_by(code="admin_core").first()
+        perm = RbacPermission.query.filter_by(code="admin.system.maintain").first()
+        RbacRolePermission.query.filter_by(role_id=role.id, permission_id=perm.id).delete()
+        db_session.commit()
+        with patch("app.routes.admin.utilities.sessions.inspect") as mock_inspect:
+            resp = logged_in_client.post(
+                "/admin/utilities/sessions/cleanup", headers={"Accept": "application/json"}
+            )
+        assert resp.status_code == 403
+        mock_inspect.assert_not_called()
+
+    def test_get_is_not_allowed(self, logged_in_client):
+        assert logged_in_client.get("/admin/utilities/sessions/cleanup").status_code == 405
 
     def test_redirects_when_table_does_not_exist(self, logged_in_client, db_session):
         """When the session table doesn't exist, flash warning and redirect."""
@@ -58,7 +84,7 @@ class TestCleanupSessions:
     def test_cleans_up_expired_sessions_and_redirects(self, logged_in_client, db_session):
         """When expired sessions exist, mark them ended and redirect."""
         expired = _make_mock_session()
-        expired.ended_at = None
+        expired.session_end = None
 
         mock_query = MagicMock()
         mock_query.filter.return_value.all.return_value = [expired]
@@ -78,6 +104,8 @@ class TestCleanupSessions:
             resp = logged_in_client.post("/admin/utilities/sessions/cleanup")
 
         assert resp.status_code == 302
+        assert expired.session_end is not None
+        assert expired.ended_by == "timeout"
 
     def test_redirects_when_no_expired_sessions(self, logged_in_client, db_session):
         """When table exists but no expired sessions, still redirect to dashboard."""
@@ -119,7 +147,7 @@ class TestCleanupSessions:
         assert resp.status_code == 302
 
     def test_multiple_expired_sessions_all_marked_ended(self, logged_in_client, db_session):
-        """All expired sessions get ended_at set."""
+        """All expired sessions get session_end / ended_by set."""
         sessions = [_make_mock_session() for _ in range(3)]
 
         mock_query = MagicMock()
@@ -140,10 +168,9 @@ class TestCleanupSessions:
             resp = logged_in_client.post("/admin/utilities/sessions/cleanup")
 
         assert resp.status_code == 302
-        # Verify each session had ended_at set
         for s in sessions:
-            assert s.ended_at is not None
-            assert s.end_reason == "timeout"
+            assert s.session_end is not None
+            assert s.ended_by == "timeout"
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +179,13 @@ class TestCleanupSessions:
 
 class TestShowAllSessions:
     """Tests for show_all_sessions (GET /admin/utilities/sessions/show_all)."""
+
+    @pytest.fixture(autouse=True)
+    def _grant_analytics_view(self, db_session, logged_in_client):
+        from tests.factories import _grant_role_permission
+
+        _grant_role_permission(db_session, "admin_core", "admin.analytics.view")
+        db_session.commit()
 
     def test_renders_template_with_empty_sessions_when_no_table(
         self, logged_in_client, db_session

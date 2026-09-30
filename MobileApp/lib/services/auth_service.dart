@@ -251,6 +251,37 @@ class AuthService {
     }
   }
 
+  /// Redeem the single-use code from the `humdatabank://oauth-success?code=...` deep link.
+  ///
+  /// [codeVerifier] is the PKCE secret whose S256 challenge was sent to `/login/azure`.
+  /// The call is not retryable: the server consumes the code on first presentation.
+  Future<bool> exchangeOAuthCode({
+    required String code,
+    required String codeVerifier,
+  }) async {
+    try {
+      final response = await _api.post(
+        AppConfig.mobileOAuthExchangeEndpoint,
+        body: {'code': code, 'code_verifier': codeVerifier},
+        includeAuth: false,
+        contentType: ApiService.contentTypeJson,
+        queueOnOffline: false,
+        retryable: false,
+      );
+      if (response.statusCode != 200) {
+        DebugLogger.logWarn(
+            'AUTH', 'OAuth code exchange failed with status ${response.statusCode}');
+        return false;
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      await _saveJwtTokensFromResponse(data);
+      return await _jwtService.hasTokens();
+    } catch (e) {
+      DebugLogger.logError('Error exchanging OAuth code: $e');
+      return false;
+    }
+  }
+
   /// Parse and persist JWT tokens from a server response body.
   ///
   /// Supports the mobile envelope `{ "success": true, "data": { "access_token": ... } }`

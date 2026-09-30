@@ -1,0 +1,50 @@
+{# Effective access of a key. `access` comes from describe_permissions(); compact=True for table cells. #}
+{% macro access_summary(access, compact=False) %}
+    {% if not access.valid or access.no_access %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-800">{{ _('No access') }}</span>
+        {% if not compact %}
+        <p class="mt-1 text-sm text-gray-600">{{ _('This key has no valid permissions, so every request with it is refused. Edit the key to grant permissions.') }}</p>
+        {% endif %}
+    {% else %}
+        {% if access.legacy_full_access %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="{{ _('Created before permissions existed: unrestricted access including personal data')|forceescape }}">
+                <i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Legacy: full access') }}
+            </span>
+        {% endif %}
+        {% if compact %}
+            {% if not access.legacy_full_access %}
+                <span class="text-xs text-gray-700">{{ access.capabilities | length }} {{ _('permissions') }}</span>
+            {% endif %}
+            {% if access.pii and not access.legacy_full_access %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">{{ _('Personal data') }}</span>
+            {% endif %}
+            {% if access.is_scoped %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">{{ _('Limited scope') }}</span>
+            {% endif %}
+        {% else %}
+            <ul class="mt-2 space-y-1 text-sm text-gray-800">
+                {% for cap in access.capabilities %}
+                <li>
+                    <span class="font-medium">{{ _(cap.label) }}</span>
+                    {% if cap.sensitivity == 'pii' %}<span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-800">{{ _('Personal data') }}</span>
+                    {% elif cap.sensitivity == 'sensitive' %}<span class="ml-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800">{{ _('Sensitive') }}</span>{% endif %}
+                    <span class="block text-xs text-gray-500">{{ _(cap.description) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if access.is_scoped %}
+                <p class="mt-2 text-sm text-blue-800">
+                    {% if access.denies_all_data %}
+                        {{ _('Data restriction is active but lists no template or country, so data endpoints return nothing.') }}
+                    {% else %}
+                        {{ _('Restricted to the selected templates/countries for:') }} {{ access.scope_applies_to | join(', ') }}.
+                    {% endif %}
+                </p>
+            {% endif %}
+            {% if access.allow_query_api_key %}
+                <p class="mt-2 text-sm text-amber-800"><i class="fas fa-link mr-1"></i>{{ _('This key may also be sent in the URL (?api_key=...). Prefer the Authorization header.') }}</p>
+            {% endif %}
+            {% for w in access.warnings %}<p class="mt-1 text-xs text-gray-500">{{ w }}</p>{% endfor %}
+        {% endif %}
+    {% endif %}
+{% endmacro %}

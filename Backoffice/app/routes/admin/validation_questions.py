@@ -24,7 +24,9 @@ from app.services.validation.questions_excel_service import (
 from app.services.validation.question_follow_up import create_follow_up, parent_ids_with_open_follow_up
 from app.services.validation.question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
 from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.error_handling import handle_json_view_exception
+from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.api_responses import json_bad_request, json_ok
 from app.utils.api_helpers import get_json_safe
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 from flask_wtf import FlaskForm
@@ -109,7 +111,7 @@ def validation_questions_create_follow_up(question_id: int):
         return json_bad_request(str(exc))
     except Exception as exc:
         db.session.rollback()
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
     db.session.commit()
     return json_ok(
@@ -145,7 +147,7 @@ def validation_questions_update(question_id: int):
         return json_bad_request(str(exc))
     except Exception as exc:
         db.session.rollback()
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
     db.session.commit()
     return json_ok(
@@ -265,7 +267,7 @@ def validation_questions_import():
         return json_bad_request(str(exc))
     except Exception as exc:
         db.session.rollback()
-        return json_server_error(str(exc))
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE)
 
     return json_ok(
         updated=result.updated,

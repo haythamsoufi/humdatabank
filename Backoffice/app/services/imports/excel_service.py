@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 from contextlib import suppress
 from typing import Any, Dict, List, Tuple
 
@@ -12,6 +13,7 @@ from app.services import get_formdata_map
 from app.services.forms.data_service import FormDataService
 from app.services.forms.variable_resolution_service import VariableResolutionService
 from app.utils.route_helpers import get_unified_form_item_id
+from app.utils.safe_workbook import UnsafeWorkbookError, load_workbook_safe
 from app.models.forms import FormData
 from app.models.assignments import PublicSubmission
 from app import db
@@ -31,9 +33,12 @@ class ExcelService:
     def load_workbook(file_storage) -> openpyxl.Workbook:
         """Load an Excel workbook from an uploaded file."""
         try:
-            workbook = openpyxl.load_workbook(io.BytesIO(file_storage.read()), data_only=True)
+            workbook = load_workbook_safe(file_storage, read_only=False, data_only=True)
+        except UnsafeWorkbookError:
+            raise
         except Exception as exc:  # pragma: no cover - openpyxl specific
-            raise ValueError(f"Unable to read the Excel file: {exc}") from exc
+            logging.getLogger(__name__).warning("Unable to read Excel upload: %s", exc, exc_info=True)
+            raise UnsafeWorkbookError("Unable to read the Excel file.") from exc
         finally:
             with suppress(Exception):
                 file_storage.stream.seek(0)
@@ -125,6 +130,8 @@ class ExcelService:
                 ws.row_dimensions[row].height = 20
 
         output = io.BytesIO()
+        from app.utils.export_safety import sanitize_workbook
+        sanitize_workbook(workbook)
         workbook.save(output)
         output.seek(0)
         from app.utils.api_serialization import _country_for_aes
@@ -488,9 +495,6 @@ class ExcelService:
         Returns:
             Dict with success status, count of updates, and any errors
         """
-        from app import db
-        import logging
-
         logger = logging.getLogger(__name__)
         updated_count = 0
         errors = []
@@ -596,7 +600,6 @@ class ExcelService:
                     logger.error(error_msg, exc_info=True)
 
             # Commit all changes
-            from app import db
             db.session.commit()
 
             return {
@@ -609,7 +612,6 @@ class ExcelService:
             }
 
         except Exception as e:
-            from app import db
             db.session.rollback()
             logger.error(f"Error in bulk save with disaggregation: {e}", exc_info=True)
             return {

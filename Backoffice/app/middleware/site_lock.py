@@ -2,13 +2,17 @@
 Site lock middleware.
 
 When COMING_SOON_LOCK or MAINTENANCE_LOCK is true, browser/HTML routes return a
-lock page. Programmatic access stays available (``/api/*``, API-key/Bearer
-requests, health, static assets). Maintenance takes precedence when both flags are enabled.
-Team bypass via *_BYPASS_SECRET query/cookie params.
+lock page. Only ``/api/*``, the API-key-authenticated Indicator Bank compat routes,
+health and static assets stay reachable; the *presence* of an ``X-API-Key`` or
+``Authorization: Bearer`` header never lifts the lock on any other path (those
+routes validate their own credentials once reachable). Maintenance takes precedence
+when both flags are enabled. Team bypass via *_BYPASS_SECRET query param; the browser
+cookie stores a keyed digest, never the secret itself.
 """
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 from dataclasses import dataclass
 from typing import Optional
@@ -18,6 +22,7 @@ from flask import current_app, g, make_response, render_template, request
 from app.utils.request_utils import is_static_asset_request
 
 _HEALTH_PATHS = frozenset({"/health"})
+_LOCK_EXEMPT_BLUEPRINTS = frozenset({"indicator_bank_compat"})
 
 
 @dataclass(frozen=True)
@@ -81,16 +86,11 @@ def _is_anonymous_root_health_probe() -> bool:
 
 
 def _is_api_path() -> bool:
-    """True for REST under /api/ or external clients authenticating with API key / Bearer."""
+    """True for REST under /api/ and the API-key-only Indicator Bank compat blueprint."""
     path = request.path or ""
     if path.startswith("/api/"):
         return True
-    if (request.headers.get("X-API-Key") or "").strip():
-        return True
-    auth = (request.headers.get("Authorization") or "").strip()
-    if auth.startswith("Bearer ") and len(auth) > 7:
-        return True
-    return False
+    return request.blueprint in _LOCK_EXEMPT_BLUEPRINTS
 
 
 def _is_exempt_path() -> bool:
@@ -111,9 +111,19 @@ def _token_matches(value: Optional[str], secret: str) -> bool:
     return hmac.compare_digest(str(value), secret)
 
 
+def _bypass_cookie_value(mode: _LockMode) -> str:
+    """Keyed digest stored in the bypass cookie (the raw secret never reaches the browser)."""
+    secret = _bypass_secret(mode)
+    if not secret:
+        return ""
+    key = str(current_app.config.get("SECRET_KEY") or "").encode("utf-8")
+    message = f"site-lock-bypass:{mode.key}:{secret}".encode("utf-8")
+    return hmac.new(key, message, hashlib.sha256).hexdigest()
+
+
 def _has_bypass(mode: _LockMode) -> bool:
     secret = _bypass_secret(mode)
-    if _token_matches(request.cookies.get(mode.bypass_cookie), secret):
+    if _token_matches(request.cookies.get(mode.bypass_cookie), _bypass_cookie_value(mode)):
         return True
     if _token_matches(request.args.get(mode.bypass_query), secret):
         setattr(g, mode.bypass_flag, True)
@@ -143,13 +153,13 @@ def register_site_lock_middleware(app):
             if not getattr(g, mode.bypass_flag, False):
                 continue
 
-            secret = _bypass_secret(mode)
-            if not secret:
+            cookie_value = _bypass_cookie_value(mode)
+            if not cookie_value:
                 continue
 
             response.set_cookie(
                 mode.bypass_cookie,
-                secret,
+                cookie_value,
                 httponly=True,
                 secure=not current_app.debug,
                 samesite="Lax",

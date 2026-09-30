@@ -12,6 +12,7 @@ from sqlalchemy import func
 from app.models import User, Country, FormTemplate, FormTemplateVersion, FormItem, FormSection, LookupList
 from app.models import IndicatorBank, IndicatorSuggestion, AssignedForm, PublicSubmission
 from app.models import APIKey
+from app.services.security.api_key_permissions import full_access_document
 from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
 from app.services.organization.secretariat_regional_office_service import (
@@ -481,7 +482,9 @@ def create_test_api_key(db_session, **kwargs):
         'client_description': kwargs.get('client_description', f"Test API key {counter}"),
         'rate_limit_per_minute': kwargs.get('rate_limit_per_minute', 1000),
         'is_active': kwargs.get('is_active', True),
-        'is_revoked': kwargs.get('is_revoked', False)
+        'is_revoked': kwargs.get('is_revoked', False),
+        # NULL grants nothing; tests get every capability unless they pass ``permissions=``.
+        'permissions': full_access_document(),
     }
     defaults.update(kwargs)
 

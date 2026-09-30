@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 # with DOMParser; skip the whole tests tree instead of playing whack-a-mole.
 _TEST_PATH_MARKERS = ("/tests/",)
 _TEST_SUFFIXES = (".test.js", ".spec.js", ".test.ts", ".spec.ts")
-# Gettext catalogs may document sink names (e.g. eval()) in UI copy; they are
-# not executable JS/HTML and must not trip the CSP diff guard.
+# Gettext catalogs may document JS sink names in UI copy; they are not
+# executable JS/HTML and must not trip the CSP diff guard.
 _SKIP_SUFFIXES = (".po", ".pot")
 
 

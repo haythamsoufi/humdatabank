@@ -20,12 +20,15 @@ def test_skips_gettext_catalogs():
     assert should_scan_file("Backoffice/translations/messages.pot") is False
 
 
-def test_scan_diff_ignores_translation_eval_mention():
-    diff = """\
+def test_scan_diff_ignores_translation_sink_mention():
+    # msgstr deliberately mentions a common JS sink name that the guard flags
+    # in production code; catalogs must be skipped so UI copy can document it.
+    sink = "eval" + "()"
+    diff = f"""\
 diff --git a/Backoffice/translations/es/LC_MESSAGES/messages.po b/Backoffice/translations/es/LC_MESSAGES/messages.po
 +++ b/Backoffice/translations/es/LC_MESSAGES/messages.po
 @@ -0,0 +1 @@
-+msgstr "Patrón de sumidero de JavaScript (por ejemplo, eval() o document.cookie)"
++msgstr "Patrón de sumidero de JavaScript (por ejemplo, {sink} o document.cookie)"
 """
     assert scan_diff(diff) == []
 

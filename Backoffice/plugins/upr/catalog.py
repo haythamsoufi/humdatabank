@@ -10,18 +10,33 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import FrozenSet
 
-from app.utils.data_quality_constants import (
-    UPR_PLANNING_TEMPLATE_ID,
-    UPR_REPORTING_TEMPLATE_ID,
-)
-
-PLAN_TEMPLATE_ID = UPR_PLANNING_TEMPLATE_ID
-REPORT_TEMPLATE_ID = UPR_REPORTING_TEMPLATE_ID
+# Template ids owned by this plugin.
+PLAN_TEMPLATE_ID = 24  # Unified Country Plan
+REPORT_TEMPLATE_ID = 33  # Country Reporting
 # Reporting — International Bilateral Support (PNS self-report).
 PNS_REPORT_TEMPLATE_ID = 23
 # PNS planning / confirmed funding for a host country (row = host Country.id).
 PNS_PLAN_TEMPLATE_ID = 22
+# Legacy published copy of country reporting; folded into the UPR tab when 33 exists.
+UPR_LEGACY_REPORTING_TEMPLATE_ID = 25
+
+UPR_PLANNING_TEMPLATE_ID = PLAN_TEMPLATE_ID
+UPR_REPORTING_TEMPLATE_ID = REPORT_TEMPLATE_ID
+UPR_VALIDATION_TEMPLATE_IDS = (REPORT_TEMPLATE_ID, PLAN_TEMPLATE_ID)
+UPR_FORM_TEMPLATE_IDS: FrozenSet[int] = frozenset({
+    PNS_PLAN_TEMPLATE_ID,
+    PNS_REPORT_TEMPLATE_ID,
+    PLAN_TEMPLATE_ID,
+    REPORT_TEMPLATE_ID,
+})
 UPR_VISUAL_TEMPLATE_IDS: FrozenSet[int] = frozenset({PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID})
+
+UPR_TEMPLATE_CHOICES = [
+    {"id": PLAN_TEMPLATE_ID, "name": "Unified Country Plan — planning country data (P*)"},
+    {"id": PNS_PLAN_TEMPLATE_ID, "name": "Annual Planning – International Bilateral Support — PNS staff (P*)"},
+    {"id": REPORT_TEMPLATE_ID, "name": "Reporting – Country — NS Data, indicators, funding, support (AR*, MYR*)"},
+    {"id": PNS_REPORT_TEMPLATE_ID, "name": "Reporting – PNS — PNS funding totals (AR* only)"},
+]
 
 @dataclass(frozen=True)
 class KpiSpec:

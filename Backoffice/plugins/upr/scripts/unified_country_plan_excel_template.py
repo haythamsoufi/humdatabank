@@ -31,6 +31,7 @@ from form_row_upsert import upsert_form_data_rows  # noqa: E402
 from import_upr_excel_data import (  # noqa: E402
     EMERGENCY_APPEALS_COLUMN,
     PLANNING_EA_FUNDING_AREAS,
+    ROW_GO_UNMATCHED_PREFIX,
     build_import_context,
     parse_value_num,
     round_to_period,
@@ -80,6 +81,7 @@ COMMENT_NAMED_CELL = "Comment"
 FUNDING_NETWORK_MEMBER_COL = 2  # "National Society name" / IFRC network member (column B).
 FUNDING_PNS_FIRST_ROW = 10
 FUNDING_PNS_LAST_ROW = 34
+FUNDING_NS_ENGLISH_COL = 24  # Hidden column X — English NS name via Table9.
 FUNDING_HNS_ROW = FUNDING_PNS_FIRST_ROW - 2
 FUNDING_IFRC_ROW = FUNDING_PNS_FIRST_ROW - 1
 FUNDING_PNS_ROW_PLACEHOLDER_AREA = "SP2"
@@ -556,6 +558,43 @@ def _funding_pns_array_formula_text(wb) -> str:
     return FUNDING_PNS_ARRAY_FORMULA_TEXT
 
 
+def _funding_ns_english_lookup_formula(spill_index: int) -> str:
+    """English NS name for the Nth spilled PNS in B10.
+
+    X11+ must not reference B11+ — those cells are FILTER spill children, so Excel
+    will not recalculate dependents until a formula is edited. Anchor to B10 instead.
+    """
+    spill = f"INDEX(_xlfn.ANCHORARRAY($B${FUNDING_PNS_FIRST_ROW}),{int(spill_index)})"
+    return f'=IF({spill}="","",_xlfn.XLOOKUP({spill},Table9[NS name],Table9[Value]))'
+
+
+def _refresh_funding_ns_english_lookup_formulas(wb) -> None:
+    ws = wb[FUNDING_SHEET]
+    for row_idx in range(FUNDING_PNS_FIRST_ROW, FUNDING_PNS_LAST_ROW):
+        spill_index = row_idx - FUNDING_PNS_FIRST_ROW + 1
+        ws.cell(row_idx, FUNDING_NS_ENGLISH_COL).value = _funding_ns_english_lookup_formula(
+            spill_index
+        )
+
+
+def _detach_funding_ns_lookup_column_from_table(wb) -> None:
+    """Keep column X out of Data_FR so the table calculated column cannot reset X11+ to B11."""
+    from openpyxl.utils import get_column_letter, range_boundaries
+
+    ws = wb[FUNDING_SHEET]
+    if FUNDING_TABLE not in ws.tables:
+        return
+    tbl = ws.tables[FUNDING_TABLE]
+    min_col, min_row, max_col, max_row = range_boundaries(tbl.ref)
+    if get_column_letter(max_col) != "X":
+        return
+    new_ref = f"{get_column_letter(min_col)}{min_row}:{get_column_letter(max_col - 1)}{max_row}"
+    tbl.ref = new_ref
+    if tbl.autoFilter is not None:
+        tbl.autoFilter.ref = new_ref
+    tbl.tableColumns = [col for col in tbl.tableColumns if str(col.name or "") != "NS"]
+
+
 def _refresh_funding_pns_array_formula(wb) -> None:
     """Re-apply the bilateral PNS listing formula and clear the spill area below it."""
     from openpyxl.worksheet.formula import ArrayFormula
@@ -567,6 +606,7 @@ def _refresh_funding_pns_array_formula(wb) -> None:
     )
     for row_idx in range(FUNDING_PNS_FIRST_ROW + 1, FUNDING_PNS_LAST_ROW + 1):
         ws.cell(row_idx, FUNDING_NETWORK_MEMBER_COL).value = None
+    _refresh_funding_ns_english_lookup_formulas(wb)
 
 
 def _dynamic_array_cell_flags_from_sheet_xml(xml: str) -> Dict[str, Dict[str, str]]:
@@ -601,14 +641,54 @@ def _patch_sheet_xml_dynamic_array_flags(xml: str, flags_by_cell: Dict[str, Dict
     return re.sub(r'<c r="([^"]+)"([^>]*)>', _patch_cell, xml)
 
 
+_SHEET_CELL_RE = re.compile(r'(<c r="[^"]+"[^>]*>)(.*?)(</c>)', re.DOTALL)
+_CACHED_VALUE_RE = re.compile(r"<v[^>]*>.*?</v>|<v[^/]*/>", re.DOTALL)
+
+
+def _flag_xlookup_cells_dynamic(xml: str) -> str:
+    """XLOOKUP is a dynamic-array function; openpyxl drops cm=\"1\" so Excel waits for an edit."""
+
+    def _patch(match: re.Match[str]) -> str:
+        start, inner, end = match.group(1), match.group(2), match.group(3)
+        if "XLOOKUP" not in inner:
+            return match.group(0)
+        if 'cm="1"' not in start:
+            start = start[:-1] + ' cm="1">'
+        return start + inner + end
+
+    return _SHEET_CELL_RE.sub(_patch, xml)
+
+
+def _strip_formula_cached_values(xml: str) -> str:
+    """Drop stale cached results so Excel cannot treat the workbook as already calculated."""
+
+    def _patch(match: re.Match[str]) -> str:
+        start, inner, end = match.group(1), match.group(2), match.group(3)
+        if "<f" not in inner:
+            return match.group(0)
+        return start + _CACHED_VALUE_RE.sub("", inner) + end
+
+    return _SHEET_CELL_RE.sub(_patch, xml)
+
+
+def _force_excel_full_calc_on_open(xml: str) -> str:
+    """Ask Excel to rebuild the dependency tree instead of trusting openpyxl's calcId cache."""
+    calc_pr = '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>'
+    if "<calcPr" in xml:
+        return re.sub(r"<calcPr\b[^/]*?/>", calc_pr, xml, count=1)
+    return xml.replace("</workbook>", calc_pr + "</workbook>")
+
+
 def restore_workbook_dynamic_array_metadata(template_path: str, output_path: str) -> None:
     """
-    openpyxl drops Excel 365 dynamic-array metadata (xl/metadata.xml, cm=\"1\" flags).
-    Copy them back from the canonical template so FILTER/UNIQUE formulas spill on open.
+    openpyxl drops Excel 365 dynamic-array metadata (xl/metadata.xml, cm=\"1\" flags)
+    and writes empty cached formula values. Restore the metadata and strip those
+    caches so FILTER/UNIQUE/XLOOKUP calculate on open instead of waiting for an edit.
     """
     metadata_part = "xl/metadata.xml"
     rels_part = "xl/_rels/workbook.xml.rels"
     content_types_part = "[Content_Types].xml"
+    workbook_part = "xl/workbook.xml"
     metadata_rel_type = (
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata"
     )
@@ -616,15 +696,19 @@ def restore_workbook_dynamic_array_metadata(template_path: str, output_path: str
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"
     )
 
-    with zipfile.ZipFile(template_path, "r") as template_zip:
-        if metadata_part not in template_zip.namelist():
-            return
-        template_metadata = template_zip.read(metadata_part)
-        sheet_flags = {
-            name: _dynamic_array_cell_flags_from_sheet_xml(template_zip.read(name).decode("utf-8"))
-            for name in template_zip.namelist()
-            if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
-        }
+    template_metadata = None
+    sheet_flags: Dict[str, Dict[str, Dict[str, str]]] = {}
+    if os.path.isfile(template_path):
+        with zipfile.ZipFile(template_path, "r") as template_zip:
+            if metadata_part in template_zip.namelist():
+                template_metadata = template_zip.read(metadata_part)
+            sheet_flags = {
+                name: _dynamic_array_cell_flags_from_sheet_xml(
+                    template_zip.read(name).decode("utf-8")
+                )
+                for name in template_zip.namelist()
+                if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
+            }
 
     patched_path = f"{output_path}.dynamic-array-patch"
     try:
@@ -633,10 +717,19 @@ def restore_workbook_dynamic_array_metadata(template_path: str, output_path: str
         ) as dst:
             wrote_metadata = False
             for item in src.infolist():
+                if item.filename == "xl/calcChain.xml":
+                    continue
                 data = src.read(item.filename)
-                if item.filename == rels_part:
+                if item.filename == workbook_part:
+                    data = _force_excel_full_calc_on_open(data.decode("utf-8")).encode("utf-8")
+                elif item.filename == rels_part:
                     text = data.decode("utf-8")
-                    if "sheetMetadata" not in text:
+                    text = re.sub(
+                        r'<Relationship[^>]+Target="calcChain\.xml"[^/]*/>',
+                        "",
+                        text,
+                    )
+                    if template_metadata is not None and "sheetMetadata" not in text:
                         rel_ids = [int(value) for value in re.findall(r'Id="rId(\d+)"', text)]
                         next_id = max(rel_ids, default=0) + 1
                         insert = (
@@ -647,23 +740,36 @@ def restore_workbook_dynamic_array_metadata(template_path: str, output_path: str
                     data = text.encode("utf-8")
                 elif item.filename == content_types_part:
                     text = data.decode("utf-8")
-                    if 'PartName="/xl/metadata.xml"' not in text:
+                    text = re.sub(
+                        r'<Override[^>]+PartName="/xl/calcChain\.xml"[^/]*/>',
+                        "",
+                        text,
+                    )
+                    if (
+                        template_metadata is not None
+                        and 'PartName="/xl/metadata.xml"' not in text
+                    ):
                         override = (
                             f'<Override PartName="/xl/metadata.xml" '
                             f'ContentType="{metadata_content_type}"/>'
                         )
                         text = text.replace("</Types>", override + "</Types>")
                     data = text.encode("utf-8")
-                elif item.filename == metadata_part:
+                elif item.filename == metadata_part and template_metadata is not None:
                     data = template_metadata
                     wrote_metadata = True
-                elif item.filename in sheet_flags and sheet_flags[item.filename]:
-                    data = _patch_sheet_xml_dynamic_array_flags(
-                        data.decode("utf-8"),
-                        sheet_flags[item.filename],
-                    ).encode("utf-8")
+                elif item.filename.startswith("xl/worksheets/sheet") and item.filename.endswith(
+                    ".xml"
+                ):
+                    text = data.decode("utf-8")
+                    flags = sheet_flags.get(item.filename) or {}
+                    if flags:
+                        text = _patch_sheet_xml_dynamic_array_flags(text, flags)
+                    text = _flag_xlookup_cells_dynamic(text)
+                    text = _strip_formula_cached_values(text)
+                    data = text.encode("utf-8")
                 dst.writestr(item, data)
-            if not wrote_metadata:
+            if template_metadata is not None and not wrote_metadata:
                 dst.writestr(metadata_part, template_metadata)
         os.replace(patched_path, output_path)
     finally:
@@ -675,6 +781,7 @@ def restore_workbook_dynamic_array_metadata(template_path: str, output_path: str
 
 
 def _ensure_workbook_recalculates_on_open(wb) -> None:
+    wb.calculation.calcMode = "auto"
     wb.calculation.fullCalcOnLoad = True
     wb.calculation.forceFullCalc = True
     wb.calculation.calcOnSave = True
@@ -908,6 +1015,10 @@ def _import_funding_matrices(
 
     for funding_item_id in ctx.t24_funding_by_offset.values():
         for area in sorted(PLANNING_EA_FUNDING_AREAS):
+            ea_code = reach_ea_codes.get((iso3, rnd, area))
+            ea_name = reach_ea_names.get((iso3, rnd, area))
+            if not ea_code and not ea_name:
+                continue
             _ensure_funding_ea_col_header(
                 matrix_cells,
                 ctx,
@@ -916,9 +1027,9 @@ def _import_funding_matrices(
                 iso3=iso3,
                 rnd=rnd,
                 area=area,
-                ea_code_raw=reach_ea_codes.get((iso3, rnd, area)),
+                ea_code_raw=ea_code,
                 reach_ea_codes=reach_ea_codes,
-                excel_name_raw=reach_ea_names.get((iso3, rnd, area)),
+                excel_name_raw=ea_name,
                 reach_ea_names=reach_ea_names,
             )
 
@@ -1089,16 +1200,138 @@ def build_unified_country_plan_client_payload(
     }
 
 
+_BARE_MDR_CODE_RE = re.compile(r"^MDR[A-Z]{2,3}\d{2,5}$", re.IGNORECASE)
+
+
 def _parse_emergency_row_id(row_id: str) -> Tuple[str, str]:
     text = (row_id or "").strip()
     if text.endswith(")"):
         open_idx = text.rfind("(")
         if open_idx > 0:
             return text[:open_idx].strip(), text[open_idx + 1 : -1].strip()
+    if _BARE_MDR_CODE_RE.match(text):
+        return "", text.upper()
     return text, ""
 
 
-def _export_reach_to_workbook(wb, entry_954, entry_960) -> None:
+def _matrix_cell_text(raw: Any) -> str:
+    val = _matrix_cell_scalar(raw)
+    if val in (None, ""):
+        return ""
+    return str(val).strip()
+
+
+def _emergency_match_key(name: str, code: str, display: str = "") -> str:
+    code_u = (code or "").strip().upper()
+    if code_u:
+        return f"code:{code_u}"
+    text = (display or name or "").strip().lower()
+    return f"name:{text}" if text else ""
+
+
+def _iter_emergency_matrix_rows(cells_960: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Emergency Appeals rows in storage order (names/codes even without a reach value)."""
+    suffix = f"_{EMERGENCY_APPEALS_COLUMN}"
+    rows: List[Dict[str, Any]] = []
+    index_by_key: Dict[str, int] = {}
+
+    def _upsert(display: str, reach: Any) -> None:
+        name, code = _parse_emergency_row_id(display)
+        match = _emergency_match_key(name, code, display)
+        if not match:
+            return
+        existing = index_by_key.get(match)
+        if existing is None:
+            index_by_key[match] = len(rows)
+            rows.append({"name": name, "code": code, "display": display, "reach": reach})
+            return
+        if reach is not None and rows[existing].get("reach") is None:
+            rows[existing]["reach"] = reach
+
+    for key, raw in cells_960.items():
+        key_s = str(key)
+        if key_s.startswith(ROW_GO_UNMATCHED_PREFIX):
+            _upsert(key_s[len(ROW_GO_UNMATCHED_PREFIX) :], None)
+            continue
+        if not key_s.endswith(suffix):
+            continue
+        _upsert(key_s[: -len(suffix)], _matrix_cell_scalar(raw))
+    return rows
+
+
+def _collect_planning_emergency_slots(
+    entry_960,
+    funding_entries: Optional[List[Any]] = None,
+) -> List[Optional[Dict[str, Any]]]:
+    """EA1–EA3 identities for the Start sheet.
+
+    Funding ``col_header|EA*`` is slot-explicit and wins when present. Emergency
+    Appeals matrix rows match those slots by MDR code (or display), then unused
+    rows fill remaining empty slots in form storage order — not A–Z by name.
+    """
+    slots: List[Optional[Dict[str, Any]]] = [None, None, None]
+    areas = tuple(area for _reach, _mdr, _ea, area in EA_SLOT_NAMED_CELLS)
+
+    for entry in funding_entries or []:
+        cells = _normalize_matrix_cells(_matrix_cells(entry))
+        if not cells:
+            continue
+        for idx, area in enumerate(areas):
+            if slots[idx]:
+                continue
+            display = _matrix_cell_text(cells.get(f"col_header|{area}"))
+            if not display:
+                continue
+            name, code = _parse_emergency_row_id(display)
+            if not (name or code):
+                continue
+            slots[idx] = {"name": name, "code": code, "display": display, "reach": None}
+
+    matrix_rows = _iter_emergency_matrix_rows(_normalize_matrix_cells(_matrix_cells(entry_960)))
+    used_rows: set = set()
+    for idx, slot in enumerate(slots):
+        if not slot:
+            continue
+        slot_key = _emergency_match_key(slot["name"], slot["code"], slot.get("display") or "")
+        for row_idx, row in enumerate(matrix_rows):
+            if row_idx in used_rows:
+                continue
+            if _emergency_match_key(row["name"], row["code"], row["display"]) != slot_key:
+                continue
+            if row.get("reach") is not None:
+                slot["reach"] = row["reach"]
+            used_rows.add(row_idx)
+            break
+
+    assigned_keys = {
+        _emergency_match_key(slot["name"], slot["code"], slot.get("display") or "")
+        for slot in slots
+        if slot
+    }
+    for row_idx, row in enumerate(matrix_rows):
+        if row_idx in used_rows:
+            continue
+        row_key = _emergency_match_key(row["name"], row["code"], row["display"])
+        if row_key and row_key in assigned_keys:
+            continue
+        for idx, slot in enumerate(slots):
+            if slot:
+                continue
+            slots[idx] = {
+                "name": row["name"],
+                "code": row["code"],
+                "display": row["display"],
+                "reach": row.get("reach"),
+            }
+            used_rows.add(row_idx)
+            if row_key:
+                assigned_keys.add(row_key)
+            break
+
+    return slots
+
+
+def _export_reach_to_workbook(wb, entry_954, entry_960, funding_entries=None) -> None:
     cells_954 = _normalize_matrix_cells(_matrix_cells(entry_954))
     _, people_rows = read_named_table(wb, PEOPLE_SHEET, PEOPLE_TABLE)
     for offset, row in enumerate(people_rows):
@@ -1114,28 +1347,12 @@ def _export_reach_to_workbook(wb, entry_954, entry_960) -> None:
             if val is not None:
                 write_table_cell(wb, PEOPLE_SHEET, PEOPLE_TABLE, offset, area, val)
 
-    cells_960 = _normalize_matrix_cells(_matrix_cells(entry_960))
-    suffix = f"_{EMERGENCY_APPEALS_COLUMN}"
-    ea_entries: List[Tuple[str, Any]] = []
-    for key, raw in cells_960.items():
-        if not str(key).endswith(suffix):
-            continue
-        row_id = str(key)[: -len(suffix)]
-        val = _matrix_cell_scalar(raw)
-        if val is None:
-            continue
-        ea_entries.append((row_id, val))
-    ea_entries.sort(key=lambda item: item[0])
+    slots = _collect_planning_emergency_slots(entry_960, funding_entries)
     for idx, (reach_name, mdr_name, ea_name, _area) in enumerate(EA_SLOT_NAMED_CELLS):
-        if idx >= len(ea_entries):
-            break
-        row_id, val = ea_entries[idx]
-        name, code = _parse_emergency_row_id(row_id)
-        write_named_cell(wb, reach_name, val)
-        if code:
-            write_named_cell(wb, mdr_name, code)
-        if name:
-            write_named_cell(wb, ea_name, name)
+        slot = slots[idx] if idx < len(slots) else None
+        write_named_cell(wb, reach_name, slot.get("reach") if slot else None)
+        write_named_cell(wb, mdr_name, (slot.get("code") or None) if slot else None)
+        write_named_cell(wb, ea_name, (slot.get("name") or None) if slot else None)
 
 
 def _export_support_to_workbook(wb, entry_955, ctx) -> None:
@@ -1221,10 +1438,15 @@ def build_unified_country_plan_export(aes_id: int, template_path: str, output_pa
         if value is not None:
             write_named_cell(wb, NS_DATA_NAMED_CELLS[key], value)
 
+    funding_entries = [
+        entries.get(item_id)
+        for _offset, item_id in sorted(ctx.t24_funding_by_offset.items())
+    ]
     _export_reach_to_workbook(
         wb,
         entries.get(ctx.t24_longer_term_item_id) if ctx.t24_longer_term_item_id else None,
         entries.get(ctx.t24_emergency_item_id) if ctx.t24_emergency_item_id else None,
+        funding_entries=funding_entries,
     )
     _export_support_to_workbook(
         wb,
@@ -1233,6 +1455,7 @@ def build_unified_country_plan_export(aes_id: int, template_path: str, output_pa
     )
     _refresh_funding_pns_array_formula(wb)
     _export_funding_to_workbook(wb, entries, period, ctx)
+    _detach_funding_ns_lookup_column_from_table(wb)
     comments_item_id = _resolve_comments_item_id(ctx)
     _export_comment_to_workbook(
         wb, entries.get(comments_item_id) if comments_item_id else None

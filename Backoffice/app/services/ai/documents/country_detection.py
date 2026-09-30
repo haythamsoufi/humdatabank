@@ -214,10 +214,6 @@ def _fold(s: str) -> str:
 # scope keywords survive normalization. Underscore is dropped like other punctuation.
 _NON_ALNUM_RE = re.compile(r"[^\w]+", re.UNICODE)
 
-# UPL codes often embed ISO2 after "MAA", e.g. UPL-2025-MAASS001 -> ISO2 "SS"
-_UPL_MAA_ISO2_RE = re.compile(r"\bUPL-\d{4}-MAA([A-Z]{2})[A-Z0-9]*\b", re.IGNORECASE)
-
-
 def _norm_space_text(s: str) -> str:
     """
     Normalize text for boundary-safe substring matching:
@@ -272,28 +268,9 @@ def _country_name_variants(country: Country) -> list[str]:
 
 
 def _detect_country_from_upl_code(*sources: str | None) -> tuple[int, str] | None:
-    """
-    Detect country from a UPL code that includes ISO2 after "MAA".
-    Example: "UPL-2025-MAASS001" -> ISO2 "SS" -> South Sudan.
-    """
-    try:
-        for src in sources:
-            t = (src or "").strip()
-            if not t:
-                continue
-            m = _UPL_MAA_ISO2_RE.search(t)
-            if not m:
-                continue
-            iso2 = (m.group(1) or "").strip().upper()
-            if not iso2:
-                continue
-            c = Country.query.filter(Country.iso2 == iso2).first()
-            if c and getattr(c, "id", None) and getattr(c, "name", None):
-                return int(c.id), str(c.name)
-    except Exception as e:
-        logger.debug("UPL/MAA ISO2 heuristic failed: %s", e)
-        return None
-    return None
+    from plugins.upr.ai.document_identity import detect_country_from_upl_code
+
+    return detect_country_from_upl_code(*sources)
 
 
 def _build_candidates() -> list[tuple[int, str, list[str]]]:

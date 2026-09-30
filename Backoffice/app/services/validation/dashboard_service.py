@@ -15,21 +15,17 @@ from app.services.forms.reporting_period_service import sort_period_names
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
 from .check_service import evaluate_validation_checks, validation_checks_disabled_message
-from app.utils.data_quality_constants import (
-    UPR_LEGACY_REPORTING_TEMPLATE_ID,
-    UPR_PLANNING_TEMPLATE_ID,
-    UPR_REPORTING_TEMPLATE_ID,
-    UPR_VALIDATION_TEMPLATE_IDS,
+from plugins.upr.catalog import UPR_VALIDATION_TEMPLATE_IDS
+from plugins.upr.validation_dashboard import (
+    merge_upr_validation_templates,
+    missing_upr_validation_template_ids,
+    upr_display_name,
+    upr_product_tab,
 )
 
 HISTORY_YEARS_LOOKBACK = 3
 
 _QUESTION_STATUS_PRIORITY = {"open": 0, "answered": 1, "waived": 2, "resolved": 3}
-
-_UPR_CHILD_LABELS = {
-    UPR_REPORTING_TEMPLATE_ID: "Reporting",
-    UPR_PLANNING_TEMPLATE_ID: "Planning",
-}
 
 
 def _history_year_columns(current_year: int | None) -> list[int]:
@@ -87,23 +83,14 @@ def _templates_with_validation() -> list[FormTemplate]:
     )
 
 
-def _upr_display_name(template_id: int, fallback: str) -> str:
-    child = _UPR_CHILD_LABELS.get(template_id)
-    if child:
-        return f"Unified Planning and Reporting — {child}"
-    return fallback
-
-
 def _validation_templates_by_id() -> dict[int, FormTemplate]:
-    """DQ-enabled templates plus UPR country templates (24/33), excluding legacy 25 when 33 exists."""
+    """DQ-enabled templates plus UPR country templates, excluding legacy reporting when current exists."""
     by_id = {t.id: t for t in _templates_with_validation()}
-    missing_upr = [tid for tid in UPR_VALIDATION_TEMPLATE_IDS if tid not in by_id]
+    missing_upr = missing_upr_validation_template_ids(by_id)
+    extra = []
     if missing_upr:
-        for tmpl in FormTemplate.query.filter(FormTemplate.id.in_(missing_upr)).all():
-            by_id[tmpl.id] = tmpl
-    if UPR_REPORTING_TEMPLATE_ID in by_id:
-        by_id.pop(UPR_LEGACY_REPORTING_TEMPLATE_ID, None)
-    return by_id
+        extra = FormTemplate.query.filter(FormTemplate.id.in_(missing_upr)).all()
+    return merge_upr_validation_templates(by_id, extra)
 
 
 def template_options() -> list[dict[str, Any]]:
@@ -112,7 +99,7 @@ def template_options() -> list[dict[str, Any]]:
     options: list[dict[str, Any]] = []
     for tid in sorted(by_id):
         tmpl = by_id[tid]
-        options.append({"id": tmpl.id, "name": _upr_display_name(tmpl.id, tmpl.name)})
+        options.append({"id": tmpl.id, "name": upr_display_name(tmpl.id, tmpl.name)})
     return options
 
 
@@ -126,21 +113,9 @@ def template_tab_options() -> list[dict[str, Any]]:
         tmpl = by_id[tid]
         tabs.append({"id": tmpl.id, "name": tmpl.name, "children": None})
 
-    upr_children: list[dict[str, Any]] = []
-    for tid in UPR_VALIDATION_TEMPLATE_IDS:
-        tmpl = by_id.get(tid)
-        if not tmpl:
-            continue
-        upr_children.append({
-            "id": tmpl.id,
-            "name": _UPR_CHILD_LABELS.get(tmpl.id, tmpl.name),
-        })
-    if upr_children:
-        tabs.append({
-            "id": upr_children[0]["id"],
-            "name": "Unified Planning and Reporting",
-            "children": upr_children,
-        })
+    upr_tab = upr_product_tab(by_id)
+    if upr_tab:
+        tabs.append(upr_tab)
     return tabs
 
 

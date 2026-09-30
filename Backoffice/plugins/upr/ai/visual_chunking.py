@@ -2862,6 +2862,110 @@ def extract_upr_visual_blocks(
     return blocks
 
 
+def collect_upr_visual_chunk_payloads(
+    *,
+    pages: Optional[List[Dict[str, Any]]],
+    document_title: Optional[str] = None,
+    document_filename: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Return chunk payloads for UPR visual blocks (content + metadata).
+
+    Host chunker converts these into ``Chunk`` objects. Disabled when
+    ``AI_UPR_VISUAL_CHUNKING_ENABLED`` is false.
+    """
+    try:
+        from flask import current_app
+
+        enabled = bool(current_app.config.get("AI_UPR_VISUAL_CHUNKING_ENABLED", True))
+    except Exception as e:
+        logger.debug("AI_UPR_VISUAL_CHUNKING_ENABLED config read failed: %s", e)
+        enabled = True
+    if not enabled or not pages:
+        return []
+    if not is_likely_upr_document(title=document_title, filename=document_filename, pages=pages):
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for block in extract_upr_visual_blocks(
+        pages=pages,
+        document_title=document_title,
+        document_filename=document_filename,
+    ):
+        try:
+            page_number = block.get("page_number")
+            out.append(
+                {
+                    "content": block_to_embedding_text(block),
+                    "page_number": int(page_number) if isinstance(page_number, int) else None,
+                    "section_title": f"UPR: {str(block.get('block') or 'visual')}",
+                    "chunk_type": "upr_visual",
+                    "metadata": {"upr": block},
+                }
+            )
+        except Exception as e:
+            logger.debug("Skipping UPR block chunk: %s", e)
+            continue
+    return out
+
+
+def attach_upr_kpi_vision_clip(page: Any, page_num: int, page_obj: Dict[str, Any]) -> None:
+    """Crop the top-of-page KPI region when ``AI_UPR_VISION_KPI_ENABLED`` is set.
+
+    Writes ``upr_kpi_clip_png_b64`` and ``upr_kpi_clip_box`` onto ``page_obj``.
+    """
+    try:
+        from flask import current_app
+
+        enabled = bool(current_app.config.get("AI_UPR_VISION_KPI_ENABLED", False))
+    except Exception as e:
+        logger.debug("AI_UPR_VISION_KPI_ENABLED config read failed: %s", e)
+        enabled = False
+    if not enabled:
+        return
+    try:
+        from flask import current_app
+
+        max_pages = int(current_app.config.get("AI_UPR_VISION_MAX_PAGES", 1))
+    except Exception as e:
+        logger.debug("AI_UPR_VISION_MAX_PAGES parse failed: %s", e)
+        max_pages = 1
+    if int(page_num) > int(max_pages):
+        return
+    try:
+        from flask import current_app
+
+        dpi = int(current_app.config.get("AI_UPR_VISION_DPI", 160))
+    except Exception as e:
+        logger.debug("AI_UPR_VISION_DPI parse failed: %s", e)
+        dpi = 160
+    try:
+        from flask import current_app
+
+        clip_top_frac = float(current_app.config.get("AI_UPR_VISION_CLIP_TOP_FRAC", 0.42))
+    except Exception as e:
+        logger.debug("AI_UPR_VISION_CLIP_TOP_FRAC parse failed: %s", e)
+        clip_top_frac = 0.42
+
+    try:
+        import base64
+
+        import fitz
+
+        rect = page.rect
+        clip = fitz.Rect(
+            float(rect.x0),
+            float(rect.y0),
+            float(rect.x1),
+            float(rect.y0 + (rect.height * float(clip_top_frac))),
+        )
+        pix = page.get_pixmap(dpi=int(dpi), alpha=False, clip=clip)
+        png_bytes = pix.tobytes("png")
+        page_obj["upr_kpi_clip_png_b64"] = base64.b64encode(png_bytes).decode("ascii")
+        page_obj["upr_kpi_clip_box"] = [float(clip.x0), float(clip.y0), float(clip.x1), float(clip.y1)]
+    except Exception as e:
+        logger.debug("UPR KPI clip extraction failed: %s", e)
+
+
 def load_upr_visual_training_cases(cases_dir: str) -> List[Dict[str, Any]]:
     """
     Load UPR visual extraction "training cases" from a directory.

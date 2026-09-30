@@ -15,7 +15,7 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.utils.ai_utils import extract_upl_year_from_title
+from plugins.upr.ai.document_identity import extract_upl_year_from_title
 
 logger = logging.getLogger(__name__)
 

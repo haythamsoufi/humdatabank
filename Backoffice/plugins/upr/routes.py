@@ -183,14 +183,11 @@ def _aes_or_404(aes_id: int) -> AssignmentEntityStatus:
 
 
 def upr_settings_status() -> dict:
-    from app.utils.data_quality_constants import (
-        UPR_PLANNING_TEMPLATE_ID,
-        UPR_REPORTING_TEMPLATE_ID,
-    )
+    from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
 
     return {
-        "planning_template_id": UPR_PLANNING_TEMPLATE_ID,
-        "reporting_template_id": UPR_REPORTING_TEMPLATE_ID,
+        "planning_template_id": PLAN_TEMPLATE_ID,
+        "reporting_template_id": REPORT_TEMPLATE_ID,
         "data_source": "GO-API / Excel",
     }
 
@@ -214,11 +211,10 @@ def settings_page():
 def upr_tools():
     """UPR tools hub: data sync & imputation, plus Excel import."""
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-    from app.utils.data_quality_constants import UPR_PLANNING_TEMPLATE_ID
-    from plugins.upr.excel.import_routes import UPR_TEMPLATE_CHOICES
+    from plugins.upr.catalog import PLAN_TEMPLATE_ID, UPR_TEMPLATE_CHOICES
 
     return render_data_sync_imputation_page(
-        UPR_PLANNING_TEMPLATE_ID,
+        PLAN_TEMPLATE_ID,
         sync_family="upr",
         page_heading="UPR Tools",
         page_icon="fas fa-cogs",

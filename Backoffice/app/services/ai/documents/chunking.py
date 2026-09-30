@@ -778,67 +778,31 @@ class AIChunkingService:
         - structured JSON in metadata['upr']
         """
         try:
-            enabled = bool(current_app.config.get("AI_UPR_VISUAL_CHUNKING_ENABLED", True))
-        except Exception as e:
-            logger.debug("AI_UPR_VISUAL_CHUNKING_ENABLED config read failed: %s", e)
-            enabled = True
-        if not enabled:
-            return []
-
-        if not pages:
-            return []
-
-        try:
-            from plugins.upr.ai.visual_chunking import (
-                is_likely_upr_document,
-                extract_in_support_kpis,
-                extract_people_reached,
-                extract_financial_overview,
-                extract_funding_requirements,
-                extract_hazards,
-                extract_pns_bilateral_support,
-                block_to_embedding_text,
-            )
+            from plugins.upr.ai.visual_chunking import collect_upr_visual_chunk_payloads
         except Exception as e:
             logger.debug("upr_visual_chunking import failed: %s", e)
             return []
 
-        if not is_likely_upr_document(title=document_title, filename=document_filename, pages=pages):
-            return []
-
-        # UPR are expected in the first 1–3 pages; older docs (country plans) may have
-        # hazards, PNS bilateral support table, and funding requirements on pages 3–5.
-        upr_pages = (pages or [])[:5]
-
-        blocks = []
-        blocks.extend(extract_in_support_kpis(upr_pages))
-        blocks.extend(extract_people_reached(upr_pages))
-        blocks.extend(extract_financial_overview(upr_pages))
-        blocks.extend(extract_funding_requirements(upr_pages))
-        blocks.extend(extract_hazards(upr_pages))
-        blocks.extend(extract_pns_bilateral_support(upr_pages))
-        if not blocks:
-            return []
-
         out: List[Chunk] = []
-        for b in blocks:
+        for payload in collect_upr_visual_chunk_payloads(
+            pages=pages,
+            document_title=document_title,
+            document_filename=document_filename,
+        ):
             try:
-                page_number = b.get("page_number")
-                text = block_to_embedding_text(b)
                 out.append(
                     self._create_chunk(
-                        content=text,
-                        chunk_index=len(out),  # temporary; caller may reindex
-                        page_number=int(page_number) if isinstance(page_number, int) else None,
-                        section_title=f"UPR: {str(b.get('block') or 'visual')}",
-                        chunk_type="upr_visual",
-                        metadata={"upr": b},
+                        content=payload.get("content") or "",
+                        chunk_index=len(out),
+                        page_number=payload.get("page_number"),
+                        section_title=payload.get("section_title"),
+                        chunk_type=payload.get("chunk_type") or "upr_visual",
+                        metadata=payload.get("metadata"),
                     )
                 )
             except Exception as e:
                 logger.debug("Skipping UPR block chunk: %s", e)
                 continue
-
         return out
 
     def optimize_chunks_for_context_window(

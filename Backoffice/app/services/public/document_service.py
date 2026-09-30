@@ -585,8 +585,11 @@ def _document_type_key(document: AIDocument, query: str) -> str:
         return "midyear_report"
     if re.search(r"\bannual\s+report|\bar\b", combined, re.IGNORECASE):
         return "annual_report"
-    if re.search(r"\bunified\s+plan|\bupl\b|\bupr\b", combined, re.IGNORECASE):
-        return "unified_plan"
+    from plugins.upr.ai.document_identity import upr_document_type_key
+
+    upr_type = upr_document_type_key(combined)
+    if upr_type:
+        return upr_type
     if query_prefers_upr_documents(query):
         return "unified_plan"
     if category:

@@ -9,7 +9,12 @@ import pytest
 from flask import Flask
 
 from app.utils import security_startup
-from app.utils.security_startup import collect_security_findings, detect_worker_count, validate_security_settings
+from app.utils.security_startup import (
+    collect_security_findings,
+    deployment_security_flag_codes,
+    detect_worker_count,
+    validate_security_settings,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
 
@@ -127,6 +132,7 @@ def _app(**config):
 def _single_worker(monkeypatch):
     for name in ("GUNICORN_WORKERS", "WEB_CONCURRENCY", "STRICT_ENV_VALIDATION", "SERVER_SOFTWARE"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("ENABLE_SSH", "true")
 
 
 class TestSecurityFindings:
@@ -135,20 +141,39 @@ class TestSecurityFindings:
         assert errors == []
         assert warnings == []
 
-    def test_missing_mobile_jwt_secret_is_fatal_in_production(self):
+    def test_missing_mobile_jwt_secret_is_flagged_not_fatal(self):
         flask_app = _app(MOBILE_JWT_SECRET=STRONG, MOBILE_JWT_SECRET_EXPLICIT=False)
-        with pytest.raises(RuntimeError, match="MOBILE_JWT_SECRET is not set"):
-            validate_security_settings(flask_app)
+        validate_security_settings(flask_app)
+        errors, warnings = collect_security_findings(flask_app)
+        assert errors == []
+        assert any("MOBILE_JWT_SECRET is not set" in w for w in warnings)
 
-    def test_mobile_secret_equal_to_secret_key_is_fatal(self):
+    def test_mobile_secret_equal_to_secret_key_is_a_warning(self):
         flask_app = _app(MOBILE_JWT_SECRET=STRONG)
-        with pytest.raises(RuntimeError, match="must differ from SECRET_KEY"):
-            validate_security_settings(flask_app)
+        validate_security_settings(flask_app)
+        errors, warnings = collect_security_findings(flask_app)
+        assert errors == []
+        assert any("must differ from SECRET_KEY" in w for w in warnings)
 
-    def test_short_mobile_secret_is_fatal(self):
+    def test_short_mobile_secret_is_a_warning(self):
         flask_app = _app(MOBILE_JWT_SECRET="short")
-        with pytest.raises(RuntimeError, match="too short"):
-            validate_security_settings(flask_app)
+        validate_security_settings(flask_app)
+        errors, warnings = collect_security_findings(flask_app)
+        assert errors == []
+        assert any("too short" in w for w in warnings)
+
+    def test_enable_ssh_off_is_a_warning_in_production(self, monkeypatch):
+        monkeypatch.delenv("ENABLE_SSH", raising=False)
+        flask_app = _app()
+        validate_security_settings(flask_app)
+        errors, warnings = collect_security_findings(flask_app)
+        assert errors == []
+        assert any("ENABLE_SSH is not set" in w for w in warnings)
+        assert deployment_security_flag_codes(flask_app) == ["enable_ssh"]
+
+    def test_settings_flags_include_missing_mobile_secret(self):
+        flask_app = _app(MOBILE_JWT_SECRET_EXPLICIT=False)
+        assert "mobile_jwt_missing" in deployment_security_flag_codes(flask_app)
 
     def test_ai_secret_missing_is_warning_not_fatal(self):
         errors, warnings = collect_security_findings(_app(AI_JWT_SECRET=None))
@@ -164,8 +189,11 @@ class TestSecurityFindings:
         assert any("DEBUG must be false" in e for e in errors)
 
     def test_staging_is_validated_like_production(self):
-        errors, _ = collect_security_findings(_app(FLASK_CONFIG="staging", MOBILE_JWT_SECRET_EXPLICIT=False))
-        assert errors
+        errors, warnings = collect_security_findings(
+            _app(FLASK_CONFIG="staging", DEBUG=True, MOBILE_JWT_SECRET_EXPLICIT=False)
+        )
+        assert any("DEBUG must be false" in e for e in errors)
+        assert any("MOBILE_JWT_SECRET is not set" in w for w in warnings)
 
     def test_development_reports_findings_but_never_raises(self):
         flask_app = _app(FLASK_CONFIG="development", DEBUG=True, MOBILE_JWT_SECRET_EXPLICIT=False)

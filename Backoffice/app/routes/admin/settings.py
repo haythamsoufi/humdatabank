@@ -1335,6 +1335,7 @@ def manage_settings():
     merged_language_display_names = {**_all_lang_disp, **_primary_lang_disp}
 
     from app.utils.branding_visual_assets import branding_visual_assets_ui_context, branding_visual_upload_available
+    from app.utils.security_startup import deployment_security_flag_codes
 
     _branding_visual_ui = branding_visual_assets_ui_context()
 
@@ -1375,6 +1376,7 @@ def manage_settings():
         title="System Configuration",
         visual_branding_upload_available=branding_visual_upload_available(),
         branding_visual_ui=_branding_visual_ui,
+        security_config_flags=deployment_security_flag_codes(current_app),
     )
 
 

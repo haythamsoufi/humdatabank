@@ -16,6 +16,24 @@ logger = logging.getLogger(__name__)
 
 MIN_SIGNING_KEY_LENGTH = 32
 
+_SSH_TRUE = frozenset({"1", "true", "yes", "on"})
+
+_MOBILE_JWT_WARNINGS = {
+    "mobile_jwt_missing": (
+        "MOBILE_JWT_SECRET is not set. Mobile JWTs are signed with SECRET_KEY. "
+        "Set a dedicated secret of at least 32 characters, distinct from SECRET_KEY."
+    ),
+    "mobile_jwt_same": "MOBILE_JWT_SECRET must differ from SECRET_KEY.",
+    "mobile_jwt_short": (
+        f"MOBILE_JWT_SECRET is too short (minimum {MIN_SIGNING_KEY_LENGTH} characters)."
+    ),
+}
+
+_ENABLE_SSH_WARNING = (
+    "ENABLE_SSH is not set. Container SSH is off; Azure portal SSH will not connect "
+    "until ENABLE_SSH=true."
+)
+
 # config/gunicorn.conf.py runs 3 workers when GUNICORN_WORKERS is unset.
 _GUNICORN_CONF_DEFAULT_WORKERS = 3
 
@@ -48,6 +66,35 @@ def redis_configured(app) -> bool:
     return False
 
 
+def ssh_enabled() -> bool:
+    return (os.environ.get("ENABLE_SSH") or "").strip().lower() in _SSH_TRUE
+
+
+def mobile_jwt_issue(cfg) -> str | None:
+    """Flag code when the dedicated mobile signing secret is missing or weak."""
+    secret_key = str(cfg.get("SECRET_KEY") or "")
+    mobile_secret = str(cfg.get("MOBILE_JWT_SECRET") or "")
+    if not cfg.get("MOBILE_JWT_SECRET_EXPLICIT"):
+        return "mobile_jwt_missing"
+    if mobile_secret == secret_key:
+        return "mobile_jwt_same"
+    if len(mobile_secret) < MIN_SIGNING_KEY_LENGTH:
+        return "mobile_jwt_short"
+    return None
+
+
+def deployment_security_flag_codes(app) -> List[str]:
+    """Codes rendered on System Configuration. These never refuse startup."""
+    codes: List[str] = []
+    issue = mobile_jwt_issue(app.config)
+    if issue:
+        codes.append(issue)
+    flask_config = str(app.config.get("FLASK_CONFIG") or "")
+    if flask_config in ("production", "staging") and not ssh_enabled():
+        codes.append("enable_ssh")
+    return codes
+
+
 def _strict(app) -> bool:
     override = (os.environ.get("STRICT_ENV_VALIDATION") or "").strip().lower()
     if override in ("true", "false"):
@@ -65,7 +112,6 @@ def collect_security_findings(app) -> Tuple[List[str], List[str]]:
 
     secret_key = str(cfg.get("SECRET_KEY") or "")
     mobile_secret = str(cfg.get("MOBILE_JWT_SECRET") or "")
-    mobile_explicit = bool(cfg.get("MOBILE_JWT_SECRET_EXPLICIT"))
     ai_secret = str(cfg.get("AI_JWT_SECRET") or "")
 
     if is_prod_like:
@@ -74,16 +120,11 @@ def collect_security_findings(app) -> Tuple[List[str], List[str]]:
         if not cfg.get("SESSION_COOKIE_SECURE"):
             warnings.append("SESSION_COOKIE_SECURE is false; session cookies can be sent over plain HTTP.")
 
-        if not mobile_explicit:
-            errors.append(
-                "MOBILE_JWT_SECRET is not set. Mobile JWTs must be signed with a dedicated secret "
-                "distinct from SECRET_KEY. Generate one with: "
-                'python -c "import secrets; print(secrets.token_urlsafe(48))"'
-            )
-        elif mobile_secret == secret_key:
-            errors.append("MOBILE_JWT_SECRET must differ from SECRET_KEY.")
-        elif len(mobile_secret) < MIN_SIGNING_KEY_LENGTH:
-            errors.append(f"MOBILE_JWT_SECRET is too short (minimum {MIN_SIGNING_KEY_LENGTH} characters).")
+        issue = mobile_jwt_issue(cfg)
+        if issue:
+            warnings.append(_MOBILE_JWT_WARNINGS[issue])
+        if not ssh_enabled():
+            warnings.append(_ENABLE_SSH_WARNING)
 
         if not ai_secret:
             warnings.append(

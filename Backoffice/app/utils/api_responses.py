@@ -63,25 +63,35 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE  # noqa: F401
 from app.utils.transactions import request_transaction_rollback
 
 
-def json_error(message, status=400, **extra):
+def json_error(message=GENERIC_ERROR_MESSAGE, status=400, **extra):
     """
     Return a JSON error response.
 
-    :param message: Error message string (never pass an Exception — use a stable
-        user-facing string or GENERIC_ERROR_MESSAGE so internal details are not echoed)
+    :param message: Stable user-facing string only. Never pass an Exception or
+        ``str(exc)`` — use ``GENERIC_ERROR_MESSAGE`` or a fixed copy string so
+        internal details are not echoed to clients.
     :param status: HTTP status code (default 400)
     :param extra: Additional keys to include in the response (e.g. success=False)
     :return: Flask Response with status_code set
     """
+    # Only plain strings are returned to clients. Exception objects (and any
+    # non-str value) are replaced so stack/exception text cannot reach jsonify.
     if isinstance(message, BaseException):
         current_app.logger.error(
             "json_error received an exception object; substituting generic message",
             exc_info=message,
         )
-        message = GENERIC_ERROR_MESSAGE
-    elif not isinstance(message, str):
-        message = str(message) if message is not None else GENERIC_ERROR_MESSAGE
-    body = {'error': message, **extra}
+        safe_message = GENERIC_ERROR_MESSAGE
+    elif isinstance(message, str) and message:
+        safe_message = message
+    else:
+        if message is not None and not isinstance(message, str):
+            current_app.logger.error(
+                "json_error received non-string message type=%s",
+                type(message).__name__,
+            )
+        safe_message = GENERIC_ERROR_MESSAGE
+    body = {'error': safe_message, **extra}
     response = jsonify(body)
     response.status_code = status
     return response

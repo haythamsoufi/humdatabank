@@ -300,7 +300,14 @@
    */
   function setHtml(el, value, options) {
     if (!el) return;
-    el.innerHTML = isSafeHtml(value) ? value.value : sanitizeHtml(value, options);
+    const markup = isSafeHtml(value) ? value.value : sanitizeHtml(value, options);
+    // Parsed in the element's own context (so <tr>/<option> fragments survive) and
+    // scripts are dropped to keep innerHTML's "inert script" behaviour.
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const fragment = range.createContextualFragment(markup);
+    fragment.querySelectorAll('script').forEach(function (node) { node.remove(); });
+    el.replaceChildren(fragment);
   }
 
   window.SafeDom = {

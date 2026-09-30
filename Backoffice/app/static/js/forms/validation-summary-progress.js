@@ -339,8 +339,8 @@
       const opEl = $(`op-${fid}`);
       if (opEl) {
         const opinionHtml = formatOpinionHtml(validation);
-        if (window.SafeDom && window.SafeDom.sanitizeHtml) {
-          opEl.innerHTML = window.SafeDom.sanitizeHtml(opinionHtml);
+        if (window.SafeDom && window.SafeDom.setHtml) {
+          window.SafeDom.setHtml(opEl, opinionHtml);
         } else {
           opEl.textContent = opinionHtml;
         }

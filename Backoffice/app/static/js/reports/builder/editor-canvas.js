@@ -309,11 +309,11 @@ export class EditorCanvas {
         try {
             const payload = await this.fetchPreviewPayload(widgetId);
             this._slotPayloadCache[widgetId] = payload;
-            previewHost.innerHTML = '';
+            previewHost.replaceChildren();
             await renderWidget(previewHost, payload);
             if (titleEl && payload.title) titleEl.textContent = payload.title;
         } catch (err) {
-            previewHost.innerHTML = '';
+            previewHost.replaceChildren();
             const errEl = document.createElement('div');
             errEl.className = 'rb-editor-slot-error';
             errEl.textContent = (err && err.message) || 'Preview failed';

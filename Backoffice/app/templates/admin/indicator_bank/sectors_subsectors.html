@@ -1095,6 +1095,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const editSubsectorBtns = document.querySelectorAll('.edit-subsector-btn');
     const modalCloseBtns = document.querySelectorAll('.modal-close');
 
+    function buildLogoPreviewImage(logoUrl) {
+        const img = document.createElement('img');
+        SafeDom.setSrc(img, logoUrl);
+        img.alt = 'Current logo';
+        img.style.maxWidth = '100px';
+        img.style.maxHeight = '100px';
+        return img;
+    }
+
     // Helper function to show modal
     function showModal(modal) {
         modal.classList.remove('hidden');
@@ -1149,13 +1158,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.logo_filename) {
                     const logoUrl = data.logo_url || `{{ url_for('system_admin.sector_logo', sector_id=0) }}`.replace('0', sectorId);
                     if (logoPreview) {
-                        logoPreview.innerHTML = `<img src="${SafeDom.safeHrefAttr(logoUrl)}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        logoPreview.replaceChildren(buildLogoPreviewImage(logoUrl));
                     } else {
                         // Create preview if it doesn't exist
                         const logoInput = document.querySelector('#editSectorModal input[name="logo_file"]');
                         const previewDiv = document.createElement('div');
                         previewDiv.classList.add('file-upload-preview');
-                        previewDiv.innerHTML = `<img src="${SafeDom.safeHrefAttr(logoUrl)}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
+                        previewDiv.replaceChildren(buildLogoPreviewImage(logoUrl));
                         logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
                     }
                 } else {

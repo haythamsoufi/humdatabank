@@ -27,6 +27,7 @@ Desktop.ini
 .vscode/
 .idea/
 .history/
+.worktrees/
 
 # Python / Flask
 __pycache__/

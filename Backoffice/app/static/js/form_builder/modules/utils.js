@@ -124,8 +124,8 @@ const Utils = {
         if (!container) return;
         container.replaceChildren();
         if (typeof html !== 'string' || !html.trim()) return;
-        if (window.SafeDom && window.SafeDom.sanitizeHtml) {
-            container.innerHTML = window.SafeDom.sanitizeHtml(html, { allowControls: true });
+        if (window.SafeDom && window.SafeDom.setHtml) {
+            window.SafeDom.setHtml(container, html, { allowControls: true });
         } else {
             container.textContent = html;
         }

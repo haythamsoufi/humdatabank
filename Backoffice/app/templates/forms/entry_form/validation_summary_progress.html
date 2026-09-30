@@ -462,8 +462,8 @@
 
     function openPopup(data) {
         var popupHtml = buildHtml(data);
-        if (window.SafeDom && window.SafeDom.sanitizeHtml) {
-            body.innerHTML = window.SafeDom.sanitizeHtml(popupHtml);
+        if (window.SafeDom && window.SafeDom.setHtml) {
+            window.SafeDom.setHtml(body, popupHtml);
         } else {
             body.textContent = popupHtml;
         }

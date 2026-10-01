@@ -137,9 +137,11 @@ Wired in `.cursor/mcp.json` as `humanitarian-databank`. Restart Cursor after
 
 ## Claude.ai (remote connector)
 
-1. Deploy to a **public HTTPS URL** (e.g. `https://databank.ifrc.org/mcp` via Backoffice proxy).
+The Backoffice proxy in front of this server is **intentionally unauthenticated**. Connectors do not send a Backoffice API key or a login cookie. Do not put `mcp:use` back in front of `/mcp` unless this client starts calling a non-public route (`databank_client.is_public_databank_read_path` is what keeps that promise). Handbook: `docs/DEVELOPER-HANDBOOK.md` (Public MCP connector).
+
+1. Deploy to a **public HTTPS URL** (e.g. `https://databank.ifrc.org/mcp` via the Backoffice proxy).
 2. Claude → **Settings → Connectors → Add custom connector**.
-3. Paste the MCP URL → Connect → enable in chat.
+3. Paste the MCP URL → Connect → enable in chat. No API key.
 
 Connector name: **IFRC Network Databank**. Icon:
 `https://databank.ifrc.org/mcp/icon.svg` (default).
@@ -155,6 +157,8 @@ Connector name: **IFRC Network Databank**. Icon:
 ```text
 MCP_UPSTREAM_URL=https://ifrc-databank-mcp-staging.azurewebsites.net
 ```
+
+`MCP_PROXY_AUTH_MODE` defaults to `public` and should stay there. Set it to `required` only together with a non-public databank call from this server. That mode then demands an API key with `mcp:use` or a browser session with `admin.mcp.use`.
 
 **Env vars:**
 

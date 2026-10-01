@@ -10,9 +10,14 @@ import io
 import time
 from app.services.imports.excel_service import ExcelService
 from app.services.imports.assignment_excel_access import (
+    MAX_ASSIGNMENT_EXCEL_BYTES,
+    assignment_excel_upload_error,
     assignment_uses_export_excel,
     assignment_uses_import_excel,
 )
+
+# Tests patch this name to force the size check. Keep it as the route-level limit.
+MAX_EXCEL_FILE_SIZE = MAX_ASSIGNMENT_EXCEL_BYTES
 from app.services.imports.import_change_log import record_assignment_import_audit
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.platform.user_analytics_service import log_user_activity
@@ -24,10 +29,6 @@ excel_bp = Blueprint("excel", __name__, url_prefix="/excel")
 
 # Alias for consistency with app's blueprint registration pattern
 bp = excel_bp
-
-# Maximum file size for Excel imports (10MB)
-MAX_EXCEL_FILE_SIZE = 10 * 1024 * 1024
-
 
 def _validate_generic_excel_export_assignment(aes, *, is_ajax: bool):
     assigned = getattr(aes, "assigned_form", None)
@@ -177,34 +178,11 @@ def import_assignment_excel(aes_id):
         return state_error
 
     excel_file = request.files.get("excel_file")
-    if not excel_file or excel_file.filename == "":
-        error_msg = "No Excel file selected."
-        flash(error_msg, "danger")
+    upload_error = assignment_excel_upload_error(excel_file, max_bytes=MAX_EXCEL_FILE_SIZE)
+    if upload_error:
+        flash(upload_error, "danger")
         if is_ajax:
-            return json_bad_request(error_msg)
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    # Validate file extension
-    if not excel_file.filename.lower().endswith('.xlsx'):
-        error_msg = "Invalid file type. Please upload a .xlsx file."
-        flash(error_msg, "danger")
-        if is_ajax:
-            return json_bad_request(error_msg)
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    # Validate file size (check content_length if available, otherwise read and check)
-    file_size = excel_file.content_length
-    if file_size is None:
-        # Read file to get size if content_length not available
-        excel_file.seek(0, 2)  # Seek to end
-        file_size = excel_file.tell()
-        excel_file.seek(0)  # Reset to beginning
-
-    if file_size > MAX_EXCEL_FILE_SIZE:
-        error_msg = f"File size ({file_size / (1024*1024):.2f}MB) exceeds the maximum allowed size of 10MB."
-        flash(error_msg, "danger")
-        if is_ajax:
-            return json_bad_request(error_msg)
+            return json_bad_request(upload_error)
         return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:

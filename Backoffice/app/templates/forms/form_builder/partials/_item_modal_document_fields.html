@@ -1,0 +1,235 @@
+                    {# Document Field Fields (Initially Hidden) #}
+                    <div id="item-document-fields" class="hidden">
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-document-label" class="text-gray-700 text-sm font-semibold">{{ _('Document Label') }}</label>
+                                <button type="button" id="document-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-document-label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Document Label')|forceescape }}" required>
+                        </div>
+
+                        <!-- Optional Document Type -->
+                        <div class="mb-4">
+                            <label for="item-document-type" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Document Type (Optional)') }}</label>
+                            <select id="item-document-type" name="document_type" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">{{ _('Select document type...') }}</option>
+                                {% for doc_type in config.DOCUMENT_TYPES %}
+                                    <option value="{{ doc_type }}">{{ doc_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" id="item-document-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="item-document-max-documents" class="block text-gray-700 text-sm font-semibold mb-2">
+                                {{ _('Maximum Documents Allowed') }}
+                                <span class="ml-1 text-gray-500 text-xs font-normal">({{ _('Leave empty for unlimited') }})</span>
+                            </label>
+                            <input type="number" id="item-document-max-documents" name="max_documents" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" min="1" placeholder="{{ _('Unlimited')|forceescape }}">
+                        </div>
+
+                        {# Document Field Display Options #}
+                        <div class="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                            <div class="flex items-center gap-2 flex-wrap mb-3">
+                                <h4 class="text-sm font-semibold text-gray-700">{{ _('Upload Modal Fields') }}</h4>
+                                {{ field_help(_('Select which fields to show in the document upload modal during data entry:')) }}
+                            </div>
+
+                            <div class="space-y-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="item-document-show-language" name="show_language" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Show Language selector') }}</span>
+                                </label>
+
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="item-document-show-type" name="show_document_type" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Show Document Type selector') }}</span>
+                                </label>
+
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="item-document-show-year" name="show_year" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                        <span class="ml-2 text-sm text-gray-700">{{ _('Show Year/Period selector') }}</span>
+                                    </label>
+
+                                    {# Period Type Options - Shown when year selector is enabled #}
+                                    <div id="period-type-options" class="ml-6 mt-2 space-y-1 hidden">
+                                        <p class="text-xs text-gray-600 mb-1">{{ _('Allowed period types:') }}</p>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="item-document-period-single-year" name="allow_single_year" value="true" class="form-checkbox h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
+                                            <span class="ml-2 text-xs text-gray-700">{{ _('Single Year') }}</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="item-document-period-year-range" name="allow_year_range" value="true" class="form-checkbox h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
+                                            <span class="ml-2 text-xs text-gray-700">{{ _('Year Range') }}</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" id="item-document-period-month-range" name="allow_month_range" value="true" class="form-checkbox h-3 w-3 text-green-600 border-gray-300 rounded focus:ring-green-500" checked>
+                                            <span class="ml-2 text-xs text-gray-700">{{ _('Month Range') }}</span>
+                                        </label>
+                                    </div>
+
+                                    {# Fixed period when the focal-point period selector is hidden (show_year off) #}
+                                    <div id="document-fixed-period-block" class="ml-6 mt-3 space-y-2 p-3 border border-gray-200 rounded-md bg-white">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <p class="text-xs font-medium text-gray-700">{{ _('Fixed period for uploads') }}</p>
+                                            {{ field_help(_('When the Year/Period selector is hidden, all uploads use this period. Focal points cannot change it.')) }}
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" name="preset_period_mode" value="custom" id="item-doc-preset-mode-custom" class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" checked>
+                                                <span class="text-sm text-gray-700">{{ _('Specific period') }}</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <input type="radio" name="preset_period_mode" value="assignment" id="item-doc-preset-mode-assignment" class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                                <span class="text-sm text-gray-700">{{ _('Same as assignment period') }}</span>
+                                                {{ field_help(_('Uses the period of the current assignment (shown in the form header).')) }}
+                                            </label>
+                                        </div>
+                                        <div id="document-fixed-period-custom-fields">
+                                        <div>
+                                            <label for="item-doc-preset-period-type" class="block text-xs text-gray-600 mb-1">{{ _('Period type') }}</label>
+                                            <select id="item-doc-preset-period-type" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                                <option value="single-year">{{ _('Single Year') }}</option>
+                                                <option value="year-range">{{ _('Year Range') }}</option>
+                                                <option value="month-range">{{ _('Month Range') }}</option>
+                                            </select>
+                                        </div>
+                                        <div id="item-doc-preset-single-year-fields" class="item-doc-preset-period-fields">
+                                            <label for="item-doc-preset-single-year" class="block text-xs text-gray-600 mb-1">{{ _('Year') }}</label>
+                                            <select id="item-doc-preset-single-year"
+                                                    class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                    data-year-select="true"
+                                                    data-year-min="2000"
+                                                    data-year-max="2100">
+                                                <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                            </select>
+                                        </div>
+                                        <div id="item-doc-preset-year-range-fields" class="item-doc-preset-period-fields hidden">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label for="item-doc-preset-start-year" class="block text-xs text-gray-600 mb-1">{{ _('Start Year') }}</label>
+                                                    <select id="item-doc-preset-start-year"
+                                                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                            data-year-select="true"
+                                                            data-year-min="2000"
+                                                            data-year-max="2100">
+                                                        <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label for="item-doc-preset-end-year" class="block text-xs text-gray-600 mb-1">{{ _('End Year') }}</label>
+                                                    <select id="item-doc-preset-end-year"
+                                                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                            data-year-select="true"
+                                                            data-year-min="2000"
+                                                            data-year-max="2100">
+                                                        <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="item-doc-preset-month-range-fields" class="item-doc-preset-period-fields hidden">
+                                            <div class="space-y-2">
+                                                <div>
+                                                    <label class="block text-xs text-gray-600 mb-1">{{ _('Start period') }}</label>
+                                                    <div class="grid grid-cols-2 gap-1">
+                                                        <select id="item-doc-preset-start-month-year"
+                                                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                data-year-select="true"
+                                                                data-year-min="2000"
+                                                                data-year-max="2100">
+                                                            <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                        </select>
+                                                        <select id="item-doc-preset-start-month" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                                            <option value="01">{{ _('Jan') }}</option>
+                                                            <option value="02">{{ _('Feb') }}</option>
+                                                            <option value="03">{{ _('Mar') }}</option>
+                                                            <option value="04">{{ _('Apr') }}</option>
+                                                            <option value="05">{{ _('May') }}</option>
+                                                            <option value="06">{{ _('Jun') }}</option>
+                                                            <option value="07">{{ _('Jul') }}</option>
+                                                            <option value="08">{{ _('Aug') }}</option>
+                                                            <option value="09">{{ _('Sep') }}</option>
+                                                            <option value="10">{{ _('Oct') }}</option>
+                                                            <option value="11">{{ _('Nov') }}</option>
+                                                            <option value="12">{{ _('Dec') }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs text-gray-600 mb-1">{{ _('End period') }}</label>
+                                                    <div class="grid grid-cols-2 gap-1">
+                                                        <select id="item-doc-preset-end-month-year"
+                                                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                                                                data-year-select="true"
+                                                                data-year-min="2000"
+                                                                data-year-max="2100">
+                                                            <option value="" disabled selected hidden>{{ _('Select year') }}</option>
+                                                        </select>
+                                                        <select id="item-doc-preset-end-month" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                                                            <option value="01">{{ _('Jan') }}</option>
+                                                            <option value="02">{{ _('Feb') }}</option>
+                                                            <option value="03">{{ _('Mar') }}</option>
+                                                            <option value="04">{{ _('Apr') }}</option>
+                                                            <option value="05">{{ _('May') }}</option>
+                                                            <option value="06">{{ _('Jun') }}</option>
+                                                            <option value="07">{{ _('Jul') }}</option>
+                                                            <option value="08">{{ _('Aug') }}</option>
+                                                            <option value="09">{{ _('Sep') }}</option>
+                                                            <option value="10">{{ _('Oct') }}</option>
+                                                            <option value="11">{{ _('Nov') }}</option>
+                                                            <option value="12">{{ _('Dec') }}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" name="preset_period" id="item-doc-preset-period-value" value="">
+                                        {# Mirrors preset_period_mode radio; always submitted even when radio is disabled #}
+                                        <input type="hidden" name="preset_period_mode_value" id="item-doc-preset-mode-hidden" value="custom">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="item-document-show-public" name="show_public_checkbox" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Show Public Document checkbox') }}</span>
+                                </label>
+
+                                <div class="pt-2 border-t border-gray-200 mt-2">
+                                    <label class="flex items-start gap-2">
+                                        <input type="checkbox" id="item-document-entity-repo" name="cross_assignment_period_reuse" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5">
+                                        <span class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                            {{ _("Satisfy from this entity's document repository") }}
+                                            {{ field_help(_("Uploads by this entity's focal points for this form template are kept as a shared repository. When enabled, this field is satisfied if a matching document type already exists in that repository for the same entity, its period covers all years of the current assignment, and the document type matches the type set above.")) }}
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        {# Translation fields handled by shared fields above #}
+                    </div>

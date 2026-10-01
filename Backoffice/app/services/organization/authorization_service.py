@@ -896,6 +896,53 @@ class AuthorizationService:
         return any(node in held for node in AuthorizationService._entity_scope_chain(entity_type, entity_id))
 
     @staticmethod
+    def user_can_access_entity(user, entity_type: str, entity_id: int) -> bool:
+        """Whether ``user`` may read this entity.
+
+        System Managers may read every entity. Country-linked entities are also open to
+        users with global country scope. Secretariat entities are open to
+        ``admin.organization.manage``. Everyone else needs a ``UserEntityPermission`` on
+        the entity or an ancestor (country covering a branch, division covering a department).
+        Holding some other ``admin.*`` permission does not widen this check.
+        """
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if AuthorizationService.is_system_manager(user):
+            return True
+
+        entity_type = str(entity_type or "").strip()
+        try:
+            entity_id = int(entity_id)
+        except (TypeError, ValueError):
+            return False
+
+        if entity_type in AuthorizationService.COUNTRY_LINKED_ENTITY_TYPES:
+            if AuthorizationService.has_global_country_scope(user):
+                return True
+        elif AuthorizationService.has_rbac_permission(user, "admin.organization.manage"):
+            return True
+
+        from app.models.core import UserEntityPermission
+
+        g = _request_g()
+        cache_key = int(user.id)
+        held = None
+        if g is not None:
+            cached = getattr(g, "_entity_access_perm_cache", None)
+            if cached is not None and cached[0] == cache_key:
+                held = cached[1]
+        if held is None:
+            held = {
+                (str(p.entity_type), int(p.entity_id))
+                for p in UserEntityPermission.query.filter_by(user_id=cache_key).all()
+            }
+            if g is not None:
+                g._entity_access_perm_cache = (cache_key, held)
+        if not held:
+            return False
+        return any(node in held for node in AuthorizationService._entity_scope_chain(entity_type, entity_id))
+
+    @staticmethod
     def has_country_scoped_permission(user, permission_code: str, country_id: int) -> bool:
         """
         Permission check bound to one country, honoring entity-scoped RbacAccessGrant rows.

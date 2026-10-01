@@ -17,6 +17,7 @@ def _user_can_access_entity(entity_type: str, entity_id: int) -> bool:
 @api_bp.route("/dashboard/data-quality/templates", methods=["GET"])
 @login_required
 def get_data_quality_templates():
+    """Session-only dashboard route. Not part of the API-key capability catalog."""
     if not is_data_quality_dashboard_enabled():
         return json_response({"enabled": False, "templates": []})
 

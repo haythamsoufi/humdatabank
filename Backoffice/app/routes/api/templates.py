@@ -134,7 +134,14 @@ def get_templates():
             total_pages = (total_items + per_page - 1) // per_page if per_page else 1
             templates = templates[start:end]
         else:
-            total_pages = None
+            # Session callers used to receive every template. Cap the page so a
+            # large catalog cannot be pulled in one response; total_items still
+            # reports the full filtered count.
+            per_page = 500
+            page = 1
+            total_pages = (total_items + per_page - 1) // per_page if total_items else 1
+            templates = templates[:per_page]
+            should_paginate = True
 
         # Batch-count sections, pages, and items to avoid 3 lazy COUNT queries per
         # template (which becomes 3×N queries for N templates on the page).

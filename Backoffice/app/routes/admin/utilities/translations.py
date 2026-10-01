@@ -36,15 +36,9 @@ logger = logging.getLogger(__name__)
 
 def _language_display_name(lang_code):
     """Human-readable label for a locale code (for flash messages)."""
-    from config import Config
+    from app.utils.language_labels import language_display_name
 
-    names_map = (
-        getattr(Config, 'LANGUAGE_DISPLAY_NAMES', None)
-        or getattr(Config, 'ALL_LANGUAGES_DISPLAY_NAMES', None)
-        or {}
-    )
-    base = str(lang_code).lower().split('_')[0]
-    return names_map.get(lang_code) or names_map.get(base) or str(lang_code).upper()
+    return language_display_name(lang_code, fallback=str(lang_code).upper())
 
 
 def _format_language_display_list(lang_codes):

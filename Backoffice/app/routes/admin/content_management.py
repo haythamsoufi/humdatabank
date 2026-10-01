@@ -90,14 +90,18 @@ def _standalone_entity_for_library_paths(document: SubmittedDocument) -> tuple[s
 
 
 def _document_modal_entity_choice_rows_for_admin():
-    """All linkable entities for admin document modal (single dropdown)."""
+    """Linkable entities for the document modal, limited to the viewer's scope."""
+    sees_all = _viewer_sees_all_documents(current_user)
     pairs = []
     for et_slug, model_class in EntityService.ENTITY_MODEL_MAP.items():
         try:
             for obj in model_class.query.all():
                 eid = getattr(obj, "id", None)
-                if eid is not None:
-                    pairs.append((et_slug, int(eid)))
+                if eid is None:
+                    continue
+                if not sees_all and not EntityService.check_user_entity_access(current_user, et_slug, int(eid)):
+                    continue
+                pairs.append((et_slug, int(eid)))
         except Exception:
             continue
     name_map = EntityService.batch_entity_names(
@@ -128,16 +132,23 @@ def _parse_standalone_link_from_form(form) -> tuple[str, int] | None:
     return (et_slug, int(eid))
 
 
-def _user_country_ids(user) -> set[int]:
-    """Return a cached set of country IDs for *user* (avoids repeated DB hits)."""
-    try:
-        return set(c.id for c in user.countries.all())
-    except Exception:
-        return set()
+def _viewer_sees_all_documents(user) -> bool:
+    """System Managers and global country/org admins are not limited to assigned entities."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    return AuthorizationService.is_system_manager(user) or AuthorizationService.has_global_country_scope(user)
+
+
+def _document_entity_in_scope(user, entity_type, entity_id) -> bool:
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if entity_type == EntityType.country.value or entity_type == "country":
+        return AuthorizationService.has_country_access(user, int(entity_id))
+    return EntityService.check_user_entity_access(user, entity_type, entity_id)
 
 
 def _focal_user_can_access_submitted_document(document: SubmittedDocument, user) -> bool:
-    """Whether a non-admin user may access this document (download/delete/edit)."""
+    """Whether ``user`` may access this document based on its country or linked entity."""
     from app.services.organization.authorization_service import AuthorizationService
 
     if AuthorizationService.is_system_manager(user):
@@ -146,58 +157,51 @@ def _focal_user_can_access_submitted_document(document: SubmittedDocument, user)
         if getattr(document, "uploaded_by_user_id", None) == getattr(user, "id", None):
             return True
 
-    cids = _user_country_ids(user)
-
     if document.assignment_entity_status_id:
         aes = document.assignment_entity_status
         if not aes:
             aes = AssignmentEntityStatus.query.get(document.assignment_entity_status_id)
         if not aes:
             return False
-        if aes.entity_type == 'country' and aes.entity_id in cids:
-            return True
-        return EntityService.check_user_entity_access(user, aes.entity_type, aes.entity_id)
+        return _document_entity_in_scope(user, aes.entity_type, aes.entity_id)
     if document.public_submission_id:
         ps = document.public_submission
         if not ps:
             ps = PublicSubmission.query.get(document.public_submission_id)
         if not ps:
             return False
-        return ps.country_id in cids
+        return AuthorizationService.has_country_access(user, ps.country_id)
     if document.linked_entity_type and document.linked_entity_id is not None:
-        if EntityService.check_user_entity_access(user, document.linked_entity_type, document.linked_entity_id):
-            return True
-        if document.linked_entity_type == EntityType.country.value:
-            return document.linked_entity_id in cids
-        return False
+        return _document_entity_in_scope(user, document.linked_entity_type, document.linked_entity_id)
     if document.country_id:
-        return document.country_id in cids
+        return AuthorizationService.has_country_access(user, document.country_id)
     parsed = _standalone_entity_pair_from_storage_path(document.storage_path)
     if parsed:
         et, eid = parsed
-        if EntityService.check_user_entity_access(user, et, eid):
-            return True
-        if et == EntityType.country.value:
-            return eid in cids
-        return False
+        return _document_entity_in_scope(user, et, eid)
     return False
 
 
 def _check_document_access(document: SubmittedDocument, user, *, action: str = "access") -> tuple[bool, str | None]:
     """Shared authorization check for document download/edit/delete.
 
+    ``admin.documents.manage`` and ``admin.ai.manage`` grant the action, not org-wide
+    reach. Callers still need the document's country or entity, unless they are a
+    System Manager or hold global country scope.
+
     Returns ``(allowed, flash_message_or_none)``.  When *allowed* is ``False`` the
     caller should redirect with the provided flash message.
     """
     from app.services.organization.authorization_service import AuthorizationService
 
-    is_admin_with_perm = AuthorizationService.has_rbac_permission(user, 'admin.documents.manage')
-    is_system_manager = AuthorizationService.is_system_manager(user)
-    if is_admin_with_perm or is_system_manager:
+    if AuthorizationService.is_system_manager(user):
         return True, None
-    if AuthorizationService.has_rbac_permission(user, 'admin.ai.manage'):
-        return True, None
-    if not AuthorizationService.has_rbac_permission(user, 'assignment.documents.upload'):
+    can_act = (
+        AuthorizationService.has_rbac_permission(user, "admin.documents.manage")
+        or AuthorizationService.has_rbac_permission(user, "admin.ai.manage")
+        or AuthorizationService.has_rbac_permission(user, "assignment.documents.upload")
+    )
+    if not can_act:
         return False, f"Access denied. Document {action} permission required."
     if not _focal_user_can_access_submitted_document(document, user):
         return False, f"Access denied. Document {action} permission required."
@@ -205,17 +209,10 @@ def _check_document_access(document: SubmittedDocument, user, *, action: str = "
 
 
 def _row_with_focal_entity_access(row: tuple) -> tuple:
-    """Append focal-access flag for documents grid (tuple row from query)."""
-    from app.services.organization.authorization_service import AuthorizationService
-
+    """Append an entity-access flag for the documents grid."""
     doc = row[0]
-    if AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage"):
-        return (*row, True)
-    if AuthorizationService.is_system_manager(current_user):
-        return (*row, True)
-    if AuthorizationService.has_rbac_permission(current_user, "assignment.documents.upload"):
-        return (*row, _focal_user_can_access_submitted_document(doc, current_user))
-    return (*row, False)
+    allowed, _msg = _check_document_access(doc, current_user)
+    return (*row, allowed)
 
 
 def _serialize_document_row(doc_row: tuple) -> dict:
@@ -227,17 +224,9 @@ def _serialize_document_row(doc_row: tuple) -> dict:
 
 
 def _language_display_name(language_code: str | None) -> str:
-    from config import Config
+    from app.utils.language_labels import language_display_name
 
-    lang = (language_code or "").split("_")[0].split("-")[0]
-    if lang == "zz":
-        return "Unknown"
-    return (
-        Config.LANGUAGE_DISPLAY_NAMES.get(lang)
-        or Config.ALL_LANGUAGES_DISPLAY_NAMES.get(lang)
-        or language_code
-        or "N/A"
-    )
+    return language_display_name(language_code)
 
 
 def _serialize_document_grid_row(
@@ -504,16 +493,23 @@ def _hydrate_admin_document_rows(page_entries: list[tuple[int, str]]) -> list[tu
 
 def _fetch_admin_documents_page(page: int, per_page: int) -> tuple[list[tuple], int]:
     union_sq = _admin_documents_union_subquery()
-    total = db.session.query(func.count()).select_from(union_sq).scalar() or 0
-    offset = (page - 1) * per_page
-    page_entries = (
+    ordered = (
         db.session.query(union_sq.c.doc_id, union_sq.c.source)
         .order_by(union_sq.c.sort_at.desc())
-        .offset(offset)
-        .limit(per_page)
-        .all()
     )
-    return _hydrate_admin_document_rows(page_entries), total
+    if _viewer_sees_all_documents(current_user):
+        total = db.session.query(func.count()).select_from(union_sq).scalar() or 0
+        offset = (page - 1) * per_page
+        page_entries = ordered.offset(offset).limit(per_page).all()
+        return _hydrate_admin_document_rows(page_entries), total
+
+    # Scoped viewers: drop rows outside their entities before paging so the grid
+    # cannot list documents they are not allowed to open.
+    rows = _hydrate_admin_document_rows(ordered.all())
+    visible = [row for row in rows if _check_document_access(row[0], current_user)[0]]
+    total = len(visible)
+    start = (page - 1) * per_page
+    return visible[start:start + per_page], total
 
 
 def _folder_prefix_for_submitted_document_storage(rel_path: str | None) -> str:
@@ -1248,8 +1244,14 @@ def manage_documents():
             pages=(total + per_page - 1) // per_page if per_page else 1,
         )
 
-    # Countries for upload modal select: admin documents page shows all countries
-    countries = Country.query.all()
+    if _viewer_sees_all_documents(current_user):
+        countries = Country.query.order_by(Country.name).all()
+    else:
+        allowed_ids = [c.id for c in current_user.countries.all()]
+        countries = (
+            Country.query.filter(Country.id.in_(allowed_ids)).order_by(Country.name).all()
+            if allowed_ids else []
+        )
 
     document_entity_types = [
         {"value": et.value, "label": EntityService.get_entity_type_label(et.value)}
@@ -1274,25 +1276,20 @@ def manage_documents():
 @permission_required_any("admin.documents.manage", "assignment.documents.upload")
 def standalone_document_entity_options():
     """JSON list of entities for the document upload/edit modal (filtered by user access)."""
-    from app.services.organization.authorization_service import AuthorizationService
-
     entity_type_raw = (request.args.get("entity_type") or "").strip().lower()
     try:
         et = storage.normalize_standalone_entity_type_slug(entity_type_raw)
     except ValueError:
         return json_bad_request("Invalid entity type")
 
-    is_admin = AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
-    is_sm = AuthorizationService.is_system_manager(current_user)
     entities = EntityService.get_all_entities_by_type(et, filter_active=True)
     out = []
     for e in entities:
         eid = getattr(e, "id", None)
         if eid is None:
             continue
-        if not (is_admin or is_sm):
-            if not EntityService.check_user_entity_access(current_user, et, eid):
-                continue
+        if not EntityService.check_user_entity_access(current_user, et, eid):
+            continue
         name = getattr(e, "name", None) or str(eid)
         out.append({"id": eid, "name": name})
     out.sort(key=lambda x: (x["name"] or "").lower())
@@ -1305,8 +1302,10 @@ def serve_document_file(doc_id):
     """Serve a document file for display (not download) - used for cover images"""
     document = SubmittedDocument.query.get_or_404(doc_id)
 
-    # For cover images, we can serve them publicly since they're meant to be displayed
-    if document.document_type != 'Cover Image' or not document.is_public:
+    from app.services.documents.public_access import is_publicly_displayable
+
+    # Cover images are public only once the document is public and approved.
+    if document.document_type != 'Cover Image' or not is_publicly_displayable(document):
         abort(404)
 
     try:

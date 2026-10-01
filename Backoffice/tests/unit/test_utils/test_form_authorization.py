@@ -354,7 +354,8 @@ class TestCheckDocumentAccessDecorator:
         user.is_authenticated = True
         with app.test_request_context():
             with patch('app.models.SubmittedDocument.query') as mock_q, \
-                 patch('app.utils.form_authorization.has_country_access', return_value=True), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment',
+                       return_value=True), \
                  patch('app.utils.form_authorization.can_edit_assignment', return_value=True), \
                  patch('app.utils.form_authorization.current_user', user):
                 mock_q.get.return_value = doc

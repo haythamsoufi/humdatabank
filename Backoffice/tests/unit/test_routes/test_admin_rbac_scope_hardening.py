@@ -196,12 +196,18 @@ class TestSeedCatalog:
 
     def test_admin_full_excludes_platform_level_permissions(self):
         _, roles = self._roles()
-        assert not roles["admin_full"] & {"admin.settings.manage", "admin.plugins.manage", "admin.system.maintain"}
+        assert not roles["admin_full"] & {
+            "admin.settings.manage",
+            "admin.plugins.manage",
+            "admin.system.maintain",
+            "admin.mcp.use",
+        }
         assert "admin.countries.delete" in roles["admin_full"]
 
     def test_dedicated_roles_carry_new_permissions(self):
         _, roles = self._roles()
         assert "admin.system.maintain" in roles["admin_system_maintainer"]
+        assert roles["admin_mcp_user"] == {"admin.mcp.use"}
         assert "admin.data_explore.impute" in roles["admin_data_explorer_data_table"]
         assert "admin.countries.delete" in roles["admin_countries_manager"]
 

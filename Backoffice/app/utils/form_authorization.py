@@ -371,17 +371,18 @@ def authorize_aes_json(aes_id, action: str = AES_ACTION_EDIT, *, forbidden_messa
     Returns ``(aes, None)`` on success or ``(None, response)``.
     """
     from app.extensions import db
-    from app.utils.api_responses import json_forbidden
+    from app.utils.api_responses import json_forbidden, json_not_found
 
     try:
         aes_pk = int(aes_id)
     except (TypeError, ValueError):
-        return None, json_forbidden(ASSIGNMENT_NOT_FOUND_MESSAGE)
+        return None, json_not_found(ASSIGNMENT_NOT_FOUND_MESSAGE)
 
     aes = db.session.get(AssignmentEntityStatus, aes_pk)
     decision = check_aes_action(aes, current_user, action)
+    # Hidden and missing assignments share 404 so callers cannot tell them apart.
     if decision == AUTH_HIDDEN:
-        return None, json_forbidden(ASSIGNMENT_NOT_FOUND_MESSAGE)
+        return None, json_not_found(ASSIGNMENT_NOT_FOUND_MESSAGE)
     if decision == AUTH_FORBIDDEN:
         return None, json_forbidden(forbidden_message or "You cannot modify this assignment")
     return aes, None
@@ -517,6 +518,39 @@ def _lock_aes_row(aes) -> str:
         return AES_LOCK_UNCHANGED
     db.session.refresh(aes)
     return AES_LOCK_CHANGED
+
+
+def require_aes_write_lock(aes, action: str = AES_ACTION_EDIT):
+    """Lock ``aes`` before a data write. Returns a JSON error response, or ``None`` when the lock is held.
+
+    A vanished row is 404. A row whose status moved out of the caller's edit rights is 409.
+    A status change that is still editable is refreshed and the caller may continue.
+    """
+    from flask_login import current_user
+    from app.utils.api_responses import json_error, json_not_found
+
+    if aes is None:
+        return json_not_found(ASSIGNMENT_NOT_FOUND_MESSAGE)
+    outcome = _lock_aes_row(aes)
+    if outcome == AES_LOCK_GONE:
+        return json_not_found(ASSIGNMENT_NOT_FOUND_MESSAGE)
+    if outcome == AES_LOCK_CHANGED and check_aes_action(aes, current_user, action) != AUTH_OK:
+        return json_error("This assignment changed and can no longer be edited.", 409)
+    return None
+
+
+def lock_public_submission(submission_id):
+    """Return the public submission row locked for update, or ``None`` when it does not exist."""
+    from sqlalchemy import select
+    from app.extensions import db
+
+    try:
+        pk = int(submission_id)
+    except (TypeError, ValueError):
+        return None
+    return db.session.execute(
+        select(PublicSubmission).where(PublicSubmission.id == pk).with_for_update()
+    ).scalar_one_or_none()
 
 
 def lock_aes_for_update(aes) -> bool:

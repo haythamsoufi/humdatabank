@@ -113,9 +113,9 @@ class TestLegacyRedirects:
         resp = client.get(f"/form/{token}")
         assert resp.status_code in (301, 302)
 
-    def test_legacy_submission_success_redirect(self, client):
+    def test_legacy_submission_success_is_404(self, client):
         resp = client.get("/public_submission_success/1")
-        assert resp.status_code in (301, 302)
+        assert resp.status_code == 404
 
     def test_legacy_document_download_unknown_id_404(self, client, db_session):
         resp = client.get("/public_documents/download/999999")

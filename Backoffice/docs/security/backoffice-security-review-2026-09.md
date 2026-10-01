@@ -198,7 +198,7 @@ Real bugs fixed on the way: `routes/excel.py` used `ExcelService` and `_validate
 | Cost and rate abuse; WebSocket checks at connect only (Medium) | Very high per-user caps; limiter failed open on Redis errors | Config-driven daily limits and cost budgets summed from `ai_reasoning_traces.total_cost_usd`; WebSocket limiter falls back to a stricter in-memory limit at half rate; each message re-checks authorization |
 | Form-builder mode trusted client JSON (Medium) | `page_context.formBuilder` accepted as sent | Accepted only with a cookie session, `admin.templates.create` or `edit`, template access and a version belonging to the template; read only through `trusted_form_builder_context()` |
 | Traces held full prompts and tool output (Medium) | No redaction or retention | Stored redacted by default (modes redacted, minimal, full); nightly purge at 03:30 (90 days for traces, 30 for tool content) and `ai_trace_purge` CLI; raw tool output visible to system managers only; `/api/ai/v2/health` generic for unauthenticated callers |
-| Unauthenticated MCP reverse proxy (High) | No guard on `/mcp` | Requires an API key with `mcp:use` |
+| Unauthenticated MCP reverse proxy (High) | No guard on `/mcp` | **Superseded 2026-10-01.** `/mcp` stays public on purpose. The upstream client only GETs public databank routes, and `databank_client._get` refuses anything else. Do not require `mcp:use` again unless that client grows a non-public call. Abuse controls that remain: IP rate limit, body cap, header allow-list, outbound URL policy, caller credentials stripped. `MCP_PROXY_AUTH_MODE=required` is the opt-in lock |
 | CSV and XLSX formula injection (Medium) | No neutralization | `app/utils/export_safety.py` prefixes `'` to cells starting with `= + - @`, tab or CR; applied at about 15 export sites |
 | Outbound URLs from configuration unchecked (Medium) | No shared policy | `app/utils/outbound_url.py`: https only, no credentials, host allowlist, blocked IP classes, DNS check. Applied to MCP and LibreTranslate (redirects disabled; private networks via `LIBRE_TRANSLATE_ALLOWED_NETWORKS`); the IFRC fetch validator delegates to it. DNS rebinding is a known remaining gap |
 
@@ -235,7 +235,7 @@ The injection audit found no exploitable SQL injection or SSTI. The fixes are de
 - Approving an assignment requires status `submitted` on the server.
 - Every entry-page POST, including autosave, takes a per-assignment row lock.
 - Same-organisation users no longer see non-public data outside their assigned countries; anonymous chat loses `compare_countries`, `get_country_information` and `validate_against_guidelines`.
-- MCP clients need `mcp:use`; the form-builder AI assistant needs a cookie session.
+- `/mcp` is intentionally public (`MCP_PROXY_AUTH_MODE=public`). Do not require `mcp:use` again unless `humanitarian-databank-mcp` calls a non-public route. The form-builder AI assistant still needs a cookie session.
 - AI traces are stored redacted with retention limits.
 - Custom roles holding only `admin.users.edit` lose mobile access-request approval.
 

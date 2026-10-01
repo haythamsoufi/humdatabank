@@ -82,15 +82,24 @@ def get_indicator_bank():
             emergency=request.args.get('emergency', default='', type=str).strip(),
             archived=request.args.get('archived', default=None),
         )
+        from app.utils.api_pagination import validate_pagination_params
+
+        page, per_page = validate_pagination_params(
+            request.args, default_per_page=100, max_per_page=500
+        )
         limit = request.args.get('limit', default=None, type=int)
         if limit is not None and limit > 0:
-            indicators_data, _total, _page, _per_page = get_indicator_list(
-                filters, page=1, per_page=min(limit, 50)
-            )
-        else:
-            indicators_data, _total, _page, _per_page = get_indicator_list(filters)
+            per_page = min(limit, 500)
+        indicators_data, total, page, per_page = get_indicator_list(
+            filters, page=page, per_page=per_page
+        )
         current_app.logger.debug("Indicator bank API returning %s items", len(indicators_data))
-        response = json_response({'indicators': indicators_data})
+        response = json_response({
+            'indicators': indicators_data,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+        })
         # Public, rarely-changing data. Allow downstream caches (AGW, CDN, BI tools) to
         # reuse the response for 5 minutes before re-querying the backend.
         response.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=60'

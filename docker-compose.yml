@@ -93,10 +93,11 @@ services:
       - SSE_ENABLED=false  # Disable SSE by default (set to true to enable)
       - RBAC_SEED_ON_STARTUP=true  # Seed RBAC roles/permissions on first boot
       - SEED_TEST_DATA=true  # Seed test users on first boot (development only)
-      # Test user passwords (enables quick-login buttons on the login page)
-      - TEST_ADMIN_PASSWORD=${TEST_ADMIN_PASSWORD:-test123}
-      - TEST_FOCAL_PASSWORD=${TEST_FOCAL_PASSWORD:-test123}
-      - TEST_SYS_MANAGER_PASSWORD=${TEST_SYS_MANAGER_PASSWORD:-test123}
+      # Test user passwords (enables quick-login on the dev login page).
+      # Set these in .env. There is no default password in this file.
+      - TEST_ADMIN_PASSWORD=${TEST_ADMIN_PASSWORD:-}
+      - TEST_FOCAL_PASSWORD=${TEST_FOCAL_PASSWORD:-}
+      - TEST_SYS_MANAGER_PASSWORD=${TEST_SYS_MANAGER_PASSWORD:-}
       # Optional: Uncomment and set these if you need email/translation services
       # - EMAIL_API_KEY=${EMAIL_API_KEY:-}
       # - EMAIL_API_KEY_STG=${EMAIL_API_KEY_STG:-}

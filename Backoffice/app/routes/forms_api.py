@@ -52,6 +52,7 @@ from app.utils.form_authorization import (
     authorize_aes_json,
     authorize_child_json,
     load_aes_for_user,
+    require_aes_write_lock,
     user_can_read_lookup_list,
 )
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
@@ -234,6 +235,9 @@ def api_add_dynamic_indicator():
         )
         if access_error is not None:
             return access_error
+        lock_error = require_aes_write_lock(assignment_entity_status)
+        if lock_error is not None:
+            return lock_error
 
         # Verify the section exists, is a dynamic section and belongs to this assignment's template
         section = FormSection.query.get_or_404(section_id)
@@ -442,6 +446,10 @@ def api_remove_dynamic_indicator(assignment_id):
         )
         if access_error is not None:
             return access_error
+        if access.aes is not None:
+            lock_error = require_aes_write_lock(access.aes)
+            if lock_error is not None:
+                return lock_error
         assignment = access.obj
 
         # Delete the assignment (data is now stored directly in the assignment)
@@ -464,6 +472,10 @@ def api_update_dynamic_indicator(assignment_id):
         )
         if access_error is not None:
             return access_error
+        if access.aes is not None:
+            lock_error = require_aes_write_lock(access.aes)
+            if lock_error is not None:
+                return lock_error
         assignment = access.obj
 
         # Get update data
@@ -496,6 +508,10 @@ def api_toggle_repeat_instance_hide(instance_id):
     )
     if access_error is not None:
         return access_error
+    if access.aes is not None:
+        lock_error = require_aes_write_lock(access.aes)
+        if lock_error is not None:
+            return lock_error
     instance = access.obj
 
     try:
@@ -1447,6 +1463,10 @@ def api_presence_sync(aes_id):
 @csrf.exempt  # sendBeacon cannot set X-CSRFToken; only removes caller's own presence
 def api_presence_leave(aes_id):
     """Remove the current user's presence immediately (tab close / navigation)."""
+    from app.utils.request_validation import reject_cross_site_request
+
+    if reject_cross_site_request():
+        return json_ok()
     try:
         # Silently ignore requests for assignments the user can't access; the
         # presence record for this user+aes pair simply won't exist in that case.

@@ -64,12 +64,13 @@ class RbacSeedLockMode(str, Enum):
 
 # System-level capabilities that stay out of the admin_full bundle and are granted
 # through their dedicated roles (admin_settings_manager, admin_plugins_manager,
-# admin_system_maintainer) so that "Full" never silently includes platform-wide
-# configuration, plugin management or destructive housekeeping.
+# admin_system_maintainer, admin_mcp_user) so that "Full" never silently includes
+# platform-wide configuration, plugin management, the MCP proxy, or destructive housekeeping.
 _ADMIN_FULL_EXCLUDED_PERMISSION_CODES = (
     "admin.settings.manage",
     "admin.plugins.manage",
     "admin.system.maintain",
+    "admin.mcp.use",
 )
 
 
@@ -149,6 +150,11 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.security.view", "View security dashboard", "View security dashboard"),
         ("admin.security.respond", "Respond to security events", "Resolve/respond to security events"),
         ("admin.ai.manage", "Manage AI", "Manage AI system (dashboard, knowledge base, traces, processing)"),
+        (
+            "admin.mcp.use",
+            "Use MCP proxy",
+            "Browser-session grant for /mcp, consulted only when MCP_PROXY_AUTH_MODE=required. The proxy is public by default because the MCP client reads public databank routes only. Not included in Admin: Full.",
+        ),
 
         # System / API / plugins
         ("admin.settings.manage", "Manage settings", "Manage system settings"),
@@ -388,6 +394,12 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "name": "Admin: System Maintenance",
             "description": "End user sessions, clean up stale sessions and clear monitoring logs (destructive housekeeping; not part of Admin: Full).",
             "permission_codes": ["admin.analytics.view", "admin.system.maintain"],
+        },
+        {
+            "code": "admin_mcp_user",
+            "name": "Admin: MCP proxy",
+            "description": "Use the MCP reverse proxy from a browser session. Not part of Admin: Full.",
+            "permission_codes": ["admin.mcp.use"],
         },
         {
             "code": "admin_data_explorer_data_table",

@@ -94,11 +94,14 @@ def session_log_page_view_paths_api(session_id):
 
 
 @bp.route("/analytics/end-session/<session_id>", methods=["POST"])
-@csrf.exempt  # Mobile app POSTs without a Referer header; auth/permission checks below are sufficient
+@csrf.exempt  # Mobile app POSTs without a Referer; enforce_api_or_csrf_protection accepts X-Mobile-Auth or CSRF
 @permission_required('admin.system.maintain')
 def end_session_api(session_id):
     """End a user session and blacklist it (JSON for admin clients)."""
+    from app.utils.request_validation import enforce_api_or_csrf_protection
     from app.services.platform.user_analytics_service import log_admin_action
+
+    enforce_api_or_csrf_protection()
     from flask import session as flask_session
     from flask_login import logout_user
 

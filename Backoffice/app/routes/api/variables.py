@@ -70,7 +70,8 @@ class _PreviewEntityStatus:
 @api_bp.route('/variables/resolve', methods=['POST'])
 @login_required
 def resolve_variables():
-    """
+    """Session-only helper for the entry form. Not part of the API-key capability catalog.
+
     API endpoint to resolve template variables with optional row entity context.
     Used for matrix variable columns that need to lookup values per row.
 

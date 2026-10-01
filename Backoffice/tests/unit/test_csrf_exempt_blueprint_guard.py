@@ -37,6 +37,7 @@ CSRF_EXEMPT_BLUEPRINT_NAMES = {
     "indicator_bank_compat",  # app/routes/__init__.py
     "mobile_api",  # mobile_bp (Blueprint name "mobile_api") — app/routes/__init__.py
     "ai_v2",  # ai_bp (Blueprint name "ai_v2") — app/routes/__init__.py
+    "mcp",  # mcp_bp — app/routes/__init__.py
 }
 
 ENFORCEMENT_MARKERS = (

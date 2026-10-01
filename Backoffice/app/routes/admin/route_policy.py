@@ -99,7 +99,7 @@ READ_ONLY_POST_ALLOWLIST = frozenset(
 # CSRF-exempt mutating routes, each with the reason it is tolerated. New entries need a review: a
 # cookie-authenticated mutation without CSRF protection is a request-forgery primitive.
 CSRF_EXEMPT_MUTATION_ALLOWLIST = {
-    "admin_analytics_api.end_session_api": "Mobile client POSTs without a Referer; requires admin.system.maintain. Follow-up: accept only bearer-token auth.",
+    "admin_analytics_api.end_session_api": "CSRF-exempt so the mobile app can POST without a Referer. The view calls enforce_api_or_csrf_protection() (X-Mobile-Auth or CSRF) and requires admin.system.maintain.",
     "admin_communication.api_send_notifications": "Mobile/API client; follow-up: restrict to token auth and drop the exemption for cookie sessions.",
 }
 

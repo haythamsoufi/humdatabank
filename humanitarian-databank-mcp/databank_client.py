@@ -11,6 +11,20 @@ import httpx
 
 DEFAULT_BASE = "https://databank.ifrc.org/api/v1"
 PUBLIC_DATA_MAX_PER_PAGE = 5000
+
+# The Backoffice ``/mcp`` proxy is intentionally public because every call this
+# module makes is an anonymous public read. ``_get`` refuses anything else.
+# Adding a path here is allowed only when that route is anonymous and returns
+# public data. A non-public path means set ``MCP_PROXY_AUTH_MODE=required`` on
+# Backoffice in the same change. Do not "fix" the open proxy by requiring
+# ``mcp:use`` while this list is still the whole client.
+def is_public_databank_read_path(path: str) -> bool:
+    """True for the anonymous public reads this connector is allowed to call."""
+    if path == "/data":
+        return True
+    if path == "/indicator-bank" or path.startswith("/indicator-bank/"):
+        return True
+    return path.startswith("/public/")
 MAX_AUTO_PAGES = 20
 REQUEST_TIMEOUT = 60.0
 
@@ -59,6 +73,13 @@ def _check_response_query_matches(url: str, sent_params: Dict[str, Any], data: A
 
 
 def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    if not is_public_databank_read_path(path):
+        raise DatabankAPIError(
+            f"Refusing non-public databank path {path!r}. This connector stays "
+            "anonymous only while every call is a public read. Add the path to "
+            "is_public_databank_read_path if it is public, or set "
+            "MCP_PROXY_AUTH_MODE=required on the Backoffice proxy if it is not."
+        )
     url = f"{api_base()}{path}"
     clean = {k: v for k, v in (params or {}).items() if v is not None and v != ""}
     try:

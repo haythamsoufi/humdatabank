@@ -15,6 +15,16 @@
  * Backend bleach sanitization remains the source of truth on save.
  */
 
+/** Insert stored markup through the shared sanitizer (SafeDom via Utils). */
+function setSanitizedEditorHtml(editor, html) {
+    if (!editor) return;
+    if (window.Utils && typeof window.Utils.setSanitizedHtml === 'function') {
+        window.Utils.setSanitizedHtml(editor, html || '');
+        return;
+    }
+    editor.replaceChildren();
+}
+
 /** Escape plain text and turn newlines into <br>. */
 function plainTextToSafeHtml(text) {
     return String(text || '')
@@ -288,8 +298,11 @@ export const BlankBodyEditor = {
 
     populate(html) {
         if (!this._editor) return;
-        this._editor.innerHTML = html || '';
-        if (this._textarea) this._textarea.value = html || '';
+        setSanitizedEditorHtml(this._editor, html || '');
+        if (this._textarea) {
+            const raw = this._editor.innerHTML;
+            this._textarea.value = (raw === '<br>' || raw === '') ? '' : raw;
+        }
     },
 
     clear() {
@@ -646,7 +659,9 @@ export const BlankTranslationEditor = {
             }
 
             // Refresh from the textarea (populated by TranslationUtils.populateFields)
-            editor.innerHTML = textarea.value || '';
+            setSanitizedEditorHtml(editor, textarea.value || '');
+            const refreshed = editor.innerHTML;
+            textarea.value = (refreshed === '<br>' || refreshed === '') ? '' : refreshed;
 
             editor.classList.remove('hidden');
             textarea.classList.add('sr-only');

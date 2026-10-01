@@ -1,0 +1,277 @@
+                    {# Question Fields (Initially Hidden) #}
+                    <div id="item-question-fields" class="hidden">
+                        <!-- Question type is chosen in the item type picker (hidden select for UI state only). question_type for submit is in #item-question-type-input at form root. -->
+                        <div class="grid grid-cols-1 gap-4 mb-4">
+                            <div class="hidden" aria-hidden="true">
+                                <label for="item-question-type-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Question Type') }}</label>
+                                <select id="item-question-type-select" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                    <option value="">{{ _('Select Question Type...') }}</option>
+                                    {% for value, label in question_type_choices_for_js %}
+                                        <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="item-question-unit" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Unit') }}</label>
+                                <input type="text" name="unit" id="item-question-unit" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., People, %, Items, Days')|forceescape }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-question-label"
+                                       id="item-question-label-caption"
+                                       class="text-gray-700 text-sm font-semibold"
+                                       data-default-text="{{ _('Question Text')|forceescape }}"
+                                       data-blank-text="{{ _('Heading')|forceescape }}">
+                                    {{ _('Question Text') }}</label>
+                                <button type="button" id="question-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <textarea data-field-type="label"
+                                      id="item-question-label"
+                                      class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                      rows="3"
+                                      data-default-placeholder="{{ _('Enter question text')|forceescape }}"
+                                      data-blank-placeholder="{{ _('Optional heading shown in bold')|forceescape }}"
+                                      placeholder="{{ _('Enter question text')|forceescape }}"
+                                      autocomplete="off"></textarea>
+                        </div>
+
+                        <!-- Definition / body text (label varies for Blank/Note) -->
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="definition">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700"
+                                                  data-default-text="{{ _('Description')|forceescape }}"
+                                                  data-blank-text="{{ _('Body text')|forceescape }}">
+                                                {{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+
+                            {# Rich-text toolbar – shown only when question_type == blank #}
+                            <div id="blank-body-toolbar"
+                                 class="hidden flex flex-wrap items-center gap-1 mb-1.5 px-1.5 py-1 border border-gray-200 rounded-md bg-gray-50"
+                                 aria-label="{{ _('Formatting toolbar')|forceescape }}">
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 font-bold text-sm text-gray-700 transition-colors" data-cmd="bold" title="{{ _('Bold')|forceescape }}" aria-label="{{ _('Bold')|forceescape }}">B</button>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 italic text-sm text-gray-700 transition-colors" data-cmd="italic" title="{{ _('Italic')|forceescape }}" aria-label="{{ _('Italic')|forceescape }}">I</button>
+                                <span class="h-4 border-l border-gray-300 mx-0.5" aria-hidden="true"></span>
+                                {# Colour split-button (Word-style): left half applies current colour, right half opens picker #}
+                                <div class="relative flex rounded overflow-visible" id="blank-body-color-wrapper">
+                                    {# Left: apply current colour immediately #}
+                                    <button type="button"
+                                            id="blank-body-color-apply"
+                                            class="body-fmt-btn flex flex-col items-center justify-center px-1.5 h-7 rounded-l hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-sm font-bold text-gray-700 transition-colors"
+                                            title="{{ _('Apply colour')|forceescape }}"
+                                            aria-label="{{ _('Apply text colour')|forceescape }}">
+                                        <span id="blank-body-color-letter" class="leading-none select-none" style="color:#374151">A</span>
+                                        <span id="blank-body-color-bar" class="block w-4 h-[3px] rounded-sm mt-0.5" style="background:#374151"></span>
+                                    </button>
+                                    {# Right: open colour picker #}
+                                    <button type="button"
+                                            id="blank-body-color-trigger"
+                                            class="body-fmt-btn flex items-center justify-center w-4 h-7 rounded-r hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 transition-colors"
+                                            title="{{ _('Choose text colour')|forceescape }}"
+                                            aria-label="{{ _('Choose text colour')|forceescape }}"
+                                            aria-haspopup="true"
+                                            aria-expanded="false">
+                                        <i class="fas fa-chevron-down text-[9px] text-gray-400" aria-hidden="true"></i>
+                                    </button>
+                                    {# Dropdown panel #}
+                                    <div id="blank-body-color-dropdown"
+                                         class="hidden absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-2"
+                                         role="menu"
+                                         aria-label="{{ _('Choose text colour')|forceescape }}">
+                                        {% set _colors = [
+                                            ('#374151', _('Dark (default)')),
+                                            ('#dc2626', _('Red')),
+                                            ('#f97316', _('Orange')),
+                                            ('#ca8a04', _('Yellow')),
+                                            ('#16a34a', _('Green')),
+                                            ('#2563eb', _('Blue')),
+                                            ('#7c3aed', _('Purple')),
+                                            ('#6b7280', _('Grey')),
+                                        ] %}
+                                        <div class="blank-body-color-swatches">
+                                            {% for color, label in _colors %}
+                                            <button type="button"
+                                                    class="body-fmt-color-btn rounded-full border-2 border-white ring-1 ring-gray-300 hover:ring-2 hover:ring-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                                                    style="background:{{ color }}"
+                                                    data-color="{{ color }}"
+                                                    title="{{ label }}"
+                                                    aria-label="{{ label }}"
+                                                    role="menuitem"></button>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="h-4 border-l border-gray-300 mx-0.5" aria-hidden="true"></span>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="createLink" title="{{ _('Insert link')|forceescape }}" aria-label="{{ _('Insert link')|forceescape }}">
+                                    <i class="fas fa-link text-xs" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="removeFormat" title="{{ _('Clear formatting')|forceescape }}" aria-label="{{ _('Clear formatting')|forceescape }}">
+                                    <i class="fas fa-eraser text-xs" aria-hidden="true"></i>
+                                </button>
+                            </div>
+
+                            {# Link URL input panel – revealed by the link button #}
+                            <div id="blank-body-link-panel" class="hidden flex items-center gap-2 mt-1 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
+                                <i class="fas fa-link text-blue-400 text-xs shrink-0" aria-hidden="true"></i>
+                                <input type="url"
+                                       id="blank-body-link-url"
+                                       class="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 min-w-0"
+                                       placeholder="https://example.com">
+                                <button type="button" id="blank-body-link-apply"
+                                        class="shrink-0 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded transition-colors">{{ _('Apply') }}</button>
+                                <button type="button" id="blank-body-link-remove"
+                                        class="shrink-0 hidden text-xs bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded transition-colors">{{ _('Remove') }}</button>
+                                <button type="button" id="blank-body-link-cancel"
+                                        class="shrink-0 text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded transition-colors">{{ _('Cancel') }}</button>
+                            </div>
+
+                            {# Contenteditable rich-text editor – shown only for Blank/Note #}
+                            <div id="item-question-definition-editor"
+                                 class="hidden shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 block w-full sm:text-sm border border-gray-300 rounded-md px-2.5 py-2 min-h-[4.5rem] blank-body-editor"
+                                 contenteditable="true"
+                                 spellcheck="true"
+                                 data-blank-placeholder="{{ _('Text shown below the heading')|forceescape }}"
+                                 aria-label="{{ _('Body text')|forceescape }}"
+                                 aria-multiline="true"
+                                 role="textbox"></div>
+
+                            {# Plain textarea – visible for non-blank types; hidden (sr-only) as the value carrier for blank #}
+                            <textarea id="item-question-definition"
+                                      class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                      rows="3"
+                                      data-default-placeholder="{{ _('Detailed definition/description of this question')|forceescape }}"
+                                      data-blank-placeholder="{{ _('Text shown below the heading')|forceescape }}"
+                                      placeholder="{{ _('Detailed definition/description of this question')|forceescape }}"></textarea>
+                            </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
+                        </div>
+
+                        <!-- Options Source - Hidden by default -->
+                        <div id="options-source-container" class="mb-4 hidden">
+                            <div class="flex items-center space-x-4" role="radiogroup" aria-labelledby="options-source-label">
+                                <span id="options-source-label" class="text-gray-700 text-sm font-semibold mr-2">{{ _('Options Source') }}</span>
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="options_source" value="manual" class="form-radio h-4 w-4 text-green-600" checked>
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('Manual list') }}</span>
+                                </label>
+                                <label class="inline-flex items-center">
+                                    <input type="radio" name="options_source" value="calculated" class="form-radio h-4 w-4 text-green-600">
+                                    <span class="ml-2 text-sm text-gray-700">{{ _('List Library') }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {# Manual Options Input -- visible when manual source selected #}
+                        <div id="item-question-options-container" class="mb-6 hidden">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label class="text-gray-700 text-sm font-semibold">{{ _('Question Options') }}</label>
+                                <button type="button" id="question-options-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage option translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+
+                            <!-- Options List -->
+                            <div id="item-question-options-list" class="space-y-2 mt-3">
+                                <!-- Options will be added here dynamically -->
+                            </div>
+
+                            <!-- Hidden input for options JSON -->
+                            <input type="hidden" id="item-question-options-json" name="options_json" value="[]">
+                            <!-- Hidden input for options translations JSON -->
+                            <input type="hidden" id="item-question-options-translations-json" name="options_translations_json" value="[]">
+
+                            <!-- Hidden template for new option -->
+                            <template id="item-question-option-template">
+                                <div class="option-row flex items-center space-x-2">
+                                    <input type="text" class="option-text shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter option text')|forceescape }}">
+                                    <button type="button" class="move-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up')|forceescape }}">
+                                        <i class="fas fa-arrow-up w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="move-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down')|forceescape }}">
+                                        <i class="fas fa-arrow-down w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="remove-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Option')|forceescape }}">
+                                        <i class="fas fa-trash w-4 h-4"></i>
+                                    </button>
+                                    <button type="button" class="add-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-green-300" title="{{ _('Add Option')|forceescape }}">
+                                        <i class="fas fa-plus w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+
+                        {# Calculated List Selection #}
+                        <div id="item-question-calculated-list-container" class="mb-6 hidden">
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="item-calculated-list-select" class="text-gray-700 text-sm font-semibold">{{ _('Select List') }}</label>
+                                        {{ field_help(_('Filters can be added after selecting a list.')) }}
+                                    </div>
+                                    <select id="item-calculated-list-select" name="lookup_list_id" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                        <option value="">{{ _('Select List...') }}</option>
+                                        {% for lst in lookup_lists_for_js %}
+                                            <option value="{{ lst.id }}"
+                                                    data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "{}" }}'
+                                                    {% if lst.has_config_ui | default(false) %}data-has-config-ui="true"{% endif %}
+                                                    {% if lst.config_js_handler | default(none) %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <!-- Display Column Select -->
+                                <div id="item-calculated-display-column-wrapper" class="hidden">
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="item-calculated-list-display-column" class="text-gray-700 text-sm font-semibold">{{ _('Display Column') }}</label>
+                                        {{ field_help(_("Values from this column will appear as dropdown options. Fields marked as [Multilingual] will display in the user's selected language.")) }}
+                                    </div>
+                                    <select id="item-calculated-list-display-column" name="list_display_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                        <option value="">{{ _('Select Column...') }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="button" id="item-calculated-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2"><i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}</button>
+                            <div id="item-calculated-list-filters-container" class="mt-2 space-y-2"></div>
+                            <input type="hidden" name="list_filters_json" id="item-calculated-list-filters-json">
+                            {# Plugin-specific configuration panel (e.g. Emergency Operations) #}
+                            <div id="question-plugin-config-container" class="mt-2"></div>
+                            <input type="hidden" name="question_plugin_config" id="question-plugin-config-json" value="{}">
+                        </div>
+
+                        {# Allow "Other" option — placed on the right panel with the options list (see updateOptionsVisibility) #}
+                        <div id="item-question-allow-other-wrapper" class="hidden mt-3 pt-3 border-t border-gray-100">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="item-question-allow-other" name="allow_other"
+                                       class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 shrink-0">
+                                <span class="text-sm text-gray-700 font-medium">{{ _('Allow "Other" option') }}</span>
+                                <span class="custom-info-tooltip shrink-0 cursor-help" aria-label="{{ _('Help')|forceescape }}">
+                                    <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                    <span class="tooltip-text">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</span>
+                                </span>
+                            </label>
+                            {# Sub-option: max extra "Other" entries — shown only when limit_entries_to_option_count is also on #}
+                            <div id="max-other-entries-row" class="mt-2 ml-2 pl-4 border-l-2 border-gray-200" style="display:none;">
+                                <label class="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-700 text-sm">
+                                    <span>{{ _('Allow up to') }}</span>
+                                    <input type="number" name="max_other_entries" id="item-max-other-entries"
+                                           class="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-green-500 focus:border-green-500"
+                                           min="1" max="99" value="1">
+                                    <span>{{ _('extra "Other" entries (beyond the option count limit)') }}</span>
+                                    {{ field_help(_('Users can add this many additional "Other" entries on top of the number of list options.')) }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>

@@ -4,6 +4,8 @@ Assignment and Matrix API endpoints.
 Part of the /api/v1 blueprint.
 """
 
+from collections import defaultdict
+
 from flask import request, current_app
 from flask_login import login_required, current_user
 import uuid
@@ -14,7 +16,7 @@ from app.routes.api import api_bp
 from app.utils.sql_utils import safe_ilike_pattern
 
 # Import models
-from app.models import AssignedForm, FormData, FormItem
+from app.models import AssignedForm, Country, FormData, FormItem
 from app.models.assignments import AssignmentEntityStatus
 from app.services.organization.authorization_service import AuthorizationService
 from app.utils.auth import api_capability, require_api_key
@@ -30,6 +32,7 @@ from app.services.security.api_authentication import (
     get_api_key_data_scope,
     get_user_allowed_template_ids,
     redact_request_params,
+    _get_user_allowed_country_ids,
 )
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.request_validation import enforce_csrf_json
@@ -85,6 +88,7 @@ def get_assigned_forms():
 
         key_scope = get_api_key_data_scope() if api_key_record is not None else None
         key_country_ids = None
+        session_country_ids = None
         if key_scope is not None:
             if not key_scope['template_ids'] and not key_scope['country_ids']:
                 query = query.filter(literal(False))
@@ -129,6 +133,7 @@ def get_assigned_forms():
                         'period_name_filter': period_name
                     })
             query = query.filter(AssignedForm.template_id.in_(allowed_template_ids))
+            session_country_ids = _get_user_allowed_country_ids(auth_user)
 
         # Apply filters
         if assignment_id:
@@ -153,18 +158,39 @@ def get_assigned_forms():
             total_items = len(forms)
             total_pages = None
 
+        visible_country_ids = key_country_ids if key_country_ids is not None else session_country_ids
+        form_ids = [assigned_form.id for assigned_form in forms]
+        statuses_by_form = defaultdict(list)
+        if form_ids:
+            status_rows = (
+                AssignmentEntityStatus.query.filter(
+                    AssignmentEntityStatus.assigned_form_id.in_(form_ids),
+                    AssignmentEntityStatus.entity_type == 'country',
+                )
+                .all()
+            )
+            country_ids = {row.entity_id for row in status_rows}
+            countries_by_id = {}
+            if country_ids:
+                countries_by_id = {
+                    country.id: country
+                    for country in Country.query.filter(Country.id.in_(country_ids)).all()
+                }
+            for status in status_rows:
+                statuses_by_form[status.assigned_form_id].append((status, countries_by_id.get(status.entity_id)))
+
         # Serialize assigned form data
         forms_data = []
         for assigned_form in forms:
-            # Get assignment country status information for this assigned form
             country_assignments = []
-            for status in assigned_form.country_statuses:
-                if key_country_ids is not None and status.country_id not in key_country_ids:
+            for status, country in statuses_by_form.get(assigned_form.id, []):
+                country_id = status.entity_id
+                if visible_country_ids is not None and country_id not in visible_country_ids:
                     continue
                 country_assignments.append({
                     'assignment_entity_status_id': status.id,
-                    'country_id': status.country_id,
-                    'iso3': status.country.iso3 if status.country else None,
+                    'country_id': country_id,
+                    'iso3': country.iso3 if country else None,
                     'status': status.status,
                     'status_timestamp': status.status_timestamp.isoformat() if status.status_timestamp else None,
                     'due_date': status.due_date.isoformat() if status.due_date else None

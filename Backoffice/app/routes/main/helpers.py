@@ -290,52 +290,21 @@ def _resolve_selected_entity_for_focal_nav(
 # Use debug_utils functions for consistent debugging patterns
 
 def _format_age_group_breakdown(age_groups, fmt_number_func):
-    """Format age group breakdown with better visual hierarchy and clearer labels."""
-    def _format_age_group_label(age_group):
-        """Convert age group codes to more readable labels."""
-        age_group_mapping = {
-            '_5': '>5',
-            '5_17': '5-17',
-            '18_49': '18-49',
-            '50_': '50+',
-            'unknown': 'Unknown',
-            'male': 'Male',
-            'female': 'Female',
-            'total': 'Total'
-        }
-        return age_group_mapping.get(age_group, age_group.replace('_', '-'))
+    """Format age group breakdown as plain text (detail, then total)."""
+    from app.utils.formatting import age_group_label, age_group_sort_key
 
-    # Filter out zero values and sort by a logical order
     non_zero_groups = [(age_group, count) for age_group, count in age_groups.items()
                       if count and count != 0]
 
     if not non_zero_groups:
         return "0"
 
-    # Sort by a logical order: total first, then by age ranges
-    def sort_key(item):
-        age_group, _ = item
-        if age_group == 'total':
-            return (0, age_group)
-        elif age_group == 'unknown':
-            return (999, age_group)
-        elif age_group == '_5':
-            return (1, age_group)
-        elif age_group == '5_17':
-            return (2, age_group)
-        elif age_group == '18_49':
-            return (3, age_group)
-        elif age_group == '50_':
-            return (4, age_group)
-        else:
-            return (100, age_group)
-
-    non_zero_groups.sort(key=sort_key)
+    non_zero_groups.sort(key=age_group_sort_key)
 
     parts = []
     total = None
     for age_group, count in non_zero_groups:
-        label = _format_age_group_label(age_group)
+        label = age_group_label(age_group)
         formatted_count = fmt_number_func(count)
         if age_group == 'total':
             total = formatted_count

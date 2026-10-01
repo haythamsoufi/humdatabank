@@ -95,6 +95,7 @@ class TestImportAssignmentExcel:
         with patch("app.routes.excel.get_aes_with_joins", return_value=mock_aes), \
              patch("app.routes.excel.AuthorizationService") as MockAuth:
             MockAuth.is_admin.return_value = False
+            MockAuth.can_edit_assignment.return_value = False
             resp = self._post_with_file(client, 1)
         assert resp.status_code in (301, 302)
 
@@ -108,6 +109,7 @@ class TestImportAssignmentExcel:
         with patch("app.routes.excel.get_aes_with_joins", return_value=mock_aes), \
              patch("app.routes.excel.AuthorizationService") as MockAuth:
             MockAuth.is_admin.return_value = False
+            MockAuth.can_edit_assignment.return_value = False
             resp = client.post(
                 "/excel/assignment/1/import",
                 json={},

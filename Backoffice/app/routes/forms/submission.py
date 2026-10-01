@@ -183,7 +183,11 @@ def register_submission_routes(bp):
     @admin_required
     def update_public_submission_status(submission_id):
         """Update public submission status via AJAX."""
-        submission = PublicSubmission.query.get_or_404(submission_id)
+        from app.utils.form_authorization import lock_public_submission
+
+        submission = lock_public_submission(submission_id)
+        if submission is None:
+            abort(404)
         denied = _authorize_public_submission(submission, PUBLIC_SUBMISSION_ACTION_MANAGE, as_json=True)
         if denied is not None:
             return denied
@@ -241,13 +245,27 @@ def register_submission_routes(bp):
         """Main public form filling route - allows external users to submit data."""
         return _fill_public_form_impl(public_token)
 
-    @bp.route("/public-submission/<int:submission_id>/success", methods=["GET"])
-    def public_submission_success(submission_id):
-        """Show success page after public form submission."""
-        submission = PublicSubmission.query.get_or_404(submission_id)
-        return render_template("admin/public/public_submission_success.html",
+    @bp.route("/public-submission/success/<token>", methods=["GET"])
+    def public_submission_success(token):
+        """Show success page after public form submission.
+
+        ``token`` is a signed receipt. Unknown, expired, and missing submissions
+        all return 404 so the page cannot be used to enumerate ids.
+        """
+        from app.services.public.submission_receipt import submission_id_from_success_token
+
+        submission_id = submission_id_from_success_token(token)
+        submission = PublicSubmission.query.get(submission_id) if submission_id else None
+        if submission is None:
+            abort(404)
+        return render_template("forms/public/public_submission_success.html",
                                title="Submission Successful",
                                submission=submission)
+
+    @bp.route("/public-submission/<int:submission_id>/success", methods=["GET"])
+    def public_submission_success_legacy(submission_id):
+        """Integer success URLs are retired. They always 404."""
+        abort(404)
 
     @bp.route("/delete_self_report_assignment/<int:aes_id>", methods=["POST"])
     @login_required
@@ -540,12 +558,12 @@ def _fill_public_form_impl(public_token):
     ).first()
 
     if not assigned_form:
-        return render_template("admin/public/public_form_unavailable.html",
+        return render_template("forms/public/public_form_unavailable.html",
                                title="Form Not Found",
                                message="This form link is not valid or has been removed.")
 
     if not assigned_form.is_public_active:
-        return render_template("admin/public/public_form_unavailable.html",
+        return render_template("forms/public/public_form_unavailable.html",
                                title="Form Unavailable",
                                message="This form is currently not active.")
 
@@ -554,7 +572,7 @@ def _fill_public_form_impl(public_token):
             message = _("This form is currently inactive.")
         else:
             message = _("This form is closed.")
-        return render_template("admin/public/public_form_unavailable.html",
+        return render_template("forms/public/public_form_unavailable.html",
                                title=_("Form Unavailable"),
                                message=message)
 
@@ -610,7 +628,7 @@ def _fill_public_form_impl(public_token):
 
     if not country_choices:
         current_app.logger.warning(f"Public form link {public_token} has no countries assigned.")
-        return render_template("admin/public/public_form_unavailable.html",
+        return render_template("forms/public/public_form_unavailable.html",
                                title="Form Unavailable",
                                message="This form is not configured for any countries.")
 
@@ -705,7 +723,11 @@ def _fill_public_form_impl(public_token):
                         except Exception as e:
                             current_app.logger.error(f"Error sending public submission notification: {e}", exc_info=True)
 
-                        return redirect(url_for('forms.public_submission_success', submission_id=submission.id))
+                        from app.services.public.submission_receipt import public_submission_success_token
+                        return redirect(url_for(
+                            'forms.public_submission_success',
+                            token=public_submission_success_token(submission.id),
+                        ))
                     else:
                         request_transaction_rollback()
                         for error in submission_result['validation_errors']:

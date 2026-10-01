@@ -1319,6 +1319,9 @@ class Config:
     # on this app is reverse-proxied to that host (path preserved). Example:
     # https://ifrc-databank-mcp-staging.azurewebsites.net
     MCP_UPSTREAM_URL = (os.environ.get('MCP_UPSTREAM_URL') or '').strip().rstrip('/')
+    # public: Claude and other connectors can call /mcp with no key. The upstream MCP
+    # server only reads public databank endpoints. required: demand mcp:use or admin.mcp.use.
+    MCP_PROXY_AUTH_MODE = (os.environ.get('MCP_PROXY_AUTH_MODE') or 'public').strip().lower()
 
     # Shareable short link target for the IFRC Network Databank Custom GPT (GET /gpt, /assistant).
     CUSTOM_GPT_URL = (

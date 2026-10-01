@@ -6,13 +6,14 @@ breaks that flow, so Backoffice forwards the request body to MCP_UPSTREAM_URL in
 Set MCP_UPSTREAM_URL (no trailing slash), e.g.:
   https://ifrc-databank-mcp-staging.azurewebsites.net
 
-Access control (deny by default):
-  ``MCP_PROXY_AUTH_MODE=required`` (default) — caller must present an API key with the
-  ``mcp:use`` capability, or a browser session that holds ``admin.mcp.use``. Session callers
-  on unsafe methods must also pass CSRF (or ``X-Mobile-Auth``). A logged-in session alone
+Access control:
+  ``MCP_PROXY_AUTH_MODE=public`` (default) — no caller credential. The upstream MCP server
+  only reads public databank endpoints. The header allow-list, body cap, upstream URL
+  policy and IP rate limit still apply.
+  ``MCP_PROXY_AUTH_MODE=required`` — caller must present an API key with the ``mcp:use``
+  capability, or a browser session that holds ``admin.mcp.use``. Session callers on
+  unsafe methods must also pass CSRF (or ``X-Mobile-Auth``). A logged-in session alone
   is not enough.
-  ``MCP_PROXY_AUTH_MODE=public`` — explicit opt-in for the anonymous public connector; the same
-  header allow-list, body cap, upstream URL policy and (IP based) rate limit still apply.
 
 Only an allow-list of MCP protocol headers is forwarded upstream; inbound cookies, Authorization
 and API-key material never leave this process. The upstream host is validated with
@@ -150,7 +151,7 @@ def _proxy_response(upstream_resp: requests.Response) -> Response:
 
 
 def _auth_mode() -> str:
-    mode = str(current_app.config.get("MCP_PROXY_AUTH_MODE") or "required").strip().lower()
+    mode = str(current_app.config.get("MCP_PROXY_AUTH_MODE") or "public").strip().lower()
     return "public" if mode == "public" else "required"
 
 

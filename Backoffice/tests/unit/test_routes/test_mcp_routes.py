@@ -184,12 +184,12 @@ class TestMcpProxyRequiredMode:
     def _required_mode(self, mcp_config):
         mcp_config.config["MCP_PROXY_AUTH_MODE"] = "required"
 
-    def test_default_mode_is_required(self, mcp_config, client):
+    def test_default_mode_is_public(self, mcp_config, client):
         mcp_config.config.pop("MCP_PROXY_AUTH_MODE", None)
-        with patch("app.routes.mcp.requests.request") as mock_request:
+        with patch("app.routes.mcp.requests.request", return_value=_upstream_response()) as mock_request:
             resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1})
-        assert resp.status_code == 401
-        mock_request.assert_not_called()
+        assert resp.status_code == 200
+        mock_request.assert_called_once()
 
     def test_anonymous_is_rejected(self, client):
         with patch("app.routes.mcp.requests.request") as mock_request:

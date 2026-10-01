@@ -26,7 +26,7 @@ Capabilities (source of truth: `CAPABILITIES` in `api_key_permissions.py`; the a
 | `indicators:suggest` | standard | no | `POST /indicator-suggestions` (write) |
 | `indicators:manage` | **personal data** | no | Read and review indicator suggestions (includes submitter emails; write) |
 | `mobile:client` | standard | no | Allows the key to be sent as `X-Mobile-Auth` (no data access on its own) |
-| `mcp:use` | standard | no | Backoffice proxy to the Databank MCP server |
+| `mcp:use` | standard | no | Backoffice MCP proxy when `MCP_PROXY_AUTH_MODE=required` (the proxy is public by default) |
 
 Presets in the admin form: **Public website / embed**, **BI / analytics (read-only data)**, **Website back end (server-side only)**, **Mobile app client**.
 
@@ -84,7 +84,7 @@ Every key-accepting route must declare a capability; `undeclared_key_routes(app)
 | `indicators:suggest` | `POST /api/v1/indicator-suggestions`, `POST /Indicator/Suggestion` |
 | `indicators:manage` | `GET /api/v1/indicator-suggestions`, `/indicator-suggestions/<id>`, `PUT /indicator-suggestions/<id>/status` |
 | `mobile:client` | `X-Mobile-Auth` CSRF marker (mobile session routes) |
-| `mcp:use` | MCP proxy (`app/routes/mcp.py`) |
+| `mcp:use` | MCP proxy (`app/routes/mcp.py`) when `MCP_PROXY_AUTH_MODE=required` |
 
 ## 3. The environment mobile key
 

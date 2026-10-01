@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 20:23+0000\n"
+"POT-Creation-Date: 2026-10-01 22:38+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: fr <LL@li.org>\n"
@@ -138,8 +138,8 @@ msgstr ""
 "La chaîne %(count)s ne figure pas dans le catalogue source courant (.pot) et"
 " peut être supprimée."
 
-#: app/routes/admin/utilities/translations.py:2118
 #: app/routes/admin/utilities/translations.py:2131
+#: app/routes/admin/utilities/translations.py:2144
 #, python-format
 msgid "%(count)s string was skipped because it is already human-approved."
 msgstr ""
@@ -13134,6 +13134,14 @@ msgstr ""
 "Si elle est activée, cette section sera imbriquée sous la section parente "
 "sélectionnée."
 
+#: plugins/upr/templates/upr/_manage_tools.html:136
+#: plugins/upr/templates/upr/_narrative_modal.html:50
+#, python-brace-format
+msgid ""
+"If the narrative is not already in {language}, it will be translated into "
+"{language} after upload, before the report is generated."
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:3137
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to avoid"
@@ -14124,7 +14132,7 @@ msgstr "Sélection de modèle invalide ou pays non assigné à vous."
 msgid "Invalid translation payload"
 msgstr "Charge utile de traduction invalide"
 
-#: app/routes/admin/utilities/translations.py:2206
+#: app/routes/admin/utilities/translations.py:2219
 msgid "Invalid translation type"
 msgstr "Type de traduction invalide"
 
@@ -16136,8 +16144,8 @@ msgstr "ID du message"
 msgid "Message ID"
 msgstr "ID du message"
 
-#: app/routes/admin/utilities/translations.py:2032
-#: app/routes/admin/utilities/translations.py:2035
+#: app/routes/admin/utilities/translations.py:2045
+#: app/routes/admin/utilities/translations.py:2048
 msgid "Message ID is required for translation type"
 msgstr "L’identifiant du message est requis pour le type de traduction"
 
@@ -17520,8 +17528,8 @@ msgstr "Aucune entrée d'audit trouvée correspondant à vos critères."
 msgid "No items found that need translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2160
-#: app/routes/admin/utilities/translations.py:2302
+#: app/routes/admin/utilities/translations.py:2173
+#: app/routes/admin/utilities/translations.py:2315
 msgid "No items provided"
 msgstr "Aucun article fourni"
 
@@ -17908,7 +17916,7 @@ msgstr "Aucune trace ne correspond aux filtres actuels"
 msgid "No translation fields found that need translation"
 msgstr "Aucun élément trouvé nécessitant une traduction"
 
-#: app/routes/admin/utilities/translations.py:1860
+#: app/routes/admin/utilities/translations.py:1861
 msgid ""
 "No translation service available. Please configure translation API keys."
 msgstr ""
@@ -26645,8 +26653,8 @@ msgstr "Texte"
 msgid "Text content"
 msgstr "Contenu textuel"
 
-#: app/routes/admin/utilities/translations.py:1817
-#: app/routes/admin/utilities/translations.py:1853
+#: app/routes/admin/utilities/translations.py:1818
+#: app/routes/admin/utilities/translations.py:1854
 msgid "Text is required"
 msgstr "Un texte est requis"
 
@@ -26816,14 +26824,6 @@ msgstr ""
 msgid "The key will be hashed and stored securely in the database."
 msgstr ""
 "La clé sera hachée et stockée de manière sécurisée dans la base de données."
-
-#: plugins/upr/templates/upr/_manage_tools.html:136
-#: plugins/upr/templates/upr/_narrative_modal.html:50
-#, python-brace-format
-msgid ""
-"The narrative will be translated into {language} after upload, before the "
-"report is generated."
-msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:307
 msgid ""
@@ -32754,3 +32754,9 @@ msgstr "✓"
 #~ msgstr ""
 #~ "Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
 #~ "4.3)"
+
+# [Removed] was: plugins/upr/templates/upr/_manage_tools.html:136
+#~ msgid ""
+#~ "The narrative will be translated into {language} after upload, before the "
+#~ "report is generated."
+#~ msgstr ""

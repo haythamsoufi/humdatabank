@@ -2445,17 +2445,9 @@ def check_submitted_document_ai_status(submitted_doc_id):
 
 def _language_display_name_for_import(language_code: str | None) -> str:
     """Display label for a document language code (import grid)."""
-    from config import Config
+    from app.utils.language_labels import language_display_name
 
-    lang = (language_code or "").split("_")[0].split("-")[0]
-    if lang == "zz":
-        return "Unknown"
-    return (
-        Config.LANGUAGE_DISPLAY_NAMES.get(lang)
-        or Config.ALL_LANGUAGES_DISPLAY_NAMES.get(lang)
-        or language_code
-        or ""
-    )
+    return language_display_name(language_code, fallback="")
 
 
 def _serialize_system_document_for_ai_import(

@@ -213,7 +213,12 @@ class TestDocumentModalEntityChoiceRows:
         from app.routes.main.helpers import _document_modal_entity_choice_rows
         with app.app_context():
             entities = [{"entity_type": "country", "entity_id": 5, "entity": MagicMock()}]
-            with patch("app.routes.main.helpers.EntityService.batch_entity_names", side_effect=Exception("fail")), \
+
+            class _RaisingMap(dict):
+                def get(self, key, default=None):
+                    raise Exception("fail")
+
+            with patch("app.routes.main.helpers.EntityService.batch_entity_names", return_value=_RaisingMap()), \
                  patch("app.routes.main.helpers.EntityService.sort_document_modal_entity_choice_rows"):
                 rows = _document_modal_entity_choice_rows(entities)
         assert rows[0]["label"] == "country #5"
@@ -1586,7 +1591,7 @@ class TestGetLocalizedFieldNameById:
             mock_item.indicator_bank_id = 1
 
             with patch("app.routes.main.helpers.FormItem.query") as mock_q, \
-                 patch("app.routes.main.helpers.get_localized_indicator_name", return_value="Indicator Name"):
+                 patch("app.utils.form_localization.get_localized_indicator_name", return_value="Indicator Name"):
                 mock_q.get.return_value = mock_item
                 result = get_localized_field_name_by_id(1)
             assert result == "Indicator Name"
@@ -1699,7 +1704,8 @@ class TestGetLocalizedIndicatorBankNameById:
     def test_exception_returns_unknown(self, app):
         from app.routes.main.helpers import _get_localized_indicator_bank_name_by_id
         with app.app_context():
-            with patch("app.models.IndicatorBank", side_effect=Exception("error")):
+            with patch("app.models.IndicatorBank.query") as mock_q:
+                mock_q.get.side_effect = Exception("error")
                 result = _get_localized_indicator_bank_name_by_id(1)
             assert "Unknown" in result
 

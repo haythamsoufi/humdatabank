@@ -1,3 +1,4 @@
+import { compareCondition } from '../../lib/condition-operators.js';
 import { debugLog, debugWarn } from './debug.js';
 // Use both helpers: getCurrentFieldValue always prefers live DOM values.
 import { getCurrentFieldValue, getFieldValue } from './field-management.js';
@@ -656,52 +657,7 @@ function evaluateSingleConditionQuietly(condition) {
         debugLog(MODULE_NAME, `🔌 QUIET MODE: Plugin measure ${item_id} -> fieldId: ${fieldId}, value: "${actualValue}"`);
     }
 
-    switch (condition_type) {
-        case 'is_empty':
-            return isValueEmpty(actualValue);
-
-        case 'is_not_empty':
-            return !isValueEmpty(actualValue);
-
-        case 'equals':
-        case 'equal_to':
-            return comparableConditionValue(actualValue) === comparableConditionValue(resolvedExpectedValue);
-
-        case 'not_equals':
-        case 'not_equal_to':
-            return comparableConditionValue(actualValue) !== comparableConditionValue(resolvedExpectedValue);
-
-        case 'is_yes':
-            // Only return true if value is explicitly "yes" - treat null/undefined/empty as false
-            return actualValue !== null && actualValue !== undefined && String(actualValue).toLowerCase().trim() === 'yes';
-
-        case 'is_no':
-            // Only return true if value is explicitly "no" - treat null/undefined/empty as false
-            return actualValue !== null && actualValue !== undefined && String(actualValue).toLowerCase().trim() === 'no';
-
-        case 'greater_than':
-            const actualNum = parseComparableNumber(actualValue);
-            const expectedNum = parseComparableNumber(resolvedExpectedValue);
-            return !isNaN(actualNum) && !isNaN(expectedNum) && actualNum > expectedNum;
-
-        case 'less_than':
-            const actualNumLT = parseComparableNumber(actualValue);
-            const expectedNumLT = parseComparableNumber(resolvedExpectedValue);
-            return !isNaN(actualNumLT) && !isNaN(expectedNumLT) && actualNumLT < expectedNumLT;
-
-        case 'greater_than_or_equal_to':
-            const actualNumGTE = parseComparableNumber(actualValue);
-            const expectedNumGTE = parseComparableNumber(resolvedExpectedValue);
-            return !isNaN(actualNumGTE) && !isNaN(expectedNumGTE) && actualNumGTE >= expectedNumGTE;
-
-        case 'less_than_or_equal_to':
-            const actualNumLTE = parseComparableNumber(actualValue);
-            const expectedNumLTE = parseComparableNumber(resolvedExpectedValue);
-            return !isNaN(actualNumLTE) && !isNaN(expectedNumLTE) && actualNumLTE <= expectedNumLTE;
-
-        default:
-            return false;
-    }
+    return compareCondition(condition_type, actualValue, resolvedExpectedValue) === true;
 }
 
 function debugFieldValues() {
@@ -1444,123 +1400,13 @@ function evaluateSingleCondition(condition) {
     // Support plugin variables like [SOME_VAR] in relevance condition "value" fields
     resolvedExpectedValue = resolveVariablePlaceholders(resolvedExpectedValue);
 
-    switch (condition_type) {
-        case 'is_empty':
-            const isEmpty = isValueEmpty(actualValue);
-            debugLog(MODULE_NAME, `    ✅ is_empty check: ${isEmpty} (value: "${actualValue}")`);
-            return isEmpty;
-
-        case 'is_not_empty':
-            const isNotEmpty = !isValueEmpty(actualValue);
-            debugLog(MODULE_NAME, `    ✅ is_not_empty check: ${isNotEmpty} (value: "${actualValue}")`);
-            return isNotEmpty;
-
-        case 'equals':
-        case 'equal_to':
-            const equals = comparableConditionValue(actualValue) === comparableConditionValue(resolvedExpectedValue);
-            debugLog(MODULE_NAME, `    ✅ equals/equal_to check: "${actualValue}" === "${resolvedExpectedValue}" -> ${equals}`);
-            return equals;
-
-        case 'not_equals':
-        case 'not_equal_to':
-            const notEquals = comparableConditionValue(actualValue) !== comparableConditionValue(resolvedExpectedValue);
-            debugLog(MODULE_NAME, `    ✅ not_equals/not_equal_to check: "${actualValue}" !== "${resolvedExpectedValue}" -> ${notEquals}`);
-            return notEquals;
-
-        case 'is_yes':
-            // Only return true if value is explicitly "yes" - treat null/undefined/empty as false
-            const isYes = actualValue !== null && actualValue !== undefined && String(actualValue).toLowerCase().trim() === 'yes';
-            debugLog(MODULE_NAME, `    ✅ is_yes check: "${actualValue}" -> ${isYes}`);
-            return isYes;
-
-        case 'is_no':
-            // Only return true if value is explicitly "no" - treat null/undefined/empty as false
-            const isNo = actualValue !== null && actualValue !== undefined && String(actualValue).toLowerCase().trim() === 'no';
-            debugLog(MODULE_NAME, `    ✅ is_no check: "${actualValue}" -> ${isNo}`);
-            return isNo;
-
-        case 'greater_than':
-            const actualNum = parseComparableNumber(actualValue);
-            const expectedNum = parseComparableNumber(resolvedExpectedValue);
-            const greater = !isNaN(actualNum) && !isNaN(expectedNum) && actualNum > expectedNum;
-            debugLog(MODULE_NAME, `    ✅ greater_than check: ${actualNum} > ${expectedNum} -> ${greater}`);
-            return greater;
-
-        case 'less_than':
-            const actualNumLT = parseComparableNumber(actualValue);
-            const expectedNumLT = parseComparableNumber(resolvedExpectedValue);
-            const less = !isNaN(actualNumLT) && !isNaN(expectedNumLT) && actualNumLT < expectedNumLT;
-            debugLog(MODULE_NAME, `    ✅ less_than check: ${actualNumLT} < ${expectedNumLT} -> ${less}`);
-            return less;
-
-        case 'greater_than_or_equal_to':
-            const actualNumGTE = parseComparableNumber(actualValue);
-            const expectedNumGTE = parseComparableNumber(resolvedExpectedValue);
-            const greaterEqual = !isNaN(actualNumGTE) && !isNaN(expectedNumGTE) && actualNumGTE >= expectedNumGTE;
-            debugLog(MODULE_NAME, `    ✅ greater_than_or_equal_to check: ${actualNumGTE} >= ${expectedNumGTE} -> ${greaterEqual}`);
-            return greaterEqual;
-
-        case 'less_than_or_equal_to':
-            const actualNumLTE = parseComparableNumber(actualValue);
-            const expectedNumLTE = parseComparableNumber(resolvedExpectedValue);
-            const lessEqual = !isNaN(actualNumLTE) && !isNaN(expectedNumLTE) && actualNumLTE <= expectedNumLTE;
-            debugLog(MODULE_NAME, `    ✅ less_than_or_equal_to check: ${actualNumLTE} <= ${expectedNumLTE} -> ${lessEqual}`);
-            return lessEqual;
-
-        default:
-            debugWarn(MODULE_NAME, `Unknown condition type: ${condition_type}`);
-            return false;
+    const result = compareCondition(condition_type, actualValue, resolvedExpectedValue);
+    if (result === undefined) {
+        debugWarn(MODULE_NAME, `Unknown condition type: ${condition_type}`);
+        return false;
     }
-}
-
-function comparableConditionValue(value) {
-    if (value === null || value === undefined) return '';
-    return String(value).trim();
-}
-
-/**
- * Parse a condition operand to a number for greater_than/less_than-style comparisons.
- *
- * Values read from numeric-formatting.js-managed inputs can still carry thousands
- * separators (e.g. "1,200") depending on the source (existingData, plugin variables,
- * a field mid-transition). A bare `parseFloat("1,200")` silently returns `1`, which
- * would make cross-field comparisons (e.g. value_field_id) wrong instead of just
- * failing loudly, so strip grouping separators the same way the input formatter does.
- */
-function parseComparableNumber(value) {
-    if (value === null || value === undefined) return NaN;
-    if (typeof value === 'number') return value;
-    const str = String(value).trim();
-    if (str === '') return NaN;
-    const unformatted = typeof window.__numericUnformat === 'function'
-        ? window.__numericUnformat(str)
-        : str.replace(/,/g, '').replace(/'/g, '');
-    return parseFloat(unformatted);
-}
-
-function isValueEmpty(value) {
-    // Check for various empty states
-    if (value === null || value === undefined) {
-        return true;
-    }
-
-    if (typeof value === 'string') {
-        return value.trim() === '';
-    }
-
-    if (typeof value === 'number') {
-        return false; // Numbers (including 0) are never considered "empty"
-    }
-
-    if (Array.isArray(value)) {
-        return value.length === 0;
-    }
-
-    if (typeof value === 'object') {
-        return Object.keys(value).length === 0;
-    }
-
-    return false;
+    debugLog(MODULE_NAME, `    ✅ ${condition_type} -> ${result} (value: "${actualValue}", expected: "${resolvedExpectedValue}")`);
+    return result;
 }
 
 function clearFieldValues(fieldContainer) {

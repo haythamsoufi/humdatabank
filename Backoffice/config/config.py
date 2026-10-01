@@ -1319,6 +1319,12 @@ class Config:
     # on this app is reverse-proxied to that host (path preserved). Example:
     # https://ifrc-databank-mcp-staging.azurewebsites.net
     MCP_UPSTREAM_URL = (os.environ.get('MCP_UPSTREAM_URL') or '').strip().rstrip('/')
+    # Intentionally public. The upstream MCP client only GETs public databank
+    # routes (humanitarian-databank-mcp/databank_client.py). Do not default this
+    # to required: that blocks Claude connectors without hiding private data.
+    # Set MCP_PROXY_AUTH_MODE=required only if that client grows a non-public call.
+    # Blank keeps this default. Any other value fails closed to required in app/routes/mcp.py.
+    MCP_PROXY_AUTH_MODE = (os.environ.get('MCP_PROXY_AUTH_MODE') or 'public').strip().lower()
 
     # Shareable short link target for the IFRC Network Databank Custom GPT (GET /gpt, /assistant).
     CUSTOM_GPT_URL = (
@@ -1397,6 +1403,12 @@ class DevelopmentConfig(Config):
     AI_TOOL_CACHE_ENABLED = False
 
 class ProductionConfig(Config):
+    # Tokens-in-URL mobile sign-in is off unless an operator opts in. Development
+    # keeps the base default so local builds that predate the code exchange still work.
+    MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK = _parse_bool(
+        os.environ.get("MOBILE_OAUTH_ALLOW_LEGACY_TOKEN_DEEP_LINK"), default=False
+    )
+
     # DEBUG is inherited from Config base class (automatically False for production)
     # DATABASE_URL must be PostgreSQL. No SQLite fallback.
     SQLALCHEMY_DATABASE_URI = _normalize_database_uri(os.environ.get('DATABASE_URL'))

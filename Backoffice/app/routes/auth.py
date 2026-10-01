@@ -914,7 +914,7 @@ def azure_callback():
         given_name = claims.get("given_name")
         family_name = claims.get("family_name")
         sub = claims.get("sub")
-        current_app.logger.info(f"Extracted from ID token - email: {email}")
+        current_app.logger.info("Extracted identity from ID token (email present=%s)", bool(email))
 
     # Try userinfo endpoint to recover missing identity fields.
     if access_token and meta.get("userinfo_endpoint"):
@@ -934,7 +934,7 @@ def azure_callback():
                     family_name = family_name or ui.get("family_name")
                     sub = sub or ui.get("sub")
             else:
-                current_app.logger.warning(f"Userinfo endpoint returned status {ur.status_code}: {ur.text}")
+                current_app.logger.warning("Userinfo endpoint returned status %s", ur.status_code)
         except Exception as e:
             current_app.logger.error(f"Error fetching userinfo: {e}", exc_info=True)
 
@@ -944,13 +944,13 @@ def azure_callback():
         return redirect(url_for("auth.login"))
 
     submitted_email = email.strip().lower()
-    current_app.logger.info(f"Processing Azure login for email: {submitted_email}")
+    current_app.logger.info("Processing Azure login (user id will be logged after lookup)")
     from app.services import UserService
     user = UserService.get_by_email(submitted_email)
 
     if not user:
         # Create a minimal user (RBAC-only)
-        current_app.logger.info(f"Creating new user account for: {submitted_email}")
+        current_app.logger.info("Creating new user account from Azure login")
         user = User(email=submitted_email)
         # Derive a sensible name if available
         if display_name:
@@ -1257,7 +1257,7 @@ def _verify_reset_token(token: str, max_age_seconds: int | None = None) -> tuple
 
     # If no record found, token is invalid (not tracked = invalid)
     if not reset_token:
-        current_app.logger.warning(f"Password reset token not found in database for email: {email}")
+        current_app.logger.warning("Password reset token not found in database")
         return None, None
 
     # Check if token is valid (not used, not revoked, not expired)

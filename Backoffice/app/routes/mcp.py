@@ -6,11 +6,22 @@ breaks that flow, so Backoffice forwards the request body to MCP_UPSTREAM_URL in
 Set MCP_UPSTREAM_URL (no trailing slash), e.g.:
   https://ifrc-databank-mcp-staging.azurewebsites.net
 
-Access control (deny by default):
-  ``MCP_PROXY_AUTH_MODE=required`` (default) — caller must present a Backoffice session or an
-  API key whose ``permissions`` JSON contains ``{"mcp": true}``.
-  ``MCP_PROXY_AUTH_MODE=public`` — explicit opt-in for the anonymous public connector; the same
-  header allow-list, body cap, upstream URL policy and (IP based) rate limit still apply.
+Access control — intentionally public. Do not default this back to a key.
+  The September 2026 review locked ``/mcp`` because the proxy had no guard. That
+  lock was reversed: ``humanitarian-databank-mcp`` only GETs public databank
+  routes, and ``databank_client._get`` refuses any other path. A Claude
+  connector therefore uses the URL alone. Requiring ``mcp:use`` hides nothing
+  private and blocks that connector.
+
+  Leave the default public unless that client grows a non-public call. Then set
+  ``MCP_PROXY_AUTH_MODE=required`` in the same change.
+
+  ``MCP_PROXY_AUTH_MODE=public`` (default) — no caller credential. Header
+  allow-list, body cap, upstream URL policy and the IP rate limit still apply.
+  A browser session that already holds a cookie must still pass CSRF on writes;
+  anonymous connector traffic has no cookie, so CSRF does not apply to it.
+  ``MCP_PROXY_AUTH_MODE=required`` — API key with ``mcp:use``, or a browser
+  session with ``admin.mcp.use``. Any other value fails closed to this mode.
 
 Only an allow-list of MCP protocol headers is forwarded upstream; inbound cookies, Authorization
 and API-key material never leave this process. The upstream host is validated with
@@ -28,6 +39,8 @@ import requests
 from flask import Blueprint, Response, abort, current_app, jsonify, request
 from flask_login import current_user
 
+from app.utils.request_validation import enforce_api_or_csrf_protection
+
 from app.extensions import limiter
 from app.utils.outbound_url import (
     is_local_dev_environment,
@@ -36,6 +49,10 @@ from app.utils.outbound_url import (
 )
 
 bp = Blueprint("mcp", __name__)
+
+# Runtime fallback when the config key is missing. Keep this ``public``.
+# Unknown values fail closed inside ``_auth_mode`` (treated as ``required``).
+DEFAULT_MCP_PROXY_AUTH_MODE = "public"
 
 MCP_API_KEY_PERMISSION = "mcp"
 _DEFAULT_MAX_BODY_BYTES = 1024 * 1024
@@ -146,7 +163,10 @@ def _proxy_response(upstream_resp: requests.Response) -> Response:
 
 
 def _auth_mode() -> str:
-    mode = str(current_app.config.get("MCP_PROXY_AUTH_MODE") or "required").strip().lower()
+    """``public`` is the only open mode. Blank means that default. Anything else is required."""
+    mode = str(current_app.config.get("MCP_PROXY_AUTH_MODE") or "").strip().lower()
+    if not mode:
+        mode = DEFAULT_MCP_PROXY_AUTH_MODE
     return "public" if mode == "public" else "required"
 
 
@@ -176,27 +196,38 @@ def _forbidden() -> Response:
     return resp
 
 
+def _session_may_use_mcp() -> bool:
+    """Browser sessions need ``admin.mcp.use``. System Managers receive it from the seed catalog."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if not getattr(current_user, "is_authenticated", False) or not getattr(current_user, "active", True):
+        return False
+    return AuthorizationService.has_rbac_permission(current_user, "admin.mcp.use")
+
+
 def authorize_mcp_request() -> Optional[Response]:
     """Return an error response when the caller may not use the proxy, else ``None``."""
     if _auth_mode() == "public":
         return None
 
-    if getattr(current_user, "is_authenticated", False) and getattr(current_user, "active", True):
+    if _presented_api_key():
+        from app.models.api_key_management import APIKey
+        from app.services.security.api_authentication import authenticate_db_api_key_only
+        from app.services.security.api_key_permissions import MCP_USE
+
+        result = authenticate_db_api_key_only(capability=MCP_USE)
+        if isinstance(result, APIKey):
+            return None if _api_key_has_mcp_capability(result) else _forbidden()
+        if result is True:
+            return _forbidden()
+        return result
+
+    if getattr(current_user, "is_authenticated", False):
+        if not _session_may_use_mcp():
+            return _forbidden()
         return None
 
-    if not _presented_api_key():
-        return _unauthorized()
-
-    from app.models.api_key_management import APIKey
-    from app.services.security.api_authentication import authenticate_db_api_key_only
-    from app.services.security.api_key_permissions import MCP_USE
-
-    result = authenticate_db_api_key_only(capability=MCP_USE)
-    if isinstance(result, APIKey):
-        return None if _api_key_has_mcp_capability(result) else _forbidden()
-    if result is True:
-        return _forbidden()
-    return result
+    return _unauthorized()
 
 
 def _client_ip_for_limits() -> str:
@@ -258,6 +289,15 @@ def mcp_proxy(subpath: str = "") -> Response:
     upstream_base = _upstream_base()
     if not upstream_base:
         abort(404)
+
+    # Cookie-authenticated browsers must present CSRF (or X-Mobile-Auth). API-key
+    # clients are not browsers and do not send a session cookie on this call.
+    if (
+        request.method in ("POST", "PUT", "PATCH", "DELETE")
+        and not _presented_api_key()
+        and getattr(current_user, "is_authenticated", False)
+    ):
+        enforce_api_or_csrf_protection()
 
     denied = authorize_mcp_request()
     if denied is not None:

@@ -175,8 +175,8 @@ def legacy_public_form_redirect(public_token):
 
 @bp.route("/public_submission_success/<int:submission_id>", methods=["GET"])
 def legacy_public_submission_success_redirect(submission_id):
-    """Backward-compatible redirect for old public submission success URLs."""
-    return redirect(url_for("forms.public_submission_success", submission_id=submission_id), code=302)
+    """Retired integer success URL. Always 404 so ids cannot be enumerated."""
+    abort(404)
 
 
 @bp.route("/public_documents/download/<int:document_id>", methods=["GET"])

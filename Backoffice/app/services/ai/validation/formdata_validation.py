@@ -79,7 +79,19 @@ class AIFormDataValidationService:
     """
 
     def __init__(self) -> None:
-        self.vector_store = AIVectorStore()
+        # Built on first search. Constructing the store opens the embedding
+        # provider, which requires an API key even when a run has nothing to do.
+        self._vector_store = None
+
+    @property
+    def vector_store(self):
+        if self._vector_store is None:
+            self._vector_store = AIVectorStore()
+        return self._vector_store
+
+    @vector_store.setter
+    def vector_store(self, value) -> None:
+        self._vector_store = value
 
     def _normalize_sources(self, sources: Any) -> Optional[Dict[str, bool]]:
         """

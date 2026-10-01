@@ -11,6 +11,9 @@ Use api_helpers when:
 For internal admin/AJAX routes with fixed response shapes, prefer
 app.utils.api_responses (json_ok, json_bad_request, etc.) instead.
 
+Mobile routes (`/api/mobile/v1`) use app.utils.mobile_responses and must
+not mix these envelopes. The three modules stay separate on purpose.
+
 See api_responses module docstring for the full decision guide.
 """
 

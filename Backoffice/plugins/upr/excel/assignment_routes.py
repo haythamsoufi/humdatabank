@@ -7,6 +7,7 @@ from flask_login import current_user, login_required
 
 from app.services import get_aes_with_joins
 from app.services.imports.assignment_excel_access import (
+    assignment_excel_upload_error,
     assignment_uses_unified_country_plan_excel,
     assignment_uses_upr_country_reporting_excel,
 )
@@ -26,7 +27,6 @@ from plugins.upr.excel.unified_country_plan_excel_service import (
     UnifiedCountryPlanExcelService,
 )
 
-MAX_EXCEL_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _validate_upr_country_reporting_assignment(aes_id, *, is_ajax: bool):
@@ -80,35 +80,13 @@ def _validate_assignment_editable_state(aes, *, is_ajax: bool):
 
 
 def _validate_excel_upload(excel_file, *, is_ajax: bool, aes_id: int):
-    if not excel_file or excel_file.filename == "":
-        error_msg = "No Excel file selected."
-        flash(error_msg, "danger")
-        if is_ajax:
-            return json_bad_request(error_msg)
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    if not excel_file.filename.lower().endswith(".xlsx"):
-        error_msg = "Invalid file type. Please upload a .xlsx file."
-        flash(error_msg, "danger")
-        if is_ajax:
-            return json_bad_request(error_msg)
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-
-    file_size = excel_file.content_length
-    if file_size is None:
-        excel_file.seek(0, 2)
-        file_size = excel_file.tell()
-        excel_file.seek(0)
-
-    if file_size > MAX_EXCEL_FILE_SIZE:
-        error_msg = (
-            f"File size ({file_size / (1024 * 1024):.2f}MB) exceeds the maximum allowed size of 10MB."
-        )
-        flash(error_msg, "danger")
-        if is_ajax:
-            return json_bad_request(error_msg)
-        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
-    return None
+    error_msg = assignment_excel_upload_error(excel_file)
+    if not error_msg:
+        return None
+    flash(error_msg, "danger")
+    if is_ajax:
+        return json_bad_request(error_msg)
+    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
 
 def register_upr_excel_routes(excel_bp):

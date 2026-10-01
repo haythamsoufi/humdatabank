@@ -28,7 +28,6 @@ _REVIEWED = {
     "app/templates/components/_page_header.html": 2,
     "app/templates/core/activity_items_partial.html": 10,
     "app/templates/core/dashboard/_admin_panel.html": 10,
-    "app/templates/forms/entry_form/_sections_fragment.html": 2,
     "app/templates/forms/entry_form/entry_form.html": 2,
     "app/templates/macros/excel_import_dropzone.html": 2,
     "app/templates/macros/excel_io_modal.html": 31,

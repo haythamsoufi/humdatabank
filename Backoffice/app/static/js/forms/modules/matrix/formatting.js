@@ -1,6 +1,7 @@
 /** Matrix number/cell formatting helpers. */
 
 import { _t, ROW_TOTAL_COLUMN_NAME } from './shared.js';
+import { FALSY_FLAG_STRINGS, TRUTHY_FLAG_STRINGS } from '../../../lib/matrix-boolean.js';
 
 export const __matrixIntegerFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 // Locale-aware formatter for variable/tooltip display (preserves decimals)
@@ -205,8 +206,8 @@ export function __configFlag(value, defaultWhenMissing = false) {
     if (typeof value === 'number') return value === 1;
     if (typeof value === 'string') {
         const v = value.trim().toLowerCase();
-        if (v === 'true' || v === '1' || v === 'yes' || v === 'y' || v === 'on') return true;
-        if (v === 'false' || v === '0' || v === 'no' || v === 'n' || v === 'off') return false;
+        if (TRUTHY_FLAG_STRINGS.has(v)) return true;
+        if (FALSY_FLAG_STRINGS.has(v)) return false;
     }
     return Boolean(value);
 }

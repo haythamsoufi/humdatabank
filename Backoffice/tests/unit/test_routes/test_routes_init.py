@@ -60,9 +60,9 @@ class TestRegisterAllBlueprints:
 
         mock_app = self._make_mock_app()
         mock_csrf = self._make_mock_csrf()
-        # csrf.exempt is called unprotected twice (indicator_bank_compat_bp, mobile_bp)
-        # before the try/except block that wraps csrf.exempt(ai_bp) — raise only on 3rd call
-        mock_csrf.exempt.side_effect = [None, None, Exception("csrf error")]
+        # Unprotected csrf.exempt calls (mcp, indicator_bank_compat, mobile) run
+        # before the try/except around csrf.exempt(ai_bp). Raise only on that call.
+        mock_csrf.exempt.side_effect = [None, None, None, Exception("csrf error")]
 
         with patch("app.routes.auth"), \
              patch("app.routes.main"), \
@@ -94,6 +94,7 @@ class TestRegisterAllBlueprints:
         from app.routes import register_all_blueprints
 
         mock_app = self._make_mock_app()
+        mock_app.config["WEBSOCKET_ENABLED"] = True
         mock_csrf = self._make_mock_csrf()
 
         with patch("app.routes.auth"), \
@@ -121,8 +122,8 @@ class TestRegisterAllBlueprints:
         assert isinstance(result, float)
         mock_app.logger.warning.assert_called()
 
-    def test_notifications_ws_exception_is_swallowed(self, app):
-        """If register_notifications_ws raises, the warning is logged and execution continues."""
+    def test_notifications_ws_is_not_registered_with_blueprints(self, app):
+        """Notifications WebSocket starts on its own, not inside register_all_blueprints."""
         from app.routes import register_all_blueprints
 
         mock_app = self._make_mock_app()
@@ -145,14 +146,14 @@ class TestRegisterAllBlueprints:
              patch("app.swagger.routes.swagger_bp", MagicMock()), \
              patch("app.routes.api.indicator_bank_compat.indicator_bank_compat_bp", MagicMock()), \
              patch("app.routes.api.mobile.mobile_bp", MagicMock()), \
-             patch("app.routes.notifications_ws.register_notifications_ws", side_effect=Exception("notif ws error")), \
+             patch("app.routes.notifications_ws.register_notifications_ws", side_effect=Exception("notif ws error")) as register_notifications, \
              patch("app.routes.admin.register_admin_blueprints"), \
              patch("app.startup_tasks.audit_admin_route_guards"):
 
             result = register_all_blueprints(mock_app, mock_csrf, 0.0)
 
         assert isinstance(result, float)
-        mock_app.logger.warning.assert_called()
+        register_notifications.assert_not_called()
 
     def test_notifications_ws_false_return_no_debug_log(self, app):
         """If register_notifications_ws returns False, no debug log is emitted for it."""

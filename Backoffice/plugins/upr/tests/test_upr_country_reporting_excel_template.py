@@ -1290,7 +1290,7 @@ def test_resolve_indicator_import_value_yes_no():
     assert not is_na
 
 
-def test_reporting_funding_matrix_column_matches_form_item(app):
+def test_reporting_funding_matrix_column_matches_form_item(app, db_session):
     with app.app_context():
         from import_upr_excel_data import (
             ITEM_REPORTING_COUNTRY_FUNDING,
@@ -1492,7 +1492,7 @@ def test_resolve_workbook_indicator_bank_id_respects_section(upr_country_reporti
     assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) is None
 
 
-def test_transform_warns_when_row_has_no_id_and_matched_by_name(app):
+def test_transform_warns_when_row_has_no_id_and_matched_by_name(app, db_session):
     """End-to-end regression test for two related fixes:
     (1) _resolve_workbook_indicator_bank_id resolving a blank-ID row via the
         best fuzzy match, and
@@ -1642,7 +1642,7 @@ def test_percentage_range_warning_respects_allow_over_100_override():
     assert negative_warning is not None
 
 
-def test_transform_warns_on_out_of_range_percentage_value(app):
+def test_transform_warns_on_out_of_range_percentage_value(app, db_session):
     """End-to-end regression test: a percentage-type indicator given a wildly
     out-of-range value (the classic '500 instead of 50' data-entry mistake in
     Excel) must produce a warning instead of silently importing as-is.
@@ -1690,7 +1690,7 @@ def test_transform_warns_on_out_of_range_percentage_value(app):
             db.session.commit()
 
 
-def test_transform_warns_on_id_present_but_text_mismatched(app):
+def test_transform_warns_on_id_present_but_text_mismatched(app, db_session):
     """End-to-end regression test for the OTHER half of the ID-integrity check:
     the workbook's ID cell is filled in (so this is NOT the blank-ID/fuzzy-match
     path), but the indicator TEXT next to it belongs to a different KPI — e.g.

@@ -78,9 +78,9 @@ def get_quiz_leaderboard():
     Returns top users by quiz_score.
     """
     try:
-        limit = request.args.get('limit', type=int, default=5)
+        limit = request.args.get('limit', type=int, default=20)
         if limit < 1 or limit > 100:
-            limit = 5  # Default to 5 if invalid
+            limit = 20
 
         # Get top users by quiz score, only active users
         top_users = User.query.filter(
@@ -95,7 +95,6 @@ def get_quiz_leaderboard():
         for rank, user in enumerate(top_users, start=1):
             leaderboard.append({
                 'rank': rank,
-                'user_id': user.id,
                 'name': user.name or user.email.split('@')[0],
                 'score': user.quiz_score or 0
             })

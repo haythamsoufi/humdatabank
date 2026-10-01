@@ -519,3 +519,52 @@ class TestGetReportTemplate:
             mock_get.return_value = mock_resp
             get_report_template("fancy")
             assert mock_get.call_args[1]["params"]["style"] == "fancy"
+
+
+class TestPublicReadPathLock:
+    """The Backoffice /mcp proxy stays anonymous because this client only GETs public routes."""
+
+    def test_non_public_path_is_refused_before_the_network(self):
+        with patch("databank_client.httpx.Client") as client_cls:
+            with pytest.raises(DatabankAPIError, match="non-public"):
+                databank_client._get("/api/v1/users")
+        client_cls.assert_not_called()
+
+    def test_every_get_call_uses_a_public_read_path(self):
+        import ast
+        from pathlib import Path
+
+        tree = ast.parse(Path(databank_client.__file__).read_text(encoding="utf-8"))
+
+        def _called(node):
+            if isinstance(node, ast.Name):
+                return node.id
+            if isinstance(node, ast.Attribute):
+                return node.attr
+            return ""
+
+        paths = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or _called(node.func) not in {"_get", "_get_with_retry"}:
+                continue
+            arg = node.args[0]
+            if isinstance(arg, ast.Name) and arg.id == "path":
+                # _get_with_retry forwards into _get, which checks the path.
+                continue
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                paths.append(arg.value)
+            elif isinstance(arg, ast.JoinedStr) and arg.values and isinstance(arg.values[0], ast.Constant):
+                paths.append(arg.values[0].value)
+            else:
+                raise AssertionError(f"databank call path is not a literal: {ast.dump(arg)}")
+        assert len(paths) >= 10
+        for path in paths:
+            assert databank_client.is_public_databank_read_path(path), path
+
+    def test_client_only_issues_gets(self):
+        from pathlib import Path
+
+        source = Path(databank_client.__file__).read_text(encoding="utf-8")
+        assert ".post(" not in source
+        assert "Authorization" not in source
+        assert "api_key" not in source

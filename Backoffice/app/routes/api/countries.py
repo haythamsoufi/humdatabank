@@ -28,6 +28,7 @@ from sqlalchemy.orm import joinedload
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error
+from app.utils.api_pagination import validate_pagination_params
 from app.services.forms.reporting_period_service import sort_period_names
 
 # ---------------------------------------------------------------------------
@@ -146,9 +147,19 @@ def get_countries():
     if requested_locale not in set(Config.LANGUAGES + ['']):
         requested_locale = 'en'
 
+    # Mobile ``/api/mobile/v1/data/countrymap`` is intentionally public reference data
+    # for the app shell. This v1 route stays key-or-session because it is the
+    # integration API. ``per_page`` is clamped so a client cannot request the
+    # whole table as one unbounded page.
     page = request.args.get('page', type=int)
     per_page = request.args.get('per_page', type=int)
-    use_cache = not (page and per_page)
+    if page or per_page:
+        page, per_page = validate_pagination_params(
+            request.args, default_per_page=50, max_per_page=200
+        )
+        use_cache = False
+    else:
+        use_cache = True
 
     # ── Build response from DB ───────────────────────────────────────────────
     region_translations, region_aliases = _load_region_translations()

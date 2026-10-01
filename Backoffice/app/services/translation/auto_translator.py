@@ -121,20 +121,27 @@ def language_has_machine_translation(target_language: str, source_language: str 
     """True when at least one configured engine can translate this pair without a guaranteed 400."""
     target = _normalize_language_code(target_language, default="")
     source = _normalize_language_code(source_language, default="en")
-    if not target or target == source:
+    if not target or not source or target == source:
         return False
-    return target in IFRC_AZURE_LANGS or target in NLLB_ISO1_LANGS
+    if source in IFRC_AZURE_LANGS and target in IFRC_AZURE_LANGS:
+        return True
+    if source in NLLB_ISO1_LANGS and target in NLLB_ISO1_LANGS:
+        return True
+    return False
 
 
-def _service_supports_language(service_name: str, target_language: str) -> bool:
+def _service_supports_language(
+    service_name: str, target_language: str, source_language: str = "en"
+) -> bool:
     code = _normalize_language_code(target_language, default="")
-    if not code:
+    source = _normalize_language_code(source_language, default="en")
+    if not code or not source:
         return False
     name = (service_name or "").strip().lower()
     if name == "ifrc":
-        return code in IFRC_AZURE_LANGS
+        return code in IFRC_AZURE_LANGS and source in IFRC_AZURE_LANGS
     if name == "nllb":
-        return code in NLLB_ISO1_LANGS
+        return code in NLLB_ISO1_LANGS and source in NLLB_ISO1_LANGS
     return True
 
 
@@ -304,9 +311,11 @@ def _is_likely_untranslated_output(
     if len(acronyms) >= 2:
         return False
 
-    # If it's a multi-word English-looking sentence and the target is non-English, it's likely a failure.
-    latin_words = re.findall(r"[A-Za-z]{2,}", probe)
-    if len(latin_words) >= 4:
+    # Unchanged multi-word prose is a failed translation, in any script. An engine
+    # that was told the source was English used to echo Russian (or French) and
+    # that echo was cached as the translation.
+    words = re.findall(r"[^\W\d_]{2,}", probe, flags=re.UNICODE)
+    if len(words) >= 4:
         return True
 
     return False
@@ -753,7 +762,7 @@ class IFRCTranslationService(TranslationService):
         """Translate text using IFRC Translation API"""
         if not text or not text.strip():
             return None
-        if not _service_supports_language("ifrc", target_language):
+        if not _service_supports_language("ifrc", target_language, source_language):
             return None
 
         try:
@@ -917,7 +926,7 @@ class NLLBTranslationService(TranslationService):
         target_norm = _normalize_language_code(target_language, default="en")
         if source_norm == target_norm:
             return None
-        if not _service_supports_language("nllb", target_norm):
+        if not _service_supports_language("nllb", target_norm, source_norm):
             return None
 
         try:
@@ -972,7 +981,7 @@ class NLLBTranslationService(TranslationService):
         target_norm = _normalize_language_code(target_language, default="en")
         if source_norm == target_norm:
             return [None] * len(texts)
-        if not _service_supports_language("nllb", target_norm):
+        if not _service_supports_language("nllb", target_norm, source_norm):
             return [None] * len(texts)
 
         payload = [{"Text": t, "From": source_norm, "To": target_norm} for t in texts]
@@ -1515,7 +1524,7 @@ class AutoTranslator:
         services_to_try = [
             svc
             for svc in self._ordered_services_to_try(service_name)
-            if _service_supports_language(getattr(svc, "service_name", ""), target_code)
+            if _service_supports_language(getattr(svc, "service_name", ""), target_code, source_code)
         ]
         if not services_to_try:
             _log_unsupported_pair(source_code, target_code)
@@ -1659,7 +1668,7 @@ class AutoTranslator:
         services_to_try = [
             svc
             for svc in self._ordered_services_to_try(service_name)
-            if _service_supports_language(getattr(svc, "service_name", ""), target_code)
+            if _service_supports_language(getattr(svc, "service_name", ""), target_code, source_code)
         ]
         if not services_to_try:
             _log_unsupported_pair(source_code, target_code)

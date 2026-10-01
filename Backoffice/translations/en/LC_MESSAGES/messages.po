@@ -25859,11 +25859,11 @@ msgstr "The key will be hashed and stored securely in the database."
 #: plugins/upr/templates/upr/_narrative_modal.html:50
 #, python-brace-format
 msgid ""
-"The narrative will be translated into {language} after upload, before the "
-"report is generated."
+"If the narrative is not already in {language}, it will be translated into "
+"{language} after upload, before the report is generated."
 msgstr ""
-"The narrative will be translated into {language} after upload, before the "
-"report is generated."
+"If the narrative is not already in {language}, it will be translated into "
+"{language} after upload, before the report is generated."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:295
 msgid ""

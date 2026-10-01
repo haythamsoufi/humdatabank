@@ -191,14 +191,13 @@
   }
 
   function updateNarrativeTranslateHints() {
-    const lang = getExportLanguage();
     const label = getExportLanguageLabel();
     document.querySelectorAll("[data-upr-narrative-translate]").forEach((el) => {
       const template = el.getAttribute("data-template") || "";
-      const show = Boolean(lang && lang !== "en" && template);
+      const show = Boolean(template);
       el.hidden = !show;
       if (show) {
-        el.textContent = template.replace("%(language)s", label).replace("{language}", label);
+        el.textContent = template.replaceAll("%(language)s", label).replaceAll("{language}", label);
       }
     });
   }

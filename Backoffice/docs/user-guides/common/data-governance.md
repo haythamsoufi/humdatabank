@@ -13,7 +13,7 @@ This document describes how the Humanitarian Databank supports **data governance
 - **Data lifecycle** — From draft to approved, and how changes are controlled
 - **Safe handling** — Exports, public links, and privacy practices
 - **Operational practices** — Running reporting cycles and sustaining governance in daily use
-- **Governance Dashboard** — A dedicated admin page that surfaces metrics, flags, and a health score across all pillars
+- **Governance register** — Named controls, an issue register, and time-bounded risk acceptance
 
 ---
 
@@ -108,12 +108,9 @@ The system restricts access so that users may view and act only on data they are
 
 ### Ghost access detection
 
-The **Governance Dashboard** detects **ghost access**: inactive (deactivated) users who still hold RBAC roles. This is a security risk because role grants may persist after a user leaves the organization. The dashboard flags these users and links directly to user management for remediation.
+The governance register (control **ACC-01**) lists deactivated users who still hold roles. They cannot sign in, but the role returns if the account is switched back on. Each row links to Edit User.
 
-Additionally, the dashboard flags:
-- **Users with entity (country) permissions but no RBAC role** — they can log in but can't do anything useful
-- **Orphan permissions** — permissions not assigned to any role or grant
-- **Roles with zero users** — roles that exist but have no members
+Control **ACC-02** lists people who have country access and no role. Unused permissions in the catalog, and roles that currently have no members, are not treated as failures.
 
 ### Summary
 
@@ -122,8 +119,8 @@ Additionally, the dashboard flags:
 | Who may view data | Roles and country/entity assignment; users see only data they are authorized to access |
 | Who may modify data | Users with edit/submit or admin roles; approvers may reopen for corrections |
 | Who may export | Users with access to the assignment and entry form; export may be enabled per template |
-| Ghost access | Governance Dashboard flags inactive users with active RBAC roles |
-| Unused roles | Governance Dashboard flags roles with zero assigned users |
+| Ghost access | Governance register ACC-01 lists deactivated accounts that still hold a role |
+| Country access without a role | Governance register ACC-02 |
 
 ---
 
@@ -304,62 +301,39 @@ Reduce risk by avoiding unnecessary personal identifiers in submissions and atta
 
 ---
 
-## 8. Governance Dashboard
+## 8. Governance register
 
-The **Governance Dashboard** (Admin Panel → Governance) is a dedicated admin page that surfaces metrics, flags, and actionable links across all governance pillars. It requires the `admin.governance.view` permission.
+**Admin Panel → Governance** (`admin.governance.view`) is the operating record for data governance. It is a control register, not a health score.
 
-### Health Score
+Each control states:
 
-A **0–100 governance health score** is computed from weighted pillar scores:
+- the rule
+- who is accountable
+- the live check
+- the result: **passing**, **gap**, **accepted**, **not applicable**, or **not evaluated**
 
-| Pillar | Weight | What it measures |
-|--------|--------|------------------|
-| Ownership | 18% | Focal point coverage, data owner assignment |
-| Access Control | 23% | RBAC coverage, ghost access, orphan permissions |
-| Quality | 23% | Submission rate, overdue tracking |
-| Compliance | 23% | FDRS document compliance rate |
-| Metadata | 13% | Indicator definitions, form item labels |
+A gap opens one issue. The issue stays open until the check passes. Someone with `admin.governance.manage` can accept the risk: a written reason and a review date, at most one year out. On that date the issue reopens if the gap is still there. Acceptances are written to the admin action log.
 
-Grades: A (≥ 90), B (≥ 75), C (≥ 60), D (≥ 45), F (< 45).
+The checks are limited to facts the platform can prove:
 
-### KPI Strip
+| Control | Rule |
+|---------|------|
+| OWN-01 | Every open assignment has a data owner |
+| OWN-02 | Every published template has an owner |
+| OWN-03 | Every country on an open assignment has a focal point |
+| ACC-01 | Deactivated accounts do not keep roles |
+| ACC-02 | Country access is not granted without a role |
+| ACC-03 | Approvals in the last 90 days record the approver |
+| RPT-01 | No open country submission is more than 30 days overdue |
+| RPT-02 | No open assignment is still unstarted after its due date |
+| CMP-01 | FDRS Annual Report and Audited Financial Statement, last three periods. Not applicable when FDRS is not in use |
+| MET-01 | Active (non-archived) indicators have a definition |
+| MET-02 | Indicator suggestions are not left pending for more than 30 days |
+| LIF-01 | Active public submission links have an expiry date |
 
-Five key metrics are shown at the top of the dashboard:
+Reporting discipline is timeliness. Validation rules and the FDRS data-quality score stay in their own tools. The page also keeps the focal-point register for every country, which is wider than OWN-03.
 
-1. **Focal Point %** — percentage of countries with at least one assigned focal point
-2. **Active without Owner** — number of active assignments without a designated data owner
-3. **Ghost Access** — number of inactive users still holding RBAC roles
-4. **Submission Rate** — percentage of entity statuses that are submitted or approved
-5. **Compliance** — FDRS document compliance rate
-
-### Section panels
-
-Each governance pillar has a detailed panel with progress bars, flag counts, and links to the relevant admin pages:
-
-- **Data Ownership** — focal point coverage, assignment data owner coverage (links to Assignments with `?no_data_owner=1` filter)
-- **Access Control** — RBAC stats, ghost user detection, orphan permissions, empty roles
-- **Quality Standards** — submission rate, overdue severity breakdown (critical/high/medium), never-started assignments, status distribution donut chart
-- **Compliance** — FDRS document compliance rate, non-compliant country list
-- **Metadata** — indicator definition coverage, form item label coverage, published-never-assigned templates, stale suggestions
-
-### Policies & Accountabilities
-
-A summary matrix maps each governance pillar to:
-- What it covers
-- Who is accountable
-- How to manage it
-- Current status (OK or Gaps)
-
-### Cross-linking with other admin pages
-
-The Governance Dashboard links directly to the relevant admin pages with pre-applied filters:
-
-| Dashboard metric | Links to | Filter applied |
-|-----------------|----------|----------------|
-| Active assignments without data owner | Assignments | `?no_data_owner=1` (shows only assignments with blank data owner) |
-| Countries without focal point | Assignment Management | Direct link |
-| Ghost users | User Management → Edit User | Direct link per user |
-| Users with entity access but no role | User Management → Edit User | Direct link per user |
+Open issues link to the screen that fixes them. Assignments with no data owner open Assignments filtered with `?no_data_owner=1`. Ghost users and accounts with country access but no role open Edit User.
 
 ---
 
@@ -371,9 +345,9 @@ The following practices help sustain governance in daily use.
 
 - **Before launch:** Agree the reporting period, participating countries, and what "good quality" means (required documents, validation expectations). Assign a **Data Owner** for the assignment.
 - **Access:** Confirm that focal points have the correct roles and country access before the assignment is opened.
-- **During collection:** Monitor progress (not started, in progress, submitted, overdue) and use validation and reminders to improve completeness. Use the Governance Dashboard to track overdue severity.
+- **During collection:** Monitor progress (not started, in progress, submitted, overdue) and use validation and reminders to improve completeness. Use the governance register for submissions more than 30 days overdue on open assignments.
 - **Review:** Use a consistent checklist (e.g. required fields, outliers, consistency) when approving submissions.
-- **After the cycle:** Document decisions (e.g. deadline extensions, duplicate rule for public submissions, known issues) for the next cycle. Review the Governance Dashboard for overall health.
+- **After the cycle:** Document decisions (for example deadline extensions, the duplicate rule for public submissions, known issues) for the next cycle. If a governance gap is accepted rather than fixed, record that on the register with a review date.
 
 *See:* [Run a reporting cycle (admin playbook)](../admin/run-a-reporting-cycle.md)
 
@@ -391,7 +365,7 @@ The following practices help sustain governance in daily use.
 - Assign roles according to need; avoid over-granting (e.g. system manager only for personnel who require full control).
 - Document the rationale for role and country access grants so that access reviews and audits are straightforward.
 - Use the audit trail and Security Dashboard to review high-risk actions (e.g. user deletion, role changes).
-- Regularly review the **Governance Dashboard** for ghost access (inactive users with roles) and remediate promptly.
+- Regularly review the governance register for deactivated accounts that still hold roles, and remove the role.
 - Review users with entity permissions but no RBAC role — they may need a role assigned or their entity access removed.
 
 *See:* [User roles and permissions](../admin/user-roles.md), [Manage users](../admin/manage-users.md)
@@ -402,23 +376,23 @@ The following practices help sustain governance in daily use.
 
 | Area | Feature | Reference |
 |------|---------|-----------|
-| **Governance Dashboard** | Health score, KPI strip, pillar panels, flags | Admin Panel → Governance |
+| **Governance register** | Controls, open issues, risk acceptance | Admin Panel → Governance |
 | **Data ownership** | Template Owner (per template) | Admin Panel → Form Builder → Edit Template |
 | **Data ownership** | Data Owner (per assignment) | Admin Panel → Assignments → Create/Edit |
 | **Data ownership** | Organization data (FDS) | This document — [Data ownership](#data-ownership) |
 | Access | Roles (RBAC), country/entity assignment | [User roles and permissions](../admin/user-roles.md) |
-| Access | Ghost access detection | Governance Dashboard → Access Control |
+| Access | Deactivated accounts that still hold a role | Governance register → ACC-01 |
 | Access | Permitted actions by status | [Submission statuses and permissions](submission-statuses-and-permissions.md) |
 | Quality | Standard definitions | [Indicator Bank](../admin/indicator-bank.md) |
 | Quality | Validation, required fields | [Form Builder (advanced)](../admin/form-builder-advanced.md), [Edit template](../admin/edit-template.md) |
-| Quality | Overdue tracking with severity | Governance Dashboard → Quality Standards |
+| Quality | Overdue work on open assignments | Governance register → RPT-01 |
 | Quality | Review and approval | [Review and approve submissions](../admin/review-approve-submissions.md) |
 | Accountability | Admin action log, risk levels | [Admin action risk levels](../../workflows/admin/admin-action-risk-levels.md) |
 | Accountability | `submitted_by` / `approved_by` tracking | Automatic on status changes |
 | Accountability | `activated_by` / `deactivated_by` tracking | Automatic on assignment lifecycle changes |
-| Compliance | FDRS document compliance rate | Governance Dashboard → Compliance |
-| Metadata | Indicator definition coverage | Governance Dashboard → Metadata |
-| Metadata | Stale suggestion detection | Governance Dashboard → Metadata |
+| Compliance | FDRS document compliance, or not applicable | Governance register → CMP-01 |
+| Metadata | Active indicators without a definition | Governance register → MET-01 |
+| Metadata | Suggestions pending more than 30 days | Governance register → MET-02 |
 | Lifecycle | Statuses, reopen | [Submission statuses](submission-statuses-and-permissions.md), [Review and approve](../admin/review-approve-submissions.md) |
 | Safe handling | Exports | [Export and download data](../admin/export-download-data.md) |
 | Safe handling | Public URLs | [Public URL submissions](../admin/public-url-submissions.md) |
@@ -446,6 +420,14 @@ The following fields were added to support governance accountability:
 | `submitted_by_user_id` | User who submitted the data for this entity |
 | `approved_by_user_id` | User who approved the submission for this entity |
 
+### `governance_issue` (control register)
+
+| Field | Purpose |
+|-------|---------|
+| `control_code` | The control this row tracks (one row per control) |
+| `status` | `open`, `accepted`, or `resolved` |
+| `acceptance_reason` / `accepted_until` | Recorded risk acceptance and the date it expires |
+
 ---
 
 ## Appendix: Alignment with Microsoft Purview
@@ -463,7 +445,7 @@ For organizations using or evaluating **Microsoft Purview**, the following mappi
 | **Audit trail** | Admin action logging with risk levels; `submitted_by` / `approved_by` / `activated_by` / `deactivated_by` attribution; Security Dashboard for high-risk actions |
 | **Data quality** (completeness, consistency, conformity, etc.) | Required fields, validation rules, standard definitions, submission and approval workflow, overdue tracking with severity buckets |
 | **Workflow** (validation and approval) | Submission statuses; approve; reopen |
-| **Health / Compliance scoring** | Governance Dashboard health score (0–100) with weighted pillar scores |
+| **Controls and issues** | Governance register: named controls, one issue per gap, time-bounded risk acceptance |
 
 *See:* [Microsoft Purview data governance glossary](https://learn.microsoft.com/en-us/purview/data-governance-glossary), [Get started with data governance in Microsoft Purview](https://learn.microsoft.com/en-us/purview/data-governance-get-started)
 

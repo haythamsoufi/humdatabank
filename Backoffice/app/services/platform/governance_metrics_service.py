@@ -33,6 +33,7 @@ from app.models.rbac import (
     RbacUserRole,
     RbacAccessGrant,
 )
+from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs.data_quality.fdrs_v1_catalog import (
     COMPLIANCE_DOC_TYPES,
     fdrs_compliance_doc_label_matches,
@@ -41,9 +42,6 @@ from app.services.data_quality.helpers import active_country_map_query
 from app.utils.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
-
-# FDRS template (aligned with data_exploration)
-FDRS_TEMPLATE_ID = 21
 
 # Max countries per user to flag for "many countries" review
 MAX_COUNTRIES_PER_USER_FLAG = 10
@@ -716,11 +714,14 @@ def _get_compliance_metrics() -> Dict[str, Any]:
     periods = all_periods[:3]
 
     if not periods:
-        total_countries = active_country_map_query().count()
+        # No FDRS cycle in this environment. Do not treat every country as
+        # non-compliant; the control register marks the check not applicable.
         return {
+            "applicable": False,
+            "periods": [],
             "compliant_count": 0,
-            "non_compliant_count": total_countries,
-            "compliance_rate_pct": 0.0,
+            "non_compliant_count": 0,
+            "compliance_rate_pct": None,
             "flags": {"non_compliant_countries": []},
         }
 
@@ -816,6 +817,8 @@ def _get_compliance_metrics() -> Dict[str, Any]:
     compliance_rate_pct = round((compliant_count / total * 100.0) if total else 0.0, 1)
 
     return {
+        "applicable": True,
+        "periods": list(periods),
         "compliant_count": compliant_count,
         "non_compliant_count": non_compliant_count,
         "compliance_rate_pct": compliance_rate_pct,

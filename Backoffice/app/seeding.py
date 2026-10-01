@@ -27,7 +27,7 @@ _DEV_TEST_ADMIN_ROLE_CODES = (
     "admin_audit_viewer",
     "admin_security_responder",
     "admin_ai_manager",
-    "admin_governance_viewer",
+    "admin_governance_manager",
     "admin_data_explorer_data_table",
     "admin_data_explorer_analysis",
     "admin_data_explorer_compliance",

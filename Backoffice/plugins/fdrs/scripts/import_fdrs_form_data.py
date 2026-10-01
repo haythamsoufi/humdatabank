@@ -431,32 +431,44 @@ def fetch_indicator_bank_table(
     include_archived: bool = False,
 ) -> List[Dict[str, Any]]:
     """
-    Indicator_Bank query: GET /api/v1/indicator-bank?per_page=10000.
+    Indicator bank query: GET /api/v1/indicator-bank, following ``total`` across pages
+    (the public route caps ``per_page`` at 500).
     By default requests only non-archived indicators so that when multiple indicators
     share the same fdrs_kpi_code (e.g. KPI_ReachM), the active one is used.
     Return list of {id, fdrs_kpi_code, name}.
     """
     out = []
     try:
-        params = {"per_page": "10000"}
-        if not include_archived:
-            params["archived"] = "false"
-        data = _databank_get(
-            databank_base,
-            "/api/v1/indicator-bank",
-            api_key,
-            params=params,
-        )
-        indicators = (data or {}).get("indicators") or []
-        for ind in indicators:
-            iid = ind.get("id")
-            code = ind.get("fdrs_kpi_code")
-            if iid is not None and code is not None:
-                out.append({
-                    "id": iid,
-                    "fdrs_kpi_code": (code or "").strip(),
-                    "name": (ind.get("name") or "").strip(),
-                })
+        page = 1
+        per_page = 500
+        while page <= 40:
+            params = {"page": str(page), "per_page": str(per_page)}
+            if not include_archived:
+                params["archived"] = "false"
+            data = _databank_get(
+                databank_base,
+                "/api/v1/indicator-bank",
+                api_key,
+                params=params,
+            )
+            indicators = (data or {}).get("indicators") or []
+            for ind in indicators:
+                iid = ind.get("id")
+                code = ind.get("fdrs_kpi_code")
+                if iid is not None and code is not None:
+                    out.append({
+                        "id": iid,
+                        "fdrs_kpi_code": (code or "").strip(),
+                        "name": (ind.get("name") or "").strip(),
+                    })
+            total = (data or {}).get("total")
+            try:
+                reported_total = int(total) if total is not None else None
+            except (TypeError, ValueError):
+                reported_total = None
+            if not indicators or reported_total is None or page * per_page >= reported_total:
+                break
+            page += 1
     except Exception as e:
         logger.warning("fetch_indicator_bank_table failed: %s", e)
     return out

@@ -35,6 +35,26 @@ class TestSearchIndicators:
 
         assert out["count"] == 1
         assert out["indicators"][0]["id"] == 1
+        assert client_cls.return_value.__enter__.return_value.get.call_count == 1
+
+    def test_follows_pages_until_total_is_covered(self):
+        first = MagicMock()
+        first.status_code = 200
+        first.json.return_value = {"indicators": [{"id": 1}], "total": 2}
+        second = MagicMock()
+        second.status_code = 200
+        second.json.return_value = {"indicators": [{"id": 2}], "total": 2}
+
+        with patch.object(databank_client, "INDICATOR_BANK_PAGE_SIZE", 1), \
+             patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.side_effect = [first, second]
+            out = search_indicators(search="volunteers")
+
+        assert [row["id"] for row in out["indicators"]] == [1, 2]
+        assert out["count"] == 2
+        assert mock_get.call_count == 2
+        assert mock_get.call_args_list[1].kwargs["params"]["page"] == 2
 
 
 class TestPublicData:

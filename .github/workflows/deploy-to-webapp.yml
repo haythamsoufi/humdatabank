@@ -241,8 +241,12 @@ jobs:
         run: |
           if [ "${{ env.EFFECTIVE_ENV }}" = "Production" ]; then
             echo "app_name=ifrc-databank-app" >> "$GITHUB_OUTPUT"
+            echo "resource_group=ifrcpunifiedplanning-rg001" >> "$GITHUB_OUTPUT"
+            echo "subscription=3e33b4c1-ada7-4922-9113-b9e41eaf1797" >> "$GITHUB_OUTPUT"
           else
             echo "app_name=ifrc-databank-staging-2" >> "$GITHUB_OUTPUT"
+            echo "resource_group=ifrctgo001rg" >> "$GITHUB_OUTPUT"
+            echo "subscription=f585c1c3-801b-4641-8d7f-145aa50ffb04" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy to Azure Web App
@@ -262,8 +266,8 @@ jobs:
           fi
 
       # Static JS/CSS/images are served from Azure Blob Storage (STATIC_CDN_URL), not Gunicorn.
-      # The container does not copy files on startup, so every deploy syncs the blob container.
-      # AzCopy skips unchanged bytes; JS/CSS Cache-Control is still rewritten each run.
+      # The container does not copy files on startup, so every deploy uploads the blob container.
+      # AzCopy sets Cache-Control during the copy (JS/CSS must-revalidate, other files immutable).
       # Production → container "static"   Staging → container "static-staging" (isolated assets).
       # Required GitHub secret: AZURE_STORAGE_CONNECTION_STRING (same storage account as uploads).
       - name: Install AzCopy
@@ -297,44 +301,21 @@ jobs:
           echo "Uploaded static assets to container '${STATIC_BLOB_CONTAINER}'; STATIC_CDN_URL=${STATIC_CDN_URL}"
           echo "Ensure this Web App has app setting STATIC_CDN_URL=${STATIC_CDN_URL} (set once per app)."
 
-      # Mutable ACR tags (staging|production) are not pulled again unless the site recycles.
-      # DOCKER_ENABLE_CI is false on production, so the workflow must restart explicitly.
-      # Runs after the blob upload so the new process starts once static assets are in place.
-      # Uses the same environment publish profile as azure/webapps-deploy (no extra secret).
+      # Mutable ACR tags (staging|production) are not pulled again unless the App Service recycles.
+      # DOCKER_ENABLE_CI is false on production, so the workflow restarts the Web App itself
+      # (az webapp restart), not an in-app HTTP route. Runs after the blob upload.
+      # Requires AZURE_CREDENTIALS for the target subscription (GitHub environment secret).
+      - name: Azure login
+        if: inputs.restart_after_deploy
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Restart Azure Web App
         if: inputs.restart_after_deploy
-        env:
-          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          APP_NAME: ${{ steps.config.outputs.app_name }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import base64
-          import os
-          import urllib.error
-          import urllib.request
-          import xml.etree.ElementTree as ET
-
-          root = ET.fromstring(os.environ["PUBLISH_PROFILE"])
-          profile = None
-          for el in root.iter("publishProfile"):
-              if el.attrib.get("publishMethod") == "MSDeploy":
-                  profile = el
-                  break
-          if profile is None:
-              raise SystemExit("Publish profile has no MSDeploy profile")
-          user = profile.attrib["userName"]
-          password = profile.attrib["userPWD"]
-          app = os.environ["APP_NAME"]
-          url = f"https://{app}.scm.azurewebsites.net/api/restart"
-          token = base64.b64encode(f"{user}:{password}".encode()).decode()
-          req = urllib.request.Request(url, data=b"", method="POST")
-          req.add_header("Authorization", f"Basic {token}")
-          print(f"Restarting {app}")
-          try:
-              with urllib.request.urlopen(req, timeout=180) as resp:
-                  print(f"Restart accepted (HTTP {resp.status})")
-          except urllib.error.HTTPError as exc:
-              body = exc.read().decode("utf-8", errors="replace")[:500]
-              raise SystemExit(f"Restart failed (HTTP {exc.code}): {body}")
-          PY
+          az account set --subscription "${{ steps.config.outputs.subscription }}"
+          az webapp restart \
+            --name "${{ steps.config.outputs.app_name }}" \
+            --resource-group "${{ steps.config.outputs.resource_group }}"

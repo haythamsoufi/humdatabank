@@ -333,8 +333,9 @@ def test_localize_export_batches_non_system_language(monkeypatch):
     monkeypatch.setattr("plugins.upr.i18n.is_system_language", lambda lang=None: False)
     batches = []
 
-    def fake_batch(texts, lang):
+    def fake_batch(texts, lang, source_language="en"):
         assert lang == "de"
+        assert source_language == "en"
         batches.append(list(texts))
         return [f"DE:{item}" for item in texts]
 
@@ -474,7 +475,7 @@ def test_t_batch_and_styled_blocks(monkeypatch):
     monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
     calls = []
 
-    def fake_batch(texts, lang):
+    def fake_batch(texts, lang, source_language="en"):
         assert lang == "es"
         calls.append(list(texts))
         return [f"ES:{item}" for item in texts]
@@ -504,7 +505,7 @@ def test_translate_styled_blocks_rebuilds_text_from_translated_runs(monkeypatch)
     monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
     calls = []
 
-    def fake_batch(texts, lang):
+    def fake_batch(texts, lang, source_language="en"):
         calls.append(list(texts))
         return [f"ES:{item}" for item in texts]
 
@@ -533,7 +534,7 @@ def test_translate_styled_blocks_dedupes_repeated_runs(monkeypatch):
     monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
     calls = []
 
-    def fake_batch(texts, lang):
+    def fake_batch(texts, lang, source_language="en"):
         calls.append(list(texts))
         return [f"ES:{item}" for item in texts]
 
@@ -551,13 +552,101 @@ def test_translate_styled_blocks_dedupes_repeated_runs(monkeypatch):
     assert blocks[2]["text"] == "ES:Unique"
 
 
+_RU_NARRATIVE = (
+    "Красный Крест оказывает помощь населению в чрезвычайных ситуациях "
+    "и поддерживает общины по всей стране."
+)
+_FR_NARRATIVE = (
+    "La Société nationale et les volontaires apportent une aide aux "
+    "communautés dans le cadre du plan et avec les partenaires."
+)
+
+
+@pytest.mark.unit
+def test_t_batch_translates_into_english_from_detected_source(monkeypatch):
+    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "en")
+    seen = []
+
+    def fake_batch(texts, lang, source_language="en"):
+        seen.append((list(texts), lang, source_language))
+        return ["Help" for _ in texts]
+
+    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    monkeypatch.setattr("plugins.upr.i18n._cached_translations", lambda *_a, **_k: {})
+    assert t_batch(["помощь населению"], source_language="ru") == ["Help"]
+    assert seen == [(["помощь населению"], "en", "ru")]
+
+
+@pytest.mark.unit
+def test_t_batch_skips_when_source_matches_target(monkeypatch):
+    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "fr")
+
+    def fail_batch(*_args, **_kwargs):
+        raise AssertionError("same-language narrative must not call the translation API")
+
+    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fail_batch)
+    assert t_batch(["bonjour les volontaires"], source_language="fr") == ["bonjour les volontaires"]
+
+
+@pytest.mark.unit
+def test_translate_styled_blocks_russian_into_english(monkeypatch):
+    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "en")
+    calls = []
+
+    def fake_batch(texts, lang, source_language="en"):
+        calls.append((list(texts), lang, source_language))
+        return [f"EN:{item}" for item in texts]
+
+    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    blocks = [
+        {"style": "Body", "text": _RU_NARRATIVE, "runs": [{"text": _RU_NARRATIVE, "href": "", "bold": False}]},
+    ]
+    translate_styled_blocks(blocks)
+    assert calls == [([_RU_NARRATIVE], "en", "ru")]
+    assert blocks[0]["text"] == f"EN:{_RU_NARRATIVE}"
+    assert blocks[0]["runs"][0]["text"] == f"EN:{_RU_NARRATIVE}"
+
+
+@pytest.mark.unit
+def test_translate_styled_blocks_skips_when_narrative_matches_export_language(monkeypatch):
+    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ru")
+
+    def fail_batch(*_args, **_kwargs):
+        raise AssertionError("narrative already in the export language")
+
+    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fail_batch)
+    blocks = [
+        {"style": "Body", "text": _RU_NARRATIVE, "runs": [{"text": _RU_NARRATIVE, "href": "", "bold": False}]},
+    ]
+    translate_styled_blocks(blocks)
+    assert blocks[0]["runs"][0]["text"] == _RU_NARRATIVE
+
+
+@pytest.mark.unit
+def test_translate_styled_blocks_french_into_spanish(monkeypatch):
+    monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "es")
+    calls = []
+
+    def fake_batch(texts, lang, source_language="en"):
+        calls.append((lang, source_language))
+        return [f"ES:{item}" for item in texts]
+
+    monkeypatch.setattr("plugins.upr.i18n._machine_translate_batch", fake_batch)
+    blocks = [
+        {"style": "Body", "text": _FR_NARRATIVE, "runs": [{"text": _FR_NARRATIVE, "href": "", "bold": False}]},
+    ]
+    translate_styled_blocks(blocks)
+    assert calls == [("es", "fr")]
+    assert blocks[0]["text"] == f"ES:{_FR_NARRATIVE}"
+
+
 @pytest.mark.unit
 def test_t_batch_reports_chunk_progress(monkeypatch):
     monkeypatch.setattr("plugins.upr.i18n.current_export_language", lambda: "ar")
     monkeypatch.setattr("plugins.upr.i18n._T_BATCH_CHUNK", 2)
     batches = []
 
-    def fake_batch(texts, lang):
+    def fake_batch(texts, lang, source_language="en"):
         assert lang == "ar"
         batches.append(list(texts))
         return [f"AR:{item}" for item in texts]
@@ -582,13 +671,13 @@ def test_t_batch_uses_cached_chunks(monkeypatch):
     monkeypatch.setattr("plugins.upr.i18n._T_BATCH_CHUNK", 2)
     cache_lookups = []
 
-    def fake_cache(texts, lang):
+    def fake_cache(texts, lang, source_language="en"):
         cache_lookups.append(list(texts))
         return {"a": "CACHED"}
 
     called = []
 
-    def fake_batch(texts, lang):
+    def fake_batch(texts, lang, source_language="en"):
         called.append(list(texts))
         return [f"AR:{item}" for item in texts]
 

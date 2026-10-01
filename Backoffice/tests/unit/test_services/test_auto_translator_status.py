@@ -493,6 +493,30 @@ def test_language_has_machine_translation_skips_romansh():
 
     assert language_has_machine_translation("de") is True
     assert language_has_machine_translation("rm") is False
+    assert language_has_machine_translation("en", "ru") is True
+    assert language_has_machine_translation("es", "ru") is True
+    assert language_has_machine_translation("ru", "ru") is False
+    assert language_has_machine_translation("en", "rm") is False
+
+
+def test_unchanged_non_english_prose_is_rejected():
+    from app.services.translation.auto_translator import _is_likely_untranslated_output
+
+    echoed = "Красный Крест оказывает помощь населению в чрезвычайных ситуациях"
+    assert _is_likely_untranslated_output(
+        translated_text=echoed,
+        protected_text=echoed,
+        token_map={},
+        source_code="ru",
+        target_code="en",
+    ) is True
+    assert _is_likely_untranslated_output(
+        translated_text="IFRC",
+        protected_text="IFRC",
+        token_map={},
+        source_code="en",
+        target_code="fr",
+    ) is False
     svc = IFRCTranslationService.__new__(IFRCTranslationService)
     svc.service_name = "ifrc"
     assert svc.translate_text("Not reported", "rm") is None

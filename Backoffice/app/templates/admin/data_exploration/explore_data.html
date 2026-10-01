@@ -1449,7 +1449,9 @@
 
             const result = await response.json();
             const periodNames = result.period_names || [];
-            const countries = result.countries || [];
+            const countries = (result.countries || []).filter(function (country) {
+                return String(country && country.name || '').trim().toLowerCase() !== 'testland';
+            });
 
             const currentTemplateId = String(domCache.templateFilter?.value || '').trim();
             if (currentTemplateId !== requestedTemplateId) return;
@@ -1699,7 +1701,47 @@
         return String(rowEntityId);
     }
 
+    function isExploreSandboxCountry(country) {
+        if (!country) return false;
+        const iso3 = String(country.iso3 || country.country_iso3 || '').trim().toUpperCase();
+        const name = String(country.name || country.country_name || '').trim().toLowerCase();
+        return iso3 === 'TST' || name === 'testland';
+    }
+
+    function withoutExploreSandboxCountries(result) {
+        if (!result || typeof result !== 'object') return result;
+        const countries = Array.isArray(result.countries) ? result.countries : [];
+        const sandboxIds = new Set();
+        countries.forEach(function (country) {
+            if (isExploreSandboxCountry(country) && country.id != null) sandboxIds.add(country.id);
+        });
+        const societies = Array.isArray(result.national_societies) ? result.national_societies : null;
+        if (societies) {
+            societies.forEach(function (society) {
+                if (isExploreSandboxCountry(society) && society.country_id != null) sandboxIds.add(society.country_id);
+            });
+        }
+        function keepRow(row) {
+            if (!row) return false;
+            if (row.country_id != null && sandboxIds.has(row.country_id)) return false;
+            return !isExploreSandboxCountry(row);
+        }
+        const data = Array.isArray(result.data) ? result.data.filter(keepRow) : result.data;
+        const next = Object.assign({}, result, {
+            countries: countries.filter(function (country) { return !isExploreSandboxCountry(country); }),
+            data: data
+        });
+        if (societies) {
+            next.national_societies = societies.filter(function (society) {
+                return !isExploreSandboxCountry(society) && (society.country_id == null || !sandboxIds.has(society.country_id));
+            });
+        }
+        if (Array.isArray(data)) next.total_items = data.length;
+        return next;
+    }
+
     function enrichTableApiResult(result) {
+        result = withoutExploreSandboxCountries(result);
         refreshExploreDimensionMaps(result);
         const data = (result && result.data) || [];
         const matrixCells = (result && result.matrix_cells) || [];

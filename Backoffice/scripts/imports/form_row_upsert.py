@@ -35,6 +35,8 @@ COL_NA = "not_applicable"
 COL_PREFILLED = "prefilled_value"
 COL_IMPUTED = "imputed_value"
 COL_SUBMITTED = "submitted_at"
+COL_PUBLISHED_VALUE = "published_value"
+COL_PUBLISHED_DISAGG = "published_disagg_data"
 
 ALL_COLUMNS = (
     COL_ASSIGNMENT,
@@ -47,6 +49,8 @@ ALL_COLUMNS = (
     COL_PREFILLED,
     COL_IMPUTED,
     COL_SUBMITTED,
+    COL_PUBLISHED_VALUE,
+    COL_PUBLISHED_DISAGG,
 )
 
 
@@ -338,6 +342,15 @@ def row_to_payload(row: Dict[str, str]) -> Tuple[Optional[int], Optional[int], O
         "submitted_at": _parse_submitted_at(row.get(COL_SUBMITTED)),
         "disagg_type": (row.get("_debug_disagg_type") or "").strip() or None,
     }
+    # Absent published columns mean this import does not own the snapshot
+    # (UPR and older FDRS files). Present columns, even when blank, replace it.
+    if COL_PUBLISHED_VALUE in row or COL_PUBLISHED_DISAGG in row:
+        published_disagg = _parse_json_field(row.get(COL_PUBLISHED_DISAGG))
+        payload["set_published"] = True
+        payload["published_value"] = _coerce_value(row.get(COL_PUBLISHED_VALUE))
+        payload["published_disagg_data"] = _normalize_json_numbers_to_ints(published_disagg)
+    else:
+        payload["set_published"] = False
     return assignment_entity_status_id, public_submission_id, form_item_id, payload
 
 
@@ -350,6 +363,35 @@ def flask_app_for_import():
     from app import create_app
 
     return create_app()
+
+
+def _published_snapshot_fields(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[Any], Optional[str]]:
+    """(published_value, published_disagg, published_source) for a row that sets the snapshot."""
+    published_value = payload.get("published_value")
+    published_disagg = payload.get("published_disagg_data")
+    if published_value is None and not published_disagg:
+        return None, None, None
+    from app.models.forms import FormData
+
+    return published_value, published_disagg, FormData.PUBLISHED_SOURCE_REPORTED
+
+
+def _apply_published_snapshot(entry: Any, payload: Dict[str, Any]) -> None:
+    """Copy FDRS State 500 into published_*, or clear them when the row is not published."""
+    if not payload.get("set_published"):
+        return
+    from app.models.forms import FormData
+
+    published_value, published_disagg, published_source = _published_snapshot_fields(payload)
+    entry.published_value = published_value
+    entry.published_disagg_data = published_disagg
+    entry.published_numeric_value = FormData._parse_numeric_string(published_value)
+    entry.published_source = published_source
+    if published_source is None:
+        entry.published_at = None
+        entry.published_by_user_id = None
+    else:
+        entry.published_at = datetime.utcnow()
 
 
 def _commit_upsert_and_yield() -> None:
@@ -581,7 +623,16 @@ def upsert_form_data_rows(
             # submitted_at is not part of this check. FDRS stamps every row with
             # the sync clock, so comparing it would rewrite every existing row
             # and overwrite the previous submitted_at.
-            unchanged = bool(existing) and (
+            published_same = True
+            if existing and payload.get("set_published"):
+                published_value, published_disagg, published_source = _published_snapshot_fields(payload)
+                published_same = (
+                    existing.published_value == published_value
+                    and existing.published_disagg_data == published_disagg
+                    and existing.published_source == published_source
+                    and existing.published_numeric_value == FormData._parse_numeric_string(published_value)
+                )
+            unchanged = bool(existing) and published_same and (
                 existing.value == payload["value"]
                 and existing.disagg_data == disagg_new
                 and existing.disagg_type == disagg_type
@@ -636,6 +687,7 @@ def upsert_form_data_rows(
                     existing.not_applicable = payload["not_applicable"]
                     existing.prefilled_value = prefilled_for_db
                     FormData.sync_imputed_numeric_value(existing, imputed_for_db)
+                    _apply_published_snapshot(existing, payload)
                     if new_submitted_at is not None:
                         existing.submitted_at = new_submitted_at
                     db.session.add(existing)
@@ -655,6 +707,7 @@ def upsert_form_data_rows(
                     )
                     entry._sync_numeric_value_from_string()
                     FormData.sync_imputed_numeric_value(entry, imputed_for_db)
+                    _apply_published_snapshot(entry, payload)
                     db.session.add(entry)
                     stats["inserted"] += 1
                     if assignment_entity_status_id:

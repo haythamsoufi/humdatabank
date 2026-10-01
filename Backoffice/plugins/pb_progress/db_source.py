@@ -17,10 +17,12 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.utils.sql_utils import ilike_contains
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
+from app.models.core import Country
 from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.models.indicator_bank import IndicatorBank, IndicatorBankSpef
 from app.services.platform import storage_service
+from app.utils.country_utils import exclude_sandbox_countries
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.upr.catalog import UPR_REPORTING_TEMPLATE_ID
 from plugins.pb_progress.plugin_data_store import (
@@ -908,12 +910,16 @@ def _aggregate_indicator_years_for_template(
         .join(FormItem, FormItem.id == FormData.form_item_id)
         .join(AssignmentEntityStatus, AssignmentEntityStatus.id == FormData.assignment_entity_status_id)
         .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+        .join(Country, Country.id == AssignmentEntityStatus.entity_id)
         .filter(
             FormItem.template_id == template_id,
             AssignedForm.template_id == template_id,
             AssignmentEntityStatus.entity_type == "country",
             FormData.not_applicable.isnot(True),
         )
+    )
+    rows = (
+        exclude_sandbox_countries(rows)
         .group_by(FormItem.indicator_bank_id, AssignedForm.period_name)
         .all()
     )
@@ -1039,6 +1045,7 @@ def _build_total_reported(final_df: pd.DataFrame) -> pd.DataFrame:
         count = (
             db.session.query(func.count(func.distinct(AssignmentEntityStatus.entity_id)))
             .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
+            .join(Country, Country.id == AssignmentEntityStatus.entity_id)
             .filter(
                 AssignedForm.template_id == template_id,
                 AssignmentEntityStatus.entity_type == "country",
@@ -1048,8 +1055,8 @@ def _build_total_reported(final_df: pd.DataFrame) -> pd.DataFrame:
                 ),
                 AssignmentEntityStatus.status.in_(("approved", "submitted")),
             )
-            .scalar()
         )
+        count = exclude_sandbox_countries(count).scalar()
         rows.append({"Source": source, "Year": str(year), "TotalReported": int(count or 0)})
 
         if str(source) in {"FDRS", "UPR"}:

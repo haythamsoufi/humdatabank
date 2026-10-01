@@ -69,6 +69,25 @@ def test_build_income_sources_matrix_rows_aggregates_cells():
     assert disagg["Home Government_Funding"] == 1000
     assert disagg["Corporations_Funding"] == 250
     assert rows[0].get("_debug_disagg_type") == "matrix"
+    assert rows[0]["published_value"] == ""
+    assert rows[0]["published_disagg_data"] == ""
+
+
+def test_income_matrix_published_disagg_keeps_only_state_500():
+    fdrs_data = [
+        {"ISO3": "SYR", "year": "2024", "BaseKPI": "si_CHF", "KPI_code": "si_CHF", "Value": "80", "State": 500},
+        {"ISO3": "SYR", "year": "2024", "BaseKPI": "h_gov_CHF", "KPI_code": "h_gov_CHF", "Value": "20", "State": 300},
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "SYR", "assignment_entity_status_id": 42},
+    ]
+    rows = build_income_sources_matrix_rows(fdrs_data, assignment_rows)
+    disagg = json.loads(rows[0]["disagg_data"])
+    published = json.loads(rows[0]["published_disagg_data"])
+    assert disagg["Service income_Funding"] == 80
+    assert disagg["Home Government_Funding"] == 20
+    assert published == {"Service income_Funding": 80}
+    assert rows[0]["published_value"] == ""
 
 
 def test_build_document_import_plan_maps_fdrs_types():
@@ -671,6 +690,37 @@ def test_build_fdrs_data_includes_imputed_only_rows():
     assert len(rows) == 1
     assert rows[0]["Value"] == ""
     assert rows[0]["ImputedValue"] == "1200"
+    assert rows[0]["State"] is None or rows[0]["State"] == ""
+
+
+def test_build_ready_to_import_copies_value_into_published_only_for_state_500():
+    assignment_rows = [{"period_name": "2024", "iso3": "SYR", "assignment_entity_status_id": 42}]
+    form_item_rows = [{"bank_id": 7, "item_id": 900}]
+    indicator_bank_rows = [{"id": 7, "fdrs_kpi_code": "KPI_PeopleVol"}]
+
+    def one(state):
+        return build_ready_to_import_from_new_pipeline(
+            [{
+                "ISO3": "SYR",
+                "year": "2024",
+                "BaseKPI": "KPI_PeopleVol",
+                "KPI_code": "KPI_PeopleVol",
+                "Value": "15",
+                "State": state,
+            }],
+            {},
+            assignment_rows,
+            form_item_rows,
+            indicator_bank_rows,
+        )[0]
+
+    published = one(500)
+    submitted = one(300)
+    assert published["value"] == "15"
+    assert published["published_value"] == "15"
+    assert submitted["value"] == "15"
+    assert submitted["published_value"] == ""
+    assert submitted["published_disagg_data"] == ""
 
 
 def test_build_ready_to_import_sets_not_applicable_from_is_data_not_collected():

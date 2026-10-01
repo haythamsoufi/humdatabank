@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
+from app.utils.country_utils import is_sandbox_country
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from plugins.upr.catalog import UPR_VISUAL_TEMPLATE_IDS, kind_for_template
 from plugins.upr.errors import UprError
@@ -69,6 +70,7 @@ def list_countries_for_bulk(assigned_form_id: int) -> list[dict[str, Any]]:
             "iso3": country.iso3 if country else "",
         }
         for aes, country in rows
+        if not is_sandbox_country(country)
     ]
 
 

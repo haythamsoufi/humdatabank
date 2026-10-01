@@ -4,12 +4,14 @@ from unittest.mock import MagicMock, patch
 
 from app.utils.dev_server_port import (
     connect_host,
+    dev_process_serves_http,
     find_available_port,
     is_reloader_child,
     occupied_server_message,
     pid_listening_on,
     port_has_listener,
     probe_bind,
+    reloader_disabled,
     should_guard_existing_server,
 )
 
@@ -24,6 +26,25 @@ class TestReloaderGuard:
         monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
         assert is_reloader_child() is True
         assert should_guard_existing_server() is False
+
+
+class TestDevProcessServesHttp:
+    def test_reloader_parent_does_not_serve(self, monkeypatch):
+        monkeypatch.delenv("WERKZEUG_RUN_MAIN", raising=False)
+        monkeypatch.delenv("FLASK_USE_RELOADER", raising=False)
+        assert reloader_disabled() is False
+        assert dev_process_serves_http() is False
+
+    def test_reloader_child_serves(self, monkeypatch):
+        monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
+        monkeypatch.delenv("FLASK_USE_RELOADER", raising=False)
+        assert dev_process_serves_http() is True
+
+    def test_reloader_disabled_serves(self, monkeypatch):
+        monkeypatch.delenv("WERKZEUG_RUN_MAIN", raising=False)
+        monkeypatch.setenv("FLASK_USE_RELOADER", "false")
+        assert reloader_disabled() is True
+        assert dev_process_serves_http() is True
 
 
 class TestConnectHost:

@@ -253,6 +253,9 @@ def test_combined_pdf_is_portrait_and_keeps_sections_together():
     assert "element(cover-footer)" in css
     assert "@page :first" in css
     assert "position: running(cover-footer)" in css
+    assert "white-space: nowrap" in css
+    assert "font-size: 0.48rem" in css
+    assert "upr-support-col-fill { width: 9.1%; }" in css
     wrapped = _wrap('<div class="upr-combined-section">x</div>', dashboard_id="combined")
     assert "page-break-inside: avoid" in wrapped
     assert "@keyframes" not in wrapped

@@ -1019,11 +1019,12 @@ def _support(payload: dict[str, Any]) -> str:
 
 
 def _wrapped_th_label(label: str) -> str:
+    """One line per word so a narrow column never splits a word."""
     text = escape(label)
-    if " " not in text:
+    parts = [part for part in text.split(" ") if part]
+    if len(parts) <= 1:
         return text
-    head, tail = text.rsplit(" ", 1)
-    return f"{head}<br>{tail}"
+    return "<br>".join(parts)
 
 
 def _support_area_header_cells(*, plan: bool = False) -> list[str]:

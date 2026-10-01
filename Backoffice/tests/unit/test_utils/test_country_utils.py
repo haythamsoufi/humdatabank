@@ -6,6 +6,7 @@ from app.utils.country_utils import (
     resolve_country_from_iso,
     get_countries_by_region,
     get_countries_by_region_with_part_of,
+    is_sandbox_country,
 )
 
 
@@ -156,3 +157,11 @@ class TestGetCountriesByRegionWithPartOf:
             assert country.id in mapping['PERC']
             found = any(country in countries for countries in regions.values())
             assert found
+
+
+def test_is_sandbox_country_matches_testland_only():
+    assert is_sandbox_country(name="Testland", iso3="TST")
+    assert is_sandbox_country(iso3="tst")
+    assert is_sandbox_country(name="testland")
+    assert not is_sandbox_country(name="Switzerland", iso3="CHE")
+    assert not is_sandbox_country(name=None, iso3=None)

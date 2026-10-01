@@ -1226,10 +1226,11 @@ def test_emergency_title_is_code_slash_name():
     date_block = css.split(".upr-doc-header__date {", 1)[1].split("}", 1)[0]
     assert "min-height: 0.95rem" in date_block
     th_block = css.split("\n.upr-support-table th.upr-support-th {", 1)[1].split("}", 1)[0]
-    assert "padding: 0.4rem 0.5rem 0.45rem" in th_block
+    assert "padding: 0.35rem 0.12rem 0.4rem" in th_block
+    assert "word-break: keep-all" in th_block
     th_span = css.split(".upr-support-table th.upr-support-th span {", 1)[1].split("}", 1)[0]
-    assert "padding-inline: 0.12rem" in th_span
-    assert "white-space: nowrap" not in th_span
+    assert "padding-inline: 0" in th_span
+    assert "white-space: nowrap" in th_span
     country_block = css.split(".upr-doc-header__country {", 1)[1].split("}", 1)[0]
     assert "margin: -0.28rem 0 0" in country_block
 

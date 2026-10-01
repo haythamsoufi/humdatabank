@@ -182,7 +182,8 @@ AREA_LABELS = {
     "EF4": "Accountability and agility",
 }
 
-# Two-line support-table headers (WeasyPrint cannot rotate writing-mode text).
+# Support-table headers break on word boundaries. WeasyPrint cannot rotate
+# writing-mode text, so portrait export shrinks the header instead.
 SUPPORT_AREA_HEADER_LINES = {
     "SP1": ("Climate and", "environment"),
     "SP2": ("Disasters and", "crises"),

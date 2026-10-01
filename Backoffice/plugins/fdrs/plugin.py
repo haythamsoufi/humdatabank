@@ -25,8 +25,8 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     def description(self) -> str:
         return (
             "Federation-wide Databank & Reporting System: data-api sync, "
-            "document fetch, disaggregation analysis, document compliance, "
-            "P&B visuals, matrix validation, and quality methodology."
+            "document fetch, disaggregation analysis, service-income estimate, "
+            "document compliance, P&B visuals, matrix validation, and quality methodology."
         )
 
     def get_settings(self):
@@ -60,6 +60,16 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
                 panel_template="plugins/fdrs/disaggregation/tab_panel.html",
                 plugin_id=self.plugin_id,
                 icon="fas fa-chart-pie",
+                manage_requires_system_manager=False,
+            ),
+            DataExplorerTabConfig(
+                tab_id="service-income",
+                label="Service income",
+                permission="admin.data_explore.analysis",
+                priority=25,
+                panel_template="plugins/fdrs/service_income/tab_panel.html",
+                plugin_id=self.plugin_id,
+                icon="fas fa-coins",
                 manage_requires_system_manager=False,
             ),
             DataExplorerTabConfig(

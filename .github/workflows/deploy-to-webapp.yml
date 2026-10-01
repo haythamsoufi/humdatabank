@@ -307,7 +307,7 @@ jobs:
       # Requires AZURE_CREDENTIALS for the target subscription (GitHub environment secret).
       - name: Azure login
         if: inputs.restart_after_deploy
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 

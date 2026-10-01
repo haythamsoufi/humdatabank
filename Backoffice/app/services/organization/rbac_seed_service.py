@@ -184,7 +184,8 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.validation.questions", "Validation: Questions", "Manage validation questions (list, edit, import/export)"),
         ("admin.validation.rules", "Validation: Rules", "Manage the Validation Rules Registry (thresholds, check types, templates)"),
         # Governance
-        ("admin.governance.view", "View governance dashboard", "Access the Governance dashboard (focal point coverage, access control, quality, compliance, metadata)"),
+        ("admin.governance.view", "View governance register", "View the data governance control register, open issues, and focal-point coverage"),
+        ("admin.governance.manage", "Manage governance decisions", "Accept a control gap until a review date, or reopen an accepted risk"),
     ]
 
 
@@ -534,8 +535,14 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         {
             "code": "admin_governance_viewer",
             "name": "Admin: Governance (View)",
-            "description": "View the Governance dashboard (focal point coverage, access control, quality, compliance, metadata).",
+            "description": "View the data governance control register and focal-point coverage.",
             "permission_codes": ["admin.governance.view"],
+        },
+        {
+            "code": "admin_governance_manager",
+            "name": "Admin: Governance (Manage)",
+            "description": "View the governance register and record risk acceptances.",
+            "permission_codes": ["admin.governance.view", "admin.governance.manage"],
         },
         {
             "code": "assignment_viewer",

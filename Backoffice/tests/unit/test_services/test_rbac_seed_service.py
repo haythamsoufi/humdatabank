@@ -55,6 +55,7 @@ class TestPermissionCatalog:
             'assignment.submit',
             'admin.settings.manage',
             'admin.governance.view',
+            'admin.governance.manage',
         ):
             assert expected in codes, f"Expected permission '{expected}' missing from catalog"
 

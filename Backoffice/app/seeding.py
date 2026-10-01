@@ -27,7 +27,7 @@ _DEV_TEST_ADMIN_ROLE_CODES = (
     "admin_audit_viewer",
     "admin_security_responder",
     "admin_ai_manager",
-    "admin_governance_viewer",
+    "admin_governance_manager",
     "admin_data_explorer_data_table",
     "admin_data_explorer_analysis",
     "admin_data_explorer_compliance",
@@ -116,15 +116,17 @@ def _ensure_user_country_entity_permission(user, country_id: int | None, app_ins
 
     user_id = int(user.id)
     country_id = int(country_id)
-    existing = UserEntityPermission.query.filter_by(
-        user_id=user_id,
-        entity_type="country",
-        entity_id=country_id,
-    ).first()
-    if existing:
-        return
-
     try:
+        # The lookup must stay inside this handler. A missing table would
+        # otherwise abort the rest of create_default_data.
+        existing = UserEntityPermission.query.filter_by(
+            user_id=user_id,
+            entity_type="country",
+            entity_id=country_id,
+        ).first()
+        if existing:
+            return
+
         user.add_entity_permission(entity_type="country", entity_id=country_id)
         db.session.commit()
         app_instance.logger.info(

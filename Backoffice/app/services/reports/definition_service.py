@@ -72,7 +72,7 @@ def resolve_user_scope(user: User) -> dict[str, list[int] | None]:
         return {"template_ids": None, "country_ids": None}
     return {
         "template_ids": get_user_allowed_template_ids(user.id),
-        "country_ids": _get_user_allowed_country_ids(user.id),
+        "country_ids": _get_user_allowed_country_ids(user),
     }
 
 

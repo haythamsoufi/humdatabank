@@ -6,11 +6,13 @@
 #   ./Backoffice/azure/upload-static-assets.sh
 #
 # Upload strategy:
-#   1. AzCopy dry-run — discover files that differ from blob storage
-#   2. Incremental: AzCopy sync, then az storage blob update (Cache-Control only)
-#   3. FORCE_STATIC_UPLOAD=1: AzCopy copy with --cache-control (set-properties
-#      cannot set this HTTP header — only tier/metadata/tags)
-#   4. az storage blob upload-batch — fallback when AzCopy is not installed
+#   AzCopy copy in two passes so Cache-Control is set during the upload
+#   (azcopy sync and set-properties cannot set this HTTP header):
+#     *.js / *.css → must-revalidate
+#     everything else → long-lived immutable
+#   One `az storage blob update` per file is much slower (~6 min for ~500
+#   JS/CSS files, mostly CLI startup). These copies move ~30MB in under a minute.
+#   az storage blob upload-batch — fallback when AzCopy is not installed.
 #
 # Optional env:
 #   STATIC_BLOB_CONTAINER            default: static  (use static-staging for staging app)
@@ -18,7 +20,6 @@
 #   STATIC_STORAGE_ACCOUNT_NAME      override AccountName parsed from connection string
 #   STATIC_CONFIGURE_CORS=1          one-time blob CORS setup (account-level)
 #   STATIC_CORS_ORIGINS              space-separated origins when STATIC_CONFIGURE_CORS=1
-#   STATIC_FORCE_UPLOAD=1            full AzCopy copy with Cache-Control (skip dry-run)
 
 set -euo pipefail
 
@@ -85,154 +86,33 @@ if [[ "${STATIC_CONFIGURE_CORS:-}" == "1" && -n "${STATIC_CORS_ORIGINS:-}" ]]; t
     --output none
 fi
 
-_blob_relative_path() {
-  local abs_path="$1"
-  local rel="${abs_path#"${SOURCE_DIR}/"}"
-  if [[ "$rel" == "$abs_path" ]]; then
-    rel="${abs_path#"${SOURCE_DIR}"}"
-    rel="${rel#/}"
-  fi
-  # Trailing newline is required: callers invoke this once per file inside a
-  # `while read` loop piped to `sort -u`. Without it, every path printed in the
-  # same loop run concatenates onto one line (no separator), so downstream
-  # consumers (see _apply_cache_control_headers) see a single bogus "path" and
-  # skip Cache-Control for the entire batch.
-  printf '%s\n' "$rel"
-}
-
-# Extract blob-relative path from an AzCopy dry-run Source/Destination value.
-_dry_run_blob_path() {
-  local value="$1"
-  if [[ -z "$value" ]]; then
-    return 0
-  fi
-  if [[ "$value" == http://* || "$value" == https://* ]]; then
-    # https://account.blob.core.windows.net/container/js/foo.js?... -> js/foo.js
-    value="${value#*://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}/}"
-    value="${value%%\?*}"
-    # See newline comment in _blob_relative_path above — same reasoning applies here.
-    printf '%s\n' "$value"
-    return 0
-  fi
-  _blob_relative_path "$value"
-}
-
-# Every local JS/CSS file (one blob-relative path per line). Used to rewrite
-# Cache-Control even when AzCopy dry-run reports no byte changes.
-_list_local_js_css() {
-  local out_file="$1"
-  : > "$out_file"
-  find "${SOURCE_DIR}" -type f \( -name '*.js' -o -name '*.css' \) -print \
-    | while IFS= read -r abs_path; do
-        [[ -z "$abs_path" ]] && continue
-        _blob_relative_path "$abs_path"
-      done | sed '/^[[:space:]]*$/d' | sort -u >>"$out_file" || true
-}
-
-# Write blob-relative paths (one per line) for files AzCopy would copy.
-_collect_dry_run_files() {
+# copy (not sync) so --cache-control is applied during upload. Quoted
+# "${SOURCE_DIR}/*" is passed to AzCopy (not expanded by bash) so files
+# land at the container root. Two passes (include/exclude-pattern match
+# filename only, not path) so .js/.css get the revalidate header instead of
+# a year-long immutable one — see CACHE_CONTROL_REVALIDATE comment above.
+# overwrite=true rewrites the header even when the bytes already match.
+_azcopy_copy_with_cache_control() {
   local dest="$1"
-  local out_file="$2"
-  local dry_out log_path
-
-  dry_out="$(mktemp)"
-  : > "$out_file"
-
-  echo "Scanning for static files that differ from blob storage (AzCopy dry-run) ..."
-  azcopy sync "${SOURCE_DIR}/" "${dest}" \
+  echo "Uploading static assets with AzCopy (Cache-Control set during copy) ..."
+  azcopy copy "${SOURCE_DIR}/*" "${dest}" \
     --recursive \
-    --delete-destination=false \
-    --dry-run \
+    --overwrite=true \
+    --include-pattern="*.js;*.css" \
+    --cache-control="${CACHE_CONTROL_REVALIDATE}" \
     --log-level=WARNING \
-    --output-type=json >"$dry_out" 2>&1 || true
-
-  if command -v jq >/dev/null 2>&1; then
-    jq -r '
-      select(.MessageType == "Dryrun")
-      | .MessageContent
-      | fromjson?
-      | select(.EntityType == "File")
-      | if (.Source // "" | test("^https?://")) then .Destination // .Source else .Source end
-    ' "$dry_out" 2>/dev/null | while IFS= read -r raw_path; do
-      [[ -z "$raw_path" ]] && continue
-      _dry_run_blob_path "$raw_path"
-    done | sed '/^[[:space:]]*$/d' | sort -u >>"$out_file" || true
-  fi
-
-  if [[ ! -s "$out_file" ]]; then
-    log_path="$(grep -Eo 'Log file is located at: [^[:space:]]+' "$dry_out" | tail -1 | sed 's/Log file is located at: //' | tr -d '\r' || true)"
-    if [[ -n "$log_path" && -f "$log_path" ]]; then
-      grep -iE 'MessageType":"Dryrun|"MessageType":"Dryrun"' "$log_path" 2>/dev/null \
-        | sed -n 's/.*"Source":"\([^"]*\)".*/\1/p' \
-        | while IFS= read -r raw_path; do
-            [[ -z "$raw_path" ]] && continue
-            _dry_run_blob_path "$raw_path"
-          done | sed '/^[[:space:]]*$/d' | sort -u >>"$out_file" || true
-    fi
-  fi
-
-  rm -f "$dry_out"
-}
-
-# Metadata-only Cache-Control via Azure CLI. AzCopy set-properties has no
-# --cache-control flag (only tier / metadata / tags), so do not call it here.
-# Used after incremental sync (typically a handful of files). Force uploads
-# set the header during azcopy copy instead — 500+ az CLI process starts
-# would be slower than re-copying ~30MB with the header already set.
-_apply_cache_control_headers() {
-  local list_file="$1"
-  local parallel count xargs_status
-
-  if [[ ! -s "$list_file" ]]; then
-    echo "No files need Cache-Control metadata updates."
-    return 0
-  fi
-
-  count="$(grep -cve '^[[:space:]]*$' "$list_file" || true)"
-  parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
-  echo "Setting Cache-Control metadata on ${count} synced blob(s) (parallel=${parallel}) ..."
-
-  export CONTAINER SOURCE_DIR CACHE_CONTROL CACHE_CONTROL_REVALIDATE AZURE_STORAGE_CONNECTION_STRING
-
-  set +e
-  tr -d '\r' < "$list_file" \
-    | sed '/^[[:space:]]*$/d' \
-    | xargs -P "${parallel}" -I {} bash -c '
-        rel="$1"
-        local_file="${SOURCE_DIR}/${rel}"
-        if [[ ! -f "${local_file}" ]]; then
-          echo "WARN: skipping Cache-Control for missing local file: ${rel}" >&2
-          exit 0
-        fi
-        # .js/.css can be reached bare (no ?v=) via relative ES-module imports —
-        # see CACHE_CONTROL_REVALIDATE comment above. Everything else is only ever
-        # requested through static_url()/versioned <link>/<script> tags.
-        case "${rel}" in
-          *.js|*.css) cc="${CACHE_CONTROL_REVALIDATE}" ;;
-          *) cc="${CACHE_CONTROL}" ;;
-        esac
-        if ! az storage blob update \
-          --container-name "${CONTAINER}" \
-          --name "${rel}" \
-          --content-cache-control "${cc}" \
-          --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
-          --only-show-errors \
-          --output none; then
-          echo "ERROR: Cache-Control update failed for: ${rel}" >&2
-          exit 1
-        fi
-      ' _ {}
-  xargs_status=$?
-  set -e
-
-  if [[ "${xargs_status}" -ne 0 ]]; then
-    echo "ERROR: Cache-Control pass failed (xargs exit ${xargs_status})." >&2
-    return 1
-  fi
+    --output-type=text
+  azcopy copy "${SOURCE_DIR}/*" "${dest}" \
+    --recursive \
+    --overwrite=true \
+    --exclude-pattern="*.js;*.css" \
+    --cache-control="${CACHE_CONTROL}" \
+    --log-level=WARNING \
+    --output-type=text
 }
 
 _upload_with_azcopy() {
-  local sas expiry dest files_to_sync cache_control_files
+  local sas expiry dest
   expiry="$(date -u -d "+2 hours" '+%Y-%m-%dT%H:%MZ' 2>/dev/null || date -u -v+2H '+%Y-%m-%dT%H:%MZ')"
   sas="$(az storage container generate-sas \
     --name "${CONTAINER}" \
@@ -241,56 +121,7 @@ _upload_with_azcopy() {
     --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
     -o tsv)"
   dest="https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}?${sas}"
-
-  files_to_sync="$(mktemp)"
-  cache_control_files="$(mktemp)"
-  trap 'rm -f "$files_to_sync" "$cache_control_files"' RETURN
-
-  if [[ "${STATIC_FORCE_UPLOAD:-}" == "1" ]]; then
-    # copy (not sync) so --cache-control is applied during upload. Quoted
-    # "${SOURCE_DIR}/*" is passed to AzCopy (not expanded by bash) so files
-    # land at the container root, same as azcopy sync with a trailing slash.
-    # Two passes (include/exclude-pattern match filename only, not path) so
-    # .js/.css get the revalidate header instead of a year-long immutable one
-    # — see CACHE_CONTROL_REVALIDATE comment above.
-    echo "STATIC_FORCE_UPLOAD=1 — AzCopy copy with Cache-Control (no set-properties)."
-    azcopy copy "${SOURCE_DIR}/*" "${dest}" \
-      --recursive \
-      --overwrite=true \
-      --include-pattern="*.js;*.css" \
-      --cache-control="${CACHE_CONTROL_REVALIDATE}" \
-      --log-level=WARNING \
-      --output-type=text
-    azcopy copy "${SOURCE_DIR}/*" "${dest}" \
-      --recursive \
-      --overwrite=true \
-      --exclude-pattern="*.js;*.css" \
-      --cache-control="${CACHE_CONTROL}" \
-      --log-level=WARNING \
-      --output-type=text
-    return 0
-  fi
-
-  _collect_dry_run_files "${dest}" "$files_to_sync"
-
-  if [[ -s "$files_to_sync" ]]; then
-    echo "AzCopy dry-run: $(wc -l < "$files_to_sync" | tr -d ' ') file(s) to sync."
-    echo "Syncing static assets with AzCopy (parallel; skips unchanged files) ..."
-    # Trailing slash on source: sync contents of the directory into the container root.
-    # azcopy sync cannot set Cache-Control; apply it after via az storage blob update.
-    azcopy sync "${SOURCE_DIR}/" "${dest}" \
-      --recursive \
-      --delete-destination=false \
-      --log-level=WARNING \
-      --output-type=text
-  else
-    echo "AzCopy dry-run: no static file bytes differ from blob storage; skipping sync."
-  fi
-
-  # Always rewrite JS/CSS Cache-Control. A header-only policy change must
-  # reach ajax-save.js even when its bytes already match the blob.
-  _list_local_js_css "$cache_control_files"
-  _apply_cache_control_headers "$cache_control_files"
+  _azcopy_copy_with_cache_control "${dest}"
 }
 
 _upload_with_az_cli() {

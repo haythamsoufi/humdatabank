@@ -445,9 +445,6 @@ if ($shouldUploadStatic -and -not $SkipStaticUpload) {
             AZURE_STORAGE_CONNECTION_STRING = $connString
             STATIC_BLOB_CONTAINER           = $staticContainer
         }
-        if ($ForceStaticUpload) {
-            $envMap['STATIC_FORCE_UPLOAD'] = '1'
-        }
         Invoke-BashScript -ScriptPath $StaticUploadScript -EnvVars $envMap
         Write-Ok 'Static assets uploaded.'
     }

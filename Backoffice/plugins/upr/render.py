@@ -803,15 +803,38 @@ def _financial(payload: dict[str, Any], *, cover: bool = False) -> str:
 
 def _hero_bar_cells(row: dict[str, Any] | None, *, scale: float) -> str:
     if not row:
-        return _ltr_row(["<td class='upr-bar-label'></td>", "<td class='upr-bar-plot'></td>"])
+        return _ltr_row(
+            [
+                "<td class='upr-bar-label'></td>",
+                "<td class='upr-bar-plot'></td>",
+                "<td class='upr-fin-hero__value'></td>",
+            ]
+        )
     label = escape(row.get("label") or "")
+    # The amount sits in its own column. A full-width bar in the plot cell
+    # was pushing values such as 189,000 past the hero edge.
+    if _is_label_only(row):
+        return _ltr_row(
+            [
+                f"<td class='upr-bar-label'>{label}</td>",
+                (
+                    f"<td class='upr-bar-plot' colspan='2'>"
+                    f"{_bar_plot(row, color=row.get('color') or IFRC_RED, scale=scale)}"
+                    f"</td>"
+                ),
+            ]
+        )
     return _ltr_row(
         [
             f"<td class='upr-bar-label'>{label}</td>",
             (
                 f"<td class='upr-bar-plot'>"
-                f"{_bar_plot(row, color=row.get('color') or IFRC_RED, scale=scale)}"
+                f"{_bar_plot(row, color=row.get('color') or IFRC_RED, scale=scale, include_value=False)}"
                 f"</td>"
+            ),
+            (
+                f"<td class='upr-fin-hero__value'{_ltr_num_attr()}>"
+                f"{_metric_html(row.get('display'))}</td>"
             ),
         ]
     )
@@ -832,7 +855,11 @@ def _hero_pair_table(
         )
     else:
         body = f"<tr><td class='upr-empty' colspan='2'>{escape(empty or '')}</td></tr>"
-    cols = [f"<col class='{label_class}'>", f"<col class='{plot_class}'>"]
+    cols = [
+        f"<col class='{label_class}'>",
+        f"<col class='{plot_class}'>",
+        "<col class='upr-fin-col-value'>",
+    ]
     return (
         f"<table class='upr-fin-grid upr-fin-grid--half' dir='ltr'><colgroup>"
         f"{_ltr_row(cols)}"

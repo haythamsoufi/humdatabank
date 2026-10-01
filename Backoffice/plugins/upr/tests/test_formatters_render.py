@@ -124,6 +124,22 @@ def test_format_count_and_chf():
 
 
 @pytest.mark.unit
+def test_round_to_nearest_thousand_half_up():
+    from plugins.upr.formatters import format_thousands, round_to_nearest_thousand
+
+    assert round_to_nearest_thousand(1_120_346) == 1_120_000
+    assert round_to_nearest_thousand(30_195) == 30_000
+    assert round_to_nearest_thousand(30_499) == 30_000
+    assert round_to_nearest_thousand(30_500) == 31_000
+    assert round_to_nearest_thousand(1_120_500) == 1_121_000
+    assert round_to_nearest_thousand(12) == 12
+    assert round_to_nearest_thousand(999) == 999
+    assert round_to_nearest_thousand(None) is None
+    assert format_thousands(1_120_346) == "1,120,000"
+    assert format_thousands(30_195) == "30,000"
+
+
+@pytest.mark.unit
 def test_format_percent_uses_form_stored_whole_percents():
     assert format_percent(60) == "60%"
     assert format_percent(0) == "0%"
@@ -501,7 +517,7 @@ def test_reach_full_row_packs_when_all_icons_present():
     report_payload = _payload()
     report_payload["meta"]["kind"] = "report"
     report_payload["meta"]["people_title"] = "People reached"
-    report_payload["meta"]["support_title"] = "IFRC Network-Supported Activities"
+    report_payload["meta"]["support_title"] = "IFRC Network Bilateral-Supported Activities"
     report_payload["meta"]["support_funding_label"] = "Funding Reported"
     report_payload["support_total"] = {"value": 1_200_000, "display": "1.2M"}
     report_html = render_dashboard_html(report_payload, "support")
@@ -639,7 +655,7 @@ def test_render_plan_combined_matches_inp_cover():
     assert "6.7M" in html
     assert "Participating National Societies" in html
     assert "Detailed funding requirements" in html
-    assert "IFRC Network-Supported Activities" not in html
+    assert "IFRC Network Bilateral-Supported Activities" not in html
     assert "Enabling local actors" in html
     assert "FINANCIAL OVERVIEW" not in html
     assert "Strategic Priorities" not in html
@@ -756,7 +772,7 @@ def test_render_report_combined_keeps_tableau_overview():
 def test_render_report_combined_orders_emergency_before_indicators_and_support_last():
     payload = _payload()
     payload["meta"]["kind"] = "report"
-    payload["meta"]["support_title"] = "IFRC Network-Supported Activities"
+    payload["meta"]["support_title"] = "IFRC Network Bilateral-Supported Activities"
     payload["core_indicators"] = [
         {"code": "SP1", "label": "People reached with climate activities", "value": 100, "display": "100", "kind": "number"},
     ]
@@ -811,7 +827,7 @@ def test_render_dashboards_html_includes_each_chip():
 def test_render_plan_network_funding_matches_tableau_detail():
     html = render_dashboard_html(_payload(), "network_funding")
     assert "Detailed funding requirements" in html
-    assert "IFRC Network-Supported Activities" not in html
+    assert "IFRC Network Bilateral-Supported Activities" not in html
     assert "Longer-term needs in Swiss francs" not in html
     assert "upr-detail-fund-wrap" in html
     assert "upr-plan-detail-row" not in html
@@ -945,6 +961,11 @@ def test_render_report_financial_breakdown():
     hero = html[html.find("upr-fin-hero") : html.find("upr-fin-network")]
     assert hero.find("upr-bar-label") < hero.find("upr-bar-plot")
     assert hero.find("upr-fin-col-overview-label") < hero.find("upr-fin-col-overview-plot")
+    assert "upr-fin-col-value" in hero
+    assert "upr-fin-hero__value" in hero
+    funding_row = hero[hero.find(">Funding</td>") : hero.find(">Funding</td>") + 400]
+    assert "upr-fin-hero__value" in funding_row
+    assert "upr-bar-value" not in funding_row
     assert "upr-fin-col-source-label" in html
     assert "upr-fin-grid--with-sources" in html
     assert "Overview" in html

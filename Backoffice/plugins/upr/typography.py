@@ -40,6 +40,7 @@ NUMBER_SELECTORS = (
     ".upr-reach-headline",
     ".upr-bar-value",
     ".upr-bar-value-cell",
+    ".upr-fin-hero__value",
     ".upr-bar-yes.upr-num",
     ".upr-num",
     ".upr-support-total",

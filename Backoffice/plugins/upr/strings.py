@@ -91,12 +91,12 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
         "ru": "Мероприятия при поддержке сети",
         "zh": "网络支持的活动",
     }),
-    ("IFRC Network-Supported Activities", {
-        "fr": "Activités soutenues par le réseau IFRC",
-        "es": "Actividades apoyadas por la red de la FICR",
-        "ar": "الأنشطة المدعومة من شبكة الاتحاد الدولي",
-        "ru": "Мероприятия при поддержке сети МФОККиКП",
-        "zh": "IFRC网络支持的活动",
+    ("IFRC Network Bilateral-Supported Activities", {
+        "fr": "Activités soutenues bilatéralement par le réseau IFRC",
+        "es": "Actividades apoyadas bilateralmente por la red de la FICR",
+        "ar": "الأنشطة المدعومة ثنائياً من شبكة الاتحاد الدولي",
+        "ru": "Мероприятия при двусторонней поддержке сети МФОККиКП",
+        "zh": "IFRC网络双边支持的活动",
     }),
     ("Strategic Priorities", {
         "fr": "Priorités stratégiques",

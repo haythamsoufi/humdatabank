@@ -672,6 +672,31 @@ def test_indicator_visual_row_keeps_percent_and_skips_blank_yesno():
     assert row["value"] == 60.0
     assert row["label"] == "Percentage of assistance delivered using cash and vouchers"
 
+    count_entry = SimpleNamespace(
+        data_not_available=False,
+        not_applicable=False,
+        get_display_value=lambda: "1120346",
+        numeric_value=1_120_346,
+    )
+    rounded = _indicator_visual_row(
+        "SP1",
+        "People reached with climate activities",
+        "number",
+        count_entry,
+        bars_only=True,
+        round_thousands=True,
+    )
+    assert rounded["value"] == 1_120_346
+    assert rounded["display"] == "1,120,000"
+    exact = _indicator_visual_row(
+        "SP1",
+        "People reached with climate activities",
+        "number",
+        count_entry,
+        bars_only=True,
+    )
+    assert exact["display"] == "1,120,346"
+
     blank_yes = SimpleNamespace(
         data_not_available=False,
         not_applicable=False,

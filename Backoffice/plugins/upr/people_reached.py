@@ -17,7 +17,7 @@ from plugins.upr.catalog import (
     SP_CODES,
     section_to_area,
 )
-from plugins.upr.formatters import format_count, planning_years, to_number
+from plugins.upr.formatters import format_thousands, planning_years, to_number
 from plugins.upr.i18n import t
 from plugins.upr.icons import _spef_icon_alias, spef_icon_srcs
 from plugins.upr.loaders import _load_dynamic_indicator_rows
@@ -75,7 +75,7 @@ def _plan_people_reached(items, by_item, period_name: str) -> list[dict[str, Any
                 "code": "TOTAL",
                 "label": t("People to be reached"),
                 "value": headline,
-                "display": format_count(headline),
+                "display": format_thousands(headline),
                 "has_value": True,
                 "icon_src": "",
                 "is_total": True,
@@ -171,7 +171,7 @@ def _reach_rows(by_code: dict[str, float]) -> list[dict[str, Any]]:
                 "code": code,
                 "label": t(AREA_LABELS[code]),
                 "value": number,
-                "display": format_count(number) if number is not None else "",
+                "display": format_thousands(number) if number is not None else "",
                 "has_value": number is not None,
                 "icon_src": icons.get(code) or icons.get(_spef_icon_alias(code)),
             }

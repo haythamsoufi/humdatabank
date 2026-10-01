@@ -17,6 +17,7 @@ import re
 import threading
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from requests.adapters import HTTPAdapter
 from typing import Dict, List, Optional, Union, Tuple
 from flask import current_app
@@ -98,23 +99,61 @@ IFRC_AZURE_LANGS = frozenset({
     "uk", "ur", "uz", "vi", "xh", "yo", "yua", "yue", "zh", "zu",
 })
 
-# ISO-639-1 keys from services/nllb-sidecar ISO1_TO_FLORES200. Keep in sync with that table.
-NLLB_ISO1_LANGS = frozenset({
-    "en", "fr", "es", "ar", "ru", "zh", "hi",
-    "af", "ak", "am", "ee", "ff", "ha", "ig", "ki", "kg", "ln", "lg", "mg", "ny", "om",
-    "rn", "rw", "sg", "sn", "so", "st", "ss", "sw", "ti", "tn", "ts", "tw", "wo", "xh",
-    "yo", "zu",
-    "fa", "he", "ku", "ps", "tg", "tk", "tr", "ug", "ur", "uz", "az", "hy", "ka", "kk",
-    "ky", "mn", "kr", "ks",
-    "as", "bn", "gu", "kn", "ml", "mr", "ne", "or", "pa", "sa", "sd", "si", "ta", "te",
-    "id", "jv", "km", "lo", "ms", "my", "su", "th", "tl", "vi", "ja", "ko", "mi", "sm", "fj",
-    "sq", "be", "bs", "bg", "ca", "hr", "cs", "da", "nl", "eo", "et", "eu", "fi", "gl",
-    "de", "el", "ht", "hu", "is", "ga", "it", "lv", "lt", "lb", "mk", "mt", "nb", "nn",
-    "no", "oc", "pl", "pt", "ro", "gd", "sr", "sk", "sl", "sc", "sv", "cy", "uk", "yi",
-    "fo", "ba", "bm", "bo", "dz", "gn", "li", "lu", "qu", "ay", "tt",
-})
+# Vendored copy of services/nllb-sidecar/iso1_to_flores200.json. A unit test
+# fails if the two files diverge. Luba-Katanga (lu) is intentionally absent.
+def _load_nllb_iso1_langs() -> frozenset:
+    path = Path(__file__).resolve().parents[3] / "config" / "nllb_iso1_to_flores200.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    languages = payload.get("languages") or payload
+    return frozenset(str(key) for key in languages)
+
+
+NLLB_ISO1_LANGS = _load_nllb_iso1_langs()
+
+# Script/region tags forwarded to the sidecar instead of the plain-code default.
+_NLLB_TAG_ALIASES = {
+    "zh_hant": "zh_Hant",
+    "zh_tw": "zh_TW",
+    "zh_hk": "zh_HK",
+    "zh_hans": "zh_Hans",
+    "zh_cn": "zh_CN",
+    "sr_latn": "sr_Latn",
+    "sr_cyrl": "sr_Cyrl",
+    "ku_latn": "ku_Latn",
+    "kmr": "kmr",
+    "ku_arab": "ku_Arab",
+    "ckb": "ckb",
+}
 
 _UNSUPPORTED_PAIR_LOGGED: set[tuple[str, str]] = set()
+
+
+def nllb_sidecar_configured() -> bool:
+    """True only when this process was pointed at a sidecar URL."""
+    return bool((os.getenv("NLLB_SIDECAR_URL") or "").strip())
+
+
+def _nllb_language_tag(lang: Optional[Union[str, object]], *, default: str = "en") -> str:
+    """Keep script/region hints the sidecar uses to pick a FLORES variant."""
+    raw = str(lang or "").strip().replace("-", "_")
+    if not raw:
+        return default
+    alias = _NLLB_TAG_ALIASES.get(raw.lower())
+    if alias:
+        return alias
+    base = _normalize_language_code(raw.split("_", 1)[0], default=default)
+    if "_" in raw and base:
+        return f"{base}_{raw.split('_', 1)[1]}"
+    return base
+
+
+def _nllb_supports_tag(tag: str) -> bool:
+    lowered = (tag or "").strip().lower()
+    if not lowered:
+        return False
+    if lowered in _NLLB_TAG_ALIASES:
+        return True
+    return lowered.split("_", 1)[0] in NLLB_ISO1_LANGS
 
 
 def language_has_machine_translation(target_language: str, source_language: str = "en") -> bool:
@@ -123,7 +162,36 @@ def language_has_machine_translation(target_language: str, source_language: str 
     source = _normalize_language_code(source_language, default="en")
     if not target or target == source:
         return False
-    return target in IFRC_AZURE_LANGS or target in NLLB_ISO1_LANGS
+    if target in IFRC_AZURE_LANGS:
+        return True
+    return nllb_sidecar_configured() and target in NLLB_ISO1_LANGS
+
+
+def resolve_requested_service(
+    service_name: Optional[str],
+    available: List[str],
+    status: Optional[Dict[str, bool]],
+    *,
+    status_verified: bool,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Resolve an explicit engine choice.
+
+    Returns ``(service_to_use, error)``. A configured engine whose health
+    check has actually failed is rejected so the request is not silently
+    served by another engine. An unknown name falls back (``None``). An
+    unverified status does not reject.
+    """
+    requested = (service_name or "").strip() or None
+    if not requested:
+        return None, None
+    if requested not in (available or []):
+        return None, None
+    if status_verified and (status or {}).get(requested) is False:
+        return requested, (
+            f"Translation service '{requested}' is unavailable. "
+            "No other engine was used."
+        )
+    return requested, None
 
 
 def _service_supports_language(service_name: str, target_language: str) -> bool:
@@ -134,7 +202,7 @@ def _service_supports_language(service_name: str, target_language: str) -> bool:
     if name == "ifrc":
         return code in IFRC_AZURE_LANGS
     if name == "nllb":
-        return code in NLLB_ISO1_LANGS
+        return _nllb_supports_tag(_nllb_language_tag(target_language, default=""))
     return True
 
 
@@ -908,24 +976,41 @@ class NLLBTranslationService(TranslationService):
             headers['x-api-key'] = self.api_key
         return headers
 
+    @staticmethod
+    def _request_timeout(n_items: int) -> float:
+        """Scale with batch size. One string stays at 30s; large batches cap at 3 minutes."""
+        count = max(1, int(n_items or 1))
+        if count <= 1:
+            return 30.0
+        return min(180.0, 30.0 + 2.0 * count)
+
+    @staticmethod
+    def _usable_text(item: object) -> Optional[str]:
+        if not isinstance(item, dict):
+            return None
+        if item.get("deferred") or item.get("truncated"):
+            return None
+        text = item.get("text")
+        return text if isinstance(text, str) and text.strip() else None
+
     def translate_text(self, text: str, target_language: str, source_language: str = 'en') -> Optional[str]:
         """Translate text using the self-hosted NLLB sidecar."""
         if self._is_circuit_open():
             return None
 
-        source_norm = _normalize_language_code(source_language, default="en")
-        target_norm = _normalize_language_code(target_language, default="en")
-        if source_norm == target_norm:
+        source_tag = _nllb_language_tag(source_language, default="en")
+        target_tag = _nllb_language_tag(target_language, default="en")
+        if source_tag.lower() == target_tag.lower():
             return None
-        if not _service_supports_language("nllb", target_norm):
+        if not _nllb_supports_tag(target_tag):
             return None
 
         try:
-            response = requests.post(
+            response = self.session.post(
                 f"{self.base_url}/api/translate",
                 headers=self._headers(),
-                data=json.dumps({"Text": text, "From": source_norm, "To": target_norm}),
-                timeout=30,
+                data=json.dumps({"Text": text, "From": source_tag, "To": target_tag}),
+                timeout=self._request_timeout(1),
             )
         except requests.exceptions.ConnectionError as e:
             self._trip_circuit()
@@ -941,19 +1026,14 @@ class NLLBTranslationService(TranslationService):
             except ValueError as e:
                 logger.warning(f"NLLB sidecar returned non-JSON response: {e}")
                 return None
-            if data.get('deferred'):
-                # Model still loading, or the sidecar could not translate this
-                # item -- let the caller fall back to another service.
-                return None
-            return data.get('text')
-        if response.status_code == 409:
-            logger.warning("NLLB sidecar declined %s->%s (409): %s", source_norm, target_norm, (response.text or "")[:200])
-            return None
+            if data.get("truncated"):
+                logger.warning("NLLB sidecar truncated %s->%s; discarding partial text", source_tag, target_tag)
+            return self._usable_text(data)
         if response.status_code == 503:
-            logger.warning("NLLB sidecar not ready (503) for %s->%s", source_norm, target_norm)
+            logger.warning("NLLB sidecar not ready (503) for %s->%s", source_tag, target_tag)
             return None
         if response.status_code == 400:
-            logger.warning("NLLB sidecar unsupported language %s->%s (400)", source_norm, target_norm)
+            logger.warning("NLLB sidecar unsupported language %s->%s (400)", source_tag, target_tag)
             return None
         if response.status_code == 401:
             logger.warning("NLLB sidecar rejected request: invalid API key (401)")
@@ -968,20 +1048,20 @@ class NLLBTranslationService(TranslationService):
         if self._is_circuit_open():
             return [None] * len(texts)
 
-        source_norm = _normalize_language_code(source_language, default="en")
-        target_norm = _normalize_language_code(target_language, default="en")
-        if source_norm == target_norm:
+        source_tag = _nllb_language_tag(source_language, default="en")
+        target_tag = _nllb_language_tag(target_language, default="en")
+        if source_tag.lower() == target_tag.lower():
             return [None] * len(texts)
-        if not _service_supports_language("nllb", target_norm):
+        if not _nllb_supports_tag(target_tag):
             return [None] * len(texts)
 
-        payload = [{"Text": t, "From": source_norm, "To": target_norm} for t in texts]
+        payload = [{"Text": t, "From": source_tag, "To": target_tag} for t in texts]
         try:
-            response = requests.post(
+            response = self.session.post(
                 f"{self.base_url}/api/translate/batch",
                 headers=self._headers(),
                 data=json.dumps(payload),
-                timeout=60,
+                timeout=self._request_timeout(len(texts)),
             )
         except requests.exceptions.ConnectionError as e:
             self._trip_circuit()
@@ -1005,7 +1085,7 @@ class NLLBTranslationService(TranslationService):
             logger.warning("NLLB sidecar batch response shape mismatch")
             return [None] * len(texts)
 
-        return [None if item.get('deferred') else item.get('text') for item in data]
+        return [self._usable_text(item) for item in data]
 
     def check_health(self) -> bool:
         """Probe /health and require the model to actually be loaded (``ok=true``).
@@ -1017,7 +1097,7 @@ class NLLBTranslationService(TranslationService):
         if self._is_circuit_open():
             return False
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.base_url}/health",
                 timeout=STATUS_PROBE_TIMEOUT_SECONDS,
             )
@@ -1046,9 +1126,44 @@ class AutoTranslator:
         self.default_service = None
         self._status_cache: Optional[Tuple[float, Dict[str, bool]]] = None
         self._status_probe_lock = threading.Lock()
+        self._engine_trace = threading.local()
 
         # Initialize available services
         self._init_services(service_name, api_key)
+
+    def begin_engine_trace(self) -> None:
+        """Start recording which engines actually produce text on this thread."""
+        self._engine_trace.names = []
+        self._engine_trace.finished = None
+
+    def note_engine(self, name: Optional[str]) -> None:
+        if not name:
+            return
+        names = getattr(self._engine_trace, "names", None)
+        if names is None or getattr(self._engine_trace, "finished", None) is not None:
+            return
+        if name not in names:
+            names.append(name)
+
+    def finish_engine_trace(self, fallback: Optional[str] = None) -> Optional[str]:
+        """Return the engines that produced text, or ``fallback`` when none did.
+
+        Safe to call more than once on the same thread: later calls repeat
+        the first result.
+        """
+        finished = getattr(self._engine_trace, "finished", None)
+        if finished is not None:
+            return finished
+        names = list(getattr(self._engine_trace, "names", None) or [])
+        if len(names) == 1:
+            label: Optional[str] = names[0]
+        elif names:
+            label = ",".join(names)
+        else:
+            label = fallback
+        self._engine_trace.finished = label
+        self._engine_trace.names = None
+        return label
 
     def _init_services(self, service_name: str = None, api_key: str = None):
         """Initialize translation services"""
@@ -1492,6 +1607,7 @@ class AutoTranslator:
 
             cached = get_cached(original_text, source_code, target_code, cache_engine)
             if cached:
+                self.note_engine(cache_engine)
                 return self._enforce_cached_translation(
                     original_text, cached, target_code, source_code, service_name
                 )
@@ -1605,6 +1721,7 @@ class AutoTranslator:
                 )
             except Exception as e:
                 logger.debug("result cache write skipped: %s", e)
+            self.note_engine(getattr(svc, "service_name", None))
             return restored
 
         return None
@@ -1650,6 +1767,7 @@ class AutoTranslator:
                         original, cached, target_code, source_code, service_name
                     )
                     should_translate[i] = False
+                    self.note_engine(self._result_cache_engine(service_name))
         except Exception as e:
             logger.debug("batch result cache read skipped: %s", e)
         for i, ok in enumerate(should_translate):
@@ -1732,6 +1850,7 @@ class AutoTranslator:
 
                 out[i] = restored
                 to_cache.append((originals[i], restored))
+                self.note_engine(getattr(svc, "service_name", None))
 
             if to_cache:
                 try:

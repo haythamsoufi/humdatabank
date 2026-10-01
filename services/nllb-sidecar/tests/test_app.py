@@ -14,6 +14,7 @@ from app import (
     protect_placeholders,
     resolve_flores_code,
     restore_placeholders,
+    split_for_translation,
 )
 
 
@@ -46,6 +47,23 @@ class TestResolveFloresCode:
     def test_core_languages_all_resolve(self):
         for code in ("en", "fr", "es", "ar", "ru", "zh", "hi"):
             assert resolve_flores_code(code) is not None
+
+    def test_luba_katanga_is_not_mapped_to_luba_kasai(self):
+        assert resolve_flores_code("lu") is None
+        assert "lu" not in ISO1_TO_FLORES200
+        assert "lua_Latn" not in ISO1_TO_FLORES200.values()
+
+    def test_script_and_region_tags_select_the_written_form(self):
+        assert resolve_flores_code("zh") == "zho_Hans"
+        assert resolve_flores_code("zh-Hant") == "zho_Hant"
+        assert resolve_flores_code("zh_TW") == "zho_Hant"
+        assert resolve_flores_code("sr") == "srp_Cyrl"
+        assert resolve_flores_code("sr_Latn") == "srp_Latn"
+        assert resolve_flores_code("ku") == "kmr_Latn"
+        assert resolve_flores_code("ckb") == "ckb_Arab"
+        assert resolve_flores_code("ff") == "fuv_Latn"
+        assert resolve_flores_code("no") == "nob_Latn"
+        assert resolve_flores_code("am-ET") == "amh_Ethi"
 
     def test_mapping_has_no_duplicate_flores_targets_collisions_are_intentional(self):
         # zh/no/az etc. intentionally share a macrolanguage variant; just make
@@ -95,6 +113,18 @@ class TestPlaceholderProtection:
         assert tokens == {}
 
 
+class TestSegmentSplit:
+    def test_long_text_splits_without_cutting_a_placeholder_token(self):
+        token = "NLLBXQZA"
+        sentence = "People reached with disaster risk reduction. "
+        text = (sentence * 12) + token + " Keep this token whole."
+        parts = split_for_translation(text, max_chars=80)
+        assert len(parts) > 1
+        assert all(len(part) <= 80 for part in parts)
+        assert sum(part.count(token) for part in parts) == 1
+        assert " ".join(parts) == " ".join(text.split())
+
+
 class TestHealthAndLanguagesEndpoints:
     def test_health_reports_disabled_status_in_test_mode(self, client):
         resp = client.get("/health")
@@ -113,6 +143,17 @@ class TestHealthAndLanguagesEndpoints:
         assert "sw" in body["sidecar_supported"]
         assert "fr" in body["sidecar_supported"]
         assert "en" in body["sidecar_supported"]
+        assert "lu" not in body["sidecar_supported"]
+        assert body["license"] == "CC-BY-NC-4.0"
+
+    def test_languages_requires_api_key_when_configured(self, client, monkeypatch):
+        import app as app_module
+
+        monkeypatch.setattr(app_module, "API_KEY", "secret123")
+        denied = client.get("/languages")
+        assert denied.status_code == 401
+        allowed = client.get("/languages", headers={"x-api-key": "secret123"})
+        assert allowed.status_code == 200
 
 
 class TestTranslateEndpointValidation:
@@ -126,6 +167,14 @@ class TestTranslateEndpointValidation:
     def test_unsupported_language_code_returns_400(self, client):
         resp = client.post("/api/translate", json={"Text": "hello", "From": "en", "To": "zz"})
         assert resp.status_code == 400
+
+    def test_luba_katanga_returns_400(self, client):
+        resp = client.post("/api/translate", json={"Text": "hello", "From": "en", "To": "lu"})
+        assert resp.status_code == 400
+
+    def test_traditional_chinese_reaches_readiness_check(self, client):
+        resp = client.post("/api/translate", json={"Text": "hello", "From": "en", "To": "zh_Hant"})
+        assert resp.status_code == 503
 
     def test_model_not_ready_returns_503(self, client):
         resp = client.post("/api/translate", json={"Text": "hello", "From": "en", "To": "am"})
@@ -173,3 +222,83 @@ class TestBatchEndpointGracefulDegradation:
         body = resp.json()
         assert len(body) == 2
         assert all(item["deferred"] is True for item in body)
+
+    def test_oversized_batch_is_rejected(self, client, monkeypatch):
+        import app as app_module
+
+        monkeypatch.setattr(app_module, "MAX_BATCH_ITEMS", 2)
+        resp = client.post(
+            "/api/translate/batch",
+            json=[
+                {"Text": "one", "From": "en", "To": "am"},
+                {"Text": "two", "From": "en", "To": "am"},
+                {"Text": "three", "From": "en", "To": "am"},
+            ],
+        )
+        assert resp.status_code == 413
+
+
+class TestInferenceLock:
+    def test_concurrent_requests_keep_their_source_language(self):
+        import threading
+        import time
+        from types import SimpleNamespace
+
+        import app as app_module
+
+        class FakeTok:
+            def __init__(self):
+                self.src_lang = None
+                self.seen = []
+                self._seen_lock = threading.Lock()
+
+            def __call__(self, text):
+                time.sleep(0.02)
+                with self._seen_lock:
+                    self.seen.append((self.src_lang, text))
+                return SimpleNamespace(input_ids=[1])
+
+            def convert_ids_to_tokens(self, ids):
+                return ["tok"]
+
+            def convert_tokens_to_ids(self, toks):
+                return [1]
+
+            def decode(self, ids, skip_special_tokens=True):
+                return "ok"
+
+        class FakeTranslator:
+            def translate_batch(self, sources, target_prefix, beam_size, max_decoding_length):
+                prefix = target_prefix[0][0]
+
+                class Result:
+                    hypotheses = [[prefix, "x"]]
+
+                return [Result() for _ in sources]
+
+        tok = FakeTok()
+        previous = (app_module._state.tokenizer, app_module._state.translator)
+        app_module._state.tokenizer = tok
+        app_module._state.translator = FakeTranslator()
+        errors = []
+
+        def run(src, text):
+            try:
+                app_module._translate_batch_same_pair([text], src, "fra_Latn")
+            except Exception as exc:  # pragma: no cover - assertion below
+                errors.append(exc)
+
+        threads = [
+            threading.Thread(target=run, args=("eng_Latn", "hello")),
+            threading.Thread(target=run, args=("spa_Latn", "hola")),
+        ]
+        try:
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        finally:
+            app_module._state.tokenizer, app_module._state.translator = previous
+        assert errors == []
+        assert ("eng_Latn", "hello") in tok.seen
+        assert ("spa_Latn", "hola") in tok.seen

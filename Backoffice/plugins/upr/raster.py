@@ -226,9 +226,10 @@ html[dir="rtl"] .upr-fin-col-overview-plot { width: auto; }
 html[dir="rtl"] .upr-fin-col-source-label { width: 28%; }
 html[dir="rtl"] .upr-fin-col-source-plot { width: 28%; }
 html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-label { width: 7em; }
-html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-label { width: 50%; }
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-label { width: 42%; }
 html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-plot { width: auto; }
-html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-plot { width: 50%; }
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-plot { width: auto; min-width: 0; }
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-value { width: 5.6em; }
 html[dir="rtl"] .upr-fin-grid--half td.upr-bar-label,
 html[dir="rtl"] .upr-fin-hero .upr-bar-row .upr-bar-label {
   padding-inline-start: 0.5em;
@@ -239,6 +240,11 @@ html[dir="rtl"] .upr-fin-hero .upr-bar-row .upr-bar-plot {
   padding-inline-end: 0.5em;
   padding-inline-start: 0;
   text-align: right;
+}
+html[dir="rtl"] .upr-fin-hero__value {
+  padding-inline-start: 0;
+  padding-inline-end: 0.35em;
+  text-align: end;
 }
 html[dir="rtl"] .upr-fin-grid--half .upr-bar-yes,
 html[dir="rtl"] .upr-fin-grid--half .upr-not-reported,

@@ -47,6 +47,39 @@ def format_count(value: Any) -> str:
     return f"{int(round(number)):,}"
 
 
+def round_to_nearest_thousand(value: Any) -> int | None:
+    """Round a count to the nearest 1,000.
+
+    The remainder below 1,000 chooses the direction:
+    - 0–499 rounds down (1,120,346 → 1,120,000; 30,195 → 30,000)
+    - 500–999 rounds up (1,120,500 → 1,121,000; 30,500 → 31,000)
+
+    Absolute values under 1,000 stay as a whole number so 12 does not become 0.
+    """
+    number = to_number(value)
+    if number is None:
+        return None
+    sign = -1 if number < 0 else 1
+    magnitude = abs(number)
+    if magnitude < 1000:
+        return sign * int(math.floor(magnitude + 0.5))
+    thousands = math.floor(magnitude / 1000.0)
+    remainder = magnitude - thousands * 1000.0
+    if remainder >= 500.0 - 1e-6:
+        thousands += 1
+    return sign * thousands * 1000
+
+
+def format_thousands(value: Any) -> str:
+    """People-count label rounded to the nearest thousand."""
+    from plugins.upr.i18n import t
+
+    rounded = round_to_nearest_thousand(value)
+    if rounded is None:
+        return t("Not reported")
+    return f"{rounded:,}"
+
+
 def format_percent(value: Any) -> str:
     """Whole-percent label for form-stored 0–100 values (``60`` → ``60%``)."""
     from plugins.upr.i18n import t

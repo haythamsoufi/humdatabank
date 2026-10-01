@@ -105,7 +105,7 @@ def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
     assert "table-layout: auto" not in css
     assert "overflow: hidden" in css
     assert "direction: ltr" in css
-    assert "upr-fin-grid--half .upr-fin-col-source-label { width: 50%; }" in css
+    assert "upr-fin-grid--half .upr-fin-col-source-label { width: 42%; }" in css
     assert "upr-fin-grid--half .upr-fin-col-overview-label { width: 7em; }" in css
     assert "upr-fin-grid--with-sources .upr-fin-col-overview-plot" not in css
     assert "justify-content: flex-end" in css

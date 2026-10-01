@@ -9,7 +9,13 @@ from typing import Any
 from app.models.form_items import FormItem
 from app.models.forms import DynamicIndicatorData, RepeatGroupInstance
 from plugins.upr.catalog import OTHER_INDICATORS_SECTION_NAME, OVERALL_ACTION_SECTION_NEEDLE
-from plugins.upr.formatters import format_count, format_percent, strip_trailing_period, to_number
+from plugins.upr.formatters import (
+    format_count,
+    format_percent,
+    format_thousands,
+    strip_trailing_period,
+    to_number,
+)
 from plugins.upr.loaders import _load_dynamic_indicator_rows
 from plugins.upr.matrix import _area_from_item, _bank_area, _scalar_number
 from plugins.upr.i18n import localized_form_item_label, localized_indicator_label, t
@@ -36,7 +42,15 @@ def _section_is_other_indicators(section) -> bool:
     return name == OTHER_INDICATORS_SECTION_NAME and stype == "dynamic_indicators"
 
 
-def _indicator_visual_row(area: str, label: str, meas: str, entry, *, bars_only: bool) -> dict[str, Any] | None:
+def _indicator_visual_row(
+    area: str,
+    label: str,
+    meas: str,
+    entry,
+    *,
+    bars_only: bool,
+    round_thousands: bool = False,
+) -> dict[str, Any] | None:
     label = strip_trailing_period(label)
     if meas in _YESNO_TYPES:
         if bars_only:
@@ -69,7 +83,7 @@ def _indicator_visual_row(area: str, label: str, meas: str, entry, *, bars_only:
         "code": area,
         "label": label,
         "value": number,
-        "display": format_count(number),
+        "display": format_thousands(number) if round_thousands else format_count(number),
         "kind": "number",
     }
 
@@ -95,7 +109,14 @@ def _report_indicator_rows(
             continue
         meas = (getattr(bank, "type", None) or "").strip().lower()
         label = localized_form_item_label(item, fallback=localized_indicator_label(bank))
-        row = _indicator_visual_row(area, label, meas, by_item.get(item.id), bars_only=bars_only)
+        row = _indicator_visual_row(
+            area,
+            label,
+            meas,
+            by_item.get(item.id),
+            bars_only=bars_only,
+            round_thousands=True,
+        )
         if row:
             rows.append(row)
     if aes_id:
@@ -112,7 +133,9 @@ def _report_indicator_rows(
                 continue
             meas = (getattr(bank, "type", None) or "").strip().lower()
             label = (dyn.custom_label or localized_indicator_label(bank) or "").strip()
-            row = _indicator_visual_row(area, label, meas, dyn, bars_only=bars_only)
+            row = _indicator_visual_row(
+                area, label, meas, dyn, bars_only=bars_only, round_thousands=True
+            )
             if row:
                 rows.append(row)
     rows.sort(key=lambda row: (areas.index(row["code"]) if row["code"] in areas else 99, -(row.get("value") or 0)))

@@ -269,7 +269,7 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             items, by_item, EF_CODES, bars_only=False, aes_id=aes.id
         )
         payload["meta"]["people_title"] = t("People reached")
-        payload["meta"]["support_title"] = t("IFRC Network-Supported Activities")
+        payload["meta"]["support_title"] = t("IFRC Network Bilateral-Supported Activities")
         payload["meta"]["support_funding_label"] = t("Funding Reported")
         payload["meta"]["header_prefix"] = t("IN SUPPORT OF")
 

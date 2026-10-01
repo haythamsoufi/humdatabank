@@ -231,33 +231,26 @@ class UprVisualsService:
             )
             meta = payload.get("meta") or {}
             filename = visual_export_filename(meta, "combined", "pdf")
-            if lang != "en":
-                def on_translate(*, done: int, total: int, lang: str, elapsed: int | None = None, **_k: Any) -> None:
-                    notify(
-                        2,
-                        f"Translating narrative… {done} of {total}",
-                        log=done in {0, total},
-                        elapsed=elapsed,
-                        chunk_done=done,
-                        chunk_total=total,
-                    )
+            def on_translate(*, done: int, total: int, lang: str, elapsed: int | None = None, **_k: Any) -> None:
+                notify(
+                    2,
+                    f"Translating narrative… {done} of {total}",
+                    log=done in {0, total},
+                    elapsed=elapsed,
+                    chunk_done=done,
+                    chunk_total=total,
+                )
 
-                notify(2, "Translating narrative…")
-                styled = translate_styled_blocks(
-                    style_narrative_blocks(
-                        load_narrative_paragraphs(word_bytes),
-                        country_name=str(meta.get("country_name") or ""),
-                    ),
-                    on_progress=on_translate,
-                )
-            else:
-                notify(2, "Reading narrative…")
-                styled = translate_styled_blocks(
-                    style_narrative_blocks(
-                        load_narrative_paragraphs(word_bytes),
-                        country_name=str(meta.get("country_name") or ""),
-                    )
-                )
+            # English is a valid *target* (a Russian narrative still translates).
+            # Progress switches to "Translating…" once chunks are actually sent.
+            notify(2, "Translating narrative…" if lang != "en" else "Reading narrative…")
+            styled = translate_styled_blocks(
+                style_narrative_blocks(
+                    load_narrative_paragraphs(word_bytes),
+                    country_name=str(meta.get("country_name") or ""),
+                ),
+                on_progress=on_translate,
+            )
             work_dir = Path(current_app.instance_path) / "upr_tmp" / f"nar_{uuid.uuid4().hex}"
             work_dir.mkdir(parents=True, exist_ok=True)
             html_path = work_dir / "in.html"

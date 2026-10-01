@@ -151,16 +151,18 @@ def export_locale(lang: str | None) -> Iterator[str]:
         yield code
 
 
-def _machine_translate(text: str, lang: str) -> str | None:
+def _machine_translate(text: str, lang: str, source_language: str = "en") -> str | None:
     from app.services.translation.auto_translator import translate_text
 
-    return translate_text(text, target_language=lang, source_language="en")
+    return translate_text(text, target_language=lang, source_language=source_language)
 
 
-def _machine_translate_batch(texts: list[str], lang: str) -> list:
+def _machine_translate_batch(texts: list[str], lang: str, source_language: str = "en") -> list:
     from app.services.translation.auto_translator import translate_batch
 
-    return translate_batch(texts, target_language=lang, source_language="en") or []
+    return translate_batch(
+        texts, target_language=lang, source_language=source_language
+    ) or []
 
 
 def parse_progress_id(value: str | None) -> str:
@@ -399,7 +401,8 @@ def t(text: str | None) -> str:
 
     Prefer the plugin visual catalog (system languages, no network). Fall back
     to Flask-Babel for other UI msgids, then the translation API for languages
-    outside the system set. English narrative still goes through ``t_batch``.
+    outside the system set. These strings are English. Narrative text is
+    translated separately by ``translate_styled_blocks``.
     """
     raw = "" if text is None else str(text)
     if not raw.strip():
@@ -445,28 +448,40 @@ def t(text: str | None) -> str:
 _T_BATCH_CHUNK = 24
 
 
-def _cached_translations(texts: list[str], lang: str) -> dict[str, str]:
+def _cached_translations(
+    texts: list[str], lang: str, source_language: str = "en"
+) -> dict[str, str]:
     """Batched cache lookup: one query for the whole chunk instead of one per text."""
     try:
         from app.services.translation.result_cache import get_cached_many
 
-        return get_cached_many(texts, "en", lang, "default")
+        return get_cached_many(texts, source_language, lang, "default")
     except Exception:
         return {}
 
 
-def t_batch(texts: Iterable[str | None], *, on_progress: Any = None) -> list[str]:
-    """Machine-translate a batch (narrative chunks, or labels for non-system languages)."""
+def t_batch(
+    texts: Iterable[str | None],
+    *,
+    on_progress: Any = None,
+    source_language: str = "en",
+) -> list[str]:
+    """Machine-translate a batch from *source_language* into the export language.
+
+    Chrome and labels stay English (``source_language="en"``). Narrative runs
+    pass the detected document language, including into English.
+    """
     originals = [("" if item is None else str(item)) for item in texts]
     if not originals:
         return []
     lang = current_export_language()
-    if lang == "en":
+    source = normalize_language_code(source_language) or "en"
+    if lang == source:
         return originals
     try:
         from app.services.translation.auto_translator import language_has_machine_translation
 
-        if not language_has_machine_translation(lang):
+        if not language_has_machine_translation(lang, source_language=source):
             return originals
     except Exception:
         pass
@@ -477,7 +492,7 @@ def t_batch(texts: Iterable[str | None], *, on_progress: Any = None) -> list[str
     total = len(payload)
     resolved: list[Any] = [None] * total
     pending: list[int] = []
-    cache_hits = _cached_translations(payload, lang)
+    cache_hits = _cached_translations(payload, lang, source)
     for offset, text in enumerate(payload):
         hit = cache_hits.get(text)
         if hit:
@@ -486,16 +501,16 @@ def t_batch(texts: Iterable[str | None], *, on_progress: Any = None) -> list[str
             pending.append(offset)
     cached_n = total - len(pending)
     started = time.monotonic()
-    logger.info("UPR t_batch %s chunks → %s (%s cached)", total, lang, cached_n)
+    logger.info("UPR t_batch %s chunks %s → %s (%s cached)", total, source, lang, cached_n)
     if on_progress:
         on_progress(done=cached_n, total=total, lang=lang, elapsed=0)
     for start in range(0, len(pending), _T_BATCH_CHUNK):
         batch_idx = pending[start : start + _T_BATCH_CHUNK]
         chunk = [payload[i] for i in batch_idx]
         try:
-            part = _machine_translate_batch(chunk, lang) or []
+            part = _machine_translate_batch(chunk, lang, source) or []
         except Exception:
-            logger.debug("UPR t_batch() failed → %s", lang, exc_info=True)
+            logger.debug("UPR t_batch() failed %s → %s", source, lang, exc_info=True)
             part = []
         if len(part) < len(chunk):
             part = list(part) + [None] * (len(chunk) - len(part))
@@ -503,7 +518,7 @@ def t_batch(texts: Iterable[str | None], *, on_progress: Any = None) -> list[str
             resolved[index] = part[pos]
         done = cached_n + min(start + len(batch_idx), len(pending))
         elapsed = int(time.monotonic() - started)
-        logger.info("UPR t_batch %s/%s → %s (%ss)", done, total, lang, elapsed)
+        logger.info("UPR t_batch %s/%s %s → %s (%ss)", done, total, source, lang, elapsed)
         if on_progress:
             on_progress(done=done, total=total, lang=lang, elapsed=elapsed)
     out = list(originals)
@@ -749,11 +764,15 @@ def translate_styled_blocks(
 ) -> list[dict[str, Any]]:
     """Translate styled narrative blocks in place (runs only). Skip Blank / hrefs.
 
+    The source language is detected from the run text, so a Russian narrative
+    can be translated into English or any other export language. Translation
+    is skipped when the document is already in the export language.
+
     De-duplicates repeated strings (headings, labels, org names) before
     calling the MT engine, the same as ``localize_export`` does for
     visuals/chrome, then rebuilds each paragraph's ``text`` from its runs.
     """
-    if current_export_language() == "en" or not blocks:
+    if not blocks:
         return blocks
     bag: list[tuple[dict, str]] = []
     for block in blocks:
@@ -762,7 +781,17 @@ def translate_styled_blocks(
         return blocks
     originals = [str(owner.get(key) or "") for owner, key in bag]
     unique = list(dict.fromkeys(item for item in originals if item.strip()))
-    translated_unique = t_batch(unique, on_progress=on_progress)
+    if not unique:
+        return blocks
+    from plugins.upr.narrative_lang import detect_narrative_language
+
+    source = detect_narrative_language("\n".join(unique))
+    target = current_export_language()
+    if source == target:
+        logger.info("UPR narrative already %s; skipping translation", source)
+        return blocks
+    logger.info("UPR narrative %s → %s (%s chunks)", source, target, len(unique))
+    translated_unique = t_batch(unique, on_progress=on_progress, source_language=source)
     value_map = {
         src: dst for src, dst in zip(unique, translated_unique) if dst and str(dst).strip()
     }

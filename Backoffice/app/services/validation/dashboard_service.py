@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from sqlalchemy import func
@@ -10,18 +11,13 @@ from app import db
 from app.models import Country, FormTemplate
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.validation import ValidationQuestion
-from app.services.data_quality.helpers import numeric_value, parse_period_year, resolve_assignment_aes
+from app.services.data_quality.helpers import numeric_value, parse_period_year
+from app.services.data_quality.service import get_rule_pack_for_template
 from app.services.forms.reporting_period_service import sort_period_names
+from app.services.validation.pack_registry import get_pack
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
 from .check_service import evaluate_validation_checks, validation_checks_disabled_message
-from plugins.upr.catalog import UPR_VALIDATION_TEMPLATE_IDS
-from plugins.upr.validation_dashboard import (
-    merge_upr_validation_templates,
-    missing_upr_validation_template_ids,
-    upr_display_name,
-    upr_product_tab,
-)
 
 HISTORY_YEARS_LOOKBACK = 3
 
@@ -83,37 +79,90 @@ def _templates_with_validation() -> list[FormTemplate]:
     )
 
 
+def _upr_dashboard():
+    """Load UPR tab helpers after this module is initialized.
+
+    Importing ``plugins.upr`` at module scope pulls admin routes, which import
+    this module again before its functions exist.
+    """
+    from plugins.upr.catalog import (
+        UPR_LEGACY_REPORTING_TEMPLATE_ID,
+        UPR_REPORTING_TEMPLATE_ID,
+        UPR_VALIDATION_TEMPLATE_IDS,
+    )
+    from plugins.upr.validation_dashboard import upr_display_name, upr_product_tab
+
+    return {
+        "legacy_id": UPR_LEGACY_REPORTING_TEMPLATE_ID,
+        "reporting_id": UPR_REPORTING_TEMPLATE_ID,
+        "validation_ids": UPR_VALIDATION_TEMPLATE_IDS,
+        "display_name": upr_display_name,
+        "product_tab": upr_product_tab,
+    }
+
+
+_PERIOD_YEAR_RE = re.compile(r"20\d{2}")
+
+
+def _registered_pack_code(template: FormTemplate):
+    """Return the pack code when this template can run checks.
+
+    Test doubles without a real published-version flag are kept so callers that
+    already selected templates are not filtered out.
+    """
+    version = getattr(template, "published_version", None)
+    enabled = getattr(version, "enable_data_quality", None)
+    if not isinstance(enabled, bool):
+        return None
+    if not enabled:
+        return ""
+    pack = get_rule_pack_for_template(template)
+    if isinstance(pack, str) and get_pack(pack):
+        return pack
+    return ""
+
+
 def _validation_templates_by_id() -> dict[int, FormTemplate]:
-    """DQ-enabled templates plus UPR country templates, excluding legacy reporting when current exists."""
-    by_id = {t.id: t for t in _templates_with_validation()}
-    missing_upr = missing_upr_validation_template_ids(by_id)
-    extra = []
-    if missing_upr:
-        extra = FormTemplate.query.filter(FormTemplate.id.in_(missing_upr)).all()
-    return merge_upr_validation_templates(by_id, extra)
+    """DQ-enabled templates whose rule pack is registered. Legacy UPR 25 drops when 33 is present."""
+    by_id = {}
+    for template in _templates_with_validation():
+        pack_code = _registered_pack_code(template)
+        if pack_code == "":
+            continue
+        by_id[template.id] = template
+    upr = _upr_dashboard()
+    if upr["reporting_id"] in by_id:
+        by_id.pop(upr["legacy_id"], None)
+    return by_id
 
 
 def template_options() -> list[dict[str, Any]]:
     """Flat template list for selects (questions/rules) and API consumers."""
     by_id = _validation_templates_by_id()
+    upr = _upr_dashboard()
     options: list[dict[str, Any]] = []
     for tid in sorted(by_id):
         tmpl = by_id[tid]
-        options.append({"id": tmpl.id, "name": upr_display_name(tmpl.id, tmpl.name)})
+        options.append({
+            "id": tmpl.id,
+            "name": upr["display_name"](tmpl.id, tmpl.name),
+            "rule_pack": _registered_pack_code(tmpl) or None,
+        })
     return options
 
 
 def template_tab_options() -> list[dict[str, Any]]:
     """Product tabs for the validation dashboard (UPR grouped as one tab)."""
     by_id = _validation_templates_by_id()
+    upr = _upr_dashboard()
     tabs: list[dict[str, Any]] = []
     for tid in sorted(by_id):
-        if tid in UPR_VALIDATION_TEMPLATE_IDS:
+        if tid in upr["validation_ids"]:
             continue
         tmpl = by_id[tid]
         tabs.append({"id": tmpl.id, "name": tmpl.name, "children": None})
 
-    upr_tab = upr_product_tab(by_id)
+    upr_tab = upr["product_tab"](by_id)
     if upr_tab:
         tabs.append(upr_tab)
     return tabs
@@ -133,27 +182,55 @@ def global_periods_for_template(template_id: int) -> list[str]:
     return sort_period_names(periods)
 
 
+def _period_matches_year(period_name: str | None, requested: str) -> bool:
+    target = parse_period_year(requested)
+    if target is None or not period_name:
+        return False
+    return any(int(year) == target for year in _PERIOD_YEAR_RE.findall(str(period_name)))
+
+
+def _pick_assignment_row(rows: list[tuple], requested: str):
+    """Choose (aes, period_name) for one country. Exact period wins, then year, then highest assignment id."""
+    exact = [row for row in rows if row[1] == requested]
+    pool = exact or [row for row in rows if _period_matches_year(row[1], requested)]
+    if not pool:
+        return None
+    aes, period, assignment_id = max(pool, key=lambda row: row[2] or 0)
+    return aes, period
+
+
 def list_countries_for_period(template_id: int, period_name: str) -> list[dict[str, Any]]:
-    """Countries with assignments for template+period, plus persisted question counts."""
-    countries = (
-        db.session.query(Country.id, Country.name)
+    """Countries with an assignment for template+period, plus persisted question counts."""
+    assignment_rows = (
+        db.session.query(
+            Country.id,
+            Country.name,
+            AssignmentEntityStatus,
+            AssignedForm.period_name,
+            AssignedForm.id,
+        )
         .join(AssignmentEntityStatus, AssignmentEntityStatus.entity_id == Country.id)
         .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
         .filter(
             AssignedForm.template_id == template_id,
             AssignmentEntityStatus.entity_type == "country",
         )
-        .distinct()
         .all()
     )
 
-    resolved_by_country: dict[int, str] = {}
-    for country_id, _country_name in countries:
-        aes, resolved_period = resolve_assignment_aes(template_id, "country", country_id, period_name)
-        if aes:
-            resolved_by_country[country_id] = resolved_period
+    grouped: dict[int, dict[str, Any]] = {}
+    for country_id, country_name, aes, period, assignment_id in assignment_rows:
+        bucket = grouped.setdefault(country_id, {"name": country_name, "rows": []})
+        bucket["rows"].append((aes, period, assignment_id))
 
-    if not resolved_by_country:
+    resolved: dict[int, tuple[str, str]] = {}
+    for country_id, info in grouped.items():
+        picked = _pick_assignment_row(info["rows"], period_name)
+        if picked:
+            _aes, resolved_period = picked
+            resolved[country_id] = (info["name"], resolved_period)
+
+    if not resolved:
         return []
 
     counts = (
@@ -166,7 +243,7 @@ def list_countries_for_period(template_id: int, period_name: str) -> list[dict[s
         .filter(
             ValidationQuestion.template_id == template_id,
             ValidationQuestion.entity_type == "country",
-            ValidationQuestion.entity_id.in_(resolved_by_country.keys()),
+            ValidationQuestion.entity_id.in_(resolved.keys()),
         )
         .group_by(
             ValidationQuestion.entity_id,
@@ -180,10 +257,7 @@ def list_countries_for_period(template_id: int, period_name: str) -> list[dict[s
         count_map.setdefault((entity_id, pn), {})[status] = cnt
 
     rows = []
-    for country_id, country_name in countries:
-        if country_id not in resolved_by_country:
-            continue
-        resolved_period = resolved_by_country[country_id]
+    for country_id, (country_name, resolved_period) in resolved.items():
         status_counts = count_map.get((country_id, resolved_period), {})
         rows.append(
             {

@@ -4,39 +4,21 @@ from __future__ import annotations
 
 from app.models.validation import ValidationQuestionTemplate
 from app.services.validation.types import CheckResult, ValidationQuestionDraft
+from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 
 
-def _format_suffix(rule_code: str, context: dict) -> str:
-    if rule_code in ("past_year_threshold", "past_3years_avg"):
-        pct = context.get("ytd_pct") or context.get("yoy_pct")
-        if pct is not None:
-            return f"{pct * 100:.2f}%"
-    if rule_code == "higher_than_pop":
-        pop = context.get("population")
-        if pop is not None:
-            return f"{int(pop):,}"
-    if rule_code == "significant_pop":
-        ratio = context.get("ratio")
-        if ratio is not None:
-            return f"{ratio * 100:.2f}%"
-    if rule_code == "branches_higher_units":
-        units = context.get("local_units")
-        if units is not None:
-            return f"{int(units):,}"
-    if rule_code == "fiscal_year":
-        days = context.get("fiscal_days")
-        if days is not None:
-            return str(int(days))
-    if rule_code == "awsd_check":
-        awsd = context.get("awsd_deaths")
-        if awsd is not None:
-            return f"{int(awsd):,}"
-    if rule_code == "typeofprograms":
-        progs = context.get("programmes") or []
-        if progs:
-            return ", ".join(progs) + "."
+def _format_suffix(
+    rule_code: str,
+    context: dict,
+    rule_pack: str | None = RULE_PACK_FDRS_MATRIX_V1,
+) -> str:
+    from app.services.validation.pack_registry import get_pack
+
+    pack = get_pack(rule_pack)
+    if pack and pack.format_suffix:
+        return pack.format_suffix(rule_code, context)
     return ""
 
 
@@ -76,7 +58,7 @@ def assemble_question_for_kpi(
     template_text, needs_suffix = lookup_template_text(winner.rule_code, language, rule_pack)
     fragment = template_text
     if needs_suffix:
-        suffix = _format_suffix(winner.rule_code, winner.context)
+        suffix = _format_suffix(winner.rule_code, winner.context, rule_pack)
         if suffix:
             fragment = f"{fragment} {suffix}".strip()
 

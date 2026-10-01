@@ -63,6 +63,7 @@ def validation_rules_admin():
         rule_packs=bootstrap["rule_packs"],
         check_type_options=bootstrap["check_type_options"],
         kpi_codes=bootstrap["kpi_codes"],
+        kpi_codes_by_pack=bootstrap.get("kpi_codes_by_pack") or {},
         rule_catalog=list_rule_catalog(),
         countries=list_countries_for_picker(),
     )

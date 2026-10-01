@@ -27,7 +27,7 @@
                 <select id="vr-template" class="vd-select">
                     <option value="">{{ _('All templates / global') }}</option>
                     {% for tmpl in template_options %}
-                    <option value="{{ tmpl.id }}">{{ tmpl.name }}</option>
+                    <option value="{{ tmpl.id }}" data-rule-pack="{{ tmpl.rule_pack or '' }}">{{ tmpl.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -208,6 +208,7 @@
     'questionTemplatesUrl': url_for('admin.validation_rules_question_templates_list_api'),
     'questionTemplateUpdateBase': url_for('admin.validation_rules_question_templates_update_api', row_id=0).rsplit('/', 1)[0] + '/',
     'initialCatalog': rule_catalog,
+    'kpiCodesByPack': kpi_codes_by_pack,
     'translations': {
         'edit': _('Edit'),
         'delete': _('Delete'),

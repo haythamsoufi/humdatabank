@@ -170,6 +170,13 @@ RULES_BY_CODE: dict[str, ValidationRuleDefinition] = {
 
 def list_rule_definitions(*, rule_pack: str | None = None) -> list[dict[str, Any]]:
     """Return rule metadata rows for admin UI."""
+    from app.services.validation.pack_registry import list_packs
+
+    packs = list_packs()
+    if rule_pack:
+        packs = [pack for pack in packs if pack.code == rule_pack]
+    if packs:
+        return [rule.to_dict() for pack in packs for rule in pack.rules]
     if rule_pack:
         rules = RULES_BY_PACK.get(rule_pack, ())
     else:
@@ -178,6 +185,11 @@ def list_rule_definitions(*, rule_pack: str | None = None) -> list[dict[str, Any
 
 
 def list_registered_rule_packs() -> list[dict[str, str]]:
+    from app.services.validation.pack_registry import list_packs
+
+    packs = list_packs()
+    if packs:
+        return [{"code": pack.code, "label": pack.label} for pack in packs]
     return [
-        {"code": RULE_PACK_FDRS_MATRIX_V1, "label": "FDRS matrix v1"},
+        {"code": code, "label": code} for code in RULES_BY_PACK
     ]

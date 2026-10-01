@@ -136,6 +136,15 @@ def _setup_db_mocks(mock_subdoc, mock_fi, mock_attr, mock_cyr, mock_thresh, mock
                     check_row=None, thresh_row=None):
     mock_check.query.filter_by.return_value.first.return_value = check_row
     mock_thresh.query.filter_by.return_value.first.return_value = thresh_row
+    if check_row is not None and not isinstance(getattr(check_row, "kpi_code", None), str):
+        check_row.kpi_code = "KPI_PeopleVol"
+    if thresh_row is not None and not isinstance(getattr(thresh_row, "kpi_code", None), str):
+        thresh_row.kpi_code = "KPI_PeopleVol"
+    if doc_item is not None:
+        if not isinstance(getattr(doc_item, "config", None), dict):
+            doc_item.config = {"document_type": "Annual Report"}
+        if not isinstance(getattr(doc_item, "label", None), str):
+            doc_item.label = "Annual Report"
     mock_cyr.query.filter_by.return_value.first.return_value = cyr_obj
     mock_attr.query.filter_by.return_value.first.return_value = attr_obj
     mock_fi.query.filter.return_value.first.return_value = doc_item

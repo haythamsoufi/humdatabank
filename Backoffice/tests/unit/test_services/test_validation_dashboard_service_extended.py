@@ -258,7 +258,7 @@ class TestTemplateOptions:
         ) as mock_q:
             mock_q.filter.return_value.all.return_value = []
             result = template_options()
-        assert result == [{"id": 21, "name": "FDRS"}]
+        assert result == [{"id": 21, "name": "FDRS", "rule_pack": None}]
 
     def test_includes_upr_templates_and_groups_tab(self):
         fdrs = MagicMock()
@@ -275,17 +275,14 @@ class TestTemplateOptions:
         planning.name = "Unified Country Plan"
         with patch(
             "app.services.validation.dashboard_service._templates_with_validation",
-            return_value=[fdrs, legacy],
-        ), patch(
-            "app.services.validation.dashboard_service.FormTemplate.query"
-        ) as mock_q:
-            mock_q.filter.return_value.all.return_value = [reporting, planning]
+            return_value=[fdrs, legacy, reporting, planning],
+        ):
             flat = template_options()
             tabs = template_tab_options()
 
-        assert {"id": 21, "name": "FDRS"} in flat
-        assert {"id": 33, "name": "Unified Planning and Reporting — Reporting"} in flat
-        assert {"id": 24, "name": "Unified Planning and Reporting — Planning"} in flat
+        assert {"id": 21, "name": "FDRS", "rule_pack": None} in flat
+        assert {"id": 33, "name": "Unified Planning and Reporting — Reporting", "rule_pack": None} in flat
+        assert {"id": 24, "name": "Unified Planning and Reporting — Planning", "rule_pack": None} in flat
         assert not any(opt["id"] == 25 for opt in flat)
 
         assert tabs[0] == {"id": 21, "name": "FDRS", "children": None}
@@ -296,6 +293,22 @@ class TestTemplateOptions:
             {"id": 33, "name": "Reporting"},
             {"id": 24, "name": "Planning"},
         ]
+
+    def test_omits_template_whose_rule_pack_is_not_registered(self):
+        version = MagicMock()
+        version.enable_data_quality = True
+        version.validation_rule_pack = "not_a_registered_pack"
+        version.data_quality_methodology = None
+        tmpl = MagicMock()
+        tmpl.id = 33
+        tmpl.name = "Reporting"
+        tmpl.published_version = version
+        with patch(
+            "app.services.validation.dashboard_service._templates_with_validation",
+            return_value=[tmpl],
+        ):
+            assert template_options() == []
+            assert template_tab_options() == []
 
 
 class TestGlobalPeriodsForTemplate:
@@ -324,51 +337,78 @@ class TestGlobalPeriodsForTemplate:
 
 
 class TestListCountriesForPeriod:
-    def test_returns_empty_when_no_resolved(self):
-        with patch(
-            "app.services.validation.dashboard_service.db"
-        ) as mock_db, patch(
-            "app.services.validation.dashboard_service.resolve_assignment_aes",
-            return_value=(None, None),
-        ):
-            mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.distinct.return_value.all.return_value = [
-                (1, "Testland")
-            ]
-            result = list_countries_for_period(21, "2024")
+    def _query(self, assignment_rows, count_rows):
+        assignment_query = MagicMock()
+        assignment_query.join.return_value = assignment_query
+        assignment_query.filter.return_value = assignment_query
+        assignment_query.all.return_value = assignment_rows
 
+        counts_query = MagicMock()
+        counts_query.filter.return_value = counts_query
+        counts_query.group_by.return_value = counts_query
+        counts_query.all.return_value = count_rows
+
+        def side_effect(*_args):
+            if not hasattr(side_effect, "calls"):
+                side_effect.calls = 0
+            side_effect.calls += 1
+            if side_effect.calls == 1:
+                return assignment_query
+            return counts_query
+
+        return side_effect
+
+    def test_returns_empty_when_period_does_not_match(self):
+        aes = MagicMock()
+        with patch("app.services.validation.dashboard_service.db") as mock_db:
+            mock_db.session.query.side_effect = self._query(
+                [(1, "Testland", aes, "FDRS 2020", 10)],
+                [],
+            )
+            result = list_countries_for_period(21, "FDRS 2024")
         assert result == []
 
-    def test_returns_country_rows(self):
+    def test_returns_country_rows_for_exact_period(self):
         aes = MagicMock()
-        aes.id = 10
+        with patch("app.services.validation.dashboard_service.db") as mock_db:
+            mock_db.session.query.side_effect = self._query(
+                [(1, "Testland", aes, "FDRS 2024", 10)],
+                [(1, "FDRS 2024", "open", 3)],
+            )
+            result = list_countries_for_period(21, "FDRS 2024")
 
-        with patch(
-            "app.services.validation.dashboard_service.db"
-        ) as mock_db, patch(
-            "app.services.validation.dashboard_service.resolve_assignment_aes",
-            return_value=(aes, "FDRS 2024"),
-        ):
-            counts_query = MagicMock()
-            counts_query.filter.return_value.group_by.return_value.all.return_value = [
-                (1, "FDRS 2024", "open", 3)
-            ]
+        assert result[0]["country_id"] == 1
+        assert result[0]["country_name"] == "Testland"
+        assert result[0]["open_questions"] == 3
+        assert result[0]["period_name"] == "FDRS 2024"
 
-            def _query_side_effect(*args):
-                if len(args) > 1 and hasattr(args[1], "__name__") and "entity_id" in str(args):
-                    return counts_query
-                q = MagicMock()
-                q.join.return_value = q
-                q.filter.return_value = q
-                q.distinct.return_value = q
-                q.all.return_value = [(1, "Testland")]
-                return q
+    def test_prefers_highest_assignment_id_when_period_is_shared(self):
+        older = MagicMock()
+        newer = MagicMock()
+        with patch("app.services.validation.dashboard_service.db") as mock_db:
+            mock_db.session.query.side_effect = self._query(
+                [
+                    (1, "Testland", older, "FDRS 2024", 4),
+                    (1, "Testland", newer, "FDRS 2024", 9),
+                ],
+                [],
+            )
+            result = list_countries_for_period(21, "FDRS 2024")
+        assert len(result) == 1
+        assert result[0]["country_name"] == "Testland"
 
-            mock_db.session.query.side_effect = _query_side_effect
-            # Re-mock cleanly using individual patches
-            result = list_countries_for_period(21, "2024")
-
-        # We don't assert exact structure since the DB is mocked; just ensure no crash
-        assert isinstance(result, list)
+    def test_skips_country_without_matching_period(self):
+        aes = MagicMock()
+        with patch("app.services.validation.dashboard_service.db") as mock_db:
+            mock_db.session.query.side_effect = self._query(
+                [
+                    (1, "Testland", aes, "FDRS 2024", 10),
+                    (2, "Skipland", MagicMock(), "FDRS 2020", 11),
+                ],
+                [],
+            )
+            result = list_countries_for_period(21, "FDRS 2024")
+        assert [row["country_id"] for row in result] == [1]
 
 
 class TestPersistedQuestionsMap:
@@ -588,117 +628,3 @@ class TestSummarizePeriod:
         assert result["totals"]["countries_with_open"] == 1
         assert result["totals"]["total_questions"] == 3
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# list_countries_for_period — lines 140 and 145 coverage
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class TestListCountriesForPeriodLineCoverage:
-    """Targets line 140 (count_map update) and line 145 (continue for missing country)."""
-
-    def test_count_map_populated_when_counts_returned(self):
-        """line 140: count_map.setdefault(...)[status] = cnt is executed when counts have rows."""
-        aes = MagicMock()
-        aes.id = 10
-
-        with patch("app.services.validation.dashboard_service.db") as mock_db, patch(
-            "app.services.validation.dashboard_service.resolve_assignment_aes",
-            return_value=(aes, "FDRS 2024"),
-        ):
-            countries_query = MagicMock()
-            countries_query.join.return_value = countries_query
-            countries_query.filter.return_value = countries_query
-            countries_query.distinct.return_value = countries_query
-            countries_query.all.return_value = [(1, "Testland")]
-
-            counts_query = MagicMock()
-            counts_query.filter.return_value = counts_query
-            counts_query.group_by.return_value = counts_query
-            counts_query.all.return_value = [(1, "FDRS 2024", "open", 3)]
-
-            call_count = [0]
-
-            def side_effect(*args):
-                call_count[0] += 1
-                if call_count[0] == 1:
-                    return countries_query
-                return counts_query
-
-            mock_db.session.query.side_effect = side_effect
-            result = list_countries_for_period(21, "2024")
-
-        assert isinstance(result, list)
-
-    def test_country_not_in_resolved_is_skipped(self):
-        """line 145: continue fires when country_id is not in resolved_by_country."""
-        with patch("app.services.validation.dashboard_service.db") as mock_db, patch(
-            "app.services.validation.dashboard_service.resolve_assignment_aes",
-            return_value=(None, None),
-        ):
-            countries_query = MagicMock()
-            countries_query.join.return_value = countries_query
-            countries_query.filter.return_value = countries_query
-            countries_query.distinct.return_value = countries_query
-            # Two countries, but resolve_assignment_aes returns (None, None) so neither
-            # ends up in resolved_by_country — the function returns [] early.
-            countries_query.all.return_value = [(1, "Testland"), (2, "Otherland")]
-
-            counts_query = MagicMock()
-            counts_query.filter.return_value = counts_query
-            counts_query.group_by.return_value = counts_query
-            counts_query.all.return_value = []
-
-            call_count = [0]
-
-            def side_effect(*args):
-                call_count[0] += 1
-                if call_count[0] == 1:
-                    return countries_query
-                return counts_query
-
-            mock_db.session.query.side_effect = side_effect
-            result = list_countries_for_period(21, "2024")
-
-        assert result == []
-
-    def test_some_countries_skip_via_continue(self):
-        """Verifies line 145 continue: country 2 is in countries list but not resolved."""
-        aes = MagicMock()
-        aes.id = 10
-
-        # resolve_assignment_aes: return (aes, period) for country 1, (None, None) for country 2
-        def mock_resolve(template_id, entity_type, country_id, period_name):
-            if country_id == 1:
-                return (aes, "FDRS 2024")
-            return (None, None)
-
-        with patch("app.services.validation.dashboard_service.db") as mock_db, patch(
-            "app.services.validation.dashboard_service.resolve_assignment_aes",
-            side_effect=mock_resolve,
-        ):
-            countries_query = MagicMock()
-            countries_query.join.return_value = countries_query
-            countries_query.filter.return_value = countries_query
-            countries_query.distinct.return_value = countries_query
-            countries_query.all.return_value = [(1, "Testland"), (2, "Skipland")]
-
-            counts_query = MagicMock()
-            counts_query.filter.return_value = counts_query
-            counts_query.group_by.return_value = counts_query
-            counts_query.all.return_value = []
-
-            call_count = [0]
-
-            def side_effect(*args):
-                call_count[0] += 1
-                if call_count[0] == 1:
-                    return countries_query
-                return counts_query
-
-            mock_db.session.query.side_effect = side_effect
-            result = list_countries_for_period(21, "2024")
-
-        # Only country 1 is resolved, country 2 should be skipped via continue
-        assert len(result) == 1
-        assert result[0]["country_id"] == 1

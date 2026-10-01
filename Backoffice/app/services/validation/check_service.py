@@ -19,7 +19,7 @@ from app.services.data_quality.helpers import (
     resolve_assignment_aes,
 )
 from app.services.data_quality.service import get_rule_pack_for_template
-from plugins.fdrs.validation.fdrs_matrix.rules import run_fdrs_matrix_rules
+from app.services.validation.pack_registry import get_pack
 from app.services.validation.question_assembler import assemble_question_for_kpi
 from app.services.validation.types import (
     CheckResult,
@@ -28,7 +28,6 @@ from app.services.validation.types import (
     ValidationRunResult,
 )
 from .question_lifecycle import mark_drafted
-from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 from app.utils.datetime_helpers import utcnow
 
 
@@ -149,10 +148,8 @@ def evaluate_validation_checks(
         country_id=_resolve_country_id(entity_type, entity_id),
     )
 
-    if pack == RULE_PACK_FDRS_MATRIX_V1:
-        check_results = run_fdrs_matrix_rules(ctx)
-    else:
-        check_results = []
+    registered = get_pack(pack)
+    check_results = registered.run_checks(ctx) if registered else []
 
     drafts = _results_to_drafts(check_results, ctx)
     return ValidationEvaluationResult(
@@ -162,6 +159,7 @@ def evaluate_validation_checks(
         period_name=period_name,
         resolved_period=resolved_period,
         rule_pack=pack,
+        language=language,
         assignment_entity_status_id=aes.id,
         kpi_data=kpi_data,
         history_by_kpi=ctx.history_by_kpi,
@@ -198,23 +196,16 @@ def _evaluation_to_context(
     evaluation: ValidationEvaluationResult,
     aes: AssignmentEntityStatus,
 ) -> ValidationContext:
-    kpi_to_item = {code: item for code, (_, item) in evaluation.kpi_data.items() if item}
     return ValidationContext(
         template_id=evaluation.template_id,
         entity_type=evaluation.entity_type,
         entity_id=evaluation.entity_id,
         period_name=evaluation.resolved_period,
         rule_pack=evaluation.rule_pack,
-        language="en",
+        language=evaluation.language,
         aes=aes,
         kpi_data=evaluation.kpi_data,
-        history_by_kpi=_load_history(
-            evaluation.template_id,
-            evaluation.entity_type,
-            evaluation.entity_id,
-            evaluation.resolved_period,
-            kpi_to_item,
-        ),
+        history_by_kpi=evaluation.history_by_kpi,
         country_id=_resolve_country_id(evaluation.entity_type, evaluation.entity_id),
     )
 
@@ -244,73 +235,124 @@ def _results_to_drafts(results: list[CheckResult], ctx: ValidationContext) -> li
     return drafts
 
 
+def _draft_identity(form_item_id: int | None, rule_code: str) -> tuple:
+    """One automatic question per field. Country-level checks stay one row per rule."""
+    if form_item_id is not None:
+        return ("item", form_item_id)
+    return ("rule", rule_code)
+
+
+def _question_identity(question: ValidationQuestion) -> tuple:
+    return _draft_identity(question.form_item_id, question.rule_code)
+
+
+def _is_auto_question(question: ValidationQuestion) -> bool:
+    return getattr(question, "source", None) == "auto"
+
+
+def _question_recency(question: ValidationQuestion) -> tuple:
+    asked = question.asked_at
+    try:
+        stamp = asked.timestamp() if asked is not None else 0
+    except (AttributeError, TypeError, ValueError):
+        stamp = 0
+    return (stamp, question.id or 0)
+
+
+def _apply_draft(question: ValidationQuestion, draft: ValidationQuestionDraft) -> None:
+    question.rule_code = draft.rule_code
+    question.form_item_id = draft.form_item_id
+    question.question_text = draft.question_text
+    question.definition_text = draft.definition_text
+    question.severity = draft.severity
+    question.context = draft.context
+    question.language = draft.language
+    question.source = "auto"
+    if question.status != "open":
+        question.status = "open"
+    mark_drafted(question)
+
+
 def _upsert_questions(
     drafts: list[ValidationQuestionDraft],
     ctx: ValidationContext,
     aes: AssignmentEntityStatus,
 ) -> ValidationRunResult:
-    result = ValidationRunResult(drafts=drafts)
-    draft_keys = set()
+    """Keep one question per field across runs.
 
-    for draft in drafts:
-        key = (draft.rule_code, draft.form_item_id)
-        draft_keys.add(key)
-        existing = ValidationQuestion.query.filter_by(
+    A later run that still fails updates that row, including when a different
+    rule is now the highest severity. An answered or resolved row is reopened
+    instead of inserting a second open question. Extra open duplicates are resolved.
+    """
+    result = ValidationRunResult(drafts=drafts)
+    scope = (
+        ValidationQuestion.query.filter_by(
             template_id=ctx.template_id,
             entity_type=ctx.entity_type,
             entity_id=ctx.entity_id,
             period_name=ctx.period_name,
-            rule_code=draft.rule_code,
-            form_item_id=draft.form_item_id,
-            status="open",
-        ).filter(ValidationQuestion.parent_question_id.is_(None)).first()
+        )
+        .filter(ValidationQuestion.parent_question_id.is_(None))
+        .all()
+    )
 
-        if existing:
-            existing.question_text = draft.question_text
-            existing.definition_text = draft.definition_text
-            existing.severity = draft.severity
-            existing.context = draft.context
-            existing.language = draft.language
-            mark_drafted(existing)
+    grouped: dict[tuple, list[ValidationQuestion]] = {}
+    for question in scope:
+        grouped.setdefault(_question_identity(question), []).append(question)
+
+    kept_ids: set[int] = set()
+    draft_identities: set[tuple] = set()
+
+    for draft in drafts:
+        identity = _draft_identity(draft.form_item_id, draft.rule_code)
+        draft_identities.add(identity)
+        candidates = grouped.get(identity, [])
+        if candidates:
+            canonical = max(candidates, key=_question_recency)
+            _apply_draft(canonical, draft)
             result.updated += 1
-        else:
-            created_at = utcnow()
-            db.session.add(
-                ValidationQuestion(
-                    template_id=ctx.template_id,
-                    entity_type=ctx.entity_type,
-                    entity_id=ctx.entity_id,
-                    period_name=ctx.period_name,
-                    assigned_form_id=aes.assigned_form_id,
-                    assignment_entity_status_id=aes.id,
-                    form_item_id=draft.form_item_id,
-                    rule_code=draft.rule_code,
-                    question_text=draft.question_text,
-                    definition_text=draft.definition_text,
-                    severity=draft.severity,
-                    status="open",
-                    context=draft.context,
-                    language=draft.language,
-                    source="auto",
-                    asked_at=created_at,
-                    drafted_at=created_at,
-                )
+            kept_ids.add(id(canonical))
+            for extra in candidates:
+                if extra is canonical or extra.status != "open" or not _is_auto_question(extra):
+                    continue
+                extra.status = "resolved"
+                result.resolved += 1
+                kept_ids.add(id(extra))
+            continue
+
+        created_at = utcnow()
+        db.session.add(
+            ValidationQuestion(
+                template_id=ctx.template_id,
+                entity_type=ctx.entity_type,
+                entity_id=ctx.entity_id,
+                period_name=ctx.period_name,
+                assigned_form_id=aes.assigned_form_id,
+                assignment_entity_status_id=aes.id,
+                form_item_id=draft.form_item_id,
+                rule_code=draft.rule_code,
+                question_text=draft.question_text,
+                definition_text=draft.definition_text,
+                severity=draft.severity,
+                status="open",
+                context=draft.context,
+                language=draft.language,
+                source="auto",
+                asked_at=created_at,
+                drafted_at=created_at,
             )
-            result.created += 1
+        )
+        result.created += 1
 
-    open_questions = ValidationQuestion.query.filter_by(
-        template_id=ctx.template_id,
-        entity_type=ctx.entity_type,
-        entity_id=ctx.entity_id,
-        period_name=ctx.period_name,
-        status="open",
-        source="auto",
-    ).filter(ValidationQuestion.parent_question_id.is_(None)).all()
-
-    for q in open_questions:
-        if (q.rule_code, q.form_item_id) not in draft_keys:
-            q.status = "resolved"
-            result.resolved += 1
+    for question in scope:
+        if id(question) in kept_ids:
+            continue
+        if question.status != "open" or not _is_auto_question(question):
+            continue
+        if _question_identity(question) in draft_identities:
+            continue
+        question.status = "resolved"
+        result.resolved += 1
 
     db.session.commit()
     return result

@@ -310,6 +310,8 @@ class PluginManager:
         # Extract field types from all plugins
         self._extract_field_types()
 
+        self._sync_validation_packs()
+
         # Save the current state after loading
         self._save_plugin_states()
 
@@ -317,6 +319,24 @@ class PluginManager:
             self.logger.info(f"Plugin system: Loaded {len(loaded_plugins)} plugins [{', '.join(loaded_plugins)}]")
 
         return self.plugins
+
+    def _sync_validation_packs(self) -> None:
+        """Register validation packs from plugins that are currently active."""
+        from app.services.validation.pack_registry import mark_synced_from_plugins
+
+        for plugin in self.get_active_plugins().values():
+            register = getattr(plugin, "register_validation_packs", None)
+            if not callable(register):
+                continue
+            try:
+                register()
+            except Exception as exc:
+                self.logger.error(
+                    "Plugin %s failed to register validation packs: %s",
+                    getattr(plugin, "plugin_id", plugin),
+                    exc,
+                )
+        mark_synced_from_plugins()
 
     def _resolve_active_plugins(self):
         """

@@ -1,0 +1,311 @@
+# Called by deploy-to-webapp.yml. Not run from the Actions UI.
+# One invocation builds and deploys a single environment (Staging or Production).
+#
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+#
+# Container registry image names and Azure web app names below are environment-specific.
+# Replace them with your org’s ACR login server and App Service names before relying on this workflow.
+
+name: Deploy to Webapp target
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Staging or Production'
+        required: true
+        type: string
+      release_label:
+        description: 'Release label stamped in the app'
+        required: true
+        type: string
+      restart_after_deploy:
+        description: 'Restart the web app after deploy so it pulls the new image'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  EFFECTIVE_ENV: ${{ inputs.environment }}
+  EFFECTIVE_RELEASE_LABEL: ${{ inputs.release_label }}
+  # Environment-scoped mutable tags in ACR. Never share one tag across prod and staging —
+  # prod DOCKER_ENABLE_CI (if enabled) auto-pulls when its tag is pushed.
+  IMAGE_TAG: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+    permissions:
+      contents: read #This is required for actions/checkout
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # Needed so we can diff against the previous commit to detect dependency changes.
+          fetch-depth: 2
+
+      - name: Detect dependency changes (requirements/Dockerfile)
+        id: deps
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            changed_files="$(git diff --name-only HEAD^..HEAD -- \
+              Backoffice/requirements.txt \
+              Backoffice/Dockerfile \
+              Backoffice/.dockerignore || true)"
+            if [ -n "${changed_files}" ]; then
+              echo "Dependency-related files changed:"
+              echo "${changed_files}"
+              echo "deps_changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "No dependency-related file changes detected."
+              echo "deps_changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            # First build (or shallow history edge case). Populate registry cache.
+            echo "No previous commit available; treating as deps change to warm cache."
+            echo "deps_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Free disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+
+          # This cleanup step can take ~1-2 minutes (dotnet/android/CodeQL + docker prune).
+          # The image build typically needs ~6-8G; skip when the runner already has enough.
+          # 15G was too tight: ubuntu-24.04 often starts at ~14G free, which is enough,
+          # but still triggered a 2-minute cleanup (see run 32479917281).
+          avail_gb="$(df -BG / | tail -1 | awk '{gsub("G","",$4); print $4}')"
+          echo "Available disk on /: ${avail_gb}G"
+
+          if [ "${avail_gb}" -ge 10 ]; then
+            echo "Skipping cleanup (>=10G free)."
+            exit 0
+          fi
+
+          echo "Running cleanup (<10G free)."
+          # Remove unnecessary packages and files
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          # Clean up Python/pip caches
+          sudo rm -rf ~/.cache/pip
+          sudo rm -rf /root/.cache/pip
+          # Clean up Docker resources
+          docker system prune -af --volumes || true
+          # Clean up Docker buildx cache (local only; registry cache is still used)
+          docker buildx prune -af || true
+
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ifrcimage.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # Optional: stamp APP_VERSION from latest GitHub release. Falls back to deploy image tag (EFFECTIVE_VERSION).
+      - name: Resolve latest GitHub release for APP_VERSION
+        id: gh_release
+        env:
+          REPO: ${{ github.repository }}
+          FALLBACK_TAG: ${{ env.EFFECTIVE_RELEASE_LABEL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=""
+          code="$(curl -sS -o /tmp/gh_latest_release.json -w "%{http_code}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPO}/releases/latest")"
+          if [ "$code" = "200" ]; then
+            tag="$(jq -r '.tag_name // empty' < /tmp/gh_latest_release.json)"
+            if [ -z "$tag" ] || [ "$tag" = "null" ]; then
+              tag=""
+            else
+              echo "Resolved latest release tag: ${tag}"
+            fi
+          else
+            echo "::warning::Could not read releases/latest (HTTP ${code}) on ${REPO}; continuing with deploy tag ${FALLBACK_TAG} for APP_VERSION."
+          fi
+          if [ -z "$tag" ]; then
+            tag="${FALLBACK_TAG}"
+            echo "Using deploy image tag for APP_VERSION: ${tag}"
+          fi
+          echo "tag_name=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push container image (fast path; no cache export)
+        if: steps.deps.outputs.deps_changed != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: ./Backoffice
+          file: ./Backoffice/Dockerfile
+          push: true
+          tags: |
+            ifrcimage.azurecr.io/databank_backend:${{ env.IMAGE_TAG }}
+            ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
+          cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
+          platforms: linux/amd64
+          provenance: false
+          # `Backoffice/.dockerignore` keeps the build context small.
+          # Used by Backoffice/app/__init__.py to generate static_url(...)?v=...
+          # Make this change every deployment so clients always fetch updated JS/CSS.
+          # RELEASE_VERSION = human release label. IMAGE_TAG = env-scoped ACR tag (staging|production).
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            ASSET_VERSION=${{ github.sha }}
+            GIT_SHA=${{ github.sha }}
+            RELEASE_VERSION=${{ env.EFFECTIVE_RELEASE_LABEL }}
+            LATEST_RELEASE_TAG=${{ steps.gh_release.outputs.tag_name }}
+
+      - name: Build and push container image (update registry build cache)
+        if: steps.deps.outputs.deps_changed == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: ./Backoffice
+          file: ./Backoffice/Dockerfile
+          push: true
+          tags: |
+            ifrcimage.azurecr.io/databank_backend:${{ env.IMAGE_TAG }}
+            ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
+          cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
+          # Full cache export is expensive (~2 minutes), so only do it when deps change.
+          # A Both run may export this shared tag from two builds at once; one write wins.
+          cache-to: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache,mode=max
+          platforms: linux/amd64
+          provenance: false
+          # RELEASE_VERSION = human release label. IMAGE_TAG = env-scoped ACR tag (staging|production).
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            ASSET_VERSION=${{ github.sha }}
+            GIT_SHA=${{ github.sha }}
+            RELEASE_VERSION=${{ env.EFFECTIVE_RELEASE_LABEL }}
+            LATEST_RELEASE_TAG=${{ steps.gh_release.outputs.tag_name }}
+
+      - name: Clean up Docker resources
+        if: always()
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          # Remove dangling images and build cache
+          docker builder prune -af || true
+          docker buildx prune -af || true
+          docker image prune -af || true
+          docker system prune -af --volumes || true
+          # Clean up any remaining Python/pip caches
+          sudo rm -rf ~/.cache/pip || true
+          sudo rm -rf /root/.cache/pip || true
+          echo "Disk space after cleanup:"
+          df -h
+
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    environment: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+    permissions:
+      contents: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set deployment target
+        id: config
+        run: |
+          if [ "${{ env.EFFECTIVE_ENV }}" = "Production" ]; then
+            echo "app_name=ifrc-databank-app" >> "$GITHUB_OUTPUT"
+            echo "resource_group=ifrcpunifiedplanning-rg001" >> "$GITHUB_OUTPUT"
+            echo "subscription=3e33b4c1-ada7-4922-9113-b9e41eaf1797" >> "$GITHUB_OUTPUT"
+          else
+            echo "app_name=ifrc-databank-staging-2" >> "$GITHUB_OUTPUT"
+            echo "resource_group=ifrctgo001rg" >> "$GITHUB_OUTPUT"
+            echo "subscription=f585c1c3-801b-4641-8d7f-145aa50ffb04" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ steps.config.outputs.app_name }}
+          images: 'ifrcimage.azurecr.io/databank_backend:${{ env.IMAGE_TAG }}'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+
+      - name: Set static blob target for environment
+        id: static_config
+        run: |
+          if [ "${{ env.EFFECTIVE_ENV }}" = "Production" ]; then
+            echo "container=static" >> "$GITHUB_OUTPUT"
+          else
+            echo "container=static-staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Static JS/CSS/images are served from Azure Blob Storage (STATIC_CDN_URL), not Gunicorn.
+      # The container does not copy files on startup, so every deploy uploads the blob container.
+      # AzCopy sets Cache-Control during the copy (JS/CSS must-revalidate, other files immutable).
+      # Production → container "static"   Staging → container "static-staging" (isolated assets).
+      # Required GitHub secret: AZURE_STORAGE_CONNECTION_STRING (same storage account as uploads).
+      - name: Install AzCopy
+        run: |
+          if command -v azcopy >/dev/null 2>&1; then
+            azcopy --version
+            exit 0
+          fi
+          curl -fsSL https://aka.ms/downloadazcopy-v10-linux -o /tmp/azcopy.tar.gz
+          tar -xzf /tmp/azcopy.tar.gz -C /tmp
+          sudo mv /tmp/azcopy_linux_*/azcopy /usr/local/bin/azcopy
+          azcopy --version
+
+      - name: Upload static assets to Azure Blob Storage
+        id: static_upload
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          STATIC_BLOB_CONTAINER: ${{ steps.static_config.outputs.container }}
+        run: |
+          set -euo pipefail
+          chmod +x Backoffice/azure/upload-static-assets.sh
+          # tee to stderr so the script's progress/diagnostics (sync counts, Cache-Control
+          # summary, WARN lines) show up in the workflow log instead of being swallowed by
+          # the `sed -n` filter below, which only needs the final STATIC_CDN_URL= line.
+          STATIC_CDN_URL="$(Backoffice/azure/upload-static-assets.sh | tee /dev/stderr | sed -n 's/^STATIC_CDN_URL=//p' | tail -1)"
+          if [ -z "${STATIC_CDN_URL}" ]; then
+            echo "ERROR: upload-static-assets.sh did not print STATIC_CDN_URL"
+            exit 1
+          fi
+          echo "static_cdn_url=${STATIC_CDN_URL}" >> "$GITHUB_OUTPUT"
+          echo "Uploaded static assets to container '${STATIC_BLOB_CONTAINER}'; STATIC_CDN_URL=${STATIC_CDN_URL}"
+          echo "Ensure this Web App has app setting STATIC_CDN_URL=${STATIC_CDN_URL} (set once per app)."
+
+      # Mutable ACR tags (staging|production) are not pulled again unless the App Service recycles.
+      # DOCKER_ENABLE_CI is false on production, so the workflow restarts the Web App itself
+      # (az webapp restart), not an in-app HTTP route. Runs after the blob upload.
+      # Requires AZURE_CREDENTIALS for the target subscription (GitHub environment secret).
+      - name: Azure login
+        if: inputs.restart_after_deploy
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Restart Azure Web App
+        if: inputs.restart_after_deploy
+        run: |
+          set -euo pipefail
+          az account set --subscription "${{ steps.config.outputs.subscription }}"
+          az webapp restart \
+            --name "${{ steps.config.outputs.app_name }}" \
+            --resource-group "${{ steps.config.outputs.resource_group }}"

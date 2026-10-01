@@ -6,14 +6,22 @@ breaks that flow, so Backoffice forwards the request body to MCP_UPSTREAM_URL in
 Set MCP_UPSTREAM_URL (no trailing slash), e.g.:
   https://ifrc-databank-mcp-staging.azurewebsites.net
 
-Access control:
-  ``MCP_PROXY_AUTH_MODE=public`` (default) — no caller credential. The upstream MCP server
-  only reads public databank endpoints. The header allow-list, body cap, upstream URL
-  policy and IP rate limit still apply.
-  ``MCP_PROXY_AUTH_MODE=required`` — caller must present an API key with the ``mcp:use``
-  capability, or a browser session that holds ``admin.mcp.use``. Session callers on
-  unsafe methods must also pass CSRF (or ``X-Mobile-Auth``). A logged-in session alone
-  is not enough.
+Access control — intentionally public. Do not default this back to a key.
+  The September 2026 review locked ``/mcp`` because the proxy had no guard. That
+  lock was reversed: ``humanitarian-databank-mcp`` only GETs public databank
+  routes, and ``databank_client._get`` refuses any other path. A Claude
+  connector therefore uses the URL alone. Requiring ``mcp:use`` hides nothing
+  private and blocks that connector.
+
+  Leave the default public unless that client grows a non-public call. Then set
+  ``MCP_PROXY_AUTH_MODE=required`` in the same change.
+
+  ``MCP_PROXY_AUTH_MODE=public`` (default) — no caller credential. Header
+  allow-list, body cap, upstream URL policy and the IP rate limit still apply.
+  A browser session that already holds a cookie must still pass CSRF on writes;
+  anonymous connector traffic has no cookie, so CSRF does not apply to it.
+  ``MCP_PROXY_AUTH_MODE=required`` — API key with ``mcp:use``, or a browser
+  session with ``admin.mcp.use``. Any other value fails closed to this mode.
 
 Only an allow-list of MCP protocol headers is forwarded upstream; inbound cookies, Authorization
 and API-key material never leave this process. The upstream host is validated with
@@ -41,6 +49,10 @@ from app.utils.outbound_url import (
 )
 
 bp = Blueprint("mcp", __name__)
+
+# Runtime fallback when the config key is missing. Keep this ``public``.
+# Unknown values fail closed inside ``_auth_mode`` (treated as ``required``).
+DEFAULT_MCP_PROXY_AUTH_MODE = "public"
 
 MCP_API_KEY_PERMISSION = "mcp"
 _DEFAULT_MAX_BODY_BYTES = 1024 * 1024
@@ -151,7 +163,10 @@ def _proxy_response(upstream_resp: requests.Response) -> Response:
 
 
 def _auth_mode() -> str:
-    mode = str(current_app.config.get("MCP_PROXY_AUTH_MODE") or "public").strip().lower()
+    """``public`` is the only open mode. Blank means that default. Anything else is required."""
+    mode = str(current_app.config.get("MCP_PROXY_AUTH_MODE") or "").strip().lower()
+    if not mode:
+        mode = DEFAULT_MCP_PROXY_AUTH_MODE
     return "public" if mode == "public" else "required"
 
 

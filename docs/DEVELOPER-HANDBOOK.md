@@ -205,6 +205,8 @@ Three JSON envelopes are intentional and should not be merged:
 
 `/api/mobile/v1/data/countrymap` and the mobile sectors list are public reference data (rate-limited). The matching `/api/v1` routes stay API-key authenticated.
 
+`/mcp` is intentionally public as well. See [Public MCP connector](#public-mcp-connector-mcp). Do not put `mcp:use` back in front of it unless the MCP client starts calling a non-public route.
+
 #### Plugins
 Shipped plugins live in `Backoffice/plugins/` (FDRS, UPR, emergency operations, interactive map, PB progress). `Backoffice/app/plugins/` is the loader, not a place to add plugin packages.
 
@@ -345,7 +347,17 @@ owner_scope_ok = document is not a submitted document OR the owner still has acc
 
 **Trace privacy** (`app/services/ai/quality/trace_privacy.py`): traces and tool-usage rows are stored redacted by default (`AI_TRACE_STORE_MODE=redacted|minimal|full`). `AI_TRACE_RETENTION_DAYS` (90) scrubs trace content and `AI_TOOL_USAGE_PAYLOAD_RETENTION_DAYS` (30) nulls tool inputs/outputs via the nightly `purge_ai_trace_content` scheduler job (`flask ai-trace-purge [--dry-run]`). Raw step observations in the admin trace viewer are shown only to system managers or holders of the permission named by `AI_TRACE_RAW_OUTPUT_PERMISSION`.
 
-**Outbound requests and exports**: server-side fetches to admin/user-influenced URLs (MCP upstream, LibreTranslate, IFRC document fetch) go through `app/utils/outbound_url.py` (https only, no credentials, host allow-list where applicable, private/link-local/metadata ranges blocked after DNS resolution, redirects re-validated). `/mcp` is public by default (`MCP_PROXY_AUTH_MODE=public`) because the upstream server only reads public databank endpoints. Set `MCP_PROXY_AUTH_MODE=required` to demand a session with `admin.mcp.use` or an API key with `mcp:use`. The proxy strips cookies and credentials, caps the body and is rate limited. Every CSV/XLSX writer must use `app/utils/export_safety.py` (`safe_csv_writer`, `safe_csv_dict_writer`, `sanitize_workbook`, `sanitize_dataframe`) so cells starting with `= + - @ TAB CR` are neutralised.
+### Public MCP connector (`/mcp`)
+
+`/mcp` is **intentionally public** (`MCP_PROXY_AUTH_MODE=public`). Claude and other remote connectors use the URL with no API key and no Backoffice login.
+
+The September 2026 review locked this route because the proxy had no guard (`mcp:use`). That lock was reversed. The upstream process (`humanitarian-databank-mcp`) only issues anonymous GETs, and `databank_client.is_public_databank_read_path` refuses any other path (`/data` with the public filter, `/indicator-bank`, and `/public/*`). Requiring a key does not hide private form data or personal data. It only blocks the connector.
+
+Do not default the proxy back to `required`, and do not treat a missing `mcp:use` check as an open finding, while that client still only calls those paths. Set `MCP_PROXY_AUTH_MODE=required` in the same change that adds a non-public call. `admin.mcp.use` and the `mcp:use` capability apply only in that mode. Any other value of `MCP_PROXY_AUTH_MODE` fails closed to `required`.
+
+Controls that stay on in public mode: caller cookies and `Authorization` are stripped before the upstream hop, the upstream host goes through `app/utils/outbound_url.py`, the body is capped, and the route is rate-limited per IP (default 120/minute). A browser that already has a Backoffice session cookie still has to pass CSRF on POST.
+
+**Outbound requests and exports**: server-side fetches to admin/user-influenced URLs (MCP upstream, LibreTranslate, IFRC document fetch) go through `app/utils/outbound_url.py` (https only, no credentials, host allow-list where applicable, private/link-local/metadata ranges blocked after DNS resolution, redirects re-validated). Every CSV/XLSX writer must use `app/utils/export_safety.py` (`safe_csv_writer`, `safe_csv_dict_writer`, `sanitize_workbook`, `sanitize_dataframe`) so cells starting with `= + - @ TAB CR` are neutralised.
 
 ### AI document batch jobs & processing (`AI_DOCS_*`)
 

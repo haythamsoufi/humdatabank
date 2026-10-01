@@ -191,6 +191,23 @@ class TestMcpProxyRequiredMode:
         assert resp.status_code == 200
         mock_request.assert_called_once()
 
+    def test_blank_mode_stays_public(self, mcp_config, client):
+        from app.routes.mcp import DEFAULT_MCP_PROXY_AUTH_MODE
+
+        assert DEFAULT_MCP_PROXY_AUTH_MODE == "public"
+        mcp_config.config["MCP_PROXY_AUTH_MODE"] = "  "
+        with patch("app.routes.mcp.requests.request", return_value=_upstream_response()) as mock_request:
+            resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1})
+        assert resp.status_code == 200
+        mock_request.assert_called_once()
+
+    def test_unknown_mode_fails_closed(self, mcp_config, client):
+        mcp_config.config["MCP_PROXY_AUTH_MODE"] = "open"
+        with patch("app.routes.mcp.requests.request") as mock_request:
+            resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1})
+        assert resp.status_code == 401
+        mock_request.assert_not_called()
+
     def test_anonymous_is_rejected(self, client):
         with patch("app.routes.mcp.requests.request") as mock_request:
             resp = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1})

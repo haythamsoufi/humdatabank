@@ -153,7 +153,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         (
             "admin.mcp.use",
             "Use MCP proxy",
-            "Call the Backoffice MCP reverse proxy with a browser session. API keys use the mcp:use capability instead. Not included in Admin: Full.",
+            "Browser-session grant for /mcp, consulted only when MCP_PROXY_AUTH_MODE=required. The proxy is public by default because the MCP client reads public databank routes only. Not included in Admin: Full.",
         ),
 
         # System / API / plugins

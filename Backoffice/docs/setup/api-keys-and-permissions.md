@@ -26,7 +26,7 @@ Capabilities (source of truth: `CAPABILITIES` in `api_key_permissions.py`; the a
 | `indicators:suggest` | standard | no | `POST /indicator-suggestions` (write) |
 | `indicators:manage` | **personal data** | no | Read and review indicator suggestions (includes submitter emails; write) |
 | `mobile:client` | standard | no | Allows the key to be sent as `X-Mobile-Auth` (no data access on its own) |
-| `mcp:use` | standard | no | Backoffice MCP proxy when `MCP_PROXY_AUTH_MODE=required` (the proxy is public by default) |
+| `mcp:use` | standard | no | Backoffice MCP proxy only when `MCP_PROXY_AUTH_MODE=required`. The proxy is intentionally public by default; do not treat a missing key as a gap |
 
 Presets in the admin form: **Public website / embed**, **BI / analytics (read-only data)**, **Website back end (server-side only)**, **Mobile app client**.
 

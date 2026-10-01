@@ -41,9 +41,11 @@ class TestGovernanceDashboard:
 
 
 class TestGovernanceApiMetrics:
-    def test_unauthenticated_redirects(self, client, db_session):
+    def test_unauthenticated_returns_401(self, client, db_session):
+        # /admin/.../api/... is treated as a JSON request, so permission_required
+        # returns 401 instead of redirecting to the login page.
         resp = client.get("/admin/governance/api/metrics")
-        assert resp.status_code in (301, 302, 308)
+        assert resp.status_code == 401
 
     def test_returns_the_control_register(self, logged_in_client, db_session, app):
         report = _sample_report()

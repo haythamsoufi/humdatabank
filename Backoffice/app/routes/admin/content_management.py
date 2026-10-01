@@ -9,16 +9,22 @@ import uuid
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import current_user
-from sqlalchemy import and_, func, literal, union_all
+from sqlalchemy import and_, exists, func, literal, or_, select, union_all
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from app import db
 from app.models import (
     Country,
+    NSBranch,
+    NSLocalUnit,
+    NSSubBranch,
+    NationalSociety,
     Resource,
     ResourceSubcategory,
     ResourceTranslation,
+    SecretariatClusterOffice,
+    SecretariatDepartment,
     SubmittedDocument,
     PublicSubmission,
 )
@@ -414,7 +420,130 @@ def _public_admin_documents_query():
     )
 
 
-def _admin_documents_union_subquery():
+def _ids_in(column, ids):
+    if not ids:
+        return literal(False)
+    return column.in_(list(ids))
+
+
+def _document_entity_scope(user):
+    """Entity ids this viewer may open, matching ``user_can_access_entity`` ancestry.
+
+    Country permissions cover national societies, branches, sub-branches, and local
+    units in that country. A branch permission covers its sub-branches and local
+    units. A division covers its departments, and a regional office covers its
+    cluster offices. Holding a permission does not cover siblings or unrelated types.
+    """
+    from collections import defaultdict
+
+    from app.models.core import UserEntityPermission
+
+    ids_by_type = defaultdict(set)
+    for perm in UserEntityPermission.query.filter_by(user_id=user.id).all():
+        ids_by_type[str(perm.entity_type)].add(int(perm.entity_id))
+    return ids_by_type
+
+
+def _entity_pair_in_scope(entity_type_col, entity_id_col, ids_by_type):
+    """SQL predicate for one entity type/id pair the viewer may read."""
+    clauses = []
+    for entity_type, ids in ids_by_type.items():
+        if ids:
+            clauses.append(and_(entity_type_col == entity_type, _ids_in(entity_id_col, ids)))
+
+    country_ids = ids_by_type.get(EntityType.country.value) or set()
+    branch_ids = ids_by_type.get(EntityType.ns_branch.value) or set()
+    division_ids = ids_by_type.get(EntityType.division.value) or set()
+    regional_ids = ids_by_type.get(EntityType.regional_office.value) or set()
+
+    if country_ids:
+        clauses.append(and_(
+            entity_type_col == EntityType.national_society.value,
+            exists(select(NationalSociety.id).where(
+                NationalSociety.id == entity_id_col,
+                _ids_in(NationalSociety.country_id, country_ids),
+            )),
+        ))
+        clauses.append(and_(
+            entity_type_col == EntityType.ns_branch.value,
+            exists(select(NSBranch.id).where(
+                NSBranch.id == entity_id_col,
+                _ids_in(NSBranch.country_id, country_ids),
+            )),
+        ))
+        clauses.append(and_(
+            entity_type_col == EntityType.ns_subbranch.value,
+            exists(
+                select(NSSubBranch.id)
+                .join(NSBranch, NSSubBranch.branch_id == NSBranch.id)
+                .where(
+                    NSSubBranch.id == entity_id_col,
+                    _ids_in(NSBranch.country_id, country_ids),
+                )
+            ),
+        ))
+        clauses.append(and_(
+            entity_type_col == EntityType.ns_localunit.value,
+            exists(
+                select(NSLocalUnit.id)
+                .join(NSBranch, NSLocalUnit.branch_id == NSBranch.id)
+                .where(
+                    NSLocalUnit.id == entity_id_col,
+                    _ids_in(NSBranch.country_id, country_ids),
+                )
+            ),
+        ))
+    if branch_ids:
+        clauses.append(and_(
+            entity_type_col == EntityType.ns_subbranch.value,
+            exists(select(NSSubBranch.id).where(
+                NSSubBranch.id == entity_id_col,
+                _ids_in(NSSubBranch.branch_id, branch_ids),
+            )),
+        ))
+        clauses.append(and_(
+            entity_type_col == EntityType.ns_localunit.value,
+            exists(select(NSLocalUnit.id).where(
+                NSLocalUnit.id == entity_id_col,
+                _ids_in(NSLocalUnit.branch_id, branch_ids),
+            )),
+        ))
+    if division_ids:
+        clauses.append(and_(
+            entity_type_col == EntityType.department.value,
+            exists(select(SecretariatDepartment.id).where(
+                SecretariatDepartment.id == entity_id_col,
+                _ids_in(SecretariatDepartment.division_id, division_ids),
+            )),
+        ))
+    if regional_ids:
+        clauses.append(and_(
+            entity_type_col == EntityType.cluster_office.value,
+            exists(select(SecretariatClusterOffice.id).where(
+                SecretariatClusterOffice.id == entity_id_col,
+                _ids_in(SecretariatClusterOffice.regional_office_id, regional_ids),
+            )),
+        ))
+    if not clauses:
+        return literal(False)
+    return or_(*clauses)
+
+
+def _document_uploader_clause(user):
+    """Own uploads are visible only with ``assignment.documents.upload``, matching the access helper."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    if not AuthorizationService.has_rbac_permission(user, "assignment.documents.upload"):
+        return None
+    return SubmittedDocument.uploaded_by_user_id == user.id
+
+
+def _admin_documents_union_subquery(scope=None, uploader_clause=None):
+    """Document ids for the admin grid.
+
+    ``scope`` is the viewer's entity-permission map. When it is set, each branch
+    keeps only rows that viewer may open, so paging happens in SQL.
+    """
     standalone_ids = (
         db.session.query(
             SubmittedDocument.id.label("doc_id"),
@@ -424,7 +553,7 @@ def _admin_documents_union_subquery():
         .filter(SubmittedDocument.assignment_entity_status_id.is_(None))
         .filter(SubmittedDocument.public_submission_id.is_(None))
         .filter(
-            db.or_(
+            or_(
                 SubmittedDocument.country_id.isnot(None),
                 SubmittedDocument.linked_entity_id.isnot(None),
             )
@@ -449,7 +578,53 @@ def _admin_documents_union_subquery():
             SubmittedDocument.public_submission_id == PublicSubmission.id,
         )
     )
+    if scope is not None:
+        country_ids = scope.get(EntityType.country.value) or set()
+
+        def _has_link():
+            return and_(
+                SubmittedDocument.linked_entity_type.isnot(None),
+                SubmittedDocument.linked_entity_type != "",
+                SubmittedDocument.linked_entity_id.isnot(None),
+            )
+
+        linked_ok = and_(
+            _has_link(),
+            _entity_pair_in_scope(
+                SubmittedDocument.linked_entity_type,
+                SubmittedDocument.linked_entity_id,
+                scope,
+            ),
+        )
+        country_ok = and_(
+            ~_has_link(),
+            _ids_in(SubmittedDocument.country_id, country_ids),
+        )
+        standalone_ids = standalone_ids.filter(_scope_or_uploader(or_(linked_ok, country_ok), uploader_clause))
+
+        assignment_ids = assignment_ids.join(
+            AssignmentEntityStatus,
+            SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id,
+        ).filter(_scope_or_uploader(
+            _entity_pair_in_scope(
+                AssignmentEntityStatus.entity_type,
+                AssignmentEntityStatus.entity_id,
+                scope,
+            ),
+            uploader_clause,
+        ))
+
+        public_ids = public_ids.filter(_scope_or_uploader(
+            _ids_in(PublicSubmission.country_id, country_ids),
+            uploader_clause,
+        ))
     return union_all(standalone_ids, assignment_ids, public_ids).subquery("admin_documents_union")
+
+
+def _scope_or_uploader(scope_clause, uploader_clause):
+    if uploader_clause is None:
+        return scope_clause
+    return or_(scope_clause, uploader_clause)
 
 
 def _hydrate_admin_document_rows(page_entries: list[tuple[int, str]]) -> list[tuple]:
@@ -492,24 +667,25 @@ def _hydrate_admin_document_rows(page_entries: list[tuple[int, str]]) -> list[tu
 
 
 def _fetch_admin_documents_page(page: int, per_page: int) -> tuple[list[tuple], int]:
-    union_sq = _admin_documents_union_subquery()
+    sees_all = _viewer_sees_all_documents(current_user)
+    if sees_all:
+        union_sq = _admin_documents_union_subquery()
+    else:
+        union_sq = _admin_documents_union_subquery(
+            _document_entity_scope(current_user),
+            _document_uploader_clause(current_user),
+        )
     ordered = (
         db.session.query(union_sq.c.doc_id, union_sq.c.source)
         .order_by(union_sq.c.sort_at.desc())
     )
-    if _viewer_sees_all_documents(current_user):
-        total = db.session.query(func.count()).select_from(union_sq).scalar() or 0
-        offset = (page - 1) * per_page
-        page_entries = ordered.offset(offset).limit(per_page).all()
-        return _hydrate_admin_document_rows(page_entries), total
-
-    # Scoped viewers: drop rows outside their entities before paging so the grid
-    # cannot list documents they are not allowed to open.
-    rows = _hydrate_admin_document_rows(ordered.all())
-    visible = [row for row in rows if _check_document_access(row[0], current_user)[0]]
-    total = len(visible)
-    start = (page - 1) * per_page
-    return visible[start:start + per_page], total
+    total = db.session.query(func.count()).select_from(union_sq).scalar() or 0
+    offset = (page - 1) * per_page
+    page_entries = ordered.offset(offset).limit(per_page).all()
+    rows = _hydrate_admin_document_rows(page_entries)
+    if not sees_all:
+        rows = [row for row in rows if _check_document_access(row[0], current_user)[0]]
+    return rows, total
 
 
 def _folder_prefix_for_submitted_document_storage(rel_path: str | None) -> str:

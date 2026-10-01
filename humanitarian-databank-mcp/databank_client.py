@@ -26,6 +26,10 @@ def is_public_databank_read_path(path: str) -> bool:
         return True
     return path.startswith("/public/")
 MAX_AUTO_PAGES = 20
+# Public indicator bank pages are capped at 500. Search walks pages until ``total``
+# is covered so a ranked search is not limited to the first page.
+INDICATOR_BANK_PAGE_SIZE = 500
+MAX_INDICATOR_BANK_PAGES = 40
 REQUEST_TIMEOUT = 60.0
 
 # Transient upstream failures worth one bounded retry (see search_public_documents):
@@ -152,8 +156,27 @@ def search_indicators(
         params["emergency"] = emergency
     if archived is not None:
         params["archived"] = archived
-    data = _get("/indicator-bank", params)
-    indicators = data.get("indicators", data if isinstance(data, list) else [])
+    indicators: List[Dict[str, Any]] = []
+    for page in range(1, MAX_INDICATOR_BANK_PAGES + 1):
+        page_params = {
+            **params,
+            "page": page,
+            "per_page": INDICATOR_BANK_PAGE_SIZE,
+        }
+        data = _get("/indicator-bank", page_params)
+        if isinstance(data, list):
+            return {"indicators": data, "count": len(data)}
+        batch = data.get("indicators") or []
+        indicators.extend(batch)
+        total = data.get("total")
+        if not batch or total is None:
+            break
+        try:
+            reported_total = int(total)
+        except (TypeError, ValueError):
+            break
+        if len(indicators) >= reported_total or len(batch) < INDICATOR_BANK_PAGE_SIZE:
+            break
     return {"indicators": indicators, "count": len(indicators)}
 
 

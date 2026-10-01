@@ -135,6 +135,34 @@ class TestGetTemplates:
         data = resp.get_json()
         assert "templates" in data
 
+    def test_user_auth_honors_page(self, client, app):
+        """Session callers can request the page after the default window."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        templates = [_make_mock_template(id=i, name=f"Form {i:02d}") for i in (1, 2, 3)]
+        mock_query = MagicMock()
+        mock_query.all.return_value = templates
+        with patch("app.routes.api.templates.authenticate_api_request",
+                   return_value=_auth_user(mock_user)), \
+             patch("app.routes.api.templates.get_user_allowed_template_ids",
+                   return_value=[1, 2, 3]), \
+             patch("app.routes.api.templates.TemplateService.get_by_ids",
+                   return_value=mock_query), \
+             patch.object(db.session, "query") as mock_db_q:
+            mock_db_q.return_value = MagicMock(
+                filter=MagicMock(return_value=MagicMock(
+                    group_by=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+                ))
+            )
+            resp = client.get(f"{self.URL}?page=2&per_page=2")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert [row["id"] for row in data["templates"]] == [3]
+        assert data["total_items"] == 3
+        assert data["current_page"] == 2
+        assert data["total_pages"] == 2
+        assert data["per_page"] == 2
+
     def test_api_key_with_templates(self, client, app):
         """API key auth with templates returns serialized data."""
         tmpl = _make_mock_template(id=1, name="Form A")

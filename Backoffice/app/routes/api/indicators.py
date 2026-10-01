@@ -59,8 +59,9 @@ from app.services.indicators.bank_service import (
 @api_rate_limit()
 def get_indicator_bank():
     """
-    API endpoint to retrieve all indicators from the indicator bank.
-    Public read — no API key required.
+    API endpoint to retrieve indicators from the indicator bank.
+    Public read — no API key required. The catalogue is paged: clients that need
+    every match must follow ``total`` with ``page`` until the pages are exhausted.
     Query Parameters:
         - search: Search query for indicator name or definition
         - type: Filter by indicator type
@@ -68,9 +69,14 @@ def get_indicator_bank():
         - sub_sector: Filter by sub-sector
         - emergency: Filter by emergency type
         - archived: Filter by archived status (true=only archived, false=only non-archived, omit=all indicators)
+        - page: Page number (default 1)
+        - per_page: Page size (default 100, max 500)
+        - limit: Optional cap on this page's size (max 500). Does not replace paging.
     Returns:
         JSON object containing:
-        - indicators: List of all indicator bank objects
+        - indicators: Indicator objects for this page
+        - total: Matching indicators across all pages
+        - page, per_page: The page that was returned
     """
     try:
         current_app.logger.debug("Entering indicator bank API endpoint")

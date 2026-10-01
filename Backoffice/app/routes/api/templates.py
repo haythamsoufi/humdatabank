@@ -46,11 +46,12 @@ def get_templates():
     Authentication (one of):
       - Authorization: Bearer YOUR_API_KEY with ``templates:read`` (paginated response;
         a key scoped to templates only sees those templates)
-      - HTTP Basic auth or session (user-scoped access, no pagination)
+      - HTTP Basic auth or session (user-scoped access, paginated)
     Query Parameters:
         - search: Search query for template name or description
-        - page: Page number (default: 1, only used with API key auth)
-        - per_page: Items per page (default: 20, capped by API_KEY_MAX_PER_PAGE, only used with API key auth)
+        - page: Page number (default: 1)
+        - per_page: Items per page (API key default 20; session default 500).
+          Capped by API_KEY_MAX_PER_PAGE.
     """
     try:
         # Authenticate request
@@ -59,15 +60,15 @@ def get_templates():
             return auth_result
         elevated_access, auth_user, api_key_record = auth_result
 
-        # Key-authenticated callers (scoped or not) always get a bounded, paginated response
-        should_paginate = elevated_access or api_key_record is not None
-
-        # Validate pagination parameters
-        if should_paginate:
-            page, per_page = validate_pagination_params(request.args, max_per_page=api_key_max_per_page())
+        # API keys and sessions both get a bounded page. Sessions default to a larger
+        # page and honor ``page`` so the rest of the catalog is reachable.
+        page_cap = api_key_max_per_page()
+        if elevated_access or api_key_record is not None:
+            page, per_page = validate_pagination_params(request.args, max_per_page=page_cap)
         else:
-            page = 1
-            per_page = None
+            page, per_page = validate_pagination_params(
+                request.args, default_per_page=500, max_per_page=page_cap
+            )
 
         current_app.logger.debug("Entering templates API endpoint")
 
@@ -85,25 +86,14 @@ def get_templates():
         if not elevated_access and auth_user is not None:
             allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
             if not allowed_template_ids:
-                # User has no access to any templates
-                if should_paginate:
-                    return json_response({
-                        'templates': [],
-                        'total_items': 0,
-                        'total_pages': 0,
-                        'current_page': page,
-                        'per_page': per_page,
-                        'search_query': search_query
-                    })
-                else:
-                    return json_response({
-                        'templates': [],
-                        'total_items': 0,
-                        'total_pages': None,
-                        'current_page': None,
-                        'per_page': None,
-                        'search_query': search_query
-                    })
+                return json_response({
+                    'templates': [],
+                    'total_items': 0,
+                    'total_pages': 0,
+                    'current_page': page,
+                    'per_page': per_page,
+                    'search_query': search_query
+                })
             query = TemplateService.get_by_ids(allowed_template_ids)
 
         # Note: template name/description are version-derived properties, so we filter in Python.
@@ -125,23 +115,12 @@ def get_templates():
             templates = filtered
 
         total_items = len(templates)
-        if should_paginate:
-            # API key auth: paginate in Python after filtering
-            if not per_page or per_page <= 0:
-                per_page = 20
-            start = max((page - 1), 0) * per_page
-            end = start + per_page
-            total_pages = (total_items + per_page - 1) // per_page if per_page else 1
-            templates = templates[start:end]
-        else:
-            # Session callers used to receive every template. Cap the page so a
-            # large catalog cannot be pulled in one response; total_items still
-            # reports the full filtered count.
-            per_page = 500
-            page = 1
-            total_pages = (total_items + per_page - 1) // per_page if total_items else 1
-            templates = templates[:per_page]
-            should_paginate = True
+        if not per_page or per_page <= 0:
+            per_page = 20
+        start = max((page - 1), 0) * per_page
+        end = start + per_page
+        total_pages = (total_items + per_page - 1) // per_page if per_page else 1
+        templates = templates[start:end]
 
         # Batch-count sections, pages, and items to avoid 3 lazy COUNT queries per
         # template (which becomes 3×N queries for N templates on the page).
@@ -189,24 +168,14 @@ def get_templates():
 
         current_app.logger.debug(f"Templates API returning {len(templates_data)} items")
 
-        if should_paginate:
-            return json_response({
-                'templates': templates_data,
-                'total_items': total_items,
-                'total_pages': total_pages,
-                'current_page': page,
-                'per_page': per_page,
-                'search_query': search_query
-            })
-        else:
-            return json_response({
-                'templates': templates_data,
-                'total_items': total_items,
-                'total_pages': None,
-                'current_page': None,
-                'per_page': None,
-                'search_query': search_query
-            })
+        return json_response({
+            'templates': templates_data,
+            'total_items': total_items,
+            'total_pages': total_pages,
+            'current_page': page,
+            'per_page': per_page,
+            'search_query': search_query
+        })
 
     except Exception as e:
         error_id = str(uuid.uuid4())

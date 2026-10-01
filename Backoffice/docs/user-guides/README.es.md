@@ -22,6 +22,7 @@ Flujos de trabajo paso a paso y tutoriales para usar el sistema de Backoffice de
 - [Export and download data](admin/export-download-data.md)
 - [Exports: how to interpret files](admin/exports-how-to-interpret.md)
 - [Indicator Bank](admin/indicator-bank.md)
+- [NLLB translation](admin/nllb-translation.md)
 - [AI Knowledge Base and embeddings](admin/ai-document-library-and-embeddings.md)
 - [AI system: security and privacy](admin/ai-system-security-and-privacy.md)
 - [Supporting documents (Admin)](admin/supporting-documents.md)

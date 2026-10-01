@@ -1,0 +1,57 @@
+# Recycle an App Service without building or deploying.
+# Requires the AZURE_CREDENTIALS secret on the staging and production GitHub environments.
+
+name: Restart Webapp
+
+run-name: Restart Webapp — ${{ inputs.environment }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - Staging
+          - Production
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment == 'Production' && 'production' || 'staging' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set restart target
+        id: config
+        run: |
+          if [ "${{ inputs.environment }}" = "Production" ]; then
+            echo "app_name=ifrc-databank-app" >> "$GITHUB_OUTPUT"
+            echo "resource_group=ifrcpunifiedplanning-rg001" >> "$GITHUB_OUTPUT"
+            echo "subscription=3e33b4c1-ada7-4922-9113-b9e41eaf1797" >> "$GITHUB_OUTPUT"
+          else
+            echo "app_name=ifrc-databank-staging-2" >> "$GITHUB_OUTPUT"
+            echo "resource_group=ifrctgo001rg" >> "$GITHUB_OUTPUT"
+            echo "subscription=f585c1c3-801b-4641-8d7f-145aa50ffb04" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Restart Azure Web App
+        run: |
+          set -euo pipefail
+          az account set --subscription "${{ steps.config.outputs.subscription }}"
+          az webapp restart \
+            --name "${{ steps.config.outputs.app_name }}" \
+            --resource-group "${{ steps.config.outputs.resource_group }}"
+          az webapp show \
+            --name "${{ steps.config.outputs.app_name }}" \
+            --resource-group "${{ steps.config.outputs.resource_group }}" \
+            --query "{name:name, state:state}" \
+            --output json

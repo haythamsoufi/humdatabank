@@ -693,7 +693,7 @@
         <i class="fa-solid fa-user-secret"></i>
         {{ _('Act as (dev only)') }}
       </div>
-      <p class="dev-panel-sub">{{ _('Sign in without a password to test as a role preset or any active user.') }}</p>
+      <p class="dev-panel-sub">{{ _('Sign in without a password as a role preset, a seeded test account, or a pre-added account that has not signed in yet.') }}</p>
 
       <form method="POST" action="{{ url_for('auth.dev_act_as_login') }}" id="devActAsForm">
         {% if form is defined and 'csrf_token' in form %}{{ form.csrf_token(id="dev_act_as_csrf_token") }}{% endif %}
@@ -727,7 +727,7 @@
           <option value="">{{ _('Select a user…') }}</option>
           {% for dev_user in dev_act_as_users %}
           <option value="{{ dev_user.id }}">
-            {{ dev_user.name }} ({{ dev_user.email }}) — {{ dev_user.access_label }}
+            {{ dev_user.name }} ({{ dev_user.email }}) — {{ dev_user.access_label }}{% if not dev_user.registered %} — {{ _('not registered') }}{% endif %}
           </option>
           {% endfor %}
         </select>

@@ -52,17 +52,18 @@ services:
       - LT_LOAD_ONLY=en,fr,es,ar,zh,ru,hi
     restart: unless-stopped
 
-  # NLLB sidecar is conditional (long-tail languages Azure/IFRC doesn't cover).
-  # First boot downloads + converts facebook/nllb-200-1.3B (int8) -- allow
-  # 10-30+ minutes and ~6GB of disk on the nllb_models volume; `docker compose
-  # --profile nllb logs -f nllb` to watch progress, `/health` to check status.
+  # NLLB sidecar (opt-in). IFRC/Azure stays the default engine.
+  # Weights are CC-BY-NC 4.0. First boot downloads + converts the pinned
+  # facebook/nllb-200-1.3B snapshot (int8) -- allow 10-30+ minutes and ~6GB
+  # on the nllb_models volume. Host port is loopback-only; other containers
+  # reach it as http://nllb:9100. Set NLLB_SIDECAR_API_KEY before exposing it.
   #   docker compose --profile nllb up -d
   nllb:
     build: ./services/nllb-sidecar
     container_name: nllb-sidecar
     profiles: ["nllb"]
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     environment:
       - NLLB_SIDECAR_API_KEY=${NLLB_SIDECAR_API_KEY:-}
       # Override to trade quality/speed/memory, e.g. the smaller distilled model:

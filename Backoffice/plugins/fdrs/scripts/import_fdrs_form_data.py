@@ -126,6 +126,8 @@ from form_row_upsert import (  # noqa: E402
     COL_NA,
     COL_PREFILLED,
     COL_PUBLIC,
+    COL_PUBLISHED_DISAGG,
+    COL_PUBLISHED_VALUE,
     COL_SUBMITTED,
     COL_VALUE,
     FdrsSyncCancelled,
@@ -594,6 +596,21 @@ def _pick_imputed_value_for_base(rows: List[Dict[str, Any]], base_kpi: str) -> A
     return None
 
 
+def _row_is_fdrs_published(row: Dict[str, Any]) -> bool:
+    """True when this FDRS data row's API State is 500 (Published)."""
+    from fdrs_data_fetcher import fdrs_state_is_published
+
+    return fdrs_state_is_published((row or {}).get("State"))
+
+
+def _published_columns(value: str = "", disagg: str = "") -> Dict[str, str]:
+    """Published snapshot columns. Blank strings clear the snapshot on upsert."""
+    return {
+        COL_PUBLISHED_VALUE: value or "",
+        COL_PUBLISHED_DISAGG: disagg or "",
+    }
+
+
 def _format_imputed_for_import(val: Any) -> str:
     """Format scalar imputed value for ready-to-import imputed_value column (JSON-parseable)."""
     if val is None or (isinstance(val, str) and not val.strip()):
@@ -878,6 +895,12 @@ def build_ready_to_import_from_new_pipeline(
         rti_excl["no_form_item_count"] = len(no_form_item_set)
         rti_excl["main_value_empty_or_zero_count"] = 0
 
+    from fdrs_data_fetcher import build_disagg
+
+    published_disagg_by_key = build_disagg(
+        [row for row in fdrs_data if _row_is_fdrs_published(row)]
+    )
+
     out = []
     if debug_iso3_year_item:
         debug_iso3, debug_year, _ = debug_iso3_year_item
@@ -892,6 +915,7 @@ def build_ready_to_import_from_new_pipeline(
         logger.debug("For %s %s available item_ids: %s", debug_iso3, debug_year, afg_item_ids)
     for (iso3, year, base_kpi), group_rows in groups.items():
         is_question_kpi = base_kpi in FDRS_QUESTION_KPI_TO_ITEM
+        disability_meta = None
         if is_question_kpi:
             item_id = FDRS_QUESTION_KPI_TO_ITEM[base_kpi]
             # Pick row with KPI_code == base_kpi (single-choice question: one value per iso3/year)
@@ -960,6 +984,19 @@ def build_ready_to_import_from_new_pipeline(
                 if len(group_rows) > 20:
                     logger.info("  ... and %d more rows", len(group_rows) - 20)
 
+        if data_not_available_flag or not_applicable_flag:
+            published_value = ""
+            published_disagg = ""
+        else:
+            scalar_text = (str(value) if value is not None else "").strip()
+            published_value = scalar_text if scalar_text and _row_is_fdrs_published(r or {}) else ""
+            if is_question_kpi:
+                published_disagg = ""
+            else:
+                published_disagg = published_disagg_by_key.get((iso3, year, base_kpi)) or ""
+                if published_value and disability_meta:
+                    published_disagg = _merge_disability_into_disagg_data(published_disagg, disability_meta)
+
         out.append(_normalize_headers({
             "_debug_year": year,
             "_debug_iso3": iso3,
@@ -974,6 +1011,7 @@ def build_ready_to_import_from_new_pipeline(
             COL_PREFILLED: "",
             COL_IMPUTED: imputed_value or "",
             COL_SUBMITTED: sub_at,
+            **_published_columns(published_value, published_disagg),
         }))
     if rti_excl is not None and isinstance(rti_excl, dict):
         rti_excl["main_value_empty_or_zero"] = [
@@ -1097,6 +1135,21 @@ def _fdrs_data_kpi_index(fdrs_data: List[Dict[str, Any]]) -> Dict[Tuple[str, str
     return index
 
 
+def _fdrs_data_state_index(fdrs_data: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """(iso3, year) -> {KPI_code: State}."""
+    from collections import defaultdict
+
+    index: Dict[Tuple[str, str], Dict[str, Any]] = defaultdict(dict)
+    for r in fdrs_data or []:
+        iso3 = (r.get("ISO3") or "").strip()
+        year = str(r.get("year") or "").strip()
+        kpi = (r.get("KPI_code") or r.get("BaseKPI") or "").strip()
+        if not iso3 or not year or not kpi:
+            continue
+        index[(iso3, year)][kpi] = r.get("State")
+    return index
+
+
 def _network_support_cells_from_slots(
     kpi_values: Dict[str, Any],
     *,
@@ -1104,11 +1157,18 @@ def _network_support_cells_from_slots(
     column: str,
     don_to_label: Dict[str, str],
     slot_count: int = FDRS_NETWORK_SUPPORT_SLOT_COUNT,
+    kpi_states: Optional[Dict[str, Any]] = None,
+    published_only: bool = False,
 ) -> Dict[str, int]:
     cells: Dict[str, int] = {}
     for slot in range(1, slot_count + 1):
         codes_kpi = f"{code_prefix}{slot}"
         amounts_kpi = f"{code_prefix}{slot}_amount"
+        if published_only:
+            from fdrs_data_fetcher import fdrs_state_is_published
+
+            if not fdrs_state_is_published((kpi_states or {}).get(amounts_kpi)):
+                continue
         pairs = _parse_don_code_amount_pairs(kpi_values.get(codes_kpi), kpi_values.get(amounts_kpi))
         for don, amount in pairs:
             row_label = don_to_label.get(don, don)
@@ -1137,6 +1197,7 @@ def build_network_support_matrix_rows(
         (r["period_name"], r["iso3"]): int(r["assignment_entity_status_id"]) for r in assignment_rows
     }
     kpi_index = _fdrs_data_kpi_index(fdrs_data)
+    state_index = _fdrs_data_state_index(fdrs_data)
     sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
     out: List[Dict[str, str]] = []
 
@@ -1158,6 +1219,14 @@ def build_network_support_matrix_rows(
             )
             if not cells:
                 continue
+            published_cells = _network_support_cells_from_slots(
+                kpi_values,
+                code_prefix=prefix,
+                column=column,
+                don_to_label=don_to_label,
+                kpi_states=state_index.get((iso3, year)) or {},
+                published_only=True,
+            )
             out.append(
                 _normalize_headers(
                     {
@@ -1175,6 +1244,10 @@ def build_network_support_matrix_rows(
                         COL_PREFILLED: "",
                         COL_IMPUTED: "",
                         COL_SUBMITTED: sub_at,
+                        **_published_columns(
+                            "",
+                            json.dumps(published_cells) if published_cells else "",
+                        ),
                     }
                 )
             )
@@ -1198,6 +1271,7 @@ def build_income_sources_matrix_rows(
         (r["period_name"], r["iso3"]): int(r["assignment_entity_status_id"]) for r in assignment_rows
     }
     cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
+    published_cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
 
     for r in fdrs_data:
         base_kpi = (r.get("BaseKPI") or "").strip()
@@ -1218,13 +1292,19 @@ def build_income_sources_matrix_rows(
         except (ValueError, TypeError):
             continue
         cell_key = f"{row_label}_{matrix_column}"
-        cells_by_key[(iso3, year, aes_id)][cell_key] = num
+        group_key = (iso3, year, aes_id)
+        cells_by_key[group_key][cell_key] = num
+        if _row_is_fdrs_published(r):
+            published_cells_by_key[group_key][cell_key] = num
+        else:
+            published_cells_by_key[group_key].pop(cell_key, None)
 
     sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
     out: List[Dict[str, str]] = []
     for (iso3, year, aes_id), cells in cells_by_key.items():
         if not cells:
             continue
+        published_cells = published_cells_by_key.get((iso3, year, aes_id)) or {}
         out.append(
             _normalize_headers(
                 {
@@ -1242,6 +1322,10 @@ def build_income_sources_matrix_rows(
                     COL_PREFILLED: "",
                     COL_IMPUTED: "",
                     COL_SUBMITTED: sub_at,
+                    **_published_columns(
+                        "",
+                        json.dumps(published_cells) if published_cells else "",
+                    ),
                 }
             )
         )

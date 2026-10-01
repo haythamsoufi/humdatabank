@@ -1,9 +1,36 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 from app.models import Country
 from app import db
+
+
+SANDBOX_COUNTRY_ISO3 = "TST"
+SANDBOX_COUNTRY_NAME = "testland"
+
+
+def is_sandbox_country(country=None, *, name=None, iso3=None) -> bool:
+    """True for the seeded Testland country (ISO3 TST)."""
+    if country is not None:
+        if name is None:
+            name = getattr(country, "name", None)
+        if iso3 is None:
+            iso3 = getattr(country, "iso3", None)
+    if str(iso3 or "").strip().upper() == SANDBOX_COUNTRY_ISO3:
+        return True
+    return str(name or "").strip().lower() == SANDBOX_COUNTRY_NAME
+
+
+def exclude_sandbox_countries(query, country_model=Country):
+    """Drop Testland from a query that already includes the Country table."""
+    return query.filter(
+        or_(
+            country_model.iso3.is_(None),
+            func.upper(country_model.iso3) != SANDBOX_COUNTRY_ISO3,
+        ),
+        func.lower(func.coalesce(country_model.name, "")) != SANDBOX_COUNTRY_NAME,
+    )
 
 
 def get_country_region_name(country) -> str:

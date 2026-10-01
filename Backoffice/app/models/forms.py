@@ -893,12 +893,10 @@ class FormData(DataEntryMixin, db.Model):
     # Imputed values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
-    # Published snapshot — a curated copy of the reported value/disagg_data (falling
-    # back to imputed_* when the reported value is missing), written only when an
-    # admin runs the FDRS publication tool (plugins/fdrs; see fdrs_publication_service.py).
-    # Never written by regular form submission. This is what the public-facing
-    # GET /api/v1/fdrs/published-data endpoint serves to external consumers, decoupling
-    # what is live/editable internally from what is currently visible on the public site.
+    # Published snapshot. FDRS sync copies the live value/disagg here only when the
+    # FDRS API State is 500 (Published); every other state leaves these columns empty.
+    # The FDRS publication tool can also write them (plugins/fdrs; fdrs_publication_service.py).
+    # Regular form submission does not. This is what GET /api/v1/fdrs/published-data serves.
     PUBLISHED_SOURCE_REPORTED = 'reported'
     PUBLISHED_SOURCE_IMPUTED = 'imputed'
     PUBLISHED_SOURCES = (PUBLISHED_SOURCE_REPORTED, PUBLISHED_SOURCE_IMPUTED)

@@ -293,6 +293,7 @@ def test_export_wait_page_has_live_status(monkeypatch):
     assert "upr-export-wait__sweep" in html
     assert "Usually ready in about 15 seconds." not in html
     assert "upr-export-wait.js" in html
+    assert "data-file-open='inline'" in html
 
 
 @pytest.mark.unit

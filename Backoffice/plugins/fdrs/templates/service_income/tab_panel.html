@@ -1,0 +1,682 @@
+<style nonce="{{ csp_nonce() }}">
+    .si-format { display: inline-flex; align-items: center; gap: 2px; padding: 2px; background: #f3f4f6; border-radius: 999px; }
+    .si-format button { border: 0; background: transparent; color: #6b7280; font-size: 0.75rem; font-weight: 600; line-height: 1; padding: 0.35rem 0.7rem; border-radius: 999px; cursor: pointer; }
+    .si-format button[aria-pressed="true"] { background: #fff; color: #111827; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12); }
+    .si-toggle { border: 1px solid #d1d5db; background: #fff; color: #374151; font-size: 0.75rem; font-weight: 600; line-height: 1; padding: 0.4rem 0.75rem; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+    .si-toggle[aria-pressed="true"] { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+    .si-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 1px solid #d1d5db; border-radius: 999px; background: #fff; color: #374151; cursor: pointer; flex: none; }
+    .si-icon:hover { background: #f9fafb; color: #111827; }
+    .si-overlay-label { position: absolute; background: #7c2d12; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; padding: 4px 5px; border-radius: 2px; pointer-events: none; white-space: nowrap; z-index: 5; }
+    .si-pin { position: sticky; top: 0; z-index: 20; display: flex; justify-content: flex-end; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.5rem 0; background: #fff; box-shadow: 0 1px 0 #e5e7eb; }
+</style>
+
+<div id="panel-service-income" class="explore-panel{% if explore_first_tab != 'service-income' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-service-income">
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
+        <h3 class="text-lg font-semibold text-gray-900">{{ _('Service income') }}</h3>
+        <p class="text-sm text-gray-600 mt-1 max-w-4xl">
+            {{ _('FDRS imputes total income for the open collection round, and does not impute income sources. The average of the two preceding closed rounds is a reference for service income in those rounds. The difference is the open round’s total income minus that reference.') }}
+        </p>
+    </div>
+
+    <div id="service-income-loading" class="bg-white p-6 shadow-md border border-gray-200 mb-6 hidden">
+        <div class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p class="text-lg text-gray-600">{{ _('Calculating service income...') }}</p>
+        </div>
+    </div>
+
+    <div id="service-income-error" class="bg-white p-6 shadow-md border border-red-200 mb-6 hidden">
+        <p class="text-red-700" id="service-income-error-text"></p>
+    </div>
+
+    <div id="service-income-content" class="hidden">
+        <div class="si-pin">
+            <button type="button" id="service-income-published-toggle" class="si-toggle" aria-pressed="false" title="{{ _('Show only service income that FDRS has published') }}">{{ _('Published figures') }}</button>
+            <div class="si-format" role="group" aria-label="{{ _('Number format') }}">
+                <button type="button" id="service-income-format-rounded" aria-pressed="true" title="{{ _('Rounded, such as 31.8 B') }}">31.8 B</button>
+                <button type="button" id="service-income-format-full" aria-pressed="false" title="{{ _('Full amount') }}">{{ _('Full') }}</button>
+            </div>
+        </div>
+        <div id="service-income-estimate" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6"></div>
+
+        <div class="bg-white p-4 sm:p-6 shadow border border-gray-200 mb-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 mb-1">{{ _('Service income and the last two closed rounds') }}</h4>
+                    <p class="text-xs text-gray-500 max-w-3xl">{{ _('Bars are reported service income, in billions of Swiss francs. The open round is amber and shows the amount reported so far. The dashed line is the average of the last two closed rounds, drawn across those rounds and the open round.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="service-income-copy-chart" class="si-icon" data-icon="fa-image" title="{{ _('Copy chart as PNG') }}" aria-label="{{ _('Copy chart as PNG') }}">
+                        <i class="fas fa-image" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="service-income-total-toggle" class="si-toggle" aria-pressed="false">{{ _('Show total income') }}</button>
+                </div>
+            </div>
+            <div id="service-income-chart"></div>
+        </div>
+
+        <div class="bg-white p-4 sm:p-6 shadow border border-gray-200 mb-6 overflow-x-auto">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <h4 class="text-sm font-medium text-gray-700">{{ _('Yearly comparison') }}</h4>
+                <button type="button" id="service-income-copy-table" class="si-icon" data-icon="fa-copy" title="{{ _('Copy table for Excel') }}" aria-label="{{ _('Copy table for Excel') }}">
+                    <i class="fas fa-copy" aria-hidden="true"></i>
+                </button>
+            </div>
+            <table class="min-w-full text-sm text-left">
+                <thead>
+                    <tr class="border-b border-gray-200 text-gray-600">
+                        <th class="py-2 pr-4 font-medium">{{ _('Year') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Total income') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Total expenditure') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Service income') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Other income') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Service share') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Change in service') }}</th>
+                        <th class="py-2 pr-4 font-medium text-right">{{ _('Reported NSs') }}</th>
+                        <th class="py-2 font-medium text-right">{{ _('Imputed NSs') }}</th>
+                    </tr>
+                </thead>
+                <tbody id="service-income-table"></tbody>
+            </table>
+            <p class="text-xs text-gray-500 mt-3">
+                {{ _('Other income is total income minus reported service income. A National Society with no service-income figure contributes zero. Reported and imputed counts refer to total income.') }}
+                <span id="service-income-published-note" class="hidden">{{ _('Published figures keeps a service-income amount only when the FDRS API state is Published (500). Other states stay in the live columns and are left out of this view. The snapshot is filled on the next FDRS sync.') }}</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script src="{{ static_url('libs/apexcharts.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    'use strict';
+
+    var chart = null;
+    var loaded = false;
+    var loading = false;
+    var rounded = true;
+    var showTotalIncome = false;
+    var publishedOnly = false;
+    var payloads = { all: null, published: null };
+    var lastYears = null;
+    var lastReference = null;
+
+    var labels = {
+        openRound: {{ _('Open round')|tojson }},
+        totalIncome: {{ _('Total income')|tojson }},
+        referenceService: {{ _('Last two closed rounds')|tojson }},
+        incomeMinusReference: {{ _('Total income minus reference')|tojson }},
+        reportedService: {{ _('Reported service income')|tojson }},
+        serviceDifference: {{ _('Difference from the reference')|tojson }},
+        averageOf: {{ _('Average service income')|tojson }},
+        totalMinus: {{ _('Open-round total income minus the closed-round reference')|tojson }},
+        incomplete: {{ _('Stored sources only. Income sources are not imputed.')|tojson }},
+        societies: {{ _('National Societies with a total')|tojson }},
+        reported: {{ _('reported')|tojson }},
+        imputed: {{ _('imputed')|tojson }},
+        withService: {{ _('with a service-income figure')|tojson }},
+        serviceSeries: {{ _('Closed rounds')|tojson }},
+        openSeries: {{ _('Open round, reported so far')|tojson }},
+        referenceSeries: {{ _('Last two closed rounds')|tojson }},
+        billions: {{ _('CHF billions')|tojson }},
+        loadFailed: {{ _('Service income could not be loaded.')|tojson }},
+        copyChart: {{ _('Copy chart as PNG')|tojson }},
+        copyTable: {{ _('Copy table for Excel')|tojson }},
+        copied: {{ _('Copied')|tojson }},
+        noData: {{ _('No FDRS income figures were found.')|tojson }}
+    };
+
+    function byId(id) {
+        return document.getElementById(id);
+    }
+
+    function formatFull(value) {
+        return new Intl.NumberFormat('en-CH', { maximumFractionDigits: 0 }).format(Math.round(Math.abs(value)));
+    }
+
+    function formatCompact(value) {
+        var abs = Math.abs(value);
+        if (abs >= 1e9) return (abs / 1e9).toFixed(1) + ' B';
+        if (abs >= 1e6) return (abs / 1e6).toFixed(1) + ' M';
+        return formatFull(abs);
+    }
+
+    function formatChf(value) {
+        if (value == null || !isFinite(value)) return '—';
+        var text = rounded ? formatCompact(value) : formatFull(value);
+        return value < 0 ? '−' + text : text;
+    }
+
+    function formatShare(value) {
+        if (value == null || !isFinite(value)) return '—';
+        return (value * 100).toLocaleString('en', { maximumFractionDigits: 1 }) + '%';
+    }
+
+    function formatSigned(value) {
+        if (value == null || !isFinite(value)) return '—';
+        var formatted = formatChf(Math.abs(value));
+        if (value > 0) return '+' + formatted;
+        if (value < 0) return '−' + formatted;
+        return formatted;
+    }
+
+    function card(title, value, note, tone) {
+        var tones = {
+            navy: 'background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);',
+            red: 'background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);',
+            slate: 'background: linear-gradient(135deg, #334155 0%, #1e293b 100%);',
+            amber: 'background: linear-gradient(135deg, #b45309 0%, #78350f 100%);'
+        };
+        return '<div class="rounded-xl p-4 shadow text-white" style="' + (tones[tone] || tones.navy) + '">' +
+            '<div class="text-xs font-medium" style="color: rgba(255,255,255,0.8);">' + title + '</div>' +
+            '<div class="text-2xl font-bold mt-2">' + value + '</div>' +
+            '<div class="text-xs mt-2" style="color: rgba(255,255,255,0.9);">' + note + '</div>' +
+            '</div>';
+    }
+
+    function renderReference(reference) {
+        var host = byId('service-income-estimate');
+        if (!reference) {
+            host.innerHTML = '';
+            return;
+        }
+        var baseline = (reference.baseline_years || []).join('–');
+        var societyNote = reference.count_reported + ' ' + labels.reported + ', ' +
+            reference.count_imputed + ' ' + labels.imputed + '. ' +
+            reference.societies_with_service + ' ' + labels.withService + '.';
+        function money(value, signed) {
+            var text = signed ? formatSigned(value) : formatChf(value);
+            return text === '—' ? text : 'CHF ' + text;
+        }
+        host.innerHTML =
+            card(labels.totalIncome + ' ' + reference.open_year, money(reference.total_income), societyNote, 'navy') +
+            card(labels.reportedService, money(reference.reported_service_income), labels.incomplete + ' ' + labels.serviceDifference + ': ' + money(reference.service_difference, true), 'amber') +
+            card(labels.referenceService, money(reference.reference_service_income), labels.averageOf + ' ' + baseline, 'red') +
+            card(labels.incomeMinusReference, money(reference.income_minus_reference), labels.totalMinus, 'slate');
+    }
+
+    function renderTable(years) {
+        var body = byId('service-income-table');
+        body.innerHTML = years.map(function (row) {
+            var yearLabel = String(row.year) + (row.is_open_round ? ' (' + labels.openRound + ')' : '');
+            return '<tr class="border-b border-gray-100' + (row.is_open_round ? ' bg-amber-50' : '') + '">' +
+                '<td class="py-2 pr-4 font-medium text-gray-900">' + yearLabel + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + formatChf(row.total_income) + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + formatChf(row.total_expenditure) + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + formatChf(row.service_income) + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + formatChf(row.other_income) + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + formatShare(row.service_share) + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + formatSigned(row.service_change) + '</td>' +
+                '<td class="py-2 pr-4 text-right tabular-nums">' + row.count_reported + '</td>' +
+                '<td class="py-2 text-right tabular-nums">' + row.count_imputed + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function billions(value) {
+        return value == null ? null : value / 1e9;
+    }
+
+    function renderChart(years, reference) {
+        var host = byId('service-income-chart');
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+        if (!window.ApexCharts || !years.length) {
+            host.innerHTML = '';
+            return;
+        }
+        var refY = reference ? billions(reference.reference_service_income) : null;
+        var peak = refY || 0;
+        var closedData = [];
+        var openData = [];
+        years.forEach(function (row) {
+            var value = billions(row.service_income);
+            peak = Math.max(peak, value || 0);
+            closedData.push(row.is_open_round ? null : value);
+            openData.push(row.is_open_round ? value : null);
+        });
+        var closedSeries = { name: labels.serviceSeries, type: 'column', data: closedData };
+        var openSeries = { name: labels.openSeries, type: 'column', data: openData };
+        if (showTotalIncome) {
+            closedSeries.group = 'service';
+            openSeries.group = 'service';
+        }
+        var series = [closedSeries, openSeries];
+        var colors = ['#b91c1c', '#d97706'];
+        var strokeWidth = [0, 0];
+        var strokeDash = [0, 0];
+        var openSeriesIndex = 1;
+        var totalSeriesIndex = -1;
+        var referenceSeriesIndex = -1;
+        if (showTotalIncome) {
+            totalSeriesIndex = series.length;
+            series.push({
+                name: labels.totalIncome,
+                type: 'column',
+                group: 'total',
+                data: years.map(function (row) {
+                    var value = billions(row.total_income);
+                    peak = Math.max(peak, value || 0);
+                    return value;
+                })
+            });
+            colors.push('#64748b');
+            strokeWidth.push(0);
+            strokeDash.push(0);
+        }
+        var baselineYears = reference && reference.baseline_years ? reference.baseline_years : [];
+        var baselineLookup = {};
+        baselineYears.forEach(function (year) { baselineLookup[year] = true; });
+        if (refY != null && baselineYears.length) {
+            referenceSeriesIndex = series.length;
+            series.push({
+                name: labels.referenceSeries,
+                type: 'line',
+                data: years.map(function (row) {
+                    return (baselineLookup[row.year] || row.is_open_round) ? refY : null;
+                })
+            });
+            colors.push('#1e3a5f');
+            strokeWidth.push(3);
+            strokeDash.push(6);
+        }
+        chart = new window.ApexCharts(host, {
+            chart: {
+                type: 'line',
+                height: 360,
+                stacked: true,
+                toolbar: { show: false },
+                zoom: { enabled: false },
+                selection: { enabled: false },
+                fontFamily: 'Montserrat, sans-serif'
+            },
+            series: series,
+            stroke: { width: strokeWidth, curve: 'straight', dashArray: strokeDash },
+            markers: { size: 0 },
+            colors: colors,
+            plotOptions: {
+                bar: {
+                    columnWidth: showTotalIncome ? '62%' : '46%',
+                    dataLabels: { position: showTotalIncome ? 'top' : 'center' }
+                }
+            },
+            dataLabels: {
+                enabled: true,
+                formatter: function (val, opts) {
+                    if (!opts) return '';
+                    var row = years[opts.dataPointIndex];
+                    if (!row) return '';
+                    if (!showTotalIncome && opts.seriesIndex === openSeriesIndex && row.is_open_round) {
+                        return formatChf(row.service_income);
+                    }
+                    if (!showTotalIncome && opts.seriesIndex === referenceSeriesIndex && row.is_open_round && reference) {
+                        return formatChf(reference.reference_service_income);
+                    }
+                    if (opts.seriesIndex === totalSeriesIndex) return formatChf(row.total_income);
+                    return '';
+                },
+                offsetY: -8,
+                style: { fontSize: '12px', fontWeight: 700, colors: ['#7c2d12'] }
+            },
+            xaxis: {
+                categories: years.map(function (row) {
+                    return row.is_open_round ? String(row.year) + ' (' + labels.openRound + ')' : String(row.year);
+                })
+            },
+            yaxis: {
+                min: 0,
+                max: peak * (showTotalIncome ? 1.28 : 1.22),
+                title: { text: labels.billions },
+                labels: { formatter: function (value) { return value == null ? '' : Number(value).toFixed(1); } }
+            },
+            legend: { position: 'top' },
+            tooltip: { y: { formatter: function (value) { return value == null ? '' : formatChf(value * 1e9); } } }
+        });
+        chart.render().then(function () {
+            placeTotalModeLabels(years, reference);
+        });
+    }
+
+    function addOverlayLabel(host, x, y, text, above) {
+        var label = document.createElement('div');
+        label.className = 'si-overlay-label';
+        label.textContent = text;
+        label.style.left = x + 'px';
+        label.style.top = y + 'px';
+        label.style.transform = above ? 'translate(-50%, -100%)' : 'translate(-50%, -50%)';
+        if (above) label.style.marginTop = '-16px';
+        host.appendChild(label);
+    }
+
+    function referenceLineScreenY(host) {
+        var line = host.querySelector('.apexcharts-line');
+        if (!line || !line.ownerSVGElement) return null;
+        var d = line.getAttribute('d') || '';
+        var points = [];
+        var match;
+        var move = /[ML]\s*([\d.]+)\s+([\d.]+)/g;
+        while ((match = move.exec(d))) points.push({ x: Number(match[1]), y: Number(match[2]) });
+        var curve = /C\s*[\d.]+\s+[\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)/g;
+        while ((match = curve.exec(d))) points.push({ x: Number(match[1]), y: Number(match[2]) });
+        if (!points.length) return null;
+        var top = points[0].y;
+        points.forEach(function (point) { if (point.y < top) top = point.y; });
+        var svgPoint = line.ownerSVGElement.createSVGPoint();
+        svgPoint.x = 0;
+        svgPoint.y = top;
+        var screen = svgPoint.matrixTransform(line.getScreenCTM());
+        return screen.y;
+    }
+
+    function placeTotalModeLabels(years, reference) {
+        var host = byId('service-income-chart');
+        var existing = host.querySelectorAll('.si-overlay-label');
+        for (var i = 0; i < existing.length; i++) existing[i].remove();
+        if (!showTotalIncome) return;
+        host.style.position = 'relative';
+        var hostBox = host.getBoundingClientRect();
+        var openRow = null;
+        years.forEach(function (row) { if (row.is_open_round) openRow = row; });
+        var bars = host.querySelectorAll('.apexcharts-bar-area');
+        var amber = null;
+        for (var b = bars.length - 1; b >= 0; b--) {
+            if ((bars[b].getAttribute('fill') || '').indexOf('217,119,6') !== -1) {
+                amber = bars[b];
+                break;
+            }
+        }
+        if (!amber || !openRow) return;
+        var box = amber.getBoundingClientRect();
+        addOverlayLabel(
+            host,
+            box.left - hostBox.left + box.width / 2,
+            box.top - hostBox.top + box.height / 2,
+            formatChf(openRow.service_income),
+            false
+        );
+        var lineY = reference ? referenceLineScreenY(host) : null;
+        var totalBar = null;
+        for (var g = bars.length - 1; g >= 0; g--) {
+            if ((bars[g].getAttribute('fill') || '').indexOf('100,116,139') !== -1) {
+                totalBar = bars[g];
+                break;
+            }
+        }
+        if (lineY != null && totalBar) {
+            var totalBox = totalBar.getBoundingClientRect();
+            addOverlayLabel(
+                host,
+                totalBox.left - hostBox.left + totalBox.width / 2,
+                lineY - hostBox.top,
+                formatChf(reference.reference_service_income),
+                true
+            );
+        }
+    }
+
+    function showError(message) {
+        byId('service-income-loading').classList.add('hidden');
+        byId('service-income-content').classList.add('hidden');
+        byId('service-income-error').classList.remove('hidden');
+        byId('service-income-error-text').textContent = message || labels.loadFailed;
+    }
+
+    function applyPayload(data) {
+        var years = data.years || [];
+        var note = byId('service-income-published-note');
+        if (note) note.classList.toggle('hidden', !publishedOnly);
+        if (!years.length) {
+            showError(data.warning || labels.noData);
+            return;
+        }
+        byId('service-income-content').classList.remove('hidden');
+        lastYears = years;
+        lastReference = data.reference;
+        renderReference(lastReference);
+        renderTable(lastYears);
+        renderChart(lastYears, lastReference);
+    }
+
+    function loadServiceIncome() {
+        var cacheKey = publishedOnly ? 'published' : 'all';
+        if (payloads[cacheKey]) {
+            loaded = true;
+            applyPayload(payloads[cacheKey]);
+            return;
+        }
+        if (loading) return;
+        loading = true;
+        byId('service-income-error').classList.add('hidden');
+        if (!loaded) byId('service-income-loading').classList.remove('hidden');
+        var url = '/admin/data-exploration/service-income' + (publishedOnly ? '?published_only=1' : '');
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (response) {
+                if (!response.ok) throw new Error(labels.loadFailed);
+                return response.json();
+            })
+            .then(function (payload) {
+                var data = payload.data || payload;
+                loading = false;
+                loaded = true;
+                byId('service-income-loading').classList.add('hidden');
+                payloads[cacheKey] = data;
+                if (publishedOnly !== (cacheKey === 'published')) return;
+                applyPayload(data);
+            })
+            .catch(function () {
+                loading = false;
+                showError(labels.loadFailed);
+            });
+    }
+
+    function flashCopied(button) {
+        var icon = button.querySelector('i');
+        if (!icon) return;
+        icon.className = 'fas fa-check';
+        button.setAttribute('aria-label', labels.copied);
+        window.setTimeout(function () {
+            icon.className = 'fas ' + (button.getAttribute('data-icon') || 'fa-copy');
+            var title = button.getAttribute('title');
+            if (title) button.setAttribute('aria-label', title);
+        }, 1500);
+    }
+
+    function dataUrlToBlob(uri) {
+        var parts = uri.split(',');
+        var mime = parts[0].match(/:(.*?);/)[1];
+        var binary = atob(parts[1]);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: mime });
+    }
+
+    var montserratFontUrl = {{ static_url('fonts/montserrat-latin.woff2')|tojson }};
+    var montserratFace = null;
+
+    function montserratStyle() {
+        if (montserratFace) return montserratFace;
+        montserratFace = fetch(montserratFontUrl).then(function (response) {
+            if (!response.ok) throw new Error('font');
+            return response.arrayBuffer();
+        }).then(function (buffer) {
+            var bytes = new Uint8Array(buffer);
+            var binary = '';
+            var step = 0x8000;
+            for (var i = 0; i < bytes.length; i += step) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+            }
+            return '@font-face{font-family:"Montserrat";font-style:normal;font-weight:100 900;src:url("data:font/woff2;base64,' +
+                btoa(binary) + '") format("woff2");}text,tspan{font-family:Montserrat,sans-serif;}';
+        }).catch(function () {
+            montserratFace = null;
+            return '';
+        });
+        return montserratFace;
+    }
+
+    function chartSvgToPng(svg) {
+        var box = svg.getBoundingClientRect();
+        var width = Math.max(1, Math.round(box.width));
+        var height = Math.max(1, Math.round(box.height));
+        return montserratStyle().then(function (css) {
+            return rasterizeChart(svg, width, height, css);
+        });
+    }
+
+    function rasterizeChart(svg, width, height, css) {
+        var clone = svg.cloneNode(true);
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clone.setAttribute('width', String(width));
+        clone.setAttribute('height', String(height));
+        if (css) {
+            var style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+            style.textContent = css;
+            clone.insertBefore(style, clone.firstChild);
+        }
+        var texts = clone.querySelectorAll('text, tspan');
+        for (var i = 0; i < texts.length; i++) {
+            texts[i].setAttribute('font-family', 'Montserrat, sans-serif');
+            texts[i].style.fontFamily = 'Montserrat, sans-serif';
+        }
+        var background = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        background.setAttribute('width', '100%');
+        background.setAttribute('height', '100%');
+        background.setAttribute('fill', '#ffffff');
+        clone.insertBefore(background, clone.firstChild);
+        var xml = new XMLSerializer().serializeToString(clone);
+        return new Promise(function (resolve, reject) {
+            var image = new Image();
+            image.onload = function () {
+                var scale = 2;
+                var canvas = document.createElement('canvas');
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+                var context = canvas.getContext('2d');
+                context.fillStyle = '#ffffff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                try {
+                    resolve(dataUrlToBlob(canvas.toDataURL('image/png')));
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            image.onerror = function () { reject(new Error('svg')); };
+            image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+        });
+    }
+
+    function copyChartPng() {
+        var svg = byId('service-income-chart').querySelector('.apexcharts-svg');
+        var button = byId('service-income-copy-chart');
+        if (!svg || !navigator.clipboard || typeof window.ClipboardItem !== 'function') return;
+        navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': chartSvgToPng(svg) })
+        ]).then(function () {
+            flashCopied(button);
+        }).catch(function () {});
+    }
+
+    function excelCell(text) {
+        return String(text || '').replace(/\u2212/g, '-').replace(/\s+/g, ' ').trim();
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function copyTableForExcel() {
+        var table = byId('service-income-content').querySelector('table');
+        var button = byId('service-income-copy-table');
+        if (!table || !navigator.clipboard || typeof window.ClipboardItem !== 'function') return;
+        var rows = Array.prototype.map.call(table.querySelectorAll('tr'), function (row) {
+            return Array.prototype.map.call(row.children, function (cell) {
+                return excelCell(cell.textContent);
+            });
+        });
+        var tsv = rows.map(function (cells) { return cells.join('\t'); }).join('\r\n');
+        var html = '<table>' + rows.map(function (cells) {
+            return '<tr>' + cells.map(function (cell) {
+                return '<td>' + escapeHtml(cell) + '</td>';
+            }).join('') + '</tr>';
+        }).join('') + '</table>';
+        navigator.clipboard.write([
+            new ClipboardItem({
+                'text/plain': new Blob([tsv], { type: 'text/plain' }),
+                'text/html': new Blob([html], { type: 'text/html' })
+            })
+        ]).then(function () {
+            flashCopied(button);
+        }).catch(function () {});
+    }
+
+    function setNumberFormat(useRounded) {
+        rounded = useRounded;
+        var compactBtn = byId('service-income-format-rounded');
+        var fullBtn = byId('service-income-format-full');
+        if (compactBtn && fullBtn) {
+            compactBtn.setAttribute('aria-pressed', rounded ? 'true' : 'false');
+            fullBtn.setAttribute('aria-pressed', rounded ? 'false' : 'true');
+        }
+        if (lastYears) {
+            renderReference(lastReference);
+            renderTable(lastYears);
+            renderChart(lastYears, lastReference);
+        }
+    }
+
+    function boot() {
+        if (!byId('panel-service-income')) return;
+        var compactBtn = byId('service-income-format-rounded');
+        var fullBtn = byId('service-income-format-full');
+        if (compactBtn) compactBtn.addEventListener('click', function () { setNumberFormat(true); });
+        if (fullBtn) fullBtn.addEventListener('click', function () { setNumberFormat(false); });
+        var publishedBtn = byId('service-income-published-toggle');
+        if (publishedBtn) {
+            publishedBtn.addEventListener('click', function () {
+                publishedOnly = !publishedOnly;
+                publishedBtn.setAttribute('aria-pressed', publishedOnly ? 'true' : 'false');
+                loadServiceIncome();
+            });
+        }
+        var totalBtn = byId('service-income-total-toggle');
+        if (totalBtn) {
+            totalBtn.addEventListener('click', function () {
+                showTotalIncome = !showTotalIncome;
+                totalBtn.setAttribute('aria-pressed', showTotalIncome ? 'true' : 'false');
+                if (lastYears) renderChart(lastYears, lastReference);
+            });
+        }
+        var copyChartBtn = byId('service-income-copy-chart');
+        var copyTableBtn = byId('service-income-copy-table');
+        if (copyChartBtn) copyChartBtn.addEventListener('click', copyChartPng);
+        if (copyTableBtn) copyTableBtn.addEventListener('click', copyTableForExcel);
+        var tab = byId('tab-service-income');
+        if (tab) {
+            tab.addEventListener('click', function () {
+                if (!loaded) {
+                    loadServiceIncome();
+                } else if (chart) {
+                    requestAnimationFrame(function () {
+                        if (typeof chart.resize === 'function') {
+                            chart.resize();
+                        } else if (typeof chart._windowResizeHandler === 'function') {
+                            chart._windowResizeHandler();
+                        }
+                        if (lastYears) placeTotalModeLabels(lastYears, lastReference);
+                    });
+                }
+            });
+        }
+        if (tab && tab.getAttribute('aria-selected') === 'true') loadServiceIncome();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+</script>

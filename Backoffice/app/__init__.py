@@ -147,15 +147,19 @@ def create_app(config_name=None):
     from app.template_context import register_template_context
     register_template_context(app, config_class)
 
+    from app.utils.dev_server_port import dev_process_serves_http
+
     is_reloading = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     # Werkzeug's debug parent process must not load plugins; the reloader child
-    # will. One-off `flask` CLI commands that need the plugin catalog (e.g.
-    # `flask rbac seed`) don't need special-casing here: rbac_seed_service's
-    # _plugin_registry() lazily calls load_plugins() itself if the registry is
-    # still empty when seeding runs, regardless of boot order.
+    # will. When FLASK_USE_RELOADER=false there is no child, so this process
+    # serves HTTP and must load plugins itself. One-off `flask` CLI commands
+    # that need the plugin catalog (e.g. `flask rbac seed`) don't need
+    # special-casing here: rbac_seed_service's _plugin_registry() lazily calls
+    # load_plugins() itself if the registry is still empty when seeding runs.
+    serves_http = dev_process_serves_http()
     should_load_plugins = (
         not app.debug
-        or is_reloading
+        or serves_http
         or app.config.get('TESTING')
     )
     if not hasattr(app, 'plugin_manager') and should_load_plugins:
@@ -187,7 +191,9 @@ def create_app(config_name=None):
 
     register_all_blueprints(app, csrf, startup_start)
 
-    if hasattr(app, 'plugin_manager') and (not app.debug or is_reloading or app.config.get('TESTING')):
+    if hasattr(app, 'plugin_manager') and (
+        not app.debug or serves_http or app.config.get('TESTING')
+    ):
         app.plugin_manager.register_blueprints()
 
     from app.error_handlers import register_error_handlers

@@ -61,6 +61,9 @@ logger = logging.getLogger(__name__)
 
 # IFRC fdrsdata row State (same scale as data-api query param state= / minstatus=).
 ALLOWED_FDRS_ROW_STATES = frozenset({0, 100, 200, 300, 400, 500})
+# IFRC State 500 is the only Published status. Saved, reopened, submitted, and
+# validated rows are stored in the live columns and left out of published_*.
+FDRS_PUBLISHED_STATE = 500
 # Default import allowlist: all IFRC workflow states except Not filled (0).
 DEFAULT_FDRS_REPORTED_IMPORT_STATES = frozenset({100, 200, 300, 400, 500})
 _FDRS_STATE_WORD = {
@@ -117,6 +120,11 @@ def _value_status_for_reported_state(state_i: int) -> str:
     if w:
         return f"Reported ({w})"
     return "Reported"
+
+
+def fdrs_state_is_published(state: Any) -> bool:
+    """True only for IFRC fdrsdata State 500 (Published)."""
+    return _fdrs_state_as_int(state) == FDRS_PUBLISHED_STATE
 
 
 def _fdrs_state_as_int(state: Any) -> Optional[int]:
@@ -830,6 +838,7 @@ def build_fdrs_data(
             "ImputedValue": imputed_out,
             "Tokens": tokens,
             "BaseKPI": base_kpi,
+            "State": r.get("State") if r.get("State") is not None else "",
         })
     if fdrs_excl is not None and isinstance(fdrs_excl, dict):
         fdrs_excl["count_by_reason"] = count_by_reason

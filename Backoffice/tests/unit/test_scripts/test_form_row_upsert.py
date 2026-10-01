@@ -188,6 +188,45 @@ class TestUpsertFormDataRowsUnchangedDetection:
             )
             assert row.value == "7"
 
+    def test_state_500_fills_published_fields_and_other_states_clear_them(self, db_session, app):
+        with app.app_context():
+            aes, item = _make_aes_and_item(db_session)
+            published_row = _row(
+                aes.id,
+                item.id,
+                "15",
+                published_value="15",
+                published_disagg_data="",
+            )
+            stats = upsert_form_data_rows([published_row], batch_size=100)
+            assert stats["inserted"] == 1
+            row = (
+                db_session.query(FormData)
+                .filter_by(assignment_entity_status_id=aes.id, form_item_id=item.id)
+                .one()
+            )
+            assert row.value == "15"
+            assert row.published_value == "15"
+            assert row.published_numeric_value == 15.0
+            assert row.published_source == FormData.PUBLISHED_SOURCE_REPORTED
+            assert row.published_at is not None
+
+            cleared = _row(
+                aes.id,
+                item.id,
+                "15",
+                published_value="",
+                published_disagg_data="",
+            )
+            stats = upsert_form_data_rows([cleared], batch_size=100)
+            assert stats["updated"] == 1
+            db_session.expire_all()
+            row = db_session.get(FormData, row.id)
+            assert row.value == "15"
+            assert row.published_value is None
+            assert row.published_numeric_value is None
+            assert row.published_source is None
+
     def test_dry_run_distinguishes_updated_from_unchanged_without_writing(self, db_session, app):
         with app.app_context():
             aes1, item1 = _make_aes_and_item(db_session)

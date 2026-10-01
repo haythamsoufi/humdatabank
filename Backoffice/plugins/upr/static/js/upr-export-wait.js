@@ -1,6 +1,7 @@
 (function () {
   var statusUrl = document.body && document.body.getAttribute("data-status-url");
   var fileUrl = document.body && document.body.getAttribute("data-file-url");
+  var openMode = (document.body && document.body.getAttribute("data-file-open")) || "download";
   if (!statusUrl || !fileUrl) return;
 
   var started = Date.now();
@@ -46,6 +47,21 @@
     if (elapsed) elapsed.textContent = formatElapsed(Date.now() - started);
   }
 
+  function showInlineFile() {
+    // Navigating this document to the PDF makes Chrome download it and leave
+    // this screen in place. A framed load renders the file in the page.
+    document.documentElement.style.height = "100%";
+    document.body.replaceChildren();
+    document.body.style.cssText =
+      "margin:0;height:100%;height:100dvh;display:block;background:#525659;overflow:hidden";
+    var frame = document.createElement("iframe");
+    frame.src = fileUrl;
+    frame.title = document.title || "PDF";
+    frame.style.cssText =
+      "position:fixed;inset:0;border:0;width:100%;height:100%;height:100dvh;background:#525659";
+    document.body.appendChild(frame);
+  }
+
   function poll() {
     if (Date.now() - started > maxMs) {
       fail("This is taking longer than expected. Try again in a moment.");
@@ -67,7 +83,8 @@
           return;
         }
         if (status === "completed") {
-          window.location.replace(fileUrl);
+          if (openMode === "inline") showInlineFile();
+          else window.location.replace(fileUrl);
           return;
         }
         if (status === "failed" || status === "cancelled") {

@@ -13,6 +13,7 @@ from plugins.upr.assignment_job import (
     REUSE_COMPLETED_SECONDS,
     _reusable_job_id,
     _visual_job_matches,
+    export_still_pulsing,
     take_matching_pdf_bytes,
 )
 from plugins.upr.typography import export_style_token
@@ -175,6 +176,47 @@ def test_take_matching_pdf_bytes_waits_for_inflight(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_export_still_pulsing_while_another_worker_renders():
+    now = utcnow()
+    fresh = SimpleNamespace(
+        meta={"heartbeat_at": (now - timedelta(seconds=4)).isoformat()},
+        started_at=now - timedelta(seconds=4),
+        created_at=now - timedelta(seconds=4),
+    )
+    assert export_still_pulsing(fresh, now=now)
+
+    stale = SimpleNamespace(
+        meta={"heartbeat_at": (now - timedelta(seconds=90)).isoformat()},
+        started_at=now - timedelta(seconds=90),
+        created_at=now - timedelta(seconds=90),
+    )
+    assert not export_still_pulsing(stale, now=now)
+
+
+@pytest.mark.unit
+def test_export_still_pulsing_uses_started_at_before_first_heartbeat():
+    now = utcnow()
+    job = SimpleNamespace(
+        meta={},
+        started_at=now - timedelta(seconds=6),
+        created_at=now - timedelta(minutes=30),
+    )
+    assert export_still_pulsing(job, now=now)
+    job.started_at = now - timedelta(seconds=90)
+    assert not export_still_pulsing(job, now=now)
+
+
+@pytest.mark.unit
+def test_export_still_pulsing_ignores_bad_heartbeat_stamp():
+    now = utcnow()
+    job = SimpleNamespace(
+        meta={"heartbeat_at": "not-a-timestamp"},
+        started_at=now - timedelta(seconds=3),
+        created_at=now - timedelta(seconds=3),
+    )
+    assert export_still_pulsing(job, now=now)
+
+
 def test_take_matching_pdf_bytes_none_when_no_job(monkeypatch):
     monkeypatch.setattr(
         "plugins.upr.assignment_job.find_reusable_assignment_export_job",

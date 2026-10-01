@@ -24,6 +24,7 @@ from app.services.data_quality.helpers import (
 )
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
+from app.utils.country_utils import exclude_sandbox_countries
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 from plugins.fdrs import bp
 from plugins.fdrs.data_quality.fdrs_v1_catalog import (
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 def _compliance_countries():
     """Every country, with National Societies loaded for activity tagging."""
     return (
-        Country.query
+        exclude_sandbox_countries(Country.query)
         .options(selectinload(Country.national_societies))
         .order_by(Country.name)
         .all()

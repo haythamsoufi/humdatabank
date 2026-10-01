@@ -42,6 +42,11 @@ REUSE_COMPLETED_SECONDS = 15 * 60
 _ACTIVE_JOB_STATUSES = ("queued", "running", "cancel_requested")
 _TERMINAL_JOB_STATUSES = frozenset({"completed", "failed", "cancelled"})
 _VISUAL_FORMATS = frozenset({"png", "pdf", "idml"})
+# Status polls land on any gunicorn worker. The export thread lives in only one
+# of them, so a missing local thread is not proof the render died. A fresh pulse
+# means another worker still owns it. Past this, the owner was recycled or killed.
+_ORPHAN_GRACE_SECONDS = 45
+_PULSE_INTERVAL_SECONDS = 5
 _last_cleanup_ts = 0.0
 _last_cleanup_lock = threading.Lock()
 
@@ -346,6 +351,75 @@ def start_assignment_export_job(app, job_id: str) -> None:
     start_ai_job_thread(app, str(job_id), _run_assignment_export_job)
 
 
+def _last_export_pulse(job: AIJob) -> datetime | None:
+    meta = job.meta if isinstance(job.meta, dict) else {}
+    raw = meta.get("heartbeat_at")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            return _as_utc(datetime.fromisoformat(raw.strip()))
+        except ValueError:
+            pass
+    return _as_utc(job.started_at) or _as_utc(job.created_at)
+
+
+def export_still_pulsing(
+    job: AIJob,
+    *,
+    now: datetime | None = None,
+    grace_seconds: float = _ORPHAN_GRACE_SECONDS,
+) -> bool:
+    """True when a render is recent enough that another worker may still own it."""
+    pulse = _last_export_pulse(job)
+    if pulse is None:
+        return False
+    current = _as_utc(now) or utcnow()
+    if current is None:
+        return False
+    return (current - pulse).total_seconds() < float(grace_seconds)
+
+
+def _pulse_assignment_export(job_id: str) -> None:
+    """Stamp heartbeat_at without clobbering progress written by the render thread."""
+    row = (
+        AIJob.query.filter(AIJob.id == str(job_id))
+        .populate_existing()
+        .with_for_update()
+        .one_or_none()
+    )
+    if row is None or _status_str(row.status) in _TERMINAL_JOB_STATUSES:
+        return
+    now = utcnow()
+    meta = dict(row.meta or {})
+    meta["heartbeat_at"] = now.isoformat()
+    row.meta = meta
+    flag_modified(row, "meta")
+    # Item activity is what other workers use to decide the job is stale.
+    for item in row.items or []:
+        if _status_str(item.status) in {"queued", "processing", "downloading"}:
+            item.updated_at = now
+    db.session.commit()
+
+
+def _export_pulse_loop(app, job_id: str, stop: threading.Event) -> None:
+    while not stop.is_set():
+        try:
+            with app.app_context():
+                _pulse_assignment_export(job_id)
+        except Exception:
+            logger.debug("UPR assignment export pulse failed job=%s", job_id, exc_info=True)
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+        finally:
+            try:
+                db.session.remove()
+            except Exception:
+                pass
+        if stop.wait(_PULSE_INTERVAL_SECONDS):
+            return
+
+
 def ensure_assignment_export_job_running(app, job_id: str) -> None:
     _maybe_cleanup_expired_jobs()
     reconcile_stale_ai_job(str(job_id))
@@ -359,6 +433,17 @@ def ensure_assignment_export_job_running(app, job_id: str) -> None:
     if _status_str(job.status) == "queued":
         ensure_ai_job_running(app, str(job_id), _run_assignment_export_job)
         return
+    # Running here, but the thread is in another worker (or this one is still
+    # inside WeasyPrint). Failing immediately is what showed "Server stopped
+    # during export" on an export that then finished a few seconds later.
+    if export_still_pulsing(job):
+        return
+    logger.warning(
+        "UPR assignment export orphaned job=%s aes=%s (no pulse for %ss)",
+        job_id,
+        (job.meta or {}).get("aes_id"),
+        _ORPHAN_GRACE_SECONDS,
+    )
     job.status = "failed"
     job.error = "Server stopped during export."
     job.finished_at = utcnow()
@@ -432,6 +517,10 @@ def serve_assignment_export(job_id: str, *, aes_id: int, as_attachment: bool = T
         as_attachment=as_attachment,
         download_name=filename,
     )
+    # A filename on an inline PDF makes Chrome download the file and leave the
+    # wait page on screen. `inline` with no name renders in the viewer iframe.
+    if not as_attachment and mimetype == "application/pdf":
+        response.headers["Content-Disposition"] = "inline"
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -464,7 +553,7 @@ def _report(
             total if total is not None else "-",
             message,
         )
-    fields: dict[str, Any] = {"message": message}
+    fields: dict[str, Any] = {"message": message, "heartbeat_at": utcnow().isoformat()}
     if step is not None:
         fields["progress"] = int(step)
     if total is not None:
@@ -483,163 +572,182 @@ def _report(
 
 def _run_assignment_export_job(app, job_id: str) -> None:
     with app.app_context():
-        job = AIJob.query.get(str(job_id))
-        if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
-            return
-        if _status_str(job.status) in _TERMINAL_JOB_STATUSES:
-            return
-        item = (job.items or [None])[0]
-        job.status = "running"
-        job.started_at = job.started_at or utcnow()
-        _report(job, "Starting export…", step=0, total=5, elapsed=0)
-        if item is not None:
-            item.status = "processing"
-        db.session.commit()
-        payload = dict(item.payload or {}) if item is not None else {}
-        aes_id = int(payload.get("aes_id") or (job.meta or {}).get("aes_id") or 0)
-        fmt = str(payload.get("export_format") or (job.meta or {}).get("export_format") or "pdf")
-        dashboard_id = str(
-            payload.get("dashboard_id") or (job.meta or {}).get("dashboard_id") or "combined"
+        stop_pulse = threading.Event()
+        pulse = threading.Thread(
+            target=_export_pulse_loop,
+            args=(app, str(job_id), stop_pulse),
+            name=f"upr-export-pulse-{str(job_id)[:8]}",
+            daemon=True,
         )
-        lang = parse_export_language(payload.get("lang") or (job.meta or {}).get("lang"))
-        job_dir = _job_dir(str(job_id))
-        word_path = payload.get("word_path") or ""
-        word_filename = str(payload.get("word_filename") or "")
-        audience = payload.get("audience")
-        started = utcnow()
+        try:
+            _run_assignment_export_job_body(app, job_id, pulse)
+        finally:
+            stop_pulse.set()
+            if pulse.is_alive():
+                pulse.join(timeout=2)
+            db.session.remove()
+
+
+def _run_assignment_export_job_body(_app, job_id: str, pulse: threading.Thread) -> None:
+    job = AIJob.query.get(str(job_id))
+    if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
+        return
+    if _status_str(job.status) in _TERMINAL_JOB_STATUSES:
+        return
+    item = (job.items or [None])[0]
+    job.status = "running"
+    job.started_at = job.started_at or utcnow()
+    _report(job, "Starting export…", step=0, total=5, elapsed=0)
+    if item is not None:
+        item.status = "processing"
+    db.session.commit()
+    if not pulse.is_alive():
+        pulse.start()
+    payload = dict(item.payload or {}) if item is not None else {}
+    aes_id = int(payload.get("aes_id") or (job.meta or {}).get("aes_id") or 0)
+    fmt = str(payload.get("export_format") or (job.meta or {}).get("export_format") or "pdf")
+    dashboard_id = str(
+        payload.get("dashboard_id") or (job.meta or {}).get("dashboard_id") or "combined"
+    )
+    lang = parse_export_language(payload.get("lang") or (job.meta or {}).get("lang"))
+    job_dir = _job_dir(str(job_id))
+    word_path = payload.get("word_path") or ""
+    word_filename = str(payload.get("word_filename") or "")
+    audience = payload.get("audience")
+    started = utcnow()
+    logger.info(
+        "UPR assignment export start job=%s aes=%s fmt=%s dash=%s lang=%s",
+        job_id,
+        aes_id,
+        fmt,
+        dashboard_id,
+        lang,
+    )
+    try:
+        if aes_id <= 0:
+            raise RuntimeError("Export job is missing the assignment.")
+        word_bytes = _read_job_word(job_dir, word_path)
+        if word_bytes and fmt == "idml":
+            _report(job, "Generating InDesign package…", step=1, total=3)
+            data, filename = UprVisualsService.idml_zip_bytes(
+                aes_id,
+                word_bytes=word_bytes,
+                lang=lang,
+                audience=audience,
+                word_filename=word_filename,
+            )
+            mimetype = "application/zip"
+        elif word_bytes:
+            last_logged_elapsed = {"value": -10}
+
+            def on_progress(
+                *,
+                step: int,
+                total: int,
+                message: str,
+                elapsed: int | None = None,
+                chunk_done: int | None = None,
+                chunk_total: int | None = None,
+                **_extra: Any,
+            ) -> None:
+                secs = int(elapsed or 0)
+                chunking = chunk_done is not None
+                should_log = (
+                    (chunking and chunk_done in {0, chunk_total})
+                    or (not chunking and (elapsed is None or secs - last_logged_elapsed["value"] >= 10))
+                )
+                if should_log and elapsed is not None and not chunking:
+                    last_logged_elapsed["value"] = secs
+                _report(
+                    job,
+                    message,
+                    step=step,
+                    total=total,
+                    elapsed=elapsed,
+                    chunk_done=chunk_done,
+                    chunk_total=chunk_total,
+                    log=should_log,
+                )
+
+            data, filename = UprVisualsService.narrative_pdf_bytes(
+                aes_id,
+                word_bytes,
+                lang=lang,
+                on_progress=on_progress,
+                audience=audience,
+                word_filename=word_filename,
+            )
+            mimetype = "application/pdf"
+        elif fmt == "png":
+            pdf_job_id = find_reusable_assignment_export_job(
+                aes_id=aes_id,
+                export_format="pdf",
+                dashboard_id=dashboard_id,
+                lang=lang,
+            )
+            waiting_for_pdf = False
+            if pdf_job_id:
+                pdf_job = AIJob.query.get(str(pdf_job_id))
+                waiting_for_pdf = bool(
+                    pdf_job and _status_str(pdf_job.status) in _ACTIVE_JOB_STATUSES
+                )
+            _report(
+                job,
+                "Waiting for PDF, then generating PNG…" if waiting_for_pdf else "Generating PNG…",
+                step=1,
+                total=2,
+            )
+            data, filename = UprVisualsService.png_bytes(aes_id, dashboard_id, lang=lang)
+            mimetype = "image/png"
+        elif fmt == "idml":
+            _report(job, "Generating InDesign package…", step=1, total=2)
+            data, filename = UprVisualsService.idml_zip_bytes(aes_id, lang=lang)
+            mimetype = "application/zip"
+        else:
+            _report(job, "Generating PDF…", step=1, total=2)
+            data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id, lang=lang)
+            mimetype = "application/pdf"
+        output = job_dir / filename
+        output.write_bytes(data)
+        job.status = "completed"
+        job.finished_at = utcnow()
+        if item is not None:
+            item.status = "completed"
+            item.error = None
+        elapsed = int((utcnow() - (started or utcnow())).total_seconds())
+        _set_meta(
+            job,
+            message="Ready",
+            filename=filename,
+            output_path=str(output),
+            mimetype=mimetype,
+            progress=5,
+            total=5,
+            elapsed_s=elapsed,
+            error=None,
+        )
+        db.session.commit()
         logger.info(
-            "UPR assignment export start job=%s aes=%s fmt=%s dash=%s lang=%s",
+            "UPR assignment export done job=%s aes=%s fmt=%s (%s bytes, %ss)",
             job_id,
             aes_id,
             fmt,
-            dashboard_id,
-            lang,
+            len(data),
+            elapsed,
         )
-        try:
-            if aes_id <= 0:
-                raise RuntimeError("Export job is missing the assignment.")
-            word_bytes = _read_job_word(job_dir, word_path)
-            if word_bytes and fmt == "idml":
-                _report(job, "Generating InDesign package…", step=1, total=3)
-                data, filename = UprVisualsService.idml_zip_bytes(
-                    aes_id,
-                    word_bytes=word_bytes,
-                    lang=lang,
-                    audience=audience,
-                    word_filename=word_filename,
-                )
-                mimetype = "application/zip"
-            elif word_bytes:
-                last_logged_elapsed = {"value": -10}
+    except Exception as exc:
+        logger.exception("UPR assignment export failed: job=%s", job_id)
+        from plugins.upr.errors import UprError
 
-                def on_progress(
-                    *,
-                    step: int,
-                    total: int,
-                    message: str,
-                    elapsed: int | None = None,
-                    chunk_done: int | None = None,
-                    chunk_total: int | None = None,
-                    **_extra: Any,
-                ) -> None:
-                    secs = int(elapsed or 0)
-                    chunking = chunk_done is not None
-                    should_log = (
-                        (chunking and chunk_done in {0, chunk_total})
-                        or (not chunking and (elapsed is None or secs - last_logged_elapsed["value"] >= 10))
-                    )
-                    if should_log and elapsed is not None and not chunking:
-                        last_logged_elapsed["value"] = secs
-                    _report(
-                        job,
-                        message,
-                        step=step,
-                        total=total,
-                        elapsed=elapsed,
-                        chunk_done=chunk_done,
-                        chunk_total=chunk_total,
-                        log=should_log,
-                    )
-
-                data, filename = UprVisualsService.narrative_pdf_bytes(
-                    aes_id,
-                    word_bytes,
-                    lang=lang,
-                    on_progress=on_progress,
-                    audience=audience,
-                    word_filename=word_filename,
-                )
-                mimetype = "application/pdf"
-            elif fmt == "png":
-                pdf_job_id = find_reusable_assignment_export_job(
-                    aes_id=aes_id,
-                    export_format="pdf",
-                    dashboard_id=dashboard_id,
-                    lang=lang,
-                )
-                waiting_for_pdf = False
-                if pdf_job_id:
-                    pdf_job = AIJob.query.get(str(pdf_job_id))
-                    waiting_for_pdf = bool(
-                        pdf_job and _status_str(pdf_job.status) in _ACTIVE_JOB_STATUSES
-                    )
-                _report(
-                    job,
-                    "Waiting for PDF, then generating PNG…" if waiting_for_pdf else "Generating PNG…",
-                    step=1,
-                    total=2,
-                )
-                data, filename = UprVisualsService.png_bytes(aes_id, dashboard_id, lang=lang)
-                mimetype = "image/png"
-            elif fmt == "idml":
-                _report(job, "Generating InDesign package…", step=1, total=2)
-                data, filename = UprVisualsService.idml_zip_bytes(aes_id, lang=lang)
-                mimetype = "application/zip"
-            else:
-                _report(job, "Generating PDF…", step=1, total=2)
-                data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id, lang=lang)
-                mimetype = "application/pdf"
-            output = job_dir / filename
-            output.write_bytes(data)
-            job.status = "completed"
-            job.finished_at = utcnow()
-            if item is not None:
-                item.status = "completed"
-                item.error = None
-            elapsed = int((utcnow() - (started or utcnow())).total_seconds())
-            _set_meta(
-                job,
-                message="Ready",
-                filename=filename,
-                output_path=str(output),
-                mimetype=mimetype,
-                progress=5,
-                total=5,
-                elapsed_s=elapsed,
-                error=None,
-            )
-            db.session.commit()
-            logger.info(
-                "UPR assignment export done job=%s aes=%s fmt=%s (%s bytes, %ss)",
-                job_id,
-                aes_id,
-                fmt,
-                len(data),
-                elapsed,
-            )
-        except Exception as exc:
-            logger.exception("UPR assignment export failed: job=%s", job_id)
-            from plugins.upr.errors import UprError
-
-            message = str(exc) if isinstance(exc, UprError) else "Could not generate this report."
-            job.status = "failed"
-            job.finished_at = utcnow()
-            job.error = message
-            if item is not None:
-                item.status = "failed"
-                item.error = message
-            _set_meta(job, message="Failed", error=message)
-            db.session.commit()
-            shutil.rmtree(job_dir, ignore_errors=True)
-        finally:
-            db.session.remove()
+        message = str(exc) if isinstance(exc, UprError) else "Could not generate this report."
+        job.status = "failed"
+        job.finished_at = utcnow()
+        job.error = message
+        if item is not None:
+            item.status = "failed"
+            item.error = message
+        _set_meta(job, message="Failed", error=message)
+        db.session.commit()
+        shutil.rmtree(job_dir, ignore_errors=True)
+    finally:
+        db.session.remove()

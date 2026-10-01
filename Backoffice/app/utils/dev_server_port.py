@@ -20,6 +20,24 @@ def is_reloader_child() -> bool:
     return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
 
+def reloader_disabled() -> bool:
+    """True when `python run.py` was started with FLASK_USE_RELOADER=false.
+
+    Only the literal ``false`` disables the reloader; that matches run.py.
+    """
+    return os.environ.get("FLASK_USE_RELOADER", "").strip().lower() == "false"
+
+
+def dev_process_serves_http() -> bool:
+    """True in the process that actually handles requests.
+
+    With the Werkzeug reloader that is the child. With the reloader disabled
+    there is no child, so this process must load plugins and their template
+    globals (otherwise assignment pages crash on ``upr_static_url``).
+    """
+    return is_reloader_child() or reloader_disabled()
+
+
 def should_guard_existing_server() -> bool:
     """Refuse a second server only in the original process, not the reloader child."""
     return not is_reloader_child()

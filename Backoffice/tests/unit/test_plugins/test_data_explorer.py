@@ -28,8 +28,10 @@ def test_fdrs_plugin_owns_fdrs_explorer_tabs():
     from plugins.upr.plugin import UprPlugin
 
     tabs = {tab.tab_id: tab for tab in FdrsPlugin().get_data_explorer_tabs()}
-    assert list(tabs) == ["disaggregation", "compliance", "pb-progress"]
+    assert list(tabs) == ["disaggregation", "service-income", "compliance", "pb-progress"]
     assert tabs["disaggregation"].permission == "admin.data_explore.analysis"
+    assert tabs["service-income"].permission == "admin.data_explore.analysis"
+    assert tabs["service-income"].panel_template == "plugins/fdrs/service_income/tab_panel.html"
     assert tabs["compliance"].permission == "admin.data_explore.compliance"
     assert tabs["pb-progress"].permission == "admin.data_explore.pb_progress"
     assert tabs["pb-progress"].plugin_id == "fdrs"

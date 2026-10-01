@@ -31,6 +31,7 @@ from app.plugins.data_explorer import (
 )
 from app.plugins.manager import PluginManager
 from app.services.data_quality.helpers import list_exploration_period_names
+from app.utils.country_utils import exclude_sandbox_countries
 from flask_babel import gettext as _
 from markupsafe import Markup
 import json
@@ -468,6 +469,7 @@ def get_assignment_filters_for_template():
             .distinct()
             .order_by(Country.name)
         )
+        countries_query = exclude_sandbox_countries(countries_query)
         countries = countries_query.all()
         countries_data = [{'id': c.id, 'name': c.name} for c in countries]
 

@@ -21,7 +21,7 @@
         <!-- Sub-tabs for Disaggregation (template selector + analysis views) -->
         <div class="bg-white shadow-md border border-gray-200 mb-6">
             <div class="border-b border-gray-200 px-3 sm:px-4">
-                <div class="flex flex-wrap items-center gap-1 overflow-x-auto py-1" id="disagg-subtabs">
+                <div class="flex flex-nowrap items-center gap-1 overflow-x-auto py-1" id="disagg-subtabs">
                     <div id="disagg-template-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
                         <label for="disagg-template-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Template') }}</label>
                         <select id="disagg-template-filter"
@@ -40,12 +40,12 @@
                         </select>
                     </div>
                     <div class="disagg-subtabs-divider" aria-hidden="true"></div>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="women-leadership">{{ _('Women Participation') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="sex-age">{{ _('Sex, Age & Sex & Age') }}</button>
-                    <button type="button" class="disagg-subtab px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="country-coverage">{{ _('Country Disaggregation Coverage') }}</button>
+                    <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
+                    <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
+                    <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
+                    <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="women-leadership">{{ _('Women Participation') }}</button>
+                    <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="sex-age">{{ _('Sex, Age & Sex & Age') }}</button>
+                    <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="country-coverage">{{ _('Country Disaggregation Coverage') }}</button>
                 </div>
             </div>
         </div>

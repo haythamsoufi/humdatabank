@@ -22,6 +22,7 @@ def load_routes() -> None:
     """Register FDRS HTTP routes onto ``bp`` (idempotent side-effect imports)."""
     from plugins.fdrs import routes  # noqa: F401
     from plugins.fdrs import compliance_routes  # noqa: F401
+    from plugins.fdrs import service_income_routes  # noqa: F401
     from plugins.fdrs import publication_routes  # noqa: F401
     from plugins.fdrs import document_status_routes  # noqa: F401
     from plugins.fdrs import public_api_routes  # noqa: F401

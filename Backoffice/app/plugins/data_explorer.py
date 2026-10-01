@@ -22,6 +22,25 @@ CORE_DATA_EXPLORER_PERMISSIONS: tuple[str, ...] = tuple(
 )
 
 
+def user_can_read_disaggregation_template(user, template_id) -> bool:
+    """Analysis permission reads the FDRS template without a share or country grant.
+
+    The Disaggregation tab aggregates that template for every country. Owning the
+    template or holding entity access is not required.
+    """
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+
+    try:
+        if int(template_id) != int(FDRS_TEMPLATE_ID):
+            return False
+    except (TypeError, ValueError):
+        return False
+    if AuthorizationService.is_system_manager(user):
+        return True
+    return AuthorizationService.has_rbac_permission(user, "admin.data_explore.analysis")
+
+
 def tab_flag_key(tab_id: str, *, prefix: str = "can_access") -> str:
     return f"{prefix}_{tab_id.replace('-', '_')}"
 

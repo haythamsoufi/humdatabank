@@ -193,18 +193,30 @@
                                 </select>
                             </div>
 
-                            {# Order — left column; label and input on one line #}
+                            {# Order — whole-number position at the chosen level #}
                             <div class="flex items-center gap-2 min-w-0">
                                 <label for="item-order" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Order') }}</label>
-                                <input type="number" name="order" id="item-order" class="w-20 shrink-0 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1.5 sm:text-sm border-gray-300 rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="4.1" step="0.1" min="0">
-                                <span class="custom-info-tooltip shrink-0" aria-label="{{ _('Help')|forceescape }}">
-                                    <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
-                                    <span class="tooltip-text">{{ _('Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, 4.3)') }}</span>
-                                </span>
+                                <input type="number" id="item-order" class="w-20 shrink-0 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1.5 sm:text-sm border-gray-300 rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="1" step="1" min="0" inputmode="numeric">
+                                <input type="hidden" name="order" id="item-order-value" value="">
                             </div>
 
                             {# Privacy — right column; populated by JS #}
                             <div id="item-privacy-field" class="flex items-center gap-2 min-w-0"></div>
+
+                            {# Parent — main item, or sub-item of a field in this section #}
+                            <div class="col-span-2 flex items-center gap-2 min-w-0">
+                                <label for="item-parent-order" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Parent') }}</label>
+                                <select id="item-parent-order" class="flex-1 min-w-0 py-1.5 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md"
+                                        data-label-main="{{ _('Main item')|forceescape }}"
+                                        data-label-item="{{ _('Item')|forceescape }}"
+                                        data-label-archived="{{ _('archived')|forceescape }}">
+                                    <option value="">{{ _('Main item') }}</option>
+                                </select>
+                                <span class="custom-info-tooltip shrink-0" aria-label="{{ _('Help')|forceescape }}">
+                                    <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                    <span class="tooltip-text">{{ _('Main item keeps this field at the top level of the section. Choose a parent to indent it as a sub-item. Order is its position at that level (1–9 under a parent).') }}</span>
+                                </span>
+                            </div>
 
                             <div id="item-modal-stable-key-row" class="hidden col-span-2 flex items-center gap-2 min-w-0 flex-wrap">
                                 <label for="item-modal-stable-key" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Field ID') }}</label>

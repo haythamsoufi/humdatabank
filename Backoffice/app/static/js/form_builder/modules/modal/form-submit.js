@@ -70,6 +70,7 @@ export const FormSubmitMixin = {
                 if (sectionSelect && sectionIdInput) {
                     sectionIdInput.value = sectionSelect.value;
                 }
+                this.composeItemOrderForSubmit();
             }
         } catch (_e) {}
 

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 20:23+0000\n"
+"POT-Creation-Date: 2026-10-01 22:38+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: en <LL@li.org>\n"
@@ -140,8 +140,8 @@ msgstr ""
 "%(count)s string is not in the current source catalog (.pot) and can be "
 "deleted."
 
-#: app/routes/admin/utilities/translations.py:2118
 #: app/routes/admin/utilities/translations.py:2131
+#: app/routes/admin/utilities/translations.py:2144
 #, python-format
 msgid "%(count)s string was skipped because it is already human-approved."
 msgstr "%(count)s string was skipped because it is already human-approved."
@@ -12999,6 +12999,16 @@ msgid "If set, this section will be nested under the selected parent section."
 msgstr ""
 "If set, this section will be nested under the selected parent section."
 
+#: plugins/upr/templates/upr/_manage_tools.html:136
+#: plugins/upr/templates/upr/_narrative_modal.html:50
+#, python-brace-format
+msgid ""
+"If the narrative is not already in {language}, it will be translated into "
+"{language} after upload, before the report is generated."
+msgstr ""
+"If the narrative is not already in {language}, it will be translated into "
+"{language} after upload, before the report is generated."
+
 #: app/templates/forms/entry_form/entry_form.html:3137
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to avoid"
@@ -13987,7 +13997,7 @@ msgstr "Invalid template selection or country not assigned to you."
 msgid "Invalid translation payload"
 msgstr "Invalid translation payload"
 
-#: app/routes/admin/utilities/translations.py:2206
+#: app/routes/admin/utilities/translations.py:2219
 msgid "Invalid translation type"
 msgstr "Invalid translation type"
 
@@ -15982,8 +15992,8 @@ msgstr "Message"
 msgid "Message ID"
 msgstr "Message ID"
 
-#: app/routes/admin/utilities/translations.py:2032
-#: app/routes/admin/utilities/translations.py:2035
+#: app/routes/admin/utilities/translations.py:2045
+#: app/routes/admin/utilities/translations.py:2048
 msgid "Message ID is required for translation type"
 msgstr "Message ID is required for translation type"
 
@@ -17357,8 +17367,8 @@ msgstr "No items found matching your search."
 msgid "No items found that need translation"
 msgstr "No items found that need translation"
 
-#: app/routes/admin/utilities/translations.py:2160
-#: app/routes/admin/utilities/translations.py:2302
+#: app/routes/admin/utilities/translations.py:2173
+#: app/routes/admin/utilities/translations.py:2315
 msgid "No items provided"
 msgstr "No items provided"
 
@@ -17742,7 +17752,7 @@ msgstr "No traces match the current filters"
 msgid "No translation fields found that need translation"
 msgstr "No translation fields found that need translation"
 
-#: app/routes/admin/utilities/translations.py:1860
+#: app/routes/admin/utilities/translations.py:1861
 msgid ""
 "No translation service available. Please configure translation API keys."
 msgstr ""
@@ -26386,8 +26396,8 @@ msgstr "Text"
 msgid "Text content"
 msgstr "Text content"
 
-#: app/routes/admin/utilities/translations.py:1817
-#: app/routes/admin/utilities/translations.py:1853
+#: app/routes/admin/utilities/translations.py:1818
+#: app/routes/admin/utilities/translations.py:1854
 msgid "Text is required"
 msgstr "Text is required"
 
@@ -26547,16 +26557,6 @@ msgstr ""
 #: app/templates/admin/api_keys/create.html:84
 msgid "The key will be hashed and stored securely in the database."
 msgstr "The key will be hashed and stored securely in the database."
-
-#: plugins/upr/templates/upr/_manage_tools.html:136
-#: plugins/upr/templates/upr/_narrative_modal.html:50
-#, python-brace-format
-msgid ""
-"The narrative will be translated into {language} after upload, before the "
-"report is generated."
-msgstr ""
-"The narrative will be translated into {language} after upload, before the "
-"report is generated."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:307
 msgid ""
@@ -32432,3 +32432,11 @@ msgstr "✓"
 #~ msgstr ""
 #~ "Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
 #~ "4.3)"
+
+# [Removed] was: plugins/upr/templates/upr/_manage_tools.html:136
+#~ msgid ""
+#~ "The narrative will be translated into {language} after upload, before the "
+#~ "report is generated."
+#~ msgstr ""
+#~ "The narrative will be translated into {language} after upload, before the "
+#~ "report is generated."

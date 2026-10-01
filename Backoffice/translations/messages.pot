@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-01 20:23+0000\n"
+"POT-Creation-Date: 2026-10-01 22:38+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -133,8 +133,8 @@ msgid ""
 "deleted."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2118
 #: app/routes/admin/utilities/translations.py:2131
+#: app/routes/admin/utilities/translations.py:2144
 #, python-format
 msgid "%(count)s string was skipped because it is already human-approved."
 msgstr ""
@@ -12430,6 +12430,14 @@ msgstr ""
 msgid "If set, this section will be nested under the selected parent section."
 msgstr ""
 
+#: plugins/upr/templates/upr/_manage_tools.html:136
+#: plugins/upr/templates/upr/_narrative_modal.html:50
+#, python-brace-format
+msgid ""
+"If the narrative is not already in {language}, it will be translated into"
+" {language} after upload, before the report is generated."
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:3137
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to "
@@ -13377,7 +13385,7 @@ msgstr ""
 msgid "Invalid translation payload"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2206
+#: app/routes/admin/utilities/translations.py:2219
 msgid "Invalid translation type"
 msgstr ""
 
@@ -15300,8 +15308,8 @@ msgstr ""
 msgid "Message ID"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2032
-#: app/routes/admin/utilities/translations.py:2035
+#: app/routes/admin/utilities/translations.py:2045
+#: app/routes/admin/utilities/translations.py:2048
 msgid "Message ID is required for translation type"
 msgstr ""
 
@@ -16632,8 +16640,8 @@ msgstr ""
 msgid "No items found that need translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2160
-#: app/routes/admin/utilities/translations.py:2302
+#: app/routes/admin/utilities/translations.py:2173
+#: app/routes/admin/utilities/translations.py:2315
 msgid "No items provided"
 msgstr ""
 
@@ -17007,7 +17015,7 @@ msgstr ""
 msgid "No translation fields found that need translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1860
+#: app/routes/admin/utilities/translations.py:1861
 msgid "No translation service available. Please configure translation API keys."
 msgstr ""
 
@@ -25330,8 +25338,8 @@ msgstr ""
 msgid "Text content"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1817
-#: app/routes/admin/utilities/translations.py:1853
+#: app/routes/admin/utilities/translations.py:1818
+#: app/routes/admin/utilities/translations.py:1854
 msgid "Text is required"
 msgstr ""
 
@@ -25461,14 +25469,6 @@ msgstr ""
 
 #: app/templates/admin/api_keys/create.html:84
 msgid "The key will be hashed and stored securely in the database."
-msgstr ""
-
-#: plugins/upr/templates/upr/_manage_tools.html:136
-#: plugins/upr/templates/upr/_narrative_modal.html:50
-#, python-brace-format
-msgid ""
-"The narrative will be translated into {language} after upload, before the"
-" report is generated."
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:307

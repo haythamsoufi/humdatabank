@@ -11,19 +11,20 @@ name: Deploy to Webapp
 run-name: >-
   ${{ github.event_name == 'release'
     && format('Auto-deploy to Staging — {0}', github.event.release.tag_name)
-    || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.release_label) }}
+    || format('Deploy to Webapp — {0} ({1})', inputs.environment == 'Both' && 'Staging + Production' || inputs.environment, inputs.release_label) }}
 
 on:
   # Release auto-deploy to Staging is disabled — use workflow_dispatch to deploy.
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: 'Target environment. Both runs Staging and Production in parallel (separate image tags, secrets, and deploy targets).'
         required: true
         type: choice
         options:
           - Staging
           - Production
+          - Both
       release_label:
         description: 'Release label stamped in the app (APP_VERSION fallback, e.g. v1.7). Not the ACR image tag — that is staging or production per environment.'
         required: true
@@ -34,10 +35,29 @@ on:
         required: false
         default: true
         type: boolean
+  # "Both" calls this workflow once per environment. Those calls are not manual
+  # runs: github.event_name stays workflow_dispatch, and inputs are the values
+  # passed in `with` (Staging or Production), not the dispatch choice "Both".
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Staging or Production'
+        required: true
+        type: string
+      release_label:
+        description: 'Release label stamped in the app'
+        required: true
+        type: string
+      restart_after_deploy:
+        description: 'Restart the web app after deploy so it pulls the new image'
+        required: false
+        default: true
+        type: boolean
 
 env:
   # When triggered by a release event, always deploy to Staging using the release tag.
   # When triggered manually, use the caller-supplied inputs.
+  # A "Both" dispatch does not build here; each called flow sets these from its own input.
   EFFECTIVE_ENV: ${{ github.event_name == 'release' && 'Staging' || inputs.environment }}
   EFFECTIVE_RELEASE_LABEL: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_label }}
   # Environment-scoped mutable tags in ACR. Never share one tag across prod and staging —
@@ -45,7 +65,27 @@ env:
   IMAGE_TAG: ${{ (github.event_name == 'release' || inputs.environment != 'Production') && 'staging' || 'production' }}
 
 jobs:
+  # Full build → deploy for each environment, in parallel. Each flow keeps its
+  # own GitHub environment (secrets and approvals) and ACR tag (staging|production).
+  # fail-fast is off so a Staging failure does not cancel Production, or the reverse.
+  deploy_both:
+    name: ${{ matrix.environment }}
+    if: inputs.environment == 'Both'
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [Staging, Production]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy-to-webapp.yml
+    secrets: inherit
+    with:
+      environment: ${{ matrix.environment }}
+      release_label: ${{ inputs.release_label }}
+      restart_after_deploy: ${{ inputs.restart_after_deploy }}
+
   build:
+    if: inputs.environment != 'Both'
     runs-on: ubuntu-latest
     environment: ${{ (github.event_name == 'release' || inputs.environment != 'Production') && 'staging' || 'production' }}
     permissions:
@@ -195,6 +235,7 @@ jobs:
             ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
           cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
           # Full cache export is expensive (~2 minutes), so only do it when deps change.
+          # A Both run may export this shared tag from two builds at once; one write wins.
           cache-to: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache,mode=max
           platforms: linux/amd64
           provenance: false
@@ -223,6 +264,9 @@ jobs:
           df -h
 
   deploy:
+    # success() keeps the usual "build must succeed" rule. An `if` on this job
+    # would otherwise run deploy even when build failed.
+    if: success() && inputs.environment != 'Both'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: build

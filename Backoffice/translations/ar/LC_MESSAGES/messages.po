@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 21:08+0000\n"
+"POT-Creation-Date: 2026-10-01 20:23+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ar <LL@li.org>\n"
@@ -23,12 +23,12 @@ msgstr "%(count)d (وأكثر)"
 msgid " Org admin notifications disabled in Settings."
 msgstr ""
 
-#: app/templates/admin/governance/dashboard.html:967
+#: app/templates/admin/governance/dashboard.html:429
 #, python-format
 msgid "%%(org)s focal point names"
 msgstr "أسماء نقاط التركيز ٪%(org)s"
 
-#: app/templates/admin/governance/dashboard.html:952
+#: app/templates/admin/governance/dashboard.html:414
 #, python-format
 msgid "%%(org)s focal points (count)"
 msgstr "نقاط البؤر ٪%(org)s (العد)"
@@ -58,6 +58,11 @@ msgstr ""
 #: app/services/notification/core.py:82
 #, python-format
 msgid "%(assignment_title)s"
+msgstr ""
+
+#: app/routes/admin/governance_dashboard.py:110
+#, python-format
+msgid "%(code)s is back on the open queue."
 msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:70
@@ -144,6 +149,11 @@ msgstr "قد يحتاج الحقل المقترح IFRC إلى تأكيد قبل 
 msgid "%(count)s value(s) carried forward"
 msgstr "قيمة IFRCHOLDERA المحمولة إلى الأمام %(count)s"
 
+#: app/services/platform/governance_program.py:649
+#, python-format
+msgid "%(country)s — %(period)s (%(days)s days overdue)"
+msgstr ""
+
 #: app/services/notification/core.py:194
 #, python-format
 msgid "%(country)s — due on %(due_date)s."
@@ -186,9 +196,69 @@ msgstr "IFRCHOLDERA في IFRCHOLDERB مع مرور الوقت %(metric)s %(count
 msgid "%(metric)s over time"
 msgstr "IFRC المكانة مع مرور الوقت %(metric)s"
 
-#: app/routes/forms/validation_summary.py:609
+#: app/services/platform/governance_program.py:342
+#, python-format
+msgid "%(missing)s of %(active)s active indicators have no definition."
+msgstr ""
+
+#: app/services/platform/governance_program.py:235
+#, python-format
+msgid "%(n)s account(s) have country access and no role."
+msgstr ""
+
+#: app/services/platform/governance_program.py:384
+#, python-format
+msgid "%(n)s active public link(s) have no expiry date."
+msgstr ""
+
+#: app/services/platform/governance_program.py:255
+#, python-format
+msgid "%(n)s approval(s) in the last 90 days have no approver recorded."
+msgstr ""
+
+#: app/services/platform/governance_program.py:321
+#, python-format
+msgid "%(n)s countries are missing one or both documents in %(periods)s."
+msgstr ""
+
+#: app/services/platform/governance_program.py:193
+#, python-format
+msgid "%(n)s country assignment(s) are open with no focal point."
+msgstr ""
+
+#: app/services/platform/governance_program.py:214
+#, python-format
+msgid "%(n)s deactivated account(s) still hold a role."
+msgstr ""
+
+#: app/routes/forms/validation_summary.py:610
 #, python-format
 msgid "%(n)s fields failed validation across %(total)s reviewed fields."
+msgstr ""
+
+#: app/services/platform/governance_program.py:363
+#, python-format
+msgid "%(n)s indicator suggestion(s) have been pending for more than 30 days."
+msgstr ""
+
+#: app/services/platform/governance_program.py:296
+#, python-format
+msgid "%(n)s open assignment(s) are still unstarted after the due date."
+msgstr ""
+
+#: app/services/platform/governance_program.py:152
+#, python-format
+msgid "%(n)s open assignment(s) have no data owner."
+msgstr ""
+
+#: app/services/platform/governance_program.py:276
+#, python-format
+msgid "%(n)s open country submission(s) are more than 30 days overdue."
+msgstr ""
+
+#: app/services/platform/governance_program.py:173
+#, python-format
+msgid "%(n)s published template(s) have no owner."
 msgstr ""
 
 #: app/templates/components/_sidebar_nav_categories.html:86
@@ -369,7 +439,7 @@ msgstr ".xlsx أو .xls (الحد الأقصى 50 ميجابايت)"
 msgid "0 selected"
 msgstr "0 تم اختياره"
 
-#: app/routes/forms/validation_summary.py:607
+#: app/routes/forms/validation_summary.py:608
 #, python-format
 msgid "1 field failed validation across %(total)s reviewed fields."
 msgstr ""
@@ -458,6 +528,13 @@ msgstr ""
 msgid "?"
 msgstr "?"
 
+#: app/services/platform/governance_program.py:202
+msgid ""
+"A deactivated person cannot sign in, but a role left on the account returns "
+"the moment the account is switched back on. Remove the role when the person "
+"leaves."
+msgstr ""
+
 #: app/templates/admin/communication/center.html:1317
 msgid "A descriptive name for this campaign"
 msgstr "اسم وصفي لهذه الحملة"
@@ -500,6 +577,12 @@ msgstr ""
 msgid "A non-English locale is required"
 msgstr "يتطلب وجود موقع غير إنجليزي"
 
+#: app/services/platform/governance_program.py:223
+msgid ""
+"A person scoped to a country and given no role can sign in and still cannot "
+"do the work. Either assign the role or remove the country access."
+msgstr ""
+
 #: app/templates/tours/tours.html:492
 msgid "A quick tour will help you get the most out of the admin tools."
 msgstr "جولة سريعة ستساعدك على الاستفادة القصوى من أدوات الإدارة."
@@ -510,10 +593,22 @@ msgid ""
 "effectively."
 msgstr "جولة سريعة ستساعدك على التنقل في المنصة وتقديم التقارير بفعالية."
 
-#: app/templates/admin/data_exploration/explore_data.html:1532
-#: app/templates/admin/data_exploration/explore_data.html:1889
+#: app/services/platform/governance_program.py:109
+msgid ""
+"A risk acceptance can run for at most one year. Choose an earlier review "
+"date."
+msgstr ""
+
+#: app/templates/admin/data_exploration/explore_data.html:1534
+#: app/templates/admin/data_exploration/explore_data.html:1931
 msgid "A server error occurred. Please try again later."
 msgstr "حدث خطأ في الخادم حاول مرة أخرى لاحقاً."
+
+#: app/services/platform/governance_program.py:351
+msgid ""
+"A suggestion still pending after 30 days has a reviewer. The glossary does "
+"not grow a queue nobody owns."
+msgstr ""
 
 #: app/routes/admin/utilities/translations.py:331
 msgid "A term with this English source and language already exists."
@@ -625,12 +720,12 @@ msgstr ""
 msgid "AI chat deleted"
 msgstr "حذفت دردشة الذكاء الاصطناعي"
 
-#: app/routes/forms/validation_summary.py:602
+#: app/routes/forms/validation_summary.py:603
 #, python-format
 msgid "AI found %(n)s discrepancies across %(total)s reviewed fields."
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:600
+#: app/routes/forms/validation_summary.py:601
 #, python-format
 msgid "AI found 1 discrepancy across %(total)s reviewed fields."
 msgstr ""
@@ -831,10 +926,38 @@ msgstr ""
 msgid "Accept"
 msgstr ""
 
+#: app/templates/admin/governance/dashboard.html:138
+msgid "Accept until review date"
+msgstr ""
+
 #: app/templates/components/_ai_policy_modal.html:16
 msgid "Acceptable Use"
 msgstr "الاستخدام المقبول"
 
+#: app/templates/admin/governance/dashboard.html:178
+msgid "Accepted"
+msgstr ""
+
+#: app/routes/admin/governance_dashboard.py:69
+#, python-format
+msgid "Accepted %(code)s until %(until)s."
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:106
+#, python-format
+msgid "Accepted by %(name)s"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:57
+msgid "Accepted risks"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:91
+#, python-format
+msgid "Accepted until %(date)s"
+msgstr ""
+
+#: app/services/platform/governance_program.py:874
 #: app/templates/admin/api_keys/details.html:260
 #: app/templates/admin/api_keys/list.html:115
 msgid "Access"
@@ -874,8 +997,8 @@ msgstr ""
 msgid "Access denied."
 msgstr "الدخول مرفوض."
 
-#: app/templates/admin/data_exploration/explore_data.html:1527
-#: app/templates/admin/data_exploration/explore_data.html:1884
+#: app/templates/admin/data_exploration/explore_data.html:1529
+#: app/templates/admin/data_exploration/explore_data.html:1926
 msgid "Access denied. You do not have permission to access this resource."
 msgstr "الدخول مرفوض ليس لديك إذن للوصول إلى هذا المورد."
 
@@ -956,6 +1079,10 @@ msgstr "إعدادات الحساب"
 #: app/templates/auth/account_settings.html:29
 msgid "Account settings sections"
 msgstr "أقسام إعدادات الحساب"
+
+#: app/templates/admin/governance/dashboard.html:98
+msgid "Accountable"
+msgstr ""
 
 #: app/templates/admin/user_management/users.html:140
 msgid "Accounts created in the last 7 days"
@@ -1146,10 +1273,18 @@ msgstr ""
 msgid "Active assignments"
 msgstr "المهام النشطة"
 
+#: app/services/platform/governance_program.py:139
+msgid "Active assignments have a data owner"
+msgstr ""
+
 #: app/templates/admin/templates/new_template.html:391
 #: app/templates/admin/templates/new_template.html:1217
 msgid "Active filters:"
 msgstr "المرشحات النشطة:"
+
+#: app/services/platform/governance_program.py:329
+msgid "Active indicators have a definition"
+msgstr ""
 
 #: app/templates/admin/translations/quality_dashboard.html:97
 msgid "Active must and preferred terms"
@@ -1175,10 +1310,6 @@ msgstr ""
 #: app/templates/admin/user_management/users.html:113
 msgid "Active users with no assigned entities"
 msgstr ""
-
-#: app/templates/admin/governance/dashboard.html:193
-msgid "Active without Owner"
-msgstr "نشط بدون مالك"
 
 #: app/templates/admin/analytics/dashboard.html:230
 #: app/templates/admin/analytics/sessions.html:158
@@ -1269,7 +1400,7 @@ msgid "Add Entry"
 msgstr "إضافة إدخال"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:171
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:244
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:246
 msgid "Add Filter"
 msgstr "إضافة فلتر"
 
@@ -1284,7 +1415,7 @@ msgstr "مجموعة الإضافة"
 msgid "Add Indicator"
 msgstr "إضافة مؤشر"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:390
+#: app/templates/forms/form_builder/partials/_item_modal.html:402
 #: app/templates/forms/form_builder/partials/_sections_container.html:140
 msgid "Add Item"
 msgstr "البند"
@@ -1363,7 +1494,7 @@ msgid "Add New Version"
 msgstr "إضافة نسخة جديدة"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:388
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:208
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:210
 msgid "Add Option"
 msgstr "إضافة خيار"
 
@@ -1371,7 +1502,7 @@ msgstr "إضافة خيار"
 msgid "Add Page"
 msgstr "إضافة صفحة"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:341
+#: app/templates/forms/form_builder/partials/_item_modal.html:353
 #: app/templates/forms/form_builder/partials/_section_modal.html:136
 #: app/templates/forms/form_builder/partials/_section_modal.html:137
 msgid "Add Relevance Rule"
@@ -1406,7 +1537,7 @@ msgstr "إضافة نوع"
 msgid "Add User"
 msgstr "إضافة مستخدم"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:345
+#: app/templates/forms/form_builder/partials/_item_modal.html:357
 msgid "Add Validation Rule"
 msgstr "قاعدة التحقق من الإضافة"
 
@@ -1450,7 +1581,7 @@ msgstr "إضافة نوع الشيك"
 msgid "Add common word"
 msgstr "إضافة كلمة شائعة"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:327
+#: app/templates/forms/form_builder/partials/_item_modal.html:339
 msgid "Add data source"
 msgstr "إضافة مصدر البيانات"
 
@@ -1537,7 +1668,7 @@ msgstr "أضف إلى التقرير الذاتي"
 #: app/templates/admin/indicator_bank/_indicator_bank_translation_helpers.html:7
 #: app/templates/forms/form_builder/partials/_item_modal.html:91
 #: app/templates/forms/form_builder/partials/_item_modal.html:106
-#: app/templates/forms/form_builder/partials/_item_modal.html:376
+#: app/templates/forms/form_builder/partials/_item_modal.html:388
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:6
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:32
 #: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:12
@@ -1549,8 +1680,8 @@ msgstr "أضف إلى التقرير الذاتي"
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:222
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:427
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:441
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:27
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:52
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:28
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:54
 #: app/templates/forms/form_builder/partials/_section_modal.html:34
 #: app/templates/forms/form_builder/partials/dynamic_section_config.html:34
 #: app/templates/forms/form_builder/partials/dynamic_section_config.html:35
@@ -1647,7 +1778,7 @@ msgstr "تحذيرات إضافية:"
 msgid "Additional actions"
 msgstr "تحذيرات إضافية:"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:260
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:262
 msgid ""
 "Adds an \"Other (please specify)\" entry to the list. Users can type a "
 "custom value that is stored as their answer."
@@ -1703,7 +1834,7 @@ msgstr "إضافة..."
 #: app/templates/admin/data_exploration/explore_data.html:22
 #: app/templates/admin/docs/documentation.html:1100
 #: app/templates/admin/embed_content/manage_embed_content.html:18
-#: app/templates/admin/governance/dashboard.html:101
+#: app/templates/admin/governance/dashboard.html:35
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:71
 #: app/templates/admin/indicator_bank/change_history.html:86
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:50
@@ -1902,11 +2033,11 @@ msgstr "الفئات العمرية"
 msgid "Age Groups (comma-separated)"
 msgstr "الفئات العمرية (مفصولة بالفاصلة)"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:135
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:167
 msgid "Age breakdown coverage"
 msgstr "تغطية تقسيم العمر"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:131
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:163
 msgid ""
 "Age breakdown coverage: percentage of eligible indicators with age or sex-"
 "and-age disaggregation."
@@ -1957,12 +2088,12 @@ msgstr "المحاذاة"
 msgid "All"
 msgstr "الجميع"
 
-#: app/routes/forms/validation_summary.py:620
+#: app/routes/forms/validation_summary.py:621
 #, python-format
 msgid "All %(n)s reviewed fields look consistent with available evidence."
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:618
+#: app/routes/forms/validation_summary.py:619
 msgid "All 1 reviewed field looks consistent with available evidence."
 msgstr ""
 
@@ -1994,7 +2125,7 @@ msgstr "All clear"
 #: app/templates/admin/ai/knowledge_base.html:649
 #: app/templates/admin/data_exploration/explore_data.html:97
 #: app/templates/admin/data_exploration/explore_data.html:1408
-#: app/templates/admin/data_exploration/explore_data.html:1464
+#: app/templates/admin/data_exploration/explore_data.html:1466
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:33
 #: app/templates/admin/templates/data_sync_imputation.html:169
 #: app/templates/admin/templates/data_sync_imputation.html:652
@@ -2019,8 +2150,8 @@ msgid "All FDS members"
 msgstr "جميع أعضاء FDS"
 
 #: app/templates/admin/data_exploration/explore_data.html:81
-#: app/templates/admin/data_exploration/explore_data.html:1495
-#: app/templates/admin/data_exploration/explore_data.html:2567
+#: app/templates/admin/data_exploration/explore_data.html:1497
+#: app/templates/admin/data_exploration/explore_data.html:2609
 msgid "All Form Items"
 msgstr "قوالب النماذج"
 
@@ -2049,7 +2180,7 @@ msgstr "جميع الوحدات"
 
 #: app/templates/admin/data_exploration/explore_data.html:89
 #: app/templates/admin/data_exploration/explore_data.html:1404
-#: app/templates/admin/data_exploration/explore_data.html:1457
+#: app/templates/admin/data_exploration/explore_data.html:1459
 msgid "All Periods"
 msgstr "الفترة"
 
@@ -2250,11 +2381,11 @@ msgstr "جميع المستخدمين"
 msgid "All years in the default range are selected initially."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:246
+#: app/templates/forms/form_builder/partials/_item_modal.html:258
 msgid "Allow \"Data not available\" option"
 msgstr "قابل للتطبيق ولكن البيانات غير متوفرة"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:254
+#: app/templates/forms/form_builder/partials/_item_modal.html:266
 msgid "Allow \"Not applicable\" option"
 msgstr "غير قابل للتطبيق"
 
@@ -2262,7 +2393,7 @@ msgstr "غير قابل للتطبيق"
 msgid "Allow \"Other\" (free text)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:257
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:259
 msgid "Allow \"Other\" option"
 msgstr "السماح بخيار \"أخرى\""
 
@@ -2284,7 +2415,7 @@ msgstr "السماح بتقديم تقارير ذاتية (من الإضافة �
 msgid "Allow clearing existing translations (dangerous)"
 msgstr "السماح بتصفية الترجمات الحالية (الغضب)"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:271
+#: app/templates/forms/form_builder/partials/_item_modal.html:283
 msgid "Allow disability questions"
 msgstr "السماح بأسئلة الإعاقة"
 
@@ -2300,7 +2431,7 @@ msgstr "السماح بإدخال الصف اليدوي"
 msgid "Allow total, sex, age, and sex+age"
 msgstr "السماح بالمجموع، الجنس، العمر، والجنس + العمر"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:266
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:268
 msgid "Allow up to"
 msgstr "اترك حتى"
 
@@ -2341,13 +2472,26 @@ msgstr "أيضا:"
 msgid "Alt text"
 msgstr "النص البديل"
 
-#: app/routes/auth.py:1333
+#: app/routes/auth.py:1381
 msgid "An account with this email already exists."
 msgstr "هناك حساب يحتوي على هذا البريد الإلكتروني موجودا بالفعل."
+
+#: app/services/platform/governance_program.py:372
+msgid ""
+"An active public link, which accepts data without a login, has an expiry "
+"date. A link with no end date stays open until someone remembers to switch "
+"it off."
+msgstr ""
 
 #: app/templates/core/dashboard/_access_requests.html:146
 msgid "An administrator will review your request."
 msgstr "سيراجع المسؤول طلبك."
+
+#: app/services/platform/governance_program.py:244
+msgid ""
+"An approval in the last 90 days records the person who approved it. Older "
+"rows from before this field existed are not part of this control."
+msgstr ""
 
 #: app/routes/admin/assignment_management.py:732
 #, python-format
@@ -2362,12 +2506,12 @@ msgstr ""
 msgid "An error occurred while loading compliance data"
 msgstr "حدث خطأ أثناء تحميل بيانات الامتثال"
 
-#: app/templates/admin/data_exploration/explore_data.html:1873
-#: app/templates/admin/data_exploration/explore_data.html:2068
+#: app/templates/admin/data_exploration/explore_data.html:1915
+#: app/templates/admin/data_exploration/explore_data.html:2110
 msgid "An error occurred while loading data"
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:1633
+#: app/routes/auth.py:1681
 msgid ""
 "An error occurred while updating your account settings. Please try again."
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
@@ -2399,6 +2543,12 @@ msgstr "حدث خطأ."
 msgid "An error occurred. Please try again."
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
 
+#: app/services/platform/governance_program.py:285
+msgid ""
+"An open assignment whose earliest due date has passed is not still entirely "
+"unstarted."
+msgstr ""
+
 #: app/templates/admin/indicator_bank/indicator_bank.html:1915
 #: app/templates/admin/indicator_bank/indicator_bank.html:2017
 msgid "Analysing file…"
@@ -2420,7 +2570,7 @@ msgstr "اكتمال التحليل · مراجعة..."
 msgid "Analysis failed. Check that the file contains the UPR Data sheet."
 msgstr "فشل التحليل. تحقق من أن الملف يحتوي على ورقة بيانات UPR."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:144
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:176
 msgid ""
 "Analysis is limited to eligible indicators with people-oriented units or "
 "configured disaggregation options. Percentages reflect the current filters."
@@ -2468,7 +2618,7 @@ msgstr "وقت تشغيل المحلل"
 msgid "Analyzing Unified Plans focus areas…"
 msgstr "تحليل مجالات اتصال الخطط الموحدة..."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:66
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:98
 msgid "Analyzing data..."
 msgstr "تحليل البيانات..."
 
@@ -2478,6 +2628,11 @@ msgstr "تحليل أسهم المصفوفة عبر جميع الدول..."
 
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:435
 msgid "Analyzing workbook… this can take a minute on first upload"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:121
+#, python-format
+msgid "And %(n)s more."
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:150
@@ -2613,7 +2768,7 @@ msgstr ""
 #: app/templates/admin/communication/registry.html:32
 #: app/templates/components/ag_grid_i18n_js.html:18
 #: app/templates/forms/entry_form/partials/_preview_banner.html:47
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:131
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:133
 msgid "Apply"
 msgstr "قدم"
 
@@ -2636,7 +2791,7 @@ msgstr "تطبيق الاستيراد"
 msgid "Apply as imputed value"
 msgstr "طبقها كقيمة محسوبة"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:71
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:73
 msgid "Apply colour"
 msgstr "تطبيق اللون"
 
@@ -2645,7 +2800,7 @@ msgstr "تطبيق اللون"
 msgid "Apply link"
 msgstr "تطبيق الرابط"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:72
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:74
 msgid "Apply text colour"
 msgstr "تطبيق لون النص"
 
@@ -3151,6 +3306,13 @@ msgstr ""
 msgid "Assignment"
 msgstr "المهام"
 
+#: app/services/platform/governance_program.py:513
+#: app/services/platform/governance_program.py:677
+#: app/services/platform/governance_program.py:703
+#, python-format
+msgid "Assignment %(id)s"
+msgstr ""
+
 #: app/routes/admin/assignment_management.py:1799
 #, python-format
 msgid "Assignment '%(name)s' has been closed."
@@ -3233,6 +3395,12 @@ msgstr ""
 #: app/templates/forms/form_builder/form_builder.html:1086
 msgid "Assignment Year"
 msgstr "سنة التعيين"
+
+#: app/services/platform/governance_program.py:141
+#: app/services/platform/governance_program.py:245
+#: app/services/platform/governance_program.py:373
+msgid "Assignment administrator"
+msgstr ""
 
 #: app/services/notification/core.py:120
 #, python-format
@@ -3737,6 +3905,10 @@ msgstr "معدل الإنجاز المتوسط (آخر 3 فترات)"
 msgid "Average Submission Timeliness (Days Early/Late)"
 msgstr "المواعيد المتوسطة للتقديم (أيام مبكرة/متأخرة)"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:111
+msgid "Average service income"
+msgstr ""
+
 #: app/templates/admin/communication/_insights.html:55
 msgid "Avg"
 msgstr ""
@@ -3861,11 +4033,19 @@ msgstr "إجراءات المكتب الخلفي"
 msgid "Bar"
 msgstr ""
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:46
+msgid ""
+"Bars are reported service income, in billions of Swiss francs. The open "
+"round is amber and shows the amount reported so far. The dashed line is the "
+"average of the last two closed rounds, drawn across those rounds and the "
+"open round."
+msgstr ""
+
 #: app/templates/admin/data_exploration/explore_data.html:1106
 msgid "Based on"
 msgstr "مبني على"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:176
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:208
 msgid ""
 "Based on FDRS governing board, volunteers, and staff indicators when "
 "available in the current filters."
@@ -3927,17 +4107,17 @@ msgstr "قالب فارغ"
 msgid "Blocked by WAF for translation"
 msgstr "تم حظرها من قبل WAF للترجمة"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:97
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:99
 msgid "Blue"
 msgstr "الأزرق"
 
 #: app/templates/forms/form_builder/form_builder.html:810
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:50
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:144
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:51
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:146
 msgid "Body text"
 msgstr "نص النص الأساسي"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:62
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:64
 msgid "Bold"
 msgstr "جريئة"
 
@@ -3948,6 +4128,10 @@ msgstr "منطقي"
 #: app/templates/admin/analytics/login_logs.html:141
 msgid "Bot detected"
 msgstr "تم اكتشاف الروبوت"
+
+#: app/templates/admin/governance/dashboard.html:239
+msgid "Both types covered"
+msgstr ""
 
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:369
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:525
@@ -4091,13 +4275,13 @@ msgstr ""
 msgid "By Age:"
 msgstr "حسب العمر:"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:45
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:167
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:77
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:199
 msgid "By Country"
 msgstr "حسب البلد"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:44
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:159
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:76
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:191
 msgid "By Indicator"
 msgstr "حسب المؤشر"
 
@@ -4121,7 +4305,7 @@ msgstr "حسب الجنس والعمر:"
 msgid "By Sex:"
 msgstr "حسب الجنس:"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:321
+#: app/templates/forms/form_builder/partials/_item_modal.html:333
 msgid "By assignment date (most recent submission wins)"
 msgstr "حسب تاريخ التعيين (آخر انتصارات في التقديم)"
 
@@ -4145,7 +4329,7 @@ msgstr "حسب العمود"
 msgid "By priority"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:320
+#: app/templates/forms/form_builder/partials/_item_modal.html:332
 msgid "By source order (first source with data wins)"
 msgstr "حسب ترتيب المصدر (أول مصدر لديه بيانات يفوز)"
 
@@ -4157,6 +4341,10 @@ msgstr ""
 #: app/templates/admin/communication/center.html:369
 msgid "CC"
 msgstr "CC"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:121
+msgid "CHF billions"
+msgstr ""
 
 #: app/templates/admin/monitoring/system_monitoring.html:484
 msgid "CPU Usage"
@@ -4173,6 +4361,10 @@ msgstr "القيم المحسوبة مؤقتا"
 
 #: app/templates/admin/translations/quality_dashboard.html:119
 msgid "Cached machine-translation results"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:24
+msgid "Calculating service income..."
 msgstr ""
 
 #: app/templates/admin/organization/index.html:2870
@@ -4310,8 +4502,8 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/forms/form_builder/form_builder.html:471
 #: app/templates/forms/form_builder/form_builder.html:1173
 #: app/templates/forms/form_builder/form_builder.html:1467
-#: app/templates/forms/form_builder/partials/_item_modal.html:389
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:135
+#: app/templates/forms/form_builder/partials/_item_modal.html:401
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:137
 #: app/templates/forms/form_builder/partials/_question_modal.html:182
 #: app/templates/forms/form_builder/partials/_section_modal.html:160
 #: app/templates/forms/form_builder/partials/_template_details.html:375
@@ -4413,7 +4605,7 @@ msgstr "البطاقات"
 msgid "Carried forward value"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:313
+#: app/templates/forms/form_builder/partials/_item_modal.html:325
 msgid "Carry forward from previous round"
 msgstr "الانتقال من الجولة السابقة"
 
@@ -4469,6 +4661,10 @@ msgstr "تغيير تاريخ التسليم"
 #: app/templates/admin/assignments/manage_assignment.html:1099
 msgid "Change due date of selected"
 msgstr "تغيير تاريخ الاستحقاق المختار"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:74
+msgid "Change in service"
+msgstr ""
 
 #: app/templates/forms/form_builder/field_mapping.html:81
 msgid "Change link"
@@ -4627,7 +4823,7 @@ msgstr "أتحقق من استخدام المؤشر..."
 msgid "Checking notification recipients…"
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:2030
+#: app/routes/forms/validation_summary.py:2032
 #: app/templates/forms/entry_form/entry_form.html:716
 msgid "Checking the figures, funding & emergencies…"
 msgstr ""
@@ -4651,6 +4847,10 @@ msgstr "الاختيار"
 
 #: app/templates/admin/reports/partials/_widget_properties.html:34
 msgid "Choose a form template under Setup first."
+msgstr ""
+
+#: app/services/platform/governance_program.py:105
+msgid "Choose a review date."
 msgstr ""
 
 #: app/routes/admin/utilities/translations.py:328
@@ -4700,9 +4900,9 @@ msgstr "اختر القسم المنشور..."
 msgid "Choose source"
 msgstr "اختر المصدر"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:80
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:81
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:90
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:82
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:83
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:92
 msgid "Choose text colour"
 msgstr "اختر لون النص"
 
@@ -4845,7 +5045,7 @@ msgstr "مرشحات الأعمدة الواضحة"
 msgid "Clear filters"
 msgstr "مرشحات واضحة"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:118
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:120
 msgid "Clear formatting"
 msgstr "تنسيق واضح"
 
@@ -5151,6 +5351,10 @@ msgstr "هل ستغلق هذه المهمة؟ يمكن إعادة فتحه لا�
 msgid "Closed"
 msgstr "مغلق"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:118
+msgid "Closed rounds"
+msgstr ""
+
 #: app/services/ai/agent/executor.py:428
 msgid "Closest indicators in the Indicator Bank (by semantic similarity):"
 msgstr "أقرب المؤشرات في بنك المؤشرات (حسب التشابه الدلالي):"
@@ -5285,7 +5489,7 @@ msgstr "الأعمدة"
 msgid "Combine requests from the same user into one row"
 msgstr "دمج طلبات نفس المستخدم في صف واحد"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:225
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:257
 msgid "Combined Sex & Age Distribution"
 msgstr "توزيع الجنس والعمر المشترك"
 
@@ -5525,7 +5729,7 @@ msgstr "معدل الإكمال"
 msgid "Completion:"
 msgstr "الإنجاز:"
 
-#: app/templates/admin/governance/dashboard.html:196
+#: app/services/platform/governance_program.py:878
 msgid "Compliance"
 msgstr "الامتثال"
 
@@ -5810,6 +6014,13 @@ msgstr ""
 msgid "Contributors"
 msgstr "المساهمون"
 
+#: app/templates/admin/governance/dashboard.html:32
+msgid ""
+"Control register for ownership, access, reporting discipline, document "
+"compliance, the indicator glossary, and public links."
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:46
 #: app/templates/admin/indicator_bank/neural_map.html:230
 msgid "Controls"
 msgstr "التحكم"
@@ -5820,6 +6031,10 @@ msgid ""
 "above. Disable this to let users see totals while filling in the form but "
 "keep row/column/grand totals out of API responses, data exports, and BI "
 "feeds for this item — raw cell values are always included either way."
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:61
+msgid "Controls passing"
 msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:502
@@ -5837,6 +6052,10 @@ msgstr "آثار المحادثة"
 #: app/templates/core/layout.html:465
 msgid "Conversations"
 msgstr "المحادثات"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:125
+msgid "Copied"
+msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:321
 #: app/templates/admin/ai/conversation_traces.html:429
@@ -5858,7 +6077,7 @@ msgstr "تم النسخ!"
 #: app/templates/admin/api_management.html:711
 #: app/templates/admin/assignments/manage_assignment.html:641
 #: app/templates/core/chat_immersive.html:53
-#: app/templates/forms/form_builder/partials/_item_modal.html:213
+#: app/templates/forms/form_builder/partials/_item_modal.html:225
 msgid "Copy"
 msgstr "نسخ"
 
@@ -5888,6 +6107,11 @@ msgstr ""
 "انسخ قالبا موجودا بما في ذلك أقسامه، صفحاته، وعناصره. يتم تعيين اسم فريد "
 "تلقائيا."
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:49
+#: plugins/fdrs/templates/service_income/tab_panel.html:123
+msgid "Copy chart as PNG"
+msgstr ""
+
 #: app/templates/admin/ai/conversation_traces.html:329
 #: app/templates/admin/ai/conversation_traces.html:335
 #: app/templates/admin/ai/conversation_traces.html:431
@@ -5901,7 +6125,7 @@ msgstr ""
 msgid "Copy failed"
 msgstr "فشل النسخة"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:213
+#: app/templates/forms/form_builder/partials/_item_modal.html:225
 msgid "Copy field identity"
 msgstr "هوية حقل النسخ"
 
@@ -5945,6 +6169,11 @@ msgstr "ملخص النسخة"
 msgid "Copy summary (queries + answers + meta only)"
 msgstr "ملخص النسخ: (استفسارات + إجابات + ميتا فقط)"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:61
+#: plugins/fdrs/templates/service_income/tab_panel.html:124
+msgid "Copy table for Excel"
+msgstr ""
+
 #: app/templates/admin/settings/manage_settings.html:582
 #: app/templates/admin/settings/manage_settings.html:636
 msgid "Copyright Year"
@@ -5984,7 +6213,7 @@ msgstr "التكلفة:"
 msgid "Could not check for existing data. Please try again."
 msgstr "لم أتمكن من التحقق من البيانات الموجودة. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:883
+#: app/routes/auth.py:931
 msgid "Could not complete Azure sign-in."
 msgstr "لم أتمكن من إكمال تسجيل الدخول إلى Azure."
 
@@ -5993,7 +6222,7 @@ msgstr "لم أتمكن من إكمال تسجيل الدخول إلى Azure."
 msgid "Could not create SP/EF entry."
 msgstr "لم أتمكن من إنشاء مدخل SP/EF."
 
-#: app/routes/auth.py:1422
+#: app/routes/auth.py:1470
 msgid "Could not create account. Please try again."
 msgstr "فشل في إرسال النموذج. يرجى المحاولة مرة أخرى."
 
@@ -6009,7 +6238,7 @@ msgstr "لم أتمكن من إنشاء النوع."
 msgid "Could not create unit."
 msgstr "لم أتمكن من إنشاء وحدة."
 
-#: app/routes/auth.py:1023 app/routes/auth.py:1028
+#: app/routes/auth.py:1071 app/routes/auth.py:1076
 msgid "Could not create user from Azure login."
 msgstr "لم أتمكن من إنشاء مستخدم من تسجيل الدخول إلى Azure."
 
@@ -6226,7 +6455,7 @@ msgstr "الدول والوثائق:"
 msgid "Countries by status"
 msgstr "الدول حسب الوضع"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:233
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:265
 msgid ""
 "Countries marked \"No data\" have no eligible indicator records for the "
 "selected view."
@@ -6239,6 +6468,10 @@ msgstr ""
 #: app/templates/core/dashboard/_access_requests.html:213
 msgid "Countries whose data you will manage"
 msgstr "الدول التي ستدير بياناتها"
+
+#: app/templates/admin/governance/dashboard.html:214
+msgid "Countries with a focal point"
+msgstr ""
 
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:219
 msgid "Countries with data"
@@ -6264,7 +6497,7 @@ msgstr "الدول – إكسل"
 #: app/templates/admin/data_exploration/explore_data.html:95
 #: app/templates/admin/data_exploration/explore_data.html:1262
 #: app/templates/admin/documents/documents.html:168
-#: app/templates/admin/governance/dashboard.html:934
+#: app/templates/admin/governance/dashboard.html:396
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:187
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:329
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:485
@@ -6300,12 +6533,12 @@ msgstr "البلد / النطاق"
 msgid "Country Access Requests"
 msgstr "طلبات الوصول الخاصة بك"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:48
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:231
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:80
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:263
 msgid "Country Disaggregation Coverage"
 msgstr "تصنيف البلد التغطية"
 
-#: app/templates/admin/governance/dashboard.html:879
+#: app/templates/admin/governance/dashboard.html:341
 msgid "Country ID"
 msgstr "معرف الدولة"
 
@@ -6331,6 +6564,10 @@ msgstr "تقرير الدولة"
 #: app/templates/admin/validation_dashboard.html:82
 msgid "Country Validation"
 msgstr "التحقق من الدولة"
+
+#: app/services/platform/governance_program.py:222
+msgid "Country access comes with a role"
+msgstr ""
 
 #: app/services/notification/core.py:165
 msgid "Country access request"
@@ -6389,9 +6626,17 @@ msgstr ""
 msgid "Cover images are always public and visible on country pages"
 msgstr "صور الغلاف دائما عامة ومرئية في صفحات الدول"
 
-#: app/templates/admin/governance/dashboard.html:905
+#: app/templates/admin/governance/dashboard.html:367
 msgid "Coverage"
 msgstr "التغطية"
+
+#: app/templates/admin/governance/dashboard.html:245
+#, python-format
+msgid ""
+"Coverage is split between %(org)s focal points and National Society focal "
+"points. Use Columns to show names, the FDS member, and programme membership."
+" Excel export includes Country ID and ISO3."
+msgstr ""
 
 #: app/templates/admin/translations/quality_dashboard.html:18
 msgid ""
@@ -6653,6 +6898,7 @@ msgid "Creating your form template…"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:346
+#: app/templates/admin/governance/dashboard.html:84
 msgid "Critical"
 msgstr "حرج"
 
@@ -6821,7 +7067,7 @@ msgstr ""
 "يشرفون عليها. يتم تخطيه عندما يتم تفعيل الموافقة التلقائية عبر متغير البيئة."
 " عدل قالب البريد الإلكتروني تحت إعدادات النظام → رسائل البريد الإلكتروني."
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:92
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:94
 msgid "Dark (default)"
 msgstr "الظلام (الافتراضي)"
 
@@ -6849,7 +7095,7 @@ msgstr ""
 #: app/templates/admin/settings/manage_settings.html:78
 #: app/templates/forms/form_builder/field_mapping.html:319
 #: app/templates/forms/form_builder/field_mapping.html:340
-#: app/templates/forms/form_builder/partials/_item_modal.html:231
+#: app/templates/forms/form_builder/partials/_item_modal.html:243
 msgid "Data"
 msgstr "البيانات"
 
@@ -6865,7 +7111,7 @@ msgstr "تم حذف البيانات"
 msgid "Data Entries"
 msgstr "إدخال البيانات"
 
-#: app/routes/forms/validation_summary.py:827
+#: app/routes/forms/validation_summary.py:828
 #: app/utils/form_localization.py:357 app/utils/form_localization.py:377
 msgid "Data Entry"
 msgstr "إدخال البيانات"
@@ -6995,6 +7241,13 @@ msgstr ""
 msgid "Data exported"
 msgstr ""
 
+#: app/routes/admin/governance_dashboard.py:40
+#: app/templates/admin/governance/dashboard.html:5
+#: app/templates/admin/governance/dashboard.html:31
+#: app/templates/admin/governance/dashboard.html:36
+msgid "Data governance"
+msgstr ""
+
 #: app/templates/forms/entry_form/partials/matrix_table.html:154
 msgid "Data matrix for"
 msgstr "تصدير البيانات"
@@ -7004,7 +7257,7 @@ msgstr "تصدير البيانات"
 msgid "Data modified"
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:421
+#: app/routes/forms/validation_summary.py:422
 #: app/templates/admin/analytics/import_change_log.html:104
 #: app/templates/admin/analytics/import_change_log.html:109
 #: app/templates/components/_form_item_renderer.html:262
@@ -7013,6 +7266,8 @@ msgstr ""
 msgid "Data not available"
 msgstr "مؤشرات متاحة"
 
+#: app/services/platform/governance_program.py:265
+#: app/services/platform/governance_program.py:286
 #: app/templates/admin/assignments/_assignment_status_overview.html:46
 msgid "Data owner"
 msgstr ""
@@ -7047,7 +7302,7 @@ msgstr ""
 msgid "Data source updated."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:324
+#: app/templates/forms/form_builder/partials/_item_modal.html:336
 msgid "Data sources:"
 msgstr "مصادر البيانات:"
 
@@ -7128,13 +7383,9 @@ msgstr "إلغاء التفعيل"
 msgid "Deactivate User?"
 msgstr "تعطيل المستخدم؟"
 
-#: app/templates/admin/governance/dashboard.html:194
-msgid ""
-"Deactivated users who still hold RBAC roles. Their access should be revoked "
-"to prevent unauthorized data exposure."
+#: app/services/platform/governance_program.py:201
+msgid "Deactivated accounts do not keep roles"
 msgstr ""
-"مستخدمون تم تعطيل منشطهم لا يزالون يشغلون أدوار RBAC. يجب إلغاء وصولهم لمنع "
-"التعرض غير المصرح به للبيانات."
 
 #: app/routes/notifications.py:78
 msgid "Deadline Reminder"
@@ -7723,8 +7974,8 @@ msgstr "صف نموذجك أو أرفق استبيانا. المساعد يكت�
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:30
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:19
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:439
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:49
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:50
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:52
 #: app/templates/forms/form_builder/partials/_sections_container.html:484
 #: app/templates/forms/form_builder/partials/_sections_container.html:490
 #: app/templates/forms/form_builder/partials/_sections_container.html:553
@@ -7765,8 +8016,8 @@ msgstr "سطح المكتب"
 msgid "Detailed analysis"
 msgstr "تحليل مفصل"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:152
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:154
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:156
 msgid "Detailed definition/description of this question"
 msgstr "تعريف/وصف مفصل لهذا السؤال"
 
@@ -7832,6 +8083,10 @@ msgstr "الجهاز غير مسجل"
 #: app/templates/admin/ai/_trace_card.html:111
 msgid "Diagnostics"
 msgstr "التشخيصات"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:110
+msgid "Difference from the reference"
+msgstr ""
 
 #: app/templates/notifications/_preferences_form.html:56
 msgid "Digest Schedule"
@@ -7908,11 +8163,11 @@ msgstr "إرشادات التفكيك"
 msgid "Disaggregation Options"
 msgstr "خيارات التفكيك"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:83
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:115
 msgid "Disaggregation coverage"
 msgstr "تغطية التفكيك"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:79
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:111
 msgid ""
 "Disaggregation coverage: percentage of eligible indicators reported with "
 "disaggregation."
@@ -8085,7 +8340,7 @@ msgstr "نازحين"
 msgid "Display"
 msgstr "العرض"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:236
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:238
 msgid "Display Column"
 msgstr "عمود العرض"
 
@@ -8152,11 +8407,11 @@ msgstr "مسارات مميزة"
 msgid "Distinct users reached"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:220
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:252
 msgid "Distribution by Age Group"
 msgstr "التوزيع حسب الفئة العمرية"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:216
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:248
 msgid "Distribution by Sex"
 msgstr "التوزيع حسب الجنس"
 
@@ -8811,6 +9066,14 @@ msgstr ""
 "يحصل كل عضو في FDS على الملخص واحد على الأكثر يوميا عندما يكون لديه طلبات "
 "معلقة."
 
+#: app/templates/admin/governance/dashboard.html:41
+msgid ""
+"Each control is a rule with someone accountable and a live check. A gap "
+"stays open until the check passes, or until a governance manager records a "
+"risk acceptance with a reason and a review date. The acceptance expires on "
+"that date and the gap reopens if it is still there."
+msgstr ""
+
 #: app/templates/admin/indicator_bank/neural_map.html:220
 msgid ""
 "Each dot represents one indicator from the Indicator Bank. Indicators are "
@@ -8824,7 +9087,7 @@ msgstr ""
 "لاسمها وتعريفها تنتجها نموذج لغوي. المؤشرات التي تتشابه دلاليا توضع بالقرب "
 "من بعضها البعض."
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:287
+#: app/templates/forms/form_builder/partials/_item_modal.html:299
 msgid "Each option can only be selected once in this section"
 msgstr "يمكن اختيار كل خيار مرة واحدة فقط في هذا القسم"
 
@@ -9098,11 +9361,11 @@ msgstr "تعليم"
 msgid "Effect"
 msgstr "الأثر"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:96
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:128
 msgid "Eligible indicators"
 msgstr "المؤشرات المؤهلة"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:92
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:124
 msgid "Eligible indicators: count of indicators included in this analysis."
 msgstr "المؤشرات المؤهلة: عدد المؤشرات المدرجة في هذا التحليل."
 
@@ -9584,12 +9847,12 @@ msgid "Enter new value…"
 msgstr "ادخل قيمة جديدة..."
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:378
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:198
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:200
 msgid "Enter option text"
 msgstr "أدخل نص الخيار"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:35
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:37
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:36
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:38
 msgid "Enter question text"
 msgstr "أدخل نص السؤال"
 
@@ -9801,7 +10064,7 @@ msgid "Error loading chart data"
 msgstr "خطأ في تحميل الإشعارات"
 
 #: app/templates/admin/ai/knowledge_base.html:688
-#: app/templates/admin/data_exploration/explore_data.html:1479
+#: app/templates/admin/data_exploration/explore_data.html:1481
 msgid "Error loading countries"
 msgstr "بلدان تحميل الأخطاء"
 
@@ -9817,11 +10080,11 @@ msgstr "خطأ في تحميل بيانات البلد. يرجى المحاول�
 msgid "Error loading documents"
 msgstr "وثائق تحميل الأخطاء"
 
-#: app/templates/admin/data_exploration/explore_data.html:1653
+#: app/templates/admin/data_exploration/explore_data.html:1655
 msgid "Error loading form items"
 msgstr "خطأ في تحميل الإشعارات"
 
-#: app/templates/admin/data_exploration/explore_data.html:1478
+#: app/templates/admin/data_exploration/explore_data.html:1480
 msgid "Error loading periods"
 msgstr "فترات تحميل الأخطاء"
 
@@ -9938,6 +10201,61 @@ msgstr "الأحداث من جانب الشدة"
 #: app/templates/admin/security/dashboard.html:306
 msgid "Events by Type"
 msgstr "الأحداث حسب النوع"
+
+#: app/services/platform/governance_program.py:339
+msgid "Every active indicator has a definition."
+msgstr ""
+
+#: app/services/platform/governance_program.py:381
+msgid "Every active public submission link has an expiry date."
+msgstr ""
+
+#: app/services/platform/governance_program.py:252
+msgid "Every approval in the last 90 days records an approver."
+msgstr ""
+
+#: app/services/platform/governance_program.py:318
+#, python-format
+msgid "Every checked country has both documents in %(periods)s."
+msgstr ""
+
+#: app/services/platform/governance_program.py:190
+msgid "Every country on an open assignment has a focal point."
+msgstr ""
+
+#: app/services/platform/governance_program.py:182
+msgid ""
+"Every country on an open assignment has at least one focal point who can "
+"submit for it. Countries that are not in a current cycle are listed in the "
+"register below and are not a failure of this control."
+msgstr ""
+
+#: app/services/platform/governance_program.py:330
+msgid ""
+"Every indicator that is not archived has a definition. Archived indicators "
+"are out of scope. This is the business glossary, not a score of form-field "
+"labels."
+msgstr ""
+
+#: app/services/platform/governance_program.py:149
+msgid "Every open assignment has a data owner."
+msgstr ""
+
+#: app/services/platform/governance_program.py:140
+msgid ""
+"Every open assignment names the person accountable for the data collected in"
+" that cycle."
+msgstr ""
+
+#: app/services/platform/governance_program.py:170
+msgid "Every published template has an owner."
+msgstr ""
+
+#: app/services/platform/governance_program.py:161
+msgid ""
+"Every published template names the person accountable for the standard it "
+"defines."
+msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:734
 msgid ""
@@ -10073,7 +10391,7 @@ msgstr ""
 msgid "Excel upload"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:262
+#: app/templates/forms/form_builder/partials/_item_modal.html:274
 msgid "Exclude from completion rate"
 msgstr ""
 
@@ -10159,7 +10477,7 @@ msgstr "التوسيع لملء منطقة المحتوى"
 msgid "Expected JSON body"
 msgstr "الجسم المتوقع JSON"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:117
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:149
 msgid ""
 "Expected indicators with no saved reported value. These appear when non-"
 "reported items are included for a bounded template, period, and country "
@@ -10199,8 +10517,8 @@ msgstr "خبراء"
 msgid "Expiry Date"
 msgstr "تاريخ الانتهاء"
 
-#: app/routes/admin/data_exploration.py:275
-#: app/routes/admin/data_exploration.py:299
+#: app/routes/admin/data_exploration.py:296
+#: app/routes/admin/data_exploration.py:320
 #: app/templates/admin/_validation_admin_shell.html:55
 #: app/templates/admin/data_exploration/explore_data.html:4
 #: app/templates/admin/data_exploration/explore_data.html:19
@@ -10470,11 +10788,23 @@ msgstr ""
 msgid "FDRS data sync, imputation, and manage publication"
 msgstr ""
 
+#: app/services/platform/governance_program.py:306
+msgid "FDRS document compliance"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:17
+msgid ""
+"FDRS imputes total income for the open collection round, and does not impute"
+" income sources. The average of the two preceding closed rounds is a "
+"reference for service income in those rounds. The difference is the open "
+"round’s total income minus that reference."
+msgstr ""
+
 #: app/templates/admin/settings/manage_settings.html:970
 msgid "FDS Access Request Digest"
 msgstr "ملخص طلبات الوصول FDS"
 
-#: app/templates/admin/governance/dashboard.html:1030
+#: app/templates/admin/governance/dashboard.html:492
 #: app/templates/admin/organization/_countries_component.html:103
 #: app/templates/admin/organization/index.html:561
 #: app/templates/admin/user_management/access_requests.html:1044
@@ -10494,7 +10824,7 @@ msgstr "رسائل ملخص FDS"
 msgid "FDS: Federation Wide Data Systems"
 msgstr "FDS: أنظمة البيانات على مستوى الاتحاد"
 
-#: app/templates/admin/governance/dashboard.html:951
+#: app/templates/admin/governance/dashboard.html:413
 msgid "FPs"
 msgstr "FPs"
 
@@ -10679,7 +11009,7 @@ msgstr "فشل في الترجمة"
 msgid "Failed to save indicator"
 msgstr "فشل في حفظ مؤشر"
 
-#: app/routes/auth.py:1758
+#: app/routes/auth.py:1806
 msgid "Failed to save profile. Please try again."
 msgstr "فشل في حفظ الملف الشخصي. يرجى المحاولة مرة أخرى."
 
@@ -10806,7 +11136,7 @@ msgstr "المعالم"
 msgid "Feb"
 msgstr "فبراير"
 
-#: app/templates/admin/governance/dashboard.html:1031
+#: app/templates/admin/governance/dashboard.html:493
 msgid "Federated Data Sharing member assigned to this country"
 msgstr "عضو مشاركة البيانات الفيدرالي المعين لهذا البلد"
 
@@ -10820,7 +11150,7 @@ msgstr "لا تتوفر ملاحظات لهذه الرسالة."
 msgid "Field"
 msgstr "الميدان:"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:210
+#: app/templates/forms/form_builder/partials/_item_modal.html:222
 msgid "Field ID"
 msgstr "معرف الحقل"
 
@@ -11149,7 +11479,7 @@ msgstr "تم تصفيتها إلى الجلسة:"
 msgid "Filters"
 msgstr "المرشحات"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:221
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:223
 msgid "Filters can be added after selecting a list."
 msgstr "يمكن إضافة الفلاتر بعد اختيار قائمة."
 
@@ -11242,11 +11572,6 @@ msgstr ""
 msgid "Focal Point"
 msgstr "نقطة اتصال"
 
-#: app/templates/admin/governance/dashboard.html:192
-#, python-format
-msgid "Focal Point %%"
-msgstr "نقطة التركيز ٪٪"
-
 #: app/templates/admin/communication/center.html:326
 #: app/templates/admin/communication/center.html:328
 #: app/templates/admin/communication/center.html:903
@@ -11258,6 +11583,11 @@ msgstr "نقاط اتصال"
 #: app/templates/core/dashboard/_admin_panel.html:520
 msgid "Focal Points for"
 msgstr "نقاط اتصال لـ"
+
+#: app/templates/admin/governance/dashboard.html:47
+#: app/templates/admin/governance/dashboard.html:202
+msgid "Focal point register"
+msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:1530
 msgid "Focal points"
@@ -11306,7 +11636,7 @@ msgstr ""
 msgid "Force logout"
 msgstr "تسجيل خروج قسري"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:220
+#: app/templates/forms/form_builder/partials/_item_modal.html:232
 msgid "Force new row after this item"
 msgstr "إجبار صف جديد بعد هذا العنصر"
 
@@ -11465,7 +11795,7 @@ msgid ""
 "Maximum 2 MB per file."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:61
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:63
 msgid "Formatting toolbar"
 msgstr "شريط أدوات التنسيق"
 
@@ -11566,6 +11896,10 @@ msgstr "من تسجيل الدخول إلى آخر نشاط مسجل؛ يستث�
 msgid "From this entity's document repository"
 msgstr "من مستودع مستندات هذا الكيان"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:37
+msgid "Full"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_item_modal.html:187
 msgid "Full (12/12)"
 msgstr "كامل (12/12)"
@@ -11577,6 +11911,10 @@ msgstr "Admin الكاملة"
 #: app/templates/components/_profile_completion_modal.html:44
 msgid "Full Name"
 msgstr "الاسم الكامل"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:37
+msgid "Full amount"
+msgstr ""
 
 #: app/templates/admin/api_keys/details.html:335
 msgid "Full key cannot be retrieved — only the prefix and hash are stored."
@@ -11594,6 +11932,11 @@ msgstr "العرض الكامل"
 msgid "Fullscreen"
 msgstr "ملء الشاشة"
 
+#: app/templates/admin/governance/dashboard.html:184
+#: app/templates/admin/governance/dashboard.html:186
+msgid "Gap"
+msgstr ""
+
 #: app/templates/admin/api_management.html:420
 msgid "Gaps"
 msgstr "الفجوات"
@@ -11602,7 +11945,7 @@ msgstr "الفجوات"
 msgid "Gathering additional sources…"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:185
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:217
 msgid "Gender Distribution by Country"
 msgstr "توزيع الجنس حسب الدولة"
 
@@ -11746,9 +12089,10 @@ msgstr "إطار iframe عام (مسموح به فقط للمضيفين)"
 msgid "Getting Started"
 msgstr "بدأت"
 
-#: app/templates/admin/governance/dashboard.html:194
-msgid "Ghost Access"
-msgstr "الوصول الشبح"
+#: app/services/platform/governance_program.py:99
+#, python-format
+msgid "Give a reason of at least %(n)s characters."
+msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:717
 #: app/templates/admin/rbac/grants.html:96
@@ -11764,6 +12108,7 @@ msgstr "الهجرة العالمية القائمة على المسارات"
 msgid "Global initiatives"
 msgstr "المبادرات العالمية"
 
+#: app/services/platform/governance_program.py:880
 #: app/templates/admin/translations/quality_dashboard.html:61
 msgid "Glossary"
 msgstr ""
@@ -11799,7 +12144,6 @@ msgstr "جيد"
 msgid "Got it!"
 msgstr "فهمت ذلك!"
 
-#: app/templates/admin/governance/dashboard.html:102
 #: app/templates/admin/validation_dashboard.html:234
 #: app/templates/components/_sidebar_nav_categories.html:231
 msgid "Governance"
@@ -11809,8 +12153,6 @@ msgstr "الحوكمة"
 msgid "Governance & structure"
 msgstr "الحوكمة والبنية"
 
-#: app/templates/admin/governance/dashboard.html:6
-#: app/templates/admin/governance/dashboard.html:98
 #: app/templates/components/_sidebar_nav_categories.html:229
 msgid "Governance Dashboard"
 msgstr "لوحة تحكم الحوكمة"
@@ -11836,11 +12178,11 @@ msgstr "رائع! هذا البريد الإلكتروني متاح."
 msgid "Greater than"
 msgstr "أعظم من"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:96
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:98
 msgid "Green"
 msgstr "الأخضر"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:99
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:101
 msgid "Grey"
 msgstr "رمادي"
 
@@ -12038,11 +12380,11 @@ msgstr "الصحة"
 #: app/routes/help_docs.py:37 app/routes/help_docs.py:38
 #: app/routes/help_docs.py:44
 #: app/templates/forms/form_builder/partials/_field_help_tooltip.html:3
-#: app/templates/forms/form_builder/partials/_item_modal.html:200
+#: app/templates/forms/form_builder/partials/_item_modal.html:215
 #: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:8
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:271
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:292
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:258
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:260
 msgid "Help"
 msgstr "النجدة"
 
@@ -12079,6 +12421,10 @@ msgstr ""
 msgid "Hide filters"
 msgstr "مرشحات إخفاء"
 
+#: app/templates/admin/governance/dashboard.html:262
+msgid "Hide focal point table"
+msgstr ""
+
 #: app/templates/core/dashboard.html:1301
 msgid "Hide past assignments"
 msgstr "إخفاء المهام السابقة"
@@ -12111,6 +12457,7 @@ msgstr ""
 #: app/services/communication/insights_service.py:111
 #: app/templates/admin/analytics/audit_trail.html:345
 #: app/templates/admin/communication/center.html:683
+#: app/templates/admin/governance/dashboard.html:86
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:150
 #: app/templates/admin/settings/manage_settings.html:1523
 msgid "High"
@@ -12362,7 +12709,7 @@ msgstr ""
 msgid "ISO2 Code"
 msgstr ""
 
-#: app/templates/admin/governance/dashboard.html:890
+#: app/templates/admin/governance/dashboard.html:352
 msgid "ISO3"
 msgstr "ISO3"
 
@@ -12396,7 +12743,7 @@ msgstr "فئة الأيقونة"
 msgid "Identity confirmed"
 msgstr "تأكيد الهوية"
 
-#: app/routes/auth.py:1490
+#: app/routes/auth.py:1538
 msgid "If an account exists for that email, a reset link has been sent."
 msgstr ""
 "إذا كان هناك حساب لهذا البريد الإلكتروني، فقد تم إرسال رابط إعادة الضبط."
@@ -12767,12 +13114,16 @@ msgid "Impute only missing data"
 msgstr "اجعل فقط البيانات المفقودة"
 
 #: app/templates/admin/data_exploration/explore_data.html:1140
-#: app/templates/admin/data_exploration/explore_data.html:2526
+#: app/templates/admin/data_exploration/explore_data.html:2568
 #: app/templates/components/_status_label.html:98
 #: app/templates/forms/entry_form/export_pdf.html:188
 #: app/templates/forms/entry_form/export_pdf.html:289
 msgid "Imputed"
 msgstr "الاتهام"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:76
+msgid "Imputed NSs"
+msgstr ""
 
 #: app/templates/admin/templates/data_sync_imputation.html:1217
 msgid "Imputed Value"
@@ -12809,7 +13160,7 @@ msgstr "قيد التنفيذ"
 msgid "In range"
 msgstr "ضمن النطاق"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:305
+#: app/templates/forms/form_builder/partials/_item_modal.html:317
 msgid ""
 "In repeat sections, shows the dropdown in the entry header instead of as a "
 "separate field."
@@ -12997,6 +13348,11 @@ msgstr "بنك المؤشرات"
 msgid "Indicator Bank ID"
 msgstr "بنك المؤشرات"
 
+#: app/services/platform/governance_program.py:331
+#: app/services/platform/governance_program.py:352
+msgid "Indicator Bank manager"
+msgstr ""
+
 #: app/templates/admin/reports/partials/_section_properties.html:28
 msgid "Indicator Bank rule"
 msgstr ""
@@ -13092,6 +13448,10 @@ msgstr "معاينة المؤشر (أول 25):"
 msgid "Indicator saved successfully."
 msgstr "تم حفظ المؤشر بنجاح."
 
+#: app/services/platform/governance_program.py:350
+msgid "Indicator suggestions are reviewed within 30 days"
+msgstr ""
+
 #: app/templates/admin/templates/new_template.html:430
 msgid "Indicator types"
 msgstr "أنواع المؤشرات"
@@ -13126,7 +13486,7 @@ msgstr "دليل خريطة المؤشرات العصبية"
 msgid "Indicators created:"
 msgstr "المؤشرات التي وضعت:"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:101
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:133
 msgid "Indicators in scope"
 msgstr "المؤشرات في النطاق"
 
@@ -13142,7 +13502,7 @@ msgstr ""
 msgid "Indicators updated:"
 msgstr "المؤشرات المستكملة:"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:104
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:136
 msgid ""
 "Indicators with a single reported value but no disaggregation breakdown. "
 "These are reported, but not disaggregated."
@@ -13158,7 +13518,7 @@ msgstr "الوصول غير المباشر"
 #: app/templates/forms/entry_form/entry_form.html:1705
 #: app/templates/forms/entry_form/entry_form.html:1847
 #: app/templates/forms/entry_form/entry_form.html:2560
-#: app/templates/forms/form_builder/partials/_item_modal.html:279
+#: app/templates/forms/form_builder/partials/_item_modal.html:291
 msgid "Indirect reach"
 msgstr "الوصول غير المباشر"
 
@@ -13202,7 +13562,7 @@ msgstr "الناتج"
 msgid "Input Tokens"
 msgstr "المدخلات"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:115
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:117
 msgid "Insert link"
 msgstr "أدرج رابط"
 
@@ -13274,7 +13634,7 @@ msgstr ""
 msgid "Introductions"
 msgstr ""
 
-#: app/routes/auth.py:798
+#: app/routes/auth.py:846
 msgid "Invalid Azure callback."
 msgstr "إعادة استدعاء Azure غير صالحة."
 
@@ -13290,7 +13650,7 @@ msgstr "صيغة تعريف الدولة غير صالحة."
 msgid "Invalid country selection or country not assigned to you."
 msgstr "اختيار الدولة غير صالح أو الدولة غير المخصصة لك."
 
-#: app/routes/auth.py:360 app/routes/auth.py:420 app/routes/auth.py:485
+#: app/routes/auth.py:408 app/routes/auth.py:468 app/routes/auth.py:533
 msgid "Invalid email or password."
 msgstr "بريد إلكتروني أو كلمة مرور غير صالحة."
 
@@ -13347,7 +13707,7 @@ msgstr "البدائل غير الصالحة"
 msgid "Invalid request. Please try again."
 msgstr "طلب غير صحيح. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:1523
+#: app/routes/auth.py:1571
 msgid "Invalid reset link."
 msgstr "رابط إعادة التعيين غير صالح."
 
@@ -13392,6 +13752,10 @@ msgstr ""
 "هل تقوم جمعيتكم الوطنية بجمع بيانات مفصلة بناء على الإعاقة لهذا المؤشر، أي "
 "عدد الأشخاص ذوي الإعاقة؟"
 
+#: app/templates/admin/governance/dashboard.html:72
+msgid "Issue register"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_sections_container.html:434
 msgid "Issue: Missing/invalid indicator reference"
 msgstr "المسألة: الإشارة المرجعية للمؤشرات المفقودة/غير المستقرة"
@@ -13400,7 +13764,7 @@ msgstr "المسألة: الإشارة المرجعية للمؤشرات الم�
 msgid "Issues"
 msgstr "القضايا"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:63
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:65
 msgid "Italic"
 msgstr "خط مائل"
 
@@ -13408,6 +13772,7 @@ msgstr "خط مائل"
 #: app/templates/admin/templates/data_sync_imputation.html:173
 #: app/templates/admin/templates/data_sync_imputation.html:260
 #: app/templates/admin/templates/data_sync_imputation.html:1192
+#: app/templates/forms/form_builder/partials/_item_modal.html:211
 msgid "Item"
 msgstr "العنصر"
 
@@ -13549,7 +13914,7 @@ msgstr "نمط sink جافا سكريبت (مثل eval() أو document.cookie)"
 msgid "Job Title"
 msgstr "المسمى الوظيفي"
 
-#: app/routes/auth.py:1741
+#: app/routes/auth.py:1789
 #: app/templates/components/_profile_completion_modal.html:125
 msgid "Job title is required."
 msgstr "المسمى الوظيفي مطلوب."
@@ -13896,6 +14261,11 @@ msgstr ""
 msgid "Last sent"
 msgstr "آخر إرسال"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:107
+#: plugins/fdrs/templates/service_income/tab_panel.html:120
+msgid "Last two closed rounds"
+msgstr ""
+
 #: app/templates/admin/ai/review_detail.html:185
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:155
 msgid "Last updated:"
@@ -14074,13 +14444,17 @@ msgstr ""
 msgid "License"
 msgstr "الترخيص"
 
+#: app/services/platform/governance_program.py:882
+msgid "Lifecycle"
+msgstr ""
+
 #: app/templates/admin/ai/_trace_card.html:176
 #: app/templates/admin/ai/reasoning_traces.html:381
 #: app/templates/core/chat_immersive.html:55
 msgid "Like"
 msgstr "مثل"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:294
+#: app/templates/forms/form_builder/partials/_item_modal.html:306
 msgid "Limit repeat section entries to the number of options"
 msgstr "حدد عدد الإدخالات في الأقسام المتكررة بعدد الخيارات"
 
@@ -14138,7 +14512,7 @@ msgid "List Config"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:333
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:171
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:173
 msgid "List Library"
 msgstr "مكتبة القوائم"
 
@@ -14289,6 +14663,10 @@ msgstr "تحميل الدول..."
 msgid "Loading countries…"
 msgstr "تحميل الدول..."
 
+#: app/templates/admin/governance/dashboard.html:247
+msgid "Loading country coverage…"
+msgstr ""
+
 #: app/templates/admin/validation_questions.html:105
 msgid "Loading country summary…"
 msgstr "تحميل ملخص الدولة..."
@@ -14338,7 +14716,7 @@ msgstr "جاري تحميل المستندات..."
 msgid "Loading form builder…"
 msgstr "...."
 
-#: app/templates/admin/data_exploration/explore_data.html:1505
+#: app/templates/admin/data_exploration/explore_data.html:1507
 msgid "Loading form items..."
 msgstr "جاري تحميل المستندات..."
 
@@ -14536,7 +14914,7 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_sections_container.html:309
 #: app/templates/forms/form_builder/partials/_sections_container.html:580
 #: app/templates/forms/form_builder/partials/_sections_container.html:584
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:39
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:71
 msgid "Loading..."
 msgstr "جاري التحميل..."
 
@@ -14649,7 +15027,7 @@ msgstr "سجلات تسجيل الدخول"
 msgid "Login events"
 msgstr "فعاليات تسجيل الدخول"
 
-#: app/routes/auth.py:829
+#: app/routes/auth.py:877
 msgid "Login session expired. Please try signing in again."
 msgstr "انتهت صلاحية جلسة تسجيل الدخول. يرجى محاولة تسجيل الدخول مرة أخرى."
 
@@ -14749,6 +15127,18 @@ msgstr ""
 #: app/templates/admin/communication/center.html:481
 msgid "Main Screens"
 msgstr "الشاشات الرئيسية"
+
+#: app/templates/forms/form_builder/partials/_item_modal.html:210
+#: app/templates/forms/form_builder/partials/_item_modal.html:213
+msgid "Main item"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal.html:217
+msgid ""
+"Main item keeps this field at the top level of the section. Choose a parent "
+"to indent it as a sub-item. Order is its position at that level (1–9 under a"
+" parent)."
+msgstr ""
 
 #: app/templates/public/maintenance.html:3
 msgid "Maintenance"
@@ -14863,7 +15253,7 @@ msgid ""
 "Manage default sex categories used for disaggregation. Drag to reorder."
 msgstr "إدارة فئات الجنس الافتراضية المستخدمة للتفصيل. اسحب لإعادة الترتيب."
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:180
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:182
 msgid "Manage option translations"
 msgstr "إدارة ترجمات الخيارات"
 
@@ -14942,7 +15332,7 @@ msgstr "تمت الإدارة حسب الكيان أدناه."
 msgid "Manual"
 msgstr "الدليل"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:167
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:169
 msgid "Manual list"
 msgstr "قائمة الأدلة"
 
@@ -15256,6 +15646,7 @@ msgid "Measurement types and units"
 msgstr "أنواع القياس والوحدات"
 
 #: app/templates/admin/analytics/audit_trail.html:344
+#: app/templates/admin/governance/dashboard.html:88
 msgid "Medium"
 msgstr "متوسط"
 
@@ -15317,11 +15708,11 @@ msgstr "رسالة للمسؤولين"
 msgid "Message to admins (optional)"
 msgstr "رسالة للمسؤولين"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:375
+#: app/templates/forms/form_builder/partials/_item_modal.html:387
 msgid "Message to display to the user if the validation rule is not met."
 msgstr "رسالة لعرضها للمستخدم إذا لم يتم تحقيق قاعدة التحقق."
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:380
+#: app/templates/forms/form_builder/partials/_item_modal.html:392
 msgid "Message to show if validation fails"
 msgstr "رسالة لتظهر إذا فشل التحقق"
 
@@ -15534,14 +15925,14 @@ msgstr "المستخدمون الأكثر نشاطاً (30 يوماً)"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:245
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:382
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:202
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:204
 #: app/templates/forms/form_builder/partials/_template_details.html:358
 msgid "Move Down"
 msgstr "انزل"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:242
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:379
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:199
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:201
 #: app/templates/forms/form_builder/partials/_template_details.html:357
 msgid "Move Up"
 msgstr "تقدم"
@@ -15630,7 +16021,7 @@ msgstr "فرع NS"
 msgid "NS Branches"
 msgstr "فروع NS"
 
-#: app/templates/admin/governance/dashboard.html:986
+#: app/templates/admin/governance/dashboard.html:448
 msgid "NS FPs"
 msgstr "NS FPs"
 
@@ -15648,7 +16039,7 @@ msgstr "جميع الوحدات"
 msgid "NS Name"
 msgstr "NS Name"
 
-#: app/templates/admin/governance/dashboard.html:1001
+#: app/templates/admin/governance/dashboard.html:463
 msgid "NS Names"
 msgstr "أسماء NS"
 
@@ -15729,7 +16120,7 @@ msgstr "ترجمة الاسم:"
 msgid "Name/ID mismatches merged by name:"
 msgstr "الاسم/المصابيح المدمجة بالاسم:"
 
-#: app/templates/admin/governance/dashboard.html:966
+#: app/templates/admin/governance/dashboard.html:428
 msgid "Names"
 msgstr "الأسماء"
 
@@ -15751,6 +16142,10 @@ msgstr ""
 #: app/templates/auth/login.html:621 app/templates/public/_site_lock.html:496
 msgid "National Societies"
 msgstr "اسم الجمعية الوطنية"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:114
+msgid "National Societies with a total"
+msgstr ""
 
 #: app/templates/admin/organization/_nss_component.html:58
 msgid "National Societies – Excel"
@@ -15786,11 +16181,15 @@ msgstr ""
 msgid "National Society Structure"
 msgstr "اسم الجمعية الوطنية"
 
-#: app/templates/admin/governance/dashboard.html:1002
+#: app/templates/admin/governance/dashboard.html:464
 msgid "National Society focal point names"
 msgstr "أسماء نقاط التركيز للجمعية الوطنية"
 
-#: app/templates/admin/governance/dashboard.html:987
+#: app/services/platform/governance_program.py:308
+msgid "National Society focal point, with the secretariat"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:449
 msgid "National Society focal points (count)"
 msgstr "نقاط التركيز للجمعية الوطنية (العد)"
 
@@ -16110,7 +16509,12 @@ msgstr "لا"
 msgid "No %(label)s found matching your search."
 msgstr "لم يتم العثور على %(label)s يتوافق مع بحثك."
 
-#: app/routes/forms/validation_summary.py:598
+#: app/templates/admin/governance/dashboard.html:231
+#, python-format
+msgid "No %(org)s focal point"
+msgstr ""
+
+#: app/routes/forms/validation_summary.py:599
 msgid ""
 "No AI validation results yet. Run AI validation, or open details to generate"
 " them."
@@ -16140,6 +16544,15 @@ msgstr "اختر ملف إكسل للاستيراد:"
 msgid "No Excel file selected for import."
 msgstr "اختر ملف إكسل للاستيراد:"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:126
+msgid "No FDRS income figures were found."
+msgstr ""
+
+#: app/services/platform/governance_program.py:314
+msgid ""
+"No FDRS reporting period is assigned, so this control does not apply here."
+msgstr ""
+
 #: app/templates/admin/templates/partials/imputation_methods_rows.html:56
 #: app/templates/admin/templates/partials/imputation_methods_rows.html:72
 msgid "No Imputation"
@@ -16163,6 +16576,10 @@ msgstr "اسم الجمعية الوطنية"
 
 #: plugins/fdrs/templates/compliance/tab_panel.html:193
 msgid "No National Society"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:235
+msgid "No National Society focal point"
 msgstr ""
 
 #: app/templates/notifications/center.html:211
@@ -16197,7 +16614,7 @@ msgstr "لا يوجد URL!"
 msgid "No Unified Plan or Report assignments found."
 msgstr ""
 
-#: app/services/platform/user_analytics_service.py:258
+#: app/services/platform/user_analytics_service.py:267
 msgid "No User-Agent header was sent."
 msgstr "لم يتم إرسال أي رأس وكيل مستخدم."
 
@@ -16329,7 +16746,7 @@ msgstr "لا توجد محادثات تتطابق مع بحثك."
 msgid "No countries"
 msgstr "لا توجد دول"
 
-#: app/templates/admin/data_exploration/explore_data.html:1474
+#: app/templates/admin/data_exploration/explore_data.html:1476
 msgid "No countries for this template"
 msgstr "لا توجد دول لهذا القالب"
 
@@ -16342,8 +16759,8 @@ msgstr "لم يتم العثور على إدخالات تدقيق تطابق م�
 msgid "No countries found."
 msgstr "لم يتم العثور على بلدان."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:172
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:236
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:204
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:268
 msgid "No country coverage data found for eligible indicators."
 msgstr "لم يتم العثور على بيانات تغطية دولية للمؤشرات المؤهلة."
 
@@ -16363,7 +16780,7 @@ msgstr ""
 msgid "No data available for this selection."
 msgstr "لا توجد بيانات متاحة لهذا الاختيار."
 
-#: app/templates/admin/data_exploration/explore_data.html:1922
+#: app/templates/admin/data_exploration/explore_data.html:1964
 msgid "No data found"
 msgstr "لم يتم العثور على بيانات"
 
@@ -16371,8 +16788,8 @@ msgstr "لم يتم العثور على بيانات"
 msgid "No data found. Try adjusting your parameters."
 msgstr "لم يتم العثور على إدخالات تدقيق تطابق معاييرك."
 
-#: app/templates/admin/data_exploration/explore_data.html:2610
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:57
+#: app/templates/admin/data_exploration/explore_data.html:2652
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:89
 msgid "No data loaded yet"
 msgstr "لم يتم تحميل البيانات حتى الآن"
 
@@ -16395,6 +16812,10 @@ msgstr ""
 #: app/templates/forms/form_builder/field_mapping.html:75
 msgid "No data will carry forward"
 msgstr "لن تنتقل أي بيانات إلى الأمام"
+
+#: app/services/platform/governance_program.py:211
+msgid "No deactivated account still holds a role."
+msgstr ""
 
 #: app/services/notification/notifiers/assignment.py:295
 #: app/services/notification/notifiers/assignment.py:398
@@ -16431,12 +16852,12 @@ msgstr "لم يتم إرسال أي رسائل ملخصة حتى الآن"
 msgid "No direct comms"
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:616
+#: app/routes/forms/validation_summary.py:617
 #, python-format
 msgid "No discrepancies; %(n)s fields need review."
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:614
+#: app/routes/forms/validation_summary.py:615
 msgid "No discrepancies; 1 field needs review."
 msgstr ""
 
@@ -16470,12 +16891,12 @@ msgstr "لم يتم العثور على أي وثائق. قم بتحميل مس�
 msgid "No documents have been uploaded for this entity yet."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:156
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:188
 msgid ""
 "No eligible disaggregation indicators found for the current parameters."
 msgstr "لم يتم العثور على مؤشرات تفكيك مؤهلة للمعايير الحالية."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:164
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:196
 msgid "No eligible indicators found."
 msgstr "لم يتم العثور على مؤشرات مؤهلة."
 
@@ -16538,6 +16959,10 @@ msgstr "لا يوجد ملف مختار."
 msgid "No filter — the complete list."
 msgstr "لا يوجد فلتر — القائمة الكاملة."
 
+#: app/templates/admin/governance/dashboard.html:227
+msgid "No focal points"
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:1333
 msgid ""
 "No focal points are configured for the selected countries — no notifications"
@@ -16556,7 +16981,7 @@ msgstr "لم يتم العثور على مهام نماذج."
 msgid "No form fields in this draft."
 msgstr "لا توجد حقول نموذج في هذه المسودة."
 
-#: app/templates/admin/data_exploration/explore_data.html:1642
+#: app/templates/admin/data_exploration/explore_data.html:1644
 msgid "No form items found for this template"
 msgstr "لم يتم العثور على أقسام أو عناصر لهذا القالب."
 
@@ -16564,7 +16989,7 @@ msgstr "لم يتم العثور على أقسام أو عناصر لهذا ال
 msgid "No form templates found."
 msgstr "لم يتم العثور على قوالب نماذج."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:210
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:242
 msgid ""
 "No governing board, volunteer, or staff gender-disaggregated data found."
 msgstr ""
@@ -16583,6 +17008,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:2068
 msgid "No import session. Please upload the file again."
 msgstr "لا يوجد جلسة استيراد. يرجى رفع الملف مرة أخرى."
+
+#: app/services/platform/governance_program.py:360
+msgid "No indicator suggestion has been pending for more than 30 days."
+msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:629
 #: app/templates/forms/entry_form/validation_summary_pdf.html:165
@@ -16697,6 +17126,18 @@ msgstr "لا إشعارات"
 msgid "No notifications in this period."
 msgstr ""
 
+#: app/services/platform/governance_program.py:293
+msgid "No open assignment is still unstarted after its due date."
+msgstr ""
+
+#: app/services/platform/governance_program.py:273
+msgid "No open country submission is more than 30 days overdue."
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:77
+msgid "No open issues. Every applicable control currently passes."
+msgstr ""
+
 #: app/templates/admin/templates/new_template.html:1220
 msgid "No options available"
 msgstr "لا توجد خيارات متاحة"
@@ -16723,7 +17164,7 @@ msgstr "لا توجد بيانات مسار لهذه المرشحات."
 msgid "No pending candidates."
 msgstr ""
 
-#: app/templates/admin/data_exploration/explore_data.html:1473
+#: app/templates/admin/data_exploration/explore_data.html:1475
 msgid "No periods for this template"
 msgstr "لا توجد نقاط لهذا القالب"
 
@@ -16811,7 +17252,7 @@ msgstr "لم يتم العثور على أي إدخالات تمت إزالته�
 msgid "No report is available yet."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:127
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:159
 msgid "No reported value saved"
 msgstr "لم يتم الإبلاغ عن أي قيمة محفوظة"
 
@@ -16922,7 +17363,7 @@ msgstr "لا جلسات"
 msgid "No settings were changed."
 msgstr "لم يتم تغيير أي إعدادات."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:228
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:260
 msgid "No sex or age disaggregation found for the current parameters."
 msgstr "لم يتم العثور على تمييز للجنس أو العمر للمعايير الحالية."
 
@@ -17100,6 +17541,10 @@ msgstr "لا سنوات"
 msgid "No years selected"
 msgstr ""
 
+#: app/services/platform/governance_program.py:232
+msgid "Nobody has country access without a role."
+msgstr ""
+
 #: plugins/fdrs/templates/compliance/tab_panel.html:334
 #: plugins/fdrs/templates/compliance/tab_panel.html:541
 msgid "Non-Compliant"
@@ -17164,9 +17609,11 @@ msgstr "لا"
 msgid "Not Started"
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:423
+#: app/routes/forms/validation_summary.py:424
 #: app/templates/admin/analytics/import_change_log.html:105
 #: app/templates/admin/analytics/import_change_log.html:110
+#: app/templates/admin/governance/dashboard.html:65
+#: app/templates/admin/governance/dashboard.html:180
 #: app/templates/components/_form_item_renderer.html:271
 #: app/templates/forms/entry_form/entry_form.html:1553
 #: app/templates/forms/entry_form/entry_form.html:1730
@@ -17211,6 +17658,10 @@ msgstr "لا يوجد تاريخ كاف ليظهر اتجاها بعد."
 msgid "Not equal"
 msgstr "غير متساوي"
 
+#: app/templates/admin/governance/dashboard.html:182
+msgid "Not evaluated"
+msgstr ""
+
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:83
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:361
 msgid "Not filled"
@@ -17238,11 +17689,11 @@ msgstr "غير متوفر"
 msgid "Not public"
 msgstr "ليس علنا"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:122
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:154
 msgid "Not reported"
 msgstr "لم يتم الإبلاغ عنه"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:118
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:150
 msgid "Not reported: expected indicators with no saved reported value."
 msgstr "غير مبلغ عنها: مؤشرات متوقعة بدون قيمة محفوظة مبلغ عنها."
 
@@ -17441,6 +17892,7 @@ msgid "Number (Whole)"
 msgstr "العدد (الكامل)"
 
 #: app/templates/admin/reports/partials/_style_properties.html:14
+#: plugins/fdrs/templates/service_income/tab_panel.html:35
 msgid "Number format"
 msgstr ""
 
@@ -17468,7 +17920,7 @@ msgstr ""
 "عدد محاولات تسجيل الدخول الفاشلة (كلمة مرور خاطئة، حساب غير معروف، إلخ) لهذا"
 " المستخدم في الفترة المحددة."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:91
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:123
 msgid ""
 "Number of indicators included in this analysis. Eligible indicators have "
 "people-oriented units or configured disaggregation options."
@@ -17561,6 +18013,13 @@ msgstr ""
 msgid "On"
 msgstr "شغلوا"
 
+#: app/services/platform/governance_program.py:264
+msgid ""
+"On an open assignment, a country submission still in progress is not more "
+"than 30 days past its due date. This is timeliness, not a check of the "
+"values submitted."
+msgstr ""
+
 #: app/templates/tours/tours.html:64
 msgid ""
 "On mobile, use this button to open the sections menu and access save/submit "
@@ -17621,6 +18080,14 @@ msgstr ""
 msgid "Only a System Manager can modify an admin user."
 msgstr "فقط مدير النظام يمكنه تعديل مستخدم المسؤول."
 
+#: app/routes/admin/governance_dashboard.py:95
+msgid "Only an accepted risk can be reopened."
+msgstr ""
+
+#: app/routes/admin/governance_dashboard.py:57
+msgid "Only an open issue can be accepted."
+msgstr ""
+
 #: app/templates/admin/translations/manage_translations.html:364
 #: app/templates/admin/translations/manage_translations.html:435
 #: app/templates/admin/translations/manage_translations.html:474
@@ -17651,7 +18118,7 @@ msgstr ""
 "فقط المستخدمون الذين لديهم بريد إلكتروني للمنظمة يمكنهم طلب الوصول إلى عدة "
 "دول في نفس الوقت. يرجى اختيار دولة واحدة."
 
-#: app/routes/auth.py:788
+#: app/routes/auth.py:836
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -17666,6 +18133,7 @@ msgstr ""
 #: app/templates/admin/analytics/dashboard.html:407
 #: app/templates/admin/api_management.html:708
 #: app/templates/admin/data_exploration/explore_data.html:1129
+#: app/templates/admin/governance/dashboard.html:93
 #: app/templates/admin/validation_dashboard.html:220
 #: app/templates/admin/validation_questions.html:130
 #: app/templates/admin/validation_questions.html:270
@@ -17715,6 +18183,14 @@ msgstr ""
 msgid "Open activities in audit trail"
 msgstr "الأنشطة المفتوحة في مسار التدقيق"
 
+#: app/services/platform/governance_program.py:284
+msgid "Open assignments are not untouched after the due date"
+msgstr ""
+
+#: app/services/platform/governance_program.py:181
+msgid "Open assignments have a focal point"
+msgstr ""
+
 #: app/templates/admin/templates/new_template.html:61
 msgid "Open assistant"
 msgstr "مساعد مفتوح"
@@ -17739,6 +18215,11 @@ msgstr ""
 msgid "Open indicator bank to propose new indicators or review existing ones"
 msgstr "فتح بنك المؤشرات لاقتراح مؤشرات جديدة أو مراجعة المؤشرات الحالية"
 
+#: app/templates/admin/governance/dashboard.html:45
+#: app/templates/admin/governance/dashboard.html:53
+msgid "Open issues"
+msgstr ""
+
 #: app/templates/core/layout.html:387
 msgid "Open menu"
 msgstr "فتح القائمة"
@@ -17746,6 +18227,18 @@ msgstr "فتح القائمة"
 #: app/templates/admin/validation_questions.html:259
 msgid "Open questions"
 msgstr "أسئلة مفتوحة"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:105
+msgid "Open round"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:119
+msgid "Open round, reported so far"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:125
+msgid "Open the screen that fixes this"
+msgstr ""
 
 #: app/services/ai/chat/engine.py:1340
 msgid "Open the template in the form builder"
@@ -17758,6 +18251,10 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:84
 msgid "Open wizard"
 msgstr "الساحر المفتوح"
+
+#: app/services/platform/governance_program.py:263
+msgid "Open work is not more than 30 days overdue"
+msgstr ""
 
 #: app/templates/macros/year_picker.html:12
 msgid "Open year calendar"
@@ -17778,6 +18275,10 @@ msgid ""
 msgstr ""
 "الأسئلة المفتوحة والإجابة عليها وإجمالي عدد الأسئلة حسب البلد في قالب وفترة "
 "تقارير."
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:112
+msgid "Open-round total income minus the closed-round reference"
+msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:42
 msgid "OpenAI API"
@@ -17817,7 +18318,7 @@ msgstr "تعريف/وصف مفصل لهذا السؤال"
 msgid "Optional description..."
 msgstr "وصف اختياري..."
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:36
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:37
 msgid "Optional heading shown in bold"
 msgstr "العنوان الاختياري موضح بالخط العريض"
 
@@ -17882,7 +18383,7 @@ msgstr ""
 msgid "Options"
 msgstr "الخيارات"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:164
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:166
 msgid "Options Source"
 msgstr "مصدر الخيارات"
 
@@ -17890,7 +18391,7 @@ msgstr "مصدر الخيارات"
 msgid "Or choose a user"
 msgstr "أو اختر مستخدما"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:94
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:96
 msgid "Orange"
 msgstr "برتقالي"
 
@@ -18001,7 +18502,7 @@ msgstr "يتيمة"
 #: app/services/documentation/service.py:411
 #: app/templates/admin/ai/knowledge_base.html:746
 #: app/templates/admin/analytics/audit_trail.html:372
-#: app/templates/admin/data_exploration/explore_data.html:1588
+#: app/templates/admin/data_exploration/explore_data.html:1590
 #: app/templates/admin/embed_content/manage_embed_content.html:143
 #: app/templates/admin/templates/new_template.html:1212
 #: app/templates/admin/validation_dashboard.html:260
@@ -18028,6 +18529,17 @@ msgstr "الوصول إلى الكيانات الأخرى"
 
 #: app/services/notification/preview.py:18
 msgid "Other focal points"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:72
+msgid "Other income"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:82
+msgid ""
+"Other income is total income minus reported service income. A National "
+"Society with no service-income figure contributes zero. Reported and imputed"
+" counts refer to total income."
 msgstr ""
 
 #: app/templates/admin/analytics/sessions.html:174
@@ -18085,8 +18597,8 @@ msgstr "علامة تجاوز (اترك فارغا لاستخدام اسم بن�
 
 #: app/services/documentation/service.py:805
 #: app/templates/admin/translations/quality_dashboard.html:57
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:43
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:74
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:75
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:106
 msgid "Overview"
 msgstr "لمحة عامة"
 
@@ -18117,6 +18629,10 @@ msgstr "آخر"
 #, python-format
 msgid "Owner: %(name)s"
 msgstr "مالك: %(name)s"
+
+#: app/services/platform/governance_program.py:872
+msgid "Ownership"
+msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:61
 msgid "P&B management sections"
@@ -18221,9 +18737,9 @@ msgstr "%(e)d %(m)d %(u)d %(lang)s مستورد من طراز PO أنهى آخر
 msgid "PO write locking is not active"
 msgstr ""
 
-#: app/routes/forms/export.py:1708 app/routes/forms/validation_summary.py:828
-#: app/routes/forms/validation_summary.py:862
-#: app/routes/forms/validation_summary.py:1833
+#: app/routes/forms/export.py:1708 app/routes/forms/validation_summary.py:829
+#: app/routes/forms/validation_summary.py:863
+#: app/routes/forms/validation_summary.py:1835
 #: app/services/documentation/pdf_service.py:121
 #: app/templates/admin/ai/knowledge_base.html:748
 #: app/templates/admin/api_management.html:1110
@@ -18371,6 +18887,10 @@ msgstr "تراجم"
 msgid "Parameters"
 msgstr "معاملات المسار"
 
+#: app/templates/forms/form_builder/partials/_item_modal.html:208
+msgid "Parent"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_section_modal.html:17
 #: app/templates/forms/form_builder/partials/_section_modal.html:18
 msgid "Parent Section"
@@ -18397,6 +18917,10 @@ msgstr "مشاركين"
 msgid "Partnerships"
 msgstr "الشراكات"
 
+#: app/templates/admin/governance/dashboard.html:176
+msgid "Passing"
+msgstr ""
+
 #: app/templates/admin/api_management.html:570
 msgid ""
 "Passing it in the URL (?api_key=) only works for keys that were explicitly "
@@ -18408,7 +18932,7 @@ msgstr ""
 msgid "Password"
 msgstr "كلمة المرور"
 
-#: app/routes/auth.py:1495
+#: app/routes/auth.py:1543
 msgid ""
 "Password reset is not available. Please sign in with your organization "
 "account."
@@ -18593,7 +19117,7 @@ msgstr "في المئة"
 msgid "Percentage"
 msgstr "نسبة مئوية"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:78
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:110
 msgid ""
 "Percentage of eligible indicators reported with sex, age, sex-and-age, "
 "matrix, or disability disaggregation. Based on all eligible indicators in "
@@ -18603,7 +19127,7 @@ msgstr ""
 " أو المصفوفة أو تفكيك الإعاقة. استنادا إلى جميع المؤشرات المؤهلة في المرشحات"
 " الحالية."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:130
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:162
 msgid ""
 "Percentage of eligible indicators that include age information, either age-"
 "only or combined sex-and-age disaggregation. Based on all eligible "
@@ -18771,7 +19295,7 @@ msgstr "يرجى الاتصال بالمدير."
 msgid "Please correct the errors in the form."
 msgstr "يرجى تصحيح الأخطاء في النموذج."
 
-#: app/routes/auth.py:1434 app/routes/auth.py:1499
+#: app/routes/auth.py:1482 app/routes/auth.py:1547
 msgid "Please correct the highlighted fields and try again."
 msgstr ""
 
@@ -19430,7 +19954,7 @@ msgstr "يجب أن يكون لون الملف الشخصي قيمة #RRGGBB."
 msgid "Profile updated"
 msgstr ""
 
-#: app/routes/auth.py:1754
+#: app/routes/auth.py:1802
 msgid "Profile updated successfully."
 msgstr "تم تحديث الملف الشخصي بنجاح."
 
@@ -19557,6 +20081,10 @@ msgstr "التقارير العامة"
 msgid "Public submission"
 msgstr ""
 
+#: app/services/platform/governance_program.py:371
+msgid "Public submission links expire"
+msgstr ""
+
 #: app/services/notification/core.py:206
 msgid "Public submission received"
 msgstr "التقديم العام المستلم"
@@ -19594,12 +20122,27 @@ msgstr ""
 "تمت إزالة الحقل المنشور من المسودة — تبقى البيانات التاريخية في النسخة "
 "المؤرشيفة."
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:34
+msgid "Published figures"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:83
+msgid ""
+"Published figures keeps a service-income amount only when the FDRS API state"
+" is Published (500). Other states stay in the live columns and are left out "
+"of this view. The snapshot is filled on the next FDRS sync."
+msgstr ""
+
 #: app/templates/forms/form_builder/field_mapping.html:317
 #: app/templates/forms/form_builder/field_mapping.html:338
 msgid "Published match"
 msgstr "المباراة المنشورة"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:98
+#: app/services/platform/governance_program.py:160
+msgid "Published templates have an owner"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:100
 msgid "Purple"
 msgstr "بنفسجي"
 
@@ -19644,7 +20187,7 @@ msgstr "الدفع فقط — العنوان والرسالة يظهران عل�
 msgid "Push title"
 msgstr "عنوان الدفع"
 
-#: app/routes/forms/validation_summary.py:2050
+#: app/routes/forms/validation_summary.py:2052
 #: app/templates/forms/entry_form/entry_form.html:717
 msgid "Putting the summary together…"
 msgstr ""
@@ -19711,7 +20254,7 @@ msgstr "الاستعلام عن بيانات النماذج..."
 msgid "Question"
 msgstr "سؤال"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:179
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:181
 msgid "Question Options"
 msgstr "خيارات الأسئلة"
 
@@ -19721,7 +20264,7 @@ msgstr "الأسئلة Matrix"
 
 #: app/templates/forms/form_builder/form_builder.html:802
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:25
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:26
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:27
 msgid "Question Text"
 msgstr "نص السؤال"
 
@@ -20009,7 +20552,7 @@ msgstr "قراءة اتجاهات المؤشرات..."
 msgid "Reading reported values for this assignment…"
 msgstr "قراءة القيم المبلغ عنها لهذه المهمة..."
 
-#: app/routes/forms/validation_summary.py:2019
+#: app/routes/forms/validation_summary.py:2021
 #: app/templates/forms/entry_form/entry_form.html:715
 msgid "Reading the assignment…"
 msgstr ""
@@ -20028,6 +20571,7 @@ msgid "Ready for deploy"
 msgstr "جاهز للنشر"
 
 #: app/templates/admin/api_keys/details.html:297
+#: app/templates/admin/governance/dashboard.html:104
 msgid "Reason"
 msgstr "السبب"
 
@@ -20086,6 +20630,10 @@ msgstr "الطلبات الأخيرة"
 msgid "Recent activities"
 msgstr ""
 
+#: app/services/platform/governance_program.py:243
+msgid "Recent approvals name the approver"
+msgstr ""
+
 #: app/templates/admin/analytics/_user_detail_partial.html:314
 msgid "Recent login attempts"
 msgstr "محاولات تسجيل الدخول الأخيرة"
@@ -20097,6 +20645,10 @@ msgstr "الجلسات الأخيرة"
 #: app/templates/admin/user_management/access_requests.html:202
 msgid "Recently Processed"
 msgstr "تمت معالجته مؤخرا"
+
+#: app/templates/admin/governance/dashboard.html:152
+msgid "Recently cleared"
+msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:1145
 msgid "Recipient"
@@ -20141,7 +20693,7 @@ msgstr "جاري الحساب..."
 msgid "Records the approval timestamp in the Excel export."
 msgstr "يسجل ختم الموافقة في تصدير إكسل."
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:93
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:95
 msgid "Red"
 msgstr "الأحمر"
 
@@ -20273,7 +20825,7 @@ msgstr "تسجيل"
 msgid "Registered Devices"
 msgstr "الأجهزة المسجلة"
 
-#: app/routes/auth.py:1299
+#: app/routes/auth.py:1347
 msgid ""
 "Registration request received. If this email was not already registered, "
 "your account has been created and your country access request is pending "
@@ -20360,7 +20912,7 @@ msgstr ""
 msgid "Relevance"
 msgstr "الصلة"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:357
+#: app/templates/forms/form_builder/partials/_item_modal.html:369
 #: app/templates/forms/form_builder/partials/_section_modal.html:148
 msgid "Relevance Rule"
 msgstr "قاعدة الصلة"
@@ -20420,7 +20972,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:11
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:21
 #: app/templates/forms/form_builder/form_builder.html:498
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:133
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:135
 msgid "Remove"
 msgstr "إزالة"
 
@@ -20453,7 +21005,7 @@ msgid "Remove Matrix"
 msgstr "إزالة المصفوفة"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:385
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:205
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:207
 msgid "Remove Option"
 msgstr "خيار إزالة"
 
@@ -20588,10 +21140,19 @@ msgstr ""
 msgid "Reopen this page for editing? Other submitted pages will stay locked."
 msgstr ""
 
+#: app/templates/admin/governance/dashboard.html:144
+msgid "Reopen this risk"
+msgstr ""
+
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:91
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:363
 msgid "Reopened"
 msgstr "أعيد فتحه"
+
+#: app/routes/admin/governance_dashboard.py:102
+#, python-format
+msgid "Reopened %(code)s."
+msgstr ""
 
 #: app/templates/core/dashboard/_assignments_tab.html:289
 #: app/templates/core/dashboard/_assignments_tab.html:300
@@ -20687,6 +21248,10 @@ msgstr ""
 msgid "Report years updated."
 msgstr ""
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:75
+msgid "Reported NSs"
+msgstr ""
+
 #: app/templates/core/dashboard.html:1280
 msgid "Reported expenditure"
 msgstr "الإنفاق المبلغ عنه"
@@ -20695,11 +21260,15 @@ msgstr "الإنفاق المبلغ عنه"
 msgid "Reported income"
 msgstr "الدخل المبلغ عنه"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:88
+#: plugins/fdrs/templates/service_income/tab_panel.html:109
+msgid "Reported service income"
+msgstr ""
+
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:120
 msgid "Reported with disaggregation"
 msgstr "تم الإبلاغ عنه مع التقسيم"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:114
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:146
 msgid "Reported, not disaggregated"
 msgstr "تم الإبلاغ عنه، وليس مفككا"
 
@@ -20712,9 +21281,13 @@ msgstr "التقارير"
 msgid "Reporting NS count"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:152
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:184
 msgid "Reporting Status"
 msgstr "حالة الإبلاغ"
+
+#: app/services/platform/governance_program.py:876
+msgid "Reporting discipline"
+msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:91
 #: app/templates/admin/validation_dashboard.html:151
@@ -20916,7 +21489,7 @@ msgstr "المطلوبة"
 msgid "Required API key for authentication"
 msgstr "تتطلب انتباه"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:238
+#: app/templates/forms/form_builder/partials/_item_modal.html:250
 msgid "Required Field"
 msgstr "الميدان المطلوب"
 
@@ -21024,7 +21597,7 @@ msgstr "الحل"
 msgid "Resolution Notes"
 msgstr "ملاحظات القرار"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:318
+#: app/templates/forms/form_builder/partials/_item_modal.html:330
 msgid "Resolution priority"
 msgstr "أولوية الحل"
 
@@ -21241,6 +21814,10 @@ msgstr "قائمة المراجعة"
 msgid "Review Trace"
 msgstr "مراجعة تتبع"
 
+#: app/templates/admin/governance/dashboard.html:136
+msgid "Review date"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_versions_modal.html:44
 #: app/templates/forms/form_builder/partials/_versions_modal.html:45
 msgid "Review field mapping"
@@ -21377,6 +21954,13 @@ msgstr "معرف التتبع الأيمن"
 msgid "Risk Level"
 msgstr "مستوى المخاطر"
 
+#: app/routes/admin/governance_dashboard.py:82
+#, python-format
+msgid ""
+"Risk accepted for %(code)s until %(until)s. It reopens on that date if the "
+"gap is still there."
+msgstr ""
+
 #: app/templates/admin/analytics/dashboard.html:229
 #: app/templates/admin/analytics/user_detail.html:48
 #: app/templates/admin/communication/center.html:893
@@ -21450,6 +22034,10 @@ msgstr "تدوير مواد المفاتيح"
 #: app/templates/admin/api_keys/details.html:336
 msgid "Rotate the key regularly or immediately if compromise is suspected."
 msgstr "قم بتدوير المفتاح بانتظام أو فورا إذا اشتبه في وجود تشويق."
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:36
+msgid "Rounded, such as 31.8 B"
+msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:56
 msgid "Rounds"
@@ -21560,7 +22148,7 @@ msgstr "جاري إجراء التحقق..."
 msgid "Running..."
 msgstr "الجري..."
 
-#: app/templates/admin/data_exploration/explore_data.html:2386
+#: app/templates/admin/data_exploration/explore_data.html:2428
 #: app/templates/core/chat_immersive.html:37
 msgid "Running…"
 msgstr "الجري..."
@@ -21764,7 +22352,7 @@ msgstr ""
 msgid "Saving..."
 msgstr "إنقاذ..."
 
-#: app/templates/admin/data_exploration/explore_data.html:2479
+#: app/templates/admin/data_exploration/explore_data.html:2521
 #: app/templates/forms/form_builder/form_builder.html:255
 #: app/templates/forms/form_builder/partials/_item_modal.html:20
 #: app/templates/forms/form_builder/partials/_template_details.html:136
@@ -22184,8 +22772,8 @@ msgstr "تعيين الأمانة العامة"
 msgid "Secretariat structure"
 msgstr "هيكل الأمانة العامة"
 
-#: app/routes/forms/validation_summary.py:844
-#: app/routes/forms/validation_summary.py:863
+#: app/routes/forms/validation_summary.py:845
+#: app/routes/forms/validation_summary.py:864
 #: app/templates/admin/reports/builder.html:78
 #: app/templates/admin/reports/partials/_section_properties.html:8
 #: app/templates/forms/entry_form/validation_summary_progress.html:331
@@ -22444,7 +23032,7 @@ msgstr "اختيار الكل"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:119
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:360
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:240
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:242
 msgid "Select Column..."
 msgstr "عمود الاختيار..."
 
@@ -22473,7 +23061,7 @@ msgid "Select Item Type"
 msgstr "اختر نوع العنصر"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:346
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:220
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:222
 msgid "Select List"
 msgstr "اختر القائمة"
 
@@ -22483,7 +23071,7 @@ msgstr "اختر قائمة للصفوف"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:104
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:348
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:224
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:226
 msgid "Select List..."
 msgstr "قائمة مختارة ..."
 
@@ -22499,7 +23087,7 @@ msgstr "Select PO ZIP file to import"
 msgid "Select PO file to import"
 msgstr "بيع ملف PO لاستيراد"
 
-#: app/templates/admin/data_exploration/explore_data.html:1808
+#: app/templates/admin/data_exploration/explore_data.html:1850
 msgid "Select Period + Country to show missing items"
 msgstr "اختر الفترة + البلد لعرض العناصر المفقودة"
 
@@ -22559,8 +23147,8 @@ msgstr "اختر قطاعاً..."
 msgid "Select a sector..."
 msgstr "اختر قطاعاً..."
 
-#: app/templates/admin/data_exploration/explore_data.html:2611
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:58
+#: app/templates/admin/data_exploration/explore_data.html:2653
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:90
 msgid "Select a template above to analyze eligible disaggregation indicators."
 msgstr "اختر قالبا أعلاه لتحليل مؤشرات التفكيك المؤهلة."
 
@@ -22578,8 +23166,8 @@ msgid "Select a template first to load countries"
 msgstr "اختر قالبا أولا لتحميل الدول"
 
 #: app/templates/admin/data_exploration/explore_data.html:83
-#: app/templates/admin/data_exploration/explore_data.html:1499
-#: app/templates/admin/data_exploration/explore_data.html:2571
+#: app/templates/admin/data_exploration/explore_data.html:1501
+#: app/templates/admin/data_exploration/explore_data.html:2613
 msgid "Select a template first to load form items"
 msgstr "اختر قالبا أولا لتحميل عناصر النموذج"
 
@@ -22973,7 +23561,7 @@ msgstr "مبلغ عنه ذاتياً"
 msgid "Self-report created: %(template)s"
 msgstr "تقرير المصير: %(template)s"
 
-#: app/routes/auth.py:1323
+#: app/routes/auth.py:1371
 msgid ""
 "Self-service registration is not available. Please sign in with your "
 "organization account."
@@ -23163,6 +23751,23 @@ msgstr "الجنس"
 #: app/templates/core/chat_immersive.html:68
 msgid "Server error"
 msgstr "خطأ في الخادم"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:15
+#: plugins/fdrs/templates/service_income/tab_panel.html:71
+msgid "Service income"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:45
+msgid "Service income and the last two closed rounds"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:122
+msgid "Service income could not be loaded."
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:73
+msgid "Service share"
+msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:459
 #: app/templates/admin/api_management.html:1831
@@ -23362,8 +23967,8 @@ msgstr "فئات الجنس"
 msgid "Sex disaggregation"
 msgstr "التقسيم الجنسي"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:47
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:213
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:79
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:245
 msgid "Sex, Age & Sex & Age"
 msgstr "الجنس والعمر"
 
@@ -23568,6 +24173,11 @@ msgstr "اعرض كل نقطة نهاية في السجل: /v1 الخارجي، 
 msgid "Show filters"
 msgstr "مرشحات العرض"
 
+#: app/templates/admin/governance/dashboard.html:220
+#: app/templates/admin/governance/dashboard.html:261
+msgid "Show focal point table"
+msgstr ""
+
 #: app/forms/form_builder/template_forms.py:39
 msgid "Show in side navigation panel"
 msgstr ""
@@ -23612,6 +24222,10 @@ msgstr "عرض المزيد من المصادر"
 #: app/templates/components/entity_dropdown.html:34
 msgid "Show national societies"
 msgstr "عرض الجمعيات الوطنية"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:34
+msgid "Show only service income that FDRS has published"
+msgstr ""
 
 #: app/templates/core/dashboard.html:1300
 #: app/templates/core/dashboard/_assignments_tab.html:429
@@ -23673,6 +24287,10 @@ msgid ""
 msgstr ""
 "عرض محدد فرع/فرع فرعي/وحدة محلية NS الهرمي (يعكس علامات التبويب في "
 "user_form.html و manage_assignment.html)."
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:52
+msgid "Show total income"
+msgstr ""
 
 #: app/templates/components/ag_grid_i18n_js.html:5
 msgid "Show/Hide Columns"
@@ -23763,7 +24381,7 @@ msgstr ""
 msgid "Shows a highlighted note below the field label in the data entry form."
 msgstr "يظهر ملاحظة مميزة أسفل تسمية الحقل في نموذج إدخال البيانات."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:232
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:264
 msgid ""
 "Shows country-level disaggregation coverage for eligible indicators in the "
 "current filters, including sex, age, and disability breakdowns where "
@@ -23772,14 +24390,14 @@ msgstr ""
 "يعرض تغطية الفصل على مستوى الدولة للمؤشرات المؤهلة في المرشحات الحالية، بما "
 "في ذلك الجنس والعمر وتوزيع الإعاقة حيثما ينطبق."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:168
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:200
 msgid ""
 "Shows country-level disaggregation coverage for eligible indicators in the "
 "current filters."
 msgstr ""
 "يعرض تغطية التفكيك على مستوى الدولة للمؤشرات المؤهلة في المرشحات الحالية."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:160
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:192
 msgid ""
 "Shows disaggregation coverage by indicator, not summed values across mixed "
 "units."
@@ -23797,8 +24415,9 @@ msgstr "تسجيل الدخول"
 
 #: app/templates/auth/login.html:696
 msgid ""
-"Sign in without a password to test as a role preset or any active user."
-msgstr "سجل الدخول بدون كلمة مرور لاختبار إعداد دور أو مستخدم نشط."
+"Sign in without a password as a role preset, a seeded test account, or a "
+"pre-added account that has not signed in yet."
+msgstr ""
 
 #: app/templates/auth/login.html:736
 msgid "Signing in…"
@@ -24145,7 +24764,7 @@ msgstr "يبدأ..."
 msgid "Starts with"
 msgstr "يبدأ ب"
 
-#: app/routes/auth.py:847
+#: app/routes/auth.py:895
 msgid "State mismatch. Please try signing in again."
 msgstr "عدم تطابق الولاية. يرجى محاولة تسجيل الدخول مرة أخرى."
 
@@ -24349,6 +24968,10 @@ msgid ""
 "\"What this key can do\""
 msgstr ""
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:113
+msgid "Stored sources only. Income sources are not imputed."
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:812
 msgid "Strategic Plan"
 msgstr "الخطة الاستراتيجية"
@@ -24431,10 +25054,6 @@ msgstr "تاريخ التقديم وجودة البيانات لـ"
 #: app/templates/admin/api_management.html:1115
 msgid "Submission ID"
 msgstr "تقديم"
-
-#: app/templates/admin/governance/dashboard.html:195
-msgid "Submission Rate"
-msgstr "معدل التقديم"
 
 #: app/templates/admin/data_exploration/explore_data.html:1341
 msgid "Submission Type"
@@ -24556,8 +25175,8 @@ msgstr "معلومات المقدم"
 msgid "Submitting…"
 msgstr "التقديم..."
 
-#: app/routes/forms/validation_summary.py:845
-#: app/routes/forms/validation_summary.py:864
+#: app/routes/forms/validation_summary.py:846
+#: app/routes/forms/validation_summary.py:865
 #: app/templates/forms/entry_form/validation_summary_progress.html:331
 msgid "Subsection"
 msgstr "القسم الفرعي"
@@ -24633,6 +25252,11 @@ msgstr "التقسيم المقترح"
 #: app/templates/admin/data_exploration/explore_data.html:1114
 msgid "Suggested value"
 msgstr "القيمة المقترحة"
+
+#: app/services/platform/governance_program.py:534
+#, python-format
+msgid "Suggestion %(id)s"
+msgstr ""
 
 #: app/templates/admin/view_indicator_suggestion.html:15
 msgid "Suggestion Details"
@@ -25052,9 +25676,14 @@ msgstr "تشمل الضمانات التقنية:"
 #: app/templates/admin/validation_questions.html:64
 #: app/templates/admin/validation_questions.html:234
 #: app/templates/forms/form_builder/field_mapping.html:230
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:26
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:58
 msgid "Template"
 msgstr "القالب"
+
+#: app/services/platform/governance_program.py:555
+#, python-format
+msgid "Template %(id)s"
+msgstr ""
 
 #: app/routes/admin/form_builder/templates.py:745
 #, python-format
@@ -25185,6 +25814,10 @@ msgstr "إصدارات القوالب"
 #: app/templates/admin/templates/templates.html:202
 msgid "Template access"
 msgstr "الوصول إلى القالب"
+
+#: app/services/platform/governance_program.py:162
+msgid "Template administrator"
+msgstr ""
 
 #: app/utils/audit_trail_labels.py:71
 msgid "Template created"
@@ -25322,8 +25955,8 @@ msgstr ""
 msgid "Text is required"
 msgstr "النص مطلوب"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:143
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:153
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:145
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:155
 msgid "Text shown below the heading"
 msgstr "النص المعروض أسفل العنوان"
 
@@ -25469,7 +26102,7 @@ msgid ""
 "report is generated."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:295
+#: app/templates/forms/form_builder/partials/_item_modal.html:307
 msgid ""
 "The number of repeat entries cannot exceed the number of available options."
 msgstr "لا يمكن أن يتجاوز عدد الإدخالات المتكررة عدد الخيارات المتاحة."
@@ -25495,10 +26128,24 @@ msgid ""
 "patience."
 msgstr ""
 
-#: app/templates/admin/data_exploration/explore_data.html:1530
-#: app/templates/admin/data_exploration/explore_data.html:1887
+#: app/templates/admin/governance/dashboard.html:101
+#, python-format
+msgid "The previous acceptance expired on %(date)s."
+msgstr ""
+
+#: app/services/platform/governance_program.py:101
+#, python-format
+msgid "The reason must be %(n)s characters or fewer."
+msgstr ""
+
+#: app/templates/admin/data_exploration/explore_data.html:1532
+#: app/templates/admin/data_exploration/explore_data.html:1929
 msgid "The requested resource was not found."
 msgstr "ولم يعثر على الموارد المطلوبة."
+
+#: app/services/platform/governance_program.py:107
+msgid "The review date must be in the future."
+msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:4038
 msgid "The server is temporarily unavailable. Please try again in a moment."
@@ -25698,6 +26345,11 @@ msgstr "لا يمكن إلغاء تثبيت هذا العمود"
 #: app/templates/forms/entry_form/partials/matrix_table.html:435
 msgid "This column requires a whole number. Please correct the decimal value."
 msgstr "هذا العمود يتطلب عددا صحيحا. يرجى تصحيح القيمة العشرية."
+
+#: app/services/platform/governance_program.py:424
+msgid ""
+"This control could not be evaluated. The previous result was left unchanged."
+msgstr ""
 
 #: app/templates/auth/login.html:1238 app/templates/auth/login.html:1251
 msgid ""
@@ -25965,7 +26617,7 @@ msgid ""
 msgstr ""
 "تمت الموافقة على هذا الطلب، لكن وصولك إلى هذا البلد قد أزال من قبل مدير."
 
-#: app/routes/auth.py:1518 app/routes/auth.py:1526
+#: app/routes/auth.py:1566 app/routes/auth.py:1574
 msgid "This reset link is invalid or has expired."
 msgstr "رابط إعادة التعيين هذا غير صالح أو منتهي الصلاحية."
 
@@ -26358,7 +27010,7 @@ msgstr "التعريف بالأقسام"
 msgid "Toggle sidebar"
 msgstr "تبديل الشريط الجانبي"
 
-#: app/routes/auth.py:380
+#: app/routes/auth.py:428
 msgid "Too many failed login attempts. Please try again later."
 msgstr "محاولات تسجيل الدخول فاشلة كثيرة جدا. يرجى المحاولة مرة أخرى لاحقا."
 
@@ -26396,7 +27048,7 @@ msgstr "مجموعة الأدوات"
 msgid "Tools Used"
 msgstr "الأدوات المستخدمة"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:148
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:180
 msgid "Top Countries by Disaggregation Coverage"
 msgstr "أفضل الدول حسب تغطية التفكيك"
 
@@ -26414,7 +27066,7 @@ msgid "Top Tools Used"
 msgstr "الأدوات الرئيسية المستخدمة"
 
 #: app/templates/admin/ai/knowledge_base.html:74
-#: app/templates/admin/governance/dashboard.html:1021
+#: app/templates/admin/governance/dashboard.html:483
 #: app/templates/forms/entry_form/export_pdf.html:354
 #: app/templates/forms/entry_form/export_pdf.html:392
 #: app/templates/forms/entry_form/export_pdf.html:481
@@ -26532,6 +27184,10 @@ msgstr ""
 msgid "Total cost"
 msgstr "التكلفة الإجمالية"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:70
+msgid "Total expenditure"
+msgstr ""
+
 #: app/templates/forms/entry_form/partials/matrix_table.html:291
 msgid "Total for column"
 msgstr "أعمدة أخرى"
@@ -26544,6 +27200,15 @@ msgstr "الإجمالي فقط"
 #: app/services/ai/planning/payload_inference.py:182
 msgid "Total funding"
 msgstr "التمويل الكلي"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:69
+#: plugins/fdrs/templates/service_income/tab_panel.html:106
+msgid "Total income"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:108
+msgid "Total income minus reference"
+msgstr ""
 
 #: app/templates/admin/analytics/_user_detail_partial.html:95
 msgid ""
@@ -26578,11 +27243,11 @@ msgstr "إجمالي المشاهدات"
 msgid "Total vs breakdown validation"
 msgstr "التحقق الكلي مقابل التحقق من التقسيم"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:109
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:141
 msgid "Total-only reporting"
 msgstr "الإبلاغ الكلي فقط"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:105
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:137
 msgid ""
 "Total-only reporting: indicators with a value but without a disaggregation "
 "breakdown."
@@ -26937,7 +27602,7 @@ msgstr "تم تحديث الترجمة بنجاح ل: %(languages)s"
 #: app/templates/admin/templates/new_template.html:125
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:82
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:186
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:180
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:182
 #: app/templates/forms/form_builder/partials/_template_details.html:146
 #: app/templates/forms/form_builder/partials/_template_details.html:343
 #: plugins/pb_progress/templates/pb_progress/manage.html:72
@@ -27001,7 +27666,7 @@ msgstr ""
 msgid "Trend Analysis"
 msgstr "تحليل الاتجاهات"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:191
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:223
 msgid "Trends Over Time"
 msgstr "الاتجاهات عبر الزمن"
 
@@ -27021,7 +27686,7 @@ msgstr "حاول مرة أخرى"
 msgid "Try asking"
 msgstr "حاول أن تسأل"
 
-#: app/templates/admin/data_exploration/explore_data.html:1923
+#: app/templates/admin/data_exploration/explore_data.html:1965
 msgid "Try selecting a different template."
 msgstr "حاول اختيار قالب مختلف."
 
@@ -27864,7 +28529,7 @@ msgstr ""
 msgid "Use approved"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:304
+#: app/templates/forms/form_builder/partials/_item_modal.html:316
 msgid "Use as repeat entry title (dropdown in header)"
 msgstr "استخدم عنوان الإدخال المتكرر (القائمة المنسدلة في الرأس)"
 
@@ -27921,14 +28586,6 @@ msgstr ""
 #: app/templates/admin/api_keys/rotate_success.html:70
 msgid "Use it in the Authorization header:"
 msgstr "استخدمه في رأس التفويض:"
-
-#: app/templates/forms/form_builder/partials/_item_modal.html:202
-msgid ""
-"Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
-"4.3)"
-msgstr ""
-"Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
-"4.3)"
 
 #: app/templates/admin/data_exploration/explore_data.html:162
 #: app/templates/core/chat_immersive.html:247
@@ -28014,6 +28671,11 @@ msgstr "المستخدم"
 #, python-format
 msgid "User %(action)s"
 msgstr "مستعمل %(action)s"
+
+#: app/services/platform/governance_program.py:524
+#, python-format
+msgid "User %(id)s"
+msgstr ""
 
 #: app/templates/admin/analytics/page_path_analytics.html:41
 msgid "User (optional)"
@@ -28123,6 +28785,12 @@ msgstr "تقييم المستخدمين"
 msgid "User added"
 msgstr ""
 
+#: app/services/platform/governance_program.py:183
+#: app/services/platform/governance_program.py:203
+#: app/services/platform/governance_program.py:224
+msgid "User administrator"
+msgstr ""
+
 #: app/templates/admin/api_management.html:626
 msgid "User auth: No pagination. Returns all accessible data."
 msgstr "مصادقة المستخدم: لا يوجد ترقيم صفحات. يعيد جميع البيانات المتاحة."
@@ -28152,7 +28820,7 @@ msgstr ""
 msgid "User not found"
 msgstr "لم يتم العثور على المستخدم"
 
-#: app/routes/auth.py:308
+#: app/routes/auth.py:356
 msgid "User not found."
 msgstr "المستخدم غير موجود."
 
@@ -28164,12 +28832,12 @@ msgstr "ملاحظة المستخدم"
 msgid "User rating"
 msgstr "تقييم المستخدم"
 
-#: app/services/platform/user_analytics_service.py:277
+#: app/services/platform/user_analytics_service.py:286
 #, python-format
 msgid "User-Agent contains an automation-related keyword: \"%(keyword)s\"."
 msgstr "يحتوي User-Agent على كلمة مفتاحية متعلقة بأتمتة: \"%(keyword)s\"."
 
-#: app/services/platform/user_analytics_service.py:291
+#: app/services/platform/user_analytics_service.py:300
 msgid ""
 "User-Agent does not include typical browser tokens (Mozilla, WebKit, Chrome,"
 " Safari, Firefox, Edge, etc.)."
@@ -28177,7 +28845,7 @@ msgstr ""
 "لا يشمل User-Agent رموز المتصفح التقليدية (مثل Mozilla، WebKit، Chrome، "
 "Safari، Firefox، Edge، إلخ)."
 
-#: app/services/platform/user_analytics_service.py:283
+#: app/services/platform/user_analytics_service.py:292
 msgid ""
 "User-Agent is very short (under 10 characters), which often indicates an "
 "automated client."
@@ -28208,7 +28876,7 @@ msgstr "المستخدمون"
 msgid "Users Without Entity Access"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:271
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:273
 msgid ""
 "Users can add this many additional \"Other\" entries on top of the number of"
 " list options."
@@ -28323,7 +28991,7 @@ msgstr "التقييم"
 msgid "Validation Dashboard"
 msgstr "لوحة تحكم التحقق"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:374
+#: app/templates/forms/form_builder/partials/_item_modal.html:386
 msgid "Validation Message"
 msgstr "رسالة التحقق"
 
@@ -28339,7 +29007,7 @@ msgstr ""
 msgid "Validation Questions"
 msgstr "أسئلة التحقق من الصحة"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:366
+#: app/templates/forms/form_builder/partials/_item_modal.html:378
 msgid "Validation Rule"
 msgstr "قاعدة التحقق"
 
@@ -28426,7 +29094,7 @@ msgstr "القيمة"
 msgid "Value for"
 msgstr "القيمة ل"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:237
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:239
 msgid ""
 "Values from this column will appear as dropdown options. Fields marked as "
 "[Multilingual] will display in the user's selected language."
@@ -28912,18 +29580,18 @@ msgid ""
 "launch preparations are complete — thank you for your patience."
 msgstr ""
 
-#: app/routes/auth.py:1485
+#: app/routes/auth.py:1533
 msgid ""
 "We could not process the reset request at this time. Please try again later."
 msgstr ""
 "لم نتمكن من معالجة طلب إعادة الضبط في هذا الوقت. يرجى المحاولة مرة أخرى "
 "لاحقا."
 
-#: app/routes/auth.py:943
+#: app/routes/auth.py:991
 msgid "We could not retrieve your email from Azure."
 msgstr "لم نتمكن من استرجاع بريدك الإلكتروني من Azure."
 
-#: app/routes/auth.py:1489
+#: app/routes/auth.py:1537
 msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
@@ -29019,6 +29687,10 @@ msgstr ""
 msgid "What this key can do"
 msgstr ""
 
+#: app/templates/admin/governance/dashboard.html:133
+msgid "What was decided, and what residual risk remains."
+msgstr ""
+
 #: app/templates/admin/plugin_management.html:256
 msgid "What will be removed:"
 msgstr "ما سيتم حذفه:"
@@ -29048,7 +29720,7 @@ msgstr ""
 "النموذج. عند إلغاء التحقق، يتم حل القيمة دائما حديثا من المتغير (مثل متغير "
 "القالب) ولا يتم تخزينها."
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:314
+#: app/templates/forms/form_builder/partials/_item_modal.html:326
 msgid ""
 "When empty in a new reporting round, prefill this field from a configured "
 "prior data source for the same entity."
@@ -29063,7 +29735,7 @@ msgid ""
 msgstr ""
 "وعند التمكين، ستعاد ترجمة جميع الترجمات، بما في ذلك تلك التي لها قيم بالفعل"
 
-#: app/templates/forms/form_builder/partials/_item_modal.html:263
+#: app/templates/forms/form_builder/partials/_item_modal.html:275
 msgid ""
 "When enabled, this field is ignored when calculating assignment completion "
 "and will not appear in missing-field highlights. Changing this setting "
@@ -29117,6 +29789,13 @@ msgstr ""
 "عندما تنتهي، اضغط على الإرسال لإنهاء النموذج. تحذير: بعد الإرسال، لا يمكنك "
 "تعديل النموذج إلا إذا أعاد المسؤول فتحه."
 
+#: app/services/platform/governance_program.py:307
+msgid ""
+"Where an FDRS cycle exists, each active country has both an Annual Report "
+"and an Audited Financial Statement in at least one of the last three "
+"periods. This control does not apply when FDRS is not in use."
+msgstr ""
+
 #: app/templates/admin/communication/center.html:463
 msgid "Where the app navigates when the user taps the push notification."
 msgstr "حيث يتنقل التطبيق عندما ينقر المستخدم على إشعار الدفع."
@@ -29129,6 +29808,13 @@ msgstr "ما إذا كانت الأقسام قد تم تقديمها قبل ال
 msgid "Which indicators?"
 msgstr ""
 
+#: app/templates/admin/governance/dashboard.html:204
+msgid ""
+"Who can submit for each country. OWN-03 fails only when a country on an open"
+" assignment has nobody. This list is the full stewardship register, "
+"including countries that are not in a current cycle."
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:345
 msgid ""
 "Who receives the review request when a focal point submits this assignment."
@@ -29137,6 +29823,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/neural_map.html:249
 msgid "Why do similar indicators sometimes appear far apart?"
 msgstr "لماذا تظهر مؤشرات متشابهة أحيانا بعيدة عن بعضها؟"
+
+#: app/templates/admin/governance/dashboard.html:132
+msgid "Why this gap is accepted"
+msgstr ""
 
 #: app/templates/admin/reports/builder.html:79
 #: app/templates/admin/reports/partials/_widget_properties.html:8
@@ -29163,7 +29853,7 @@ msgstr "سيتم التخلص منه عند الحفظ"
 msgid "Will be deleted when you save the form."
 msgstr "سيتم حذفه عند حفظ النموذج."
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:140
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:172
 msgid "With age breakdown"
 msgstr "مع تقسيم العمر"
 
@@ -29171,30 +29861,34 @@ msgstr "مع تقسيم العمر"
 msgid "Wizard steps"
 msgstr "خطوات الساحر"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:46
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:175
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:78
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:207
 msgid "Women Participation"
 msgstr "مشاركة النساء"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:181
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:213
 msgid "Women Participation by Category"
 msgstr "مشاركة النساء حسب الفئة"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:197
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:229
 msgid "Women in Leadership Roles"
 msgstr "النساء في الأدوار القيادية"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:201
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:233
 msgid "Women in Staff"
 msgstr "النساء في الكادر"
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:205
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:237
 msgid "Women in Volunteering"
 msgstr "النساء في التطوع"
 
 #: app/templates/admin/ai/knowledge_base.html:838
 msgid "Work Plan"
 msgstr "خطة العمل"
+
+#: app/templates/admin/governance/dashboard.html:73
+msgid "Work the open rows. An accepted row is a decision, not a pass."
+msgstr ""
 
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:443
 msgid "Workbook analysis timed out. Please try uploading again."
@@ -29258,7 +29952,8 @@ msgstr "ييي-مم-دد أو يي-مم-دثث:مم:إس إس"
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:49
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:120
 #: app/templates/macros/year_picker.html:24
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:35
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:67
+#: plugins/fdrs/templates/service_income/tab_panel.html:68
 msgid "Year"
 msgstr "السنة"
 
@@ -29271,12 +29966,16 @@ msgstr "السنة"
 msgid "Year Range"
 msgstr "نطاق السنة"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:60
+msgid "Yearly comparison"
+msgstr ""
+
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:572
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1043
 msgid "Years"
 msgstr "السنوات"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:95
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:97
 msgid "Yellow"
 msgstr "الأصفر"
 
@@ -29461,8 +30160,8 @@ msgstr "لا يمكنك تعديل دورك من فضلك اسأل مدير ال
 msgid "You do not have access to any templates to clone yet."
 msgstr "ليس لديك وصول إلى أي قوالب للاستنساخ حتى الآن."
 
-#: app/templates/admin/data_exploration/explore_data.html:1525
-#: app/templates/admin/data_exploration/explore_data.html:1877
+#: app/templates/admin/data_exploration/explore_data.html:1527
+#: app/templates/admin/data_exploration/explore_data.html:1919
 msgid ""
 "You do not have access to the selected template. Please select a different "
 "template."
@@ -29583,13 +30282,13 @@ msgid ""
 msgstr ""
 "%(count)d لقد تم تقديم طلبات دخولك إلى البلدان سيراجعهم أحد الحكام قريباً."
 
-#: app/routes/auth.py:1415
+#: app/routes/auth.py:1463
 msgid ""
 "Your account has been created. Your country access request is pending admin "
 "approval."
 msgstr "تم إنشاء حسابك. طلب الوصول إلى بلدك ينتظر موافقة المسؤول."
 
-#: app/routes/auth.py:416 app/routes/auth.py:1040
+#: app/routes/auth.py:464 app/routes/auth.py:1088
 msgid ""
 "Your account is deactivated. Please contact an administrator to reactivate "
 "it."
@@ -29607,7 +30306,7 @@ msgid ""
 "under review."
 msgstr "حسابك غير مرتبط بدولة بعد. لديك طلبات معلقة قيد المراجعة."
 
-#: app/routes/auth.py:1610
+#: app/routes/auth.py:1658
 msgid "Your account settings have been updated successfully."
 msgstr "تم تحديث إعدادات حسابك بنجاح."
 
@@ -29643,7 +30342,7 @@ msgstr ""
 "(مثل OpenAI، Gemini، Azure) لتوليد ردود. نستخدم تتبع النظام والقياس عن بعد "
 "لتحسين المساعد."
 
-#: app/routes/auth.py:1571
+#: app/routes/auth.py:1619
 msgid "Your password has been reset. You can now log in."
 msgstr "تم إعادة تعيين كلمة المرور الخاصة بك. يمكنك الآن تسجيل الدخول."
 
@@ -29656,7 +30355,7 @@ msgstr ""
 "ملفك الشخصي يفتقد مسمى وظيفي. إضافة هذا الاسم تساعد الإداريين ونقاط اتصال "
 "على التعرف عليك. يمكنك تحديث هذا في أي وقت في إعدادات حسابك."
 
-#: app/routes/auth.py:334
+#: app/routes/auth.py:382
 #: app/templates/admin/user_management/user_form.html:806
 msgid "Your session has expired."
 msgstr "انتهت جلستك."
@@ -29725,6 +30424,10 @@ msgstr "و {الحساب} أكثر"
 #: app/templates/admin/user_management/access_requests.html:491
 msgid "approved"
 msgstr "تمت الموافقة"
+
+#: app/templates/forms/form_builder/partials/_item_modal.html:212
+msgid "archived"
+msgstr ""
 
 #: app/templates/components/auto_translate_modal_js.html:31
 msgid "are already translated!"
@@ -29817,7 +30520,7 @@ msgid "completed"
 msgstr "اكتمل"
 
 #: app/templates/admin/ai/knowledge_base.html:663
-#: app/templates/admin/data_exploration/explore_data.html:1474
+#: app/templates/admin/data_exploration/explore_data.html:1476
 #: app/templates/admin/organization/index.html:2530
 #: app/templates/admin/user_management/users.html:379
 #: app/templates/admin/validation_questions.html:274
@@ -30043,7 +30746,7 @@ msgstr "الأخطاء"
 msgid "exchange(s)"
 msgstr "التبادل"
 
-#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:270
+#: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:272
 msgid "extra \"Other\" entries (beyond the option count limit)"
 msgstr "إدخالات \"أخرى\" إضافية (بعد حد عدد الخيارات)"
 
@@ -30077,7 +30780,7 @@ msgstr "نقاط اتصال لـ"
 msgid "form data entries"
 msgstr "مدخلات بيانات محفوظة."
 
-#: app/templates/admin/data_exploration/explore_data.html:1641
+#: app/templates/admin/data_exploration/explore_data.html:1643
 msgid "form items loaded"
 msgstr "قوالب النماذج"
 
@@ -30116,6 +30819,7 @@ msgstr "قد"
 
 #: app/templates/admin/data_exploration/explore_data.html:794
 #: app/templates/admin/data_exploration/explore_data.html:801
+#: plugins/fdrs/templates/service_income/tab_panel.html:116
 msgid "imputed"
 msgstr "الإشارة إلى الموضوع"
 
@@ -30302,6 +31006,10 @@ msgstr "جديد"
 msgid "non-compliant countries have compliance documents pending validation."
 msgstr "الدول غير المتوافقة لديها مستندات امتثال تنتظر التحقق منها."
 
+#: app/templates/auth/login.html:730
+msgid "not registered"
+msgstr ""
+
 #: app/templates/forms/entry_form/validation_summary_pdf.html:92
 #: app/templates/forms/entry_form/validation_summary_progress.html:342
 #: app/templates/forms/entry_form/validation_summary_progress.html:363
@@ -30403,7 +31111,7 @@ msgstr "طلبات الوصول المعلقة"
 msgid "per day"
 msgstr ""
 
-#: app/templates/admin/data_exploration/explore_data.html:1473
+#: app/templates/admin/data_exploration/explore_data.html:1475
 msgid "periods"
 msgstr "الفترات"
 
@@ -30473,6 +31181,10 @@ msgstr "تم رفضه"
 #: app/templates/admin/templates/templates.html:318
 msgid "repeat group data entries"
 msgstr "مجموعة التكرار"
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:115
+msgid "reported"
+msgstr ""
 
 #: app/templates/admin/api_keys/details.html:275
 msgid "req / min"
@@ -30786,6 +31498,10 @@ msgstr "وسوف تترجم )ترجمة التحريرات القائمة من �
 msgid "will be unassigned"
 msgstr "مُسند"
 
+#: plugins/fdrs/templates/service_income/tab_panel.html:117
+msgid "with a service-income figure"
+msgstr ""
+
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:399
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:404
 msgid "years"
@@ -30842,8 +31558,8 @@ msgid ""
 " enabled{no_focal_suffix}{admin_suffix}{admin_cc_suffix}"
 msgstr ""
 
-#: app/routes/forms/validation_summary.py:861
-#: app/routes/forms/validation_summary.py:906
+#: app/routes/forms/validation_summary.py:862
+#: app/routes/forms/validation_summary.py:907
 #: app/templates/admin/communication/center.html:1462
 #: app/templates/forms/entry_form/validation_summary_progress.html:331
 msgid "—"
@@ -31056,3 +31772,41 @@ msgstr "✓"
 # [Removed] was: app/templates/admin/data_exploration/explore_data.html:25
 #~ msgid "View FDRS document compliance by country."
 #~ msgstr "عرض الامتثال لوثائق FDRS حسب الدولة."
+
+# [Removed] was: app/templates/admin/governance/dashboard.html:193
+#~ msgid "Active without Owner"
+#~ msgstr "نشط بدون مالك"
+
+# [Removed] was: app/templates/admin/governance/dashboard.html:194
+#~ msgid ""
+#~ "Deactivated users who still hold RBAC roles. Their access should be revoked "
+#~ "to prevent unauthorized data exposure."
+#~ msgstr ""
+#~ "مستخدمون تم تعطيل منشطهم لا يزالون يشغلون أدوار RBAC. يجب إلغاء وصولهم لمنع "
+#~ "التعرض غير المصرح به للبيانات."
+
+# [Removed] was: app/templates/admin/governance/dashboard.html:192
+#~ msgid "Focal Point %%"
+#~ msgstr "نقطة التركيز ٪٪"
+
+# [Removed] was: app/templates/admin/governance/dashboard.html:194
+#~ msgid "Ghost Access"
+#~ msgstr "الوصول الشبح"
+
+# [Removed] was: app/templates/auth/login.html:696
+#~ msgid ""
+#~ "Sign in without a password to test as a role preset or any active user."
+#~ msgstr "سجل الدخول بدون كلمة مرور لاختبار إعداد دور أو مستخدم نشط."
+
+# [Removed] was: app/templates/admin/governance/dashboard.html:195
+#~ msgid "Submission Rate"
+#~ msgstr "معدل التقديم"
+
+# [Removed] was:
+# app/templates/forms/form_builder/partials/_item_modal.html:202
+#~ msgid ""
+#~ "Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
+#~ "4.3)"
+#~ msgstr ""
+#~ "Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
+#~ "4.3)"

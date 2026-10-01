@@ -729,6 +729,7 @@ def _fetch_extended_data(
     elevated_access, auth_user,
     date_from=None, date_to=None,
     key_scope=None,
+    unrestricted_user_scope=False,
 ):
     """
     Fetch DynamicIndicatorData and/or RepeatGroupData rows for the current request filters.
@@ -784,7 +785,7 @@ def _fetch_extended_data(
                 if k_p is not None:
                     k_p = k_p.filter(PublicSubmission.country_id.in_(key_cids))
             return {'assigned': k_a, 'public': k_p}
-        if elevated_access or auth_user is None:
+        if unrestricted_user_scope or elevated_access or auth_user is None:
             return q_dict
 
         is_sys_mgr = AuthorizationService.is_system_manager(auth_user)
@@ -1561,12 +1562,19 @@ def get_all_data():
             )
 
         # ---------- RBAC: if user-authenticated, restrict to templates the user owns or that are shared with them ----------
+        analysis_template_read = False
         if not elevated_access and auth_user is not None:
-            # System managers have access to all templates
+            # System managers have access to all templates.
+            # Disaggregation analysis may read the FDRS template without a share or country grant.
             from app.services.organization.authorization_service import AuthorizationService
+            from app.plugins.data_explorer import user_can_read_disaggregation_template
             is_system_mgr = AuthorizationService.is_system_manager(auth_user)
+            analysis_template_read = bool(
+                analysis_requested
+                and user_can_read_disaggregation_template(auth_user, template_id)
+            )
 
-            if not is_system_mgr:
+            if not is_system_mgr and not analysis_template_read:
                 allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
                 if template_id is not None and template_id not in allowed_template_ids:
                     return api_error('Forbidden: no access to requested template', 403)
@@ -1580,16 +1588,18 @@ def get_all_data():
                 aes_allowed_template_ids = allowed_template_ids
                 aes_allowed_country_ids = _get_user_allowed_country_ids(auth_user)
 
-            # Apply template scoping to queries
-            scoped_queries = apply_user_template_scoping(
-                queries,
-                auth_user,
-                template_id,
-                country_id,
-                period_name,
-                assignment_ids=assignment_ids,
-            )
-            assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
+            # FDRS disaggregation is already limited to that template. Do not also
+            # require a template share or country grant.
+            if not analysis_template_read:
+                scoped_queries = apply_user_template_scoping(
+                    queries,
+                    auth_user,
+                    template_id,
+                    country_id,
+                    period_name,
+                    assignment_ids=assignment_ids,
+                )
+                assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
 
             # If user has no access, return empty result.
             # IMPORTANT: Do NOT short-circuit when include_non_reported=1 for a bounded assigned scope,
@@ -2166,6 +2176,7 @@ def get_all_data():
             date_from=date_from,
             date_to=date_to,
             key_scope=get_api_key_data_scope() if api_key_record is not None else None,
+            unrestricted_user_scope=analysis_template_read,
         ) if (include_dynamic or include_repeat) else {
             'dynamic_data': [], 'repeat_data': [], 'dynamic_context': [], 'assigned_submission_ids': set(),
         }

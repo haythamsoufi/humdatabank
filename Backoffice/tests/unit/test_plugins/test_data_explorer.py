@@ -3,7 +3,12 @@
 from unittest.mock import MagicMock
 
 from app.plugins.base import DataExplorerTabConfig
-from app.plugins.data_explorer import explore_first_tab, resolve_explore_tab
+from app.plugins.data_explorer import (
+    explore_first_tab,
+    resolve_explore_tab,
+    user_can_read_disaggregation_template,
+)
+from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
 
 def _plugin_manager_with_pb_progress():
@@ -81,3 +86,37 @@ def test_resolve_explore_tab_falls_back_for_unknown_tab():
     manager = _plugin_manager_with_pb_progress()
 
     assert resolve_explore_tab(flags, manager, "not-a-tab") == "data-table"
+
+
+def test_analysis_permission_reads_fdrs_without_a_template_share():
+    from unittest.mock import patch
+
+    user = MagicMock()
+
+    with patch(
+        "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
+        return_value=False,
+    ), patch(
+        "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+        return_value=True,
+    ) as has_permission:
+        assert user_can_read_disaggregation_template(user, FDRS_TEMPLATE_ID) is True
+        has_permission.assert_called_once_with(user, "admin.data_explore.analysis")
+
+    with patch(
+        "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
+        return_value=False,
+    ), patch(
+        "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+        return_value=True,
+    ):
+        assert user_can_read_disaggregation_template(user, FDRS_TEMPLATE_ID + 1) is False
+
+    with patch(
+        "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
+        return_value=False,
+    ), patch(
+        "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
+        return_value=False,
+    ):
+        assert user_can_read_disaggregation_template(user, FDRS_TEMPLATE_ID) is False

@@ -28,6 +28,7 @@ from app.plugins.data_explorer import (
     manage_flag_key,
     resolve_explore_tab,
     tab_flag_key,
+    user_can_read_disaggregation_template,
 )
 from app.plugins.manager import PluginManager
 from app.services.data_quality.helpers import list_exploration_period_names
@@ -215,6 +216,25 @@ def data_explorer_required(f):
         logger.debug("data_explorer_required: metadata assignment failed: %s", e)
     return decorated_function
 
+def _templates_for_disaggregation(templates, tab_flags):
+    """Include FDRS in the analysis template list even when the user has no share."""
+    if not tab_flags.get("can_access_disaggregation"):
+        return templates
+    if any(getattr(template, "id", None) == FDRS_TEMPLATE_ID for template in templates):
+        return templates
+    fdrs_template = (
+        FormTemplate.query
+        .options(joinedload(FormTemplate.published_version))
+        .get(FDRS_TEMPLATE_ID)
+    )
+    if fdrs_template is None:
+        return templates
+    panel_templates = list(templates)
+    panel_templates.append(fdrs_template)
+    panel_templates.sort(key=lambda template: template.name if template.name else "")
+    return panel_templates
+
+
 # === Data Exploration Routes ===
 @bp.route("/data-exploration", methods=["GET"])
 @data_explorer_required
@@ -249,7 +269,7 @@ def explore_data():
         templates.sort(key=lambda t: t.name if t.name else "")
 
         panel_context = {
-            "templates": templates,
+            "templates": _templates_for_disaggregation(templates, tab_flags),
             "fdrs_template_id": FDRS_TEMPLATE_ID,
         }
         extension_panels = _render_extension_panels(
@@ -446,9 +466,10 @@ def get_assignment_filters_for_template():
             return json_error('template_id is required', 400)
 
         if not AuthorizationService.is_system_manager(current_user):
-            allowed_template_ids = get_user_allowed_template_ids(current_user.id)
-            if template_id not in allowed_template_ids:
-                return json_forbidden('Forbidden: no access to requested template')
+            if not user_can_read_disaggregation_template(current_user, template_id):
+                allowed_template_ids = get_user_allowed_template_ids(current_user.id)
+                if template_id not in allowed_template_ids:
+                    return json_forbidden('Forbidden: no access to requested template')
 
         template = FormTemplate.query.get(template_id)
         if not template:

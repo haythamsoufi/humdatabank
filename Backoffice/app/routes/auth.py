@@ -7,7 +7,7 @@ from flask_babel import _
 # Removed check_password_hash as it's now in the User model method
 from app.models import User
 from app import db # db instance might not be needed here unless modifying user on login
-from sqlalchemy import func
+from sqlalchemy import and_, exists, false, func, or_
 from sqlalchemy.exc import IntegrityError
 from app.forms.auth_forms import LoginForm, AccountSettingsForm, RegisterForm, ForgotPasswordForm, ResetPasswordForm
 from urllib.parse import urlencode
@@ -131,23 +131,69 @@ def _dev_act_as_allowed_emails() -> set[str]:
     return allowed
 
 
+def _has_registered_login():
+    """Correlated check: the account has completed a real sign-in (not dev act-as)."""
+    from app.models import UserLoginLog
+
+    return exists().where(
+        and_(
+            UserLoginLog.user_id == User.id,
+            UserLoginLog.event_type == 'login_success',
+        )
+    )
+
+
+def _dev_act_as_user_allowed(user: User) -> bool:
+    """Seeded/allow-listed accounts, or an active account that has not signed in yet.
+
+    Pre-added users (created ahead of registration) are included so local testing
+    can use them before the first real login. Anyone who has already signed in
+    stays off the list unless they are a seeded test account or listed in
+    DEV_ACT_AS_EXTRA_EMAILS — a restored production database must not be
+    impersonated through this picker.
+    """
+    if not user or not getattr(user, 'active', False):
+        return False
+    email = (user.email or '').strip().lower()
+    if email in _dev_act_as_allowed_emails():
+        return True
+    from app.models import UserLoginLog
+
+    registered = (
+        db.session.query(UserLoginLog.id)
+        .filter(
+            UserLoginLog.user_id == user.id,
+            UserLoginLog.event_type == 'login_success',
+        )
+        .first()
+    )
+    return registered is None
+
+
 def _get_dev_act_as_users() -> list[dict]:
-    """Active seeded/allow-listed users for the dev act-as picker."""
+    """Seeded accounts plus active users who have not registered yet."""
     allowed = _dev_act_as_allowed_emails()
+    email_allowed = func.lower(User.email).in_(allowed) if allowed else false()
     users = (
-        User.query.filter(User.active.is_(True), func.lower(User.email).in_(allowed))
+        User.query.filter(
+            User.active.is_(True),
+            or_(email_allowed, ~_has_registered_login()),
+        )
         .order_by(User.name, User.email)
         .all()
     )
     result = []
     for user in users:
         access = AuthorizationService.access_level(user)
+        email = (user.email or '').strip().lower()
+        # Non-allow-listed rows are here only because they have no real sign-in yet.
         result.append({
             'id': user.id,
             'email': user.email,
             'name': user.name or user.email,
             'access_level': access,
             'access_label': _DEV_ACT_AS_ACCESS_LABELS.get(access, access),
+            'registered': email in allowed,
         })
     return result
 
@@ -215,7 +261,9 @@ def _complete_dev_act_as_login(user: User) -> None:
     if not (user.title and user.title.strip()):
         session['prompt_profile_completion'] = True
 
-    log_login_attempt(user.email, success=True, user=user, session_id=session_id)
+    log_login_attempt(
+        user.email, success=True, user=user, session_id=session_id, dev_act_as=True,
+    )
     client_info = get_client_info()
     end_other_active_sessions_for_device(
         user.id, client_info['ip_address'], client_info.get('browser'), client_info.get('device_type'),
@@ -284,7 +332,7 @@ def dev_act_as_login():
         user = _resolve_dev_act_as_preset(preset)
     if not user and user_id:
         candidate = User.query.filter_by(id=user_id, active=True).first()
-        if candidate and (candidate.email or '').strip().lower() in _dev_act_as_allowed_emails():
+        if candidate and _dev_act_as_user_allowed(candidate):
             user = candidate
         elif candidate:
             current_app.logger.warning(

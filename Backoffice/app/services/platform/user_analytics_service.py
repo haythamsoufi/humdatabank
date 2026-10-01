@@ -188,7 +188,7 @@ def session_log_device_icon_classes(
     return 'fas fa-laptop text-gray-500'
 
 
-def log_login_attempt(email, success=True, user=None, session_id=None, failure_reason=None):
+def log_login_attempt(email, success=True, user=None, session_id=None, failure_reason=None, dev_act_as=False):
     """
     Log a user login attempt (successful or failed).
 
@@ -198,6 +198,8 @@ def log_login_attempt(email, success=True, user=None, session_id=None, failure_r
         user (User): User object if login was successful
         session_id (str): Session ID for successful logins
         failure_reason (str): Reason for failure ('wrong_password', 'user_not_found', etc.)
+        dev_act_as (bool): When True, a successful attempt is stored as ``dev_act_as_login``
+            so it does not count as the account having registered.
     """
     try:
         client_info = get_client_info()
@@ -215,10 +217,17 @@ def log_login_attempt(email, success=True, user=None, session_id=None, failure_r
         # Get referrer information
         referrer = request.referrer if hasattr(request, 'referrer') else None
 
+        # Dev act-as is not a registration. Keep it out of login_success so a
+        # pre-added account stays available in the dev picker after you use it.
+        if success and dev_act_as:
+            event_type = 'dev_act_as_login'
+        else:
+            event_type = 'login_success' if success else 'login_failed'
+
         login_log = UserLoginLog(
             user_id=user.id if user and success else None,
             email_attempted=email,
-            event_type='login_success' if success else 'login_failed',
+            event_type=event_type,
             ip_address=client_info['ip_address'],
             user_agent=client_info['user_agent'],
             browser=client_info['browser'],

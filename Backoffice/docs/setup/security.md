@@ -87,7 +87,7 @@ App builds that predate the code flow send no challenge; while `MOBILE_OAUTH_ALL
 
 ### Development-only shortcuts
 
-Dev "Act as" needs `FLASK_CONFIG=development`, `DEBUG`, a true loopback connection (no forwarding headers) and only signs in as the seeded test users (plus `DEV_ACT_AS_EXTRA_EMAILS`); posting an arbitrary `user_id` is refused. `DEBUG_SKIP_LOGIN` is now defined in `Config` (default false) and is fatal outside development + DEBUG. Plugin ZIP upload is controlled by `PLUGIN_UPLOAD_ENABLED` (default off in production/staging, on in development/testing).
+Dev "Act as" needs `FLASK_CONFIG=development`, `DEBUG`, and a true loopback connection (no forwarding headers). It signs in as the seeded test users (plus `DEV_ACT_AS_EXTRA_EMAILS`) and as active accounts that have never completed a real sign-in (pre-added users). A `user_id` for someone who has already signed in, and is not on that allow list, is refused. Dev act-as itself is logged as `dev_act_as_login`, so using the picker does not count as registration. `DEBUG_SKIP_LOGIN` is now defined in `Config` (default false) and is fatal outside development + DEBUG. Plugin ZIP upload is controlled by `PLUGIN_UPLOAD_ENABLED` (default off in production/staging, on in development/testing).
 
 ### Deployment and upgrade notes
 

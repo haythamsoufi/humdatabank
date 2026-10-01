@@ -1709,6 +1709,7 @@ def api_auto_translate():
     try:
         from app.services.translation.auto_translator import (
             get_auto_translator,
+            resolve_requested_service,
             translate_form_item_auto,
             translate_section_name_auto,
             translate_question_option_auto,
@@ -1843,8 +1844,8 @@ def api_auto_translate():
             configured = current_app.config.get('TRANSLATABLE_LANGUAGES') or []
             target_languages = [lc for lc in (configured or []) if lc != 'en']
         # An explicit service disables engine fallbacks. Omit or blank → default
-        # engine first, then the remaining configured services (skips a down
-        # LibreTranslate instance instead of failing the whole request).
+        # engine first, then the remaining configured services. A verified-down
+        # explicit engine is rejected instead of being swapped for another one.
         raw_service = data.get('translation_service')
         service_name = str(raw_service).strip() if raw_service else None
 
@@ -1859,24 +1860,36 @@ def api_auto_translate():
         if not available_services:
             return json_bad_request(_('No translation service available. Please configure translation API keys.'))
 
-        # Configured != reachable. An explicit service disables engine fallbacks, so
-        # drop a requested engine that is known-down (e.g. LibreTranslate offline)
-        # and let the translator use the default plus remaining services.
         service_status = auto_translator.check_service_status() or {}
+        status_verified = auto_translator.has_status_cache()
         reachable_services = [
             name for name in available_services if service_status.get(name) is not False
         ]
         reachable_label = ", ".join(reachable_services) if reachable_services else "none reachable"
         if service_name and service_name not in available_services:
-            logger.warning(f"Requested translation service '{service_name}' is not available. Available services: {available_services}. Using fallback.")
-            service_name = None
-        elif service_name and service_status.get(service_name) is False:
             logger.warning(
-                "Requested translation service '%s' is currently unavailable. Status: %s. Using fallback.",
+                "Requested translation service '%s' is not configured. Available services: %s. Using fallback.",
                 service_name,
-                service_status,
+                available_services,
             )
             service_name = None
+        else:
+            service_name, service_error = resolve_requested_service(
+                service_name,
+                available_services,
+                service_status,
+                status_verified=status_verified,
+            )
+            if service_error:
+                logger.warning(service_error)
+                return json_bad_request(service_error)
+
+        auto_translator.begin_engine_trace()
+
+        def _used():
+            return auto_translator.finish_engine_trace(
+                fallback=service_name or auto_translator.get_default_service()
+            )
 
         if translation_type == 'form_item':
             # Translate form item (label and definition)
@@ -1888,7 +1901,7 @@ def api_auto_translate():
             )
 
             if result and (result.get('label_translations') or result.get('definition_translations')):
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             else:
                 logger.warning(
                     "Auto-translate empty result type=form_item service=%s langs=%s status=%s",
@@ -1907,7 +1920,7 @@ def api_auto_translate():
                 service_name=service_name
             )
             if result and result.get('label_translations'):
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             else:
                 logger.warning(
                     "Auto-translate empty result type=document_field service=%s langs=%s status=%s",
@@ -1925,7 +1938,7 @@ def api_auto_translate():
             )
 
             if result and len(result) > 0:
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             else:
                 # Return partial success if some translations failed but we have at least one
                 # This allows the frontend to show successful translations even if some languages failed
@@ -1949,7 +1962,7 @@ def api_auto_translate():
             )
 
             if result and len(result) > 0:
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             else:
                 return json_bad_request(f'Translation failed. No translations were generated. Reachable services: {reachable_label}.')
 
@@ -1962,7 +1975,7 @@ def api_auto_translate():
             )
 
             if result and len(result) > 0:
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             else:
                 return json_bad_request(f'Translation failed. No translations were generated. Reachable services: {reachable_label}.')
 
@@ -1975,7 +1988,7 @@ def api_auto_translate():
             )
 
             if result and len(result) > 0:
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             else:
                 # Translation produced no output (e.g. acronym/proper noun returned unchanged or
                 # service unavailable for this text). Return the source text for each target language
@@ -1998,7 +2011,7 @@ def api_auto_translate():
                 service_name=service_name,
             )
             if result and len(result) > 0:
-                return json_ok(translations=result, service_used=auto_translator.get_default_service())
+                return json_ok(translations=result, service_used=_used())
             return json_bad_request(
                 f'Translation failed. No translations were generated. Reachable services: {reachable_label}.'
             )
@@ -2089,7 +2102,7 @@ def api_auto_translate():
                 batch_result = upsert_batch(
                     pending_writes,
                     provenance=PROVENANCE_MACHINE,
-                    engine=service_name,
+                    engine=_used(),
                 )
                 skipped_protected = batch_result.get('skipped_protected', 0)
                 for locale, msgid in batch_result.get('updated_pairs', []):
@@ -2110,7 +2123,7 @@ def api_auto_translate():
                     translations={'label_translations': translations},
                     results=results,
                     updated_count=success_count,
-                    service_used=service_name,
+                    service_used=_used(),
                 )
                 if skipped_protected:
                     response_kwargs['skipped_protected'] = skipped_protected
@@ -2126,7 +2139,7 @@ def api_auto_translate():
                     translations={},
                     updated_count=0,
                     skipped_protected=skipped_protected,
-                    service_used=service_name,
+                    service_used=_used(),
                     message=ngettext(
                         '%(count)s string was skipped because it is already human-approved.',
                         '%(count)s strings were skipped because they are already human-approved.',
@@ -2140,7 +2153,7 @@ def api_auto_translate():
                     updated_count=0,
                     skipped_untranslatable=skipped_untranslatable,
                     skipped_protected=skipped_protected,
-                    service_used=service_name,
+                    service_used=_used(),
                     untranslated=True,
                     message='No translation available: the text may be a proper noun or technical term that does not require translation.',
                 )
@@ -2181,14 +2194,14 @@ def api_auto_translate():
                     results=results,
                     updated_count=success_count,
                     skipped_existing=skipped_existing,
-                    service_used=service_name,
+                    service_used=_used(),
                 )
             if skipped_existing > 0 and skipped_untranslatable == 0:
                 return json_ok(
                     translations={},
                     updated_count=0,
                     skipped_existing=skipped_existing,
-                    service_used=service_name,
+                    service_used=_used(),
                 )
             if skipped_untranslatable > 0:
                 return json_ok(
@@ -2196,7 +2209,7 @@ def api_auto_translate():
                     updated_count=0,
                     skipped_untranslatable=skipped_untranslatable,
                     skipped_existing=skipped_existing,
-                    service_used=service_name,
+                    service_used=_used(),
                     untranslated=True,
                     message='No translation available: the text may be a proper noun or technical term that does not require translation.',
                 )

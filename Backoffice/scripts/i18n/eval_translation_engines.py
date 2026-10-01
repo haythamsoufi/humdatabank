@@ -3,6 +3,8 @@
 
 Compares Azure/IFRC, Google, and optional NLLB, each with and without glossary.
 Does nothing useful until gold[locale] fields are filled by humans.
+NLLB is scored only when NLLB_SIDECAR_URL is configured. Do not fill the
+gold fixture with machine output; empty references are not a quality claim.
 """
 
 from __future__ import annotations

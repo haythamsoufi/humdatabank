@@ -267,8 +267,10 @@ export const FormPopulationMixin = {
             requiredCheckbox.checked = parseBool(itemData.is_required);
         }
 
-        if (orderInput && itemData.order) {
-            orderInput.value = itemData.order;
+        if (orderInput && itemData.order != null && itemData.order !== '') {
+            this._pendingStoredOrder = itemData.order;
+        } else if (orderInput) {
+            this._pendingStoredOrder = null;
         }
 
         if (dataNotAvailableCheckbox && !isDisplayOnly) {
@@ -394,6 +396,14 @@ export const FormPopulationMixin = {
         if (sectionSelect && sectionId) {
             sectionSelect.value = sectionId;
         }
+
+        if (this._pendingStoredOrder != null && this._pendingStoredOrder !== '') {
+            this.applyStoredItemOrder(this._pendingStoredOrder);
+        } else {
+            this.refreshItemParentOptions('');
+            this.syncOrderInputMode();
+        }
+        this._pendingStoredOrder = null;
 
         if (itemIdInput && itemData.id) {
             itemIdInput.value = itemData.id;

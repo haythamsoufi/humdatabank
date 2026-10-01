@@ -157,9 +157,14 @@ export const SectionSelectorMixin = {
                 this.ensureUseAsRepeatEntryTitleField(itemType);
             }
 
-            // Recalculate default order for the new section (only in add mode)
+            // Add mode picks the next top-level order. Edit mode keeps the
+            // current position and only refreshes which parents exist.
             if (this.currentMode === 'add' && e.target.value) {
                 this.setDefaultOrderValue(e.target.value);
+            } else {
+                const parentSelect = this.modalElement.querySelector('#item-parent-order');
+                this.refreshItemParentOptions(parentSelect ? parentSelect.value : '');
+                this.syncOrderInputMode();
             }
         };
         sectionSelect.addEventListener('change', sectionSelect._sectionChangeHandler);
@@ -168,28 +173,206 @@ export const SectionSelectorMixin = {
     },
 
     setDefaultOrderValue: function(sectionId) {
-        // Find the order input field
         const orderInput = this.modalElement.querySelector('#item-order');
         if (!orderInput) return;
 
-        // Get the current section's items to calculate the next order
-        const sectionItems = (DataManager && typeof DataManager.getData === 'function')
+        this.refreshItemParentOptions('');
+        const items = this.getSectionFormItems(sectionId);
+        orderInput.value = String(this.nextMainItemOrder(items));
+        this.syncOrderInputMode();
+    },
+
+    /**
+     * Whole-number order is the position. A parent selection makes the field
+     * a sub-item; the stored value stays a tenth (parent + position/10) so
+     * existing sub-item rendering keeps working.
+     */
+    getSectionFormItems: function(sectionId) {
+        const id = sectionId != null && sectionId !== '' ? sectionId : this.getActiveSectionId();
+        if (id == null || id === '') return [];
+        const sections = (DataManager && typeof DataManager.getData === 'function')
             ? (DataManager.getData('sectionsWithItems') || [])
             : (window.sectionsWithItemsForJs || []);
-        // Compare IDs robustly (string vs number)
-        const currentSection = sectionItems.find(s => String(s.id) === String(sectionId));
+        const section = sections.find(s => String(s.id) === String(id));
+        return (section && Array.isArray(section.form_items)) ? section.form_items : [];
+    },
 
-        if (currentSection && currentSection.form_items && currentSection.form_items.length > 0) {
-            // Find the highest order value in the current section
-            const maxOrder = Math.max(...currentSection.form_items.map(item => parseFloat(item.order) || 0));
-            const nextOrder = maxOrder + 1;
-            orderInput.value = nextOrder;
+    splitStoredOrder: function(order) {
+        const n = parseFloat(order);
+        if (!Number.isFinite(n) || n < 0) return { parent: '', position: '' };
+        const rounded = Math.round(n * 10) / 10;
+        const parent = Math.floor(rounded + 1e-6);
+        const tenth = Math.round((rounded - parent) * 10);
+        if (tenth <= 0) return { parent: '', position: String(parent) };
+        return { parent: String(parent), position: String(Math.min(9, tenth)) };
+    },
 
-        } else {
-            // If no items in section, start with order 1
-            orderInput.value = 1;
+    composeStoredOrder: function(positionRaw, parentRaw) {
+        const positionText = String(positionRaw ?? '').trim();
+        if (!positionText) return '';
+        const position = parseInt(positionText, 10);
+        if (!Number.isFinite(position) || position < 0) return '';
+        const parentText = String(parentRaw ?? '').trim();
+        if (!parentText) return String(position);
+        const parent = parseInt(parentText, 10);
+        if (!Number.isFinite(parent) || parent < 0) return String(position);
+        const sub = Math.min(9, Math.max(1, position));
+        return (parent + sub / 10).toFixed(1);
+    },
 
+    nextMainItemOrder: function(items) {
+        const excludeId = this.currentItemId;
+        let max = 0;
+        (items || []).forEach((item) => {
+            if (excludeId != null && String(item.item_id) === String(excludeId)) return;
+            const split = this.splitStoredOrder(item.order);
+            if (split.parent || !split.position) return;
+            const n = parseInt(split.position, 10);
+            if (Number.isFinite(n)) max = Math.max(max, n);
+        });
+        return max + 1;
+    },
+
+    nextSubItemPosition: function(items, parentOrder) {
+        const excludeId = this.currentItemId;
+        const used = new Set();
+        (items || []).forEach((item) => {
+            if (excludeId != null && String(item.item_id) === String(excludeId)) return;
+            const split = this.splitStoredOrder(item.order);
+            if (split.parent !== String(parentOrder)) return;
+            const n = parseInt(split.position, 10);
+            if (Number.isFinite(n)) used.add(n);
+        });
+        for (let i = 1; i <= 9; i += 1) {
+            if (!used.has(i)) return i;
         }
+        return 9;
+    },
+
+    refreshItemParentOptions: function(preferredParent) {
+        if (!this.modalElement) return;
+        const select = this.modalElement.querySelector('#item-parent-order');
+        if (!select) return;
+        this.wireItemOrderControls();
+
+        const mainLabel = select.getAttribute('data-label-main') || 'Main item';
+        const itemLabel = select.getAttribute('data-label-item') || 'Item';
+        const archivedLabel = select.getAttribute('data-label-archived') || 'archived';
+        const wanted = preferredParent != null ? String(preferredParent) : (select.value || '');
+        const items = this.getSectionFormItems();
+        const excludeId = this.currentItemId;
+
+        const parents = items
+            .filter((item) => {
+                if (excludeId != null && String(item.item_id) === String(excludeId)) return false;
+                const split = this.splitStoredOrder(item.order);
+                if (!split.position || split.parent) return false;
+                if (item.archived && split.position !== wanted) return false;
+                return true;
+            })
+            .sort((a, b) => (parseFloat(a.order) || 0) - (parseFloat(b.order) || 0));
+
+        select.replaceChildren();
+        const mainOpt = document.createElement('option');
+        mainOpt.value = '';
+        mainOpt.textContent = mainLabel;
+        select.appendChild(mainOpt);
+
+        const seen = new Set();
+        parents.forEach((item) => {
+            const split = this.splitStoredOrder(item.order);
+            if (seen.has(split.position)) return;
+            seen.add(split.position);
+            const opt = document.createElement('option');
+            opt.value = split.position;
+            const label = String(item.label || '').trim();
+            const shortLabel = label.length > 80 ? `${label.slice(0, 77)}…` : label;
+            let text = shortLabel ? `${split.position} — ${shortLabel}` : `${itemLabel} ${split.position}`;
+            if (item.archived) text += ` (${archivedLabel})`;
+            opt.textContent = text;
+            select.appendChild(opt);
+        });
+
+        if (wanted && !seen.has(wanted)) {
+            const missing = document.createElement('option');
+            missing.value = wanted;
+            missing.textContent = `${itemLabel} ${wanted}`;
+            select.appendChild(missing);
+        }
+        const hasWanted = wanted && Array.from(select.options).some((opt) => opt.value === wanted);
+        select.value = hasWanted ? wanted : '';
+    },
+
+    applyStoredItemOrder: function(order) {
+        if (!this.modalElement) return;
+        const orderInput = this.modalElement.querySelector('#item-order');
+        const split = this.splitStoredOrder(order);
+        this.refreshItemParentOptions(split.parent);
+        if (orderInput) orderInput.value = split.position;
+        this.syncOrderInputMode();
+    },
+
+    syncOrderInputMode: function() {
+        if (!this.modalElement) return;
+        const orderInput = this.modalElement.querySelector('#item-order');
+        const parentSelect = this.modalElement.querySelector('#item-parent-order');
+        if (!orderInput) return;
+        const hasParent = !!(parentSelect && parentSelect.value);
+        orderInput.step = '1';
+        orderInput.min = hasParent ? '1' : '0';
+        if (hasParent) orderInput.max = '9';
+        else orderInput.removeAttribute('max');
+    },
+
+    wireItemOrderControls: function() {
+        if (!this.modalElement) return;
+        const orderInput = this.modalElement.querySelector('#item-order');
+        const parentSelect = this.modalElement.querySelector('#item-parent-order');
+        if (orderInput && !orderInput.dataset.orderWired) {
+            orderInput.dataset.orderWired = 'true';
+            orderInput.addEventListener('input', () => {
+                const raw = String(orderInput.value ?? '');
+                const digits = raw.split(/[.,]/, 1)[0].replace(/[^\d]/g, '');
+                let next = digits;
+                const parent = parentSelect && parentSelect.value;
+                if (digits && parent) {
+                    let n = parseInt(digits, 10);
+                    if (n < 1) n = 1;
+                    if (n > 9) n = 9;
+                    next = String(n);
+                }
+                if (orderInput.value !== next) orderInput.value = next;
+            });
+        }
+        if (parentSelect && !parentSelect.dataset.parentWired) {
+            parentSelect.dataset.parentWired = 'true';
+            parentSelect.addEventListener('change', () => {
+                this.syncOrderInputMode();
+                if (!orderInput) return;
+                const parent = parentSelect.value;
+                const pos = parseInt(orderInput.value, 10);
+                const invalid = !Number.isFinite(pos);
+                if (parent && (invalid || pos < 1 || pos > 9)) {
+                    orderInput.value = String(this.nextSubItemPosition(this.getSectionFormItems(), parent));
+                } else if (!parent && invalid) {
+                    orderInput.value = String(this.nextMainItemOrder(this.getSectionFormItems()));
+                }
+            });
+        }
+    },
+
+    composeItemOrderForSubmit: function() {
+        if (!this.modalElement) return;
+        const orderInput = this.modalElement.querySelector('#item-order');
+        const parentSelect = this.modalElement.querySelector('#item-parent-order');
+        const hidden = this.modalElement.querySelector('#item-order-value');
+        if (!orderInput || !hidden) return;
+        let position = orderInput.value;
+        if (parentSelect && parentSelect.value && !String(position).trim()) {
+            position = '1';
+            orderInput.value = position;
+        }
+        hidden.value = this.composeStoredOrder(position, parentSelect ? parentSelect.value : '');
     },
 
     getActiveSectionId: function() {

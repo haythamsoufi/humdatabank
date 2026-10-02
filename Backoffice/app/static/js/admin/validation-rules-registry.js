@@ -76,7 +76,7 @@
         if (!select) return;
         var current = select.value;
         var codes = kpiCodesForSelection();
-        select.innerHTML = '';
+        select.replaceChildren();
         codes.forEach(function (code) {
             var opt = document.createElement('option');
             opt.value = code;

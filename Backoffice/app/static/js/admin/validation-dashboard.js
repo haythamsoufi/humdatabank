@@ -305,74 +305,97 @@
         return '<span class="vd-muted">—</span>';
     }
 
-    function th(label, className) {
-        return '<th' + (className ? ' class="' + className + '"' : '') + '>' + esc(label) + '</th>';
+    function headerCell(label, className) {
+        return { text: label == null ? '' : String(label), className: className || '' };
     }
 
-    function td(html, className) {
-        return '<td' + (className ? ' class="' + className + '"' : '') + '>' + html + '</td>';
+    function htmlCell(html, className) {
+        return { html: html || '', className: className || '' };
+    }
+
+    function valueCell(display, className) {
+        if (!display) return htmlCell('<span class="vd-muted">—</span>', className);
+        return { text: String(display), className: className || '' };
+    }
+
+    function appendFragment(parent, html) {
+        var parsed = new DOMParser().parseFromString('<div>' + (html || '') + '</div>', 'text/html');
+        var wrapper = parsed.body.firstChild;
+        if (!wrapper) return;
+        while (wrapper.firstChild) parent.appendChild(wrapper.firstChild);
+    }
+
+    function appendCell(row, tag, spec) {
+        var cell = document.createElement(tag);
+        if (spec.className) cell.className = spec.className;
+        if (spec.html) appendFragment(cell, spec.html);
+        else cell.textContent = spec.text == null ? '' : String(spec.text);
+        row.appendChild(cell);
     }
 
     function indicatorHeaderCells() {
         var years = comparisonYears();
         if (state.layout === 'checks') {
             return [
-                th(t.indicator || 'Indicator', 'vd-sticky'),
-                th(t.value || 'Value', 'vd-num'),
-                th(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'),
-                th(t.severity || 'Severity'),
-            ].join('');
+                headerCell(t.indicator || 'Indicator', 'vd-sticky'),
+                headerCell(t.value || 'Value', 'vd-num'),
+                headerCell(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'),
+                headerCell(t.severity || 'Severity'),
+            ];
         }
         if (state.layout === 'questions') {
             return [
-                th(t.indicator || 'Indicator', 'vd-sticky'),
-                th(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'),
-                th(t.severity || 'Severity'),
-                th(t.questionStatus || 'Question status'),
-                th(t.sent || 'Sent'),
-                th(t.answer || 'Answer', 'vd-cell-wrap'),
-                th(t.questionPreview || 'Question preview', 'vd-cell-wrap'),
-            ].join('');
+                headerCell(t.indicator || 'Indicator', 'vd-sticky'),
+                headerCell(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'),
+                headerCell(t.severity || 'Severity'),
+                headerCell(t.questionStatus || 'Question status'),
+                headerCell(t.sent || 'Sent'),
+                headerCell(t.answer || 'Answer', 'vd-cell-wrap'),
+                headerCell(t.questionPreview || 'Question preview', 'vd-cell-wrap'),
+            ];
         }
-        var cells = [th(t.indicator || 'Indicator', 'vd-sticky')];
-        if (!years.length) cells.push(th(t.value || 'Value', 'vd-num'));
-        years.forEach(function (year) { cells.push(th(String(year), 'vd-num')); });
+        var cells = [headerCell(t.indicator || 'Indicator', 'vd-sticky')];
+        if (!years.length) cells.push(headerCell(t.value || 'Value', 'vd-num'));
+        years.forEach(function (year) { cells.push(headerCell(String(year), 'vd-num')); });
         var changeLabel = t.change || 'Change';
         if (years.length >= 2) changeLabel += ' vs ' + years[1];
-        cells.push(th(changeLabel, 'vd-num'));
-        cells.push(th(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'));
-        return cells.join('');
+        cells.push(headerCell(changeLabel, 'vd-num'));
+        cells.push(headerCell(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'));
+        return cells;
     }
 
     function indicatorBodyCells(row) {
         var years = comparisonYears();
-        var name = td(esc(row.indicator_label || row.kpi_code || ''), 'vd-sticky');
+        var name = { text: row.indicator_label || row.kpi_code || '', className: 'vd-sticky' };
         if (state.layout === 'checks') {
-            return name +
-                td(row.current_value ? esc(formatNumericDisplay(row.current_value)) : '<span class="vd-muted">—</span>', 'vd-num') +
-                td(checkHtml(row), 'vd-cell-wrap') +
-                td(severityHtml(row));
+            return [
+                name,
+                valueCell(row.current_value ? formatNumericDisplay(row.current_value) : '', 'vd-num'),
+                htmlCell(checkHtml(row), 'vd-cell-wrap'),
+                htmlCell(severityHtml(row)),
+            ];
         }
         if (state.layout === 'questions') {
-            return name +
-                td(checkHtml(row), 'vd-cell-wrap') +
-                td(severityHtml(row)) +
-                td(questionStatusHtml(row)) +
-                td(sentHtml(row)) +
-                td(answerHtml(row), 'vd-cell-wrap') +
-                td(textHtml(row.question_preview), 'vd-cell-wrap');
+            return [
+                name,
+                htmlCell(checkHtml(row), 'vd-cell-wrap'),
+                htmlCell(severityHtml(row)),
+                htmlCell(questionStatusHtml(row)),
+                htmlCell(sentHtml(row)),
+                htmlCell(answerHtml(row), 'vd-cell-wrap'),
+                htmlCell(textHtml(row.question_preview), 'vd-cell-wrap'),
+            ];
         }
         var cells = [name];
         if (!years.length) {
-            cells.push(td(row.current_value ? esc(formatNumericDisplay(row.current_value)) : '<span class="vd-muted">—</span>', 'vd-num'));
+            cells.push(valueCell(row.current_value ? formatNumericDisplay(row.current_value) : '', 'vd-num'));
         }
         years.forEach(function (year) {
-            var value = yearValue(row, year);
-            cells.push(td(value ? esc(value) : '<span class="vd-muted">—</span>', 'vd-num'));
+            cells.push(valueCell(yearValue(row, year), 'vd-num'));
         });
-        cells.push(td(changeHtml(row), 'vd-num'));
-        cells.push(td(checkHtml(row), 'vd-cell-wrap'));
-        return cells.join('');
+        cells.push(htmlCell(changeHtml(row), 'vd-num'));
+        cells.push(htmlCell(checkHtml(row), 'vd-cell-wrap'));
+        return cells;
     }
 
     function layoutHint() {
@@ -399,11 +422,18 @@
         var head = table.querySelector('thead');
         var body = table.querySelector('tbody');
         var rows = filteredIndicatorRows();
-        if (head) head.innerHTML = rows.length ? '<tr>' + indicatorHeaderCells() + '</tr>' : '';
-        if (body) {
-            body.innerHTML = rows.map(function (row) {
-                return '<tr class="' + (row.flagged ? 'vd-row-flagged' : '') + '">' + indicatorBodyCells(row) + '</tr>';
-            }).join('');
+        if (head) head.replaceChildren();
+        if (body) body.replaceChildren();
+        if (rows.length && head && body) {
+            var headRow = document.createElement('tr');
+            indicatorHeaderCells().forEach(function (spec) { appendCell(headRow, 'th', spec); });
+            head.appendChild(headRow);
+            rows.forEach(function (row) {
+                var tr = document.createElement('tr');
+                if (row.flagged) tr.className = 'vd-row-flagged';
+                indicatorBodyCells(row).forEach(function (spec) { appendCell(tr, 'td', spec); });
+                body.appendChild(tr);
+            });
         }
         if (empty) {
             var hasCountry = !!state.selectedCountry;

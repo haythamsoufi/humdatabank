@@ -584,12 +584,27 @@
         };
     }
 
-    function trackerTh(label, className) {
-        return '<th' + (className ? ' class="' + className + '"' : '') + '>' + esc(label) + '</th>';
+    function trackerHeaderCell(label, className) {
+        return { text: label == null ? '' : String(label), className: className || '' };
     }
 
-    function trackerTd(html, className) {
-        return '<td' + (className ? ' class="' + className + '"' : '') + '>' + html + '</td>';
+    function trackerHtmlCell(html, className) {
+        return { html: html || '', className: className || '' };
+    }
+
+    function appendTrackerFragment(parent, html) {
+        var parsed = new DOMParser().parseFromString('<div>' + (html || '') + '</div>', 'text/html');
+        var wrapper = parsed.body.firstChild;
+        if (!wrapper) return;
+        while (wrapper.firstChild) parent.appendChild(wrapper.firstChild);
+    }
+
+    function appendTrackerCell(row, tag, spec) {
+        var cell = document.createElement(tag);
+        if (spec.className) cell.className = spec.className;
+        if (spec.html) appendTrackerFragment(cell, spec.html);
+        else cell.textContent = spec.text == null ? '' : String(spec.text);
+        row.appendChild(cell);
     }
 
     function renderTrackerTable(rows) {
@@ -600,9 +615,9 @@
         var body = table.querySelector('tbody');
         var list = rows || [];
         var meta = trackerColumnMeta();
+        if (head) head.replaceChildren();
+        if (body) body.replaceChildren();
         if (!list.length) {
-            if (head) head.innerHTML = '';
-            if (body) body.innerHTML = '';
             var emptyScroll = table.closest('.vd-table-scroll');
             if (emptyScroll) emptyScroll.classList.add('hidden');
             if (empty) {
@@ -612,36 +627,44 @@
             return;
         }
         var headers = [
-            trackerTh(t.region || 'Region', 'vd-col-region'),
-            trackerTh(t.country || 'Country', 'vd-col-country'),
-            trackerTh(t.status || 'Status'),
-            trackerTh(t.completionRate || 'Completion rate', 'vd-center vd-head-wrap'),
+            trackerHeaderCell(t.region || 'Region', 'vd-col-region'),
+            trackerHeaderCell(t.country || 'Country', 'vd-col-country'),
+            trackerHeaderCell(t.status || 'Status'),
+            trackerHeaderCell(t.completionRate || 'Completion rate', 'vd-center vd-head-wrap'),
         ];
         meta.sections.forEach(function (spec) {
-            headers.push(trackerTh(spec.label || sectionLabelForKey(spec.key), 'vd-center vd-head-wrap'));
+            headers.push(trackerHeaderCell(spec.label || sectionLabelForKey(spec.key), 'vd-center vd-head-wrap'));
         });
         meta.documents.forEach(function (doc) {
-            headers.push(trackerTh(doc.label, 'vd-center vd-head-wrap'));
+            headers.push(trackerHeaderCell(doc.label, 'vd-center vd-head-wrap'));
         });
-        if (head) head.innerHTML = '<tr>' + headers.join('') + '</tr>';
+        if (head) {
+            var headRow = document.createElement('tr');
+            headers.forEach(function (spec) { appendTrackerCell(headRow, 'th', spec); });
+            head.appendChild(headRow);
+        }
         if (body) {
-            body.innerHTML = list.map(function (row) {
+            list.forEach(function (row) {
                 var cells = [
-                    trackerTd(row.region ? esc(row.region) : '<span class="vd-muted">—</span>', 'vd-col-region'),
-                    trackerTd(esc(row.country_name || ''), 'vd-col-country'),
-                    trackerTd(statusBadge(row.status, row.status_label)),
-                    trackerTd(completionRateCell(row.completion_rate), 'vd-center'),
+                    row.region
+                        ? { text: row.region, className: 'vd-col-region' }
+                        : trackerHtmlCell('<span class="vd-muted">—</span>', 'vd-col-region'),
+                    { text: row.country_name || '', className: 'vd-col-country' },
+                    trackerHtmlCell(statusBadge(row.status, row.status_label)),
+                    trackerHtmlCell(completionRateCell(row.completion_rate), 'vd-center'),
                 ];
                 var sections = row.sections || {};
                 meta.sections.forEach(function (spec) {
-                    cells.push(trackerTd(sectionStatusIcon(sections[spec.key]), 'vd-center'));
+                    cells.push(trackerHtmlCell(sectionStatusIcon(sections[spec.key]), 'vd-center'));
                 });
                 var docs = row.documents || {};
                 meta.documents.forEach(function (doc) {
-                    cells.push(trackerTd(boolIcon(!!docs[doc.key]), 'vd-center'));
+                    cells.push(trackerHtmlCell(boolIcon(!!docs[doc.key]), 'vd-center'));
                 });
-                return '<tr>' + cells.join('') + '</tr>';
-            }).join('');
+                var tr = document.createElement('tr');
+                cells.forEach(function (spec) { appendTrackerCell(tr, 'td', spec); });
+                body.appendChild(tr);
+            });
         }
         var scroll = table.closest('.vd-table-scroll');
         if (scroll) scroll.classList.remove('hidden');

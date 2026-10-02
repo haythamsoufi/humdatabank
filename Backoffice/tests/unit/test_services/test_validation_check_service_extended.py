@@ -280,8 +280,8 @@ class TestEvaluateValidationChecks:
             "app.services.validation.check_service._resolve_country_id",
             return_value=1,
         ), patch(
-            "app.services.validation.check_service.run_fdrs_matrix_rules",
-            return_value=[check_result],
+            "app.services.validation.check_service.get_pack",
+            return_value=MagicMock(run_checks=MagicMock(return_value=[check_result])),
         ), patch(
             "app.services.validation.check_service._results_to_drafts",
             return_value=[],
@@ -324,6 +324,44 @@ class TestEvaluateValidationChecks:
             result = evaluate_validation_checks(1, "country", 1, "2024", rule_pack="some_other_pack")
 
         assert result.check_results == []
+
+    def test_uses_core_pack_when_data_quality_has_no_plugin_pack(self):
+        template = MagicMock()
+        template.published_version_id = 5
+        template.published_version.enable_data_quality = True
+        aes = MagicMock()
+        aes.id = 10
+        check_result = CheckResult(rule_code="indicator_not_reported", form_item_id=4, fired=True)
+
+        with patch(
+            "app.services.validation.check_service.FormTemplate.query"
+        ) as mock_tpl, patch(
+            "app.services.validation.check_service.get_rule_pack_for_template",
+            return_value=None,
+        ), patch(
+            "app.services.validation.check_service.resolve_assignment_aes",
+            return_value=(aes, "2024"),
+        ), patch(
+            "app.services.validation.check_service.load_form_data_by_kpi",
+            return_value={},
+        ), patch(
+            "app.services.validation.check_service._load_history",
+            return_value={},
+        ), patch(
+            "app.services.validation.check_service._resolve_country_id",
+            return_value=1,
+        ), patch(
+            "app.services.validation.check_service.run_core_checks",
+            return_value=[check_result],
+        ), patch(
+            "app.services.validation.check_service._results_to_drafts",
+            return_value=[],
+        ):
+            mock_tpl.get.return_value = template
+            result = evaluate_validation_checks(33, "country", 1, "2024")
+
+        assert result.rule_pack == "core"
+        assert result.check_results == [check_result]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -552,6 +590,9 @@ class TestUpsertQuestions:
         stale_q.rule_code = "old_rule"
         stale_q.form_item_id = 99
         stale_q.status = "open"
+        stale_q.source = "auto"
+        stale_q.id = 3
+        stale_q.asked_at = None
 
         with patch(
             "app.services.validation.check_service.ValidationQuestion.query"
@@ -567,6 +608,104 @@ class TestUpsertQuestions:
 
         assert result.resolved == 1
         assert stale_q.status == "resolved"
+
+    def test_reopens_answered_question_instead_of_creating_another(self):
+        draft = self._make_draft()
+        ctx = self._make_ctx()
+        aes = MagicMock()
+        aes.id = 10
+        aes.assigned_form_id = 5
+        answered = MagicMock()
+        answered.rule_code = "not_reported"
+        answered.form_item_id = 1
+        answered.status = "answered"
+        answered.source = "auto"
+        answered.id = 4
+        answered.asked_at = None
+
+        with patch(
+            "app.services.validation.check_service.ValidationQuestion.query"
+        ) as mock_vq, patch(
+            "app.services.validation.check_service.db"
+        ) as mock_db, patch(
+            "app.services.validation.check_service.mark_drafted"
+        ):
+            filter_q = MagicMock()
+            filter_q.filter.return_value.all.return_value = [answered]
+            mock_vq.filter_by.return_value = filter_q
+            result = _upsert_questions([draft], ctx, aes)
+
+        assert result.created == 0
+        assert result.updated == 1
+        assert answered.status == "open"
+        mock_db.session.add.assert_not_called()
+
+    def test_keeps_row_when_winning_rule_changes(self):
+        draft = self._make_draft(rule_code="indicator_not_reported")
+        ctx = self._make_ctx()
+        aes = MagicMock()
+        aes.id = 10
+        existing = MagicMock()
+        existing.rule_code = "past_year_threshold"
+        existing.form_item_id = 1
+        existing.status = "open"
+        existing.source = "auto"
+        existing.id = 8
+        existing.asked_at = None
+
+        with patch(
+            "app.services.validation.check_service.ValidationQuestion.query"
+        ) as mock_vq, patch(
+            "app.services.validation.check_service.db"
+        ), patch(
+            "app.services.validation.check_service.mark_drafted"
+        ):
+            filter_q = MagicMock()
+            filter_q.filter.return_value.all.return_value = [existing]
+            mock_vq.filter_by.return_value = filter_q
+            result = _upsert_questions([draft], ctx, aes)
+
+        assert result.updated == 1
+        assert result.created == 0
+        assert result.resolved == 0
+        assert existing.rule_code == "indicator_not_reported"
+
+    def test_resolves_extra_open_duplicate(self):
+        draft = self._make_draft()
+        ctx = self._make_ctx()
+        aes = MagicMock()
+        aes.id = 10
+
+        def _question(qid, stamp):
+            question = MagicMock()
+            question.rule_code = "not_reported"
+            question.form_item_id = 1
+            question.status = "open"
+            question.source = "auto"
+            question.id = qid
+            question.asked_at = MagicMock()
+            question.asked_at.timestamp.return_value = stamp
+            return question
+
+        older = _question(1, 1)
+        newer = _question(2, 9)
+
+        with patch(
+            "app.services.validation.check_service.ValidationQuestion.query"
+        ) as mock_vq, patch(
+            "app.services.validation.check_service.db"
+        ), patch(
+            "app.services.validation.check_service.mark_drafted"
+        ):
+            filter_q = MagicMock()
+            filter_q.filter.return_value.all.return_value = [older, newer]
+            mock_vq.filter_by.return_value = filter_q
+            result = _upsert_questions([draft], ctx, aes)
+
+        assert result.updated == 1
+        assert result.resolved == 1
+        assert newer.status == "open"
+        assert older.status == "resolved"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -603,8 +742,51 @@ class TestLoadHistoryFormItemNotInKpiBank:
             mock_fd.query.filter_by.return_value.all.return_value = [form_data]
             result = _load_history(1, "country", 1, "FDRS 2024", {"MY_KPI": item})
 
-        # form_item_id 99 != item.id 5, so item_to_kpi has no entry for 99 → continue
+        # form_item_id 99 != item.id 5, and the mock item has no stable key, so the row is skipped
         assert result == {}
+
+    def test_matches_prior_version_item_by_stable_key(self):
+        from app.services.validation.check_service import _load_history
+
+        aes = MagicMock()
+        aes.id = 10
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.period_name = "2023"
+
+        form_data = MagicMock()
+        form_data.form_item_id = 99
+        form_data.data_not_available = False
+        form_data.not_applicable = False
+        form_data.total_value = 40
+
+        current = MagicMock()
+        current.id = 5
+        current.template_id = 33
+        current.stable_key = "field-a"
+
+        prior = MagicMock()
+        prior.id = 99
+        prior.template_id = 33
+        prior.stable_key = "field-a"
+
+        with patch(
+            "app.services.validation.check_service.AssignmentEntityStatus"
+        ) as mock_aes_cls, patch(
+            "app.services.validation.check_service.AssignedForm"
+        ), patch(
+            "app.services.validation.check_service.FormData"
+        ) as mock_fd, patch(
+            "app.services.validation.check_service.FormItem"
+        ) as mock_item, patch(
+            "app.services.validation.check_service.parse_period_year",
+            side_effect=lambda p: 2024 if "2024" in str(p) else 2023 if "2023" in str(p) else None,
+        ):
+            mock_aes_cls.query.join.return_value.filter.return_value.all.return_value = [aes]
+            mock_fd.query.filter_by.return_value.all.return_value = [form_data]
+            mock_item.query.filter.return_value.all.return_value = [current, prior]
+            result = _load_history(33, "country", 1, "2024", {"ib:7": current})
+
+        assert result == {"ib:7": {2023: 40.0}}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -648,10 +830,11 @@ class TestEvaluationToContext:
         assert ctx.aes is aes
         assert ctx.country_id == 5
 
-    def test_filters_none_form_items_from_kpi_to_item(self):
-        """kpi_data entries with None form_item are excluded from kpi_to_item."""
+    def test_reuses_evaluation_history_without_reloading(self):
+        """Persisting questions copies history already loaded during evaluation."""
         from app.services.validation.check_service import _evaluation_to_context
 
+        history = {"KPI_B": {2023: 10.0}}
         evaluation = ValidationEvaluationResult(
             template_id=2,
             entity_type="country",
@@ -659,22 +842,23 @@ class TestEvaluationToContext:
             period_name="2024",
             resolved_period="FDRS 2024",
             rule_pack="fdrs_matrix_v1",
+            language="fr",
             assignment_entity_status_id=11,
             kpi_data={"KPI_A": (MagicMock(), None), "KPI_B": (MagicMock(), MagicMock())},
+            history_by_kpi=history,
             drafts=[],
         )
         aes = MagicMock()
 
         with patch(
             "app.services.validation.check_service._load_history",
-            return_value={},
+            return_value={"KPI_B": {2022: 1.0}},
         ) as mock_load, patch(
             "app.services.validation.check_service._resolve_country_id",
             return_value=7,
         ):
-            _evaluation_to_context(evaluation, aes)
-            # kpi_to_item passed to _load_history should only have KPI_B (not KPI_A)
-            _, call_kwargs = mock_load.call_args
-            kpi_to_item_arg = mock_load.call_args[0][4]
-            assert "KPI_B" in kpi_to_item_arg
-            assert "KPI_A" not in kpi_to_item_arg
+            ctx = _evaluation_to_context(evaluation, aes)
+
+        mock_load.assert_not_called()
+        assert ctx.history_by_kpi == history
+        assert ctx.language == "fr"

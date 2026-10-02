@@ -4,19 +4,16 @@ FDRS matrix v1 validation rules (see IFRC Docs/fdrs-automatic-validation-checks-
 
 from __future__ import annotations
 
-from app.utils.sql_utils import ilike_contains
 from app.models.validation import CountryAttribute, CountryYearReference, ValidationKpiCheckType, ValidationThreshold
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
+from plugins.fdrs.data_quality.fdrs_v1_catalog import fdrs_compliance_doc_label_matches
 from app.services.data_quality.helpers import is_reported_value, numeric_value, parse_period_year
-from plugins.fdrs.validation.fdrs_matrix.history import (
-    CHECK_TYPE_3YEAR_AVG,
-    CHECK_TYPE_PAST_YEAR,
-    DEATH_KPI_CODES,
-    baseline_value,
-    threshold_exceeded,
-    ytd_pct,
-)
+from plugins.fdrs.validation.fdrs_matrix.history import DEATH_KPI_CODES
 from app.services.validation.types import CheckResult
+
+# Core checks own thresholds, check types, and the blank-value helper.
+# These names stay on this module so existing rule tests can patch them.
+_PATCHABLE = (ValidationKpiCheckType, ValidationThreshold, is_reported_value)
 
 NON_ZERO_KPI_CODES = frozenset({
     "KPI_GB",
@@ -52,11 +49,52 @@ THEMATIC_REACH_FOR_TYPEOF = frozenset({
 })
 
 
+def _query_rows(query) -> list:
+    """Return query rows. Stubs that only set ``.first()`` still work."""
+    rows = query.all()
+    if isinstance(rows, list):
+        return rows
+    one = query.first()
+    return [one] if one is not None else []
+
+
+def _configured_document_type(item) -> str:
+    cfg = getattr(item, "config", None)
+    if not isinstance(cfg, dict):
+        return ""
+    raw = cfg.get("document_type")
+    if not isinstance(raw, str):
+        return ""
+    return raw.strip()
+
+
+def _document_item_for_label(items: list, doc_label: str):
+    """Prefer the field's configured document type, then its label."""
+    for item in items:
+        configured = _configured_document_type(item)
+        if configured and (
+            configured.lower() == doc_label.lower()
+            or fdrs_compliance_doc_label_matches(configured, doc_label)
+        ):
+            return item
+    for item in items:
+        label = getattr(item, "label", None)
+        if not isinstance(label, str):
+            continue
+        if label.strip() == doc_label or fdrs_compliance_doc_label_matches(label, doc_label):
+            return item
+    return None
+
+
 def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
     """Run all FDRS matrix rules against a ValidationContext."""
     results: list[CheckResult] = []
     year = parse_period_year(ctx.period_name)
     country_id = ctx.country_id
+
+    country_year = None
+    if year and country_id:
+        country_year = CountryYearReference.query.filter_by(country_id=country_id, year=year).first()
 
     for kpi_code, (entry, item) in ctx.kpi_data.items():
         if kpi_code in DEATH_KPI_CODES:
@@ -83,63 +121,6 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                         context={"deaths": nv},
                     )
                 )
-
-        fired_indicator_not_reported = False
-        if kpi_code in NON_ZERO_KPI_CODES:
-            if not is_reported_value(entry):
-                fired_indicator_not_reported = True
-                results.append(
-                    CheckResult(
-                        rule_code="indicator_not_reported",
-                        form_item_id=item.id if item else None,
-                        fired=True,
-                        severity="warning",
-                        kpi_code=kpi_code,
-                    )
-                )
-
-        if year and country_id and kpi_code not in DEATH_KPI_CODES:
-            check_row = ValidationKpiCheckType.query.filter_by(
-                kpi_code=kpi_code, template_id=ctx.template_id
-            ).first()
-            thresh_row = ValidationThreshold.query.filter_by(
-                country_id=country_id, kpi_code=kpi_code, template_id=ctx.template_id
-            ).first()
-            threshold = thresh_row.threshold_fraction if thresh_row else None
-            current = numeric_value(entry)
-            hist = ctx.history_by_kpi.get(kpi_code, {})
-            if check_row and threshold is not None:
-                bl = baseline_value(hist, year, check_row.check_type)
-                ytd = ytd_pct(current, bl)
-                if threshold_exceeded(ytd, threshold):
-                    rule = (
-                        "past_year_threshold"
-                        if check_row.check_type == CHECK_TYPE_PAST_YEAR
-                        else "past_3years_avg"
-                    )
-                    results.append(
-                        CheckResult(
-                            rule_code=rule,
-                            form_item_id=item.id if item else None,
-                            fired=True,
-                            severity="warning",
-                            kpi_code=kpi_code,
-                            context={"ytd_pct": ytd, "threshold": threshold, "current": current, "baseline": bl},
-                        )
-                    )
-
-        prior = ctx.history_by_kpi.get(kpi_code, {}).get((year - 1) if year else 0)
-        if year and prior and prior != 0 and not is_reported_value(entry) and not fired_indicator_not_reported:
-            results.append(
-                CheckResult(
-                    rule_code="not_reported",
-                    form_item_id=item.id if item else None,
-                    fired=True,
-                    severity="warning",
-                    kpi_code=kpi_code,
-                    context={"prior_year": year - 1, "prior_value": prior},
-                )
-            )
 
     branches = numeric_value(ctx.kpi_data.get("KPI_noBranches", (None, None))[0])
     units = numeric_value(ctx.kpi_data.get("KPI_noLocalUnits", (None, None))[0])
@@ -172,36 +153,34 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                     )
                 )
 
-    if year and country_id:
-        cyr = CountryYearReference.query.filter_by(country_id=country_id, year=year).first()
-        population = cyr.world_bank_population if cyr else None
-        if population:
-            for code in cat.REACH_KPI_CODES:
-                entry, item = ctx.kpi_data.get(code, (None, None))
-                nv = numeric_value(entry)
-                if nv is not None:
-                    if nv >= population:
-                        results.append(
-                            CheckResult(
-                                rule_code="higher_than_pop",
-                                form_item_id=item.id if item else None,
-                                fired=True,
-                                severity="error",
-                                kpi_code=code,
-                                context={"value": nv, "population": population},
-                            )
+    if year and country_id and country_year and country_year.world_bank_population:
+        population = country_year.world_bank_population
+        for code in cat.REACH_KPI_CODES:
+            entry, item = ctx.kpi_data.get(code, (None, None))
+            nv = numeric_value(entry)
+            if nv is not None:
+                if nv >= population:
+                    results.append(
+                        CheckResult(
+                            rule_code="higher_than_pop",
+                            form_item_id=item.id if item else None,
+                            fired=True,
+                            severity="error",
+                            kpi_code=code,
+                            context={"value": nv, "population": population},
                         )
-                    elif nv / population >= 0.30:
-                        results.append(
-                            CheckResult(
-                                rule_code="significant_pop",
-                                form_item_id=item.id if item else None,
-                                fired=True,
-                                severity="warning",
-                                kpi_code=code,
-                                context={"value": nv, "population": population, "ratio": nv / population},
-                            )
+                    )
+                elif nv / population >= 0.30:
+                    results.append(
+                        CheckResult(
+                            rule_code="significant_pop",
+                            form_item_id=item.id if item else None,
+                            fired=True,
+                            severity="warning",
+                            kpi_code=code,
+                            context={"value": nv, "population": population, "ratio": nv / population},
                         )
+                    )
 
     drer = numeric_value(ctx.kpi_data.get("KPI_ReachDRER", (None, None))[0])
     ltspd = numeric_value(ctx.kpi_data.get("KPI_ReachLTSPD", (None, None))[0])
@@ -238,9 +217,8 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                     )
                 )
 
-    if year and country_id:
-        cyr = CountryYearReference.query.filter_by(country_id=country_id, year=year).first()
-        awsd = cyr.awsd_deaths_on_duty if cyr else None
+    if year and country_id and country_year and country_year.awsd_deaths_on_duty:
+        awsd = country_year.awsd_deaths_on_duty
         if awsd is not None and awsd > 0:
             vol_deaths = numeric_value(ctx.kpi_data.get("KPI_noVolDeathsDuty_Tot", (None, None))[0])
             staff_deaths = numeric_value(ctx.kpi_data.get("KPI_PStaffDeathsDuty_Tot", (None, None))[0])
@@ -272,16 +250,15 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
 
     from app.models import FormItem, SubmittedDocument
 
-    for doc_rule, doc_label in (("missing_ar", "Annual Report"), ("missing_sp", "Audited Financial Statement")):
-        doc_item = (
-            FormItem.query.filter(
-                FormItem.template_id == ctx.template_id,
-                FormItem.item_type == "document_field",
-                FormItem.archived == False,
-                ilike_contains(FormItem.label, doc_label),
-            )
-            .first()
+    document_items = _query_rows(
+        FormItem.query.filter(
+            FormItem.template_id == ctx.template_id,
+            FormItem.item_type == "document_field",
+            FormItem.archived == False,
         )
+    )
+    for doc_rule, doc_label in (("missing_ar", "Annual Report"), ("missing_sp", "Audited Financial Statement")):
+        doc_item = _document_item_for_label(document_items, doc_label)
         if doc_item:
             has_doc = (
                 SubmittedDocument.query.filter_by(
@@ -297,7 +274,7 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                         form_item_id=doc_item.id,
                         fired=True,
                         severity="warning",
-                        context={"document_type": doc_label},
+                        context={"document_type": _configured_document_type(doc_item) or doc_label},
                     )
                 )
 

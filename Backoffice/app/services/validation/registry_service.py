@@ -26,10 +26,16 @@ _THRESHOLD_KPI_CODES = sorted(
 
 
 def registry_bootstrap() -> dict[str, Any]:
+    from app.services.validation.pack_registry import list_packs
+
+    packs = list_packs()
+    kpi_codes_by_pack = {pack.code: list(pack.threshold_kpi_codes) for pack in packs}
+    kpi_codes = sorted({code for codes in kpi_codes_by_pack.values() for code in codes})
     return {
         "rule_packs": list_registered_rule_packs(),
         "check_type_options": list(CHECK_TYPE_OPTIONS),
-        "kpi_codes": _THRESHOLD_KPI_CODES,
+        "kpi_codes": kpi_codes or list(_THRESHOLD_KPI_CODES),
+        "kpi_codes_by_pack": kpi_codes_by_pack,
     }
 
 

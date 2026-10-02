@@ -46,6 +46,7 @@ class ValidationEvaluationResult:
     period_name: str
     resolved_period: str
     rule_pack: str
+    language: str = "en"
     assignment_entity_status_id: int | None = None
     kpi_data: dict = field(default_factory=dict)
     history_by_kpi: dict[str, dict[int, float]] = field(default_factory=dict)

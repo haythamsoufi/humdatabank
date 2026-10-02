@@ -50,6 +50,47 @@
         return el('vr-rule-pack')?.value || '';
     }
 
+    function kpiCodesForSelection() {
+        var byPack = config.kpiCodesByPack || {};
+        var template = el('vr-template');
+        var selected = template && template.selectedOptions && template.selectedOptions[0];
+        var fromTemplate = selected ? (selected.getAttribute('data-kpi-codes') || '') : '';
+        if (fromTemplate) {
+            return fromTemplate.split(',').map(function (code) { return code.trim(); }).filter(Boolean);
+        }
+        var pack = selected ? (selected.getAttribute('data-rule-pack') || '') : '';
+        if (!pack) pack = getRulePack();
+        if (pack && byPack[pack] && byPack[pack].length) return byPack[pack].slice();
+        var all = [];
+        Object.keys(byPack).forEach(function (key) {
+            (byPack[key] || []).forEach(function (code) {
+                if (all.indexOf(code) === -1) all.push(code);
+            });
+        });
+        all.sort();
+        return all;
+    }
+
+    function fillKpiSelect(selectId) {
+        var select = el(selectId);
+        if (!select) return;
+        var current = select.value;
+        var codes = kpiCodesForSelection();
+        select.replaceChildren();
+        codes.forEach(function (code) {
+            var opt = document.createElement('option');
+            opt.value = code;
+            opt.textContent = code;
+            select.appendChild(opt);
+        });
+        if (current && codes.indexOf(current) !== -1) select.value = current;
+    }
+
+    function refreshKpiSelects() {
+        fillKpiSelect('vr-threshold-kpi');
+        fillKpiSelect('vr-check-type-kpi');
+    }
+
     function templateQuery() {
         var tid = getTemplateId();
         return tid ? ('?template_id=' + encodeURIComponent(String(tid))) : '';
@@ -455,6 +496,7 @@
         });
 
         el('vr-template')?.addEventListener('change', function () {
+            refreshKpiSelects();
             if (state.activeTab === 'thresholds') loadThresholds();
             if (state.activeTab === 'check-types') loadCheckTypes();
         });
@@ -482,6 +524,7 @@
         bindGridActions('validationCheckTypesGrid-container', function () { return state.checkTypesApi; });
         bindGridActions('validationQuestionTemplatesGrid-container', function () { return state.qtApi; });
 
+        refreshKpiSelects();
         loadCatalog();
     }
 

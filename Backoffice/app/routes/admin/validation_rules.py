@@ -10,7 +10,7 @@ from flask_login import login_required
 from app import db
 from app.routes.admin import bp
 from app.routes.admin.shared import VALIDATION_RULES_PERMISSION, permission_required
-from app.services.validation.dashboard_service import template_options
+from app.services.validation.dashboard_service import indicator_codes_for_template_ids, template_options
 from app.services.validation.registry_service import (
     delete_check_type,
     delete_threshold,
@@ -57,12 +57,17 @@ def _handle_registry_delete(operation: Callable[[], None], *, log_label: str):
 @permission_required(VALIDATION_RULES_PERMISSION)
 def validation_rules_admin():
     bootstrap = registry_bootstrap()
+    options = template_options()
+    codes_by_template = indicator_codes_for_template_ids([opt["id"] for opt in options])
+    for opt in options:
+        opt["kpi_codes"] = codes_by_template.get(opt["id"], [])
     return render_template(
         "admin/validation_rules.html",
-        template_options=template_options(),
+        template_options=options,
         rule_packs=bootstrap["rule_packs"],
         check_type_options=bootstrap["check_type_options"],
         kpi_codes=bootstrap["kpi_codes"],
+        kpi_codes_by_pack=bootstrap.get("kpi_codes_by_pack") or {},
         rule_catalog=list_rule_catalog(),
         countries=list_countries_for_picker(),
     )

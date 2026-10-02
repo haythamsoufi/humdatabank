@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-01 22:38+0000\n"
+"POT-Creation-Date: 2026-10-02 01:23+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: en <LL@li.org>\n"
@@ -1203,7 +1203,7 @@ msgstr "Action Type"
 #: app/templates/admin/translations/quality_dashboard.html:369
 #: app/templates/admin/user_management/access_requests.html:1122
 #: app/templates/admin/validation_questions.html:244
-#: app/templates/admin/validation_rules.html:237
+#: app/templates/admin/validation_rules.html:238
 #: app/templates/components/_builder_items.html:42
 #: app/templates/components/ag_grid_i18n_js.html:25
 #: app/templates/core/dashboard/_assignments_tab.html:508
@@ -2191,7 +2191,7 @@ msgid "All Entity Types"
 msgstr "All Entity Types"
 
 #: app/templates/admin/validation_dashboard.html:105
-#: app/templates/admin/validation_dashboard.html:258
+#: app/templates/admin/validation_dashboard.html:294
 msgid "All FDS members"
 msgstr "All FDS members"
 
@@ -2290,7 +2290,7 @@ msgstr "All categories"
 msgid "All clear! No active assignments for"
 msgstr "All clear! No active assignments for"
 
-#: app/templates/admin/validation_dashboard.html:256
+#: app/templates/admin/validation_dashboard.html:292
 msgid "All countries"
 msgstr "All countries"
 
@@ -2716,7 +2716,7 @@ msgstr "Annual Report and Audited Financial Statement uploads"
 
 #: app/templates/admin/ai/trace_compare.html:99
 #: app/templates/admin/ai/trace_compare.html:135
-#: app/templates/admin/validation_dashboard.html:219
+#: app/templates/admin/validation_dashboard.html:255
 #: app/templates/admin/validation_questions.html:146
 #: app/templates/admin/validation_questions.html:241
 msgid "Answer"
@@ -2730,11 +2730,11 @@ msgstr "Answer Value"
 msgid "Answer is required when status is Answered"
 msgstr "Answer is required when status is Answered"
 
-#: app/templates/admin/validation_dashboard.html:226
+#: app/templates/admin/validation_dashboard.html:262
 msgid "Answer received"
 msgstr "Answer received"
 
-#: app/templates/admin/validation_dashboard.html:221
+#: app/templates/admin/validation_dashboard.html:257
 #: app/templates/admin/validation_questions.html:131
 #: app/templates/admin/validation_questions.html:260
 #: app/templates/admin/validation_questions.html:271
@@ -2911,7 +2911,7 @@ msgstr "Approve official"
 #: app/templates/admin/documents/documents.html:340
 #: app/templates/admin/documents/documents.html:743
 #: app/templates/admin/reports/partials/_filter_panel.html:38
-#: app/templates/admin/validation_dashboard.html:246
+#: app/templates/admin/validation_dashboard.html:282
 #: app/templates/components/_status_label.html:41
 #: app/templates/components/ag_grid_i18n_js.html:29
 #: plugins/fdrs/templates/compliance/tab_panel.html:133
@@ -3936,9 +3936,13 @@ msgstr "Auto-translate the English label to all blank language fields"
 msgid "Auto-translate types & units"
 msgstr "Auto-translate types & units"
 
-#: app/templates/admin/validation_dashboard.html:215
+#: app/templates/admin/validation_dashboard.html:251
 msgid "Automatic check"
 msgstr "Automatic check"
+
+#: app/templates/admin/validation_dashboard.html:245
+msgid "Automatic checks and severity for this round."
+msgstr "Automatic checks and severity for this round."
 
 #: app/templates/admin/validation_rules.html:66
 msgid ""
@@ -3952,7 +3956,7 @@ msgstr ""
 msgid "Automatic compression for responses > 512 bytes"
 msgstr "Automatic compression for responses > 512 bytes"
 
-#: app/templates/admin/validation_dashboard.html:176
+#: app/templates/admin/validation_dashboard.html:188
 msgid "Automatic flags"
 msgstr "Automatic flags"
 
@@ -4717,7 +4721,7 @@ msgstr ""
 #: app/templates/admin/embed_content/manage_embed_content.html:47
 #: app/templates/admin/embed_content/manage_embed_content.html:137
 #: app/templates/admin/indicator_bank/indicator_bank.html:1964
-#: app/templates/admin/validation_rules.html:222
+#: app/templates/admin/validation_rules.html:223
 #: app/templates/notifications/center.html:103
 msgid "Category"
 msgstr "Category"
@@ -4735,6 +4739,7 @@ msgid "Centers"
 msgstr "Centers"
 
 #: app/templates/admin/templates/new_template.html:243
+#: app/templates/admin/validation_dashboard.html:240
 msgid "Change"
 msgstr "Change"
 
@@ -4894,7 +4899,7 @@ msgid "Check this box to make the document publicly accessible"
 msgstr "Check this box to make the document publicly accessible"
 
 #: app/templates/admin/validation_rules.html:158
-#: app/templates/admin/validation_rules.html:230
+#: app/templates/admin/validation_rules.html:231
 msgid "Check type"
 msgstr "Check type"
 
@@ -4937,6 +4942,11 @@ msgstr "Checking your assignments…"
 #: app/templates/forms/form_builder/form_builder.html:1168
 msgid "Checking…"
 msgstr "Checking…"
+
+#: app/templates/admin/validation_dashboard.html:173
+#: app/templates/admin/validation_dashboard.html:242
+msgid "Checks"
+msgstr "Checks"
 
 #: app/templates/admin/templates/data_sync_imputation.html:186
 msgid "Choice"
@@ -5071,7 +5081,7 @@ msgstr "Cleaned up %(count)d expired sessions."
 #: app/templates/admin/monitoring/system_monitoring.html:185
 #: app/templates/admin/monitoring/system_monitoring.html:443
 #: app/templates/admin/settings/manage_settings.html:1301
-#: app/templates/admin/validation_dashboard.html:254
+#: app/templates/admin/validation_dashboard.html:290
 #: app/templates/components/ag_grid_i18n_js.html:19
 #: app/templates/core/chat_immersive.html:48
 #: app/templates/notifications/center.html:152
@@ -5495,7 +5505,7 @@ msgstr "Clusters"
 #: app/templates/admin/organization/index.html:1730
 #: app/templates/admin/organization/index.html:1903
 #: app/templates/admin/rbac/roles.html:46
-#: app/templates/admin/validation_rules.html:219
+#: app/templates/admin/validation_rules.html:220
 msgid "Code"
 msgstr "Code"
 
@@ -5790,7 +5800,7 @@ msgstr ""
 msgid "Compiling..."
 msgstr "Compiling..."
 
-#: app/templates/admin/validation_dashboard.html:240
+#: app/templates/admin/validation_dashboard.html:276
 msgid "Complete"
 msgstr "Complete"
 
@@ -5829,7 +5839,7 @@ msgstr "Completion Rate"
 msgid "Completion Rate Over Time"
 msgstr "Completion Rate Over Time"
 
-#: app/templates/admin/validation_dashboard.html:233
+#: app/templates/admin/validation_dashboard.html:269
 msgid "Completion rate"
 msgstr "Completion rate"
 
@@ -5904,7 +5914,7 @@ msgstr "Confidence"
 msgid "Confidence:"
 msgstr "Confidence:"
 
-#: app/templates/admin/validation_rules.html:224
+#: app/templates/admin/validation_rules.html:225
 msgid "Configurable"
 msgstr "Configurable"
 
@@ -6563,7 +6573,7 @@ msgstr "Count of entries"
 #: app/templates/admin/user_management/access_requests.html:1012
 #: app/templates/admin/user_management/user_form.html:892
 #: app/templates/admin/validation_dashboard.html:97
-#: app/templates/admin/validation_dashboard.html:245
+#: app/templates/admin/validation_dashboard.html:281
 #: plugins/upr/templates/upr/_manage_tools.html:65
 msgid "Countries"
 msgstr "Countries"
@@ -6577,7 +6587,7 @@ msgid "Countries and documents:"
 msgstr "Countries and documents:"
 
 #: app/templates/admin/validation_dashboard.html:125
-#: app/templates/admin/validation_dashboard.html:244
+#: app/templates/admin/validation_dashboard.html:280
 msgid "Countries by status"
 msgstr "Countries by status"
 
@@ -6634,12 +6644,12 @@ msgstr "Countries – Excel"
 #: app/templates/admin/user_management/access_requests.html:1192
 #: app/templates/admin/user_management/access_requests.html:1242
 #: app/templates/admin/user_management/user_form.html:967
-#: app/templates/admin/validation_dashboard.html:157
-#: app/templates/admin/validation_dashboard.html:207
+#: app/templates/admin/validation_dashboard.html:162
+#: app/templates/admin/validation_dashboard.html:232
 #: app/templates/admin/validation_questions.html:79
 #: app/templates/admin/validation_questions.html:233
 #: app/templates/admin/validation_rules.html:112
-#: app/templates/admin/validation_rules.html:227
+#: app/templates/admin/validation_rules.html:228
 #: app/templates/components/country_dropdown.html:27
 #: app/templates/components/entity_dropdown.html:27
 #: app/templates/components/entity_dropdown.html:154
@@ -7707,7 +7717,7 @@ msgstr "Delegation focal point"
 #: app/templates/admin/translations/manage_translations.html:739
 #: app/templates/admin/user_management/user_form.html:47
 #: app/templates/admin/user_management/user_form.html:1423
-#: app/templates/admin/validation_rules.html:213
+#: app/templates/admin/validation_rules.html:214
 #: app/templates/components/ag_grid_i18n_js.html:47
 #: app/templates/components/thumbnail_upload.html:35
 #: app/templates/components/thumbnail_upload.html:54
@@ -7890,7 +7900,7 @@ msgstr ""
 msgid "Delete this notification?"
 msgstr "Delete this notification?"
 
-#: app/templates/admin/validation_rules.html:214
+#: app/templates/admin/validation_rules.html:215
 msgid "Delete this row?"
 msgstr "Delete this row?"
 
@@ -7920,7 +7930,7 @@ msgstr "Delete widget"
 
 #: app/templates/admin/analytics/audit_trail.html:387
 #: app/templates/admin/indicator_bank/view_indicator_bank.html:275
-#: app/templates/admin/validation_rules.html:218
+#: app/templates/admin/validation_rules.html:219
 msgid "Deleted"
 msgstr "Deleted"
 
@@ -8105,7 +8115,7 @@ msgstr ""
 #: app/templates/admin/security/dashboard.html:249
 #: app/templates/admin/security/event_detail.html:42
 #: app/templates/admin/templates/new_template.html:509
-#: app/templates/admin/validation_rules.html:223
+#: app/templates/admin/validation_rules.html:224
 #: app/templates/components/_builder_items.html:89
 #: app/templates/components/_builder_items.html:95
 #: app/templates/components/_builder_items.html:108
@@ -8800,7 +8810,7 @@ msgstr "Documentation"
 
 #: app/templates/admin/ai/dashboard.html:70
 #: app/templates/admin/ai/knowledge_base.html:533
-#: app/templates/admin/validation_dashboard.html:262
+#: app/templates/admin/validation_dashboard.html:298
 #: app/templates/core/dashboard.html:1254
 #: app/templates/public_submission_export_pdf.html:61
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:101
@@ -9354,7 +9364,7 @@ msgstr "Earliest:"
 #: app/templates/admin/resources/edit_resource_subgroup.html:17
 #: app/templates/admin/templates/templates.html:266
 #: app/templates/admin/validation_questions.html:245
-#: app/templates/admin/validation_rules.html:212
+#: app/templates/admin/validation_rules.html:213
 #: app/templates/components/ag_grid_i18n_js.html:46
 #: app/templates/core/chat_immersive.html:61
 #: app/templates/forms/form_builder/form_builder.html:498
@@ -11042,7 +11052,7 @@ msgstr "FDS Access Request Digest"
 #: app/templates/admin/user_management/access_requests.html:1044
 #: app/templates/admin/user_management/users.html:376
 #: app/templates/admin/validation_dashboard.html:103
-#: app/templates/admin/validation_dashboard.html:257
+#: app/templates/admin/validation_dashboard.html:293
 #: app/templates/core/dashboard/_admin_panel.html:637
 msgid "FDS Member"
 msgstr "FDS Member"
@@ -11148,11 +11158,11 @@ msgstr "Failed to load analytics."
 msgid "Failed to load country summary"
 msgstr "Failed to load country summary"
 
-#: app/templates/admin/validation_dashboard.html:229
+#: app/templates/admin/validation_dashboard.html:265
 msgid "Failed to load dashboard data"
 msgstr "Failed to load dashboard data"
 
-#: app/templates/admin/validation_rules.html:216
+#: app/templates/admin/validation_rules.html:217
 msgid "Failed to load data"
 msgstr "Failed to load data"
 
@@ -11169,7 +11179,7 @@ msgstr "Failed to load documents"
 msgid "Failed to load documents from external API"
 msgstr "Failed to load documents from external API"
 
-#: app/templates/admin/validation_dashboard.html:230
+#: app/templates/admin/validation_dashboard.html:266
 msgid "Failed to load indicator preview"
 msgstr "Failed to load indicator preview"
 
@@ -11196,7 +11206,7 @@ msgstr "Failed to load subsector data. Please try again."
 msgid "Failed to load template"
 msgstr "Failed to load template"
 
-#: app/templates/admin/validation_dashboard.html:232
+#: app/templates/admin/validation_dashboard.html:268
 msgid "Failed to load tracker data"
 msgstr "Failed to load tracker data"
 
@@ -11721,7 +11731,7 @@ msgstr "Filters can be added after selecting a list."
 msgid "Filter…"
 msgstr "Filter…"
 
-#: app/templates/admin/validation_dashboard.html:235
+#: app/templates/admin/validation_dashboard.html:271
 msgid "Finance"
 msgstr "Finance"
 
@@ -11762,9 +11772,9 @@ msgstr "Fixed period for uploads"
 msgid "Flagged for review"
 msgstr "Flagged for review"
 
-#: app/templates/admin/validation_dashboard.html:169
-msgid "Flagged indicators only"
-msgstr "Flagged indicators only"
+#: app/templates/admin/validation_dashboard.html:181
+msgid "Flagged only"
+msgstr "Flagged only"
 
 #: app/templates/admin/analytics/login_logs.html:142
 msgid ""
@@ -12247,7 +12257,7 @@ msgstr "Generate dataset"
 msgid "Generate from PDF"
 msgstr "Generate from PDF"
 
-#: app/templates/admin/validation_dashboard.html:181
+#: app/templates/admin/validation_dashboard.html:193
 msgid "Generate questions"
 msgstr "Generate questions"
 
@@ -12255,7 +12265,7 @@ msgstr "Generate questions"
 msgid "Generate report"
 msgstr "Generate report"
 
-#: app/templates/admin/validation_dashboard.html:231
+#: app/templates/admin/validation_dashboard.html:267
 msgid "Generate validation questions for the selected scope?"
 msgstr "Generate validation questions for the selected scope?"
 
@@ -12279,6 +12289,10 @@ msgstr "Generated automatically"
 #, python-format
 msgid "Generated on %(date)s"
 msgstr "Generated on %(date)s"
+
+#: app/templates/admin/validation_dashboard.html:246
+msgid "Generated questions, whether they were sent, and focal-point answers."
+msgstr "Generated questions, whether they were sent, and focal-point answers."
 
 #: app/templates/forms/entry_form/export_pdf.html:24
 #: app/templates/forms/entry_form/validation_summary_pdf.html:22
@@ -12383,7 +12397,7 @@ msgstr "Good"
 msgid "Got it!"
 msgstr "Got it!"
 
-#: app/templates/admin/validation_dashboard.html:234
+#: app/templates/admin/validation_dashboard.html:270
 #: app/templates/components/_sidebar_nav_categories.html:231
 msgid "Governance"
 msgstr "Governance"
@@ -12735,7 +12749,7 @@ msgstr "Hint"
 msgid "Hint style"
 msgstr "Hint style"
 
-#: app/templates/admin/validation_dashboard.html:214
+#: app/templates/admin/validation_dashboard.html:239
 msgid "Historical"
 msgstr "Historical"
 
@@ -13412,8 +13426,8 @@ msgid "In good shape"
 msgstr "In good shape"
 
 #: app/templates/admin/reports/partials/_filter_panel.html:39
-#: app/templates/admin/validation_dashboard.html:239
-#: app/templates/admin/validation_dashboard.html:250
+#: app/templates/admin/validation_dashboard.html:275
+#: app/templates/admin/validation_dashboard.html:286
 msgid "In progress"
 msgstr "In progress"
 
@@ -13575,7 +13589,7 @@ msgstr "Incorrect"
 
 #: app/services/ai/planning/payload_inference.py:831
 #: app/services/ai/runtime/step_ux.py:214
-#: app/templates/admin/validation_dashboard.html:211
+#: app/templates/admin/validation_dashboard.html:236
 #: app/templates/admin/validation_questions.html:237
 msgid "Indicator"
 msgstr "Indicator"
@@ -13731,12 +13745,9 @@ msgstr "Indicator types & units"
 #: app/templates/admin/indicator_bank/indicator_bank.html:1967
 #: app/templates/admin/indicator_bank/indicator_bank.html:2332
 #: app/templates/admin/templates/new_template.html:455
+#: app/templates/admin/validation_dashboard.html:203
 msgid "Indicators"
 msgstr "Indicators"
-
-#: app/templates/admin/validation_dashboard.html:190
-msgid "Indicators & automatic flags"
-msgstr "Indicators & automatic flags"
 
 #: app/utils/audit_trail_labels.py:26
 msgid "Indicators & lists"
@@ -14235,7 +14246,7 @@ msgstr "KPI check types"
 
 #: app/templates/admin/validation_rules.html:121
 #: app/templates/admin/validation_rules.html:150
-#: app/templates/admin/validation_rules.html:228
+#: app/templates/admin/validation_rules.html:229
 msgid "KPI code"
 msgstr "KPI code"
 
@@ -14286,7 +14297,7 @@ msgstr "Key Information"
 msgid "Key Prefix"
 msgstr "Key Prefix"
 
-#: app/templates/admin/validation_dashboard.html:252
+#: app/templates/admin/validation_dashboard.html:288
 msgid "Key docs uploaded"
 msgstr "Key docs uploaded"
 
@@ -14362,7 +14373,7 @@ msgstr "LLM Synthesis Used"
 #: app/templates/admin/indicator_bank/measurement_lookup_spef_form_partial.html:166
 #: app/templates/admin/indicator_bank/measurement_lookups.html:226
 #: app/templates/admin/indicator_bank/measurement_lookups.html:322
-#: app/templates/admin/validation_rules.html:220
+#: app/templates/admin/validation_rules.html:221
 #: app/templates/components/_builder_items.html:40
 #: app/templates/components/_builder_items.html:68
 #: app/templates/forms/form_builder/partials/_sections_container.html:463
@@ -14398,7 +14409,7 @@ msgstr ""
 #: app/templates/admin/translations/manage_translations.html:412
 #: app/templates/admin/translations/quality_dashboard.html:322
 #: app/templates/admin/translations/quality_dashboard.html:361
-#: app/templates/admin/validation_rules.html:233
+#: app/templates/admin/validation_rules.html:234
 #: app/templates/auth/login.html:643
 #: app/templates/components/_mobile_language_menu.html:18
 #: app/templates/core/layout.html:275
@@ -14827,7 +14838,7 @@ msgid "Load More"
 msgstr "Load More"
 
 #: app/templates/admin/validation_dashboard.html:99
-#: app/templates/admin/validation_dashboard.html:255
+#: app/templates/admin/validation_dashboard.html:291
 msgid "Load a reporting period to filter countries."
 msgstr "Load a reporting period to filter countries."
 
@@ -14940,7 +14951,7 @@ msgstr "Loading compliance data..."
 msgid "Loading countries..."
 msgstr "Loading countries..."
 
-#: app/templates/admin/validation_dashboard.html:159
+#: app/templates/admin/validation_dashboard.html:164
 #: plugins/upr/templates/upr/tab_panel.html:351
 msgid "Loading countries…"
 msgstr "Loading countries…"
@@ -15010,10 +15021,6 @@ msgstr "Loading form…"
 msgid "Loading glossary…"
 msgstr "Loading glossary…"
 
-#: app/templates/admin/validation_dashboard.html:192
-msgid "Loading indicator flags…"
-msgstr "Loading indicator flags…"
-
 #: app/templates/admin/indicator_bank/indicator_bank.html:413
 msgid "Loading indicators..."
 msgstr "Loading indicators..."
@@ -15061,7 +15068,7 @@ msgid "Loading periods..."
 msgstr "Loading periods..."
 
 #: app/templates/admin/validation_dashboard.html:93
-#: app/templates/admin/validation_dashboard.html:153
+#: app/templates/admin/validation_dashboard.html:158
 msgid "Loading periods…"
 msgstr "Loading periods…"
 
@@ -15145,10 +15152,6 @@ msgstr "Loading thresholds…"
 #: app/templates/admin/assignments/gantt_chart.html:211
 msgid "Loading timeline..."
 msgstr "Loading timeline..."
-
-#: app/templates/admin/validation_dashboard.html:142
-msgid "Loading tracker data…"
-msgstr "Loading tracker data…"
 
 #: app/templates/admin/translations/manage_translations.html:236
 msgid "Loading translations..."
@@ -16090,7 +16093,7 @@ msgstr "Mining terminology"
 msgid "Mismatch"
 msgstr "Mismatch"
 
-#: app/templates/admin/validation_dashboard.html:242
+#: app/templates/admin/validation_dashboard.html:278
 #: app/templates/core/dashboard.html:1289
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:196
 #: plugins/fdrs/templates/compliance/tab_panel.html:136
@@ -16570,7 +16573,7 @@ msgstr "Needs review"
 msgid "Needs review only"
 msgstr "Needs review only"
 
-#: app/templates/admin/validation_rules.html:235
+#: app/templates/admin/validation_rules.html:236
 msgid "Needs suffix"
 msgstr "Needs suffix"
 
@@ -16793,7 +16796,7 @@ msgstr "Next year"
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:78
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:239
 #: app/templates/admin/indicator_bank/measurement_lookups.html:127
-#: app/templates/admin/validation_rules.html:226
+#: app/templates/admin/validation_rules.html:227
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:85
 #: app/templates/components/ag_grid_i18n_js.html:36
@@ -17071,6 +17074,11 @@ msgstr "No countries found matching your search."
 msgid "No countries found."
 msgstr "No countries found."
 
+#: app/templates/admin/validation_dashboard.html:147
+#: app/templates/admin/validation_dashboard.html:250
+msgid "No country assignments for this period."
+msgstr "No country assignments for this period."
+
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:204
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:268
 msgid "No country coverage data found for eligible indicators."
@@ -17341,6 +17349,10 @@ msgstr "No indicators found in the bank."
 #: app/templates/admin/indicator_bank/indicator_bank.html:1262
 msgid "No indicators found that need translation"
 msgstr "No indicators found that need translation"
+
+#: app/templates/admin/validation_dashboard.html:248
+msgid "No indicators match this view."
+msgstr "No indicators match this view."
 
 #: app/templates/admin/templates/new_template.html:456
 #: app/templates/admin/templates/new_template.html:1204
@@ -17955,7 +17967,7 @@ msgstr ""
 #: app/templates/admin/assignments/assignments.html:127
 #: app/templates/admin/organization/_countries_component.html:105
 #: app/templates/admin/organization/index.html:623
-#: app/templates/admin/validation_dashboard.html:259
+#: app/templates/admin/validation_dashboard.html:295
 msgid "Not assigned"
 msgstr "Not assigned"
 
@@ -17989,7 +18001,7 @@ msgid "Not filled"
 msgstr "Not filled"
 
 #: app/templates/admin/assignments/manage_assignment.html:657
-#: app/templates/admin/validation_dashboard.html:224
+#: app/templates/admin/validation_dashboard.html:260
 msgid "Not generated"
 msgstr "Not generated"
 
@@ -18029,7 +18041,7 @@ msgstr "Not reviewed"
 msgid "Not run"
 msgstr "Not run"
 
-#: app/templates/admin/validation_dashboard.html:225
+#: app/templates/admin/validation_dashboard.html:261
 msgid "Not sent"
 msgstr "Not sent"
 
@@ -18045,7 +18057,7 @@ msgstr "Not shared with other users."
 msgid "Not specified"
 msgstr "Not specified"
 
-#: app/templates/admin/validation_dashboard.html:238
+#: app/templates/admin/validation_dashboard.html:274
 msgid "Not started"
 msgstr "Not started"
 
@@ -18465,7 +18477,7 @@ msgstr "Op"
 #: app/templates/admin/api_management.html:708
 #: app/templates/admin/data_exploration/explore_data.html:1129
 #: app/templates/admin/governance/dashboard.html:93
-#: app/templates/admin/validation_dashboard.html:220
+#: app/templates/admin/validation_dashboard.html:256
 #: app/templates/admin/validation_questions.html:130
 #: app/templates/admin/validation_questions.html:270
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:123
@@ -18837,7 +18849,7 @@ msgstr "Orphaned"
 #: app/templates/admin/data_exploration/explore_data.html:1590
 #: app/templates/admin/embed_content/manage_embed_content.html:143
 #: app/templates/admin/templates/new_template.html:1212
-#: app/templates/admin/validation_dashboard.html:260
+#: app/templates/admin/validation_dashboard.html:296
 #: app/utils/audit_trail_labels.py:37 app/utils/form_localization.py:315
 #: app/utils/form_localization.py:327 app/utils/form_localization.py:336
 #: app/utils/form_localization.py:348
@@ -19293,6 +19305,11 @@ msgstr "Passwords do not match"
 msgid "Passwords match"
 msgstr "Passwords match"
 
+#: app/templates/admin/validation_dashboard.html:170
+#: app/templates/admin/validation_dashboard.html:241
+msgid "Past 2 rounds"
+msgstr "Past 2 rounds"
+
 #: app/templates/core/dashboard/_assignments_tab.html:418
 msgid "Past Assignments for"
 msgstr "Past Assignments for"
@@ -19365,7 +19382,7 @@ msgstr "Paused"
 #: app/templates/admin/security/dashboard.html:216
 #: app/templates/admin/security/event_detail.html:38
 #: app/templates/admin/security/event_detail.html:95
-#: app/templates/admin/validation_dashboard.html:251
+#: app/templates/admin/validation_dashboard.html:287
 #: app/templates/components/_status_label.html:35
 #: app/templates/components/ag_grid_i18n_js.html:31
 msgid "Pending"
@@ -19493,7 +19510,7 @@ msgstr "Percentage value (0–100)."
 #: app/templates/admin/ai/knowledge_base.html:825
 #: app/templates/admin/assignments/assignments.html:118
 #: app/templates/admin/documents/documents.html:683
-#: app/templates/admin/validation_dashboard.html:208
+#: app/templates/admin/validation_dashboard.html:233
 #: app/templates/admin/validation_questions.html:235
 #: app/templates/core/dashboard/_assignments_tab.html:116
 #: app/templates/core/dashboard/_assignments_tab.html:496
@@ -20181,7 +20198,7 @@ msgstr "Print"
 msgid "Print report"
 msgstr "Print report"
 
-#: app/templates/admin/validation_dashboard.html:213
+#: app/templates/admin/validation_dashboard.html:238
 msgid "Prior year"
 msgstr "Prior year"
 
@@ -20639,11 +20656,11 @@ msgstr "Question Text"
 msgid "Question Type"
 msgstr "Question Type"
 
-#: app/templates/admin/validation_rules.html:232
+#: app/templates/admin/validation_rules.html:233
 msgid "Question code"
 msgstr "Question code"
 
-#: app/templates/admin/validation_dashboard.html:227
+#: app/templates/admin/validation_dashboard.html:263
 msgid "Question preview"
 msgstr "Question preview"
 
@@ -20651,7 +20668,7 @@ msgstr "Question preview"
 msgid "Question saved"
 msgstr "Question saved"
 
-#: app/templates/admin/validation_dashboard.html:217
+#: app/templates/admin/validation_dashboard.html:253
 msgid "Question status"
 msgstr "Question status"
 
@@ -20674,6 +20691,11 @@ msgstr "Question templates"
 #: app/templates/admin/validation_questions.html:251
 msgid "Question text is required"
 msgstr "Question text is required"
+
+#: app/templates/admin/validation_dashboard.html:176
+#: app/templates/admin/validation_dashboard.html:243
+msgid "Questions"
+msgstr "Questions"
 
 #: app/templates/admin/ai/dashboard.html:152
 msgid "Queue backlog"
@@ -20763,7 +20785,7 @@ msgstr ""
 "Re-run metadata enrichment: date, language, category, quality, source org "
 "(no re-chunk)"
 
-#: app/templates/admin/validation_dashboard.html:236
+#: app/templates/admin/validation_dashboard.html:272
 msgid "Reach"
 msgstr "Reach"
 
@@ -21158,7 +21180,7 @@ msgstr "Regenerate Strings"
 msgid "Regenerate Thumbnail"
 msgstr "Regenerate Thumbnail"
 
-#: app/templates/admin/validation_dashboard.html:209
+#: app/templates/admin/validation_dashboard.html:234
 msgid "Region"
 msgstr "Region"
 
@@ -21667,7 +21689,7 @@ msgid "Reporting discipline"
 msgstr "Reporting discipline"
 
 #: app/templates/admin/validation_dashboard.html:91
-#: app/templates/admin/validation_dashboard.html:151
+#: app/templates/admin/validation_dashboard.html:156
 #: app/templates/admin/validation_questions.html:73
 #: app/templates/core/dashboard/_admin_panel.html:56
 #: app/templates/core/dashboard/_admin_panel.html:58
@@ -21897,7 +21919,7 @@ msgstr "Requires Review"
 msgid "Requires Revision"
 msgstr "Requires Revision"
 
-#: app/templates/admin/validation_dashboard.html:249
+#: app/templates/admin/validation_dashboard.html:285
 msgid "Requires revision"
 msgstr "Requires revision"
 
@@ -21988,7 +22010,7 @@ msgstr "Resolve Security Event"
 #: app/templates/admin/security/dashboard.html:214
 #: app/templates/admin/security/event_detail.html:38
 #: app/templates/admin/security/event_detail.html:95
-#: app/templates/admin/validation_dashboard.html:223
+#: app/templates/admin/validation_dashboard.html:259
 #: app/templates/admin/validation_questions.html:133
 #: app/templates/admin/validation_questions.html:262
 #: app/templates/admin/validation_questions.html:273
@@ -22469,7 +22491,7 @@ msgid "Rule catalog"
 msgstr "Rule catalog"
 
 #: app/templates/admin/validation_rules.html:35
-#: app/templates/admin/validation_rules.html:236
+#: app/templates/admin/validation_rules.html:237
 msgid "Rule pack"
 msgstr "Rule pack"
 
@@ -22694,7 +22716,7 @@ msgstr "Save digest settings"
 #: app/templates/admin/indicator_bank/_indicator_bank_form_submit.js.html:96
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:297
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1031
-#: app/templates/admin/validation_rules.html:215
+#: app/templates/admin/validation_rules.html:216
 msgid "Save failed"
 msgstr "Save failed"
 
@@ -22714,7 +22736,7 @@ msgstr ""
 "Save your progress at any time. Your data is preserved and you can return to"
 " continue editing later."
 
-#: app/templates/admin/validation_rules.html:217
+#: app/templates/admin/validation_rules.html:218
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:87
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:362
 msgid "Saved"
@@ -23022,6 +23044,9 @@ msgid "Search guidance..."
 msgstr "Search guidance..."
 
 #: app/templates/admin/reports/partials/_widget_properties.html:30
+#: app/templates/admin/validation_dashboard.html:207
+#: app/templates/admin/validation_dashboard.html:208
+#: app/templates/admin/validation_dashboard.html:247
 msgid "Search indicators"
 msgstr "Search indicators"
 
@@ -23231,7 +23256,7 @@ msgstr "Section heading in the report"
 msgid "Section modified"
 msgstr "Section modified"
 
-#: app/templates/admin/validation_dashboard.html:261
+#: app/templates/admin/validation_dashboard.html:297
 msgid "Section progress"
 msgstr "Section progress"
 
@@ -23248,7 +23273,7 @@ msgstr ""
 "are not edited here."
 
 #: app/templates/admin/templates/new_template.html:1136
-#: app/templates/admin/validation_dashboard.html:237
+#: app/templates/admin/validation_dashboard.html:273
 #: app/templates/forms/entry_form/entry_form.html:884
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:68
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:69
@@ -23513,6 +23538,11 @@ msgstr "Select a campaign..."
 msgid "Select a country"
 msgstr "Select a country"
 
+#: app/templates/admin/validation_dashboard.html:217
+#: app/templates/admin/validation_dashboard.html:249
+msgid "Select a country to compare indicators."
+msgstr "Select a country to compare indicators."
+
 #: plugins/upr/templates/upr/tab_panel.html:375
 msgid "Select a country to preview."
 msgstr "Select a country to preview."
@@ -23549,7 +23579,7 @@ msgstr ""
 msgid "Select a template and period."
 msgstr "Select a template and period."
 
-#: app/templates/admin/validation_dashboard.html:228
+#: app/templates/admin/validation_dashboard.html:264
 msgid "Select a template and reporting period."
 msgstr "Select a template and reporting period."
 
@@ -23607,7 +23637,7 @@ msgstr "Select activity types..."
 #: app/templates/admin/user_management/user_form.html:1148
 #: app/templates/admin/user_management/user_form.html:1155
 #: app/templates/admin/user_management/user_form.html:1163
-#: app/templates/admin/validation_dashboard.html:253
+#: app/templates/admin/validation_dashboard.html:289
 #: plugins/upr/templates/upr/_manage_tools.html:55
 #: plugins/upr/templates/upr/_manage_tools.html:77
 msgid "Select all"
@@ -23823,7 +23853,7 @@ msgid "Select template"
 msgstr "Select template"
 
 #: app/templates/admin/validation_dashboard.html:93
-#: app/templates/admin/validation_dashboard.html:153
+#: app/templates/admin/validation_dashboard.html:158
 #: app/templates/admin/validation_questions.html:75
 msgid "Select template first"
 msgstr "Select template first"
@@ -24110,7 +24140,7 @@ msgstr "Sensitive; not stored in database. Set in environment."
 
 #: app/services/communication/insights_service.py:95
 #: app/templates/admin/communication/center.html:1381
-#: app/templates/admin/validation_dashboard.html:218
+#: app/templates/admin/validation_dashboard.html:254
 #: app/templates/admin/validation_questions.html:242
 msgid "Sent"
 msgstr "Sent"
@@ -24127,7 +24157,7 @@ msgstr ""
 msgid "Sent for Review"
 msgstr "Sent for Review"
 
-#: app/templates/admin/validation_dashboard.html:248
+#: app/templates/admin/validation_dashboard.html:284
 #: app/utils/audit_trail_labels.py:44
 msgid "Sent for review"
 msgstr "Sent for review"
@@ -24252,7 +24282,7 @@ msgstr "Sessions where this path had at least one hit"
 msgid "Sessions with path"
 msgstr "Sessions with path"
 
-#: app/templates/admin/validation_dashboard.html:243
+#: app/templates/admin/validation_dashboard.html:279
 msgid ""
 "Set MAPBOX_ACCESS_TOKEN in environment secrets to enable the Mapbox basemap."
 msgstr ""
@@ -24346,10 +24376,10 @@ msgstr "Setup"
 #: app/templates/admin/security/alerts.html:26
 #: app/templates/admin/security/dashboard.html:163
 #: app/templates/admin/security/event_detail.html:84
-#: app/templates/admin/validation_dashboard.html:216
+#: app/templates/admin/validation_dashboard.html:252
 #: app/templates/admin/validation_questions.html:137
 #: app/templates/admin/validation_questions.html:238
-#: app/templates/admin/validation_rules.html:221
+#: app/templates/admin/validation_rules.html:222
 msgid "Severity"
 msgstr "Severity"
 
@@ -24586,10 +24616,6 @@ msgstr "Show focal point table"
 #: app/forms/form_builder/template_forms.py:39
 msgid "Show in side navigation panel"
 msgstr "Show in side navigation panel"
-
-#: app/templates/admin/validation_dashboard.html:165
-msgid "Show last 3 years"
-msgstr "Show last 3 years"
 
 #: app/templates/admin/reports/partials/_style_properties.html:19
 msgid "Show legend"
@@ -25246,7 +25272,7 @@ msgstr "Static attachment(s)"
 #: app/templates/admin/translations/quality_dashboard.html:366
 #: app/templates/admin/user_management/access_requests.html:1254
 #: app/templates/admin/user_management/users.html:372
-#: app/templates/admin/validation_dashboard.html:210
+#: app/templates/admin/validation_dashboard.html:235
 #: app/templates/admin/validation_questions.html:128
 #: app/templates/admin/validation_questions.html:239
 #: app/templates/components/_assignment_status_pipeline.html:23
@@ -25548,7 +25574,7 @@ msgstr "Submit your request"
 #: app/routes/main/helpers.py:1280
 #: app/templates/admin/communication/center.html:943
 #: app/templates/admin/reports/partials/_filter_panel.html:37
-#: app/templates/admin/validation_dashboard.html:247
+#: app/templates/admin/validation_dashboard.html:283
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:95
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:364
 msgid "Submitted"
@@ -26017,6 +26043,10 @@ msgstr "Table"
 msgid "Table columns"
 msgstr "Table columns"
 
+#: app/templates/admin/validation_dashboard.html:168
+msgid "Table layout"
+msgstr "Table layout"
+
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:37
 msgid "Table rows"
 msgstr "Table rows"
@@ -26193,7 +26223,7 @@ msgid "Template HTML"
 msgstr "Template HTML"
 
 #: app/templates/admin/templates/new_template.html:302
-#: app/templates/admin/validation_rules.html:231
+#: app/templates/admin/validation_rules.html:232
 msgid "Template ID"
 msgstr "Template ID"
 
@@ -26317,7 +26347,7 @@ msgid "Template name is required."
 msgstr "Template name is required."
 
 #: app/templates/admin/validation_rules.html:184
-#: app/templates/admin/validation_rules.html:234
+#: app/templates/admin/validation_rules.html:235
 msgid "Template text"
 msgstr "Template text"
 
@@ -27117,6 +27147,11 @@ msgstr ""
 msgid "This reset link is invalid or has expired."
 msgstr "This reset link is invalid or has expired."
 
+#: app/templates/admin/validation_dashboard.html:205
+#: app/templates/admin/validation_dashboard.html:244
+msgid "This round beside the previous two reporting rounds."
+msgstr "This round beside the previous two reporting rounds."
+
 #: app/templates/admin/api_management.html:529
 #: app/templates/admin/api_management.html:1849
 msgid ""
@@ -27317,7 +27352,7 @@ msgstr "Three quarters (9/12)"
 msgid "Threshold"
 msgstr "Threshold"
 
-#: app/templates/admin/validation_rules.html:229
+#: app/templates/admin/validation_rules.html:230
 #, python-format
 msgid "Threshold %%"
 msgstr "Threshold %%"
@@ -27806,11 +27841,11 @@ msgstr "Traces with LLM quality score"
 
 #: app/templates/admin/validation_dashboard.html:18
 msgid ""
-"Track FDRS submission progress across countries, monitor validation flags, "
-"and generate questions for focal points."
+"Track submission progress across countries, monitor validation flags, and "
+"generate questions for focal points."
 msgstr ""
-"Track FDRS submission progress across countries, monitor validation flags, "
-"and generate questions for focal points."
+"Track submission progress across countries, monitor validation flags, and "
+"generate questions for focal points."
 
 #: app/templates/admin/validation_dashboard.html:77
 msgid "Tracker"
@@ -28945,7 +28980,7 @@ msgstr "Upload/Import Documents"
 
 #: app/services/notification/preview.py:24
 #: app/templates/admin/ai/knowledge_base.html:833
-#: app/templates/admin/validation_dashboard.html:241
+#: app/templates/admin/validation_dashboard.html:277
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:55
 msgid "Uploaded"
 msgstr "Uploaded"
@@ -29618,7 +29653,7 @@ msgstr "Validation rules registry views"
 msgid "Validation summary"
 msgstr "Validation summary"
 
-#: app/templates/admin/validation_dashboard.html:212
+#: app/templates/admin/validation_dashboard.html:237
 #: app/templates/forms/entry_form/export_pdf.html:499
 #: app/templates/forms/entry_form/validation_summary_progress.html:321
 msgid "Value"
@@ -29947,10 +29982,6 @@ msgstr "View full size image"
 msgid "View indicator suggestions"
 msgstr "View indicator suggestions"
 
-#: app/templates/admin/validation_dashboard.html:162
-msgid "View options"
-msgstr "View options"
-
 #: app/templates/admin/ai/knowledge_base.html:837
 msgid "View or download"
 msgstr "View or download"
@@ -30050,7 +30081,7 @@ msgstr "WARNING: You are making direct changes to a PUBLISHED version"
 msgid "Waive"
 msgstr "Waive"
 
-#: app/templates/admin/validation_dashboard.html:222
+#: app/templates/admin/validation_dashboard.html:258
 #: app/templates/admin/validation_questions.html:132
 #: app/templates/admin/validation_questions.html:261
 #: app/templates/admin/validation_questions.html:272
@@ -30547,7 +30578,7 @@ msgstr "Yellow"
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:77
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:239
 #: app/templates/admin/indicator_bank/measurement_lookups.html:126
-#: app/templates/admin/validation_rules.html:225
+#: app/templates/admin/validation_rules.html:226
 #: app/templates/components/_builder_items.html:51
 #: app/templates/components/_builder_items.html:73
 #: app/templates/components/_builder_items.html:87
@@ -32440,3 +32471,35 @@ msgstr "✓"
 #~ msgstr ""
 #~ "The narrative will be translated into {language} after upload, before the "
 #~ "report is generated."
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:169
+#~ msgid "Flagged indicators only"
+#~ msgstr "Flagged indicators only"
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:190
+#~ msgid "Indicators & automatic flags"
+#~ msgstr "Indicators & automatic flags"
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:192
+#~ msgid "Loading indicator flags…"
+#~ msgstr "Loading indicator flags…"
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:142
+#~ msgid "Loading tracker data…"
+#~ msgstr "Loading tracker data…"
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:165
+#~ msgid "Show last 3 years"
+#~ msgstr "Show last 3 years"
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:18
+#~ msgid ""
+#~ "Track FDRS submission progress across countries, monitor validation flags, "
+#~ "and generate questions for focal points."
+#~ msgstr ""
+#~ "Track FDRS submission progress across countries, monitor validation flags, "
+#~ "and generate questions for focal points."
+
+# [Removed] was: app/templates/admin/validation_dashboard.html:162
+#~ msgid "View options"
+#~ msgstr "View options"

@@ -211,22 +211,28 @@ class TestFdrsMatrixRulesDeathKpis:
 
 
 class TestFdrsMatrixRulesNonZeroKpis:
-    """indicator_not_reported fires when a NON_ZERO KPI is not reported."""
+    """Required FDRS indicators are flagged by the core missing-data check."""
+
+    def _run_core(self, ctx, *, is_reported):
+        from app.services.validation.core_checks import run_core_checks
+
+        with patch("app.services.validation.core_checks.ValidationKpiCheckType") as mock_check, \
+             patch("app.services.validation.core_checks.ValidationThreshold") as mock_thresh, \
+             patch("app.services.validation.core_checks.is_reported_value", return_value=is_reported):
+            mock_check.query.filter_by.return_value.first.return_value = None
+            mock_thresh.query.filter_by.return_value.first.return_value = None
+            return run_core_checks(ctx, required_indicator_codes=("KPI_GB",))
 
     def test_not_reported_fires_for_unreported_non_zero_kpi(self):
         entry = _make_entry(value=None)
         ctx = _make_ctx(kpi_data={"KPI_GB": (entry, _make_item())})
-        results = _run_fdrs_rules(ctx, numeric_side_effect=lambda e: None, is_reported=False)
+        results = self._run_core(ctx, is_reported=False)
         assert "indicator_not_reported" in _rule_codes(results)
 
     def test_reported_non_zero_kpi_does_not_fire(self):
         entry = _make_entry(value="500")
         ctx = _make_ctx(kpi_data={"KPI_GB": (entry, _make_item())})
-
-        def _nv(e):
-            return 500 if e is entry else None
-
-        results = _run_fdrs_rules(ctx, numeric_side_effect=_nv, is_reported=True)
+        results = self._run_core(ctx, is_reported=True)
         assert "indicator_not_reported" not in _rule_codes(results)
 
 

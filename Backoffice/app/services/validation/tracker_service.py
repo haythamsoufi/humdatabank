@@ -23,6 +23,8 @@ from app.services.data_quality.helpers import (
     resolve_assignment_aes,
 )
 from app.services.organization.country_service import fds_member_user_display_name
+from app.services.validation.pack_registry import get_pack
+from app.services.data_quality.service import get_rule_pack_for_template
 from .dashboard_service import global_periods_for_template
 
 # Document types shown as upload columns (FDRS template 21).
@@ -110,7 +112,10 @@ def _reporting_section_ratios(
     }
 
 
-def _document_field_map(template_id: int) -> dict[str, list[int]]:
+def _document_field_map(
+    template_id: int,
+    document_specs: tuple[dict[str, str], ...] = TRACKER_DOCUMENT_SPECS,
+) -> dict[str, list[int]]:
     items = (
         FormItem.query.filter(
             FormItem.template_id == template_id,
@@ -118,11 +123,19 @@ def _document_field_map(template_id: int) -> dict[str, list[int]]:
             FormItem.archived == False,  # noqa: E712
         ).all()
     )
-    mapping: dict[str, list[int]] = {spec["key"]: [] for spec in TRACKER_DOCUMENT_SPECS}
+    mapping: dict[str, list[int]] = {spec["key"]: [] for spec in document_specs}
     for item in items:
         label = (item.label or "").strip()
-        for spec in TRACKER_DOCUMENT_SPECS:
-            if fdrs_compliance_doc_label_matches(label, spec["label"]) or label == spec["label"]:
+        configured = ""
+        cfg = getattr(item, "config", None)
+        if isinstance(cfg, dict) and isinstance(cfg.get("document_type"), str):
+            configured = cfg["document_type"].strip()
+        for spec in document_specs:
+            if (
+                (configured and (configured == spec["label"] or fdrs_compliance_doc_label_matches(configured, spec["label"])))
+                or fdrs_compliance_doc_label_matches(label, spec["label"])
+                or label == spec["label"]
+            ):
                 mapping[spec["key"]].append(item.id)
                 break
     return mapping
@@ -180,14 +193,49 @@ def _bulk_kpi_data_by_aes(
     return result
 
 
+def _exact_period_assignments(template_id: int, period_name: str) -> list:
+    """Assignments whose period name matches exactly.
+
+    When several share the name, the caller picks per country instead of using
+    whichever row the database returns first.
+    """
+    query = AssignedForm.query.filter(
+        AssignedForm.template_id == template_id,
+        AssignedForm.period_name == period_name,
+    )
+    ordered = query.order_by(AssignedForm.id.desc())
+    rows = ordered.all()
+    if isinstance(rows, list):
+        return rows
+    single = query.first()
+    return [single] if single is not None else []
+
+
+def _tracker_layout(template) -> tuple[tuple[dict[str, str], ...], tuple[dict[str, str], ...]]:
+    """Section and document columns for this template.
+
+    FDRS packs use the governance/finance/reach tracker. Other packs, and
+    templates with data quality turned off, show assignment status only.
+    Objects that are not a real published template (unit-test doubles) keep the
+    FDRS columns so existing tracker tests stay meaningful.
+    """
+    version = getattr(template, "published_version", None)
+    enabled = getattr(version, "enable_data_quality", None)
+    if not isinstance(enabled, bool):
+        return TRACKER_SECTION_SPECS, TRACKER_DOCUMENT_SPECS
+    if not enabled:
+        return (), ()
+    pack_code = get_rule_pack_for_template(template)
+    pack = get_pack(pack_code) if isinstance(pack_code, str) else None
+    if pack and pack.tracker_id == "fdrs":
+        return TRACKER_SECTION_SPECS, TRACKER_DOCUMENT_SPECS
+    return (), ()
+
+
 def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
     """Rows, aggregate stats, and map payload for the validation dashboard tracker tab."""
-    assignment = (
-        AssignedForm.query.filter(
-            AssignedForm.template_id == template_id,
-            AssignedForm.period_name == period_name,
-        ).first()
-    )
+    assignments = _exact_period_assignments(template_id, period_name)
+    primary = max(assignments, key=lambda item: item.id or 0) if assignments else None
 
     countries = (
         active_country_map_query()
@@ -195,25 +243,31 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         .all()
     )
 
-    doc_field_map = _document_field_map(template_id)
-    all_doc_item_ids = [iid for ids in doc_field_map.values() for iid in ids]
-
-    template = assignment.template if assignment else None
+    template = primary.template if primary else None
     version_id = template.published_version_id if template else None
-    delegation_review_enabled = bool(assignment and assignment.requires_delegation_review)
+    section_specs, document_specs = _tracker_layout(template)
+    doc_field_map = _document_field_map(template_id, document_specs) if document_specs else {}
+    all_doc_item_ids = [iid for ids in doc_field_map.values() for iid in ids]
+    delegation_review_enabled = any(
+        bool(getattr(item, "requires_delegation_review", False)) for item in assignments
+    )
 
     aes_by_country: dict[int, AssignmentEntityStatus] = {}
     resolved_period_by_country: dict[int, str] = {}
-    if assignment:
+    if assignments:
+        assignment_ids = [item.id for item in assignments]
+        rank = {item.id: item.id or 0 for item in assignments}
         aes_rows = (
             AssignmentEntityStatus.query.filter(
-                AssignmentEntityStatus.assigned_form_id == assignment.id,
+                AssignmentEntityStatus.assigned_form_id.in_(assignment_ids),
                 AssignmentEntityStatus.entity_type == "country",
             ).all()
         )
         for aes in aes_rows:
-            aes_by_country[aes.entity_id] = aes
-            resolved_period_by_country[aes.entity_id] = period_name
+            current = aes_by_country.get(aes.entity_id)
+            if current is None or rank.get(aes.assigned_form_id, 0) >= rank.get(current.assigned_form_id, 0):
+                aes_by_country[aes.entity_id] = aes
+                resolved_period_by_country[aes.entity_id] = period_name
     else:
         for country in countries:
             aes, resolved = resolve_assignment_aes(template_id, "country", country.id, period_name)
@@ -245,7 +299,7 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     map_countries: list[dict[str, Any]] = []
     status_counts: dict[str, int] = {}
-    section_complete_counts = {spec["key"]: 0 for spec in TRACKER_SECTION_SPECS}
+    section_complete_counts = {spec["key"]: 0 for spec in section_specs}
     docs_both_required = 0
 
     for country in countries:
@@ -256,26 +310,29 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         status = _status_value(aes)
         status_counts[status] = status_counts.get(status, 0) + 1
 
-        sections: dict[str, str] = {spec["key"]: "not_started" for spec in TRACKER_SECTION_SPECS}
-        section_ratios: dict[str, float] = {spec["key"]: 0.0 for spec in TRACKER_SECTION_SPECS}
-        kpi_data = kpi_by_aes.get(aes.id)
-        if kpi_data is None:
-            kpi_data = load_form_data_by_kpi(aes.id, template_id, version_id)
-        ratios = _reporting_section_ratios(
-            kpi_data,
-            aes_id=aes.id,
-            template_id=template_id,
-            version_id=version_id,
-        )
-        for key, ratio in ratios.items():
-            section_ratios[key] = ratio
-            fill = _section_fill_status(ratio)
-            sections[key] = fill
-            if fill == "complete":
-                section_complete_counts[key] = section_complete_counts.get(key, 0) + 1
+        sections: dict[str, str] = {spec["key"]: "not_started" for spec in section_specs}
+        section_ratios: dict[str, float] = {spec["key"]: 0.0 for spec in section_specs}
+        if section_specs:
+            kpi_data = kpi_by_aes.get(aes.id)
+            if kpi_data is None:
+                kpi_data = load_form_data_by_kpi(aes.id, template_id, version_id)
+            ratios = _reporting_section_ratios(
+                kpi_data,
+                aes_id=aes.id,
+                template_id=template_id,
+                version_id=version_id,
+            )
+            for key, ratio in ratios.items():
+                if key not in section_ratios:
+                    continue
+                section_ratios[key] = ratio
+                fill = _section_fill_status(ratio)
+                sections[key] = fill
+                if fill == "complete":
+                    section_complete_counts[key] = section_complete_counts.get(key, 0) + 1
 
-        documents: dict[str, bool] = {spec["key"]: False for spec in TRACKER_DOCUMENT_SPECS}
-        for spec in TRACKER_DOCUMENT_SPECS:
+        documents: dict[str, bool] = {spec["key"]: False for spec in document_specs}
+        for spec in document_specs:
             documents[spec["key"]] = (aes.id, spec["key"]) in doc_lookup
 
         has_ar = documents.get("annual_report", False)
@@ -344,8 +401,8 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         "rows": rows,
         "stats": stats,
         "map": {"countries": map_countries},
-        "documents_meta": [{"key": s["key"], "label": s["label"]} for s in TRACKER_DOCUMENT_SPECS],
-        "sections_meta": [{"key": s["key"], "label": s["label"]} for s in TRACKER_SECTION_SPECS],
+        "documents_meta": [{"key": s["key"], "label": s["label"]} for s in document_specs],
+        "sections_meta": [{"key": s["key"], "label": s["label"]} for s in section_specs],
     }
 
 

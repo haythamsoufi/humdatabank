@@ -311,6 +311,7 @@ class PluginManager:
         self._extract_field_types()
 
         self._sync_validation_packs()
+        self._register_section_binding_providers()
 
         # Save the current state after loading
         self._save_plugin_states()
@@ -343,6 +344,21 @@ class PluginManager:
                     exc,
                 )
         mark_synced_from_plugins()
+
+    def _register_section_binding_providers(self) -> None:
+        """Let active plugins own dynamic-section variables and save bindings."""
+        for plugin in self.get_active_plugins().values():
+            register = getattr(plugin, 'register_section_binding', None)
+            if not callable(register):
+                continue
+            try:
+                register()
+            except Exception as exc:
+                self.logger.error(
+                    'Plugin %s failed to register section bindings: %s',
+                    getattr(plugin, 'plugin_id', plugin),
+                    exc,
+                )
 
     def _resolve_active_plugins(self):
         """
@@ -1042,12 +1058,36 @@ class PluginManager:
                 ", ".join(registered),
             )
 
+    def calculated_list_adapter_specs(self) -> list:
+        """Lookup adapters entry forms should load before calculated lists initialise."""
+        specs = []
+        form_integration = getattr(self.app, 'form_integration', None)
+        if form_integration is None:
+            return specs
+        try:
+            lookup_lists = form_integration.get_plugin_lookup_lists() or []
+        except Exception as exc:
+            self.logger.warning('calculated list adapters unavailable: %s', exc)
+            return specs
+        for item in lookup_lists:
+            if not isinstance(item, dict):
+                continue
+            module = item.get('calculated_list_adapter')
+            list_id = item.get('id')
+            if module and list_id:
+                specs.append({'id': list_id, 'module': module})
+        return specs
+
     def register_context_processors(self) -> None:
         @self.app.context_processor
         def inject_plugin_admin_context():
             return {
                 "data_explorer_extension_tabs": self.get_data_explorer_tabs(),
             }
+
+        @self.app.template_global('calculated_list_adapters')
+        def calculated_list_adapters():
+            return self.calculated_list_adapter_specs()
 
     def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
         tabs: List[DataExplorerTabConfig] = []

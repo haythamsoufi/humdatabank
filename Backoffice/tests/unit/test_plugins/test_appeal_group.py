@@ -4,12 +4,28 @@ from plugins.emergency_operations.appeal_group import (
     APPEAL_GROUP_URL,
     LEGACY_APPEAL_URL,
     effective_feed_id,
+    format_operation_label,
     map_subtype_to_appeal_type,
     normalize_appeal_group_row,
+    parse_operation_label,
     resolve_appeals_url,
     url_for_feed,
 )
 from plugins.emergency_operations.routes import _cache_matches_feed
+
+
+def test_operation_label_puts_code_first_and_names_the_parent():
+    assert format_operation_label(
+        "Uganda - Population Movement", "MDRUG051", "MDRS1001"
+    ) == "MDRUG051 Uganda - Population Movement (part of MDRS1001)"
+    assert format_operation_label("Uganda - Floods", "MDRUG048") == "MDRUG048 Uganda - Floods"
+    parsed = parse_operation_label("MDRUG051 Uganda - Population Movement (part of MDRS1001)")
+    assert parsed["code"] == "MDRUG051"
+    assert parsed["name"] == "Uganda - Population Movement"
+    assert parsed["part_of"] == "MDRS1001"
+    legacy = parse_operation_label("Uganda - Population Movement (MDRUG051)")
+    assert legacy["code"] == "MDRUG051"
+    assert legacy["name"] == "Uganda - Population Movement"
 
 
 def test_emergency_and_minor_emergency_map_to_go_type_names():

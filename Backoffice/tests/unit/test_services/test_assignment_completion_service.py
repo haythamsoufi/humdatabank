@@ -686,7 +686,7 @@ def test_emergency_operations_option_count_unknown_when_cache_cold():
         'app.services.assignments.completion_service._emergency_operations_cache_is_warm',
         return_value=False,
     ), patch(
-        'app.services.forms.emergency_section_binding._country_iso_for_aes',
+        'plugins.emergency_operations.section_binding._country_iso_for_aes',
         return_value='BGR',
     ):
         assert emergency_operations_option_count(item, SimpleNamespace()) is None
@@ -726,10 +726,10 @@ def test_emergency_operations_option_count_zero_when_cache_warm_and_empty():
         'app.services.assignments.completion_service._emergency_operations_cache_is_warm',
         return_value=True,
     ), patch(
-        'app.services.forms.emergency_section_binding._country_iso_for_aes',
+        'plugins.emergency_operations.section_binding._country_iso_for_aes',
         return_value='BGR',
     ), patch(
-        'app.services.forms.emergency_section_binding._assignment_period_for_aes',
+        'plugins.emergency_operations.section_binding._assignment_period_for_aes',
         return_value='Annual 2024',
     ), patch(
         'plugins.emergency_operations.routes.get_emergency_operations_data',

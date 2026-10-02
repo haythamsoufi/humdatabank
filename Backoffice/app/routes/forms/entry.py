@@ -269,7 +269,7 @@ def handle_assignment_form(aes_id):
                 resolved_variables = {}
 
             # Resolve Emergency Operations label variables (EO1/EO2/EO3) server-side, anchored to a
-            # stable appeal code per assignment (see emergency_section_binding). This keeps section
+            # stable appeal code per assignment (see plugins/emergency_operations/section_binding). This keeps section
             # names stable across API reordering/filter changes; the client replacement remains a
             # fallback for any [EOn] left untouched (e.g. when no value could be resolved).
             try:
@@ -278,8 +278,8 @@ def handle_assignment_form(aes_id):
                     for s in all_sections
                 )
                 if has_eo_placeholder:
-                    from app.services.forms.emergency_section_binding import resolve_eo_variables
-                    eo_vars = resolve_eo_variables(assignment_entity_status)
+                    from app.services.forms.section_binding import resolve_section_variables
+                    eo_vars = resolve_section_variables(assignment_entity_status)
                     if not isinstance(resolved_variables, dict):
                         resolved_variables = {}
                     for key, value in eo_vars.items():

@@ -2019,8 +2019,8 @@ class VariableResolutionService:
                     configs = template_version.variables or {}
             resolved = cls.resolve_variables(template_version, assignment_entity_status) or {}
             try:
-                from app.services.forms.emergency_section_binding import resolve_eo_variables
-                for key, value in (resolve_eo_variables(assignment_entity_status) or {}).items():
+                from app.services.forms.section_binding import resolve_section_variables
+                for key, value in (resolve_section_variables(assignment_entity_status) or {}).items():
                     if value:
                         resolved[key] = value
             except Exception as e:

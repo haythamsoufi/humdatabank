@@ -45,9 +45,9 @@ Migration: [`Backoffice/migrations/versions/add_dynamic_section_context.py`](../
 
 | Layer | File | Role |
 |-------|------|------|
-| Service | [`Backoffice/app/services/emergency_section_binding.py`](../../app/services/emergency_section_binding.py) | Fetch/filter/sort operations; `resolve_slot_map`, `resolve_eo_variables`, `persist_section_binding`, `slot_for_section` |
+| Service | [`section_binding.py`](section_binding.py) | Fetch/filter/sort operations; `resolve_slot_map`, `resolve_eo_variables`, `persist_section_binding`, `slot_for_section`. Registered through [`app/services/forms/section_binding.py`](../../app/services/forms/section_binding.py). |
 | Render | [`Backoffice/app/routes/forms/entry.py`](../../app/routes/forms/entry.py) | Injects binding-aware `EO1`/`EO2`/`EO3` into `resolved_variables` before section names are substituted |
-| Save | [`Backoffice/app/services/form_data_service.py`](../../app/services/form_data_service.py) | After dynamic indicators are processed, calls `_persist_emergency_section_binding` when the section has `[EOn]` and at least one dynamic row |
+| Save | [`Backoffice/app/services/forms/data_service.py`](../../app/services/forms/data_service.py) | After dynamic indicators are processed, calls the section-binding registry when the section has at least one dynamic row |
 | Export | [`Backoffice/app/routes/forms/export.py`](../../app/routes/forms/export.py) | PDF export uses the same binding-aware EO resolution |
 
 Operations are loaded with the **template’s Emergency Operations field config** (operation types, date filters, closed/active) via `get_emergency_operations_data` in [`routes.py`](routes.py).

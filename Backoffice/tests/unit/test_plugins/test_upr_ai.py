@@ -1305,11 +1305,11 @@ class TestListAvailableEmergencies:
     def _patch_lookup(self, fake_fetch, iso="GMB", period="2027"):
         return (
             patch(
-                "app.services.forms.emergency_section_binding._country_iso_for_aes",
+                "plugins.emergency_operations.section_binding._country_iso_for_aes",
                 lambda aes: iso,
             ),
             patch(
-                "app.services.forms.emergency_section_binding._assignment_period_for_aes",
+                "plugins.emergency_operations.section_binding._assignment_period_for_aes",
                 lambda aes: period,
             ),
             patch(

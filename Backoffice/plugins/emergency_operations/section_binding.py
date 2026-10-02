@@ -70,7 +70,9 @@ def _country_iso_for_aes(aes) -> Optional[str]:
         country = None
     if not country:
         return None
-    iso = (getattr(country, 'iso3', None) or getattr(country, 'iso2', None) or '').strip().upper()
+    # Appeal catalogue stores Geographical_Code as ISO2. Prefer that over ISO3 so
+    # the country filter matches the same code the form dropdown sends.
+    iso = (getattr(country, 'iso2', None) or getattr(country, 'iso3', None) or '').strip().upper()
     return iso or None
 
 
@@ -199,7 +201,7 @@ def _fetch_ordered_operations(
     # block this worker on a requests.get() to the GO API for up to ~10 s.
     try:
         from plugins.emergency_operations.data_store import get_data_store, trigger_background_refresh
-        from plugins.emergency_operations.routes import GO_APPEALS_URL, plugin_config as _eo_plugin_config
+        from plugins.emergency_operations.routes import _appeals_feed_url, plugin_config as _eo_plugin_config
         _store = get_data_store()
         if _store.load_cached() is None:
             logger.info(
@@ -215,7 +217,7 @@ def _fetch_ordered_operations(
                     'format': 'json',
                     'limit': str(_qd.get('limit', 1000)),
                 }
-                trigger_background_refresh(GO_APPEALS_URL, _fetch_params)
+                trigger_background_refresh(_appeals_feed_url(), _fetch_params)
             except Exception as _exc:
                 logger.debug("[EmOps] Background refresh trigger failed: %s", _exc)
             return []
@@ -254,9 +256,9 @@ def _fetch_ordered_operations(
 
 
 def _op_label(op: Dict) -> str:
-    name = (op.get('name') or '').strip()
-    code = (op.get('code') or '').strip()
-    return f"{name} ({code})" if code else name
+    from plugins.emergency_operations.appeal_group import format_operation_label
+
+    return format_operation_label(op.get('name'), op.get('code'), op.get('part_of'))
 
 
 def resolve_slot_map(aes, max_slots: int = MAX_SLOTS) -> List[Optional[Dict]]:
@@ -395,3 +397,18 @@ def persist_section_binding(section, aes, user_id=None) -> Optional[DynamicSecti
     binding.filters_hash = _filters_hash(country_iso, eo_cfg, assignment_period)
     binding.resolved_at = now
     return binding
+
+
+class EmergencySectionBindingProvider:
+    """Registered with the core section-binding registry while this plugin is active."""
+
+    provider_id = PROVIDER_ID
+
+    def owns_section(self, section) -> bool:
+        return slot_for_section(section) is not None
+
+    def resolve_variables(self, aes) -> Dict[str, str]:
+        return resolve_eo_variables(aes)
+
+    def persist(self, section, aes, user_id=None):
+        return persist_section_binding(section, aes, user_id=user_id)

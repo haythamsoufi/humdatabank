@@ -1,8 +1,13 @@
 """Unit tests for emergency section binding config resolution."""
 
+from types import SimpleNamespace
+
 import pytest
 
-from app.services.forms.emergency_section_binding import _normalize_emops_config
+from plugins.emergency_operations.section_binding import (
+    _country_iso_for_aes,
+    _normalize_emops_config,
+)
 
 
 @pytest.mark.unit
@@ -40,3 +45,33 @@ class TestNormalizeEmopsConfig:
         assert cfg["operation_types"] == ["DREF"]
         assert cfg["show_closed_operations"] is False
         assert cfg["end_date_gt"] == "2024-06-01"
+
+
+def test_country_iso_prefers_iso2(monkeypatch):
+    country = SimpleNamespace(iso2="UG", iso3="UGA")
+    monkeypatch.setattr(
+        "app.utils.api_serialization._country_for_aes",
+        lambda aes: country,
+    )
+    assert _country_iso_for_aes(object()) == "UG"
+
+
+def test_registry_uses_registered_provider():
+    from app.services.forms.section_binding import (
+        register_section_binding_provider,
+        resolve_section_variables,
+        unregister_section_binding_provider,
+    )
+    from plugins.emergency_operations.section_binding import EmergencySectionBindingProvider
+
+    class _Stub(EmergencySectionBindingProvider):
+        def resolve_variables(self, aes):
+            return {"EO1": "MDRUG051 Uganda - Population Movement"}
+
+    register_section_binding_provider(_Stub())
+    try:
+        assert resolve_section_variables(object()) == {
+            "EO1": "MDRUG051 Uganda - Population Movement",
+        }
+    finally:
+        unregister_section_binding_provider("emergency_operations")

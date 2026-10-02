@@ -139,10 +139,23 @@ class EmergencyOperationsPlugin(FirstPartyPluginMetadata, BasePlugin):
             from routes import create_blueprint
             return create_blueprint()
 
+    def register_section_binding(self) -> None:
+        from app.services.forms.section_binding import register_section_binding_provider
+        from plugins.emergency_operations.section_binding import EmergencySectionBindingProvider
+
+        register_section_binding_provider(EmergencySectionBindingProvider())
+
+    def unregister_section_binding(self) -> None:
+        from app.services.forms.section_binding import unregister_section_binding_provider
+
+        unregister_section_binding_provider('emergency_operations')
+
     def activate(self) -> bool:
+        self.register_section_binding()
         return True
 
     def deactivate(self) -> bool:
+        self.unregister_section_binding()
         return True
 
     def get_lookup_lists(self) -> List[Dict[str, Any]]:

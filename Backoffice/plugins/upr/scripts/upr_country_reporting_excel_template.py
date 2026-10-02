@@ -1540,16 +1540,17 @@ def _parse_emergency_selection_from_entry(entry) -> Optional[Dict[str, str]]:
         code = str(disagg.get("code") or "").strip()
         name = str(disagg.get("name") or "").strip()
         if code or name:
-            label = f"{name} ({code})" if code else name
+            from plugins.emergency_operations.appeal_group import format_operation_label
+            label = format_operation_label(name, code)
             return {"code": code, "name": name, "label": label}
     text = str(getattr(entry, "value", None) or "").strip()
     if not text:
         return None
-    match = re.match(r"^(.*)\s+\(([^)]+)\)\s*$", text)
-    if match:
-        name = match.group(1).strip()
-        code = match.group(2).strip()
-        return {"code": code, "name": name, "label": text}
+    from plugins.emergency_operations.appeal_group import parse_operation_label
+
+    parsed = parse_operation_label(text)
+    if parsed.get("code") or parsed.get("name"):
+        return {"code": parsed.get("code") or "", "name": parsed.get("name") or "", "label": text}
     return {"code": "", "name": text, "label": text}
 
 
@@ -2541,12 +2542,10 @@ def parse_comments(wb) -> str:
     return str(read_named_cell(wb, COMMENTS_NAMED_CELL) or "").strip()
 
 
-def _format_emergency_operation_display(name: str, code: str) -> str:
-    name = (name or "").strip()
-    code = (code or "").strip()
-    if name and code:
-        return f"{name} ({code})"
-    return name or code
+def _format_emergency_operation_display(name: str, code: str, part_of: str = "") -> str:
+    from plugins.emergency_operations.appeal_group import format_operation_label
+
+    return format_operation_label(name, code, part_of)
 
 
 def _upsert_emergency_repeat_choice(

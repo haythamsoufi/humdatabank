@@ -168,6 +168,55 @@ class TestPluginManagerInit:
 
 
 # ---------------------------------------------------------------------------
+# Integration hooks (validation packs, assignment-form assets)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestIntegratingPlugins:
+    def test_admin_feature_contributes_when_not_activated(self, tmp_path):
+        pm, _ = _make_manager(tmp_path)
+        admin = MagicMock()
+        admin.is_admin_feature.return_value = True
+        admin.get_entry_form_assets.return_value = [
+            {"kind": "stylesheet", "url": "/upr/static/css/upr-emergency-coverage.css"},
+            {"kind": "script", "url": "/upr/static/js/upr-emergency-coverage.js"},
+        ]
+        gated = MagicMock()
+        gated.is_admin_feature.return_value = False
+        gated.get_entry_form_assets.return_value = [
+            {"kind": "script", "url": "/inactive.js"},
+        ]
+        pm.plugins = {"upr": admin, "off": gated}
+        pm.active_plugins = set()
+
+        assert pm.entry_form_assets(33) == [
+            {"kind": "stylesheet", "url": "/upr/static/css/upr-emergency-coverage.css"},
+            {"kind": "script", "url": "/upr/static/js/upr-emergency-coverage.js"},
+        ]
+        admin.get_entry_form_assets.assert_called_once_with(33)
+        gated.get_entry_form_assets.assert_not_called()
+
+    def test_validation_sync_includes_admin_features(self, tmp_path):
+        pm, _ = _make_manager(tmp_path)
+        admin = MagicMock()
+        admin.plugin_id = "upr"
+        admin.is_admin_feature.return_value = True
+        gated = MagicMock()
+        gated.plugin_id = "off"
+        gated.is_admin_feature.return_value = False
+        pm.plugins = {"upr": admin, "off": gated}
+        pm.active_plugins = set()
+
+        with patch("app.services.validation.core_checks.register_core_validation_pack"), patch(
+            "app.services.validation.pack_registry.mark_synced_from_plugins"
+        ):
+            pm._sync_validation_packs()
+
+        admin.register_validation_packs.assert_called_once_with()
+        gated.register_validation_packs.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # _save_plugin_states
 # ---------------------------------------------------------------------------
 

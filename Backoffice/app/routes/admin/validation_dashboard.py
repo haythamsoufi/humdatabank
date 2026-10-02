@@ -27,6 +27,16 @@ from app.utils.api_helpers import get_json_safe
 from app.utils.request_validation import enforce_csrf_json
 
 
+@bp.route("/validation-dashboard/api/rounds", methods=["GET"])
+@login_required
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
+def validation_dashboard_rounds_api():
+    """UPR round list: each option is named like the assignment (2026 planning, 2026 midyear reporting)."""
+    from plugins.upr.validation_dashboard import upr_validation_rounds
+
+    return json_ok(rounds=upr_validation_rounds())
+
+
 @bp.route("/validation-dashboard", methods=["GET"])
 @login_required
 @permission_required(VALIDATION_DASHBOARD_PERMISSION)

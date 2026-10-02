@@ -113,6 +113,22 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
             ),
         ]
 
+    def register_validation_packs(self) -> None:
+        from plugins.upr.validation.register import register_upr_validation_pack
+
+        register_upr_validation_pack()
+
+    def get_entry_form_assets(self, template_id: int | None) -> list[dict[str, str]]:
+        from plugins.upr.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
+        from plugins.upr.routes import upr_static_url
+
+        if template_id not in (PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID):
+            return []
+        return [
+            {"kind": "stylesheet", "url": upr_static_url("css/upr-emergency-coverage.css")},
+            {"kind": "script", "url": upr_static_url("js/upr-emergency-coverage.js")},
+        ]
+
     def get_csp_overrides(self) -> list[CspOverride]:
         return [
             CspOverride(

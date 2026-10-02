@@ -117,7 +117,10 @@ def _registered_pack_code(template: FormTemplate):
     if not isinstance(enabled, bool):
         return None
     if not enabled:
-        return ""
+        from app.services.validation.pack_registry import packs_for_template
+
+        scoped = packs_for_template(getattr(template, "id", None))
+        return scoped[0].code if scoped else ""
     pack = get_rule_pack_for_template(template)
     if isinstance(pack, str) and pack != RULE_PACK_CORE and get_pack(pack):
         return pack
@@ -125,13 +128,29 @@ def _registered_pack_code(template: FormTemplate):
 
 
 def _validation_templates_by_id() -> dict[int, FormTemplate]:
-    """DQ-enabled templates. Legacy UPR 25 drops when 33 is present."""
+    """Templates that can show validation checks.
+
+    Data-quality templates are included, and so are templates named by a product
+    pack even when the general data-quality switch is off.
+    Legacy UPR 25 drops when 33 is present.
+    """
+    from app.services.validation.pack_registry import list_packs
+
     by_id = {}
     for template in _templates_with_validation():
         pack_code = _registered_pack_code(template)
         if pack_code == "":
             continue
         by_id[template.id] = template
+    wanted = [
+        template_id
+        for pack in list_packs()
+        for template_id in pack.template_ids
+        if template_id not in by_id
+    ]
+    if wanted:
+        for template in FormTemplate.query.filter(FormTemplate.id.in_(wanted)).all():
+            by_id[template.id] = template
     upr = _upr_dashboard()
     if upr["reporting_id"] in by_id:
         by_id.pop(upr["legacy_id"], None)
@@ -399,6 +418,38 @@ def _question_row_fields(question: ValidationQuestion | None) -> dict[str, Any]:
     }
 
 
+def _assignment_display_variables(evaluation: ValidationEvaluationResult):
+    """Tokens for labels such as ``National Society [assignment_year] Expenditure``."""
+    aes_id = getattr(evaluation, "assignment_entity_status_id", None)
+    if not aes_id:
+        return {}, {}
+    needs = False
+    for _entry, item in evaluation.kpi_data.values():
+        label = getattr(item, "label", None) if item is not None else None
+        if isinstance(label, str) and "[" in label:
+            needs = True
+            break
+    if not needs:
+        return {}, {}
+    aes = db.session.get(AssignmentEntityStatus, aes_id)
+    if aes is None:
+        return {}, {}
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+
+    return VariableResolutionService.resolve_for_assignment_display(aes)
+
+
+def _display_indicator_label(label: str | None, resolved, configs) -> str | None:
+    if not isinstance(label, str) or "[" not in label or not resolved:
+        return label
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+
+    try:
+        return VariableResolutionService.replace_variables_if_placeholders(label, resolved, configs)
+    except Exception:
+        return label
+
+
 def build_indicator_preview_rows(
     evaluation: ValidationEvaluationResult,
     questions_by_key: dict[tuple[str, int | None], ValidationQuestion] | None = None,
@@ -416,6 +467,8 @@ def build_indicator_preview_rows(
     draft_by_key = {(d.rule_code, d.form_item_id): d for d in evaluation.drafts}
     current_year = parse_period_year(evaluation.resolved_period)
     questions_by_key = questions_by_key or {}
+
+    resolved, configs = _assignment_display_variables(evaluation)
 
     rows: list[dict[str, Any]] = []
     for kpi_code, (entry, item) in sorted(evaluation.kpi_data.items()):
@@ -438,7 +491,11 @@ def build_indicator_preview_rows(
                 "row_type": "indicator",
                 "kpi_code": kpi_code,
                 "form_item_id": form_item_id,
-                "indicator_label": (item.label if item else None) or kpi_code,
+                "indicator_label": _display_indicator_label(
+                    (item.label if item else None) or kpi_code,
+                    resolved,
+                    configs,
+                ),
                 "current_value": _format_value(entry),
                 "prior_value": _format_display_number(prior_value),
                 "historical_values": historical_values,
@@ -461,7 +518,10 @@ def build_indicator_preview_rows(
                 "row_type": "country",
                 "kpi_code": None,
                 "form_item_id": None,
-                "indicator_label": result.rule_code.replace("_", " ").title(),
+                "indicator_label": (
+                    (result.context or {}).get("label")
+                    or result.rule_code.replace("_", " ").title()
+                ),
                 "current_value": None,
                 "flagged": True,
                 "rule_code": result.rule_code,

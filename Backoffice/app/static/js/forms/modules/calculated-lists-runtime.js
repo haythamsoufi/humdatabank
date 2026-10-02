@@ -918,6 +918,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         }
 
         syncEmergencyOperationMetadata(selectElement);
+        selectElement.dispatchEvent(new CustomEvent('ifrc:calculated-list-refreshed', { bubbles: true }));
     } catch (err) {
         debugError(MODULE, `❌ Exception during API call:`, err);
         debugWarn(MODULE, '❌ Exception while fetching options', err);

@@ -1,9 +1,11 @@
 from flask import Blueprint, request, current_app, render_template
 from flask_login import login_required
 import base64
+import contextvars
 import requests
 import logging
 import json
+from contextlib import contextmanager
 from app.plugins.template_utils import render_plugin_template
 from app.plugins.plugin_utils import (
     BasePluginRoutes,
@@ -36,6 +38,22 @@ def _appeals_feed_url() -> str:
 # Constants
 MAX_LIMIT = 1000
 CACHE_TTL_SECONDS = 300  # 5 minutes; clear_plugin_cache() is called on config changes
+
+# Tracker pages ask for every country. Reuse one catalogue load for that request.
+_DIRECT_CACHE: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "emops_direct_cache",
+    default=None,
+)
+
+
+@contextmanager
+def reuse_emergency_operations_catalogue():
+    """Load the appeals file once, then serve repeated country lookups from memory."""
+    token = _DIRECT_CACHE.set({})
+    try:
+        yield
+    finally:
+        _DIRECT_CACHE.reset(token)
 
 
 def _format_api_error(exc):
@@ -1210,11 +1228,16 @@ def get_emergency_operations_data(country_iso=None, config=None):
         if config is None:
             config = {}
 
-        # Defaults from config
-        cfg = plugin_config.get_all_config()
-        query_defaults = cfg.get('query_defaults', {})
-        limit_default = str(query_defaults.get('limit', 1000))
-        end_date_default = query_defaults.get('end_date_gt', '2022-12-31')
+        direct_cache = _DIRECT_CACHE.get()
+        cache_key = None
+        if direct_cache is not None:
+            cache_key = (
+                str(country_iso or ""),
+                json.dumps(config, sort_keys=True, default=str),
+            )
+            cached_rows = direct_cache.get(cache_key)
+            if cached_rows is not None:
+                return cached_rows
 
         # Get configuration values
         show_closed_operations = config.get('show_closed_operations', True)
@@ -1225,25 +1248,40 @@ def get_emergency_operations_data(country_iso=None, config=None):
         # Get start_date (optional)
         start_date = config.get('start_date')
 
+        catalogue = direct_cache.get("_catalogue") if direct_cache is not None else None
+        if catalogue is None:
+            cfg = plugin_config.get_all_config()
+            query_defaults = cfg.get('query_defaults', {})
+            end_date_default = query_defaults.get('end_date_gt', '2022-12-31')
+            timeout_sec = cfg.get('api', {}).get('timeout', 10)
+            use_file_cache = cfg.get('data_cache', {}).get('use_file_cache', True)
+            store = get_data_store()
+            results, from_cache = _load_appeal_results(
+                store,
+                use_file_cache=use_file_cache,
+                timeout=timeout_sec,
+                fetch_params={'format': 'json'},
+            )
+            catalogue = (results, end_date_default)
+            if direct_cache is not None:
+                direct_cache["_catalogue"] = catalogue
+            current_app.logger.debug(
+                "[EmOps Direct] %s records (%s)",
+                len(results),
+                "cache" if from_cache else "live",
+            )
+        raw_results, end_date_default = catalogue
+        results = list(raw_results)
+
         # Use end_date_gt from config if provided, otherwise use plugin default
         end_date_gt = config.get('end_date_gt', end_date_default)
 
-        current_app.logger.debug(f"[EmOps Direct] Fetching operations for iso={country_iso}, config={config}, start_date={start_date}, end_date_gt={end_date_gt}")
-        timeout_sec = cfg.get('api', {}).get('timeout', 10)
-        use_file_cache = cfg.get('data_cache', {}).get('use_file_cache', True)
-
-        store = get_data_store()
-        params = {'format': 'json'}
-        results, from_cache = _load_appeal_results(
-            store,
-            use_file_cache=use_file_cache,
-            timeout=timeout_sec,
-            fetch_params=params,
-        )
         current_app.logger.debug(
-            "[EmOps Direct] %s records (%s)",
-            len(results),
-            "cache" if from_cache else "live",
+            "[EmOps Direct] Fetching operations for iso=%s, config=%s, start_date=%s, end_date_gt=%s",
+            country_iso,
+            config,
+            start_date,
+            end_date_gt,
         )
 
         current_app.logger.debug(f"[EmOps Direct] GO results total: {len(results)}")
@@ -1345,6 +1383,8 @@ def get_emergency_operations_data(country_iso=None, config=None):
         elif operation_types and 'All' in operation_types:
             current_app.logger.debug(f"[EmOps Direct] 'All' selected in operation_types, showing all types")
 
+        if direct_cache is not None and cache_key is not None:
+            direct_cache[cache_key] = results
         return results
 
     except Exception as e:

@@ -64,8 +64,10 @@
         var subtabs = el('vd-upr-subtabs');
         var parent = findTemplateTabForId(activeTemplateId);
         var childIds = parseChildIds(parent);
-        var show = !!(subtabs && childIds.length);
+        var roundScope = parent && parent.getAttribute('data-scope-mode') === 'round';
+        var show = !!(subtabs && childIds.length && !roundScope);
         if (subtabs) subtabs.classList.toggle('hidden', !show);
+        if (scopeLoader.syncScopeFieldLabels) scopeLoader.syncScopeFieldLabels();
         if (!show) return;
         var A = window.AdminUnderlineTabs;
         var target = String(activeTemplateId || '');
@@ -119,11 +121,17 @@
         }
     }
 
+    function periodValue(selectId) {
+        var selectEl = el(selectId);
+        if (scopeLoader.selectedPeriod) return scopeLoader.selectedPeriod(selectEl);
+        return selectEl?.value || '';
+    }
+
     function saveScope() {
         try {
             localStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify({
                 templateId: getTemplateId(),
-                period: el('vd-period')?.value || '',
+                period: periodValue('vd-period'),
                 countryId: el('vd-country')?.value || '',
                 layout: state.layout,
                 flaggedOnly: state.flaggedOnly,
@@ -515,24 +523,42 @@
 
     /* ——— Data loading ——— */
 
+    var periodLoadGeneration = 0;
+
     async function loadPeriods(preferredPeriod) {
+        var generation = ++periodLoadGeneration;
         var templateId = getTemplateId();
         var periodEl = el('vd-period');
-        if (!periodEl) return;
-        await scopeLoader.loadPeriodsIntoSelect({
-            selectEl: periodEl,
-            periodsUrl: config.periodsUrl,
-            templateId: templateId,
-            preferredPeriod: preferredPeriod,
-            emptyLabel: t.selectTemplatePeriod || 'Select template first',
-            chooseLabel: 'Choose period',
-        });
+        if (!periodEl) return false;
+        var stillCurrent = function () { return generation === periodLoadGeneration; };
+        if (scopeLoader.isRoundScope && scopeLoader.isRoundScope(templateId)) {
+            await scopeLoader.loadRoundsIntoSelect({
+                selectEl: periodEl,
+                roundsUrl: config.roundsUrl,
+                preferredPeriod: preferredPeriod,
+                preferredTemplateId: templateId,
+                isCurrent: stillCurrent,
+            });
+        } else {
+            await scopeLoader.loadPeriodsIntoSelect({
+                selectEl: periodEl,
+                periodsUrl: config.periodsUrl,
+                templateId: templateId,
+                preferredPeriod: preferredPeriod,
+                emptyLabel: t.selectTemplatePeriod || 'Select template first',
+                chooseLabel: 'Choose period',
+                isCurrent: stillCurrent,
+            });
+            if (stillCurrent() && scopeLoader.syncScopeFieldLabels) scopeLoader.syncScopeFieldLabels();
+        }
+        if (!stillCurrent()) return false;
         saveScope();
+        return true;
     }
 
     async function loadCountriesForPeriod(preferredCountryId) {
         var templateId = getTemplateId();
-        var period = el('vd-period')?.value;
+        var period = periodValue('vd-period');
         if (!templateId || !period) {
             state.countries = [];
             populateCountrySelect([]);
@@ -552,14 +578,14 @@
     }
 
     async function applyScope(preferredPeriod, preferredCountryId) {
-        await loadPeriods(preferredPeriod);
-        if (!el('vd-period')?.value) return;
+        var applied = await loadPeriods(preferredPeriod);
+        if (!applied || !periodValue('vd-period')) return;
         await loadDashboard(preferredCountryId);
     }
 
     async function loadDashboard(preferredCountryId) {
         var templateId = getTemplateId();
-        var period = el('vd-period')?.value;
+        var period = periodValue('vd-period');
         if (!templateId || !period) {
             showFeedback(t.selectTemplatePeriod || 'Select template and period.', 'error');
             return false;
@@ -667,6 +693,12 @@
                 if (!tabId) return;
                 A.activateStripTab('#vd-main-tabs', tabId, { panelSelector: '.vd-panel', panelIdPrefix: 'panel-' });
                 document.dispatchEvent(new CustomEvent('vd-main-tab-activated', { detail: { tab: tabId } }));
+                if (tabId === 'country-validation') {
+                    var period = periodValue('vd-period');
+                    if (period && period !== state.period) {
+                        loadDashboard().catch(function (err) { console.error(err); });
+                    }
+                }
                 if (tabId === 'tracker' && window.validationDashboardTracker) {
                     window.validationDashboardTracker.invalidateMapSize();
                 }
@@ -677,6 +709,12 @@
     initMainTabs();
 
     el('vd-period')?.addEventListener('change', function () {
+        if (scopeLoader.isRoundScope && scopeLoader.isRoundScope()) {
+            scopeLoader.commitRoundSelection(this);
+            if (window.validationDashboardTracker && window.validationDashboardTracker.markStale) {
+                window.validationDashboardTracker.markStale();
+            }
+        }
         saveScope();
         var countryId = state.selectedCountry && state.selectedCountry.country_id;
         loadDashboard(countryId).catch(function (err) { console.error(err); });
@@ -729,15 +767,24 @@
 
         if (!saved || !saved.templateId) {
             if (getTemplateId()) await applyScope(null, null);
+            await notifyTracker(null);
             return;
         }
 
         if (!setTemplateId(saved.templateId)) {
             if (getTemplateId()) await applyScope(null, null);
+            await notifyTracker(null);
             return;
         }
 
         await applyScope(saved.period, saved.countryId);
+        await notifyTracker(saved.period);
+    }
+
+    function notifyTracker(preferredPeriod) {
+        var tracker = window.validationDashboardTracker;
+        if (!tracker || !tracker.onTemplateChanged) return Promise.resolve();
+        return tracker.onTemplateChanged(preferredPeriod);
     }
 
     restoreSavedScope().catch(function (err) { console.error(err); });

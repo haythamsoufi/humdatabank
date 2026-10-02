@@ -109,3 +109,28 @@ def test_build_indicator_preview_includes_persisted_question_fields():
     vol = next(r for r in rows if r["kpi_code"] == "KPI_PeopleVol")
     assert vol["question_status"] == "answered"
     assert vol["question_sent"] is True
+
+
+def test_indicator_label_resolves_assignment_year(monkeypatch):
+    evaluation = _evaluation(
+        assignment_entity_status_id=9,
+        check_results=[],
+        history_by_kpi={},
+        kpi_data={
+            "KPI_EXP": (
+                MagicMock(total_value=10),
+                MagicMock(id=3, label="National Society [assignment_year] Expenditure (CHF)"),
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.validation.dashboard_service.db.session.get",
+        lambda model, aes_id: MagicMock(),
+    )
+    monkeypatch.setattr(
+        "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_for_assignment_display",
+        lambda aes: ({"assignment_year": "2026"}, {}),
+    )
+
+    rows = build_indicator_preview_rows(evaluation)
+    assert rows[0]["indicator_label"] == "National Society 2026 Expenditure (CHF)"

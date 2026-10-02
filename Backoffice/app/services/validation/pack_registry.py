@@ -17,6 +17,24 @@ logger = logging.getLogger(__name__)
 
 CheckRunner = Callable[[Any], list[CheckResult]]
 SuffixFormatter = Callable[[str, dict], str]
+SectionRatios = Callable[..., dict[str, float]]
+DocumentMatch = Callable[[str | None, str], bool]
+IndicatorCode = Callable[[Any], str | None]
+
+
+@dataclass(frozen=True)
+class ValidationTracker:
+    """Columns and calculations a product adds to the validation dashboard tracker.
+
+    Core renders these fields and does not interpret what they mean.
+    """
+
+    sections: tuple[dict[str, str], ...] = ()
+    documents: tuple[dict[str, str], ...] = ()
+    section_ratios: SectionRatios | None = None
+    document_matches: DocumentMatch | None = None
+    indicator_code: IndicatorCode | None = None
+    required_document_keys: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -31,8 +49,7 @@ class ValidationPack:
     threshold_kpi_codes: tuple[str, ...] = ()
     # Indicator codes the core missing-data check treats as required for this product.
     required_indicator_codes: tuple[str, ...] = ()
-    # "fdrs" draws governance/finance/reach and FDRS document columns on the tracker.
-    tracker_id: str | None = None
+    tracker: ValidationTracker | None = None
 
 
 _PACKS: dict[str, ValidationPack] = {}

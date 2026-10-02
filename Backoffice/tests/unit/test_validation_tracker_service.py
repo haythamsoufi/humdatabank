@@ -2,14 +2,32 @@
 
 from unittest.mock import MagicMock, patch
 
+from app.services.validation.pack_registry import ValidationTracker
 from app.services.validation.tracker_service import (
-    TRACKER_DOCUMENT_SPECS,
-    TRACKER_SECTION_SPECS,
     _overall_completion_rate,
-    _reporting_section_ratios,
     _section_fill_status,
     _status_value,
+    _tracker_for_template,
     build_tracker_data,
+)
+
+_SHAPE_TRACKER = ValidationTracker(
+    sections=(
+        {"key": "governance", "label": "Governance"},
+        {"key": "finance", "label": "Finance"},
+        {"key": "reach", "label": "Reach"},
+    ),
+    documents=(
+        {"key": "annual_report", "label": "Annual Report"},
+        {"key": "audited_financial", "label": "Audited Financial Statement"},
+        {"key": "strategic_plan", "label": "Strategic Plan"},
+        {"key": "unaudited_financial", "label": "Unaudited Financial Statement"},
+    ),
+    section_ratios=lambda kpi_data, **kwargs: {
+        "governance": 0.0,
+        "finance": 0.0,
+        "reach": 0.0,
+    },
 )
 
 
@@ -29,12 +47,37 @@ def test_status_value_from_enum():
     assert _status_value(aes) == "submitted"
 
 
-@patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
-def test_reporting_section_ratios_empty_kpi_data(_mock_income_ratio):
-    ratios = _reporting_section_ratios({}, aes_id=1, template_id=21, version_id=None)
-    assert set(ratios.keys()) == {"governance", "finance", "reach"}
-    assert ratios["governance"] == 0.0
-    assert ratios["reach"] == 0.0
+def test_tracker_comes_from_the_template_validation_pack():
+    template = MagicMock()
+    template.published_version.enable_data_quality = True
+    pack = MagicMock(tracker=_SHAPE_TRACKER)
+    with patch(
+        "app.services.validation.tracker_service.get_rule_pack_for_template",
+        return_value="product",
+    ), patch(
+        "app.services.validation.tracker_service.get_pack",
+        return_value=pack,
+    ):
+        assert _tracker_for_template(template) is _SHAPE_TRACKER
+
+
+def test_tracker_absent_when_pack_has_none():
+    template = MagicMock()
+    template.published_version.enable_data_quality = True
+    with patch(
+        "app.services.validation.tracker_service.get_rule_pack_for_template",
+        return_value="product",
+    ), patch(
+        "app.services.validation.tracker_service.get_pack",
+        return_value=MagicMock(tracker=None),
+    ):
+        assert _tracker_for_template(template) is None
+
+
+def test_tracker_absent_when_data_quality_is_off():
+    template = MagicMock()
+    template.published_version.enable_data_quality = False
+    assert _tracker_for_template(template) is None
 
 
 def test_overall_completion_rate_averages_sections():
@@ -42,7 +85,7 @@ def test_overall_completion_rate_averages_sections():
     assert _overall_completion_rate({}) == 0.0
 
 
-@patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+@patch("app.services.validation.tracker_service._tracker_for_template", return_value=_SHAPE_TRACKER)
 @patch("app.services.validation.tracker_service.active_country_map_query")
 @patch("app.services.validation.tracker_service.AssignedForm")
 @patch("app.services.validation.tracker_service.AssignmentEntityStatus")
@@ -56,7 +99,7 @@ def test_build_tracker_data_shapes(
     mock_aes_model,
     mock_assigned_form,
     mock_active_countries,
-    _mock_income_ratio,
+    _mock_tracker,
 ):
     assignment = MagicMock()
     assignment.id = 10
@@ -85,7 +128,7 @@ def test_build_tracker_data_shapes(
     aes.submitted_at = None
     mock_aes_model.query.filter.return_value.all.return_value = [aes]
 
-    mock_doc_map.return_value = {spec["key"]: [] for spec in TRACKER_DOCUMENT_SPECS}
+    mock_doc_map.return_value = {spec["key"]: [] for spec in _SHAPE_TRACKER.documents}
     mock_bulk_kpi.return_value = {99: {}}
     mock_submitted_doc.query.filter.return_value.all.return_value = []
 
@@ -97,7 +140,7 @@ def test_build_tracker_data_shapes(
     row = payload["rows"][0]
     assert row["country_name"] == "Testland"
     assert row["status"] == "in_progress"
-    assert set(row["sections"].keys()) == {s["key"] for s in TRACKER_SECTION_SPECS}
+    assert set(row["sections"].keys()) == {s["key"] for s in _SHAPE_TRACKER.sections}
     assert row["completion_rate"] == 0.0
     assert payload["stats"]["assigned_count"] == 1
     assert payload["delegation_review_enabled"] is False

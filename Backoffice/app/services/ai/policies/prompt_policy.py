@@ -31,7 +31,7 @@ def _build_focal_point_context_block(
     Personalized focal-point context appended to the agent system prompt.
     This section is NOT cached so it always reflects the current user's live data.
     """
-    from datetime import datetime, timezone
+    from app.utils.datetime_helpers import parse_iso_utc, utcnow
 
     ns_label = ", ".join(str(c) for c in countries[:10]) if countries else None
 
@@ -49,10 +49,11 @@ def _build_focal_point_context_block(
             deadline_text = ""
             raw_dl = a.get("deadline")
             if raw_dl:
-                try:
-                    dl = datetime.fromisoformat(str(raw_dl).replace("Z", "+00:00"))
-                    now = datetime.now(timezone.utc) if dl.tzinfo else datetime.now()
-                    days_left = (dl - now).days
+                dl = parse_iso_utc(raw_dl)
+                if dl is None:
+                    deadline_text = ""
+                else:
+                    days_left = (dl - utcnow()).days
                     if days_left < 0:
                         deadline_text = " (OVERDUE)"
                     elif days_left == 0:
@@ -61,8 +62,6 @@ def _build_focal_point_context_block(
                         deadline_text = (
                             f" (due in {days_left} day{'s' if days_left != 1 else ''})"
                         )
-                except Exception:
-                    deadline_text = ""
             assignment_lines.append(f"  - {template}{deadline_text}")
         if len(pending_details) > 5:
             assignment_lines.append(f"  - ...and {len(pending_details) - 5} more")

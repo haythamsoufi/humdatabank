@@ -13,7 +13,7 @@ from sqlalchemy import and_, or_, desc, cast, String, select
 from sqlalchemy.exc import IntegrityError
 from app import db
 from app.utils.constants import MAX_NOTIFICATION_MESSAGE_LENGTH
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import ensure_utc, utc_sort_key, utcnow
 from app.utils.form_localization import get_translation_key
 from app.models import (
     Notification, EntityActivityLog, NotificationType, NotificationPreferences,
@@ -623,7 +623,7 @@ def get_country_recent_activities(country_id, days=7, limit=50):
         enhanced_activities.append(enhanced_activity)
 
     # Sort all activities by timestamp and limit
-    enhanced_activities.sort(key=lambda x: x.timestamp, reverse=True)
+    enhanced_activities.sort(key=lambda x: utc_sort_key(x.timestamp), reverse=True)
     return enhanced_activities[:limit]
 
 
@@ -638,14 +638,14 @@ def enhance_activity_with_audit_data(activity, user_activities, admin_activities
     matching_user_activities = [
         ua for ua in user_activities
         if (ua.user_id == activity.user_id and
-            abs((ua.timestamp - activity.timestamp).total_seconds()) <= time_window.total_seconds())
+            abs((ensure_utc(ua.timestamp) - ensure_utc(activity.timestamp)).total_seconds()) <= time_window.total_seconds())
     ]
 
     # Look for matching admin activities
     matching_admin_activities = [
         aa for aa in admin_activities
         if (aa.admin_user_id == activity.user_id and
-            abs((aa.timestamp - activity.timestamp).total_seconds()) <= time_window.total_seconds())
+            abs((ensure_utc(aa.timestamp) - ensure_utc(activity.timestamp)).total_seconds()) <= time_window.total_seconds())
     ]
 
     # Create enhanced activity object
@@ -817,7 +817,10 @@ class ActivityFromAuditLog:
     @property
     def time_ago(self):
         """Calculate time ago string."""
-        time_diff = utcnow() - self.timestamp
+        stamp = ensure_utc(self.timestamp)
+        if stamp is None:
+            return ""
+        time_diff = utcnow() - stamp
         if time_diff.days > 0:
             return f"{time_diff.days} day{'s' if time_diff.days != 1 else ''} ago"
         elif time_diff.seconds > 3600:

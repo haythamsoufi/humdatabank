@@ -706,7 +706,7 @@ def _build_focal_orientation_fallback(
     pending_details: list,
 ) -> str:
     """Template fallback used only when the LLM is unavailable."""
-    from datetime import datetime, timezone
+    from app.utils.datetime_helpers import parse_iso_utc, utcnow
 
     ns_phrase = f" for **{ns_label}**" if ns_label else ""
     lines = [
@@ -721,18 +721,15 @@ def _build_focal_orientation_fallback(
             raw_dl = a.get("deadline")
             deadline_text = ""
             if raw_dl:
-                try:
-                    dl = datetime.fromisoformat(str(raw_dl).replace("Z", "+00:00"))
-                    now_dt = datetime.now(timezone.utc) if dl.tzinfo else datetime.now()
-                    days = (dl - now_dt).days
+                dl = parse_iso_utc(raw_dl)
+                if dl is not None:
+                    days = (dl - utcnow()).days
                     if days < 0:
                         deadline_text = " — overdue"
                     elif days == 0:
                         deadline_text = " — due today"
                     else:
                         deadline_text = f" — due in {days} day{'s' if days != 1 else ''}"
-                except Exception:
-                    pass
             entry = f"- {template}"
             if country:
                 entry += f" ({country})"
@@ -761,7 +758,7 @@ def _generate_focal_orientation_reply(
     from platform_context, with a small fast model and a tight system prompt
     that enforces the correct response format.
     """
-    from datetime import datetime, timezone
+    from app.utils.datetime_helpers import parse_iso_utc, utcnow
     from app.utils.ai_utils import openai_model_supports_sampling_params
 
     lang = (preferred_language or "en").split("-")[0]
@@ -802,18 +799,15 @@ def _generate_focal_orientation_reply(
             raw_dl = a.get("deadline")
             deadline_text = ""
             if raw_dl:
-                try:
-                    dl = datetime.fromisoformat(str(raw_dl).replace("Z", "+00:00"))
-                    now_dt = datetime.now(timezone.utc) if dl.tzinfo else datetime.now()
-                    days = (dl - now_dt).days
+                dl = parse_iso_utc(raw_dl)
+                if dl is not None:
+                    days = (dl - utcnow()).days
                     if days < 0:
                         deadline_text = " (OVERDUE)"
                     elif days == 0:
                         deadline_text = " (due today)"
                     else:
                         deadline_text = f" (due in {days} day{'s' if days != 1 else ''})"
-                except Exception:
-                    pass
             entry = f"  - [{status}] {template}"
             if country:
                 entry += f" [{country}]"

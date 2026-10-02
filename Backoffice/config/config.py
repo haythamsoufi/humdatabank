@@ -530,6 +530,9 @@ class Config:
         # Stop waiting for a pool slot well before Gunicorn's 25 s kill timeout.
         "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "echo": False,
+        # timestamp-without-time-zone columns store the UTC wall clock.
+        # Pin the session here so a later rollback cannot undo it.
+        "connect_args": {"options": "-c timezone=UTC"},
     }
     # List of supported language codes (order matters: first is fallback)
     # Note: Runtime settings are stored in the database (system_settings table).
@@ -1459,7 +1462,10 @@ class ProductionConfig(Config):
         "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "connect_args": {
             "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
-            **({"options": f"-c statement_timeout={_stmt_timeout_ms}"} if _stmt_timeout_ms > 0 else {}),
+            "options": " ".join(
+                ["-c timezone=UTC"]
+                + ([f"-c statement_timeout={_stmt_timeout_ms}"] if _stmt_timeout_ms > 0 else [])
+            ),
         },
     }
 
@@ -1498,7 +1504,7 @@ class TestingConfig(Config):
         "pool_timeout": 10,
         "connect_args": {
             "connect_timeout": 10,
-            "options": "-c statement_timeout=120000",
+            "options": "-c timezone=UTC -c statement_timeout=120000",
         },
     }
 

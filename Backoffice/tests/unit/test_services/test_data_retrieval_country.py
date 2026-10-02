@@ -19,6 +19,16 @@ from tests.factories import (
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
+class TestPostgresSessionTimezone:
+    def test_session_timezone_is_utc(self, app, db_session):
+        from sqlalchemy import text
+
+        with app.app_context():
+            tz = db_session.execute(text("SHOW timezone")).scalar()
+        assert str(tz).upper() in {"UTC", "ETC/UTC"}
+
+
+@pytest.mark.unit
 class TestCheckCountryAccess:
     def test_unrestricted_user_returns_true(self, app, db_session):
         with app.app_context():
@@ -184,12 +194,16 @@ class TestGetCountryInfo:
                 db_session, country=country, template=template, status="in_progress"
             )
             future_date = datetime.now(timezone.utc) + timedelta(days=10)
-            aes.due_date = future_date
+            # Stored due dates load back naive. That must still compare with aware utcnow().
+            aes.due_date = future_date.replace(tzinfo=None)
             db_session.commit()
+            db_session.expire_all()
 
             with patch("app.services.data_retrieval.country.check_country_access", return_value=True):
                 result = get_country_info(country.id)
-                assert len(result["upcoming_deadlines"]) >= 0
+            assert "error" not in result
+            assert len(result["upcoming_deadlines"]) == 1
+            assert 9 <= result["upcoming_deadlines"][0]["days_left"] <= 10
 
     def test_found_returns_recent_submissions(self, app, db_session):
         with app.app_context():
@@ -200,11 +214,13 @@ class TestGetCountryInfo:
             aes = create_test_assignment_entity_status(
                 db_session, country=country, template=template, status="approved"
             )
-            aes.status_timestamp = datetime.now(timezone.utc)
+            aes.status_timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
             db_session.commit()
+            db_session.expire_all()
 
             with patch("app.services.data_retrieval.country.check_country_access", return_value=True):
                 result = get_country_info(country.id)
+                assert "error" not in result
                 assert len(result["recent_submissions"]) >= 1
 
     def test_by_string_identifier(self, app, db_session):

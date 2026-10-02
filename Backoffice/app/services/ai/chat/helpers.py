@@ -3,9 +3,8 @@ from flask_login import login_required, current_user
 import json
 import logging
 import os
-from datetime import datetime, timedelta
 from sqlalchemy import func, desc, select
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import parse_iso_utc, utcnow
 from app.models import (
     User, Country, FormTemplate, FormSection, IndicatorBank,
     AssignedForm, FormData, FormItem
@@ -1153,15 +1152,15 @@ def format_user_data(user_data, role):
             for assignment in pending_assignments[:5]:
                 deadline_text = ""
                 if assignment.get('deadline'):
-                    try:
-                        deadline = datetime.fromisoformat(assignment['deadline'].replace('Z', '+00:00'))
-                        if deadline < datetime.now():
+                    deadline = parse_iso_utc(assignment['deadline'])
+                    if deadline is None:
+                        deadline_text = ""
+                    else:
+                        days_left = (deadline - utcnow()).days
+                        if days_left < 0:
                             deadline_text = " (OVERDUE)"
                         else:
-                            days_left = (deadline - datetime.now()).days
                             deadline_text = f" (Due in {days_left} day{'s' if days_left != 1 else ''})"
-                    except (ValueError, TypeError):
-                        deadline_text = ""
 
                 user_data_text += f"\n  * {assignment['template_name']}{deadline_text}"
             if len(pending_assignments) > 5:
@@ -1457,15 +1456,15 @@ def format_country_assignment_response(country, assignments, user_role):
         for assignment in pending_assignments[:5]:  # Show up to 5 pending
             deadline_text = ""
             if assignment['deadline']:
-                try:
-                    deadline = datetime.fromisoformat(assignment['deadline'])
-                    if deadline < datetime.now():
+                deadline = parse_iso_utc(assignment['deadline'])
+                if deadline is None:
+                    deadline_text = " (Deadline format error)"
+                else:
+                    days_left = (deadline - utcnow()).days
+                    if days_left < 0:
                         deadline_text = " ⚠️ <span style='color: red;'>OVERDUE</span>"
                     else:
-                        days_left = (deadline - datetime.now()).days
                         deadline_text = f" (Due in {days_left} day{'s' if days_left != 1 else ''})"
-                except (ValueError, TypeError):
-                    deadline_text = " (Deadline format error)"
 
             status_text = f" [{assignment['status']}]" if assignment.get('status') else ""
             response += f"• <strong>{assignment['template_name']}</strong>{status_text}{deadline_text}<br>"
@@ -1487,12 +1486,12 @@ def format_country_assignment_response(country, assignments, user_role):
         for assignment in recent_completed:
             submitted_date = ""
             if assignment['submitted_at']:
-                try:
-                    submitted = datetime.fromisoformat(assignment['submitted_at'])
-                    days_ago = (datetime.now() - submitted).days
-                    submitted_date = f" (Submitted {days_ago} day{'s' if days_ago != 1 else ''} ago)"
-                except (ValueError, TypeError):
+                submitted = parse_iso_utc(assignment['submitted_at'])
+                if submitted is None:
                     submitted_date = " (Recently submitted)"
+                else:
+                    days_ago = (utcnow() - submitted).days
+                    submitted_date = f" (Submitted {days_ago} day{'s' if days_ago != 1 else ''} ago)"
 
             response += f"• <strong>{assignment['template_name']}</strong>{submitted_date}<br>"
 

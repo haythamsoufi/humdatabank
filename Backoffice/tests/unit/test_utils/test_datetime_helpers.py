@@ -12,8 +12,11 @@ from app.utils.datetime_helpers import (
     get_org_timezone,
     get_timezone,
     isoformat_utc,
+    naive_utc,
     now_in_org_timezone,
     org_day_start_utc,
+    parse_iso_utc,
+    utc_sort_key,
     utcnow,
 )
 
@@ -130,3 +133,60 @@ class TestOrgTimezone:
     def test_get_timezone_invalid_falls_back_to_utc(self):
         tz = get_timezone("Not/A_Real_Zone")
         assert tz == timezone.utc
+
+
+@pytest.mark.unit
+class TestNaiveUtc:
+    def test_none(self):
+        assert naive_utc(None) is None
+
+    def test_strips_utc_offset(self):
+        aware = datetime(2026, 10, 2, 11, 30, tzinfo=timezone.utc)
+        result = naive_utc(aware)
+        assert result == datetime(2026, 10, 2, 11, 30)
+        assert result.tzinfo is None
+
+    def test_converts_offset_before_stripping(self):
+        plus_two = timezone(timedelta(hours=2))
+        aware = datetime(2026, 10, 2, 13, 30, tzinfo=plus_two)
+        result = naive_utc(aware)
+        assert result == datetime(2026, 10, 2, 11, 30)
+        assert result.tzinfo is None
+
+    def test_naive_input_is_already_utc_wall_clock(self):
+        naive = datetime(2026, 10, 2, 11, 30)
+        assert naive_utc(naive) == naive
+
+
+@pytest.mark.unit
+class TestParseIsoUtc:
+    def test_z_suffix_is_utc(self):
+        parsed = parse_iso_utc("2026-10-02T11:30:00Z")
+        assert parsed == datetime(2026, 10, 2, 11, 30, tzinfo=timezone.utc)
+
+    def test_naive_string_is_labeled_utc(self):
+        parsed = parse_iso_utc("2026-10-02T11:30:00")
+        assert parsed == datetime(2026, 10, 2, 11, 30, tzinfo=timezone.utc)
+
+    def test_offset_is_converted(self):
+        parsed = parse_iso_utc("2026-10-02T13:30:00+02:00")
+        assert parsed == datetime(2026, 10, 2, 11, 30, tzinfo=timezone.utc)
+
+    def test_empty_and_garbage(self):
+        assert parse_iso_utc(None) is None
+        assert parse_iso_utc("") is None
+        assert parse_iso_utc("not-a-date") is None
+
+
+@pytest.mark.unit
+class TestUtcSortKey:
+    def test_naive_and_aware_order_together(self):
+        naive = datetime(2026, 10, 2, 12, 0)
+        aware = datetime(2026, 10, 2, 11, 0, tzinfo=timezone.utc)
+        ordered = sorted([naive, None, aware], key=utc_sort_key)
+        assert ordered == [None, aware, naive]
+
+    def test_empty_max_sorts_missing_last(self):
+        stamp = datetime(2026, 10, 2, 12, 0)
+        ordered = sorted([None, stamp], key=lambda value: utc_sort_key(value, empty="max"))
+        assert ordered == [stamp, None]

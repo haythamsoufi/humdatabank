@@ -167,6 +167,43 @@ def load_dynamic_settings(app, config_class, startup_start):
         app.logger.debug("RBAC sanity check skipped (permissions may not be seeded): %s", e)
 
 
+def _install_utc_session_timezone(app) -> None:
+    """Pin every PostgreSQL session to UTC.
+
+    Timestamp columns are ``timestamp without time zone`` and store the UTC
+    wall clock. An aware bind parameter is sent as ``timestamptz``; PostgreSQL
+    then reads the naive column in the session timezone. UTC keeps that cast
+    aligned with ``ensure_utc()``.
+    """
+    from sqlalchemy import event as _sa_event
+
+    try:
+        from app.extensions import db as _db
+        engine = _db.engine
+    except Exception:
+        return
+
+    if getattr(engine, "_humdb_utc_timezone_installed", False):
+        return
+    if getattr(engine.dialect, "name", None) != "postgresql":
+        return
+    engine._humdb_utc_timezone_installed = True
+
+    @_sa_event.listens_for(engine, "connect")
+    def _set_utc_timezone(dbapi_conn, _connection_record):
+        cursor = dbapi_conn.cursor()
+        try:
+            cursor.execute("SET TIME ZONE 'UTC'")
+        finally:
+            cursor.close()
+        # SET is transactional. Commit so a pool rollback cannot restore
+        # the server default. connect_args also passes -c timezone=UTC.
+        if not getattr(dbapi_conn, "autocommit", False):
+            dbapi_conn.commit()
+
+    app.logger.debug("PostgreSQL sessions pinned to UTC")
+
+
 def _install_db_pool_logging(app) -> None:
     """Attach SQLAlchemy engine events that log slow DB connection hold times.
 
@@ -285,6 +322,7 @@ def init_flask_extensions(app, config_class, startup_start):
     # this prevents.
     _configure_all_model_mappers(app)
 
+    _install_utc_session_timezone(app)
     _install_db_pool_logging(app)
 
     with app.app_context():

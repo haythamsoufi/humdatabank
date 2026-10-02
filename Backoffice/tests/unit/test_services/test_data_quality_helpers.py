@@ -641,8 +641,6 @@ class TestListAssignmentPeriods:
 
 class TestListExplorationPeriodNames:
     def test_returns_distinct_sorted_periods(self):
-        from sqlalchemy import union
-
         mock_combined = MagicMock()
         mock_combined.c.period_name = MagicMock()
 
@@ -665,7 +663,7 @@ class TestListExplorationPeriodNames:
             calls = [af_mock, fd_mock]
             mock_sq.side_effect = lambda *args: calls.pop(0) if calls else MagicMock()
 
-            with patch("app.services.data_quality.helpers.union", return_value=union_mock):
+            with patch("sqlalchemy.union", return_value=union_mock):
                 # Patch the final query call
                 final_mock = MagicMock()
                 final_mock.distinct.return_value.all.return_value = [
@@ -691,11 +689,15 @@ class TestListExplorationPeriodNames:
         union_mock.subquery.return_value = MagicMock()
 
         with patch("app.services.data_quality.helpers.db", mock_db), \
-             patch("app.services.data_quality.helpers.union", return_value=union_mock):
+             patch("sqlalchemy.union", return_value=union_mock), \
+             patch(
+                 "app.services.data_quality.helpers.sort_period_names",
+                 side_effect=lambda names: list(names),
+             ):
             from app.services.data_quality.helpers import list_exploration_period_names
 
             result = list_exploration_period_names(template_id=21)
-            assert isinstance(result, list)
+            assert result == ["FDRS 2024"]
 
 
 # ---------------------------------------------------------------------------

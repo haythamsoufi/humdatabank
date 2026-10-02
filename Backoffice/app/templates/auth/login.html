@@ -723,7 +723,7 @@
         <i class="fa-solid fa-user-secret"></i>
         {{ _('Act as (dev only)') }}
       </div>
-      <p class="dev-panel-sub">{{ _('Sign in without a password as a role preset, a seeded test account, or a pre-added account that has not signed in yet.') }}</p>
+      <p class="dev-panel-sub">{{ _('Sign in without a password as a role preset or any active user. Accounts that have not signed in yet are marked not registered.') }}</p>
 
       <form method="POST" action="{{ url_for('auth.dev_act_as_login') }}" id="devActAsForm">
         {% if form is defined and 'csrf_token' in form %}{{ form.csrf_token(id="dev_act_as_csrf_token") }}{% endif %}
@@ -1123,7 +1123,7 @@ function initDevActAsUserSelect(){
   var $select = window.jQuery(userSelect);
   try{
     if($select.hasClass('select2-hidden-accessible')) return;
-    $select.select2({ width:'100%', placeholder:{{ _('Select a user…') | tojson | safe }}, allowClear:true, minimumResultsForSearch:0 });
+    $select.select2({ width:'100%', placeholder:{{ _('Select a user…') | tojson | safe }}, allowClear:false, minimumResultsForSearch:0 });
     $select.on('select2:select select2:clear', function(){
       var err = document.getElementById('devActAsUserError');
       if(err) err.classList.add('hidden');

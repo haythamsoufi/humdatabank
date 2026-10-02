@@ -7,7 +7,6 @@ from flask_babel import _
 # Removed check_password_hash as it's now in the User model method
 from app.models import User
 from app import db # db instance might not be needed here unless modifying user on login
-from sqlalchemy import and_, exists, false, func, or_
 from sqlalchemy.exc import IntegrityError
 from app.forms.auth_forms import LoginForm, AccountSettingsForm, RegisterForm, ForgotPasswordForm, ResetPasswordForm
 from urllib.parse import urlencode
@@ -121,79 +120,100 @@ def _is_dev_act_as_enabled(*, require_loopback: bool = False) -> bool:
     return True
 
 
-def _dev_act_as_allowed_emails() -> set[str]:
-    """Accounts dev act-as may sign in as: the seeded test users plus explicit extras."""
-    allowed = {
-        email for email in (_dev_preset_email(p) for p in ('sys_manager', 'admin', 'focal')) if email
-    }
-    extras = current_app.config.get('DEV_ACT_AS_EXTRA_EMAILS') or []
-    allowed.update(str(e).strip().lower() for e in extras if str(e).strip())
-    return allowed
-
-
-def _has_registered_login():
-    """Correlated check: the account has completed a real sign-in (not dev act-as)."""
+def _registered_user_ids(user_ids: list[int]) -> set[int]:
+    """User ids that have completed a real sign-in (dev act-as does not count)."""
+    if not user_ids:
+        return set()
     from app.models import UserLoginLog
 
-    return exists().where(
-        and_(
-            UserLoginLog.user_id == User.id,
-            UserLoginLog.event_type == 'login_success',
-        )
-    )
-
-
-def _dev_act_as_user_allowed(user: User) -> bool:
-    """Seeded/allow-listed accounts, or an active account that has not signed in yet.
-
-    Pre-added users (created ahead of registration) are included so local testing
-    can use them before the first real login. Anyone who has already signed in
-    stays off the list unless they are a seeded test account or listed in
-    DEV_ACT_AS_EXTRA_EMAILS — a restored production database must not be
-    impersonated through this picker.
-    """
-    if not user or not getattr(user, 'active', False):
-        return False
-    email = (user.email or '').strip().lower()
-    if email in _dev_act_as_allowed_emails():
-        return True
-    from app.models import UserLoginLog
-
-    registered = (
-        db.session.query(UserLoginLog.id)
+    rows = (
+        db.session.query(UserLoginLog.user_id)
         .filter(
-            UserLoginLog.user_id == user.id,
+            UserLoginLog.user_id.in_(user_ids),
             UserLoginLog.event_type == 'login_success',
         )
-        .first()
+        .distinct()
+        .all()
     )
-    return registered is None
+    return {int(uid) for (uid,) in rows if uid is not None}
+
+
+def _dev_act_as_access_by_user(user_ids: list[int]) -> dict[int, str]:
+    """Role label per user from two queries, matching the act-as access buckets."""
+    if not user_ids:
+        return {}
+    from collections import defaultdict
+
+    from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
+
+    codes_by_user: dict[int, set[str]] = defaultdict(set)
+    try:
+        for uid, code in (
+            db.session.query(RbacUserRole.user_id, RbacRole.code)
+            .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+            .filter(RbacUserRole.user_id.in_(user_ids))
+            .all()
+        ):
+            if uid is not None and code:
+                codes_by_user[int(uid)].add(code)
+        admin_ids = {
+            int(uid)
+            for (uid,) in (
+                db.session.query(RbacUserRole.user_id)
+                .join(RbacRolePermission, RbacUserRole.role_id == RbacRolePermission.role_id)
+                .join(RbacPermission, RbacRolePermission.permission_id == RbacPermission.id)
+                .filter(
+                    RbacUserRole.user_id.in_(user_ids),
+                    RbacPermission.code.like('admin.%'),
+                )
+                .distinct()
+                .all()
+            )
+            if uid is not None
+        }
+    except Exception as exc:
+        current_app.logger.debug("Dev act-as role labels failed: %s", exc)
+        return {}
+
+    labels: dict[int, str] = {}
+    for uid in user_ids:
+        codes = codes_by_user.get(uid, set())
+        if 'system_manager' in codes:
+            access = 'system_manager'
+        elif uid in admin_ids or 'admin_core' in codes or any(code.startswith('admin_') for code in codes):
+            access = 'admin'
+        elif 'assignment_editor_submitter' in codes:
+            access = 'focal_point'
+        else:
+            access = 'user'
+        labels[uid] = access
+    return labels
 
 
 def _get_dev_act_as_users() -> list[dict]:
-    """Seeded accounts plus active users who have not registered yet."""
-    allowed = _dev_act_as_allowed_emails()
-    email_allowed = func.lower(User.email).in_(allowed) if allowed else false()
+    """Every active account, for the local dev act-as picker.
+
+    Still only rendered when development, DEBUG, and a loopback request all hold.
+    Accounts with no real sign-in are marked so pre-added users stay visible.
+    """
     users = (
-        User.query.filter(
-            User.active.is_(True),
-            or_(email_allowed, ~_has_registered_login()),
-        )
+        User.query.filter(User.active.is_(True))
         .order_by(User.name, User.email)
         .all()
     )
+    user_ids = [user.id for user in users]
+    registered_ids = _registered_user_ids(user_ids)
+    access_by_user = _dev_act_as_access_by_user(user_ids)
     result = []
     for user in users:
-        access = AuthorizationService.access_level(user)
-        email = (user.email or '').strip().lower()
-        # Non-allow-listed rows are here only because they have no real sign-in yet.
+        access = access_by_user.get(user.id, 'user')
         result.append({
             'id': user.id,
             'email': user.email,
             'name': user.name or user.email,
             'access_level': access,
             'access_label': _DEV_ACT_AS_ACCESS_LABELS.get(access, access),
-            'registered': email in allowed,
+            'registered': user.id in registered_ids,
         })
     return result
 
@@ -332,13 +352,8 @@ def dev_act_as_login():
         user = _resolve_dev_act_as_preset(preset)
     if not user and user_id:
         candidate = User.query.filter_by(id=user_id, active=True).first()
-        if candidate and _dev_act_as_user_allowed(candidate):
+        if candidate:
             user = candidate
-        elif candidate:
-            current_app.logger.warning(
-                "SECURITY: dev act-as refused for non-seeded user id=%s from %s",
-                user_id, get_client_ip(),
-            )
 
     if not user:
         if preset:

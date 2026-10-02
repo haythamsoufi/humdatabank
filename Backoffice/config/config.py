@@ -392,8 +392,8 @@ class Config:
         os.environ.get("PLUGIN_UPLOAD_ENABLED"), default=_flask_config in ("development", "testing")
     )
 
-    # Extra accounts (comma-separated e-mails) the dev-only "Act as" panel may sign in as, in
-    # addition to the seeded test_sys / test_admin / test_focal users.
+    # Kept so an existing DEV_ACT_AS_EXTRA_EMAILS env var still parses. The local Act as
+    # picker lists every active user and does not read this list.
     DEV_ACT_AS_EXTRA_EMAILS: list[str] = [
         e.strip().lower() for e in (os.environ.get("DEV_ACT_AS_EXTRA_EMAILS") or "").split(",") if e.strip()
     ]

@@ -61,6 +61,7 @@
     height: 100vh;
     min-height: 560px;
     font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--navy);
     opacity:0; transform: scale(1.015);
     overflow: hidden;
   }
@@ -256,6 +257,7 @@
   /* Right: login panel                                                  */
   /* ------------------------------------------------------------------ */
   .login-panel{
+    --panel-enter-x: calc(100% + 120px);
     position: relative;
     z-index: 5;
     grid-column: 2;
@@ -268,38 +270,48 @@
     flex-direction:column;
     justify-content:center;
     padding:56px 50px;
-    box-shadow: -24px 0 60px rgba(0,0,0,.3);
+    box-shadow: -28px 0 70px rgba(0,0,0,.28);
     opacity:0;
-    transform: translate3d(40px, 0, 0);
+    transform: translate3d(var(--panel-enter-x), 0, 0);
     overflow-y: auto;
     overflow-x: hidden;
     flex-shrink: 0;
     justify-self: stretch;
     align-self: stretch;
   }
+  /* Panel sits on the left in RTL — enter from that outer edge. */
+  html[dir="rtl"] .login-panel{
+    --panel-enter-x: calc(-100% - 120px);
+    box-shadow: 28px 0 70px rgba(0,0,0,.28);
+  }
   .login-panel::before{
     content:''; position:absolute; inset-inline-start:0; top:0; bottom:0; width:4px;
     background: linear-gradient(180deg, var(--blue), var(--navy) 45%, var(--red));
     transform: scaleY(0); transform-origin: top;
   }
-  .login-panel.in{ animation: panelIn .6s var(--ease-expo) forwards; }
-  .login-panel.in::before{ animation: barGrowV .7s var(--ease-expo) .1s forwards; }
-  @keyframes panelIn{ to{ opacity:1; transform: translate3d(0, 0, 0); } }
+  .login-panel.in{
+    animation:
+      panelSlide .78s var(--ease-expo) forwards,
+      panelFade .34s ease-out forwards;
+  }
+  .login-panel.in::before{ animation: barGrowV .62s var(--ease-expo) .42s forwards; }
+  @keyframes panelSlide{ to{ transform: translate3d(0, 0, 0); } }
+  @keyframes panelFade{ to{ opacity: 1; } }
   @keyframes barGrowV{ to{ transform: scaleY(1); } }
 
-  /* staggered content reveal */
+  /* staggered content reveal — starts as the panel decelerates into place */
   .lang-nav, .panel-brand, .panel-title, .panel-lead,
   .btn-sso, .panel-hint, .dev-panel, .panel-footer{
-    opacity:0; transform: translateY(12px);
+    opacity:0; transform: translateY(14px);
   }
-  .login-panel.in .lang-nav   { animation: fadeUp .5s var(--ease-expo) .18s forwards; }
-  .login-panel.in .panel-brand{ animation: fadeUp .5s var(--ease-expo) .24s forwards; }
-  .login-panel.in .panel-title{ animation: fadeUp .5s var(--ease-expo) .30s forwards; }
-  .login-panel.in .panel-lead { animation: fadeUp .5s var(--ease-expo) .36s forwards; }
-  .login-panel.in .btn-sso    { animation: fadeUp .5s var(--ease-expo) .44s forwards; }
-  .login-panel.in .panel-hint { animation: fadeUp .5s var(--ease-expo) .52s forwards; }
-  .login-panel.in .dev-panel  { animation: fadeUp .5s var(--ease-expo) .56s forwards; }
-  .login-panel.in .panel-footer{ animation: fadeUp .5s var(--ease-expo) .60s forwards; }
+  .login-panel.in .lang-nav   { animation: fadeUp .48s var(--ease-expo) .32s forwards; }
+  .login-panel.in .panel-brand{ animation: fadeUp .48s var(--ease-expo) .38s forwards; }
+  .login-panel.in .panel-title{ animation: fadeUp .48s var(--ease-expo) .44s forwards; }
+  .login-panel.in .panel-lead { animation: fadeUp .48s var(--ease-expo) .50s forwards; }
+  .login-panel.in .btn-sso    { animation: fadeUp .5s var(--ease-expo) .56s forwards; }
+  .login-panel.in .panel-hint { animation: fadeUp .48s var(--ease-expo) .64s forwards; }
+  .login-panel.in .dev-panel  { animation: fadeUp .48s var(--ease-expo) .70s forwards; }
+  .login-panel.in .panel-footer{ animation: fadeUp .48s var(--ease-expo) .76s forwards; }
 
   /* language nav */
   .lang-nav{
@@ -426,13 +438,22 @@
       height:auto;
       min-height:0;
       padding:44px 6vw 40px;
-      box-shadow:0 -12px 32px rgba(0,0,0,.12);
-      transform:none;
-      opacity:1;
+      box-shadow:0 -16px 40px rgba(0,0,0,.14);
+      --panel-enter-x: 0px;
+      transform: translate3d(0, 22px, 0);
+      opacity:0;
       justify-content:flex-start;
     }
-    .login-panel.in{ animation: panelInMobile .45s var(--ease-expo) forwards; }
-    @keyframes panelInMobile{ from{ opacity:0; transform: translate3d(0, 12px, 0); } to{ opacity:1; transform:none; } }
+    html[dir="rtl"] .login-panel{
+      --panel-enter-x: 0px;
+      box-shadow:0 -16px 40px rgba(0,0,0,.14);
+    }
+    .login-panel.in{
+      animation:
+        panelInMobile .58s var(--ease-expo) forwards,
+        panelFade .28s ease-out forwards;
+    }
+    @keyframes panelInMobile{ to{ transform: none; } }
 
     .login-panel.in .lang-nav,
     .login-panel.in .panel-brand,
@@ -442,9 +463,17 @@
     .login-panel.in .panel-hint,
     .login-panel.in .dev-panel,
     .login-panel.in .panel-footer{
-      animation-duration:.35s;
-      animation-delay:0s !important;
+      animation-duration:.4s;
     }
+    .login-panel.in .lang-nav   { animation-delay:.06s !important; }
+    .login-panel.in .panel-brand{ animation-delay:.1s !important; }
+    .login-panel.in .panel-title{ animation-delay:.14s !important; }
+    .login-panel.in .panel-lead { animation-delay:.18s !important; }
+    .login-panel.in .btn-sso    { animation-delay:.22s !important; }
+    .login-panel.in .panel-hint { animation-delay:.26s !important; }
+    .login-panel.in .dev-panel  { animation-delay:.3s !important; }
+    .login-panel.in .panel-footer{ animation-delay:.34s !important; }
+    .login-panel.in::before{ animation-delay:.22s; animation-duration:.42s; }
 
     .hero-visual{
       order:0;
@@ -488,7 +517,8 @@
       width:100%;
       height:4px;
       background: linear-gradient(90deg, var(--blue), var(--navy) 45%, var(--red));
-      transform-origin:left;
+      transform: scaleX(0);
+      transform-origin: left;
     }
     .login-panel.in::before{ animation-name: barGrowH; }
     .lang-nav{
@@ -829,10 +859,11 @@
     el.addEventListener('animationend', function(e){
       if(e.target !== el || names.indexOf(e.animationName) === -1) return;
       el.style.transform = 'none';
+      el.style.opacity = '1';
     });
   }
   settleAnimationTransform(document.getElementById('scene'), ['sceneIn']);
-  settleAnimationTransform(document.getElementById('loginPanel'), ['panelIn', 'panelInMobile']);
+  settleAnimationTransform(document.getElementById('loginPanel'), ['panelSlide', 'panelInMobile']);
 
   if(window.jQuery){
     window.jQuery(document).on('select2:open select2:close', function(){
@@ -905,7 +936,7 @@
       document.getElementById('brandMark').classList.add('in');
       document.getElementById('heroCopyCol').classList.add('in');
     }, 60);
-    setTimeout(function(){ document.getElementById('loginPanel').classList.add('in'); }, 200);
+    setTimeout(function(){ document.getElementById('loginPanel').classList.add('in'); }, 140);
     setTimeout(function(){
       document.getElementById('eyebrow').classList.add('in');
       animateCount(document.getElementById('statNum'), 191, 700);

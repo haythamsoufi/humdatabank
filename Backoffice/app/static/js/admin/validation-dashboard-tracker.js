@@ -11,7 +11,6 @@
     var state = {
         templateId: null,
         period: null,
-        trackerApi: null,
         map: null,
         geoLayer: null,
         mapInitialized: false,
@@ -564,138 +563,89 @@
 
     function applyTrackerView() {
         var filtered = getFilteredRows();
-        initTrackerGrid(filtered);
+        renderTrackerTable(filtered);
         renderStatusChart(filtered.length ? computeStatsFromRows(filtered) : null);
         renderMapCountries(getFilteredMapCountries(filtered));
     }
 
-    function trackerColumnDefs() {
-        var cols = [
-            { field: 'region', headerName: t.region || 'Region', width: 125, minWidth: 115, filter: 'agTextColumnFilter', pinned: 'left' },
-            { field: 'country_name', headerName: t.country || 'Country', flex: 1, minWidth: 175, filter: 'agTextColumnFilter', pinned: 'left' },
-            {
-                field: 'status',
-                headerName: t.status || 'Status',
-                width: 140,
-                minWidth: 130,
-                filter: 'customSetFilter',
-                valueGetter: function (p) {
-                    var d = p.data || {};
-                    return d.status_label || statusLabel(d.status) || d.status || '';
-                },
-                cellRenderer: function (p) {
-                    var d = p.data || {};
-                    return statusBadge(d.status, d.status_label);
-                },
-            },
-            {
-                field: 'completion_rate',
-                headerName: t.completionRate || 'Completion rate',
-                width: 118,
-                minWidth: 108,
-                maxWidth: 140,
-                filter: 'agNumberColumnFilter',
-                cellClass: 'compliance-cell-center',
-                headerClass: 'compliance-header-center',
-                valueGetter: function (p) {
-                    var rate = p.data && p.data.completion_rate;
-                    return rate == null || rate === '' ? null : Number(rate);
-                },
-                cellRenderer: function (p) {
-                    return completionRateCell(p.data && p.data.completion_rate);
-                },
-            },
-        ];
-
-        var sectionMeta = state.sectionsMeta.length ? state.sectionsMeta : [
-            { key: 'governance', label: t.governance || 'Governance' },
-            { key: 'finance', label: t.finance || 'Finance' },
-            { key: 'reach', label: t.reach || 'Reach' },
-        ];
-        sectionMeta.forEach(function (spec) {
-            var isGovernance = spec.key === 'governance';
-            cols.push({
-                colId: 'section_' + spec.key,
-                headerName: spec.label || sectionLabelForKey(spec.key),
-                width: isGovernance ? 126 : 108,
-                minWidth: isGovernance ? 118 : 100,
-                maxWidth: isGovernance ? 152 : 136,
-                filter: 'customSetFilter',
-                cellClass: 'compliance-cell-center',
-                headerClass: 'compliance-header-center',
-                valueGetter: function (p) {
-                    var sections = (p.data && p.data.sections) || {};
-                    return sectionStatusLabel(sections[spec.key]);
-                },
-                cellRenderer: function (p) {
-                    var sections = (p.data && p.data.sections) || {};
-                    return sectionStatusIcon(sections[spec.key]);
-                },
-            });
-        });
-
-        var docMeta = state.documentsMeta.length ? state.documentsMeta : [
-            { key: 'annual_report', label: 'Annual Report' },
-            { key: 'audited_financial', label: 'Audited Financial Statement' },
-            { key: 'strategic_plan', label: 'Strategic Plan' },
-            { key: 'unaudited_financial', label: 'Unaudited Financial Statement' },
-        ];
-        docMeta.forEach(function (doc) {
-            var isFinancialStatement = doc.key === 'audited_financial' || doc.key === 'unaudited_financial';
-            var isStrategicPlan = doc.key === 'strategic_plan';
-            var width = isFinancialStatement ? 120 : (isStrategicPlan ? 112 : 100);
-            var minWidth = isFinancialStatement ? 112 : (isStrategicPlan ? 104 : 92);
-            var maxWidth = isFinancialStatement ? 152 : (isStrategicPlan ? 148 : 140);
-            cols.push({
-                colId: 'doc_' + doc.key,
-                headerName: doc.label,
-                width: width,
-                minWidth: minWidth,
-                maxWidth: maxWidth,
-                filter: 'customSetFilter',
-                cellClass: 'compliance-cell-center',
-                headerClass: 'compliance-header-center',
-                valueGetter: function (p) {
-                    var docs = (p.data && p.data.documents) || {};
-                    return docs[doc.key] ? (t.uploaded || 'Uploaded') : (t.missing || 'Missing');
-                },
-                cellRenderer: function (p) {
-                    var docs = (p.data && p.data.documents) || {};
-                    return boolIcon(!!docs[doc.key]);
-                },
-            });
-        });
-
-        return cols;
+    function trackerColumnMeta() {
+        return {
+            sections: state.sectionsMeta.length ? state.sectionsMeta : [
+                { key: 'governance', label: t.governance || 'Governance' },
+                { key: 'finance', label: t.finance || 'Finance' },
+                { key: 'reach', label: t.reach || 'Reach' },
+            ],
+            documents: state.documentsMeta.length ? state.documentsMeta : [
+                { key: 'annual_report', label: 'Annual Report' },
+                { key: 'audited_financial', label: 'Audited Financial Statement' },
+                { key: 'strategic_plan', label: 'Strategic Plan' },
+                { key: 'unaudited_financial', label: 'Unaudited Financial Statement' },
+            ],
+        };
     }
 
-    function initTrackerGrid(rows) {
-        if (state.trackerApi) {
-            state.trackerApi.setGridOption('columnDefs', trackerColumnDefs());
-            state.trackerApi.setGridOption('rowData', rows);
-            state.trackerApi.setGridOption('pagination', false);
-            if (typeof state.trackerApi.refreshHeader === 'function') {
-                state.trackerApi.refreshHeader();
+    function trackerTh(label, className) {
+        return '<th' + (className ? ' class="' + className + '"' : '') + '>' + esc(label) + '</th>';
+    }
+
+    function trackerTd(html, className) {
+        return '<td' + (className ? ' class="' + className + '"' : '') + '>' + html + '</td>';
+    }
+
+    function renderTrackerTable(rows) {
+        var table = el('vd-tracker-table');
+        var empty = el('vd-tracker-empty');
+        if (!table) return;
+        var head = table.querySelector('thead');
+        var body = table.querySelector('tbody');
+        var list = rows || [];
+        var meta = trackerColumnMeta();
+        if (!list.length) {
+            if (head) head.innerHTML = '';
+            if (body) body.innerHTML = '';
+            var emptyScroll = table.closest('.vd-table-scroll');
+            if (emptyScroll) emptyScroll.classList.add('hidden');
+            if (empty) {
+                empty.textContent = t.noAssignments || 'No country assignments for this period.';
+                empty.classList.remove('hidden');
             }
             return;
         }
-        var result = AgGridHelper.create('validationTrackerGrid', 'admin-validation-tracker', trackerColumnDefs(), rows, {
-            showResultCount: false,
-            columnVisibilityOptions: { buttonPlaceholderId: 'vd-tracker-col-vis', enableExport: true },
-            sizeColumnsToFitOnInit: false,
-            gridOptions: {
-                pagination: false,
-                defaultColDef: {
-                    suppressSizeToFit: true,
-                    wrapHeaderText: true,
-                    autoHeaderHeight: true,
-                },
-                onFirstDataRendered: function (params) {
-                    AgGridHelper.enforceColumnMinWidths(params.api);
-                },
-            },
+        var headers = [
+            trackerTh(t.region || 'Region', 'vd-col-region'),
+            trackerTh(t.country || 'Country', 'vd-col-country'),
+            trackerTh(t.status || 'Status'),
+            trackerTh(t.completionRate || 'Completion rate', 'vd-center vd-head-wrap'),
+        ];
+        meta.sections.forEach(function (spec) {
+            headers.push(trackerTh(spec.label || sectionLabelForKey(spec.key), 'vd-center vd-head-wrap'));
         });
-        state.trackerApi = result.api;
+        meta.documents.forEach(function (doc) {
+            headers.push(trackerTh(doc.label, 'vd-center vd-head-wrap'));
+        });
+        if (head) head.innerHTML = '<tr>' + headers.join('') + '</tr>';
+        if (body) {
+            body.innerHTML = list.map(function (row) {
+                var cells = [
+                    trackerTd(row.region ? esc(row.region) : '<span class="vd-muted">—</span>', 'vd-col-region'),
+                    trackerTd(esc(row.country_name || ''), 'vd-col-country'),
+                    trackerTd(statusBadge(row.status, row.status_label)),
+                    trackerTd(completionRateCell(row.completion_rate), 'vd-center'),
+                ];
+                var sections = row.sections || {};
+                meta.sections.forEach(function (spec) {
+                    cells.push(trackerTd(sectionStatusIcon(sections[spec.key]), 'vd-center'));
+                });
+                var docs = row.documents || {};
+                meta.documents.forEach(function (doc) {
+                    cells.push(trackerTd(boolIcon(!!docs[doc.key]), 'vd-center'));
+                });
+                return '<tr>' + cells.join('') + '</tr>';
+            }).join('');
+        }
+        var scroll = table.closest('.vd-table-scroll');
+        if (scroll) scroll.classList.remove('hidden');
+        if (empty) empty.classList.add('hidden');
     }
 
     async function loadTrackerPeriods(preferredPeriod) {
@@ -720,7 +670,7 @@
             state.allMapCountries = [];
             state.trackerMeta = null;
             buildCountrySlicer([]);
-            initTrackerGrid([]);
+            renderTrackerTable([]);
             renderStatusChart(null);
             renderMapCountries([]);
             renderTrackerLegend();
@@ -813,7 +763,7 @@
                 state.allRows = [];
                 state.allMapCountries = [];
                 buildCountrySlicer([]);
-                initTrackerGrid([]);
+                renderTrackerTable([]);
                 renderStatusChart(null);
                 renderMapCountries([]);
                 renderTrackerLegend();
@@ -831,7 +781,7 @@
     bindEvents();
     buildCountrySlicer([]);
     renderTrackerLegend();
-    initTrackerGrid([]);
+    renderTrackerTable([]);
     renderStatusChart(null);
 
     (async function initTracker() {

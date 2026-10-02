@@ -19,8 +19,8 @@
         rawIndicatorRows: [],
         historyYears: [],
         flaggedOnly: false,
-        showHistorical: false,
-        indicatorsApi: null,
+        layout: 'comparison',
+        search: '',
     };
 
     function el(id) { return document.getElementById(id); }
@@ -125,8 +125,9 @@
                 templateId: getTemplateId(),
                 period: el('vd-period')?.value || '',
                 countryId: el('vd-country')?.value || '',
-                showHistorical: state.showHistorical,
+                layout: state.layout,
                 flaggedOnly: state.flaggedOnly,
+                search: state.search,
             }));
         } catch (err) { /* ignore */ }
     }
@@ -174,10 +175,6 @@
         return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
     }
 
-    function numericValueFormatter(params) {
-        return formatNumericDisplay(params.value);
-    }
-
     function questionStatusLabel(status) {
         var map = {
             open: t.statusOpen || 'Open',
@@ -188,52 +185,31 @@
         return map[status] || status;
     }
 
-    function questionStatusRenderer(params) {
-        var d = params.data || {};
-        var status = d.question_status;
+    function questionStatusHtml(row) {
+        var status = row && row.question_status;
         if (status) {
             var variant = 'neutral';
             if (status === 'open') variant = 'warning';
-            else if (status === 'answered') variant = 'success';
-            else if (status === 'resolved') variant = 'success';
+            else if (status === 'answered' || status === 'resolved') variant = 'success';
             return badge(questionStatusLabel(status), variant);
         }
-        if (d.flagged) {
+        if (row && row.flagged) {
             return badge(t.notGenerated || 'Not generated', 'neutral');
         }
-        return '';
+        return '<span class="vd-muted">—</span>';
     }
 
-    function sentStatusRenderer(params) {
-        var d = params.data || {};
-        if (d.sent_at) return esc(formatIsoDate(d.sent_at));
-        if (d.question_id && d.question_status === 'open') {
+    function sentHtml(row) {
+        if (row && row.sent_at) return esc(formatIsoDate(row.sent_at));
+        if (row && row.question_id && row.question_status === 'open') {
             return badge(t.notSent || 'Not sent', 'pending');
         }
-        return '';
+        return '<span class="vd-muted">—</span>';
     }
 
-    function multilineTextRenderer(params) {
-        var val = params.value;
-        if (val == null || val === '') {
-            return '<span class="text-gray-400">—</span>';
-        }
-        return '<div class="vd-multiline-text text-sm text-gray-900">' + esc(String(val)) + '</div>';
-    }
-
-    function multilineColumnDef(overrides) {
-        return Object.assign({
-            wrapText: true,
-            autoHeight: true,
-            cellClass: 'vd-multiline-cell',
-            cellRenderer: multilineTextRenderer,
-            cellStyle: {
-                whiteSpace: 'normal',
-                lineHeight: '1.4',
-                alignItems: 'flex-start',
-            },
-            filter: 'agTextColumnFilter',
-        }, overrides);
+    function textHtml(value) {
+        if (value == null || value === '') return '<span class="vd-muted">—</span>';
+        return '<div class="vd-multiline-text">' + esc(String(value)) + '</div>';
     }
 
     function setActionButtonsEnabled(enabled) {
@@ -248,7 +224,7 @@
         state.rawIndicatorRows = [];
         state.historyYears = [];
         populateCountrySelect([]);
-        initIndicatorsGrid([]);
+        renderIndicatorsTable();
         updateKpis();
         setActionButtonsEnabled(false);
         hideFeedback();
@@ -260,173 +236,185 @@
         if (flagsEl) flagsEl.textContent = preview ? preview.flag_count : '—';
     }
 
-    /* ——— Grids ——— */
+    /* ——— Indicator table ——— */
+
+    function rowSearchText(row) {
+        if (!row) return '';
+        return [
+            row.indicator_label,
+            row.kpi_code,
+            automaticCheckLabel(row),
+            row.question_preview,
+        ].filter(Boolean).join(' ').toLowerCase();
+    }
 
     function filteredIndicatorRows() {
+        var query = (state.search || '').trim().toLowerCase();
         return state.rawIndicatorRows.filter(function (row) {
-            return !(state.flaggedOnly && !row.flagged);
+            if (state.flaggedOnly && !row.flagged) return false;
+            if (!query) return true;
+            return rowSearchText(row).indexOf(query) !== -1;
         });
     }
 
-    function applyIndicatorFilters() {
-        if (state.indicatorsApi) {
-            state.indicatorsApi.setGridOption('rowData', filteredIndicatorRows());
-        }
+    var LAYOUTS = ['comparison', 'checks', 'questions'];
+
+    function comparisonYears() {
+        return (state.historyYears || []).slice(0, 3);
     }
 
-    function historyColumnDefs() {
-        if (!state.showHistorical || !state.historyYears.length) return [];
-        return state.historyYears.map(function (year) {
-            return {
-                colId: 'hist_' + year,
-                headerName: String(year),
-                width: 100,
-                minWidth: 100,
-                filter: 'agTextColumnFilter',
-                valueGetter: function (p) {
-                    var hv = p.data && p.data.historical_values;
-                    if (!hv) return '';
-                    var v = hv[String(year)];
-                    return v != null ? formatNumericDisplay(v) : '';
-                },
-                valueFormatter: numericValueFormatter,
-            };
+    function yearValue(row, year) {
+        var hv = (row && row.historical_values) || {};
+        var raw = hv[String(year)];
+        if ((raw == null || raw === '') && String(comparisonYears()[0]) === String(year)) raw = row.current_value;
+        return raw == null || raw === '' ? '' : formatNumericDisplay(raw);
+    }
+
+    function parseDisplayNumber(value) {
+        if (value == null || value === '') return null;
+        var num = Number(String(value).replace(/,/g, '').trim());
+        return Number.isFinite(num) ? num : null;
+    }
+
+    function changeHtml(row) {
+        var years = comparisonYears();
+        if (years.length < 2) return '<span class="vd-muted">—</span>';
+        var current = parseDisplayNumber(yearValue(row, years[0]));
+        var prior = parseDisplayNumber(yearValue(row, years[1]));
+        if (current == null || prior == null || prior === 0) return '<span class="vd-muted">—</span>';
+        var pct = ((current - prior) / Math.abs(prior)) * 100;
+        var cls = pct > 0.05 ? 'vd-change-up' : (pct < -0.05 ? 'vd-change-down' : 'vd-change-flat');
+        var sign = pct > 0 ? '+' : '';
+        return '<span class="' + cls + '">' + sign + pct.toFixed(1) + '%</span>';
+    }
+
+    function checkHtml(row) {
+        if (row && row.flagged) return badge(automaticCheckLabel(row), 'danger');
+        return '<span class="vd-muted">—</span>';
+    }
+
+    function severityHtml(row) {
+        if (!row || !row.severity) return '<span class="vd-muted">—</span>';
+        var variant = row.severity === 'error' ? 'danger' : (row.severity === 'warning' ? 'warning' : (row.severity === 'info' ? 'info' : 'neutral'));
+        return badge(row.severity, variant);
+    }
+
+    function answerHtml(row) {
+        if (row && row.answer_preview) return textHtml(row.answer_preview);
+        if (row && row.has_answer) return textHtml(t.answerReceived || 'Answer received');
+        return '<span class="vd-muted">—</span>';
+    }
+
+    function th(label, className) {
+        return '<th' + (className ? ' class="' + className + '"' : '') + '>' + esc(label) + '</th>';
+    }
+
+    function td(html, className) {
+        return '<td' + (className ? ' class="' + className + '"' : '') + '>' + html + '</td>';
+    }
+
+    function indicatorHeaderCells() {
+        var years = comparisonYears();
+        if (state.layout === 'checks') {
+            return [
+                th(t.indicator || 'Indicator', 'vd-sticky'),
+                th(t.value || 'Value', 'vd-num'),
+                th(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'),
+                th(t.severity || 'Severity'),
+            ].join('');
+        }
+        if (state.layout === 'questions') {
+            return [
+                th(t.indicator || 'Indicator', 'vd-sticky'),
+                th(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'),
+                th(t.severity || 'Severity'),
+                th(t.questionStatus || 'Question status'),
+                th(t.sent || 'Sent'),
+                th(t.answer || 'Answer', 'vd-cell-wrap'),
+                th(t.questionPreview || 'Question preview', 'vd-cell-wrap'),
+            ].join('');
+        }
+        var cells = [th(t.indicator || 'Indicator', 'vd-sticky')];
+        if (!years.length) cells.push(th(t.value || 'Value', 'vd-num'));
+        years.forEach(function (year) { cells.push(th(String(year), 'vd-num')); });
+        var changeLabel = t.change || 'Change';
+        if (years.length >= 2) changeLabel += ' vs ' + years[1];
+        cells.push(th(changeLabel, 'vd-num'));
+        cells.push(th(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'));
+        return cells.join('');
+    }
+
+    function indicatorBodyCells(row) {
+        var years = comparisonYears();
+        var name = td(esc(row.indicator_label || row.kpi_code || ''), 'vd-sticky');
+        if (state.layout === 'checks') {
+            return name +
+                td(row.current_value ? esc(formatNumericDisplay(row.current_value)) : '<span class="vd-muted">—</span>', 'vd-num') +
+                td(checkHtml(row), 'vd-cell-wrap') +
+                td(severityHtml(row));
+        }
+        if (state.layout === 'questions') {
+            return name +
+                td(checkHtml(row), 'vd-cell-wrap') +
+                td(severityHtml(row)) +
+                td(questionStatusHtml(row)) +
+                td(sentHtml(row)) +
+                td(answerHtml(row), 'vd-cell-wrap') +
+                td(textHtml(row.question_preview), 'vd-cell-wrap');
+        }
+        var cells = [name];
+        if (!years.length) {
+            cells.push(td(row.current_value ? esc(formatNumericDisplay(row.current_value)) : '<span class="vd-muted">—</span>', 'vd-num'));
+        }
+        years.forEach(function (year) {
+            var value = yearValue(row, year);
+            cells.push(td(value ? esc(value) : '<span class="vd-muted">—</span>', 'vd-num'));
         });
+        cells.push(td(changeHtml(row), 'vd-num'));
+        cells.push(td(checkHtml(row), 'vd-cell-wrap'));
+        return cells.join('');
     }
 
-    function indicatorColumnDefs() {
-        var base = [
-            { field: 'indicator_label', headerName: t.indicator || 'Indicator', flex: 1, minWidth: 180, filter: 'agTextColumnFilter' },
-        ];
-        if (!state.showHistorical) {
-            base.push({
-                field: 'current_value',
-                headerName: t.value || 'Value',
-                width: 110,
-                minWidth: 110,
-                filter: 'agTextColumnFilter',
-                valueFormatter: numericValueFormatter,
-            });
-        }
-        base = base.concat(historyColumnDefs());
-        base.push(
-            {
-                colId: 'automatic_check',
-                headerName: t.automaticCheck || 'Automatic check',
-                flex: 1,
-                minWidth: 180,
-                filter: 'agTextColumnFilter',
-                valueGetter: function (p) { return automaticCheckLabel(p.data); },
-                cellRenderer: function (p) {
-                    if (p.data && p.data.flagged) {
-                        return badge(automaticCheckLabel(p.data), 'danger');
-                    }
-                    return '';
-                },
-            },
-            {
-                field: 'severity',
-                headerName: t.severity || 'Severity',
-                width: 100,
-                minWidth: 100,
-                filter: 'customSetFilter',
-                cellRenderer: function (p) {
-                    if (!p.value) return '';
-                    var variant = p.value === 'error' ? 'danger' : (p.value === 'warning' ? 'warning' : (p.value === 'info' ? 'info' : 'neutral'));
-                    return badge(p.value, variant);
-                },
-            },
-            {
-                colId: 'question_status',
-                field: 'question_status',
-                headerName: t.questionStatus || 'Question status',
-                width: 130,
-                minWidth: 130,
-                filter: 'customSetFilter',
-                valueGetter: function (p) {
-                    var d = p.data || {};
-                    if (d.question_status) return questionStatusLabel(d.question_status);
-                    if (d.flagged) return t.notGenerated || 'Not generated';
-                    return '';
-                },
-                cellRenderer: questionStatusRenderer,
-            },
-            {
-                colId: 'sent_at',
-                headerName: t.sent || 'Sent',
-                width: 110,
-                minWidth: 110,
-                filter: 'agTextColumnFilter',
-                valueGetter: function (p) {
-                    var d = p.data || {};
-                    if (d.sent_at) return formatIsoDate(d.sent_at);
-                    if (d.question_id && d.question_status === 'open') return t.notSent || 'Not sent';
-                    return '';
-                },
-                cellRenderer: sentStatusRenderer,
-            },
-            multilineColumnDef({
-                field: 'answer_preview',
-                headerName: t.answer || 'Answer',
-                flex: 1,
-                minWidth: 180,
-                valueGetter: function (p) {
-                    var d = p.data || {};
-                    if (d.answer_preview) return d.answer_preview;
-                    if (d.has_answer) return t.answerReceived || 'Answer received';
-                    return '';
-                },
-            }),
-            multilineColumnDef({
-                field: 'question_preview',
-                headerName: t.questionPreview || 'Question preview',
-                flex: 1.2,
-                minWidth: 220,
-            })
-        );
-        return base;
+    function layoutHint() {
+        if (state.layout === 'checks') return t.layoutHintChecks || 'Automatic checks and severity for this round.';
+        if (state.layout === 'questions') return t.layoutHintQuestions || 'Generated questions, whether they were sent, and focal-point answers.';
+        return t.layoutHintComparison || 'This round beside the previous two reporting rounds.';
     }
 
-    function rebuildIndicatorsGrid() {
-        if (!state.indicatorsApi) {
-            initIndicatorsGrid(filteredIndicatorRows());
-            return;
-        }
-        state.indicatorsApi.setGridOption('columnDefs', indicatorColumnDefs());
-        applyIndicatorFilters();
-        AgGridHelper.enforceColumnMinWidths(state.indicatorsApi);
-    }
-
-    function initIndicatorsGrid(rows) {
-        if (state.indicatorsApi) {
-            state.indicatorsApi.setGridOption('columnDefs', indicatorColumnDefs());
-            state.indicatorsApi.setGridOption('rowData', rows);
-            if (typeof state.indicatorsApi.refreshHeader === 'function') {
-                state.indicatorsApi.refreshHeader();
-            }
-            return;
-        }
-        var result = AgGridHelper.create('validationIndicatorsGrid', 'admin-validation-indicators', indicatorColumnDefs(), rows, {
-            columnVisibilityOptions: { buttonPlaceholderId: 'vd-indicators-col-vis', enableExport: true },
-            sizeColumnsToFitOnInit: false,
-            sizeColumnsToFitOnRefresh: false,
-            sizeColumnsToFitOnColumnChange: false,
-            gridOptions: {
-                defaultColDef: {
-                    suppressSizeToFit: true,
-                    wrapHeaderText: true,
-                    autoHeaderHeight: true,
-                },
-                getRowClass: function (p) {
-                    if (p.data && p.data.flagged) return 'vd-ag-row-flagged';
-                    return '';
-                },
-                onFirstDataRendered: function (params) {
-                    AgGridHelper.enforceColumnMinWidths(params.api);
-                },
-            },
+    function syncLayoutControls() {
+        document.querySelectorAll('[data-vd-layout]').forEach(function (btn) {
+            var active = btn.getAttribute('data-vd-layout') === state.layout;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
-        state.indicatorsApi = result.api;
+        var hint = el('vd-layout-hint');
+        if (hint) hint.textContent = layoutHint();
+    }
+
+    function renderIndicatorsTable() {
+        var table = el('vd-indicators-table');
+        var empty = el('vd-indicators-empty');
+        syncLayoutControls();
+        if (!table) return;
+        var head = table.querySelector('thead');
+        var body = table.querySelector('tbody');
+        var rows = filteredIndicatorRows();
+        if (head) head.innerHTML = rows.length ? '<tr>' + indicatorHeaderCells() + '</tr>' : '';
+        if (body) {
+            body.innerHTML = rows.map(function (row) {
+                return '<tr class="' + (row.flagged ? 'vd-row-flagged' : '') + '">' + indicatorBodyCells(row) + '</tr>';
+            }).join('');
+        }
+        if (empty) {
+            var hasCountry = !!state.selectedCountry;
+            var message = !hasCountry
+                ? (t.selectCountry || 'Select a country to compare indicators.')
+                : (t.noIndicators || 'No indicators match this view.');
+            empty.textContent = message;
+            empty.classList.toggle('hidden', rows.length > 0);
+        }
+        var scroll = table.closest('.vd-table-scroll');
+        if (scroll) scroll.classList.toggle('hidden', !rows.length);
     }
 
     function populateCountrySelect(countries, preferredCountryId) {
@@ -458,7 +446,7 @@
             state.rawIndicatorRows = [];
             state.historyYears = [];
             setActionButtonsEnabled(false);
-            initIndicatorsGrid([]);
+            renderIndicatorsTable();
             updateKpis();
             hideFeedback();
             saveScope();
@@ -536,7 +524,7 @@
         state.rawIndicatorRows = [];
         state.historyYears = [];
         setActionButtonsEnabled(false);
-        initIndicatorsGrid([]);
+        renderIndicatorsTable();
         await loadCountriesForPeriod(restoreCountryId);
         if (el('vd-country')?.value) {
             onCountrySelected();
@@ -555,7 +543,7 @@
             state.historyYears = (state.preview && state.preview.history_years) || [];
             var checksEnabled = !!(state.preview && state.preview.validation_enabled !== false && state.preview.rule_pack);
             setActionButtonsEnabled(!!state.selectedCountry && checksEnabled);
-            rebuildIndicatorsGrid();
+            renderIndicatorsTable();
             updateKpis();
             if (state.preview && state.preview.validation_enabled === false && state.preview.message) {
                 showFeedback(state.preview.message, 'info');
@@ -646,15 +634,25 @@
 
     el('vd-country')?.addEventListener('change', onCountrySelected);
 
-    el('vd-show-historical')?.addEventListener('change', function (e) {
-        state.showHistorical = e.target.checked;
-        rebuildIndicatorsGrid();
-        saveScope();
+    document.querySelectorAll('[data-vd-layout]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var layout = btn.getAttribute('data-vd-layout');
+            if (LAYOUTS.indexOf(layout) === -1 || layout === state.layout) return;
+            state.layout = layout;
+            renderIndicatorsTable();
+            saveScope();
+        });
     });
 
     el('vd-flagged-only')?.addEventListener('change', function (e) {
         state.flaggedOnly = e.target.checked;
-        applyIndicatorFilters();
+        renderIndicatorsTable();
+        saveScope();
+    });
+
+    el('vd-indicator-search')?.addEventListener('input', function (e) {
+        state.search = e.target.value || '';
+        renderIndicatorsTable();
         saveScope();
     });
 
@@ -665,16 +663,18 @@
 
     /* ——— Init ——— */
 
-    initIndicatorsGrid([]);
+    renderIndicatorsTable();
     setActionButtonsEnabled(false);
 
     async function restoreSavedScope() {
         var saved = readSavedScope();
         if (saved) {
-            state.showHistorical = !!saved.showHistorical;
+            if (LAYOUTS.indexOf(saved.layout) !== -1) state.layout = saved.layout;
             state.flaggedOnly = !!saved.flaggedOnly;
-            if (el('vd-show-historical')) el('vd-show-historical').checked = state.showHistorical;
+            state.search = typeof saved.search === 'string' ? saved.search : '';
             if (el('vd-flagged-only')) el('vd-flagged-only').checked = state.flaggedOnly;
+            if (el('vd-indicator-search')) el('vd-indicator-search').value = state.search;
+            syncLayoutControls();
         }
 
         if (!saved || !saved.templateId) {

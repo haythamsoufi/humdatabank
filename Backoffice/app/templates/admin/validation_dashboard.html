@@ -1,7 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "admin/_validation_admin_shell.html" import validation_admin_shell, validation_admin_styles with context %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
-{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container, ag_grid_page_config %}
+{% from "components/ag_grid_includes.html" import ag_grid_page_config %}
 
 {% block title %}{{ _('Validation Dashboard') }} — {{ _('Admin') }}{% endblock %}
 
@@ -137,9 +137,14 @@
                 </div>
                 <div class="vd-tracker-legend-row mb-3">
                     <div id="vd-tracker-legend" class="vd-tracker-legend" aria-label="{{ _('Legend')|forceescape }}"></div>
-                    <div id="vd-tracker-col-vis" class="vd-tracker-col-vis"></div>
                 </div>
-                {{ ag_grid_container('validationTrackerGrid', loading_text=_('Loading tracker data…'), grid_height='520px', placeholder_id='vd-tracker-col-vis', include_card=false, show_placeholder=false) }}
+                <div class="vd-table-scroll">
+                    <table class="vd-table vd-table-tracker" id="vd-tracker-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <p id="vd-tracker-empty" class="vd-table-empty hidden">{{ _('No country assignments for this period.') }}</p>
             </div>
         </div>
 
@@ -159,14 +164,21 @@
                             <option value="">{{ _('Loading countries…') }}</option>
                         </select>
                     </div>
-                    <div class="vd-toolbar-options" role="group" aria-label="{{ _('View options')|forceescape }}">
-                        <label class="vd-toggle">
-                            <input type="checkbox" id="vd-show-historical">
-                            <span>{{ _('Show last 3 years') }}</span>
-                        </label>
+                    <div class="vd-toolbar-options">
+                        <div class="vd-layout-toggle" role="radiogroup" aria-label="{{ _('Table layout')|forceescape }}">
+                            <button type="button" class="vd-layout-btn is-active" data-vd-layout="comparison" aria-pressed="true">
+                                {{ _('Past 2 rounds') }}
+                            </button>
+                            <button type="button" class="vd-layout-btn" data-vd-layout="checks" aria-pressed="false">
+                                {{ _('Checks') }}
+                            </button>
+                            <button type="button" class="vd-layout-btn" data-vd-layout="questions" aria-pressed="false">
+                                {{ _('Questions') }}
+                            </button>
+                        </div>
                         <label class="vd-toggle">
                             <input type="checkbox" id="vd-flagged-only">
-                            <span>{{ _('Flagged indicators only') }}</span>
+                            <span>{{ _('Flagged only') }}</span>
                         </label>
                     </div>
                     <div class="vd-flags-stat" aria-live="polite">
@@ -185,11 +197,24 @@
             </div>
 
             <div>
-                <h3 class="text-md font-semibold text-ifrc-navy mb-2">
-                    <i class="fas fa-flag mr-1.5 text-red-400" aria-hidden="true"></i>
-                    {{ _('Indicators & automatic flags') }}
-                </h3>
-                {{ ag_grid_container('validationIndicatorsGrid', loading_text=_('Loading indicator flags…'), grid_height='480px', placeholder_id='vd-indicators-col-vis', include_card=false) }}
+                <div class="vd-table-heading">
+                    <h3 class="text-md font-semibold text-ifrc-navy">
+                        <i class="fas fa-flag mr-1.5 text-red-400" aria-hidden="true"></i>
+                        {{ _('Indicators') }}
+                    </h3>
+                    <p id="vd-layout-hint" class="vd-layout-hint">{{ _('This round beside the previous two reporting rounds.') }}</p>
+                    <label class="vd-search">
+                        <span class="vd-sr-only">{{ _('Search indicators') }}</span>
+                        <input type="search" id="vd-indicator-search" class="vd-search-input" placeholder="{{ _('Search indicators') }}">
+                    </label>
+                </div>
+                <div class="vd-table-scroll">
+                    <table class="vd-table" id="vd-indicators-table">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <p id="vd-indicators-empty" class="vd-table-empty">{{ _('Select a country to compare indicators.') }}</p>
             </div>
         </div>
     </div>
@@ -212,6 +237,17 @@
         'value': _('Value'),
         'priorValue': _('Prior year'),
         'historicalValues': _('Historical'),
+        'change': _('Change'),
+        'layoutComparison': _('Past 2 rounds'),
+        'layoutChecks': _('Checks'),
+        'layoutQuestions': _('Questions'),
+        'layoutHintComparison': _('This round beside the previous two reporting rounds.'),
+        'layoutHintChecks': _('Automatic checks and severity for this round.'),
+        'layoutHintQuestions': _('Generated questions, whether they were sent, and focal-point answers.'),
+        'searchIndicators': _('Search indicators'),
+        'noIndicators': _('No indicators match this view.'),
+        'selectCountry': _('Select a country to compare indicators.'),
+        'noAssignments': _('No country assignments for this period.'),
         'automaticCheck': _('Automatic check'),
         'severity': _('Severity'),
         'questionStatus': _('Question status'),
@@ -269,7 +305,6 @@
 {% endblock %}
 
 {% block extra_js %}
-{{ ag_grid_js() }}
 <script src="{{ static_url('libs/apexcharts.min.js') }}"></script>
 <script src="{{ static_url('vendor/leaflet/leaflet.js') }}"></script>
 <script src="{{ static_url('js/lib/html-escape.js') }}"></script>

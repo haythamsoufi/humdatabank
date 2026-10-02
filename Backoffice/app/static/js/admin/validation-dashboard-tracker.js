@@ -22,6 +22,7 @@
         loaded: false,
         sectionsMeta: [],
         documentsMeta: [],
+        statusesMeta: [],
         requiredDocumentKeys: [],
         sortKey: 'country',
         sortDir: 'asc',
@@ -131,15 +132,29 @@
         var docItems = '<li class="vd-tracker-legend-item">' + boolIcon(true) + esc(t.uploaded || 'Uploaded') + '</li>' +
             '<li class="vd-tracker-legend-item">' + boolIcon(false) + esc(t.missing || 'Missing') + '</li>';
 
-        legendEl.innerHTML =
-            '<div class="vd-tracker-legend-group">' +
-            '<span class="vd-tracker-legend-title">' + esc(t.legendSections || 'Section progress') + '</span>' +
-            '<ul class="vd-tracker-legend-items">' + sectionItems + '</ul>' +
-            '</div>' +
-            '<div class="vd-tracker-legend-group">' +
-            '<span class="vd-tracker-legend-title">' + esc(t.legendDocuments || 'Documents') + '</span>' +
-            '<ul class="vd-tracker-legend-items">' + docItems + '</ul>' +
-            '</div>';
+        var html = '';
+        if ((state.sectionsMeta || []).length) {
+            html += '<div class="vd-tracker-legend-group">' +
+                '<span class="vd-tracker-legend-title">' + esc(t.legendSections || 'Section progress') + '</span>' +
+                '<ul class="vd-tracker-legend-items">' + sectionItems + '</ul>' +
+                '</div>';
+        }
+        if ((state.documentsMeta || []).length) {
+            html += '<div class="vd-tracker-legend-group">' +
+                '<span class="vd-tracker-legend-title">' + esc(t.legendDocuments || 'Documents') + '</span>' +
+                '<ul class="vd-tracker-legend-items">' + docItems + '</ul>' +
+                '</div>';
+        }
+        (state.statusesMeta || []).forEach(function (spec) {
+            var items = (spec.legend || []).map(function (text) {
+                return '<li class="vd-tracker-legend-item">' + esc(text) + '</li>';
+            }).join('');
+            if (!items) return;
+            html += '<div class="vd-tracker-legend-group">' +
+                '<span class="vd-tracker-legend-title">' + esc(spec.label || '') + '</span>' +
+                '<ul class="vd-tracker-legend-items">' + items + '</ul></div>';
+        });
+        legendEl.innerHTML = html;
     }
 
     function boolIcon(uploaded) {
@@ -544,6 +559,15 @@
         pending: 1,
     };
     var SECTION_SORT_RANK = { not_started: 0, in_progress: 1, complete: 2 };
+    var NOTICE_SORT_RANK = {
+        mixed: 0,
+        missing: 1,
+        not_applicable: 2,
+        no_longer_applicable: 3,
+        ok: 4,
+        unknown: 5,
+        not_used: 6,
+    };
 
     function trackerColumns() {
         var meta = trackerColumnMeta();
@@ -597,6 +621,20 @@
                 value: function (row) { return !!(row.documents || {})[doc.key]; },
             });
         });
+        meta.statuses.forEach(function (spec) {
+            cols.push({
+                key: 'status:' + spec.key,
+                label: spec.label,
+                className: 'vd-head-wrap',
+                kind: 'notice',
+                filters: spec.filters || [],
+                value: function (row) {
+                    var cell = (row.statuses || {})[spec.key] || {};
+                    return cell.state || 'unknown';
+                },
+                cell: function (row) { return (row.statuses || {})[spec.key] || {}; },
+            });
+        });
         return cols;
     }
 
@@ -641,6 +679,8 @@
                 var uploaded = !!value;
                 if (raw === 'yes' && !uploaded) return false;
                 if (raw === 'no' && uploaded) return false;
+            } else if (col.kind === 'notice') {
+                if (String(value) !== String(raw)) return false;
             } else if (col.kind === 'number') {
                 var num = Number(value);
                 if (!Number.isFinite(num)) return false;
@@ -670,6 +710,9 @@
             result = (SECTION_SORT_RANK[a] || 0) - (SECTION_SORT_RANK[b] || 0);
         } else if (col.kind === 'document') {
             result = (a ? 1 : 0) - (b ? 1 : 0);
+        } else if (col.kind === 'notice') {
+            result = (NOTICE_SORT_RANK[a] == null ? 9 : NOTICE_SORT_RANK[a]) -
+                (NOTICE_SORT_RANK[b] == null ? 9 : NOTICE_SORT_RANK[b]);
         } else {
             result = String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
         }
@@ -720,6 +763,10 @@
         } else if (col.kind === 'document') {
             options.push(filterOption('yes', t.uploaded || 'Uploaded'));
             options.push(filterOption('no', t.missing || 'Missing'));
+        } else if (col.kind === 'notice') {
+            (col.filters || []).forEach(function (item) {
+                if (item && item.value) options.push(filterOption(item.value, item.label || item.value));
+            });
         } else if (col.kind === 'number') {
             options.push(filterOption('80', t.completionAtLeast80 || '80% and above'));
             options.push(filterOption('50', t.completionAtLeast50 || '50% and above'));
@@ -890,10 +937,21 @@
         renderMapCountries(getFilteredMapCountries(filtered));
     }
 
+    function noticeBadge(cell) {
+        if (!cell || !cell.state || cell.state === 'unknown' || cell.state === 'not_used') {
+            return '<span class="vd-muted">—</span>';
+        }
+        var variant = cell.state === 'ok' ? 'status-label--success' : 'status-label--warning';
+        var title = cell.detail || cell.label || '';
+        return '<span class="status-label ' + variant + '" title="' + esc(title) + '">' +
+            esc(cell.label || '') + '</span>';
+    }
+
     function trackerColumnMeta() {
         return {
             sections: state.sectionsMeta || [],
             documents: state.documentsMeta || [],
+            statuses: state.statusesMeta || [],
         };
     }
 
@@ -937,6 +995,9 @@
             }
             if (col.kind === 'document') {
                 return trackerHtmlCell(boolIcon(!!col.value(row)), 'vd-center');
+            }
+            if (col.kind === 'notice') {
+                return trackerHtmlCell(noticeBadge(col.cell ? col.cell(row) : null));
             }
             return { text: String(col.value(row) || '') };
         });
@@ -995,29 +1056,53 @@
         }
     }
 
+    var periodLoadGeneration = 0;
+
     async function loadTrackerPeriods(preferredPeriod) {
+        var generation = ++periodLoadGeneration;
         var templateId = getTemplateId();
         var periodEl = el('vd-tracker-period');
-        if (!periodEl) return;
-        await scopeLoader.loadPeriodsIntoSelect({
-            selectEl: periodEl,
-            periodsUrl: config.periodsUrl,
-            templateId: templateId,
-            preferredPeriod: preferredPeriod,
-            emptyLabel: t.selectTemplatePeriod || 'Select template first',
-            chooseLabel: 'Choose period',
-        });
+        if (!periodEl) return false;
+        if (scopeLoader.isRoundScope && scopeLoader.isRoundScope(templateId)) {
+            await scopeLoader.loadRoundsIntoSelect({
+                selectEl: periodEl,
+                roundsUrl: config.roundsUrl,
+                preferredPeriod: preferredPeriod,
+                preferredTemplateId: templateId,
+                isCurrent: function () { return generation === periodLoadGeneration; },
+            });
+        } else {
+            await scopeLoader.loadPeriodsIntoSelect({
+                selectEl: periodEl,
+                periodsUrl: config.periodsUrl,
+                templateId: templateId,
+                preferredPeriod: preferredPeriod,
+                emptyLabel: t.selectTemplatePeriod || 'Select template first',
+                chooseLabel: 'Choose period',
+                isCurrent: function () { return generation === periodLoadGeneration; },
+            });
+            if (scopeLoader.syncScopeFieldLabels) scopeLoader.syncScopeFieldLabels();
+        }
+        return generation === periodLoadGeneration;
     }
+
+    var trackerAbort = null;
 
     async function loadTrackerData() {
         var templateId = getTemplateId();
-        var period = el('vd-tracker-period')?.value;
+        var period = scopeLoader.selectedPeriod
+            ? scopeLoader.selectedPeriod(el('vd-tracker-period'))
+            : (el('vd-tracker-period')?.value || '');
+        if (trackerAbort) trackerAbort.abort();
+        var controller = new AbortController();
+        trackerAbort = controller;
         if (!templateId || !period) {
             state.allRows = [];
             state.allMapCountries = [];
             state.trackerMeta = null;
             state.sectionsMeta = [];
             state.documentsMeta = [];
+            state.statusesMeta = [];
             state.requiredDocumentKeys = [];
             state.columnFilters = {};
             state.sortKey = 'country';
@@ -1035,9 +1120,15 @@
         try {
             var url = config.trackerUrl + '?template_id=' + encodeURIComponent(templateId) +
                 '&period=' + encodeURIComponent(period);
-            var data = await window.apiFetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            var data = await window.apiFetch(url, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+                signal: controller.signal,
+            });
+            if (trackerAbort !== controller) return;
             state.sectionsMeta = data.sections_meta || [];
             state.documentsMeta = data.documents_meta || [];
+            state.statusesMeta = data.statuses_meta || [];
             state.requiredDocumentKeys = data.required_document_keys || [];
             state.delegationReviewEnabled = !!data.delegation_review_enabled;
             state.allRows = data.rows || [];
@@ -1055,6 +1146,7 @@
             state.loaded = true;
             saveTrackerScope();
         } catch (err) {
+            if (controller.signal.aborted || (err && err.name === 'AbortError')) return;
             console.error(err);
             showFeedback(t.trackerLoadFailed || 'Tracker load failed', 'error');
         }
@@ -1064,7 +1156,7 @@
         try {
             localStorage.setItem(TRACKER_STORAGE_KEY, JSON.stringify({
                 templateId: getTemplateId(),
-                period: el('vd-tracker-period')?.value || '',
+                period: (scopeLoader.selectedPeriod ? scopeLoader.selectedPeriod(el('vd-tracker-period')) : el('vd-tracker-period')?.value) || '',
             }));
         } catch (err) { /* ignore */ }
     }
@@ -1089,6 +1181,9 @@
 
     function bindEvents() {
         el('vd-tracker-period')?.addEventListener('change', function () {
+            if (scopeLoader.isRoundScope && scopeLoader.isRoundScope()) {
+                scopeLoader.commitRoundSelection(el('vd-tracker-period'));
+            }
             loadTrackerData().catch(function (err) { console.error(err); });
         });
 
@@ -1139,8 +1234,10 @@
         onTemplateChanged: async function (preferredPeriod) {
             state.loaded = false;
             var saved = readTrackerScope();
-            var period = preferredPeriod || (saved && saved.templateId === getTemplateId() ? saved.period : null);
-            await loadTrackerPeriods(period);
+            var sameTemplate = saved && String(saved.templateId) === String(getTemplateId());
+            var period = (sameTemplate && saved.period) ? saved.period : (preferredPeriod || null);
+            var applied = await loadTrackerPeriods(period);
+            if (!applied) return;
             if (el('vd-tracker-period')?.value) {
                 await loadTrackerData();
             } else {
@@ -1152,6 +1249,9 @@
                 renderMapCountries([]);
                 renderTrackerLegend();
             }
+        },
+        markStale: function () {
+            state.loaded = false;
         },
         refreshIfActive: function () {
             var trackerPanel = el('panel-tracker');
@@ -1167,15 +1267,5 @@
     renderTrackerLegend();
     renderTrackerTable([]);
     renderStatusChart(null);
-
-    (async function initTracker() {
-        var saved = readTrackerScope();
-        if (getTemplateId()) {
-            await loadTrackerPeriods(saved && saved.templateId === getTemplateId() ? saved.period : null);
-            var trackerPanel = el('panel-tracker');
-            if (trackerPanel && !trackerPanel.classList.contains('hidden') && el('vd-tracker-period')?.value) {
-                await loadTrackerData();
-            }
-        }
-    })().catch(function (err) { console.error(err); });
+    // validation-dashboard.js loads this list after the saved template is restored.
 })();

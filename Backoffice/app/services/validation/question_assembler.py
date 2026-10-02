@@ -68,12 +68,16 @@ def assemble_question_for_kpi(
     fired.sort(key=lambda r: (SEVERITY_ORDER.get(r.severity, 9), r.rule_code))
     winner = fired[0]
 
-    template_text, needs_suffix = lookup_template_text(winner.rule_code, language, rule_pack)
-    fragment = template_text
-    if needs_suffix:
-        suffix = _format_suffix(winner.rule_code, winner.context, rule_pack)
-        if suffix:
-            fragment = f"{fragment} {suffix}".strip()
+    override = winner.context.get("message") if isinstance(winner.context, dict) else None
+    if isinstance(override, str) and override.strip():
+        fragment = override.strip()
+    else:
+        template_text, needs_suffix = lookup_template_text(winner.rule_code, language, rule_pack)
+        fragment = template_text
+        if needs_suffix:
+            suffix = _format_suffix(winner.rule_code, winner.context, rule_pack)
+            if suffix:
+                fragment = f"{fragment} {suffix}".strip()
 
     question_text = fragment
     if definition_text:

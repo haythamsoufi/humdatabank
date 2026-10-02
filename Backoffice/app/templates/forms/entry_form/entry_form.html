@@ -22,6 +22,7 @@
 {% set page_last_section_ids = page_last_section_ids if page_last_section_ids is defined else {} %}
 {% set show_whole_form_submit = (not enable_scoped_submission) or (enable_page_submission and not pages_total_count) %}
 {% set show_upr_assets = can_use_upr and template_structure and template_structure.id in [24, 33] %}
+{% set plugin_form_assets = plugin_entry_form_assets(template_structure.id if template_structure else none) if plugin_entry_form_assets is defined else [] %}
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
 {% block head %}
@@ -37,6 +38,9 @@
 {% endif %}
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
+{% for asset in plugin_form_assets if asset.kind == 'stylesheet' %}
+<link rel="stylesheet" href="{{ asset.url }}">
+{% endfor %}
 {% if show_upr_assets %}
 <link rel="stylesheet" href="{{ upr_static_url('css/upr.css') }}">
 <link rel="stylesheet" href="{{ url_for('upr.fonts_css', v=upr_asset_v()) }}">
@@ -3194,6 +3198,9 @@
 <script src="{{ upr_static_url('js/upr-download.js') }}"></script>
 <script src="{{ upr_static_url('js/upr-assignment.js') }}"></script>
 {% endif %}
+{% for asset in plugin_form_assets if asset.kind == 'script' %}
+<script src="{{ asset.url }}"></script>
+{% endfor %}
 {% if is_preview_mode %}
     {% include "forms/entry_form/partials/_preview_banner_js.html" %}
 {% endif %}

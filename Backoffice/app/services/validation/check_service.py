@@ -4,8 +4,11 @@ Orchestrator for template-scoped automatic validation checks.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app import db
 from app.models import Country, FormData, FormItem, FormTemplate
@@ -20,7 +23,7 @@ from app.services.data_quality.helpers import (
 )
 from app.services.data_quality.service import get_rule_pack_for_template
 from app.services.validation.core_checks import run_core_checks
-from app.services.validation.pack_registry import get_pack
+from app.services.validation.pack_registry import get_pack, list_packs, packs_for_template
 from app.utils.data_quality_constants import RULE_PACK_CORE
 from app.services.validation.question_assembler import assemble_question_for_kpi
 from app.services.validation.types import (
@@ -45,6 +48,15 @@ class ValidationContext:
     kpi_data: dict
     history_by_kpi: dict[str, dict[int, float]] = field(default_factory=dict)
     country_id: int | None = None
+
+
+def _run_pack_checks(pack, ctx: ValidationContext) -> list[CheckResult]:
+    """Run one product pack. A failing pack does not drop the other checks."""
+    try:
+        return list(pack.run_checks(ctx) or [])
+    except Exception:
+        logger.exception("Validation pack %s failed", getattr(pack, "code", pack))
+        return []
 
 
 def _resolve_country_id(entity_type: str, entity_id: int) -> int | None:
@@ -163,10 +175,14 @@ def evaluate_validation_checks(
     if not template:
         raise ValueError(f"Template {template_id} not found.")
 
+    data_quality_on = _data_quality_enabled(template)
+    scoped = packs_for_template(template_id)
     pack = rule_pack if rule_pack is not None else get_rule_pack_for_template(template)
     if not pack:
-        if _data_quality_enabled(template):
+        if data_quality_on:
             pack = RULE_PACK_CORE
+        elif scoped:
+            pack = scoped[0].code
         elif require_rule_pack:
             raise ValueError(validation_checks_disabled_message(template_id))
         else:
@@ -205,9 +221,20 @@ def evaluate_validation_checks(
             raw_required = getattr(plugin, "required_indicator_codes", ())
             if isinstance(raw_required, (list, tuple, set, frozenset)):
                 required = tuple(raw_required)
-        check_results.extend(run_core_checks(ctx, required_indicator_codes=required))
+        # General indicator checks follow the data-quality switch. A product pack
+        # that names this template still runs when that switch is off.
+        if data_quality_on or pack == RULE_PACK_CORE:
+            check_results.extend(run_core_checks(ctx, required_indicator_codes=required))
+        ran_packs: set[str] = set()
         if plugin is not None and getattr(plugin, "code", None) != RULE_PACK_CORE:
-            check_results.extend(plugin.run_checks(ctx) or [])
+            check_results.extend(_run_pack_checks(plugin, ctx))
+            ran_packs.add(plugin.code)
+        for extra in list_packs():
+            if extra.code in ran_packs or extra.code == RULE_PACK_CORE:
+                continue
+            if ctx.template_id not in extra.template_ids:
+                continue
+            check_results.extend(_run_pack_checks(extra, ctx))
 
     drafts = _results_to_drafts(check_results, ctx)
     return ValidationEvaluationResult(

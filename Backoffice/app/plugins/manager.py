@@ -322,7 +322,7 @@ class PluginManager:
         return self.plugins
 
     def _sync_validation_packs(self) -> None:
-        """Register the core pack and packs from plugins that are currently active."""
+        """Register the core pack and packs from plugins that integrate with core."""
         from app.services.validation.core_checks import register_core_validation_pack
         from app.services.validation.pack_registry import mark_synced_from_plugins
 
@@ -331,7 +331,7 @@ class PluginManager:
         except Exception as exc:
             self.logger.error("Failed to register core validation checks: %s", exc)
 
-        for plugin in self.get_active_plugins().values():
+        for plugin in self._integrating_plugins().values():
             register = getattr(plugin, "register_validation_packs", None)
             if not callable(register):
                 continue
@@ -625,6 +625,26 @@ class PluginManager:
     def get_plugin(self, plugin_name: str) -> Optional[BasePlugin]:
         """Get plugin instance by plugin_id."""
         return self.plugins.get(plugin_name)
+
+    def _integrating_plugins(self) -> Dict[str, BasePlugin]:
+        """Plugins that plug into core behavior.
+
+        User-activated plugins are included. Admin features are included too:
+        their routes stay registered when they are not in the activation list,
+        and the same plugins own validation packs and assignment-form assets.
+        """
+        chosen: Dict[str, BasePlugin] = {}
+        for plugin_id, plugin in self.plugins.items():
+            if plugin_id in self.active_plugins:
+                chosen[plugin_id] = plugin
+                continue
+            try:
+                always_on = bool(plugin.is_admin_feature())
+            except Exception:
+                always_on = False
+            if always_on:
+                chosen[plugin_id] = plugin
+        return chosen
 
     def get_active_plugins(self) -> Dict[str, BasePlugin]:
         """Get all active plugin instances."""
@@ -1058,6 +1078,35 @@ class PluginManager:
                 ", ".join(registered),
             )
 
+    def entry_form_assets(self, template_id=None) -> list:
+        """Stylesheets and scripts active plugins contribute to an assignment form."""
+        try:
+            template_id = int(template_id) if template_id is not None else None
+        except (TypeError, ValueError):
+            template_id = None
+        assets: list = []
+        for plugin in self._integrating_plugins().values():
+            contribute = getattr(plugin, "get_entry_form_assets", None)
+            if not callable(contribute):
+                continue
+            try:
+                contributed = contribute(template_id) or []
+            except Exception as exc:
+                self.logger.warning(
+                    "get_entry_form_assets failed for plugin %s: %s",
+                    getattr(plugin, "plugin_id", plugin),
+                    exc,
+                )
+                continue
+            for asset in contributed:
+                if not isinstance(asset, dict):
+                    continue
+                kind = asset.get("kind")
+                url = asset.get("url")
+                if kind in ("stylesheet", "script") and isinstance(url, str) and url:
+                    assets.append({"kind": kind, "url": url})
+        return assets
+
     def calculated_list_adapter_specs(self) -> list:
         """Lookup adapters entry forms should load before calculated lists initialise."""
         specs = []
@@ -1088,6 +1137,10 @@ class PluginManager:
         @self.app.template_global('calculated_list_adapters')
         def calculated_list_adapters():
             return self.calculated_list_adapter_specs()
+
+        @self.app.template_global('plugin_entry_form_assets')
+        def plugin_entry_form_assets(template_id=None):
+            return self.entry_form_assets(template_id)
 
     def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
         tabs: List[DataExplorerTabConfig] = []

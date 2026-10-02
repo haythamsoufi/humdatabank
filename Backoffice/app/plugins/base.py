@@ -299,6 +299,14 @@ class BasePlugin(ABC):
         """RBAC roles to seed on startup."""
         return []
 
+    def get_entry_form_assets(self, template_id: int | None) -> List[Dict[str, str]]:
+        """Stylesheets and scripts this plugin adds to an assignment form.
+
+        Each item is ``{"kind": "stylesheet"|"script", "url": "..."}``.
+        Core renders them and does not decide which template they belong to.
+        """
+        return []
+
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""
         return []

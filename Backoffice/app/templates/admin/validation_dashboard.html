@@ -34,6 +34,7 @@
                 class="vd-template-tab {{ admin_underline_tab_btn_classes(loop.first) }}"
                 data-template-id="{{ default_id }}"
                 {% if child_ids %}data-child-ids="{{ child_ids | join(',') }}"{% endif %}
+                {% if tmpl.scope %}data-scope-mode="{{ tmpl.scope }}"{% endif %}
                 aria-selected="{{ 'true' if loop.first else 'false' }}">
             {% if tmpl.children %}
                 {{ _('Unified Planning and Reporting') }}
@@ -43,7 +44,7 @@
         </button>
         {% endfor %}
     {% endcall %}
-    {% if upr_tab and upr_tab.children %}
+    {% if upr_tab and upr_tab.children and upr_tab.scope != 'round' %}
     <div id="vd-upr-subtabs" class="hidden border-b border-ifrc-gray-100">
         {% call scroll_tab_bar(inner_id='vd-upr-template-tabs', aria_label=_('Unified Planning and Reporting templates'), wrapper_class='px-4 sm:px-6') %}
             {% for child in upr_tab.children %}
@@ -222,6 +223,7 @@
 
 {% set vd_grid_bootstrap = {
     'periodsUrl': url_for('admin.validation_dashboard_periods_api'),
+    'roundsUrl': url_for('admin.validation_dashboard_rounds_api'),
     'countriesUrl': url_for('admin.validation_dashboard_countries_api'),
     'previewUrl': url_for('admin.validation_dashboard_preview_api'),
     'runChecksUrl': url_for('admin.validation_dashboard_run_checks'),
@@ -274,6 +276,8 @@
         'answerReceived': _('Answer received'),
         'questionPreview': _('Question preview'),
         'selectTemplatePeriod': _('Select a template and reporting period.'),
+        'round': _('Round'),
+        'chooseRound': _('Choose round'),
         'loadFailed': _('Failed to load dashboard data'),
         'previewFailed': _('Failed to load indicator preview'),
         'generateConfirm': _('Generate validation questions for the selected scope?'),

@@ -8,6 +8,7 @@ nothing instead of failing the page.
 from __future__ import annotations
 
 import logging
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -20,6 +21,8 @@ SuffixFormatter = Callable[[str, dict], str]
 SectionRatios = Callable[..., dict[str, float]]
 DocumentMatch = Callable[[str | None, str], bool]
 IndicatorCode = Callable[[Any], str | None]
+AssignmentStatuses = Callable[..., dict[str, dict]]
+PrepareRows = Callable[[list], AbstractContextManager[None]]
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,12 @@ class ValidationTracker:
     document_matches: DocumentMatch | None = None
     indicator_code: IndicatorCode | None = None
     required_document_keys: tuple[str, ...] = ()
+    # Status columns such as emergency coverage. Each spec is {"key", "label"}.
+    statuses: tuple[dict[str, str], ...] = ()
+    assignment_statuses: AssignmentStatuses | None = None
+    # Opens once for the whole country list, so a product can load shared data
+    # before assignment_statuses runs per country.
+    prepare_rows: PrepareRows | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +59,8 @@ class ValidationPack:
     # Indicator codes the core missing-data check treats as required for this product.
     required_indicator_codes: tuple[str, ...] = ()
     tracker: ValidationTracker | None = None
+    # Templates that should run this pack even when their saved rule pack is another one.
+    template_ids: tuple[int, ...] = ()
 
 
 _PACKS: dict[str, ValidationPack] = {}
@@ -75,6 +86,13 @@ def get_pack(code: str | None) -> ValidationPack | None:
 def list_packs() -> list[ValidationPack]:
     ensure_validation_packs()
     return [_PACKS[code] for code in sorted(_PACKS)]
+
+
+def packs_for_template(template_id: int | None) -> list[ValidationPack]:
+    """Packs that apply to this template even when it has no saved rule pack."""
+    if not isinstance(template_id, int):
+        return []
+    return [pack for pack in list_packs() if template_id in pack.template_ids]
 
 
 def mark_synced_from_plugins() -> None:

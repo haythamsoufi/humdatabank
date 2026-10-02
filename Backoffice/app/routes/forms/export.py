@@ -825,9 +825,9 @@ def _export_pdf_impl(aes_id):
         if country:
             try:
                 # Binding-aware resolution: keeps EO1/EO2/EO3 in the export aligned with the appeal
-                # codes the data was actually entered against (see emergency_section_binding).
-                from app.services.forms.emergency_section_binding import resolve_eo_variables
-                eo_vars = resolve_eo_variables(assignment_entity_status)
+                # codes the data was actually entered against (see plugins/emergency_operations/section_binding).
+                from app.services.forms.section_binding import resolve_section_variables
+                eo_vars = resolve_section_variables(assignment_entity_status)
                 for key, value in eo_vars.items():
                     resolved_variables[key] = value or ''
             except Exception as e:

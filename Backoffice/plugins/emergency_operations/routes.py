@@ -21,7 +21,7 @@ from app.utils.api_responses import json_bad_request, json_error, json_ok, json_
 
 from pathlib import Path
 
-from .appeal_group import CACHE_SOURCE
+from .appeal_group import CACHE_SOURCE, format_operation_label
 from .data_store import get_data_store, trigger_background_refresh
 
 plugin_config = load_plugin_config(Path(__file__).parent, "emergency_operations")
@@ -441,7 +441,9 @@ def create_blueprint():
                 # Build combined name with code field
                 operation_name = item.get('name', 'Unnamed Operation')
                 operation_code = item.get('code', '')
-                name_with_code = f"{operation_name} ({operation_code})" if operation_code else operation_name
+                name_with_code = format_operation_label(
+                    operation_name, operation_code, item.get('part_of')
+                )
 
                 list_data.append({
                     'id': operation_code,
@@ -451,6 +453,7 @@ def create_blueprint():
                     'name_with_code': name_with_code,
                     'type': item.get('atype_display', 'Unknown Type'),
                     'status': item.get('status_display', 'Unknown Status'),
+                    'part_of': (item.get('part_of') or ''),
                     'country': country_str,
                     'end_date': str(item.get('end_date') or '')[:10] or None,
                     'requested_amount': item.get('amount_requested', 0),
@@ -770,7 +773,7 @@ def get_emergency_operations_lookup_list():
         'columns_config': [
             {'name': 'name', 'label': 'Operation Name'},
             {'name': 'code', 'label': 'Operation Code'},
-            {'name': 'name_with_code', 'label': 'Operation Name (Operation Code)'},
+            {'name': 'name_with_code', 'label': 'Operation Code and Name'},
             {'name': 'type', 'label': 'Operation Type'},
             {'name': 'status', 'label': 'Status'},
             {'name': 'country', 'label': 'Country'},
@@ -783,7 +786,9 @@ def get_emergency_operations_lookup_list():
         # Configuration UI handler for matrix item modal
         'get_config_ui_handler': get_emergency_operations_config_ui,
         # JavaScript handler function name for setting up config UI event listeners
-        'config_ui_js_handler': 'setupEmergencyOperationsConfigUI'
+        'config_ui_js_handler': 'setupEmergencyOperationsConfigUI',
+        # Loaded by calculated-lists-runtime when a question uses this lookup.
+        'calculated_list_adapter': '/plugins/static/emergency_operations/js/calculated_list_adapter.js',
     }
 
 
@@ -1152,7 +1157,9 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
             # Build combined name with code field
             operation_name = operation.get('name', '')
             operation_code = operation.get('code', '')
-            name_with_code = f"{operation_name} ({operation_code})" if operation_code else operation_name
+            name_with_code = format_operation_label(
+                operation_name, operation_code, operation.get('part_of')
+            )
 
             # Create a row dictionary with the expected structure
             row_dict = {
@@ -1163,6 +1170,7 @@ def get_emergency_operations_options_handler(country_iso=None, config=None, **kw
                 'name_with_code': name_with_code,
                 'type': operation.get('atype_display', ''),
                 'status': operation.get('status_display', ''),
+                'part_of': operation.get('part_of') or '',
                 'country': operation.get('country', {}).get('name', '') if isinstance(operation.get('country'), dict) else '',
                 'requested_amount': operation.get('amount_requested', ''),
                 'funded_amount': operation.get('amount_funded', ''),

@@ -379,7 +379,7 @@ def emergency_operations_option_count(form_item, aes) -> int | None:
     EmOps cache is cold, or the lookup fails — an empty list must be certain
     before we drop the matrix from the completion denominator.
     """
-    from app.services.forms.emergency_section_binding import (
+    from plugins.emergency_operations.section_binding import (
         _assignment_period_for_aes,
         _country_iso_for_aes,
         _filters_hash,

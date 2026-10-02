@@ -32,7 +32,10 @@ class IdleIntersectionObserver {
 
 async function loadRuntime() {
     vi.resetModules();
-    return import('../../../app/static/js/forms/modules/calculated-lists-runtime.js');
+    const runtime = await import('../../../app/static/js/forms/modules/calculated-lists-runtime.js');
+    const adapter = await import('../../../plugins/emergency_operations/static/js/calculated_list_adapter.js');
+    runtime.registerCalculatedListAdapter(adapter.calculatedListAdapter);
+    return runtime;
 }
 
 function hiddenInputs(root = document.querySelector('form') || document) {

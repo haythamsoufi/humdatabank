@@ -638,13 +638,12 @@ Backoffice/
 │   ├── routes/admin/
 │   │   ├── upr_excel_import.py          ← blueprint routes: /admin/templates/upr-excel-import/*
 │   │   └── __init__.py                  ← registers upr_excel_import blueprint
-│   ├── templates/admin/templates/
+│   └── templates/admin/templates/
 │   │   ├── upr_excel_import.html        ← 3-step wizard UI
 │   │   └── data_sync_imputation.html    ← FDRS or UPR family page; UPR header links to wizard
-│   └── services/
-│       └── emergency_section_binding.py ← GO API slot resolution (used by EA mapping)
 ├── plugins/emergency_operations/
-│   └── routes.py                        ← get_emergency_operations_data()
+│   ├── routes.py                        ← get_emergency_operations_data()
+│   └── section_binding.py               ← GO API slot resolution (used by EA mapping)
 └── docs/
     └── upr-excel-import.md              ← this document
 ```

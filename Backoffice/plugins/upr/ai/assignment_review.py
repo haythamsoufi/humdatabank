@@ -222,11 +222,10 @@ def _emergency_label(op: Dict[str, Any]) -> str:
     custom = str(op.get("_display") or "").strip()
     if custom:
         return custom
-    name = str(op.get("name") or "").strip()
-    code = str(op.get("code") or "").strip()
-    if name and code:
-        return f"{name} ({code})"
-    return name or code or str(op.get("id") or "")
+    from plugins.emergency_operations.appeal_group import format_operation_label
+
+    label = format_operation_label(op.get("name"), op.get("code"), op.get("part_of"))
+    return label or str(op.get("id") or "")
 
 
 def _emops_config_sources(mc: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -295,7 +294,7 @@ def list_available_emergencies(form_item: Any, aes: Any) -> List[Dict[str, str]]
         return []
     try:
         from app.services.assignments.completion_service import _form_item_matrix_config
-        from app.services.forms.emergency_section_binding import (
+        from plugins.emergency_operations.section_binding import (
             _assignment_period_for_aes,
             _country_iso_for_aes,
             _normalize_emops_config,

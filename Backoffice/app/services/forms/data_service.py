@@ -1224,17 +1224,13 @@ class FormDataService(
 
         Only applies to assignment submissions (not public submissions) and only when the section
         references an [EOn] slot and has at least one dynamic indicator row. The actual ordering and
-        identity resolution live in .emergency_section_binding.
+        identity resolution lives in the plugin registered with section_binding.
         """
         if cls._is_public_submission(assignment_entity_status):
             return
 
-        from .emergency_section_binding import slot_for_section, persist_section_binding
-
-        if not slot_for_section(section):
-            return
-
         # Only bind sections that actually carry dynamic indicators.
+        # The registered provider decides whether this section is one it owns.
         has_rows = DynamicIndicatorData.query.filter_by(
             assignment_entity_status_id=assignment_entity_status.id,
             section_id=section.id,
@@ -1250,7 +1246,9 @@ class FormDataService(
         except Exception:
             user_id = None
 
-        persist_section_binding(section, assignment_entity_status, user_id=user_id)
+        from .section_binding import persist_section_bindings
+
+        persist_section_bindings(section, assignment_entity_status, user_id=user_id)
 
     @classmethod
     def _delete_pending_dynamic_indicators(cls, section, assignment_entity_status) -> set:

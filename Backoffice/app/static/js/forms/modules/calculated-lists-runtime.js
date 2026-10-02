@@ -4,23 +4,47 @@ import { appendOtherOptionToSelect, appendOtherOptionToMultiDropdown, restoreOth
 
 const MODULE = 'calculated-lists-runtime';
 
-/** EmOps type-filter tracing (filter DevTools console by "[EmOpsFilter]"). Gated by calculated-lists-runtime debug module. */
-function traceEmOpsFilter(fieldId, step, detail) {
-    const id = fieldId != null && fieldId !== '' ? String(fieldId) : '?';
-    if (detail !== undefined) {
-        debugLog(MODULE, `[EmOpsFilter] field=${id} | ${step}`, detail);
-    } else {
-        debugLog(MODULE, `[EmOpsFilter] field=${id} | ${step}`);
+/** Lookup-specific request, label, and selection behaviour supplied by plugins. */
+const calculatedListAdapters = new Map();
+
+export function registerCalculatedListAdapter(adapter) {
+    if (adapter && adapter.id) {
+        calculatedListAdapters.set(String(adapter.id), adapter);
     }
 }
 
-function summarizeEmOpsTypes(rows) {
-    const counts = {};
-    (rows || []).forEach((row) => {
-        const t = row && row.type != null ? String(row.type) : '(missing type)';
-        counts[t] = (counts[t] || 0) + 1;
-    });
-    return counts;
+function calculatedListAdapterFor(lookupListId) {
+    if (!lookupListId) return null;
+    return calculatedListAdapters.get(String(lookupListId)) || null;
+}
+
+function declaredCalculatedListAdapterSpecs() {
+    const node = document.getElementById('calculated-list-adapters');
+    if (!node || !node.textContent || !node.textContent.trim()) return [];
+    try {
+        const parsed = JSON.parse(node.textContent);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        debugWarn(MODULE, 'Failed to parse calculated-list adapters', err);
+        return [];
+    }
+}
+
+async function loadDeclaredCalculatedListAdapters() {
+    const specs = declaredCalculatedListAdapterSpecs();
+    await Promise.all(specs.map(async (spec) => {
+        if (!spec || !spec.module || !spec.id) return;
+        if (calculatedListAdapters.has(String(spec.id))) return;
+        try {
+            const mod = await import(/* @vite-ignore */ spec.module);
+            const adapter = mod.calculatedListAdapter || mod.default;
+            if (adapter) {
+                registerCalculatedListAdapter({ ...adapter, id: adapter.id || spec.id });
+            }
+        } catch (err) {
+            debugWarn(MODULE, `Failed to load calculated list adapter ${spec.id}`, err);
+        }
+    }));
 }
 
 /** Coerce API/list row values to safe display strings (never "[object Object]"). */
@@ -41,24 +65,11 @@ function scalarDisplayText(value) {
     return text === '[object Object]' ? '' : text;
 }
 
-function formatEmergencyOperationLabel(row) {
-    if (!row || typeof row !== 'object') return '';
-    const combined = scalarDisplayText(row.name_with_code);
-    if (combined) return combined;
-    const name = scalarDisplayText(row.name);
-    const code = scalarDisplayText(row.code);
-    if (name && code) return `${name} (${code})`;
-    return name || code || '';
-}
-
 function resolveCalculatedListRowDisplay(row, displayColumn, lookupListId) {
-    if (lookupListId === 'emergency_operations') {
-        const preferred = formatEmergencyOperationLabel(row);
+    const adapter = calculatedListAdapterFor(lookupListId);
+    if (adapter?.formatRow) {
+        const preferred = adapter.formatRow(row, displayColumn);
         if (preferred) return preferred;
-        if (row && displayColumn && Object.prototype.hasOwnProperty.call(row, displayColumn)) {
-            return scalarDisplayText(row[displayColumn]);
-        }
-        return '';
     }
     if (!row || !displayColumn || !Object.prototype.hasOwnProperty.call(row, displayColumn)) {
         return '';
@@ -122,37 +133,6 @@ function cachedFetch(urlString) {
     return promise;
 }
 
-/** Resolve ISO code for the assignment's country (used by Emergency Operations list). */
-function resolveAssignedCountryIso() {
-    const ctx = window.metadataContext;
-    if (ctx) {
-        const fromCtx = String(ctx.country_iso2 || ctx.country_iso || '').trim();
-        if (fromCtx) {
-            return fromCtx.toUpperCase();
-        }
-    }
-
-    const countryIsoElement = document.querySelector('[data-country-iso]');
-    if (countryIsoElement && countryIsoElement.dataset.countryIso) {
-        return countryIsoElement.dataset.countryIso.trim().toUpperCase();
-    }
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const countryParam = urlParams.get('country') || urlParams.get('iso');
-    if (countryParam) {
-        return countryParam.toUpperCase();
-    }
-
-    if (window.countryInfo) {
-        const fromInfo = window.countryInfo.iso || window.countryInfo.iso3;
-        if (fromInfo) {
-            return String(fromInfo).toUpperCase();
-        }
-    }
-
-    return null;
-}
-
 export function initCalculatedLists() {
     debugLog(MODULE, '🚀 Starting calculated lists initialization...');
     debugLog(MODULE, '🔄 Initializing calculated lists runtime support...');
@@ -179,15 +159,27 @@ export function initCalculatedLists() {
         }
     };
 
+    const boot = () => {
+        const specs = declaredCalculatedListAdapterSpecs();
+        if (!specs.length) {
+            checkAndInit();
+            return;
+        }
+        loadDeclaredCalculatedListAdapters().then(checkAndInit).catch((err) => {
+            debugWarn(MODULE, 'Calculated list adapters failed to load', err);
+            checkAndInit();
+        });
+    };
+
     // Wait for DOM to be fully ready before initializing
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             debugLog(MODULE, '📄 DOM content loaded, checking for existing data...');
-            checkAndInit();
+            boot();
         });
     } else {
         // DOM is already ready, check for existing data
-        checkAndInit();
+        boot();
     }
 }
 
@@ -326,8 +318,9 @@ function refreshCalculatedSelect(selectElement) {
         return;
     }
 
-    if (lookupListId === 'emergency_operations') {
-        attachEmergencyMetadataListener(selectElement);
+    const refreshAdapter = calculatedListAdapterFor(lookupListId);
+    if (refreshAdapter?.attach) {
+        refreshAdapter.attach(selectElement);
         attachStaleSavedValueListener(selectElement);
     }
 
@@ -429,10 +422,13 @@ function setupCalculatedSelect(selectElement) {
     // Initial population
     debugLog(MODULE, `Performing initial refresh for ${selectElement.id || selectElement.name}`);
     attachStaleSavedValueListener(selectElement);
-    if (lookupListId === 'emergency_operations') {
-        attachEmergencyMetadataListener(selectElement);
-        // Defer the first EmOps fetch until the field is visible. The response is expensive
-        // (~989 ms) and the field is often on a later page or below the fold. Once the first
+    const setupAdapter = calculatedListAdapterFor(lookupListId);
+    if (setupAdapter?.attach) {
+        setupAdapter.attach(selectElement);
+    }
+    if (setupAdapter?.deferInitialRefresh) {
+        // Defer the first fetch until the field is visible. The response can be slow
+        // and the field is often on a later page or below the fold. Once the first
         // fetch completes the normal dependency-change listeners handle subsequent refreshes.
         deferRefreshUntilVisible(selectElement, refresh);
     } else {
@@ -455,7 +451,7 @@ function deferRefreshUntilVisible(el, refresh) {
     function doFetch() {
         if (fetched) return;
         fetched = true;
-        debugLog(MODULE, `[deferred] EmOps field now visible/focused, triggering initial refresh for ${el.id || el.name}`);
+        debugLog(MODULE, `[deferred] Calculated list now visible/focused, triggering initial refresh for ${el.id || el.name}`);
         if (observer) {
             try { observer.disconnect(); } catch (_) { /* no-op */ }
         }
@@ -589,115 +585,10 @@ function resolveCalculatedSelectFieldId(selectElement) {
     return standardMatch ? standardMatch[1] : null;
 }
 
-function parseEmergencyDisplayValue(value) {
-    const text = String(value || '').trim();
-    if (!text) return null;
-    const match = text.match(/^(.+?)\s+\(([^)]+)\)\s*$/);
-    if (match) {
-        return { name: match[1].trim(), code: match[2].trim() };
-    }
-    return { name: text, code: '' };
-}
-
-function applyEmergencyRowToOption(option, row, displayValue) {
-    const name = scalarDisplayText(row?.name);
-    const code = scalarDisplayText(row?.code);
-    if (name) option.dataset.emergencyName = name;
-    if (code) option.dataset.emergencyCode = code;
-    if (!option.dataset.emergencyName && !option.dataset.emergencyCode && displayValue) {
-        const parsed = parseEmergencyDisplayValue(scalarDisplayText(displayValue));
-        if (parsed) {
-            if (parsed.name) option.dataset.emergencyName = parsed.name;
-            if (parsed.code) option.dataset.emergencyCode = parsed.code;
-        }
-    }
-}
-
-function getEmergencyMetadataHiddenInputName(selectElement) {
-    const fieldId = resolveCalculatedSelectFieldId(selectElement);
-    const selectName = selectElement.name || '';
-    if (selectName.startsWith('repeat_')) {
-        return selectName.replace(/_\d+$/, '_emergency_metadata');
-    }
-    return fieldId ? `field_disagg_metadata[${fieldId}]` : null;
-}
-
-function findOrCreateEmergencyMetadataHiddenInput(selectElement) {
-    const name = getEmergencyMetadataHiddenInputName(selectElement);
-    if (!name) return null;
-
-    const form = selectElement.form || selectElement.closest('form');
-    if (!form) return null;
-
-    for (const input of form.querySelectorAll('input[type="hidden"]')) {
-        if (input.name === name) return input;
-    }
-
-    const hidden = document.createElement('input');
-    hidden.type = 'hidden';
-    hidden.name = name;
-    hidden.value = '';
-    form.appendChild(hidden);
-    return hidden;
-}
-
-function extractEmergencyMetadataFromOption(option) {
-    if (!option?.value) return null;
-
-    const name = option.dataset.emergencyName?.trim() || '';
-    const code = option.dataset.emergencyCode?.trim() || '';
-    if (name || code) {
-        if (name === '[object Object]') return null;
-        return { name, code };
-    }
-    return parseEmergencyDisplayValue(option.value);
-}
-
-function findEmergencyOtherTextInput(selectElement) {
-    const titleWrap = selectElement.closest('.repeat-entry__title-select-wrap');
-    if (titleWrap) {
-        const fromWrap = titleWrap.querySelector('.other-text-input');
-        if (fromWrap) return fromWrap;
-    }
-    const block = selectElement.closest('.form-item-block, .repeat-entry, .repeat-entry__title-select-wrap')
-        || selectElement.parentElement;
-    return block?.querySelector('.other-text-input') || null;
-}
-
 export function syncEmergencyOperationMetadata(selectElement) {
-    if (selectElement.dataset.lookupListId !== 'emergency_operations') return;
-
-    const hidden = findOrCreateEmergencyMetadataHiddenInput(selectElement);
-    if (!hidden) return;
-
-    if (!selectElement.value) {
-        hidden.value = '';
-        return;
-    }
-
-    if (selectElement.value === '__other__') {
-        const otherInput = findEmergencyOtherTextInput(selectElement);
-        const meta = parseEmergencyDisplayValue(otherInput?.value || '');
-        hidden.value = meta && (meta.name || meta.code) && meta.name !== '__other__'
-            ? JSON.stringify(meta)
-            : '';
-        return;
-    }
-
-    const option = selectElement.options[selectElement.selectedIndex];
-    const meta = extractEmergencyMetadataFromOption(option);
-    hidden.value = meta ? JSON.stringify(meta) : '';
-}
-
-function attachEmergencyMetadataListener(selectElement) {
-    if (selectElement.dataset.emergencyMetadataListenerAttached === 'true') return;
-    selectElement.dataset.emergencyMetadataListenerAttached = 'true';
-    selectElement.addEventListener('change', () => syncEmergencyOperationMetadata(selectElement));
-    const otherInput = findEmergencyOtherTextInput(selectElement);
-    if (otherInput && otherInput.dataset.emergencyMetadataListenerAttached !== 'true') {
-        otherInput.dataset.emergencyMetadataListenerAttached = 'true';
-        otherInput.addEventListener('input', () => syncEmergencyOperationMetadata(selectElement));
-        otherInput.addEventListener('change', () => syncEmergencyOperationMetadata(selectElement));
+    const adapter = calculatedListAdapterFor(selectElement?.dataset?.lookupListId);
+    if (adapter?.syncSelection) {
+        adapter.syncSelection(selectElement);
     }
 }
 
@@ -719,7 +610,7 @@ function appendStaleSavedOption(selectElement, value) {
     opt.value = value;
     opt.textContent = value;
     opt.dataset.staleSavedValue = 'true';
-    applyEmergencyRowToOption(opt, null, value);
+    calculatedListAdapterFor(selectElement.dataset.lookupListId)?.decorateOption?.(opt, null, value);
     selectElement.appendChild(opt);
     return opt;
 }
@@ -845,178 +736,20 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
 
     let url;
 
-    // Handle emergency operations special case
-    if (lookupListId === 'emergency_operations') {
-        url = new URL('/admin/plugins/emergency_operations/api/list-data', window.location.origin);
-        debugLog(MODULE, `Emergency Operations URL: ${url.toString()}`);
-
-        const fieldIdForTrace = resolveCalculatedSelectFieldId(selectElement);
-        traceEmOpsFilter(fieldIdForTrace, 'refresh start', {
-            selectId: selectElement.id || null,
+    const requestAdapter = calculatedListAdapterFor(lookupListId);
+    if (requestAdapter?.buildRequestUrl) {
+        url = requestAdapter.buildRequestUrl({
+            selectElement,
+            lookupListId,
             displayColumn,
-            listFilters: filters,
+            filters,
+            fieldValues,
+            origin: window.location.origin,
+            fieldId,
         });
-
-        // Read plugin config stored on the element by the template (data-plugin-config)
-        let pluginConfig = {};
-        const rawCfgSelf = selectElement.dataset.pluginConfig;
-        const rawCfgClosest = selectElement.closest('[data-plugin-config]')?.dataset.pluginConfig;
-        const rawCfg = rawCfgSelf || rawCfgClosest || '{}';
-        traceEmOpsFilter(fieldIdForTrace, 'data-plugin-config source', {
-            fromSelect: Boolean(rawCfgSelf),
-            fromAncestor: Boolean(!rawCfgSelf && rawCfgClosest),
-            rawLength: rawCfg.length,
-            rawPreview: rawCfg.length > 200 ? `${rawCfg.slice(0, 200)}…` : rawCfg,
-        });
-        try {
-            pluginConfig = JSON.parse(rawCfg);
-        } catch (parseErr) {
-            traceEmOpsFilter(fieldIdForTrace, 'data-plugin-config parse FAILED', {
-                error: parseErr && parseErr.message ? parseErr.message : String(parseErr),
-                rawCfg,
-            });
-        }
-        traceEmOpsFilter(fieldIdForTrace, 'parsed question_plugin_config', pluginConfig);
-
-        // --- Country resolution ---
-        let countryIso = null;
-
-        const countrySource = pluginConfig.emops_country_source || 'assigned';
-        if (countrySource === 'static' && pluginConfig.emops_static_country_iso) {
-            // Template designer pinned a specific country
-            countryIso = pluginConfig.emops_static_country_iso.trim().toUpperCase();
-            debugLog(MODULE, `Using static country ISO from plugin config: ${countryIso}`);
-        } else {
-            // Default: use the entity/assignment country from page metadata
-            countryIso = resolveAssignedCountryIso();
-            if (countryIso) {
-                debugLog(MODULE, `Found country ISO from assignment metadata: ${countryIso}`);
-            }
-        }
-
-        if (countryIso) {
-            url.searchParams.set('iso', countryIso);
-        } else {
-            debugLog(MODULE, `No country ISO found, will return all operations`);
-        }
-
-        // WAF: pack dates and filter JSON in query_b64 so values like dates and "Emergency Appeal"
-        // don't trigger OWASP CRS rules in the URL query string.
-        const queryPayload = {};
-
-        // --- Timeframe resolution ---
-        const timeframeMode = pluginConfig.emops_timeframe_mode || 'static';
-
-        if (timeframeMode === 'assignment_period') {
-            // Derive dates from the assignment period (e.g. "Jan-Jun 2026" → year 2026)
-            const periodStr = (window.metadataContext && window.metadataContext.assignment_period) || '';
-            const yearMatch = periodStr.match(/\b(20\d{2})\b/);
-            if (yearMatch) {
-                const year = yearMatch[1];
-                // Include operations that were active at any point during the period year:
-                // end_date_gt = <year>-01-01 means "still active at the start of the period year"
-                queryPayload.end_date__gte = `${year}-01-01`;
-                traceEmOpsFilter(fieldIdForTrace, 'timeframe: assignment_period', {
-                    periodStr,
-                    effectiveEndDateGte: queryPayload.end_date__gte,
-                    note: 'Overrides emops_end_date_gt from form builder config',
-                    staticConfigEndDate: pluginConfig.emops_end_date_gt || null,
-                });
-                debugLog(MODULE, `Using assignment period year ${year} for timeframe filter`);
-            } else {
-                traceEmOpsFilter(fieldIdForTrace, 'timeframe: assignment_period (no year parsed)', {
-                    periodStr,
-                    metadataContext: window.metadataContext || null,
-                });
-                debugLog(MODULE, `Could not extract year from period "${periodStr}", no timeframe filter applied`);
-            }
-        } else {
-            // Static dates configured in the form builder
-            if (pluginConfig.emops_end_date_gt) {
-                queryPayload.end_date__gte = pluginConfig.emops_end_date_gt;
-            }
-            traceEmOpsFilter(fieldIdForTrace, 'timeframe: static', {
-                effectiveEndDateGte: queryPayload.end_date__gte || null,
-            });
-            // Note: start_date is not supported by the list-data endpoint directly;
-            // it is handled via the filters array below.
-        }
-
-        // Translate operation-type and show-closed plugin config into row filters
-        // (the list-data endpoint already processes a 'filters' JSON array)
-        const extraFilters = [];
-
-        const configTypes = pluginConfig.emops_operation_types;
-        traceEmOpsFilter(fieldIdForTrace, 'emops_operation_types raw', {
-            value: configTypes,
-            typeof: typeof configTypes,
-            isArray: Array.isArray(configTypes),
-        });
-        if (configTypes) {
-            const types = Array.isArray(configTypes) ? configTypes : [configTypes];
-            const hasAll = types.includes('All');
-            if (!hasAll && types.length > 0) {
-                extraFilters.push({ field: 'type', op: 'eq', value: types[0] });
-                traceEmOpsFilter(fieldIdForTrace, 'type filter applied', {
-                    filter: extraFilters[extraFilters.length - 1],
-                    note: types.length > 1
-                        ? `Only first of ${types.length} selected types is used (eq filter)`
-                        : 'Single type selected',
-                });
-            } else {
-                traceEmOpsFilter(fieldIdForTrace, 'type filter SKIPPED', {
-                    reason: hasAll ? 'includes All' : 'empty types array',
-                    types,
-                });
-            }
-        } else {
-            traceEmOpsFilter(fieldIdForTrace, 'type filter SKIPPED', {
-                reason: 'emops_operation_types missing or falsy in plugin config',
-            });
-        }
-
-        const showClosed = pluginConfig.emops_show_closed_operations;
-        traceEmOpsFilter(fieldIdForTrace, 'emops_show_closed_operations', {
-            value: showClosed,
-            typeof: typeof showClosed,
-            isArray: Array.isArray(showClosed),
-        });
-        const hideClosed = showClosed === false
-            || showClosed === '0'
-            || showClosed === 0
-            || (Array.isArray(showClosed) && showClosed.length === 0);
-        if (hideClosed) {
-            extraFilters.push({ field: 'status', op: 'ne', value: 'Closed' });
-            traceEmOpsFilter(fieldIdForTrace, 'status filter applied (hide closed)', extraFilters[extraFilters.length - 1]);
-        } else {
-            traceEmOpsFilter(fieldIdForTrace, 'status filter SKIPPED (showing closed ops)', { showClosed });
-        }
-
-        // Merge with any existing row-level filters
-        const allFilters = [...extraFilters, ...(filters || [])];
-        traceEmOpsFilter(fieldIdForTrace, 'merged filters', {
-            extraFilters,
-            listFilters: filters,
-            allFilters,
-        });
-        if (allFilters.length > 0) {
-            queryPayload.filters = allFilters;
-        }
-
-        traceEmOpsFilter(fieldIdForTrace, 'query payload (pre-b64)', queryPayload);
-
-        if (Object.keys(queryPayload).length > 0) {
-            const queryB64 = btoa(unescape(encodeURIComponent(JSON.stringify(queryPayload))));
-            url.searchParams.set('query_b64', queryB64);
-        }
-
-        traceEmOpsFilter(fieldIdForTrace, 'request URL', {
-            iso: url.searchParams.get('iso'),
-            hasQueryB64: url.searchParams.has('query_b64'),
-            url: url.toString(),
-        });
-
+        if (!url) return;
     } else if (lookupListId === 'reporting_currency') {
+
         // Core system list: Reporting Currency
         url = new URL(`/api/forms/lookup-lists/${lookupListId}/options`, window.location.origin);
         debugLog(MODULE, `Reporting Currency URL: ${url.toString()}`);
@@ -1065,45 +798,9 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
 
         // Handle different response formats
         let rows = [];
-        if (lookupListId === 'emergency_operations') {
-            rows = json.data || [];
-            const typeCounts = summarizeEmOpsTypes(rows);
-            traceEmOpsFilter(fieldId, 'API response rows', {
-                count: rows.length,
-                typeCounts,
-                sample: rows.slice(0, 5).map((r) => ({
-                    name: r.name,
-                    code: r.code,
-                    type: r.type,
-                    status: r.status,
-                    end_date: r.end_date,
-                })),
-            });
-            const expectedTypeFilter = (() => {
-                try {
-                    const raw = selectElement.dataset.pluginConfig
-                        || selectElement.closest('[data-plugin-config]')?.dataset.pluginConfig
-                        || '{}';
-                    const cfg = JSON.parse(raw);
-                    const types = cfg.emops_operation_types;
-                    const arr = Array.isArray(types) ? types : (types ? [types] : []);
-                    if (arr.length && !arr.includes('All')) return arr[0];
-                } catch (_) { /* no-op */ }
-                return null;
-            })();
-            if (expectedTypeFilter) {
-                const unexpected = rows.filter((r) => String(r.type || '') !== String(expectedTypeFilter));
-                if (unexpected.length > 0) {
-                    traceEmOpsFilter(fieldId, 'UNEXPECTED types in response (filter may not be applied server-side)', {
-                        expectedType: expectedTypeFilter,
-                        unexpectedCount: unexpected.length,
-                        unexpectedTypes: summarizeEmOpsTypes(unexpected),
-                        examples: unexpected.slice(0, 3).map((r) => ({ name: r.name, type: r.type, status: r.status })),
-                    });
-                } else {
-                    traceEmOpsFilter(fieldId, 'all rows match expected type filter', { expectedType: expectedTypeFilter });
-                }
-            }
+        const responseAdapter = calculatedListAdapterFor(lookupListId);
+        if (responseAdapter?.rowsFromResponse) {
+            rows = responseAdapter.rowsFromResponse(json, { selectElement, fieldId }) || [];
         } else {
             rows = json.rows || [];
         }
@@ -1141,9 +838,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             const opt = document.createElement('option');
             opt.value = val;
             opt.textContent = val;
-            if (lookupListId === 'emergency_operations') {
-                applyEmergencyRowToOption(opt, row, val);
-            }
+            calculatedListAdapterFor(lookupListId)?.decorateOption?.(opt, row, val);
             selectElement.appendChild(opt);
             debugLog(MODULE, `Added option ${idx + 1}: "${val}"`);
             debugLog(MODULE, `   Added option ${idx + 1}:`, val);

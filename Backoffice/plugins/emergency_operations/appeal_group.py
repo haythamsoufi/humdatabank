@@ -8,6 +8,7 @@ names the form already filters on.
 from __future__ import annotations
 
 import os
+import re
 from typing import Dict, List, Optional
 
 APPEAL_GROUP_URL = "https://go-api.ifrc.org/api/appealgroupchild"
@@ -66,6 +67,50 @@ def map_subtype_to_appeal_type(subtype: Optional[str]) -> str:
     label = (subtype or "").strip()
     mapped = SUBTYPE_TO_APPEAL_TYPE.get(label.casefold())
     return mapped if mapped else (label or "Unknown Type")
+
+
+_PART_OF_LABEL_RE = re.compile(r"^(.*?)\s+\(part of ([A-Za-z0-9]+)\)\s*$", re.IGNORECASE)
+_CODE_FIRST_LABEL_RE = re.compile(r"^([A-Z][A-Z0-9]{4,})\s+(.+)$")
+_NAME_FIRST_LABEL_RE = re.compile(r"^(.+?)\s+\(([A-Z][A-Z0-9]{4,})\)\s*$")
+
+
+def parse_operation_label(value: Optional[str]) -> Dict[str, str]:
+    """Read a dropdown label back into name and appeal code.
+
+    Accepts ``CODE Name (part of PARENT)`` and the older ``Name (CODE)`` form.
+    """
+    text = (value or "").strip()
+    if not text:
+        return {"name": "", "code": "", "part_of": ""}
+    parent = ""
+    body = text
+    part_match = _PART_OF_LABEL_RE.match(text)
+    if part_match:
+        body = part_match.group(1).strip()
+        parent = part_match.group(2).strip().upper()
+    code_first = _CODE_FIRST_LABEL_RE.match(body)
+    if code_first:
+        return {"name": code_first.group(2).strip(), "code": code_first.group(1).strip(), "part_of": parent}
+    name_first = _NAME_FIRST_LABEL_RE.match(body)
+    if name_first:
+        return {"name": name_first.group(1).strip(), "code": name_first.group(2).strip(), "part_of": parent}
+    return {"name": text, "code": "", "part_of": parent}
+
+
+def format_operation_label(name: Optional[str], code: Optional[str], part_of: Optional[str] = None) -> str:
+    """Dropdown label: ``CODE Name``, plus ``(part of PARENT)`` for a child appeal."""
+    appeal_name = (name or "").strip()
+    appeal_code = (code or "").strip()
+    parent = (part_of or "").strip()
+    if parent and appeal_code and parent.upper() == appeal_code.upper():
+        parent = ""
+    if appeal_code and appeal_name:
+        label = f"{appeal_code} {appeal_name}"
+    else:
+        label = appeal_code or appeal_name
+    if parent and label:
+        label = f"{label} (part of {parent})"
+    return label
 
 
 def _basic_auth():

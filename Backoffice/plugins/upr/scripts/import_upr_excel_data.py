@@ -1717,9 +1717,9 @@ def _emergency_go_config(plugin_cfg: Dict[str, Any]) -> Dict[str, Any]:
 
 def _emergency_op_row_id(op: Dict[str, Any]) -> str:
     """Matrix row id for emergency_operations list_library (name_with_code)."""
-    name = (op.get("name") or "").strip()
-    code = (op.get("code") or "").strip()
-    return f"{name} ({code})" if code else name
+    from plugins.emergency_operations.appeal_group import format_operation_label
+
+    return format_operation_label(op.get("name"), op.get("code"), op.get("part_of"))
 
 
 def _emergency_op_display(op: Dict[str, Any]) -> str:
@@ -1746,7 +1746,7 @@ ROW_GO_UNMATCHED_PREFIX = "row_go_unmatched|"
 
 def _fetch_emergency_ops_for_country(iso3: str, plugin_cfg: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     """Fetch GO emergency operations for a country; return ordered list and code index."""
-    from app.services.forms.emergency_section_binding import _fetch_ordered_operations
+    from plugins.emergency_operations.section_binding import _fetch_ordered_operations
 
     go_cfg = _emergency_go_config(plugin_cfg)
     ops = _fetch_ordered_operations(iso3.upper(), go_cfg)
@@ -1772,12 +1772,10 @@ def _aes_id_to_iso3(ctx: UprImportContext, aes_id: int) -> str:
     return ""
 
 
-def _format_emergency_operation_display(name: str, code: str) -> str:
-    name = (name or "").strip()
-    code = (code or "").strip()
-    if name and code:
-        return f"{name} ({code})"
-    return name or code
+def _format_emergency_operation_display(name: str, code: str, part_of: str = "") -> str:
+    from plugins.emergency_operations.appeal_group import format_operation_label
+
+    return format_operation_label(name, code, part_of)
 
 
 def _resolve_emergency_operation_labels(

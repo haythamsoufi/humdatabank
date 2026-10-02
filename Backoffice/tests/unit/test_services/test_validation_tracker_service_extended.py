@@ -692,7 +692,7 @@ class TestBuildTrackerDataCompleteSections:
             return_value={100: {}},  # aes.id=100, return empty KPI data so no DB hit
         ), patch(
             "app.services.validation.tracker_service._reporting_section_ratios",
-            return_value={"section_a": 1.0},  # ratio=1.0 → 'complete'
+            return_value={"governance": 1.0},  # ratio=1.0 → 'complete'
         ), patch(
             "app.services.validation.tracker_service.AssignmentEntityStatus.query"
         ) as mock_aes_q, patch(
@@ -709,8 +709,8 @@ class TestBuildTrackerDataCompleteSections:
         assert isinstance(result, dict)
         assert "rows" in result
         assert "stats" in result
-        # Verify section_complete_counts was computed (section_a should have 1 complete)
-        assert result["stats"]["section_complete_counts"].get("section_a", 0) >= 1
+        # Governance is a tracker section; a ratio of 1.0 counts as complete.
+        assert result["stats"]["section_complete_counts"].get("governance", 0) >= 1
         if result["rows"]:
             country_row = result["rows"][0]
-            assert country_row.get("sections", {}).get("section_a") == "complete"
+            assert country_row.get("sections", {}).get("governance") == "complete"

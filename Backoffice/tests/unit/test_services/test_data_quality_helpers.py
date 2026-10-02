@@ -641,8 +641,6 @@ class TestListAssignmentPeriods:
 
 class TestListExplorationPeriodNames:
     def test_returns_distinct_sorted_periods(self):
-        from sqlalchemy import union
-
         mock_combined = MagicMock()
         mock_combined.c.period_name = MagicMock()
 
@@ -665,7 +663,7 @@ class TestListExplorationPeriodNames:
             calls = [af_mock, fd_mock]
             mock_sq.side_effect = lambda *args: calls.pop(0) if calls else MagicMock()
 
-            with patch("app.services.data_quality.helpers.union", return_value=union_mock):
+            with patch("sqlalchemy.union", return_value=union_mock):
                 # Patch the final query call
                 final_mock = MagicMock()
                 final_mock.distinct.return_value.all.return_value = [
@@ -691,11 +689,15 @@ class TestListExplorationPeriodNames:
         union_mock.subquery.return_value = MagicMock()
 
         with patch("app.services.data_quality.helpers.db", mock_db), \
-             patch("app.services.data_quality.helpers.union", return_value=union_mock):
+             patch("sqlalchemy.union", return_value=union_mock), \
+             patch(
+                 "app.services.data_quality.helpers.sort_period_names",
+                 side_effect=lambda names: list(names),
+             ):
             from app.services.data_quality.helpers import list_exploration_period_names
 
             result = list_exploration_period_names(template_id=21)
-            assert isinstance(result, list)
+            assert result == ["FDRS 2024"]
 
 
 # ---------------------------------------------------------------------------
@@ -795,6 +797,31 @@ class TestLoadFormDataByKpi:
         assert "KPI_TEST" in result
         assert result["KPI_TEST"][0] is data_row
         assert result["KPI_TEST"][1] is item
+
+    def test_indicator_without_fdrs_code_uses_bank_id(self):
+        bank = MagicMock()
+        bank.fdrs_kpi_code = None
+        bank.id = 42
+
+        item = MagicMock()
+        item.id = 10
+        item.indicator_bank_id = 42
+        item.indicator_bank = bank
+        item.version_id = None
+
+        mock_item_query = MagicMock()
+        mock_item_query.filter.return_value.options.return_value.all.return_value = [item]
+        mock_data_query = MagicMock()
+        mock_data_query.filter.return_value.all.return_value = []
+
+        with patch("app.services.data_quality.helpers.FormItem.query", mock_item_query), \
+             patch("app.services.data_quality.helpers.FormData.query", mock_data_query):
+            from app.services.data_quality.helpers import load_form_data_by_kpi
+
+            result = load_form_data_by_kpi(aes_id=5, template_id=33, version_id=None)
+
+        assert "ib:42" in result
+        assert result["ib:42"][1] is item
 
     def test_items_without_bank_skipped(self):
         item = MagicMock()

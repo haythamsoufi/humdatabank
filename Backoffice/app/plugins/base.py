@@ -349,12 +349,25 @@ class BasePlugin(ABC):
         """Called when plugin is uninstalled (legacy method - use cleanup instead)"""
         return True
 
+    def register_validation_packs(self) -> None:
+        """Register automatic validation packs this plugin contributes.
+
+        Called when the plugin is loaded and active, and again on activate.
+        """
+        return None
+
+    def unregister_validation_packs(self) -> None:
+        """Remove packs registered by register_validation_packs."""
+        return None
+
     def activate(self) -> bool:
         """Called when plugin is activated"""
+        self.register_validation_packs()
         return True
 
     def deactivate(self) -> bool:
         """Called when plugin is deactivated"""
+        self.unregister_validation_packs()
         return True
 
     def upgrade(self, from_version: str, to_version: str) -> bool:

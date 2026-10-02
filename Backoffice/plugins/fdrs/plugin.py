@@ -101,3 +101,22 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     def is_admin_feature(self) -> bool:
         return True
+
+    def register_validation_packs(self) -> None:
+        from plugins.fdrs.validation.register import register_fdrs_validation_pack
+
+        register_fdrs_validation_pack()
+
+    def unregister_validation_packs(self) -> None:
+        from app.services.validation.pack_registry import unregister_pack
+        from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
+
+        unregister_pack(RULE_PACK_FDRS_MATRIX_V1)
+
+    def activate(self) -> bool:
+        self.register_validation_packs()
+        return True
+
+    def deactivate(self) -> bool:
+        self.unregister_validation_packs()
+        return True

@@ -294,7 +294,7 @@
       panelSlide .78s var(--ease-expo) forwards,
       panelFade .34s ease-out forwards;
   }
-  .login-panel.in::before{ animation: barGrowV .62s var(--ease-expo) .42s forwards; }
+  .login-panel.in::before{ animation: barGrowV .55s var(--ease-expo) .3s forwards; }
   @keyframes panelSlide{ to{ transform: translate3d(0, 0, 0); } }
   @keyframes panelFade{ to{ opacity: 1; } }
   @keyframes barGrowV{ to{ transform: scaleY(1); } }
@@ -304,14 +304,14 @@
   .btn-sso, .panel-hint, .dev-panel, .panel-footer{
     opacity:0; transform: translateY(14px);
   }
-  .login-panel.in .lang-nav   { animation: fadeUp .48s var(--ease-expo) .32s forwards; }
-  .login-panel.in .panel-brand{ animation: fadeUp .48s var(--ease-expo) .38s forwards; }
-  .login-panel.in .panel-title{ animation: fadeUp .48s var(--ease-expo) .44s forwards; }
-  .login-panel.in .panel-lead { animation: fadeUp .48s var(--ease-expo) .50s forwards; }
-  .login-panel.in .btn-sso    { animation: fadeUp .5s var(--ease-expo) .56s forwards; }
-  .login-panel.in .panel-hint { animation: fadeUp .48s var(--ease-expo) .64s forwards; }
-  .login-panel.in .dev-panel  { animation: fadeUp .48s var(--ease-expo) .70s forwards; }
-  .login-panel.in .panel-footer{ animation: fadeUp .48s var(--ease-expo) .76s forwards; }
+  .login-panel.in .lang-nav   { animation: fadeUp .5s var(--ease-expo) .1s forwards; }
+  .login-panel.in .panel-brand{ animation: fadeUp .5s var(--ease-expo) .14s forwards; }
+  .login-panel.in .panel-title{ animation: fadeUp .5s var(--ease-expo) .18s forwards; }
+  .login-panel.in .panel-lead { animation: fadeUp .5s var(--ease-expo) .22s forwards; }
+  .login-panel.in .btn-sso    { animation: fadeUp .5s var(--ease-expo) .26s forwards; }
+  .login-panel.in .panel-hint { animation: fadeUp .5s var(--ease-expo) .32s forwards; }
+  .login-panel.in .dev-panel  { animation: fadeUp .5s var(--ease-expo) .36s forwards; }
+  .login-panel.in .panel-footer{ animation: fadeUp .5s var(--ease-expo) .42s forwards; }
 
   /* language nav */
   .lang-nav{

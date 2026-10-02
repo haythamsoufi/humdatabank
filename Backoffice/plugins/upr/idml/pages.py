@@ -89,15 +89,15 @@ def build_cover_chrome(
     footer: dict[str, dict] | None = None,
 ) -> list[str]:
     from plugins.upr.audience import INTERNAL_COVER_BANNER, INTERNAL_COVER_BANNER_H, is_internal_narrative
-    from plugins.upr.formatters import appeal_number
     from plugins.upr.i18n import localized_country_header, t
+    from plugins.upr.maa_codes import appeal_code_for_cover
     from plugins.upr.render import COVER_FOOTER_NOTE, COVER_FOOTER_ORG
 
     country = localized_country_header(meta)
     subtitle = (meta.get("document_subtitle") or "").strip()
     prefix = (meta.get("header_prefix") or t("IN SUPPORT OF")).strip()
     ns = (meta.get("national_society") or "").strip()
-    appeal = appeal_number(meta.get("iso2") or meta.get("appeal_iso2"))
+    appeal = appeal_code_for_cover(meta)
     footer = footer or {}
     L = _COVER_LAYOUT
     rtl = bool(getattr(doc, "rtl", False))

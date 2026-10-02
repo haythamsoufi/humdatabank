@@ -33,7 +33,7 @@ from app.models import (
 )
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.platform.governance_metrics_service import get_governance_metrics
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +567,13 @@ def _recent_approvals_without_approver():
         return 0, True
 
 
+def _overdue_days(now, due) -> int:
+    """Days past due. Stored due dates are often naive UTC."""
+    if due is None:
+        return CRITICAL_OVERDUE_DAYS
+    return max(0, (now - ensure_utc(due)).days)
+
+
 def _reporting_gaps():
     try:
         now = utcnow()
@@ -603,7 +610,7 @@ def _reporting_gaps():
         )
         overdue = []
         for assignment_id, period_name, country_name, due in overdue_rows:
-            days = (now - due).days if due else CRITICAL_OVERDUE_DAYS
+            days = _overdue_days(now, due)
             label = _("%(country)s — %(period)s (%(days)s days overdue)", country=country_name, period=period_name or "—", days=days)
             overdue.append({
                 "label": label,

@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
 {% from "components/ag_grid_includes.html" import ag_grid_container, ag_grid_js %}
 
 {% block title %}{{ _('Data governance') }}{% endblock %}
@@ -7,19 +8,35 @@
 {% block head %}
 {{ super() }}
 <style nonce="{{ csp_style_nonce() }}">
-.badge { display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:.72rem;font-weight:600; }
+.badge { display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:.72rem;font-weight:600; white-space:nowrap; }
 .badge-critical  { background:#fee2e2;color:#991b1b; }
 .badge-high      { background:#ffedd5;color:#9a3412; }
 .badge-medium    { background:#fef9c3;color:#854d0e; }
+.badge-warning   { background:#fff7ed;color:#c2410c; }
 .badge-ok        { background:#dcfce7;color:#166534; }
 .badge-accepted  { background:#e0e7ff;color:#3730a3; }
+.badge-open      { background:#fff;color:#b91c1c;box-shadow:inset 0 0 0 1px #fecaca; }
 .badge-na        { background:#f3f4f6;color:#4b5563; }
 .badge-unknown   { background:#f3f4f6;color:#6b7280; }
 .pbar { height: 8px; border-radius: 4px; overflow: hidden; background: #e5e7eb; }
 .pbar-fill { height: 100%; border-radius: 4px; }
-section[id] { scroll-margin-top: 80px; }
-.gov-jump a { color:#1d4ed8; font-size:.8rem; text-decoration:none; }
-.gov-jump a:hover { text-decoration:underline; }
+.kpi-accent-ok { border-left: 4px solid #16a34a; }
+.kpi-accent-bad { border-left: 4px solid #dc2626; }
+.kpi-accent-warn { border-left: 4px solid #d97706; }
+.kpi-accent-info { border-left: 4px solid #4f46e5; }
+.kpi-accent-muted { border-left: 4px solid #9ca3af; }
+.gov-table { width:100%; border-collapse:collapse; }
+.gov-table th {
+    text-align:left; font-size:.68rem; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; color:#6b7280; padding:8px 16px;
+    background:#f9fafb; border-bottom:1px solid #e5e7eb;
+}
+.gov-table td { padding:12px 16px; vertical-align:top; border-bottom:1px solid #f3f4f6; }
+.gov-table tr:last-child td { border-bottom:0; }
+.gov-domain td { background:#f8fafc; padding-top:8px; padding-bottom:8px; border-bottom:1px solid #e5e7eb; }
+.gov-evidence { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
+details.gov-decide > summary { cursor:pointer; color:#1d4ed8; font-size:.75rem; width:max-content; }
+details.gov-decide > summary:hover { text-decoration:underline; }
 </style>
 {% endblock %}
 
@@ -29,7 +46,7 @@ section[id] { scroll-margin-top: 80px; }
 
 {{ page_header(
     title=_('Data governance'),
-    subtitle=_('Control register for ownership, access, reporting discipline, document compliance, the indicator glossary, and public links.'),
+    subtitle=_('Control register for ownership, access, reporting discipline, the indicator glossary, and public links.'),
     icon='fas fa-balance-scale',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
@@ -37,167 +54,225 @@ section[id] { scroll-margin-top: 80px; }
     ]
 ) }}
 
-<p class="text-sm text-gray-600 mb-4 max-w-4xl">
-    {{ _('Each control is a rule with someone accountable and a live check. A gap stays open until the check passes, or until a governance manager records a risk acceptance with a reason and a review date. The acceptance expires on that date and the gap reopens if it is still there.') }}
-</p>
+{% set open_n = summary.open %}
+{% set pass_tone = 'kpi-accent-ok' if open_n == 0 and summary.unknown == 0 else 'kpi-accent-bad' if summary.effective == 0 else 'kpi-accent-warn' %}
+{% set pass_text = 'text-green-600' if open_n == 0 and summary.unknown == 0 else 'text-red-600' if summary.effective == 0 else 'text-amber-600' %}
 
-<nav class="gov-jump flex flex-wrap gap-4 mb-6">
-    <a href="#issues">{{ _('Open issues') }}</a>
-    <a href="#controls">{{ _('Controls') }}</a>
-    <a href="#focal-points">{{ _('Focal point register') }}</a>
-</nav>
-
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-    <div class="bg-white rounded-lg shadow border border-gray-200 p-4">
-        <div class="text-2xl font-bold text-gray-800">{{ summary.open }}</div>
-        <div class="text-xs text-gray-500 mt-1">{{ _('Open issues') }}</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 {{ 'kpi-accent-bad' if open_n else 'kpi-accent-ok' }}">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-gray-700">{{ _('Open issues') }}</h2>
+            <i class="fas fa-exclamation-circle {{ 'text-red-500' if open_n else 'text-green-500' }}" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold tabular-nums {{ 'text-red-600' if open_n else 'text-green-600' }}">{{ open_n }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Gaps still waiting on a fix or a decision') }}</p>
     </div>
-    <div class="bg-white rounded-lg shadow border border-gray-200 p-4">
-        <div class="text-2xl font-bold text-gray-800">{{ summary.accepted }}</div>
-        <div class="text-xs text-gray-500 mt-1">{{ _('Accepted risks') }}</div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 {{ 'kpi-accent-info' if summary.accepted else 'kpi-accent-muted' }}">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-gray-700">{{ _('Accepted risks') }}</h2>
+            <i class="fas fa-clipboard-check text-indigo-500" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold tabular-nums {{ 'text-indigo-600' if summary.accepted else 'text-gray-600' }}">{{ summary.accepted }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ _('Decisions with a review date, not a pass') }}</p>
     </div>
-    <div class="bg-white rounded-lg shadow border border-gray-200 p-4">
-        <div class="text-2xl font-bold text-gray-800">{{ summary.effective }}<span class="text-sm font-normal text-gray-400">/{{ summary.controls }}</span></div>
-        <div class="text-xs text-gray-500 mt-1">{{ _('Controls passing') }}</div>
-    </div>
-    <div class="bg-white rounded-lg shadow border border-gray-200 p-4">
-        <div class="text-2xl font-bold text-gray-800">{{ summary.not_applicable }}</div>
-        <div class="text-xs text-gray-500 mt-1">{{ _('Not applicable') }}</div>
+    <div class="bg-white p-4 rounded-lg shadow border border-gray-200 {{ pass_tone }}">
+        <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-gray-700">{{ _('Controls passing') }}</h2>
+            <i class="fas fa-check-circle {{ pass_text }}" aria-hidden="true"></i>
+        </div>
+        <p class="text-2xl font-bold tabular-nums {{ pass_text }}">{{ summary.effective }}<span class="text-sm font-normal text-gray-400">/{{ summary.controls }}</span></p>
+        <p class="text-xs text-gray-500 mt-1">
+            {% if summary.unknown %}{{ _('%(n)s not evaluated', n=summary.unknown) }}{% else %}{{ _('Live checks that currently pass') }}{% endif %}
+        </p>
     </div>
 </div>
 
-<section id="issues" class="mb-8">
-    <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+<div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden mb-8">
+    {% call scroll_tab_bar(inner_id='gov-tabs', aria_label=_('Data governance sections')) %}
+        <button type="button" role="tab" id="gov-tab-issues" data-tab="issues"
+                class="{{ admin_underline_tab_btn_classes(true) }}"
+                aria-controls="panel-issues" aria-selected="true">
+            {{ _('Issues') }}
+            <span class="{{ admin_underline_tab_badge_classes(true) }}">{{ open_n }}</span>
+        </button>
+        <button type="button" role="tab" id="gov-tab-controls" data-tab="controls"
+                class="{{ admin_underline_tab_btn_classes(false) }}"
+                aria-controls="panel-controls" aria-selected="false">
+            {{ _('Controls') }}
+            <span class="{{ admin_underline_tab_badge_classes(false) }}">{{ summary.effective }}/{{ summary.controls }}</span>
+        </button>
+        <button type="button" role="tab" id="gov-tab-focal-points" data-tab="focal-points"
+                class="{{ admin_underline_tab_btn_classes(false) }}"
+                aria-controls="panel-focal-points" aria-selected="false">
+            {{ _('Focal points') }}
+        </button>
+    {% endcall %}
+
+    <div id="panel-issues" class="settings-panel" role="tabpanel" aria-labelledby="gov-tab-issues">
         <div class="px-6 py-4 border-b border-gray-100">
             <h2 class="font-semibold text-gray-800 text-lg">{{ _('Issue register') }}</h2>
-            <p class="text-sm text-gray-500 mt-1">{{ _('Work the open rows. An accepted row is a decision, not a pass.') }}</p>
+            <p class="text-sm text-gray-500 mt-1">{{ _('Work these rows. An accepted row is a decision with a review date, not a pass.') }}</p>
         </div>
-        <div class="p-6 space-y-4">
-            {% if not report.issues %}
-            <p class="text-sm text-green-700"><i class="fas fa-check-circle mr-1"></i>{{ _('No open issues. Every applicable control currently passes.') }}</p>
-            {% endif %}
-            {% for issue in report.issues %}
-            <article class="border border-gray-200 rounded-lg p-4">
-                <div class="flex flex-wrap items-center gap-2 mb-2">
-                    <span class="font-mono text-xs text-gray-500">{{ issue.code }}</span>
-                    {% if issue.severity == 'critical' %}
-                    <span class="badge badge-critical">{{ _('Critical') }}</span>
-                    {% elif issue.severity == 'high' %}
-                    <span class="badge badge-high">{{ _('High') }}</span>
-                    {% else %}
-                    <span class="badge badge-medium">{{ _('Medium') }}</span>
-                    {% endif %}
-                    {% if issue.status == 'accepted' %}
-                    <span class="badge badge-accepted">{{ _('Accepted until %(date)s', date=issue.accepted_until) }}</span>
-                    {% else %}
-                    <span class="badge badge-critical">{{ _('Open') }}</span>
-                    {% endif %}
-                </div>
-                <h3 class="font-semibold text-gray-800">{{ issue.title }}</h3>
-                <p class="text-sm text-gray-600 mt-1">{{ issue.summary }}</p>
-                <p class="text-xs text-gray-500 mt-2">{{ _('Accountable') }}: {{ issue.accountable }}</p>
-                <p class="text-sm text-gray-700 mt-2">{{ issue.statement }}</p>
-                {% if issue.expired %}
-                <p class="text-xs text-amber-700 mt-2">{{ _('The previous acceptance expired on %(date)s.', date=issue.accepted_until) }} {{ issue.acceptance_reason }}</p>
-                {% endif %}
-                {% if issue.status == 'accepted' %}
-                <p class="text-sm text-gray-700 mt-2"><span class="font-medium">{{ _('Reason') }}:</span> {{ issue.acceptance_reason }}</p>
-                {% if issue.accepted_by %}
-                <p class="text-xs text-gray-500">{{ _('Accepted by %(name)s', name=issue.accepted_by) }}</p>
-                {% endif %}
-                {% endif %}
-                {% if issue.evidence %}
-                <ul class="mt-3 text-sm text-gray-700 space-y-1">
-                    {% for item in issue.evidence %}
-                    <li>
-                        {% if item.href %}
-                        <a href="{{ item.href }}" class="text-blue-600 hover:underline">{{ item.label }}</a>
-                        {% else %}
-                        {{ item.label }}
-                        {% endif %}
-                    </li>
+        {% if not report.issues %}
+        <p class="px-6 py-5 text-sm text-green-700"><i class="fas fa-check-circle mr-1"></i>{{ _('No open issues. Every applicable control currently passes.') }}</p>
+        {% else %}
+        <div class="overflow-x-auto">
+            <table class="gov-table text-sm">
+                <thead>
+                    <tr>
+                        <th>{{ _('Control') }}</th>
+                        <th>{{ _('Issue') }}</th>
+                        <th>{{ _('Accountable') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for issue in report.issues %}
+                    <tr>
+                        <td class="whitespace-nowrap">
+                            <div class="font-mono text-xs text-gray-500 mb-1">{{ issue.code }}</div>
+                            <div class="flex flex-wrap gap-1">
+                                {% if issue.severity == 'critical' %}
+                                <span class="badge badge-critical">{{ _('Critical') }}</span>
+                                {% elif issue.severity == 'high' %}
+                                <span class="badge badge-high">{{ _('High') }}</span>
+                                {% else %}
+                                <span class="badge badge-medium">{{ _('Medium') }}</span>
+                                {% endif %}
+                                {% if issue.status == 'accepted' %}
+                                <span class="badge badge-accepted">{{ _('Accepted until %(date)s', date=issue.accepted_until) }}</span>
+                                {% else %}
+                                <span class="badge badge-open">{{ _('Open') }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="font-semibold text-gray-800">{{ issue.title }}</div>
+                            <p class="text-gray-600 mt-0.5">{{ issue.summary }}</p>
+                            {% if issue.expired %}
+                            <p class="text-xs text-amber-700 mt-1">{{ _('The previous acceptance expired on %(date)s.', date=issue.accepted_until) }} {{ issue.acceptance_reason }}</p>
+                            {% endif %}
+                            {% if issue.status == 'accepted' %}
+                            <p class="text-gray-700 mt-1"><span class="font-medium">{{ _('Reason') }}:</span> {{ issue.acceptance_reason }}</p>
+                            {% if issue.accepted_by %}
+                            <p class="text-xs text-gray-500">{{ _('Accepted by %(name)s', name=issue.accepted_by) }}</p>
+                            {% endif %}
+                            {% endif %}
+                            {% if issue.evidence %}
+                            <div class="gov-evidence text-xs">
+                                {% for item in issue.evidence %}
+                                    {% if item.href %}
+                                    <a href="{{ item.href }}" class="text-blue-600 hover:underline">{{ item.label }}</a>
+                                    {% else %}
+                                    <span class="text-gray-700">{{ item.label }}</span>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if issue.failing_count > issue.evidence|length %}
+                                <span class="text-gray-500">{{ _('And %(n)s more.', n=issue.failing_count - issue.evidence|length) }}</span>
+                                {% endif %}
+                            </div>
+                            {% elif issue.href and issue.status == 'open' %}
+                            <p class="mt-1 text-xs"><a href="{{ issue.href }}" class="text-blue-600 hover:underline">{{ _('Open the screen that fixes this') }} →</a></p>
+                            {% endif %}
+                            {% if can_manage and issue.status == 'open' %}
+                            <details class="gov-decide mt-2">
+                                <summary>{{ _('Accept this risk') }}</summary>
+                                <form method="post" action="{{ url_for('governance_dashboard.accept_issue', issue_id=issue.id) }}" class="mt-2 grid md:grid-cols-2 gap-3 items-end">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1" for="reason-{{ issue.id }}">{{ _('Why this gap is accepted') }}</label>
+                                        <textarea id="reason-{{ issue.id }}" name="reason" required minlength="10" maxlength="1000" rows="2" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('What was decided, and what residual risk remains.')|forceescape }}"></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-gray-600 mb-1" for="until-{{ issue.id }}">{{ _('Review date') }}</label>
+                                        <input id="until-{{ issue.id }}" type="date" name="accepted_until" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                        <button type="submit" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded">{{ _('Accept until review date') }}</button>
+                                    </div>
+                                </form>
+                            </details>
+                            {% elif can_manage and issue.status == 'accepted' %}
+                            <form method="post" action="{{ url_for('governance_dashboard.reopen_issue', issue_id=issue.id) }}" class="mt-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="text-xs text-blue-600 hover:underline">{{ _('Reopen this risk') }}</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                        <td class="text-gray-600">{{ issue.accountable }}</td>
+                    </tr>
                     {% endfor %}
-                    {% if issue.failing_count > issue.evidence|length %}
-                    <li class="text-xs text-gray-500">{{ _('And %(n)s more.', n=issue.failing_count - issue.evidence|length) }}</li>
-                    {% endif %}
-                </ul>
-                {% elif issue.href and issue.status == 'open' %}
-                <p class="mt-3 text-sm"><a href="{{ issue.href }}" class="text-blue-600 hover:underline">{{ _('Open the screen that fixes this') }} →</a></p>
-                {% endif %}
-
-                {% if can_manage and issue.status == 'open' %}
-                <form method="post" action="{{ url_for('governance_dashboard.accept_issue', issue_id=issue.id) }}" class="mt-4 grid md:grid-cols-2 gap-3 items-end">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1" for="reason-{{ issue.id }}">{{ _('Why this gap is accepted') }}</label>
-                        <textarea id="reason-{{ issue.id }}" name="reason" required minlength="10" maxlength="1000" rows="2" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('What was decided, and what residual risk remains.')|forceescape }}"></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1" for="until-{{ issue.id }}">{{ _('Review date') }}</label>
-                        <input id="until-{{ issue.id }}" type="date" name="accepted_until" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                        <button type="submit" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded">{{ _('Accept until review date') }}</button>
-                    </div>
-                </form>
-                {% elif can_manage and issue.status == 'accepted' %}
-                <form method="post" action="{{ url_for('governance_dashboard.reopen_issue', issue_id=issue.id) }}" class="mt-3">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="text-xs text-blue-600 hover:underline">{{ _('Reopen this risk') }}</button>
-                </form>
-                {% endif %}
-            </article>
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% if report.recently_resolved %}
+        <div class="px-6 py-3 border-t border-gray-100 text-sm text-gray-600">
+            <span class="font-semibold text-gray-700">{{ _('Recently cleared') }}:</span>
+            {% for issue in report.recently_resolved %}
+            <span class="ml-2"><span class="font-mono text-xs text-gray-400">{{ issue.code }}</span> {{ issue.title }}</span>{% if not loop.last %}<span class="text-gray-300"> ·</span>{% endif %}
             {% endfor %}
-
-            {% if report.recently_resolved %}
-            <div class="pt-2">
-                <h3 class="text-sm font-semibold text-gray-700 mb-2">{{ _('Recently cleared') }}</h3>
-                <ul class="text-sm text-gray-600 space-y-1">
-                    {% for issue in report.recently_resolved %}
-                    <li><span class="font-mono text-xs text-gray-400">{{ issue.code }}</span> {{ issue.title }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
-</section>
 
-<section id="controls" class="mb-8 space-y-6">
-    {% for domain in report.domains %}
-    <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div id="panel-controls" class="settings-panel hidden" role="tabpanel" aria-labelledby="gov-tab-controls">
         <div class="px-6 py-4 border-b border-gray-100">
-            <h2 class="font-semibold text-gray-800 text-lg">{{ domain.label }}</h2>
+            <h2 class="font-semibold text-gray-800 text-lg">{{ _('Controls') }}</h2>
+            <p class="text-sm text-gray-500 mt-1">{{ _('Every rule, who is accountable, and whether the live check passes. Open gaps are worked on the Issues tab.') }}</p>
         </div>
-        <div class="divide-y divide-gray-100">
-            {% for control in domain.controls %}
-            <div class="px-6 py-4">
-                <div class="flex flex-wrap items-center gap-2 mb-1">
-                    <span class="font-mono text-xs text-gray-500">{{ control.code }}</span>
-                    {% if control.status == 'effective' %}
-                    <span class="badge badge-ok">{{ _('Passing') }}</span>
-                    {% elif control.status == 'accepted' %}
-                    <span class="badge badge-accepted">{{ _('Accepted') }}</span>
-                    {% elif control.status == 'not_applicable' %}
-                    <span class="badge badge-na">{{ _('Not applicable') }}</span>
-                    {% elif control.status == 'unknown' %}
-                    <span class="badge badge-unknown">{{ _('Not evaluated') }}</span>
-                    {% elif control.severity == 'critical' %}
-                    <span class="badge badge-critical">{{ _('Gap') }}</span>
-                    {% else %}
-                    <span class="badge badge-high">{{ _('Gap') }}</span>
-                    {% endif %}
-                    <span class="text-xs text-gray-400">{{ control.accountable }}</span>
-                </div>
-                <h3 class="font-medium text-gray-800">{{ control.title }}</h3>
-                <p class="text-sm text-gray-600 mt-1">{{ control.summary }}</p>
-            </div>
-            {% endfor %}
+        <div class="overflow-x-auto">
+            <table class="gov-table text-sm">
+                <thead>
+                    <tr>
+                        <th>{{ _('Control') }}</th>
+                        <th>{{ _('Rule') }}</th>
+                        <th>{{ _('Accountable') }}</th>
+                        <th>{{ _('Status') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for domain in report.domains %}
+                    {% set gap_n = domain.controls | selectattr('status', 'equalto', 'gap') | list | length %}
+                    {% set pass_n = domain.controls | selectattr('status', 'equalto', 'effective') | list | length %}
+                    {% set unk_n = domain.controls | selectattr('status', 'equalto', 'unknown') | list | length %}
+                    <tr class="gov-domain">
+                        <td colspan="4">
+                            <span class="font-semibold text-gray-800">{{ domain.label }}</span>
+                            <span class="text-xs text-gray-500 ml-2">{{ _('%(pass)s passing', pass=pass_n) }}{% if gap_n %} · {{ _('%(gap)s gap', gap=gap_n) if gap_n == 1 else _('%(gap)s gaps', gap=gap_n) }}{% endif %}{% if unk_n %} · {{ _('%(n)s not evaluated', n=unk_n) }}{% endif %}</span>
+                        </td>
+                    </tr>
+                    {% for control in domain.controls %}
+                    <tr>
+                        <td class="font-mono text-xs text-gray-500 whitespace-nowrap">{{ control.code }}</td>
+                        <td>
+                            <div class="font-medium text-gray-800">{{ control.title }}</div>
+                            <p class="text-gray-500 text-xs mt-0.5">{{ control.summary }}</p>
+                        </td>
+                        <td class="text-gray-600">{{ control.accountable }}</td>
+                        <td class="whitespace-nowrap">
+                            {% if control.status == 'effective' %}
+                            <span class="badge badge-ok">{{ _('Passing') }}</span>
+                            {% elif control.status == 'accepted' %}
+                            <span class="badge badge-accepted">{{ _('Accepted') }}</span>
+                            {% elif control.status == 'not_applicable' %}
+                            <span class="badge badge-na">{{ _('Not applicable') }}</span>
+                            {% elif control.status == 'unknown' %}
+                            <span class="badge badge-unknown">{{ _('Not evaluated') }}</span>
+                            {% elif control.severity == 'critical' %}
+                            <span class="badge badge-critical">{{ _('Gap') }}</span>
+                            {% elif control.severity == 'medium' %}
+                            <span class="badge badge-medium">{{ _('Gap') }}</span>
+                            {% else %}
+                            <span class="badge badge-high">{{ _('Gap') }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-    {% endfor %}
-</section>
 
-<section id="focal-points" class="mb-8">
-    <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div id="panel-focal-points" class="settings-panel hidden" role="tabpanel" aria-labelledby="gov-tab-focal-points">
         <div class="px-6 py-4 border-b border-gray-100">
             <h2 class="font-semibold text-gray-800 text-lg">{{ _('Focal point register') }}</h2>
             <p class="text-sm text-gray-500 mt-1">
@@ -214,33 +289,32 @@ section[id] { scroll-margin-top: 80px; }
                         <span class="font-medium text-gray-700">{{ _('Countries with a focal point') }}</span>
                         <span class="font-semibold text-gray-800 whitespace-nowrap ml-3">{{ fp_with }}/{{ fp_total }} ({{ fp_pct }}%)</span>
                     </div>
-                    <div class="pbar mb-2"><div class="pbar-fill bg-blue-500" style="width:{{ fp_pct }}%"></div></div>
-                    <button id="fp-table-toggle" type="button" class="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                        <i class="fas fa-table"></i>
-                        <span id="fp-toggle-label">{{ _('Show focal point table') }}</span>
-                        <i id="fp-toggle-chevron" class="fas fa-chevron-down"></i>
-                    </button>
+                    {% set fp_bar = 'bg-green-500' if fp_pct >= 80 else 'bg-yellow-400' if fp_pct >= 50 else 'bg-red-500' %}
+                    <div class="pbar"><div class="pbar-fill {{ fp_bar }}" style="width:{{ fp_pct }}%"></div></div>
                 </div>
                 <div class="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div class="rounded border border-gray-200 p-3 text-center">
-                        <div class="text-xl font-bold text-gray-800">{{ o.countries_without_focal_point | default(0) }}</div>
+                    {% set none_n = o.countries_without_focal_point | default(0) %}
+                    {% set org_n = o.countries_without_org_focal_point | default(0) %}
+                    {% set ns_n = o.countries_without_non_org_focal_point | default(0) %}
+                    <div class="rounded border {{ 'border-red-200 bg-red-50' if none_n else 'border-green-200 bg-green-50' }} p-3 text-center">
+                        <div class="text-xl font-bold {{ 'text-red-700' if none_n else 'text-green-700' }}">{{ none_n }}</div>
                         <div class="text-xs text-gray-600 mt-0.5">{{ _('No focal points') }}</div>
                     </div>
-                    <div class="rounded border border-gray-200 p-3 text-center">
-                        <div class="text-xl font-bold text-gray-800">{{ o.countries_without_org_focal_point | default(0) }}</div>
+                    <div class="rounded border {{ 'border-amber-200 bg-amber-50' if org_n else 'border-green-200 bg-green-50' }} p-3 text-center">
+                        <div class="text-xl font-bold {{ 'text-amber-700' if org_n else 'text-green-700' }}">{{ org_n }}</div>
                         <div class="text-xs text-gray-600 mt-0.5">{{ _('No %(org)s focal point', org=ORG_SHORT_NAME | default('organization')) }}</div>
                     </div>
-                    <div class="rounded border border-gray-200 p-3 text-center">
-                        <div class="text-xl font-bold text-gray-800">{{ o.countries_without_non_org_focal_point | default(0) }}</div>
+                    <div class="rounded border {{ 'border-amber-200 bg-amber-50' if ns_n else 'border-green-200 bg-green-50' }} p-3 text-center">
+                        <div class="text-xl font-bold {{ 'text-amber-700' if ns_n else 'text-green-700' }}">{{ ns_n }}</div>
                         <div class="text-xs text-gray-600 mt-0.5">{{ _('No National Society focal point') }}</div>
                     </div>
-                    <div class="rounded border border-gray-200 p-3 text-center">
-                        <div class="text-xl font-bold text-gray-800">{{ o.countries_with_both_focal_point_types | default(0) }}</div>
+                    <div class="rounded border border-green-200 bg-green-50 p-3 text-center">
+                        <div class="text-xl font-bold text-green-700">{{ o.countries_with_both_focal_point_types | default(0) }}</div>
                         <div class="text-xs text-gray-600 mt-0.5">{{ _('Both types covered') }}</div>
                     </div>
                 </div>
             </div>
-            <div id="fp-table-container" class="hidden space-y-3">
+            <div class="space-y-3">
                 <p class="text-sm text-gray-500">
                     {{ _('Coverage is split between %(org)s focal points and National Society focal points. Use Columns to show names, the FDS member, and programme membership. Excel export includes Country ID and ISO3.', org=ORG_SHORT_NAME | default('organization')) }}
                 </p>
@@ -248,23 +322,34 @@ section[id] { scroll-margin-top: 80px; }
             </div>
         </div>
     </div>
-</section>
+</div>
 
 <script nonce="{{ csp_nonce() }}">
+(function () {
+    var tabs = document.getElementById('gov-tabs');
+    if (!tabs || !window.AdminUnderlineTabs) return;
+    var known = { issues: true, controls: true, 'focal-points': true };
 
-(function() {
-    const toggle = document.getElementById('fp-table-toggle');
-    const container = document.getElementById('fp-table-container');
-    const label = document.getElementById('fp-toggle-label');
-    const chevron = document.getElementById('fp-toggle-chevron');
-    if (!toggle || !container) return;
-    const showLabel = {{ _('Show focal point table')|tojson }};
-    const hideLabel = {{ _('Hide focal point table')|tojson }};
-    toggle.addEventListener('click', function() {
-        const hidden = container.classList.toggle('hidden');
-        label.textContent = hidden ? showLabel : hideLabel;
-        chevron.className = hidden ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+    function show(tabId) {
+        if (!known[tabId]) tabId = 'issues';
+        AdminUnderlineTabs.activateStripTab('#gov-tabs', tabId, { panelSelector: '.settings-panel' });
+        tabs.querySelectorAll('.settings-tab').forEach(function (btn) {
+            AdminUnderlineTabs.setOrgMainTabButton(btn, btn.getAttribute('data-tab') === tabId);
+        });
+        document.dispatchEvent(new CustomEvent('gov-tab', { detail: { tab: tabId } }));
+        if (history.replaceState) {
+            history.replaceState(null, '', '#' + tabId);
+        }
+    }
+
+    tabs.addEventListener('click', function (event) {
+        var btn = event.target.closest('.settings-tab');
+        if (!btn) return;
+        show(btn.getAttribute('data-tab'));
     });
+
+    var initial = (location.hash || '').replace('#', '');
+    if (known[initial] && initial !== 'issues') show(initial);
 })();
 </script>
 
@@ -543,25 +628,29 @@ section[id] { scroll-margin-top: 80px; }
         });
     });
 
-    function initGrid() {
-        if (typeof AgGridHelper === 'undefined') return;
-        AgGridHelper.create('countriesFocalGrid', 'gov-countries-focal-v2', columnDefs, rowData, {
-            gridOptions: {
-                getRowStyle: function (p) {
-                    if (p.data && p.data.total_focal_points === 0) {
-                        return { background: '#fef2f2' };
+    var focalApi = null;
+    function ensureFocalGrid() {
+        var panel = document.getElementById('panel-focal-points');
+        if (!panel || panel.classList.contains('hidden') || typeof AgGridHelper === 'undefined') return;
+        if (!focalApi) {
+            var created = AgGridHelper.create('countriesFocalGrid', 'gov-countries-focal-v2', columnDefs, rowData, {
+                gridOptions: {
+                    getRowStyle: function (p) {
+                        if (p.data && p.data.total_focal_points === 0) {
+                            return { background: '#fef2f2' };
+                        }
+                        return null;
                     }
-                    return null;
                 }
-            }
-        });
+            });
+            focalApi = created && created.api;
+        }
+        if (focalApi && focalApi.sizeColumnsToFit) {
+            focalApi.sizeColumnsToFit();
+        }
     }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initGrid);
-    } else {
-        initGrid();
-    }
+    document.addEventListener('gov-tab', ensureFocalGrid);
+    ensureFocalGrid();
 })();
 </script>
 {% endblock %}

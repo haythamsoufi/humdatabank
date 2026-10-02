@@ -256,7 +256,7 @@ Cross-guide: [Export and download data](user-guides/admin/export-download-data.m
 
 **Who:** `admin.governance.view` to read. `admin.governance.manage` to accept or reopen a risk.
 
-**What you get:** A **control register**, not a grade. Each control states the rule, who is accountable, and whether the live check passes. Gaps become **issues**. A manager with `admin.governance.manage` can **accept** a gap until a review date (reason required, one year maximum); the issue reopens when that date passes if the gap is still there. The page also keeps the **focal point register**. Reporting discipline here is timeliness on open assignments. FDRS document compliance is **not applicable** when no FDRS period exists. Complements [Data governance](user-guides/common/data-governance.md).
+**What you get:** A **control register**, not a grade. Each control states the rule, who is accountable, and whether the live check passes. Gaps become **issues**. A manager with `admin.governance.manage` can **accept** a gap until a review date (reason required, one year maximum); the issue reopens when that date passes if the gap is still there. The page also keeps the **focal point register**. Reporting discipline here is timeliness on open assignments. FDRS document compliance is monitored in Explore Data, not on this page. Complements [Data governance](user-guides/common/data-governance.md).
 
 ---
 

@@ -10,8 +10,8 @@ module replaces that with a control catalog:
 - an acceptance expires on that date and the issue reopens
 
 Checks are limited to facts this platform can actually prove. Submission
-timeliness is not called data quality. A missing FDRS cycle is "not
-applicable", not a zero. "Every account has a role" is not a control.
+timeliness is not called data quality. FDRS document compliance is monitored
+in Explore Data, not here. "Every account has a role" is not a control.
 """
 from __future__ import annotations
 
@@ -50,7 +50,6 @@ DOMAIN_KEYS = (
     "ownership",
     "access",
     "reporting",
-    "compliance",
     "glossary",
     "lifecycle",
 )
@@ -126,7 +125,6 @@ def evaluate_controls(ctx: Dict[str, Any]) -> List[Dict[str, Any]]:
         _acc_03(ctx, errors),
         _rpt_01(ctx, errors),
         _rpt_02(ctx, errors),
-        _cmp_01(ctx, errors),
         _met_01(ctx, errors),
         _met_02(ctx, errors),
         _lif_01(ctx, errors),
@@ -298,31 +296,6 @@ def _rpt_02(ctx, errors):
     )
 
 
-def _cmp_01(ctx, errors):
-    periods = ctx.get("fdrs_periods") or []
-    period_label = ", ".join(str(p) for p in periods) if periods else ""
-    spec = _spec(
-        "CMP-01", "compliance", "high",
-        _("FDRS document compliance"),
-        _("Where an FDRS cycle exists, each active country has both an Annual Report and an Audited Financial Statement in at least one of the last three periods. This control does not apply when FDRS is not in use."),
-        _("National Society focal point, with the secretariat"),
-        _href("data_exploration.explore_data"),
-    )
-    if "compliance" in errors or ctx.get("fdrs_applicable") is None:
-        return _unknown(spec)
-    if not ctx.get("fdrs_applicable"):
-        return _na(spec, _("No FDRS reporting period is assigned, so this control does not apply here."))
-    samples = ctx.get("fdrs_non_compliant") or []
-    count = int(ctx.get("fdrs_non_compliant_count") or len(samples))
-    if count == 0:
-        return _pass(spec, _("Every checked country has both documents in %(periods)s.", periods=period_label))
-    return _fail(
-        spec, count,
-        _("%(n)s countries are missing one or both documents in %(periods)s.", n=count, periods=period_label),
-        samples,
-    )
-
-
 def _met_01(ctx, errors):
     spec = _spec(
         "MET-01", "glossary", "medium",
@@ -416,10 +389,6 @@ def _fail(spec, count, summary, evidence):
     return _base(spec, "gap", summary, count, evidence)
 
 
-def _na(spec, summary):
-    return _base(spec, "not_applicable", summary, 0, [])
-
-
 def _unknown(spec):
     return _base(spec, "unknown", _("This control could not be evaluated. The previous result was left unchanged."), 0, [])
 
@@ -442,11 +411,10 @@ def _collect_context() -> Dict[str, Any]:
     except Exception as exc:
         logger.error("Governance metrics failed: %s", exc)
         metrics = {}
-        errors.update({"ownership", "access", "glossary", "compliance"})
+        errors.update({"ownership", "access", "glossary"})
 
     ownership = metrics.get("ownership") or {}
     access = metrics.get("access_control") or {}
-    compliance = metrics.get("compliance") or {}
     glossary = metrics.get("metadata") or {}
 
     ctx: Dict[str, Any] = {
@@ -458,14 +426,6 @@ def _collect_context() -> Dict[str, Any]:
         "ghost_users_count": int(access.get("inactive_users_with_role") or 0),
         "entity_without_role": _user_samples((ownership.get("flags") or {}).get("users_with_entities_no_role")),
         "entity_without_role_count": int(ownership.get("users_with_entities_no_role") or 0),
-        "fdrs_applicable": compliance.get("applicable") if "applicable" in compliance else None,
-        "fdrs_periods": list(compliance.get("periods") or []),
-        "fdrs_non_compliant_count": int(compliance.get("non_compliant_count") or 0),
-        "fdrs_non_compliant": [
-            {"label": c.get("name") or "", "href": None}
-            for c in ((compliance.get("flags") or {}).get("non_compliant_countries") or [])
-            if c.get("name")
-        ],
         "indicators_missing_definition": int(glossary.get("indicators_without_definition") or 0),
         "indicators_active": int(glossary.get("indicators_with_definition") or 0),
         "stale_suggestions_count": int(glossary.get("indicator_suggestions_stale") or 0),
@@ -475,8 +435,6 @@ def _collect_context() -> Dict[str, Any]:
         errors.add("ownership")
     if metrics.get("access_control") is None:
         errors.add("access")
-    if metrics.get("compliance") is None:
-        errors.add("compliance")
     if metrics.get("metadata") is None:
         errors.add("glossary")
 
@@ -874,8 +832,6 @@ def _domain_label(key: str) -> str:
         return _("Access")
     if key == "reporting":
         return _("Reporting discipline")
-    if key == "compliance":
-        return _("Compliance")
     if key == "glossary":
         return _("Glossary")
     if key == "lifecycle":

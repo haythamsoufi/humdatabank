@@ -19,7 +19,9 @@ from app.services.data_quality.helpers import (
     resolve_assignment_aes,
 )
 from app.services.data_quality.service import get_rule_pack_for_template
+from app.services.validation.core_checks import run_core_checks
 from app.services.validation.pack_registry import get_pack
+from app.utils.data_quality_constants import RULE_PACK_CORE
 from app.services.validation.question_assembler import assemble_question_for_kpi
 from app.services.validation.types import (
     CheckResult,
@@ -77,7 +79,7 @@ def _load_history(
     )
 
     history: dict[str, dict[int, float]] = {}
-    item_to_kpi = {item.id: code for code, item in kpi_to_item.items() if item}
+    item_to_kpi = _history_item_codes(kpi_to_item)
 
     for aes in assignments:
         pn = aes.assigned_form.period_name if aes.assigned_form else None
@@ -93,6 +95,50 @@ def _load_history(
             if nv is not None:
                 history.setdefault(code, {})[y] = nv
     return history
+
+
+def _history_item_codes(kpi_to_item: dict[str, FormItem]) -> dict[int, str]:
+    """Map form item ids to indicator codes, including older versions of the same field."""
+    item_to_code: dict[int, str] = {}
+    stable_pairs: list[tuple[int, str, str]] = []
+    for code, item in kpi_to_item.items():
+        if not item:
+            continue
+        item_id = getattr(item, "id", None)
+        if isinstance(item_id, int):
+            item_to_code[item_id] = code
+        stable_key = getattr(item, "stable_key", None)
+        template_id = getattr(item, "template_id", None)
+        if isinstance(stable_key, str) and stable_key and isinstance(template_id, int):
+            stable_pairs.append((template_id, stable_key, code))
+    if not stable_pairs:
+        return item_to_code
+
+    from sqlalchemy import and_, or_
+
+    clauses = [
+        and_(FormItem.template_id == template_id, FormItem.stable_key == stable_key)
+        for template_id, stable_key, _code in stable_pairs
+    ]
+    rows = FormItem.query.filter(or_(*clauses)).all()
+    if not isinstance(rows, list):
+        return item_to_code
+    code_for_key = {
+        (template_id, stable_key): code for template_id, stable_key, code in stable_pairs
+    }
+    for row in rows:
+        row_id = getattr(row, "id", None)
+        if not isinstance(row_id, int):
+            continue
+        code = code_for_key.get((getattr(row, "template_id", None), getattr(row, "stable_key", None)))
+        if code:
+            item_to_code[row_id] = code
+    return item_to_code
+
+
+def _data_quality_enabled(template: FormTemplate) -> bool:
+    version = getattr(template, "published_version", None)
+    return getattr(version, "enable_data_quality", None) is True
 
 
 def validation_checks_disabled_message(template_id: int) -> str:
@@ -117,11 +163,14 @@ def evaluate_validation_checks(
     if not template:
         raise ValueError(f"Template {template_id} not found.")
 
-    pack = rule_pack or get_rule_pack_for_template(template)
+    pack = rule_pack if rule_pack is not None else get_rule_pack_for_template(template)
     if not pack:
-        if require_rule_pack:
+        if _data_quality_enabled(template):
+            pack = RULE_PACK_CORE
+        elif require_rule_pack:
             raise ValueError(validation_checks_disabled_message(template_id))
-        pack = ""
+        else:
+            pack = ""
 
     aes, resolved_period = resolve_assignment_aes(template_id, entity_type, entity_id, period_name)
     if aes is None:
@@ -148,8 +197,17 @@ def evaluate_validation_checks(
         country_id=_resolve_country_id(entity_type, entity_id),
     )
 
-    registered = get_pack(pack)
-    check_results = registered.run_checks(ctx) if registered else []
+    check_results: list[CheckResult] = []
+    if pack:
+        plugin = get_pack(pack)
+        required: tuple[str, ...] = ()
+        if plugin is not None and getattr(plugin, "code", None) != RULE_PACK_CORE:
+            raw_required = getattr(plugin, "required_indicator_codes", ())
+            if isinstance(raw_required, (list, tuple, set, frozenset)):
+                required = tuple(raw_required)
+        check_results.extend(run_core_checks(ctx, required_indicator_codes=required))
+        if plugin is not None and getattr(plugin, "code", None) != RULE_PACK_CORE:
+            check_results.extend(plugin.run_checks(ctx) or [])
 
     drafts = _results_to_drafts(check_results, ctx)
     return ValidationEvaluationResult(

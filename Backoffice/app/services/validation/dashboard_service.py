@@ -15,6 +15,7 @@ from app.services.data_quality.helpers import numeric_value, parse_period_year
 from app.services.data_quality.service import get_rule_pack_for_template
 from app.services.forms.reporting_period_service import sort_period_names
 from app.services.validation.pack_registry import get_pack
+from app.utils.data_quality_constants import RULE_PACK_CORE
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
 from .check_service import evaluate_validation_checks, validation_checks_disabled_message
@@ -105,10 +106,11 @@ _PERIOD_YEAR_RE = re.compile(r"20\d{2}")
 
 
 def _registered_pack_code(template: FormTemplate):
-    """Return the pack code when this template can run checks.
+    """Plugin pack for this template, or the general checks pack when data quality is on.
 
     Test doubles without a real published-version flag are kept so callers that
-    already selected templates are not filtered out.
+    already selected templates are not filtered out. An empty string means the
+    template is left off the dashboard.
     """
     version = getattr(template, "published_version", None)
     enabled = getattr(version, "enable_data_quality", None)
@@ -117,13 +119,13 @@ def _registered_pack_code(template: FormTemplate):
     if not enabled:
         return ""
     pack = get_rule_pack_for_template(template)
-    if isinstance(pack, str) and get_pack(pack):
+    if isinstance(pack, str) and pack != RULE_PACK_CORE and get_pack(pack):
         return pack
-    return ""
+    return RULE_PACK_CORE
 
 
 def _validation_templates_by_id() -> dict[int, FormTemplate]:
-    """DQ-enabled templates whose rule pack is registered. Legacy UPR 25 drops when 33 is present."""
+    """DQ-enabled templates. Legacy UPR 25 drops when 33 is present."""
     by_id = {}
     for template in _templates_with_validation():
         pack_code = _registered_pack_code(template)
@@ -134,6 +136,44 @@ def _validation_templates_by_id() -> dict[int, FormTemplate]:
     if upr["reporting_id"] in by_id:
         by_id.pop(upr["legacy_id"], None)
     return by_id
+
+
+def indicator_codes_for_template_ids(template_ids: list[int]) -> dict[int, list[str]]:
+    """Indicator codes on each template's published items, for the rules screen."""
+    from sqlalchemy.orm import joinedload
+
+    from app.models import FormItem
+    from app.services.data_quality.helpers import indicator_storage_key
+
+    ids = [template_id for template_id in template_ids if isinstance(template_id, int)]
+    if not ids:
+        return {}
+    templates = FormTemplate.query.filter(FormTemplate.id.in_(ids)).all()
+    version_by_template = {template.id: template.published_version_id for template in templates}
+    items = (
+        FormItem.query.filter(
+            FormItem.template_id.in_(ids),
+            FormItem.archived == False,  # noqa: E712
+            FormItem.indicator_bank_id.isnot(None),
+        )
+        .options(joinedload(FormItem.indicator_bank))
+        .all()
+    )
+    found: dict[int, list[str]] = {template_id: [] for template_id in ids}
+    seen: dict[int, set[str]] = {template_id: set() for template_id in ids}
+    for item in items:
+        version_id = version_by_template.get(item.template_id)
+        if version_id and item.version_id not in (version_id, None):
+            continue
+        key = indicator_storage_key(getattr(item, "indicator_bank", None))
+        bucket = seen.setdefault(item.template_id, set())
+        if not key or key in bucket:
+            continue
+        bucket.add(key)
+        found.setdefault(item.template_id, []).append(key)
+    for codes in found.values():
+        codes.sort()
+    return found
 
 
 def template_options() -> list[dict[str, Any]]:

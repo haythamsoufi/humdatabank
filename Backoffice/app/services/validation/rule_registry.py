@@ -1,8 +1,9 @@
 """
 Canonical registry of automatic validation rules (read-only metadata for admin UI and docs).
 
-Rule execution lives in ``validation.fdrs_matrix.rules``; this module describes what each
-rule code means without importing Flask or database models.
+General checks run from ``validation.core_checks``. Product plugins register extra
+rules. This module describes what each rule code means without importing Flask
+or database models.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
+from app.utils.data_quality_constants import RULE_PACK_CORE, RULE_PACK_FDRS_MATRIX_V1
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,43 @@ class ValidationRuleDefinition:
         }
 
 
+CORE_RULES: tuple[ValidationRuleDefinition, ...] = (
+    ValidationRuleDefinition(
+        code="indicator_not_reported",
+        label="Required indicator not reported",
+        severity="warning",
+        category="reporting",
+        description="A required indicator is missing or reported as zero.",
+        rule_pack=RULE_PACK_CORE,
+    ),
+    ValidationRuleDefinition(
+        code="not_reported",
+        label="Previously reported, now missing",
+        severity="warning",
+        category="reporting",
+        description="Indicator was reported last year but is missing this year.",
+        rule_pack=RULE_PACK_CORE,
+    ),
+    ValidationRuleDefinition(
+        code="past_year_threshold",
+        label="Past-year variation threshold",
+        severity="warning",
+        category="variation",
+        description="Current value changed more than the allowed fraction compared to the prior reporting year.",
+        configurable=True,
+        rule_pack=RULE_PACK_CORE,
+    ),
+    ValidationRuleDefinition(
+        code="past_3years_avg",
+        label="Three-year average variation threshold",
+        severity="warning",
+        category="variation",
+        description="Current value changed more than the allowed fraction compared to the three-year average.",
+        configurable=True,
+        rule_pack=RULE_PACK_CORE,
+    ),
+)
+
 FDRS_MATRIX_V1_RULES: tuple[ValidationRuleDefinition, ...] = (
     ValidationRuleDefinition(
         code="volunteer_deaths",
@@ -49,36 +87,6 @@ FDRS_MATRIX_V1_RULES: tuple[ValidationRuleDefinition, ...] = (
         severity="info",
         category="deaths",
         description="Flags when staff deaths on duty are reported (≥ 1).",
-    ),
-    ValidationRuleDefinition(
-        code="indicator_not_reported",
-        label="Required indicator not reported",
-        severity="warning",
-        category="reporting",
-        description="Core governance, finance, or reach KPIs are missing or reported as zero.",
-    ),
-    ValidationRuleDefinition(
-        code="past_year_threshold",
-        label="Past-year variation threshold",
-        severity="warning",
-        category="variation",
-        description="Current value changed more than the allowed fraction compared to the prior reporting year.",
-        configurable=True,
-    ),
-    ValidationRuleDefinition(
-        code="past_3years_avg",
-        label="Three-year average variation threshold",
-        severity="warning",
-        category="variation",
-        description="Current value changed more than the allowed fraction compared to the three-year average.",
-        configurable=True,
-    ),
-    ValidationRuleDefinition(
-        code="not_reported",
-        label="Previously reported, now missing",
-        severity="warning",
-        category="reporting",
-        description="Indicator was reported last year but is missing this year.",
     ),
     ValidationRuleDefinition(
         code="branches_higher_units",
@@ -160,6 +168,7 @@ FDRS_MATRIX_V1_RULES: tuple[ValidationRuleDefinition, ...] = (
 )
 
 RULES_BY_PACK: dict[str, tuple[ValidationRuleDefinition, ...]] = {
+    RULE_PACK_CORE: CORE_RULES,
     RULE_PACK_FDRS_MATRIX_V1: FDRS_MATRIX_V1_RULES,
 }
 
@@ -169,19 +178,34 @@ RULES_BY_CODE: dict[str, ValidationRuleDefinition] = {
 
 
 def list_rule_definitions(*, rule_pack: str | None = None) -> list[dict[str, Any]]:
-    """Return rule metadata rows for admin UI."""
-    from app.services.validation.pack_registry import list_packs
+    """Return rule metadata rows for admin UI.
+
+    A product pack's catalog also includes the general checks, because those
+    run for that template as well.
+    """
+    from app.services.validation.pack_registry import get_pack, list_packs
 
     packs = list_packs()
     if rule_pack:
         packs = [pack for pack in packs if pack.code == rule_pack]
     if packs:
-        return [rule.to_dict() for pack in packs for rule in pack.rules]
-    if rule_pack:
-        rules = RULES_BY_PACK.get(rule_pack, ())
+        rows = [rule.to_dict() for pack in packs for rule in pack.rules]
+    elif rule_pack:
+        rows = [rule.to_dict() for rule in RULES_BY_PACK.get(rule_pack, ())]
     else:
-        rules = tuple(rule for pack_rules in RULES_BY_PACK.values() for rule in pack_rules)
-    return [rule.to_dict() for rule in rules]
+        rows = [
+            rule.to_dict()
+            for pack_rules in RULES_BY_PACK.values()
+            for rule in pack_rules
+        ]
+
+    if rule_pack and rule_pack != RULE_PACK_CORE:
+        core = get_pack(RULE_PACK_CORE)
+        core_rules = core.rules if core else CORE_RULES
+        seen = {row["code"] for row in rows}
+        extra = [rule.to_dict() for rule in core_rules if rule.code not in seen]
+        rows = extra + rows
+    return rows
 
 
 def list_registered_rule_packs() -> list[dict[str, str]]:

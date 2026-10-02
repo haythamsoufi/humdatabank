@@ -325,6 +325,44 @@ class TestEvaluateValidationChecks:
 
         assert result.check_results == []
 
+    def test_uses_core_pack_when_data_quality_has_no_plugin_pack(self):
+        template = MagicMock()
+        template.published_version_id = 5
+        template.published_version.enable_data_quality = True
+        aes = MagicMock()
+        aes.id = 10
+        check_result = CheckResult(rule_code="indicator_not_reported", form_item_id=4, fired=True)
+
+        with patch(
+            "app.services.validation.check_service.FormTemplate.query"
+        ) as mock_tpl, patch(
+            "app.services.validation.check_service.get_rule_pack_for_template",
+            return_value=None,
+        ), patch(
+            "app.services.validation.check_service.resolve_assignment_aes",
+            return_value=(aes, "2024"),
+        ), patch(
+            "app.services.validation.check_service.load_form_data_by_kpi",
+            return_value={},
+        ), patch(
+            "app.services.validation.check_service._load_history",
+            return_value={},
+        ), patch(
+            "app.services.validation.check_service._resolve_country_id",
+            return_value=1,
+        ), patch(
+            "app.services.validation.check_service.run_core_checks",
+            return_value=[check_result],
+        ), patch(
+            "app.services.validation.check_service._results_to_drafts",
+            return_value=[],
+        ):
+            mock_tpl.get.return_value = template
+            result = evaluate_validation_checks(33, "country", 1, "2024")
+
+        assert result.rule_pack == "core"
+        assert result.check_results == [check_result]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # run_validation_checks
@@ -704,8 +742,51 @@ class TestLoadHistoryFormItemNotInKpiBank:
             mock_fd.query.filter_by.return_value.all.return_value = [form_data]
             result = _load_history(1, "country", 1, "FDRS 2024", {"MY_KPI": item})
 
-        # form_item_id 99 != item.id 5, so item_to_kpi has no entry for 99 → continue
+        # form_item_id 99 != item.id 5, and the mock item has no stable key, so the row is skipped
         assert result == {}
+
+    def test_matches_prior_version_item_by_stable_key(self):
+        from app.services.validation.check_service import _load_history
+
+        aes = MagicMock()
+        aes.id = 10
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.period_name = "2023"
+
+        form_data = MagicMock()
+        form_data.form_item_id = 99
+        form_data.data_not_available = False
+        form_data.not_applicable = False
+        form_data.total_value = 40
+
+        current = MagicMock()
+        current.id = 5
+        current.template_id = 33
+        current.stable_key = "field-a"
+
+        prior = MagicMock()
+        prior.id = 99
+        prior.template_id = 33
+        prior.stable_key = "field-a"
+
+        with patch(
+            "app.services.validation.check_service.AssignmentEntityStatus"
+        ) as mock_aes_cls, patch(
+            "app.services.validation.check_service.AssignedForm"
+        ), patch(
+            "app.services.validation.check_service.FormData"
+        ) as mock_fd, patch(
+            "app.services.validation.check_service.FormItem"
+        ) as mock_item, patch(
+            "app.services.validation.check_service.parse_period_year",
+            side_effect=lambda p: 2024 if "2024" in str(p) else 2023 if "2023" in str(p) else None,
+        ):
+            mock_aes_cls.query.join.return_value.filter.return_value.all.return_value = [aes]
+            mock_fd.query.filter_by.return_value.all.return_value = [form_data]
+            mock_item.query.filter.return_value.all.return_value = [current, prior]
+            result = _load_history(33, "country", 1, "2024", {"ib:7": current})
+
+        assert result == {"ib:7": {2023: 40.0}}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

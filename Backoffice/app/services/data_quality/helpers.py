@@ -350,12 +350,25 @@ def compute_income_sources_ratio(
     return max(row_coverage, reconciliation)
 
 
+def indicator_storage_key(bank) -> str | None:
+    """Stable code for an indicator: FDRS KPI code, otherwise ``ib:<bank id>``."""
+    if bank is None:
+        return None
+    raw = getattr(bank, "fdrs_kpi_code", None)
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    bank_id = getattr(bank, "id", None)
+    if isinstance(bank_id, int):
+        return f"ib:{bank_id}"
+    return None
+
+
 def load_form_data_by_kpi(
     aes_id: int,
     template_id: int,
     version_id: int | None,
 ) -> dict[str, tuple[FormData | None, FormItem | None]]:
-    """Map fdrs_kpi_code -> (FormData, FormItem) for published items."""
+    """Map indicator code -> (FormData, FormItem) for published items."""
     items = (
         FormItem.query.filter(
             FormItem.template_id == template_id,
@@ -371,9 +384,7 @@ def load_form_data_by_kpi(
     kpi_to_item: dict[str, FormItem] = {}
     for item in items:
         bank = item.indicator_bank
-        if not bank or not bank.fdrs_kpi_code:
-            continue
-        code = bank.fdrs_kpi_code.strip()
+        code = indicator_storage_key(bank)
         if code and code not in kpi_to_item:
             kpi_to_item[code] = item
 

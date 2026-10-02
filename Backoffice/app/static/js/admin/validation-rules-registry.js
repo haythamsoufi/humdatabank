@@ -54,6 +54,10 @@
         var byPack = config.kpiCodesByPack || {};
         var template = el('vr-template');
         var selected = template && template.selectedOptions && template.selectedOptions[0];
+        var fromTemplate = selected ? (selected.getAttribute('data-kpi-codes') || '') : '';
+        if (fromTemplate) {
+            return fromTemplate.split(',').map(function (code) { return code.trim(); }).filter(Boolean);
+        }
         var pack = selected ? (selected.getAttribute('data-rule-pack') || '') : '';
         if (!pack) pack = getRulePack();
         if (pack && byPack[pack] && byPack[pack].length) return byPack[pack].slice();

@@ -321,8 +321,14 @@ class PluginManager:
         return self.plugins
 
     def _sync_validation_packs(self) -> None:
-        """Register validation packs from plugins that are currently active."""
+        """Register the core pack and packs from plugins that are currently active."""
+        from app.services.validation.core_checks import register_core_validation_pack
         from app.services.validation.pack_registry import mark_synced_from_plugins
+
+        try:
+            register_core_validation_pack()
+        except Exception as exc:
+            self.logger.error("Failed to register core validation checks: %s", exc)
 
         for plugin in self.get_active_plugins().values():
             register = getattr(plugin, "register_validation_packs", None)

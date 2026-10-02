@@ -796,6 +796,31 @@ class TestLoadFormDataByKpi:
         assert result["KPI_TEST"][0] is data_row
         assert result["KPI_TEST"][1] is item
 
+    def test_indicator_without_fdrs_code_uses_bank_id(self):
+        bank = MagicMock()
+        bank.fdrs_kpi_code = None
+        bank.id = 42
+
+        item = MagicMock()
+        item.id = 10
+        item.indicator_bank_id = 42
+        item.indicator_bank = bank
+        item.version_id = None
+
+        mock_item_query = MagicMock()
+        mock_item_query.filter.return_value.options.return_value.all.return_value = [item]
+        mock_data_query = MagicMock()
+        mock_data_query.filter.return_value.all.return_value = []
+
+        with patch("app.services.data_quality.helpers.FormItem.query", mock_item_query), \
+             patch("app.services.data_quality.helpers.FormData.query", mock_data_query):
+            from app.services.data_quality.helpers import load_form_data_by_kpi
+
+            result = load_form_data_by_kpi(aes_id=5, template_id=33, version_id=None)
+
+        assert "ib:42" in result
+        assert result["ib:42"][1] is item
+
     def test_items_without_bank_skipped(self):
         item = MagicMock()
         item.id = 10

@@ -29,6 +29,8 @@ class ValidationPack:
     rules: tuple[Any, ...]
     format_suffix: SuffixFormatter | None = None
     threshold_kpi_codes: tuple[str, ...] = ()
+    # Indicator codes the core missing-data check treats as required for this product.
+    required_indicator_codes: tuple[str, ...] = ()
     # "fdrs" draws governance/finance/reach and FDRS document columns on the tracker.
     tracker_id: str | None = None
 
@@ -65,13 +67,20 @@ def mark_synced_from_plugins() -> None:
 
 
 def ensure_validation_packs() -> None:
-    """Load packs from the plugin manager, or from built-in plugins when it is absent.
+    """Load the core pack, then plugin packs.
 
     Unit tests and scripts often call validation services without booting the
     plugin manager. In a running app the manager syncs active plugins first and
-    this function does not import inactive ones.
+    this function does not import inactive ones. The general checks pack is
+    always registered.
     """
-    if _manager_synced or _PACKS:
+    from app.utils.data_quality_constants import RULE_PACK_CORE
+
+    if RULE_PACK_CORE not in _PACKS:
+        from app.services.validation.core_checks import register_core_validation_pack
+
+        register_core_validation_pack()
+    if _manager_synced or any(code != RULE_PACK_CORE for code in _PACKS):
         return
     try:
         from plugins.fdrs.validation.register import register_fdrs_validation_pack

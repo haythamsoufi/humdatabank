@@ -294,21 +294,21 @@ class TestTemplateOptions:
             {"id": 24, "name": "Planning"},
         ]
 
-    def test_omits_template_whose_rule_pack_is_not_registered(self):
+    def test_uses_core_checks_when_plugin_pack_is_missing(self):
         version = MagicMock()
         version.enable_data_quality = True
         version.validation_rule_pack = "not_a_registered_pack"
         version.data_quality_methodology = None
         tmpl = MagicMock()
-        tmpl.id = 33
-        tmpl.name = "Reporting"
+        tmpl.id = 99
+        tmpl.name = "Country plan"
         tmpl.published_version = version
         with patch(
             "app.services.validation.dashboard_service._templates_with_validation",
             return_value=[tmpl],
         ):
-            assert template_options() == []
-            assert template_tab_options() == []
+            assert template_options() == [{"id": 99, "name": "Country plan", "rule_pack": "core"}]
+            assert template_tab_options() == [{"id": 99, "name": "Country plan", "children": None}]
 
 
 class TestGlobalPeriodsForTemplate:

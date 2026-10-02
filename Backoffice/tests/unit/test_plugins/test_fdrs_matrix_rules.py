@@ -13,7 +13,6 @@ from plugins.fdrs.validation.fdrs_matrix.history import (
 )
 from plugins.fdrs.validation.fdrs_matrix.rules import (
     HEALTH_SUB_KPI_CODES,
-    NON_ZERO_KPI_CODES,
     THEMATIC_REACH_FOR_TYPEOF,
     run_fdrs_matrix_rules,
 )
@@ -215,116 +214,6 @@ class TestRunFdrsMatrixRulesDeaths:
             results = run_fdrs_matrix_rules(ctx)
 
         assert all(r.rule_code != "volunteer_deaths" for r in results)
-
-
-class TestRunFdrsMatrixRulesNonZeroKpi:
-    @patch(_PATCH_SD)
-    @patch(_PATCH_FI)
-    @patch(_PATCH_ATTR)
-    @patch(_PATCH_CYR)
-    @patch(_PATCH_THRESH)
-    @patch(_PATCH_CHECK)
-    def test_indicator_not_reported_fires_for_non_zero_kpi(
-        self, mock_check, mock_thresh, mock_cyr, mock_attr, mock_fi, mock_subdoc
-    ):
-        entry = MagicMock()
-        item = _make_item(5)
-        _setup_db_mocks(mock_subdoc, mock_fi, mock_attr, mock_cyr, mock_thresh, mock_check)
-
-        with patch("plugins.fdrs.validation.fdrs_matrix.rules.is_reported_value", return_value=False), \
-             patch("plugins.fdrs.validation.fdrs_matrix.rules.numeric_value", return_value=None):
-            ctx = _make_ctx(kpi_data={"KPI_GB": (entry, item)})
-            results = run_fdrs_matrix_rules(ctx)
-
-        assert any(r.rule_code == "indicator_not_reported" for r in results)
-
-
-class TestRunFdrsMatrixRulesThreshold:
-    @patch(_PATCH_SD)
-    @patch(_PATCH_FI)
-    @patch(_PATCH_ATTR)
-    @patch(_PATCH_CYR)
-    @patch(_PATCH_THRESH)
-    @patch(_PATCH_CHECK)
-    def test_past_year_threshold_rule_fires(
-        self, mock_check, mock_thresh, mock_cyr, mock_attr, mock_fi, mock_subdoc
-    ):
-        entry = MagicMock()
-        item = _make_item(7)
-        check_row = MagicMock()
-        check_row.check_type = CHECK_TYPE_PAST_YEAR
-        thresh_row = MagicMock()
-        thresh_row.threshold_fraction = 0.2
-        _setup_db_mocks(mock_subdoc, mock_fi, mock_attr, mock_cyr, mock_thresh, mock_check,
-                        check_row=check_row, thresh_row=thresh_row)
-
-        with patch("plugins.fdrs.validation.fdrs_matrix.rules.is_reported_value", return_value=True), \
-             patch("plugins.fdrs.validation.fdrs_matrix.rules.numeric_value", return_value=200.0):
-            ctx = _make_ctx(
-                kpi_data={"KPI_PeopleVol": (entry, item)},
-                history_by_kpi={"KPI_PeopleVol": {2023: 100.0}},
-                country_id=1,
-            )
-            results = run_fdrs_matrix_rules(ctx)
-
-        assert any(r.rule_code == "past_year_threshold" for r in results)
-
-    @patch(_PATCH_SD)
-    @patch(_PATCH_FI)
-    @patch(_PATCH_ATTR)
-    @patch(_PATCH_CYR)
-    @patch(_PATCH_THRESH)
-    @patch(_PATCH_CHECK)
-    def test_past_3years_avg_rule_fires(
-        self, mock_check, mock_thresh, mock_cyr, mock_attr, mock_fi, mock_subdoc
-    ):
-        entry = MagicMock()
-        item = _make_item(8)
-        check_row = MagicMock()
-        check_row.check_type = CHECK_TYPE_3YEAR_AVG
-        thresh_row = MagicMock()
-        thresh_row.threshold_fraction = 0.2
-        _setup_db_mocks(mock_subdoc, mock_fi, mock_attr, mock_cyr, mock_thresh, mock_check,
-                        check_row=check_row, thresh_row=thresh_row)
-
-        with patch("plugins.fdrs.validation.fdrs_matrix.rules.is_reported_value", return_value=True), \
-             patch("plugins.fdrs.validation.fdrs_matrix.rules.numeric_value", return_value=500.0):
-            ctx = _make_ctx(
-                kpi_data={"KPI_PeopleVol": (entry, item)},
-                history_by_kpi={"KPI_PeopleVol": {2023: 100.0, 2022: 100.0}},
-                country_id=1,
-            )
-            results = run_fdrs_matrix_rules(ctx)
-
-        assert any(r.rule_code == "past_3years_avg" for r in results)
-
-
-class TestRunFdrsMatrixRulesNotReported:
-    @patch(_PATCH_SD)
-    @patch(_PATCH_FI)
-    @patch(_PATCH_ATTR)
-    @patch(_PATCH_CYR)
-    @patch(_PATCH_THRESH)
-    @patch(_PATCH_CHECK)
-    def test_not_reported_fires_when_prior_year_exists(
-        self, mock_check, mock_thresh, mock_cyr, mock_attr, mock_fi, mock_subdoc
-    ):
-        entry = MagicMock()
-        item = _make_item(9)
-        _setup_db_mocks(mock_subdoc, mock_fi, mock_attr, mock_cyr, mock_thresh, mock_check)
-
-        # Use a KPI code NOT in NON_ZERO_KPI_CODES so fired_indicator_not_reported stays False
-        kpi_code = "KPI_ReachDRR"
-        with patch("plugins.fdrs.validation.fdrs_matrix.rules.is_reported_value", return_value=False), \
-             patch("plugins.fdrs.validation.fdrs_matrix.rules.numeric_value", return_value=None):
-            ctx = _make_ctx(
-                kpi_data={kpi_code: (entry, item)},
-                history_by_kpi={kpi_code: {2023: 400.0}},
-                country_id=1,
-            )
-            results = run_fdrs_matrix_rules(ctx)
-
-        assert any(r.rule_code == "not_reported" for r in results)
 
 
 class TestRunFdrsMatrixRulesBranchesHigherUnits:

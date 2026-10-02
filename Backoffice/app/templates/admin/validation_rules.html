@@ -27,7 +27,7 @@
                 <select id="vr-template" class="vd-select">
                     <option value="">{{ _('All templates / global') }}</option>
                     {% for tmpl in template_options %}
-                    <option value="{{ tmpl.id }}" data-rule-pack="{{ tmpl.rule_pack or '' }}">{{ tmpl.name }}</option>
+                    <option value="{{ tmpl.id }}" data-rule-pack="{{ tmpl.rule_pack or '' }}" data-kpi-codes="{{ (tmpl.kpi_codes or [])|join(',') }}">{{ tmpl.name }}</option>
                     {% endfor %}
                 </select>
             </div>

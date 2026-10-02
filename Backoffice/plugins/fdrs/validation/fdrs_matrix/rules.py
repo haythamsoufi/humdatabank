@@ -8,15 +8,12 @@ from app.models.validation import CountryAttribute, CountryYearReference, Valida
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 from plugins.fdrs.data_quality.fdrs_v1_catalog import fdrs_compliance_doc_label_matches
 from app.services.data_quality.helpers import is_reported_value, numeric_value, parse_period_year
-from plugins.fdrs.validation.fdrs_matrix.history import (
-    CHECK_TYPE_3YEAR_AVG,
-    CHECK_TYPE_PAST_YEAR,
-    DEATH_KPI_CODES,
-    baseline_value,
-    threshold_exceeded,
-    ytd_pct,
-)
+from plugins.fdrs.validation.fdrs_matrix.history import DEATH_KPI_CODES
 from app.services.validation.types import CheckResult
+
+# Core checks own thresholds, check types, and the blank-value helper.
+# These names stay on this module so existing rule tests can patch them.
+_PATCHABLE = (ValidationKpiCheckType, ValidationThreshold, is_reported_value)
 
 NON_ZERO_KPI_CODES = frozenset({
     "KPI_GB",
@@ -61,15 +58,6 @@ def _query_rows(query) -> list:
     return [one] if one is not None else []
 
 
-def _index_by_kpi(rows: list) -> dict:
-    indexed: dict[str, object] = {}
-    for row in rows:
-        code = getattr(row, "kpi_code", None)
-        if isinstance(code, str) and code:
-            indexed[code] = row
-    return indexed
-
-
 def _configured_document_type(item) -> str:
     cfg = getattr(item, "config", None)
     if not isinstance(cfg, dict):
@@ -104,19 +92,6 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
     year = parse_period_year(ctx.period_name)
     country_id = ctx.country_id
 
-    check_by_kpi = _index_by_kpi(
-        _query_rows(ValidationKpiCheckType.query.filter_by(template_id=ctx.template_id))
-    )
-    thresh_by_kpi = {}
-    if country_id:
-        thresh_by_kpi = _index_by_kpi(
-            _query_rows(
-                ValidationThreshold.query.filter_by(
-                    country_id=country_id,
-                    template_id=ctx.template_id,
-                )
-            )
-        )
     country_year = None
     if year and country_id:
         country_year = CountryYearReference.query.filter_by(country_id=country_id, year=year).first()
@@ -146,59 +121,6 @@ def run_fdrs_matrix_rules(ctx) -> list[CheckResult]:
                         context={"deaths": nv},
                     )
                 )
-
-        fired_indicator_not_reported = False
-        if kpi_code in NON_ZERO_KPI_CODES:
-            if not is_reported_value(entry):
-                fired_indicator_not_reported = True
-                results.append(
-                    CheckResult(
-                        rule_code="indicator_not_reported",
-                        form_item_id=item.id if item else None,
-                        fired=True,
-                        severity="warning",
-                        kpi_code=kpi_code,
-                    )
-                )
-
-        if year and country_id and kpi_code not in DEATH_KPI_CODES:
-            check_row = check_by_kpi.get(kpi_code)
-            thresh_row = thresh_by_kpi.get(kpi_code)
-            threshold = thresh_row.threshold_fraction if thresh_row else None
-            current = numeric_value(entry)
-            hist = ctx.history_by_kpi.get(kpi_code, {})
-            if check_row and threshold is not None:
-                bl = baseline_value(hist, year, check_row.check_type)
-                ytd = ytd_pct(current, bl)
-                if threshold_exceeded(ytd, threshold):
-                    rule = (
-                        "past_year_threshold"
-                        if check_row.check_type == CHECK_TYPE_PAST_YEAR
-                        else "past_3years_avg"
-                    )
-                    results.append(
-                        CheckResult(
-                            rule_code=rule,
-                            form_item_id=item.id if item else None,
-                            fired=True,
-                            severity="warning",
-                            kpi_code=kpi_code,
-                            context={"ytd_pct": ytd, "threshold": threshold, "current": current, "baseline": bl},
-                        )
-                    )
-
-        prior = ctx.history_by_kpi.get(kpi_code, {}).get((year - 1) if year else 0)
-        if year and prior and prior != 0 and not is_reported_value(entry) and not fired_indicator_not_reported:
-            results.append(
-                CheckResult(
-                    rule_code="not_reported",
-                    form_item_id=item.id if item else None,
-                    fired=True,
-                    severity="warning",
-                    kpi_code=kpi_code,
-                    context={"prior_year": year - 1, "prior_value": prior},
-                )
-            )
 
     branches = numeric_value(ctx.kpi_data.get("KPI_noBranches", (None, None))[0])
     units = numeric_value(ctx.kpi_data.get("KPI_noLocalUnits", (None, None))[0])

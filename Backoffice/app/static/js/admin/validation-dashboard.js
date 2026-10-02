@@ -370,16 +370,14 @@
         }
         var cells = [headerCell(t.indicator || 'Indicator', 'vd-sticky')];
         var displayed = displayedComparisonYears();
-        var currentYear = currentComparisonYear();
         if (!displayed.length) cells.push(headerCell(t.value || 'Value', 'vd-num'));
         displayed.forEach(function (year) {
-            if (String(year) === String(currentYear) && priorComparisonYear() != null) {
-                var changeLabel = t.change || 'Change';
-                changeLabel += ' vs ' + priorComparisonYear();
-                cells.push(headerCell(changeLabel, 'vd-num'));
-            }
             cells.push(headerCell(String(year), 'vd-num'));
         });
+        if (priorComparisonYear() != null) {
+            var changeLabel = (t.change || 'Change') + ' vs ' + priorComparisonYear();
+            cells.push(headerCell(changeLabel, 'vd-num'));
+        }
         cells.push(headerCell(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'));
         return cells;
     }
@@ -407,16 +405,15 @@
         }
         var cells = [name];
         var displayed = displayedComparisonYears();
-        var currentYear = currentComparisonYear();
         if (!displayed.length) {
             cells.push(valueCell(row.current_value ? formatNumericDisplay(row.current_value) : '', 'vd-num'));
         }
         displayed.forEach(function (year) {
-            if (String(year) === String(currentYear) && priorComparisonYear() != null) {
-                cells.push(htmlCell(changeHtml(row), 'vd-num'));
-            }
             cells.push(valueCell(yearValue(row, year), 'vd-num'));
         });
+        if (priorComparisonYear() != null) {
+            cells.push(htmlCell(changeHtml(row), 'vd-num'));
+        }
         cells.push(htmlCell(checkHtml(row), 'vd-cell-wrap'));
         return cells;
     }

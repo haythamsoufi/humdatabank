@@ -3,7 +3,7 @@
 Governance metrics for the Admin Governance dashboard (federation / NS–secretariat style deployments).
 
 Aggregates: focal point / data owner coverage, access control (RBAC),
-reporting timeliness and quality, FDRS document compliance, metadata (Indicator Bank /
+reporting timeliness and quality, metadata (Indicator Bank /
 form) completeness, security & audit events, and translation coverage.
 """
 
@@ -22,7 +22,6 @@ from app.models import (
     AssignedForm,
     FormItem,
     AssignmentEntityStatus,
-    SubmittedDocument,
 )
 from app.models.forms import FormTemplateVersion
 from app.models.core import UserEntityPermission
@@ -33,12 +32,6 @@ from app.models.rbac import (
     RbacUserRole,
     RbacAccessGrant,
 )
-from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
-from plugins.fdrs.data_quality.fdrs_v1_catalog import (
-    COMPLIANCE_DOC_TYPES,
-    fdrs_compliance_doc_label_matches,
-)
-from app.services.data_quality.helpers import active_country_map_query
 from app.utils.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
@@ -67,8 +60,8 @@ def get_governance_metrics() -> Dict[str, Any]:
     remaining sections.
 
     Returns a dict containing health_score, ownership, access_control, quality,
-    compliance, and metadata sections. Security & Audit and Translation Coverage
-    are handled separately by the Admin Dashboard.
+    and metadata sections. FDRS document compliance is monitored in Explore Data.
+    Security & Audit and Translation Coverage are handled separately by the Admin Dashboard.
     """
     empty = _empty_metrics()
 
@@ -88,14 +81,12 @@ def get_governance_metrics() -> Dict[str, Any]:
     ownership = _safe("ownership", _get_ownership_metrics, empty["ownership"])
     access_control = _safe("access_control", _get_access_control_metrics, empty["access_control"])
     quality = _safe("quality", _get_quality_metrics, empty["quality"])
-    compliance = _safe("compliance", _get_compliance_metrics, empty["compliance"])
     metadata = _safe("metadata", _get_metadata_metrics, empty["metadata"])
 
     sections = {
         "ownership": ownership,
         "access_control": access_control,
         "quality": quality,
-        "compliance": compliance,
         "metadata": metadata,
     }
 
@@ -121,15 +112,15 @@ def _calculate_health_score(sections: Dict[str, Any]) -> Dict[str, Any]:
     Compute a 0–100 governance health score from weighted pillar scores.
 
     Security & Audit and Translation Coverage have been moved to the Admin Dashboard.
-    Weights (5 governance pillars, total 100%):
-      Ownership 18% | Access Control 23% | Quality 23% | Compliance 23% | Metadata 13%
+    FDRS document compliance is not scored here.
+    Weights (4 governance pillars, total 100%):
+      Ownership 23% | Access Control 30% | Quality 30% | Metadata 17%
     """
     weights = {
-        "ownership": 18,
-        "access_control": 23,
-        "quality": 23,
-        "compliance": 23,
-        "metadata": 13,
+        "ownership": 23,
+        "access_control": 30,
+        "quality": 30,
+        "metadata": 17,
     }
 
     def _ownership_score(o):
@@ -151,9 +142,6 @@ def _calculate_health_score(sections: Dict[str, Any]) -> Dict[str, Any]:
     def _quality_score(q):
         return min(100, q.get("submission_rate_pct", 0))
 
-    def _compliance_score(c):
-        return min(100, c.get("compliance_rate_pct", 0))
-
     def _metadata_score(m):
         total = m.get("indicators_total", 0)
         if not total:
@@ -166,7 +154,6 @@ def _calculate_health_score(sections: Dict[str, Any]) -> Dict[str, Any]:
             "ownership": _ownership_score(sections.get("ownership", {})),
             "access_control": _access_score(sections.get("access_control", {})),
             "quality": _quality_score(sections.get("quality", {})),
-            "compliance": _compliance_score(sections.get("compliance", {})),
             "metadata": _metadata_score(sections.get("metadata", {})),
         }
 
@@ -695,136 +682,6 @@ def _get_quality_metrics() -> Dict[str, Any]:
     }
 
 
-# ---------------------------------------------------------------------------
-# Compliance
-# ---------------------------------------------------------------------------
-
-def _get_compliance_metrics() -> Dict[str, Any]:
-    """FDRS document compliance: Annual Report + Audited Financial Statement in last 3 periods."""
-    all_periods_query = (
-        db.session.query(distinct(AssignedForm.period_name))
-        .filter(
-            AssignedForm.template_id == FDRS_TEMPLATE_ID,
-            AssignedForm.period_name.isnot(None),
-        )
-        .order_by(AssignedForm.period_name.desc())
-        .all()
-    )
-    all_periods = [p[0] for p in all_periods_query if p[0]]
-    periods = all_periods[:3]
-
-    if not periods:
-        # No FDRS cycle in this environment. Do not treat every country as
-        # non-compliant; the control register marks the check not applicable.
-        return {
-            "applicable": False,
-            "periods": [],
-            "compliant_count": 0,
-            "non_compliant_count": 0,
-            "compliance_rate_pct": None,
-            "flags": {"non_compliant_countries": []},
-        }
-
-    countries = active_country_map_query().all()
-    doc_items = (
-        FormItem.query.filter(
-            FormItem.template_id == FDRS_TEMPLATE_ID,
-            FormItem.item_type == "document_field",
-            FormItem.archived == False,
-        ).all()
-    )
-
-    doc_item_map = {}
-    all_doc_item_ids = []
-    for item in doc_items:
-        label = (item.label or "").strip()
-        for doc_type in COMPLIANCE_DOC_TYPES:
-            if fdrs_compliance_doc_label_matches(label, doc_type):
-                if doc_type not in doc_item_map:
-                    doc_item_map[doc_type] = []
-                doc_item_map[doc_type].append(item.id)
-                all_doc_item_ids.append(item.id)
-                break
-    item_id_to_doc_type = {}
-    for doc_type, item_ids in doc_item_map.items():
-        for item_id in item_ids:
-            item_id_to_doc_type[item_id] = doc_type
-
-    assignments = (
-        AssignedForm.query.filter(
-            AssignedForm.template_id == FDRS_TEMPLATE_ID,
-            AssignedForm.period_name.in_(periods),
-        ).all()
-    )
-    assignment_map = {a.period_name: a for a in assignments}
-    assignment_ids = [a.id for a in assignments]
-
-    all_aes = []
-    if assignment_ids:
-        all_aes = (
-            AssignmentEntityStatus.query.filter(
-                AssignmentEntityStatus.assigned_form_id.in_(assignment_ids),
-                AssignmentEntityStatus.entity_type == "country",
-            ).all()
-        )
-    aes_lookup = {}
-    aes_ids = []
-    for aes in all_aes:
-        aes_lookup[(aes.assigned_form_id, aes.entity_id)] = aes
-        aes_ids.append(aes.id)
-
-    submitted_docs = []
-    if aes_ids and all_doc_item_ids:
-        submitted_docs = (
-            SubmittedDocument.query.filter(
-                SubmittedDocument.assignment_entity_status_id.in_(aes_ids),
-                SubmittedDocument.form_item_id.in_(all_doc_item_ids),
-            ).all()
-        )
-    doc_lookup = {}
-    for doc in submitted_docs:
-        doc_type = item_id_to_doc_type.get(doc.form_item_id)
-        if doc_type:
-            doc_lookup[(doc.assignment_entity_status_id, doc_type)] = True
-
-    compliant_count = 0
-    non_compliant_list = []
-
-    for country in countries:
-        has_annual_report = False
-        has_audited_financial = False
-        for period in periods:
-            assignment = assignment_map.get(period)
-            if assignment:
-                aes = aes_lookup.get((assignment.id, country.id))
-                if aes:
-                    for doc_type in COMPLIANCE_DOC_TYPES:
-                        if doc_lookup.get((aes.id, doc_type)):
-                            if doc_type == "Annual Report":
-                                has_annual_report = True
-                            elif doc_type == "Audited Financial Statement":
-                                has_audited_financial = True
-        is_compliant = has_annual_report and has_audited_financial
-        if is_compliant:
-            compliant_count += 1
-        else:
-            non_compliant_list.append(
-                {"id": country.id, "name": country.name, "iso3": country.iso3}
-            )
-
-    non_compliant_count = len(non_compliant_list)
-    total = len(countries)
-    compliance_rate_pct = round((compliant_count / total * 100.0) if total else 0.0, 1)
-
-    return {
-        "applicable": True,
-        "periods": list(periods),
-        "compliant_count": compliant_count,
-        "non_compliant_count": non_compliant_count,
-        "compliance_rate_pct": compliance_rate_pct,
-        "flags": {"non_compliant_countries": non_compliant_list[:100]},
-    }
-
 
 # ---------------------------------------------------------------------------
 # Metadata
@@ -1141,12 +998,6 @@ def _empty_metrics() -> Dict[str, Any]:
                 "assignments_with_no_entities": [],
                 "templates_with_no_assigned_form": [],
             },
-        },
-        "compliance": {
-            "compliant_count": 0,
-            "non_compliant_count": 0,
-            "compliance_rate_pct": 0.0,
-            "flags": {"non_compliant_countries": []},
         },
         "metadata": {
             "indicators_total": 0,

@@ -34,10 +34,6 @@ def _ctx(**overrides):
         "critical_overdue_count": 0,
         "critical_overdue": [],
         "unstarted_past_due": [],
-        "fdrs_applicable": False,
-        "fdrs_periods": [],
-        "fdrs_non_compliant_count": 0,
-        "fdrs_non_compliant": [],
         "indicators_missing_definition": 0,
         "indicators_active": 0,
         "stale_suggestions_count": 0,
@@ -54,13 +50,11 @@ def _by_code(results):
 
 
 class TestEvaluateControls:
-    def test_clean_environment_passes_and_skips_fdrs(self, app):
+    def test_clean_environment_passes(self, app):
         results = _by_code(evaluate_controls(_ctx()))
-        assert len(results) == 12
-        assert results["CMP-01"]["status"] == "not_applicable"
+        assert len(results) == 11
+        assert "CMP-01" not in results
         for code, row in results.items():
-            if code == "CMP-01":
-                continue
             assert row["status"] == "effective", code
 
     def test_open_assignment_without_owner_is_a_gap(self, app):
@@ -80,18 +74,6 @@ class TestEvaluateControls:
         )))
         assert results["ACC-01"]["failing_count"] == 40
         assert len(results["ACC-01"]["evidence"]) == 1
-
-    def test_fdrs_gap_names_the_period(self, app):
-        results = _by_code(evaluate_controls(_ctx(
-            fdrs_applicable=True,
-            fdrs_periods=["2024", "2023"],
-            fdrs_non_compliant_count=3,
-            fdrs_non_compliant=[{"label": "Testland", "href": None}],
-        )))
-        row = results["CMP-01"]
-        assert row["status"] == "gap"
-        assert row["failing_count"] == 3
-        assert "2024" in row["summary"]
 
     def test_failed_check_is_unknown_not_a_pass(self, app):
         results = _by_code(evaluate_controls(_ctx(errors={"public_links"})))
@@ -157,6 +139,26 @@ class TestIssueSync:
             issue = GovernanceIssue.query.filter_by(control_code="OWN-01").one()
             assert issue.status == "open"
             assert issue.acceptance_reason
+
+    def test_retired_control_closes_its_issue(self, app, db_session):
+        with app.app_context():
+            now = utcnow()
+            db_session.add(GovernanceIssue(
+                control_code="CMP-01",
+                fingerprint="CMP-01",
+                title="FDRS document compliance",
+                severity="high",
+                status="open",
+                opened_at=now,
+                last_seen_at=now,
+                summary="43 countries are missing documents.",
+                failing_count=43,
+            ))
+            db_session.commit()
+            sync_issues(evaluate_controls(_ctx()))
+            issue = GovernanceIssue.query.filter_by(control_code="CMP-01").one()
+            assert issue.status == "resolved"
+            assert issue.resolution == "control_retired"
 
     def test_passing_check_resolves_an_open_issue(self, app, db_session):
         with app.app_context():

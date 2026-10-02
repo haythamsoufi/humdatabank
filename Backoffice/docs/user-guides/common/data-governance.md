@@ -8,7 +8,7 @@ This document describes how the Humanitarian Databank supports **data governance
 - **Access control and data scope** — Who can view and modify which data, with ghost-access detection
 - **Data quality and consistency** — Validation, standard definitions, overdue tracking, and the submission workflow
 - **Accountability and audit** — Attribution of administrative actions, submission/approval tracking, and activation audit
-- **Compliance** — FDRS document compliance tracking
+- **FDRS documents** — Annual Report and Audited Financial Statement coverage, monitored in Explore Data
 - **Metadata** — Indicator definitions, form labels, and stale-suggestion detection
 - **Data lifecycle** — From draft to approved, and how changes are controlled
 - **Safe handling** — Exports, public links, and privacy practices
@@ -213,13 +213,9 @@ These fields are set automatically at the moment of the action and cannot be edi
 
 ---
 
-## 4. Compliance (FDRS Documents)
+## 4. FDRS documents
 
-The Governance Dashboard tracks **FDRS document compliance**: whether countries have submitted required documents (Annual Report and Audited Financial Statement) across recent reporting periods.
-
-- **Compliance rate** — percentage of countries that have submitted the required documents
-- **Non-compliant countries** — flagged with a list that can be expanded to view individual countries
-- **Compliance threshold** — the dashboard considers 70% or above as "OK" for the health score
+Annual Report and Audited Financial Statement coverage is monitored in **Explore Data → Compliance**, not on the governance register.
 
 ---
 
@@ -326,12 +322,11 @@ The checks are limited to facts the platform can prove:
 | ACC-03 | Approvals in the last 90 days record the approver |
 | RPT-01 | No open country submission is more than 30 days overdue |
 | RPT-02 | No open assignment is still unstarted after its due date |
-| CMP-01 | FDRS Annual Report and Audited Financial Statement, last three periods. Not applicable when FDRS is not in use |
 | MET-01 | Active (non-archived) indicators have a definition |
 | MET-02 | Indicator suggestions are not left pending for more than 30 days |
 | LIF-01 | Active public submission links have an expiry date |
 
-Reporting discipline is timeliness. Validation rules and the FDRS data-quality score stay in their own tools. The page also keeps the focal-point register for every country, which is wider than OWN-03.
+Reporting discipline is timeliness. Validation rules, the FDRS data-quality score, and FDRS document compliance stay in their own tools. The page also keeps the focal-point register for every country, which is wider than OWN-03.
 
 Open issues link to the screen that fixes them. Assignments with no data owner open Assignments filtered with `?no_data_owner=1`. Ghost users and accounts with country access but no role open Edit User.
 
@@ -390,7 +385,7 @@ The following practices help sustain governance in daily use.
 | Accountability | Admin action log, risk levels | [Admin action risk levels](../../workflows/admin/admin-action-risk-levels.md) |
 | Accountability | `submitted_by` / `approved_by` tracking | Automatic on status changes |
 | Accountability | `activated_by` / `deactivated_by` tracking | Automatic on assignment lifecycle changes |
-| Compliance | FDRS document compliance, or not applicable | Governance register → CMP-01 |
+| FDRS documents | Annual Report and Audited Financial Statement coverage | Explore Data → Compliance |
 | Metadata | Active indicators without a definition | Governance register → MET-01 |
 | Metadata | Suggestions pending more than 30 days | Governance register → MET-02 |
 | Lifecycle | Statuses, reopen | [Submission statuses](submission-statuses-and-permissions.md), [Review and approve](../admin/review-approve-submissions.md) |

@@ -32,7 +32,7 @@ from app.models.rbac import (
     RbacUserRole,
     RbacAccessGrant,
 )
-from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -557,7 +557,7 @@ def _get_quality_metrics() -> Dict[str, Any]:
         and_(
             AssignmentEntityStatus.entity_type == "country",
             AssignmentEntityStatus.due_date.isnot(None),
-            AssignmentEntityStatus.due_date < now,
+            AssignmentEntityStatus.due_date < naive_utc(now),
             AssignmentEntityStatus.status.in_(["pending", "in_progress"]),
         )
     )

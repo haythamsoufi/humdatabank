@@ -1,8 +1,13 @@
 """
 Utility helpers for working with timezone-aware UTC datetimes and org-local time.
 
-Storage and server logic use UTC. IFRC operational schedules (e.g. FDS digests) use
-the organization timezone — Geneva (Europe/Zurich, CET/CEST).
+Storage and server logic use UTC. Timestamp columns are ``timestamp without time
+zone`` and hold the UTC wall clock, so values come back naive. ``ensure_utc()``
+labels those as UTC before any arithmetic. PostgreSQL sessions are pinned to UTC
+so an aware bind parameter is not shifted by the server timezone.
+
+IFRC operational schedules (e.g. FDS digests) use the organization timezone —
+Geneva (Europe/Zurich, CET/CEST).
 """
 from __future__ import annotations
 
@@ -45,6 +50,63 @@ def ensure_utc(dt):
         return dt.replace(tzinfo=timezone.utc)
     # Already timezone-aware - convert to UTC
     return dt.astimezone(timezone.utc)
+
+
+def naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """UTC wall clock with tzinfo removed.
+
+    Bind this to ``timestamp without time zone`` columns. Those columns store
+    UTC clock time and load back as naive datetimes.
+    """
+    aware = ensure_utc(dt)
+    if aware is None:
+        return None
+    return aware.replace(tzinfo=None)
+
+
+def parse_iso_utc(value) -> Optional[datetime]:
+    """Parse an ISO-8601 datetime as UTC.
+
+    Aware values are converted to UTC. Naive values are treated as UTC.
+    A trailing ``Z`` is accepted. Returns None when *value* is empty or not
+    a datetime.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return ensure_utc(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(parsed, datetime):
+        return None
+    return ensure_utc(parsed)
+
+
+_UTC_MIN = datetime.min.replace(tzinfo=timezone.utc)
+_UTC_MAX = datetime.max.replace(tzinfo=timezone.utc)
+
+
+def utc_sort_key(dt: Optional[datetime], *, empty: str = "min") -> datetime:
+    """Sort key that accepts naive UTC values, aware datetimes, and None.
+
+    ``empty="min"`` places missing values first in ascending order.
+    ``empty="max"`` places them last.
+    """
+    sentinel = _UTC_MAX if empty == "max" else _UTC_MIN
+    if dt is None:
+        return sentinel
+    try:
+        normalized = ensure_utc(dt)
+    except AttributeError:
+        return sentinel
+    return normalized if normalized is not None else sentinel
 
 
 def now_in_org_timezone() -> datetime:

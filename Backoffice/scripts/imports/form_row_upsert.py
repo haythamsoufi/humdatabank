@@ -381,6 +381,7 @@ def _apply_published_snapshot(entry: Any, payload: Dict[str, Any]) -> None:
     if not payload.get("set_published"):
         return
     from app.models.forms import FormData
+    from app.utils.datetime_helpers import utcnow
 
     published_value, published_disagg, published_source = _published_snapshot_fields(payload)
     entry.published_value = published_value
@@ -391,7 +392,7 @@ def _apply_published_snapshot(entry: Any, payload: Dict[str, Any]) -> None:
         entry.published_at = None
         entry.published_by_user_id = None
     else:
-        entry.published_at = datetime.utcnow()
+        entry.published_at = utcnow()
 
 
 def _commit_upsert_and_yield() -> None:

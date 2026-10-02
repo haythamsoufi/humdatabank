@@ -4,7 +4,6 @@ Country resolution, country info, assignments, and user-accessible country lists
 """
 
 import logging
-from datetime import datetime
 from typing import Dict, List, Optional, Union, Any
 
 from flask_login import current_user
@@ -13,7 +12,7 @@ from sqlalchemy.orm import joinedload
 from app.models import Country, AssignedForm, FormTemplateVersion
 from app.models.assignments import AssignmentEntityStatus
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import ensure_utc, utc_sort_key, utcnow
 
 from .shared import (
     user_allowed_country_ids,
@@ -93,16 +92,17 @@ def get_country_info(country_identifier: Union[int, str]) -> Dict[str, Any]:
         now = utcnow()
         upcoming = []
         for s in statuses:
-            if s.status not in ['submitted', 'approved'] and s.due_date and s.due_date > now:
+            due = ensure_utc(s.due_date)
+            if s.status not in ['submitted', 'approved'] and due and due > now:
                 upcoming.append({
                     'template_name': s.assigned_form.template.name if s.assigned_form and s.assigned_form.template else 'Unknown',
-                    'due_date': s.due_date.isoformat(),
-                    'days_left': (s.due_date - now).days,
+                    'due_date': due.isoformat(),
+                    'days_left': (due - now).days,
                 })
         upcoming = sorted(upcoming, key=lambda x: x['days_left'])[:5]
 
         recent_submissions = []
-        for s in sorted(statuses, key=lambda x: x.status_timestamp or datetime.min, reverse=True)[:5]:
+        for s in sorted(statuses, key=lambda x: utc_sort_key(x.status_timestamp), reverse=True)[:5]:
             if s.status in ['submitted', 'approved']:
                 recent_submissions.append({
                     'template_name': s.assigned_form.template.name if s.assigned_form and s.assigned_form.template else 'Unknown',

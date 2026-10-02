@@ -33,7 +33,7 @@ from app.models import (
 )
 from app.models.enums import AssignmentEntityStatusValue
 from app.services.platform.governance_metrics_service import get_governance_metrics
-from app.utils.datetime_helpers import ensure_utc, utcnow
+from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -554,7 +554,7 @@ def _countries_missing_focal(ownership: Dict[str, Any]):
 
 def _recent_approvals_without_approver():
     try:
-        cutoff = utcnow() - timedelta(days=RECENT_APPROVAL_DAYS)
+        cutoff = naive_utc(utcnow() - timedelta(days=RECENT_APPROVAL_DAYS))
         count = AssignmentEntityStatus.query.filter(
             AssignmentEntityStatus.status == AssignmentEntityStatusValue.approved,
             AssignmentEntityStatus.approved_by_user_id.is_(None),
@@ -577,7 +577,7 @@ def _overdue_days(now, due) -> int:
 def _reporting_gaps():
     try:
         now = utcnow()
-        critical_before = now - timedelta(days=CRITICAL_OVERDUE_DAYS)
+        critical_before = naive_utc(now - timedelta(days=CRITICAL_OVERDUE_DAYS))
         overdue_q = (
             AssignmentEntityStatus.query.join(
                 AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id

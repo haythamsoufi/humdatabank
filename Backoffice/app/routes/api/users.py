@@ -2,7 +2,7 @@ from app.utils.transactions import request_transaction_rollback
 from contextlib import suppress
 import uuid
 # Backoffice/app/routes/api/users.py
-from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.datetime_helpers import utcnow, ensure_utc, utc_sort_key
 from app.utils.sql_utils import safe_ilike_pattern
 """
 User and Dashboard API endpoints.
@@ -13,7 +13,7 @@ from flask import request, current_app, session
 from flask_login import login_required, current_user
 from sqlalchemy import func, case, or_, and_
 from sqlalchemy.orm import aliased, joinedload
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
@@ -784,7 +784,7 @@ def get_dashboard():
                         continue
                     tmp_contrib.setdefault(aid, []).append((last_ts, user))
                 for aid, items in tmp_contrib.items():
-                    items.sort(key=lambda x: x[0] or datetime.min, reverse=True)
+                    items.sort(key=lambda x: utc_sort_key(x[0]), reverse=True)
                     contributors_by_assignment[aid] = [u for _, u in items]
 
                 entity_country = EntityService.get_country_for_entity(

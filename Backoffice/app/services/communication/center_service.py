@@ -24,7 +24,7 @@ from app.services.email.delivery import (
 )
 from app.services.notification.core import get_default_icon_for_notification_type
 from app.services.notification.service import NotificationService
-from app.utils.datetime_helpers import ensure_utc
+from app.utils.datetime_helpers import ensure_utc, utc_sort_key
 
 RECORD_TYPE_NOTIFICATION = 'notification'
 RECORD_TYPE_EMAIL = 'email'
@@ -152,7 +152,7 @@ def ensure_notifications_for_linked_email_logs(
 
     extra = Notification.query.filter(Notification.id.in_(missing_ids)).all()
     merged = list(notifications) + extra
-    merged.sort(key=lambda row: row.created_at or datetime.min, reverse=True)
+    merged.sort(key=lambda row: utc_sort_key(row.created_at), reverse=True)
     return merged
 
 

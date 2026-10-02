@@ -8,10 +8,18 @@ from flask import current_app
 from flask.cli import with_appcontext
 
 from app.extensions import db
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import ensure_utc, naive_utc, utcnow
 from app.utils.transactions import atomic
 
 logger = logging.getLogger(__name__)
+
+
+def _hours_since(value):
+    """Hours between a stored timestamp and now. Naive values are UTC."""
+    stamp = ensure_utc(value)
+    if stamp is None:
+        return 0.0
+    return (utcnow() - stamp).total_seconds() / 3600
 
 
 def register_dev_tools_commands(app):
@@ -48,8 +56,8 @@ def register_dev_tools_commands(app):
             click.echo(f"  Total sessions: {total_sessions}")
             click.echo(f"  Active sessions: {active_sessions}")
 
-            inactivity_cutoff = utcnow() - timedelta(hours=2)
-            max_duration_cutoff = utcnow() - timedelta(hours=8)
+            inactivity_cutoff = naive_utc(utcnow() - timedelta(hours=2))
+            max_duration_cutoff = naive_utc(utcnow() - timedelta(hours=8))
 
             inactive_sessions = UserSessionLog.query.filter(
                 UserSessionLog.is_active == True,
@@ -67,9 +75,7 @@ def register_dev_tools_commands(app):
                 click.echo("\nSessions to be cleaned up:")
                 for session_log in sessions_to_close:
                     user_email = session_log.user.email if session_log.user else "Unknown"
-                    hours_since_activity = (
-                        utcnow() - session_log.last_activity
-                    ).total_seconds() / 3600
+                    hours_since_activity = _hours_since(session_log.last_activity)
                     click.echo(
                         f"  - User: {user_email}, Last activity: {hours_since_activity:.1f} hours ago"
                     )
@@ -192,12 +198,8 @@ def register_dev_tools_commands(app):
             click.echo("\nActive session details:")
             for session_log in active_session_details:
                 user_email = session_log.user.email if session_log.user else "Unknown"
-                hours_since_start = (
-                    utcnow() - session_log.session_start
-                ).total_seconds() / 3600
-                hours_since_activity = (
-                    utcnow() - session_log.last_activity
-                ).total_seconds() / 3600
+                hours_since_start = _hours_since(session_log.session_start)
+                hours_since_activity = _hours_since(session_log.last_activity)
                 click.echo(f"  - User: {user_email}")
                 click.echo(f"    Session start: {session_log.session_start}")
                 click.echo(f"    Last activity: {session_log.last_activity}")
@@ -240,12 +242,8 @@ def register_dev_tools_commands(app):
 
             for session_log in all_sessions:
                 user_email = session_log.user.email if session_log.user else "Unknown"
-                hours_since_start = (
-                    utcnow() - session_log.session_start
-                ).total_seconds() / 3600
-                hours_since_activity = (
-                    utcnow() - session_log.last_activity
-                ).total_seconds() / 3600
+                hours_since_start = _hours_since(session_log.session_start)
+                hours_since_activity = _hours_since(session_log.last_activity)
 
                 status = "ACTIVE" if session_log.is_active else "INACTIVE"
                 if session_log.is_active:

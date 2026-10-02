@@ -12,8 +12,8 @@ from sqlalchemy import and_, or_, func, case
 from sqlalchemy.orm import aliased, joinedload
 from app.services import get_user_countries
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PERIOD_NAME
+from app.utils.datetime_helpers import utc_sort_key, utcnow
 from app.utils.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
-from datetime import datetime
 from app.services.notification.core import get_country_recent_activities, notify_self_report_created
 from app.services.forms.reporting_period_service import (
     dashboard_assignment_period_sort_key,
@@ -28,7 +28,6 @@ from app.forms.auth_forms import RequestCountryAccessForm
 from flask_babel import _
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from contextlib import suppress
-from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, PAST_ASSIGNMENT_DAYS
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.request_utils import is_top_level_navigation
@@ -678,7 +677,7 @@ def dashboard():
                         tmp.setdefault(aid, []).append((last_ts, user))
 
                     for aid, items in tmp.items():
-                        items.sort(key=lambda x: x[0] or datetime.min, reverse=True)
+                        items.sort(key=lambda x: utc_sort_key(x[0]), reverse=True)
                         contributors_by_assignment[aid] = [u for _, u in items]
                 else:
                     last_modified_user_by_assignment = {}
@@ -804,7 +803,7 @@ def dashboard():
 
 
             # Sort the combined list - sort by date_info, with None dates last
-            all_forms_for_display.sort(key=lambda x: x['date_info'] if x['date_info'] is not None else datetime.max, reverse=False)
+            all_forms_for_display.sort(key=lambda x: utc_sort_key(x['date_info'], empty="max"), reverse=False)
 
             # NEW: Separate assignments into current and past based on status and timestamp
             from datetime import timedelta, timezone

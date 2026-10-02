@@ -158,9 +158,10 @@ class TestDevActAsHelpers:
         assert len(match) == 1
         assert match[0]['access_label'] == 'User'
 
-    def test_get_dev_act_as_users_excludes_non_seeded_users(self, app, db_session):
+    def test_get_dev_act_as_users_includes_signed_in_users(self, app, db_session):
         seeded = create_test_user(db_session, email='test_admin@humdatabank.org', name='Seeded')
         real = create_test_user(db_session, email='real.person@example.org', name='Real Person')
+        inactive = create_test_user(db_session, email='inactive.person@example.org', name='Inactive', active=False)
         db_session.add(UserLoginLog(
             user_id=real.id,
             email_attempted=real.email,
@@ -169,9 +170,12 @@ class TestDevActAsHelpers:
         ))
         db_session.commit()
         with app.test_request_context('/'):
-            ids = {u['id'] for u in _get_dev_act_as_users()}
-        assert seeded.id in ids
-        assert real.id not in ids
+            users = _get_dev_act_as_users()
+        by_id = {u['id']: u for u in users}
+        assert seeded.id in by_id
+        assert real.id in by_id
+        assert by_id[real.id]['registered'] is True
+        assert inactive.id not in by_id
 
     def test_get_dev_act_as_users_includes_preadded_before_registration(self, app, db_session):
         preadded = create_test_user(db_session, email='preadded.user@example.com', name='Pre Added')
@@ -256,15 +260,15 @@ class TestDevActAsHelpers:
         assert mock_complete.call_args.args[0].id == user.id
         assert resp.status_code == 302
 
-    def test_dev_act_as_route_refuses_non_seeded_user_id(self, app, db_session, monkeypatch):
+    def test_dev_act_as_route_allows_signed_in_user(self, app, db_session, monkeypatch):
         from app.routes.auth import dev_act_as_login
 
         monkeypatch.setenv('FLASK_CONFIG', 'development')
         app.config['DEBUG'] = True
-        victim = create_test_user(db_session, email='real.admin@example.org', name='Real Admin')
+        signed_in = create_test_user(db_session, email='real.admin@example.org', name='Real Admin')
         db_session.add(UserLoginLog(
-            user_id=victim.id,
-            email_attempted=victim.email,
+            user_id=signed_in.id,
+            email_attempted=signed_in.email,
             event_type='login_success',
             ip_address='127.0.0.1',
         ))
@@ -273,12 +277,14 @@ class TestDevActAsHelpers:
         with app.test_request_context(
             '/login/dev-act-as',
             method='POST',
-            data={'user_id': str(victim.id)},
+            data={'user_id': str(signed_in.id)},
             environ_base={'REMOTE_ADDR': '127.0.0.1'},
         ):
-            with patch('app.routes.auth._complete_dev_act_as_login') as mock_complete:
+            with patch('app.routes.auth._complete_dev_act_as_login') as mock_complete, \
+                 patch('app.routes.auth.safe_redirect', return_value=make_response('', 302)):
                 resp = dev_act_as_login()
-        mock_complete.assert_not_called()
+        mock_complete.assert_called_once()
+        assert mock_complete.call_args.args[0].id == signed_in.id
         assert resp.status_code == 302
 
     def test_dev_act_as_route_allows_preadded_user(self, app, db_session, monkeypatch):

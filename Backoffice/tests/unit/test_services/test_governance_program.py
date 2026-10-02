@@ -1,12 +1,13 @@
 """Controls and the governance issue register."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from tests.factories import create_test_user
 from app.models import GovernanceIssue
 from app.services.platform.governance_program import (
+    _overdue_days,
     accept_governance_issue,
     evaluate_controls,
     reopen_governance_issue,
@@ -47,6 +48,12 @@ def _ctx(**overrides):
 
 def _by_code(results):
     return {row["code"]: row for row in results}
+
+
+def test_overdue_days_accepts_a_naive_utc_due_date():
+    now = datetime(2026, 10, 2, tzinfo=timezone.utc)
+    due = datetime(2026, 8, 1)
+    assert _overdue_days(now, due) == 62
 
 
 class TestEvaluateControls:

@@ -358,6 +358,137 @@
     background: rgb(249 250 251);
 }
 
+.vd-table-tracker th {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.vd-table-tracker th.vd-head-wrap {
+    vertical-align: middle;
+}
+
+.vd-col-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.vd-col-label {
+    min-width: 0;
+    line-height: 1.25;
+    text-align: center;
+}
+
+.vd-sort-mark {
+    margin-left: 0.2rem;
+    color: rgb(37 99 235);
+    font-size: 0.65rem;
+}
+
+.vd-col-menu-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: rgb(156 163 175);
+    cursor: pointer;
+}
+
+.vd-col-menu-btn:hover,
+.vd-col-menu-btn:focus-visible,
+.vd-col-menu-btn[aria-expanded="true"] {
+    background: rgb(239 246 255);
+    color: rgb(29 78 216);
+}
+
+.vd-col-menu-btn.is-sorted,
+.vd-col-menu-btn.is-filtered {
+    color: rgb(37 99 235);
+}
+
+.vd-col-popover {
+    position: fixed;
+    z-index: 80;
+    width: 14rem;
+    padding: 0.75rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.5rem;
+    background: rgb(255 255 255);
+    box-shadow: 0 10px 24px rgb(15 23 42 / 0.12);
+}
+
+.vd-col-popover-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(17 24 39);
+}
+
+.vd-col-popover-sort {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 0.65rem;
+}
+
+.vd-col-popover-sort button {
+    flex: 1 1 0;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.35rem;
+    background: rgb(249 250 251);
+    color: rgb(55 65 81);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vd-col-popover-sort button.is-active {
+    border-color: rgb(37 99 235);
+    background: rgb(239 246 255);
+    color: rgb(29 78 216);
+}
+
+.vd-col-popover-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgb(107 114 128);
+}
+
+.vd-col-filter {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.35rem;
+    background: rgb(255 255 255);
+    color: rgb(55 65 81);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.3;
+}
+
+.vd-col-clear {
+    margin-top: 0.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgb(37 99 235);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
 .vd-change-up { color: rgb(21 128 61); font-weight: 600; }
 .vd-change-down { color: rgb(220 38 38); font-weight: 600; }
 .vd-change-flat { color: rgb(75 85 99); font-weight: 600; }

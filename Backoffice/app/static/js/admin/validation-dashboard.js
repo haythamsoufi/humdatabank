@@ -263,10 +263,24 @@
         return (state.historyYears || []).slice(0, 3);
     }
 
+    function currentComparisonYear() {
+        var years = comparisonYears();
+        return years.length ? years[0] : null;
+    }
+
+    function priorComparisonYear() {
+        var years = comparisonYears();
+        return years.length > 1 ? years[1] : null;
+    }
+
+    function displayedComparisonYears() {
+        return comparisonYears().slice().reverse();
+    }
+
     function yearValue(row, year) {
         var hv = (row && row.historical_values) || {};
         var raw = hv[String(year)];
-        if ((raw == null || raw === '') && String(comparisonYears()[0]) === String(year)) raw = row.current_value;
+        if ((raw == null || raw === '') && String(currentComparisonYear()) === String(year)) raw = row.current_value;
         return raw == null || raw === '' ? '' : formatNumericDisplay(raw);
     }
 
@@ -277,10 +291,11 @@
     }
 
     function changeHtml(row) {
-        var years = comparisonYears();
-        if (years.length < 2) return '<span class="vd-muted">—</span>';
-        var current = parseDisplayNumber(yearValue(row, years[0]));
-        var prior = parseDisplayNumber(yearValue(row, years[1]));
+        var currentYear = currentComparisonYear();
+        var priorYear = priorComparisonYear();
+        if (currentYear == null || priorYear == null) return '<span class="vd-muted">—</span>';
+        var current = parseDisplayNumber(yearValue(row, currentYear));
+        var prior = parseDisplayNumber(yearValue(row, priorYear));
         if (current == null || prior == null || prior === 0) return '<span class="vd-muted">—</span>';
         var pct = ((current - prior) / Math.abs(prior)) * 100;
         var cls = pct > 0.05 ? 'vd-change-up' : (pct < -0.05 ? 'vd-change-down' : 'vd-change-flat');
@@ -334,7 +349,6 @@
     }
 
     function indicatorHeaderCells() {
-        var years = comparisonYears();
         if (state.layout === 'checks') {
             return [
                 headerCell(t.indicator || 'Indicator', 'vd-sticky'),
@@ -355,17 +369,22 @@
             ];
         }
         var cells = [headerCell(t.indicator || 'Indicator', 'vd-sticky')];
-        if (!years.length) cells.push(headerCell(t.value || 'Value', 'vd-num'));
-        years.forEach(function (year) { cells.push(headerCell(String(year), 'vd-num')); });
-        var changeLabel = t.change || 'Change';
-        if (years.length >= 2) changeLabel += ' vs ' + years[1];
-        cells.push(headerCell(changeLabel, 'vd-num'));
+        var displayed = displayedComparisonYears();
+        var currentYear = currentComparisonYear();
+        if (!displayed.length) cells.push(headerCell(t.value || 'Value', 'vd-num'));
+        displayed.forEach(function (year) {
+            if (String(year) === String(currentYear) && priorComparisonYear() != null) {
+                var changeLabel = t.change || 'Change';
+                changeLabel += ' vs ' + priorComparisonYear();
+                cells.push(headerCell(changeLabel, 'vd-num'));
+            }
+            cells.push(headerCell(String(year), 'vd-num'));
+        });
         cells.push(headerCell(t.automaticCheck || 'Automatic check', 'vd-cell-wrap'));
         return cells;
     }
 
     function indicatorBodyCells(row) {
-        var years = comparisonYears();
         var name = { text: row.indicator_label || row.kpi_code || '', className: 'vd-sticky' };
         if (state.layout === 'checks') {
             return [
@@ -387,13 +406,17 @@
             ];
         }
         var cells = [name];
-        if (!years.length) {
+        var displayed = displayedComparisonYears();
+        var currentYear = currentComparisonYear();
+        if (!displayed.length) {
             cells.push(valueCell(row.current_value ? formatNumericDisplay(row.current_value) : '', 'vd-num'));
         }
-        years.forEach(function (year) {
+        displayed.forEach(function (year) {
+            if (String(year) === String(currentYear) && priorComparisonYear() != null) {
+                cells.push(htmlCell(changeHtml(row), 'vd-num'));
+            }
             cells.push(valueCell(yearValue(row, year), 'vd-num'));
         });
-        cells.push(htmlCell(changeHtml(row), 'vd-num'));
         cells.push(htmlCell(checkHtml(row), 'vd-cell-wrap'));
         return cells;
     }

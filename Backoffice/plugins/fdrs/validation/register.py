@@ -5,6 +5,7 @@ from __future__ import annotations
 from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 from plugins.fdrs.validation.fdrs_matrix.rules import NON_ZERO_KPI_CODES, run_fdrs_matrix_rules
 from app.services.validation.pack_registry import ValidationPack, register_pack
+from plugins.fdrs.validation.tracker import FDRS_TRACKER
 from app.services.validation.rule_registry import FDRS_MATRIX_V1_RULES
 from app.utils.data_quality_constants import RULE_PACK_FDRS_MATRIX_V1
 
@@ -58,6 +59,6 @@ def register_fdrs_validation_pack() -> None:
             format_suffix=format_fdrs_question_suffix,
             threshold_kpi_codes=FDRS_THRESHOLD_KPI_CODES,
             required_indicator_codes=tuple(sorted(NON_ZERO_KPI_CODES)),
-            tracker_id="fdrs",
+            tracker=FDRS_TRACKER,
         )
     )

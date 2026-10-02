@@ -6,40 +6,20 @@ from typing import Any
 
 from sqlalchemy.orm import joinedload
 
-from app import db
 from app.models import FormData, FormItem, SubmittedDocument
 from app.models.core import Country
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.enums import status_display_label
-from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
-from plugins.fdrs.data_quality.fdrs_v1_catalog import fdrs_compliance_doc_label_matches
 from app.services.data_quality.helpers import (
     active_country_map_query,
-    compute_income_sources_ratio,
-    is_reported_value,
     load_form_data_by_kpi,
-    numeric_value,
     parse_period_year,
     resolve_assignment_aes,
 )
 from app.services.organization.country_service import fds_member_user_display_name
-from app.services.validation.pack_registry import get_pack
+from app.services.validation.pack_registry import ValidationTracker, get_pack
 from app.services.data_quality.service import get_rule_pack_for_template
 from .dashboard_service import global_periods_for_template
-
-# Document types shown as upload columns (FDRS template 21).
-TRACKER_DOCUMENT_SPECS: tuple[dict[str, str], ...] = (
-    {"key": "annual_report", "label": "Annual Report"},
-    {"key": "audited_financial", "label": "Audited Financial Statement"},
-    {"key": "strategic_plan", "label": "Strategic Plan"},
-    {"key": "unaudited_financial", "label": "Unaudited Financial Statement"},
-)
-
-TRACKER_SECTION_SPECS: tuple[dict[str, str], ...] = (
-    {"key": "governance", "label": "Governance"},
-    {"key": "finance", "label": "Finance"},
-    {"key": "reach", "label": "Reach"},
-)
 
 _STATUS_RANK = {
     "approved": 5,
@@ -73,48 +53,10 @@ def _overall_completion_rate(section_ratios: dict[str, float]) -> float:
     return round(sum(values) / len(values) * 100, 1)
 
 
-def _reporting_section_ratios(
-    kpi_data: dict[str, tuple[FormData | None, FormItem | None]],
-    *,
-    aes_id: int,
-    template_id: int,
-    version_id: int | None,
-) -> dict[str, float]:
-    gov_reported = sum(
-        1 for code in cat.GOVERNANCE_KPI_CODES if is_reported_value(kpi_data.get(code, (None, None))[0])
-    )
-    gov_ratio = gov_reported / len(cat.GOVERNANCE_KPI_CODES) if cat.GOVERNANCE_KPI_CODES else 0.0
-
-    income_entry = kpi_data.get(cat.FINANCE_TOTAL_INCOME, (None, None))[0]
-    expend_entry = kpi_data.get(cat.FINANCE_TOTAL_EXPENDITURE, (None, None))[0]
-    income_reported = 1.0 if is_reported_value(income_entry) else 0.0
-    expend_reported = 1.0 if is_reported_value(expend_entry) else 0.0
-    total_income = numeric_value(income_entry) or 0.0
-    income_sources_ratio = compute_income_sources_ratio(
-        aes_id,
-        template_id,
-        version_id,
-        kpi_data,
-        cat.INCOME_SOURCE_KPI_CODES,
-        total_income,
-    )
-    finance_ratio = income_reported * 0.35 + expend_reported * 0.35 + income_sources_ratio * 0.30
-
-    reach_reported = sum(
-        1 for code in cat.REACH_KPI_CODES if is_reported_value(kpi_data.get(code, (None, None))[0])
-    )
-    reach_ratio = reach_reported / len(cat.REACH_KPI_CODES) if cat.REACH_KPI_CODES else 0.0
-
-    return {
-        "governance": round(gov_ratio, 3),
-        "finance": round(finance_ratio, 3),
-        "reach": round(reach_ratio, 3),
-    }
-
-
 def _document_field_map(
     template_id: int,
-    document_specs: tuple[dict[str, str], ...] = TRACKER_DOCUMENT_SPECS,
+    document_specs: tuple[dict[str, str], ...],
+    document_matches,
 ) -> dict[str, list[int]]:
     items = (
         FormItem.query.filter(
@@ -131,11 +73,15 @@ def _document_field_map(
         if isinstance(cfg, dict) and isinstance(cfg.get("document_type"), str):
             configured = cfg["document_type"].strip()
         for spec in document_specs:
-            if (
-                (configured and (configured == spec["label"] or fdrs_compliance_doc_label_matches(configured, spec["label"])))
-                or fdrs_compliance_doc_label_matches(label, spec["label"])
-                or label == spec["label"]
-            ):
+            spec_label = spec["label"]
+            configured_match = bool(configured) and (
+                configured == spec_label
+                or (document_matches is not None and document_matches(configured, spec_label))
+            )
+            label_match = label == spec_label or (
+                document_matches is not None and document_matches(label, spec_label)
+            )
+            if configured_match or label_match:
                 mapping[spec["key"]].append(item.id)
                 break
     return mapping
@@ -145,6 +91,7 @@ def _bulk_kpi_data_by_aes(
     aes_ids: list[int],
     template_id: int,
     version_id: int | None,
+    indicator_code,
 ) -> dict[int, dict[str, tuple[FormData | None, FormItem | None]]]:
     if not aes_ids:
         return {}
@@ -164,11 +111,10 @@ def _bulk_kpi_data_by_aes(
     kpi_to_item: dict[str, FormItem] = {}
     for item in items:
         bank = item.indicator_bank
-        if not bank or not bank.fdrs_kpi_code:
+        code = indicator_code(bank) if indicator_code is not None else None
+        if not code or code in kpi_to_item:
             continue
-        code = bank.fdrs_kpi_code.strip()
-        if code and code not in kpi_to_item:
-            kpi_to_item[code] = item
+        kpi_to_item[code] = item
 
     item_ids = [i.id for i in kpi_to_item.values()]
     data_rows = (
@@ -211,25 +157,16 @@ def _exact_period_assignments(template_id: int, period_name: str) -> list:
     return [single] if single is not None else []
 
 
-def _tracker_layout(template) -> tuple[tuple[dict[str, str], ...], tuple[dict[str, str], ...]]:
-    """Section and document columns for this template.
-
-    FDRS packs use the governance/finance/reach tracker. Other packs, and
-    templates with data quality turned off, show assignment status only.
-    Objects that are not a real published template (unit-test doubles) keep the
-    FDRS columns so existing tracker tests stay meaningful.
-    """
+def _tracker_for_template(template) -> ValidationTracker | None:
+    """Tracker contributed by this template's validation pack, if it has one."""
     version = getattr(template, "published_version", None)
-    enabled = getattr(version, "enable_data_quality", None)
-    if not isinstance(enabled, bool):
-        return TRACKER_SECTION_SPECS, TRACKER_DOCUMENT_SPECS
-    if not enabled:
-        return (), ()
+    if getattr(version, "enable_data_quality", None) is not True:
+        return None
     pack_code = get_rule_pack_for_template(template)
     pack = get_pack(pack_code) if isinstance(pack_code, str) else None
-    if pack and pack.tracker_id == "fdrs":
-        return TRACKER_SECTION_SPECS, TRACKER_DOCUMENT_SPECS
-    return (), ()
+    if pack is None:
+        return None
+    return pack.tracker
 
 
 def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
@@ -245,8 +182,14 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
 
     template = primary.template if primary else None
     version_id = template.published_version_id if template else None
-    section_specs, document_specs = _tracker_layout(template)
-    doc_field_map = _document_field_map(template_id, document_specs) if document_specs else {}
+    tracker = _tracker_for_template(template)
+    section_specs = tracker.sections if tracker else ()
+    document_specs = tracker.documents if tracker else ()
+    doc_field_map = (
+        _document_field_map(template_id, document_specs, tracker.document_matches if tracker else None)
+        if document_specs
+        else {}
+    )
     all_doc_item_ids = [iid for ids in doc_field_map.values() for iid in ids]
     delegation_review_enabled = any(
         bool(getattr(item, "requires_delegation_review", False)) for item in assignments
@@ -276,7 +219,16 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
                 resolved_period_by_country[country.id] = resolved
 
     aes_ids = [aes.id for aes in aes_by_country.values()]
-    kpi_by_aes = _bulk_kpi_data_by_aes(aes_ids, template_id, version_id)
+    kpi_by_aes = (
+        _bulk_kpi_data_by_aes(
+            aes_ids,
+            template_id,
+            version_id,
+            tracker.indicator_code if tracker else None,
+        )
+        if section_specs
+        else {}
+    )
 
     submitted_docs: list[SubmittedDocument] = []
     if aes_ids and all_doc_item_ids:
@@ -312,11 +264,11 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
 
         sections: dict[str, str] = {spec["key"]: "not_started" for spec in section_specs}
         section_ratios: dict[str, float] = {spec["key"]: 0.0 for spec in section_specs}
-        if section_specs:
+        if section_specs and tracker is not None and tracker.section_ratios is not None:
             kpi_data = kpi_by_aes.get(aes.id)
             if kpi_data is None:
                 kpi_data = load_form_data_by_kpi(aes.id, template_id, version_id)
-            ratios = _reporting_section_ratios(
+            ratios = tracker.section_ratios(
                 kpi_data,
                 aes_id=aes.id,
                 template_id=template_id,
@@ -335,9 +287,8 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         for spec in document_specs:
             documents[spec["key"]] = (aes.id, spec["key"]) in doc_lookup
 
-        has_ar = documents.get("annual_report", False)
-        has_afs = documents.get("audited_financial", False)
-        if has_ar and has_afs:
+        required_keys = tracker.required_document_keys if tracker else ()
+        if required_keys and all(documents.get(key) for key in required_keys):
             docs_both_required += 1
 
         fds_user = country.fds_member_user
@@ -403,6 +354,7 @@ def build_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
         "map": {"countries": map_countries},
         "documents_meta": [{"key": s["key"], "label": s["label"]} for s in document_specs],
         "sections_meta": [{"key": s["key"], "label": s["label"]} for s in section_specs],
+        "required_document_keys": list(tracker.required_document_keys) if tracker else [],
     }
 
 

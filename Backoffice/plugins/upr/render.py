@@ -22,7 +22,6 @@ from plugins.upr.catalog import (
     kpi_icon_src,
 )
 from plugins.upr.formatters import (
-    appeal_number,
     chf_label,
     document_subtitle,
     format_compact_chf,
@@ -39,6 +38,7 @@ from plugins.upr.i18n import (
     rtl_document_attrs,
     t,
 )
+from plugins.upr.maa_codes import appeal_code_for_cover
 
 
 def _export_dir_attrs() -> str:
@@ -465,7 +465,7 @@ COVER_FOOTER_ORG = "International Federation of Red Cross and Red Crescent Socie
 
 def _doc_footer(payload: dict[str, Any]) -> str:
     meta = payload.get("meta") or {}
-    code = escape(appeal_number(meta.get("iso2") or meta.get("appeal_iso2")))
+    code = escape(appeal_code_for_cover(meta))
     appeal_html = ""
     if code:
         appeal_html = (

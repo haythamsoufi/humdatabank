@@ -318,7 +318,12 @@ def document_subtitle(
 
 
 def appeal_number(iso2: str | None) -> str:
-    """Country appeal code ``MAA`` + ISO2 + ``001`` (e.g. Uganda → ``MAAUG001``)."""
+    """Static country appeal code ``MAA`` + ISO2 + ``001`` (Uganda → ``MAAUG001``).
+
+    Cover pages prefer the live code from appealgroupchild; see
+    ``plugins.upr.maa_codes``. This pattern is the fallback when that feed
+    has no row for the country.
+    """
     code = (iso2 or "").strip().upper()
     if len(code) != 2 or not code.isalpha():
         return ""

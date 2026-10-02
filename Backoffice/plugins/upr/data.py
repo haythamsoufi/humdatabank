@@ -64,6 +64,7 @@ from plugins.upr.loaders import (
     _load_entries,
     _load_items,
 )
+from plugins.upr.maa_codes import resolve_appeal_number
 from plugins.upr.matrix import (
     _funding_column_bucket,
     _funding_entity,
@@ -273,6 +274,10 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
         payload["meta"]["support_funding_label"] = t("Funding Reported")
         payload["meta"]["header_prefix"] = t("IN SUPPORT OF")
 
+    payload["meta"]["appeal_code"] = resolve_appeal_number(
+        payload["meta"].get("iso2"),
+        year=payload["meta"].get("year"),
+    )
     payload["support_total"] = support_total_from_rows(payload.get("support") or [])
     emergency_slots = {int(em.get("slot") or 0) for em in payload.get("emergencies") or []}
     payload["dashboards"] = [

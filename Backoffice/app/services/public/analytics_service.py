@@ -24,7 +24,9 @@ SEARCH_SUMMARY_FIELDS = ("id", "name", "type", "unit", "fdrs_kpi_code", "sector"
 _TEMPLATE_PROGRAMME_LABELS: Dict[int, str] = {
     21: "FDRS",
     22: "UPR",
+    23: "UPR",
     24: "UPR",
+    33: "UPR",
 }
 
 COUNTRY_SEARCH_SUMMARY_FIELDS = ("id", "name", "iso3", "iso2", "region")

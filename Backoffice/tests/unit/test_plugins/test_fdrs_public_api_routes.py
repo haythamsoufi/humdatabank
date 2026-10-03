@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import FormData
+from app.models import FormData, IndicatorBank
 from app.utils.datetime_helpers import utcnow
 from tests.factories import (
     create_test_api_key,
@@ -205,6 +205,32 @@ class TestPublishedDataContents:
             headers=_bearer_headers(full_key),
         )
         assert len(response.get_json()["data"]) == 1
+
+    def test_filter_by_indicator_bank_id(self, client, db_session, published_scenario):
+        indicator = IndicatorBank(name="Published feed indicator", type="number", unit="people", archived=False)
+        db_session.add(indicator)
+        db_session.commit()
+        item = published_scenario["item_public"]
+        item.indicator_bank_id = indicator.id
+        db_session.commit()
+
+        api_key_obj, full_key = create_test_api_key(db_session)
+        response = client.get(
+            _URL,
+            query_string={"indicator_bank_id": indicator.id},
+            headers=_bearer_headers(full_key),
+        )
+        data = response.get_json()["data"]
+        assert len(data) == 1
+        assert data[0]["indicator_bank_id"] == indicator.id
+        assert data[0]["id"] is not None
+
+        response_miss = client.get(
+            _URL,
+            query_string={"indicator_bank_id": indicator.id + 1},
+            headers=_bearer_headers(full_key),
+        )
+        assert response_miss.get_json()["data"] == []
 
     def test_filter_by_form_item_id(self, client, db_session, published_scenario):
         api_key_obj, full_key = create_test_api_key(db_session)

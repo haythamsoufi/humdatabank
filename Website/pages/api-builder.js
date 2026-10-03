@@ -9,7 +9,12 @@ import { useTranslation } from '../lib/useTranslation';
 export default function ApiBuilder() {
   const { t } = useTranslation();
   const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-  const apiKey = process.env.NEXT_PUBLIC_API_KEY || 'databank2026';
+
+  const toSameOriginProxy = (absoluteApiUrl) => {
+    const parsed = new URL(absoluteApiUrl);
+    const path = parsed.pathname.replace(/^\/api\/v1\//, '');
+    return `/api/backoffice/${path}${parsed.search}`;
+  };
 
   // State for parameters
   const [parameters, setParameters] = useState({
@@ -17,7 +22,11 @@ export default function ApiBuilder() {
     country_id: { enabled: false, value: '' },
     item_type: { enabled: false, value: '' },
     submission_type: { enabled: false, value: '' },
-      disagg: { enabled: false, value: '' },
+    indicator_bank_id: { enabled: false, value: '' },
+    country_iso3: { enabled: false, value: '' },
+    stable_key: { enabled: false, value: '' },
+    layout: { enabled: false, value: '' },
+    include_calculated_totals: { enabled: false, value: '' },
     period_name: { enabled: false, value: '' },
     page: { enabled: false, value: '1' },
     per_page: { enabled: false, value: '20' }
@@ -108,14 +117,43 @@ export default function ApiBuilder() {
       placeholder: t('apiBuilder.parameters.submission_type.placeholder'),
       description: t('apiBuilder.parameters.submission_type.description')
     },
-    disagg: {
+    indicator_bank_id: {
+      type: 'number',
+      label: 'indicator_bank_id',
+      placeholder: '729',
+      description: 'Limit facts to one indicator bank id.'
+    },
+    country_iso3: {
+      type: 'text',
+      label: 'country_iso3',
+      placeholder: 'KEN',
+      description: 'ISO3 country code. country_id is preferred when you have it.'
+    },
+    stable_key: {
+      type: 'text',
+      label: 'stable_key',
+      placeholder: 'UUID',
+      description: 'Logical field id that stays the same across template versions.'
+    },
+    layout: {
       type: 'select',
+      label: 'layout',
+      options: [
+        { value: 'flat', label: 'flat' },
+        { value: 'star', label: 'star' }
+      ],
+      placeholder: 'flat',
+      description: 'flat keeps fact arrays at the top level. star nests them for BI tools.'
+    },
+    include_calculated_totals: {
+      type: 'select',
+      label: 'include_calculated_totals',
       options: [
         { value: 'true', label: t('common.yes') },
         { value: 'false', label: t('common.no') }
       ],
-      placeholder: t('apiBuilder.parameters.disagg.placeholder', { defaultValue: 'Select yes or no' }),
-      description: t('apiBuilder.parameters.disagg.description', { defaultValue: 'Include disaggregation data when available' })
+      placeholder: 'true',
+      description: 'Pass false to drop calculated matrix row, column, and grand totals.'
     },
     period_name: {
       type: 'text',
@@ -200,7 +238,7 @@ export default function ApiBuilder() {
     setResponse(null);
 
     try {
-      const response = await fetch(generatedUrl);
+      const response = await fetch(toSameOriginProxy(generatedUrl));
       const contentType = response.headers.get('content-type');
 
       if (contentType && contentType.includes('application/json')) {
@@ -234,20 +272,20 @@ export default function ApiBuilder() {
     const buildExportUrl = (url) => {
       try {
         const u = new URL(url);
-        u.searchParams.set('per_page', '100000');
+        u.searchParams.set('per_page', '10000');
         return u.toString();
       } catch (_) {
         if (/([?&])per_page=\d+/.test(url)) {
-          return url.replace(/per_page=\d+/, 'per_page=100000');
+          return url.replace(/per_page=\d+/, 'per_page=10000');
         }
         const joiner = url.includes('?') ? '&' : '?';
-        return `${url}${joiner}per_page=100000`;
+        return `${url}${joiner}per_page=10000`;
       }
     };
 
     try {
       setIsDownloading(true);
-      const exportUrl = buildExportUrl(generatedUrl);
+      const exportUrl = toSameOriginProxy(buildExportUrl(generatedUrl));
       const res = await fetch(exportUrl);
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
@@ -297,7 +335,7 @@ export default function ApiBuilder() {
 
   // Generate URL whenever parameters change
   useEffect(() => {
-    const baseUrl = `${backendBaseUrl}/api/v1/data?api_key=${apiKey}`;
+    const baseUrl = `${backendBaseUrl}/api/v1/data`;
     const queryParams = [];
 
     Object.entries(parameters).forEach(([key, param]) => {
@@ -306,7 +344,7 @@ export default function ApiBuilder() {
       }
     });
 
-    const url = queryParams.length > 0 ? `${baseUrl}&${queryParams.join('&')}` : baseUrl;
+    const url = queryParams.length > 0 ? `${baseUrl}?${queryParams.join('&')}` : baseUrl;
     setGeneratedUrl(url);
   }, [parameters]);
 
@@ -424,8 +462,9 @@ export default function ApiBuilder() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.docs.authentication', { defaultValue: 'Authentication' })}</h3>
-                  <p className="text-sm text-humdb-gray-700 mt-2">{t('apiBuilder.docs.authInstruction', { param: 'api_key', defaultValue: 'Pass your API key via the api_key query parameter.' })}</p>
-                  <pre className="text-xs whitespace-pre-wrap bg-humdb-gray-50 border border-humdb-gray-200 rounded-lg p-3 mt-2">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY`}</pre>
+                  <p className="text-sm text-humdb-gray-700 mt-2">Send your API key in the Authorization header. A key in the query string still works, but responses are marked deprecated and are not cached.</p>
+                  <pre className="text-xs whitespace-pre-wrap bg-humdb-gray-50 border border-humdb-gray-200 rounded-lg p-3 mt-2">{`curl -H "Authorization: Bearer YOUR_KEY" \\
+  "${backendBaseUrl}/api/v1/data?template_id=21&period_name=2024"`}</pre>
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.endpoint.title')}</h3>
@@ -433,7 +472,7 @@ export default function ApiBuilder() {
                     <code className="text-sm">GET /api/v1/data</code>
                   </div>
                   <p className="text-sm text-humdb-gray-600 mt-2">
-                    Returns submitted form data with optional filtering and pagination.
+                    Returns submitted form data with optional filtering and pagination. Disaggregation is included on each fact as disaggregation_data. Matrix cells are returned separately in matrix_cells. Percentage values are a 0–1 decimal (25% is 0.25). Public FDRS dashboards should call GET /api/v1/fdrs/published-data, which serves the curated published snapshot on the stored 0–100 scale.
                   </p>
                 </div>
                 <div>
@@ -441,22 +480,24 @@ export default function ApiBuilder() {
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <ul className="text-sm space-y-2">
-                        <li><span className="font-medium">api_key</span>: required API key</li>
+                        <li><span className="font-medium">Authorization</span>: Bearer API key</li>
                         <li><span className="font-medium">template_id</span>: number</li>
-                        <li><span className="font-medium">submission_id</span>: number</li>
-                        <li><span className="font-medium">item_id</span>: number</li>
-                        <li><span className="font-medium">item_type</span>: 'indicator' | 'question' | 'document_field'</li>
-                        <li><span className="font-medium">country_id</span>: number</li>
-                        <li><span className="font-medium">submission_type</span>: 'assigned' | 'public'</li>
+                        <li><span className="font-medium">submission_id</span>: AssignmentEntityStatus id</li>
+                        <li><span className="font-medium">assignment_id</span>: AssignedForm id</li>
+                        <li><span className="font-medium">item_id</span> / <span className="font-medium">stable_key</span>: field id</li>
+                        <li><span className="font-medium">item_type</span>: indicator, question, document_field, matrix</li>
+                        <li><span className="font-medium">country_id</span> / <span className="font-medium">country_iso3</span></li>
+                        <li><span className="font-medium">submission_type</span>: assigned or public</li>
                       </ul>
                     </div>
                     <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <ul className="text-sm space-y-2">
-                        <li><span className="font-medium">period_name</span>: string (e.g. '2023', 'FY2023', 'Q1 2024')</li>
+                        <li><span className="font-medium">period_name</span>: string (e.g. 2024)</li>
                         <li><span className="font-medium">indicator_bank_id</span>: number</li>
-                        <li><span className="font-medium">disagg</span>: boolean ('true' to include disaggregation data; omitted/default excludes)</li>
-                        <li><span className="font-medium">page</span>: number (default 1)</li>
-                        <li><span className="font-medium">per_page</span>: number (default 20; use 50000 to fetch all)</li>
+                        <li><span className="font-medium">layout</span>: flat (default) or star</li>
+                        <li><span className="font-medium">include_calculated_totals</span>: true (default) or false</li>
+                        <li><span className="font-medium">include_dimensions</span>: countries, national societies, indicator bank</li>
+                        <li><span className="font-medium">page</span> / <span className="font-medium">per_page</span>: per_page max 10000</li>
                       </ul>
                     </div>
                   </div>
@@ -465,23 +506,23 @@ export default function ApiBuilder() {
                   <h3 className="text-lg font-semibold text-humdb-navy">{t('apiBuilder.docs.examplesTitle', { defaultValue: 'Examples' })}</h3>
                   <div className="mt-3 space-y-4">
                     <div className="p-4 bg-humdb-gray-50 rounded-lg border">
-                      <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleBasic', { defaultValue: 'Basic request (without disaggregation)' })}</p>
-                      <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY`}</pre>
+                      <p className="text-sm font-medium mb-2">Scoped public read</p>
+                      <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?template_id=21&period_name=2024`}</pre>
                     </div>
                     <div className="p-4 bg-humdb-gray-50 rounded-lg border">
-                      <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleDisagg', { defaultValue: 'Include disaggregation data' })}</p>
-                      <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY&disagg=true`}</pre>
+                      <p className="text-sm font-medium mb-2">Published FDRS figures for the public website</p>
+                      <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/fdrs/published-data?period_name=2024&indicator_bank_id=729`}</pre>
                     </div>
                     <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleFilterPaginate', { defaultValue: 'Filter by template, period, and paginate' })}</p>
-                      <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?api_key=YOUR_KEY&template_id=21&period_name=2023&page=1&per_page=100`}</pre>
+                      <pre className="text-xs whitespace-pre-wrap">{`GET ${backendBaseUrl}/api/v1/data?template_id=21&period_name=2024&page=1&per_page=100`}</pre>
                     </div>
                     <div className="p-4 bg-humdb-gray-50 rounded-lg border">
                       <p className="text-sm font-medium mb-2">{t('apiBuilder.docs.exampleCurlTitle', { defaultValue: 'cURL example' })}</p>
                       <pre className="text-xs whitespace-pre-wrap">{`curl -G "${backendBaseUrl}/api/v1/data" \\
-  --data-urlencode "api_key=YOUR_KEY" \\
+  -H "Authorization: Bearer YOUR_KEY" \\
   --data-urlencode "template_id=21" \\
-  --data-urlencode "period_name=2023" \\
+  --data-urlencode "period_name=2024" \\
   --data-urlencode "per_page=100"`}</pre>
                     </div>
                   </div>
@@ -571,7 +612,7 @@ export default function ApiBuilder() {
                             <label htmlFor={`enable_${key}`} className={`font-medium transition-colors ${
                               parameters[key].enabled ? 'text-humdb-red' : 'text-humdb-gray-800'
                             }`}>
-                              {t(`apiBuilder.parameters.${key}.label`)}
+                              {def.label || t(`apiBuilder.parameters.${key}.label`)}
                             </label>
                           </div>
                           {def.type === 'select' && (
@@ -698,18 +739,13 @@ export default function ApiBuilder() {
                             'public': 'Public'
                           };
                           displayValue = submissionTypeMap[param.value] || param.value;
-                        } else if (key === 'disagg') {
-                          const yesNoMap = {
-                            'true': t('common.yes'),
-                            'false': t('common.no')
-                          };
-                          displayValue = yesNoMap[param.value] || param.value;
                         }
 
+                        const def = parameterDefinitions[key];
                         return (
                           <div key={key} className="flex items-center justify-between bg-humdb-gray-50 rounded-lg px-3 py-2">
                             <span className="text-sm font-medium text-humdb-gray-700">
-                              {t(`apiBuilder.parameters.${key}.label`)}
+                              {def?.label || t(`apiBuilder.parameters.${key}.label`)}
                             </span>
                             <span className="text-sm text-humdb-gray-600 bg-white px-2 py-1 rounded border">
                               {displayValue}

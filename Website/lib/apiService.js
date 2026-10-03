@@ -1,6 +1,13 @@
 // lib/apiService.js
 
 import { FDRS_TEMPLATE_ID } from './constants';
+import {
+  adaptFlatDataPayload,
+  collectFormItems,
+  collectPublishedFdrsRows,
+  publishedFdrsSearchParams,
+  shouldUsePublishedFdrsFeed,
+} from './apiContract.mjs';
 export { FDRS_TEMPLATE_ID } from './constants';
 
 // Ensure this URL matches where your Flask backend is running.
@@ -1203,8 +1210,78 @@ export async function getDataWithRelated(filters = {}) {
  * Returns full response with data, form_items, and countries tables
  * @private
  */
+async function fetchPublishedFdrsBundle(filters = {}) {
+  const rows = await collectPublishedFdrsRows(async (page, perPage) => {
+    const url = getBackofficeApiUrl(
+      'fdrs/published-data',
+      publishedFdrsSearchParams(filters, page, perPage),
+    );
+    const bearer = getBearerAuthHeader();
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(bearer && url.includes('/api/v1/') ? { Authorization: bearer } : {}),
+      },
+      signal: AbortSignal.timeout(90000),
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Published FDRS feed HTTP ${response.status}`);
+    }
+    return response.json();
+  });
+  if (!rows) return null;
+  return {
+    data: rows,
+    form_items: [],
+    countries: [],
+    total_items: rows.length,
+    total_pages: 1,
+    current_page: 1,
+    per_page: rows.length,
+    source: 'fdrs-published',
+  };
+}
+
 async function getDataWithRelatedFromAPI(filters = {}) {
   const returnFullResponse = filters.returnFullResponse === true;
+  const templateId = filters.template_id || FDRS_TEMPLATE_ID;
+
+  if (shouldUsePublishedFdrsFeed(templateId, filters)) {
+    try {
+      const published = await fetchPublishedFdrsBundle(filters);
+      if (published) {
+        if (returnFullResponse) {
+          try {
+            published.form_items = await collectFormItems(async (page) => {
+              const url = getBackofficeApiUrl('form-items', {
+                template_id: String(templateId),
+                per_page: '1000',
+                page: String(page),
+              });
+              const bearer = getBearerAuthHeader();
+              const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                  Accept: 'application/json',
+                  ...(bearer && url.includes('/api/v1/') ? { Authorization: bearer } : {}),
+                },
+                signal: AbortSignal.timeout(60000),
+              });
+              if (!response.ok) return null;
+              return response.json();
+            });
+          } catch (error) {
+            console.warn('Form items for published FDRS failed:', error.message);
+          }
+        }
+        return returnFullResponse ? published : published.data;
+      }
+    } catch (error) {
+      console.warn('Published FDRS feed unavailable, falling back to /api/v1/data:', error.message);
+    }
+  }
 
   // Build URL using the enhanced helper function
   const backofficeUrl = buildDataTablesApiUrl({
@@ -1243,7 +1320,7 @@ async function getDataWithRelatedFromAPI(filters = {}) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
+    const result = adaptFlatDataPayload(await response.json());
 
     // Return full response object if requested, otherwise just data array for backward compatibility
     if (returnFullResponse) {

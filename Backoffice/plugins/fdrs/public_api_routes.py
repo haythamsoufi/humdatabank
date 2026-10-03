@@ -20,6 +20,7 @@ from flask import request
 
 from app.extensions import db
 from app.models import AssignedForm, Country, FormData, FormItem
+from app.utils.api_serialization import _wrap_disagg_dict
 from app.models.assignments import AssignmentEntityStatus
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
 from app.utils.api_helpers import (
@@ -49,8 +50,9 @@ API_ENDPOINTS = [
             "Published FDRS figures for the public website (published_* snapshot only). "
             "Bearer API key or an authenticated Backoffice session. "
             "Each row includes value_source (reported | imputed | null). "
-            "Filters: period_name, assignment_id, country_id / country_iso2 / country_iso3, "
-            "form_item_id, page, per_page."
+            "Filters: period_name, assignment_id, indicator_bank_id, "
+            "country_id / country_iso2 / country_iso3, form_item_id, page, per_page. "
+            "Percentage figures stay on the stored 0–100 scale."
         ),
         "consumers": "Public website, Backoffice session",
     },
@@ -71,6 +73,7 @@ def get_fdrs_published_data():
     Query parameters:
       - ``period_name``: exact FDRS reporting period (e.g. ``"2024"``)
       - ``assignment_id``: ``AssignedForm.id`` (one FDRS reporting round)
+      - ``indicator_bank_id``: limit to one indicator bank entry
       - ``country_id`` / ``country_iso2`` / ``country_iso3``
       - ``form_item_id``
       - ``page``, ``per_page`` (default 20, max 10000)
@@ -159,6 +162,10 @@ def get_fdrs_published_data():
         if form_item_id is not None:
             query = query.filter(FormData.form_item_id == form_item_id)
 
+        indicator_bank_id = request.args.get('indicator_bank_id', type=int)
+        if indicator_bank_id is not None:
+            query = query.filter(FormItem.indicator_bank_id == indicator_bank_id)
+
         total = query.count()
         total_pages = (total + per_page - 1) // per_page if per_page > 0 else 1
 
@@ -176,6 +183,7 @@ def get_fdrs_published_data():
 
         data = [
             {
+                'id': r.id,
                 'submission_id': r.submission_id,
                 'assignment_id': r.assignment_id,
                 'period_name': r.period_name,
@@ -189,7 +197,7 @@ def get_fdrs_published_data():
                 'item_label': r.item_label,
                 'value': r.published_value,
                 'num_value': r.published_numeric_value,
-                'disaggregation_data': r.published_disagg_data,
+                'disaggregation_data': _wrap_disagg_dict(r.published_disagg_data),
                 'value_source': r.published_source,
                 'data_status': (
                     'no_data' if FormData._is_blank_value(r.published_value, r.published_disagg_data)

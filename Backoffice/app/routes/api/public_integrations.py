@@ -96,7 +96,8 @@ def public_submission_coverage():
     Count countries with a public submitted value for a template/indicator, by period.
 
     Answers "how many countries submitted FDRS/UPR data for <period>, or across all
-    years?" — pass ``template_id=21`` for FDRS or ``22``/``24`` for UPR. Counts **public
+    years?" — pass ``template_id=21`` for FDRS, ``24`` for the Unified Country Plan,
+    or ``33`` for country reporting. Counts **public
     data coverage** only (rows with data_status='available' on privacy=public form
     items) — never internal assignment/workflow status, which requires an API key.
     """

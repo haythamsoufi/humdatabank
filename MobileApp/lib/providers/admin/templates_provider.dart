@@ -33,16 +33,43 @@ class TemplatesProvider with ChangeNotifier, AsyncOperationMixin {
       _error = null;
       notifyListeners();
 
-      final response =
-          await _errorHandler.executeWithErrorHandling<http.Response>(
-        apiCall: () => _api.get(AppConfig.mobileTemplatesEndpoint),
-        context: 'Load Templates',
-        defaultValue: null,
-        maxRetries: 1,
-        handleAuthErrors: true,
-      );
+      final collected = <Template>[];
+      var page = 1;
+      var totalPages = 1;
+      http.Response? response;
+      try {
+        while (page <= totalPages && page <= 25) {
+          response = await _errorHandler.executeWithErrorHandling<http.Response>(
+            apiCall: () => _api.get(
+              AppConfig.mobileTemplatesEndpoint,
+              queryParams: {'page': '$page', 'per_page': '200'},
+            ),
+            context: 'Load Templates',
+            defaultValue: null,
+            maxRetries: 1,
+            handleAuthErrors: true,
+          );
+          if (response == null || response.statusCode != 200) break;
+          final jsonData = decodeJsonObject(response.body);
+          if (jsonData['success'] != true) break;
+          collected.addAll(mobileDataMaps(jsonData).map(Template.fromJson));
+          totalPages = mobileTotalPages(jsonData);
+          page += 1;
+        }
+      } catch (e, stackTrace) {
+        final error = _errorHandler.parseError(
+          error: e,
+          stackTrace: stackTrace,
+          context: 'Parse Templates',
+        );
+        _error = error.getUserMessage();
+        _templates = collected;
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
 
-      if (response == null) {
+      if (response == null && collected.isEmpty) {
         _error = 'Unable to load templates. Please try again.';
         _templates = [];
         _isLoading = false;
@@ -50,49 +77,18 @@ class TemplatesProvider with ChangeNotifier, AsyncOperationMixin {
         return;
       }
 
-      if (response.statusCode == 200) {
-        try {
-          // Try to parse as JSON first
-          try {
-            final jsonData = decodeJsonObject(response.body);
-            if (jsonData['success'] == true) {
-              final rawData = jsonData['data'];
-              final List<dynamic>? templatesList = rawData is List
-                  ? rawData
-                  : rawData is Map ? (rawData['templates'] as List<dynamic>?) : (jsonData['templates'] as List<dynamic>?);
-              if (templatesList != null) {
-                _templates = templatesList
-                    .map((json) => Template.fromJson(json as Map<String, dynamic>))
-                    .toList();
-              } else {
-                _templates = [];
-              }
-              _error = null;
-            } else {
-              // Fallback to HTML parsing for backward compatibility
-              final html = response.body;
-              _templates = _parseTemplatesFromHtml(html);
-              _error = null;
-            }
-          } catch (e) {
-            // If JSON parsing fails, try HTML parsing as fallback
-            DebugLogger.logWarn('TEMPLATES', 'JSON parse failed, trying HTML: $e');
-            final html = response.body;
-            _templates = _parseTemplatesFromHtml(html);
-            _error = null;
-          }
-        } catch (e, stackTrace) {
-          final error = _errorHandler.parseError(
-            error: e,
-            stackTrace: stackTrace,
-            context: 'Parse Templates',
-          );
-          _error = error.getUserMessage();
-          _templates = [];
+      if (collected.isNotEmpty || (response != null && response.statusCode == 200)) {
+        if (collected.isNotEmpty ||
+            (response != null && response.body.trimLeft().startsWith('{'))) {
+          _templates = collected;
+          _error = null;
+        } else if (response != null) {
+          _templates = _parseTemplatesFromHtml(response.body);
+          _error = null;
         }
       } else {
         final error = _errorHandler.parseError(
-          error: Exception('HTTP ${response.statusCode}'),
+          error: Exception('HTTP ${response?.statusCode ?? 'unknown'}'),
           response: response,
           context: 'Load Templates',
         );

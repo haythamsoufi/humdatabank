@@ -38,7 +38,8 @@ class Document {
       uploadedAt: json['uploaded_at'] != null
           ? DateTime.parse(json['uploaded_at'] as String)
           : null,
-      assignmentPeriod: json['assignment_period'] as String?,
+      assignmentPeriod:
+          (json['assignment_period'] ?? json['period'])?.toString(),
       isPublic: json['is_public'] as bool? ?? false,
     );
   }

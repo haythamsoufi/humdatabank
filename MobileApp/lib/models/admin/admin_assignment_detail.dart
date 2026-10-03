@@ -9,6 +9,11 @@ class AdminAssignmentEntityRow {
   final bool isPublicAvailable;
   final String? submittedAtIso;
   final String? statusTimestampIso;
+  final double? completionRate;
+  final String? publishedAtIso;
+  final bool reopenedAfterClose;
+  final int pageCount;
+  final int pagesSubmitted;
 
   const AdminAssignmentEntityRow({
     required this.id,
@@ -20,6 +25,11 @@ class AdminAssignmentEntityRow {
     required this.isPublicAvailable,
     this.submittedAtIso,
     this.statusTimestampIso,
+    this.completionRate,
+    this.publishedAtIso,
+    this.reopenedAfterClose = false,
+    this.pageCount = 0,
+    this.pagesSubmitted = 0,
   });
 
   factory AdminAssignmentEntityRow.fromJson(Map<String, dynamic> json) {
@@ -37,7 +47,23 @@ class AdminAssignmentEntityRow {
       isPublicAvailable: json['is_public_available'] == true,
       submittedAtIso: json['submitted_at']?.toString(),
       statusTimestampIso: json['status_timestamp']?.toString(),
+      completionRate: _asDouble(json['completion_rate']),
+      publishedAtIso: json['published_at']?.toString(),
+      reopenedAfterClose: json['reopened_after_close'] == true,
+      pageCount: _asInt(json['page_count']),
+      pagesSubmitted: _asInt(json['pages_submitted']),
     );
+  }
+
+  static int _asInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse('${raw ?? ''}') ?? 0;
+  }
+
+  static double? _asDouble(dynamic raw) {
+    if (raw is num) return raw.toDouble();
+    return double.tryParse('${raw ?? ''}');
   }
 }
 
@@ -58,6 +84,7 @@ class AdminAssignmentDetail {
   final bool isPublicActive;
   final String? publicUrl;
   final int? publicSubmissionCount;
+  final bool enablePageSubmission;
   final List<AdminAssignmentEntityRow> entities;
 
   AdminAssignmentDetail({
@@ -76,6 +103,7 @@ class AdminAssignmentDetail {
     required this.isPublicActive,
     this.publicUrl,
     this.publicSubmissionCount,
+    this.enablePageSubmission = false,
     required this.entities,
   });
 
@@ -106,6 +134,7 @@ class AdminAssignmentDetail {
       hasPublicUrl: json['has_public_url'] == true,
       isPublicActive: json['is_public_active'] == true,
       publicUrl: json['public_url']?.toString(),
+      enablePageSubmission: json['enable_page_submission'] == true,
       publicSubmissionCount: pscRaw is int
           ? pscRaw
           : (pscRaw is num ? pscRaw.toInt() : null),

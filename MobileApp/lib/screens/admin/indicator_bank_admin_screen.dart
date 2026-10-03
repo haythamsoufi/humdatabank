@@ -35,6 +35,9 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider =
+          Provider.of<IndicatorBankAdminProvider>(context, listen: false);
+      provider.loadSectorNames();
       _applyFilters();
     });
   }
@@ -68,6 +71,29 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
 
   Future<void> _openFiltersBottomSheet() async {
     final loc = AppLocalizations.of(context)!;
+    final provider =
+        Provider.of<IndicatorBankAdminProvider>(context, listen: false);
+    if (provider.sectorNames.isEmpty) {
+      await provider.loadSectorNames();
+    }
+    if (!mounted) return;
+    final sectorNames = provider.sectorNames.isNotEmpty
+        ? provider.sectorNames
+        : const ['Health', 'WASH', 'Shelter', 'Education'];
+    final typeOptions = provider.measurementTypes.isNotEmpty
+        ? provider.measurementTypes
+        : const [
+            IndicatorTypeOption(code: 'number', label: 'Number'),
+            IndicatorTypeOption(code: 'percentage', label: 'Percentage'),
+          ];
+    if (_selectedSectorFilter != null &&
+        !sectorNames.contains(_selectedSectorFilter)) {
+      _selectedSectorFilter = null;
+    }
+    if (_selectedCategoryFilter != null &&
+        !typeOptions.any((option) => option.code == _selectedCategoryFilter)) {
+      _selectedCategoryFilter = null;
+    }
     await showAdminFiltersBottomSheet<void>(
       context: context,
       builder: (sheetContext, setModalState) {
@@ -126,7 +152,7 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategoryFilter,
                 decoration: InputDecoration(
-                  labelText: loc.category,
+                  labelText: loc.type,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -139,20 +165,13 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
                 items: [
                   DropdownMenuItem<String>(
                     value: null,
-                    child: Text(loc.allCategories),
+                    child: Text(loc.allTypes),
                   ),
-                  DropdownMenuItem<String>(
-                    value: 'output',
-                    child: Text(loc.output),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: 'outcome',
-                    child: Text(loc.outcome),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: 'impact',
-                    child: Text(loc.impact),
-                  ),
+                  for (final option in typeOptions)
+                    DropdownMenuItem<String>(
+                      value: option.code,
+                      child: Text(option.label),
+                    ),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -180,22 +199,11 @@ class _IndicatorBankAdminScreenState extends State<IndicatorBankAdminScreen>
                     value: null,
                     child: Text(loc.allSectors),
                   ),
-                  DropdownMenuItem<String>(
-                    value: 'health',
-                    child: Text(loc.health),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: 'wash',
-                    child: Text(loc.wash),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: 'shelter',
-                    child: Text(loc.shelter),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: 'education',
-                    child: Text(loc.education),
-                  ),
+                  for (final name in sectorNames)
+                    DropdownMenuItem<String>(
+                      value: name,
+                      child: Text(name),
+                    ),
                 ],
                 onChanged: (value) {
                   setState(() {

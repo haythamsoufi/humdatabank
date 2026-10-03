@@ -4,7 +4,6 @@ import '../../config/app_config.dart';
 import '../../models/shared/document.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
-import '../../utils/debug_logger.dart';
 import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
 import '../../di/service_locator.dart';
@@ -15,10 +14,12 @@ class DocumentManagementProvider with ChangeNotifier, AsyncOperationMixin {
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<Document> _documents = [];
+  List<String> _documentTypes = [];
   bool _isLoading = false;
   String? _error;
 
   List<Document> get documents => _documents;
+  List<String> get documentTypes => List.unmodifiable(_documentTypes);
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -53,19 +54,55 @@ class DocumentManagementProvider with ChangeNotifier, AsyncOperationMixin {
           queryParams['country'] = countryFilter;
         }
 
-        final response =
-            await _errorHandler.executeWithErrorHandling<http.Response>(
-          apiCall: () => _api.get(
-            AppConfig.mobileDocumentsEndpoint,
-            queryParams: queryParams.isNotEmpty ? queryParams : null,
-          ),
-          context: 'Load Documents',
-          defaultValue: null,
-          maxRetries: 1,
-          handleAuthErrors: true,
-        );
+        final collected = <Document>[];
+        var page = 1;
+        var totalPages = 1;
+        http.Response? response;
+        try {
+          while (page <= totalPages && page <= 25) {
+            final pageParams = {
+              ...queryParams,
+              'page': '$page',
+              'per_page': '200',
+            };
+            response = await _errorHandler.executeWithErrorHandling<http.Response>(
+              apiCall: () => _api.get(
+                AppConfig.mobileDocumentsEndpoint,
+                queryParams: pageParams,
+              ),
+              context: 'Load Documents',
+              defaultValue: null,
+              maxRetries: 1,
+              handleAuthErrors: true,
+            );
+            if (response == null || response.statusCode != 200) break;
+            final jsonData = decodeJsonObject(response.body);
+            if (jsonData['success'] != true) break;
+            final typeRows = mobileMetaList(jsonData, 'document_types');
+            if (typeRows.isNotEmpty) {
+              _documentTypes = typeRows
+                  .map((item) => item?.toString().trim() ?? '')
+                  .where((item) => item.isNotEmpty)
+                  .toList();
+            }
+            collected.addAll(mobileDataMaps(jsonData).map(Document.fromJson));
+            totalPages = mobileTotalPages(jsonData);
+            page += 1;
+          }
+        } catch (e, stackTrace) {
+          final error = _errorHandler.parseError(
+            error: e,
+            stackTrace: stackTrace,
+            context: 'Parse Documents',
+          );
+          _error = error.getUserMessage();
+          _documents = collected;
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
 
-        if (response == null) {
+        if (response == null && collected.isEmpty) {
           _error = 'Unable to load documents. Please try again.';
           _documents = [];
           _isLoading = false;
@@ -73,47 +110,18 @@ class DocumentManagementProvider with ChangeNotifier, AsyncOperationMixin {
           return;
         }
 
-        if (response.statusCode == 200) {
-          try {
-            // Try to parse as JSON first
-            try {
-              final jsonData = decodeJsonObject(response.body);
-              if (jsonData['success'] == true) {
-                final rawData = jsonData['data'];
-                final List<dynamic>? documentsList = rawData is List
-                    ? rawData
-                    : rawData is Map ? (rawData['documents'] as List<dynamic>?) : (jsonData['documents'] as List<dynamic>?);
-                if (documentsList != null) {
-                  _documents = documentsList
-                      .map((json) => Document.fromJson(json as Map<String, dynamic>))
-                      .toList();
-                } else {
-                  _documents = [];
-                }
-                _error = null;
-              } else {
-                // Fallback to HTML parsing for backward compatibility
-                _documents = _parseDocumentsFromHtml(response.body);
-                _error = null;
-              }
-            } catch (e) {
-              // If JSON parsing fails, try HTML parsing as fallback
-              DebugLogger.logWarn('DOCUMENTS', 'JSON parse failed, trying HTML: $e');
-              _documents = _parseDocumentsFromHtml(response.body);
-              _error = null;
-            }
-          } catch (e, stackTrace) {
-            final error = _errorHandler.parseError(
-              error: e,
-              stackTrace: stackTrace,
-              context: 'Parse Documents',
-            );
-            _error = error.getUserMessage();
-            _documents = [];
+        if (collected.isNotEmpty || (response != null && response.statusCode == 200)) {
+          if (collected.isNotEmpty ||
+              (response != null && response.body.trimLeft().startsWith('{'))) {
+            _documents = collected;
+            _error = null;
+          } else if (response != null) {
+            _documents = _parseDocumentsFromHtml(response.body);
+            _error = null;
           }
         } else {
           final error = _errorHandler.parseError(
-            error: Exception('HTTP ${response.statusCode}'),
+            error: Exception('HTTP ${response?.statusCode ?? 'unknown'}'),
             response: response,
             context: 'Load Documents',
           );

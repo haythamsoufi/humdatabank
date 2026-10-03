@@ -70,6 +70,32 @@ class _DocumentManagementScreenState extends State<DocumentManagementScreen>
   Future<void> _openFiltersBottomSheet() async {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final provider =
+        Provider.of<DocumentManagementProvider>(context, listen: false);
+    final documentTypes = provider.documentTypes.isNotEmpty
+        ? provider.documentTypes
+        : const [
+            'Annual Report',
+            'Audited Financial Statement',
+            'Unaudited Financial Statement',
+            'Strategic Plan',
+            'Operational Plan',
+            'Evaluation Report',
+            'Policy Document',
+            'Unified Network Plan',
+            'Unified Network Annual Report',
+            'Unified Network Midyear Report',
+            'Legal Document',
+            'Cover Image',
+            'Agreement',
+            'Other',
+          ];
+    if (_selectedTypeFilter != null &&
+        !documentTypes.any(
+          (type) => type.toLowerCase() == _selectedTypeFilter!.toLowerCase(),
+        )) {
+      _selectedTypeFilter = null;
+    }
     await showAdminFiltersBottomSheet<void>(
       context: context,
       builder: (sheetContext, setModalState) {
@@ -210,27 +236,14 @@ class _DocumentManagementScreenState extends State<DocumentManagementScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const DropdownMenuItem<String?>(
-                    value: 'report',
-                    child: Text(
-                      'Report',
-                      overflow: TextOverflow.ellipsis,
+                  for (final type in documentTypes)
+                    DropdownMenuItem<String?>(
+                      value: type,
+                      child: Text(
+                        type,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  DropdownMenuItem<String?>(
-                    value: 'publication',
-                    child: Text(
-                      loc.publication,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const DropdownMenuItem<String?>(
-                    value: 'cover_image',
-                    child: Text(
-                      'Cover Image',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
                 ],
                 onChanged: (value) {
                   setState(() => _selectedTypeFilter = value);

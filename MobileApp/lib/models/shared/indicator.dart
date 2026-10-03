@@ -88,10 +88,10 @@ class Indicator {
 
     return Indicator(
       id: parsedId,
-      name: json['name'] as String?,
-      type: json['type'] as String?,
-      unit: json['unit'] as String?,
-      fdrsKpiCode: json['fdrs_kpi_code'] as String?,
+      name: json['name']?.toString(),
+      type: json['type']?.toString(),
+      unit: json['unit']?.toString(),
+      fdrsKpiCode: json['fdrs_kpi_code']?.toString(),
       sector: sectorStr,
       subSector: subStr,
       sectorLevels: secLevels,
@@ -99,15 +99,30 @@ class Indicator {
       nameTranslations: _stringMap(json['name_translations']),
       definitionTranslations: _stringMap(json['definition_translations']),
       translatableLanguages: _stringList(json['translatable_languages']),
-      comments: json['comments'] as String?,
-      relatedPrograms: json['related_programs'] as String?,
+      comments: json['comments']?.toString(),
+      relatedPrograms: _relatedProgramsText(json['related_programs']),
       isEmergency: (json['is_emergency'] as bool?) ??
           (json['emergency'] as bool?) ??
           false,
       isArchived:
           (json['is_archived'] as bool?) ?? (json['archived'] as bool?) ?? false,
       canArchive: json['can_archive'] as bool? ?? true,
-      description: (json['description'] as String?) ?? (json['definition'] as String?),
+      description: json['description']?.toString() ?? json['definition']?.toString(),
     );
+  }
+
+  /// Detail payload sends a list; older rows and the edit form use a string.
+  static String? _relatedProgramsText(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is String) return raw;
+    if (raw is List) {
+      final parts = raw
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+      return parts.isEmpty ? null : parts.join(', ');
+    }
+    final text = raw.toString().trim();
+    return text.isEmpty ? null : text;
   }
 }

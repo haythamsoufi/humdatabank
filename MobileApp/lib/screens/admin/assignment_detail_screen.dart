@@ -303,6 +303,21 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen>
                   ),
                 ),
               ),
+              if (d.enablePageSubmission) ...[
+                const SizedBox(height: 12),
+                _labeledBlock(
+                  context,
+                  label: loc.pageSubmission,
+                  child: Text(
+                    loc.active,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.45,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               _sectionTitle(context, '${loc.entities} (${d.entities.length})'),
               const SizedBox(height: 12),
@@ -432,6 +447,9 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen>
     final theme = Theme.of(context);
     final due = _fmtIso(context, e.dueDateIso);
     final submitted = _fmtIso(context, e.submittedAtIso);
+    final published = _fmtIso(context, e.publishedAtIso);
+    final completion = e.completionRate;
+    final showPages = e.pageCount > 0;
 
     final nameStyle = (dense
             ? theme.textTheme.bodyLarge
@@ -471,7 +489,13 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen>
             ),
           ],
         ),
-        if (due != null || submitted != null || e.isPublicAvailable) ...[
+        if (due != null ||
+            submitted != null ||
+            published != null ||
+            completion != null ||
+            showPages ||
+            e.reopenedAfterClose ||
+            e.isPublicAvailable) ...[
           SizedBox(height: dense ? 6 : 8),
           Wrap(
             spacing: 10,
@@ -498,6 +522,35 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen>
                   '${loc.entitySubmittedAt}: $submitted',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: context.textSecondaryColor,
+                  ),
+                ),
+              if (completion != null)
+                Text(
+                  '${loc.completion}: ${completion.toStringAsFixed(completion.truncateToDouble() == completion ? 0 : 1)}%',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: context.textSecondaryColor,
+                  ),
+                ),
+              if (published != null)
+                Text(
+                  '${loc.lastPublished}: $published',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: context.textSecondaryColor,
+                  ),
+                ),
+              if (showPages)
+                Text(
+                  '${loc.pagesSubmitted}: ${e.pagesSubmitted}/${e.pageCount}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: context.textSecondaryColor,
+                  ),
+                ),
+              if (e.reopenedAfterClose)
+                Text(
+                  loc.reopenedAfterClose,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.tertiary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               if (e.isPublicAvailable)

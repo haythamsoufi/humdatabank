@@ -330,9 +330,10 @@ class TestListDocuments:
         ):
             login_user(route_admin)
             resp = list_documents()
-
-        _, status = _parse(resp)
-        assert status == 200
+            body, status = _parse(resp)
+            assert status == 200
+            payload = json.loads(body.get_data())
+            assert isinstance(payload['meta'].get('document_types'), list)
 
     def test_with_search(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_content import list_documents
@@ -581,9 +582,10 @@ class TestListIndicators:
         ):
             login_user(route_admin)
             resp = list_indicators()
-
-        _, status = _parse(resp)
-        assert status == 200
+            body, status = _parse(resp)
+            assert status == 200
+            payload = json.loads(body.get_data())
+            assert isinstance(payload['meta'].get('measurement_types'), list)
 
     def test_with_search_and_filters(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_content import list_indicators

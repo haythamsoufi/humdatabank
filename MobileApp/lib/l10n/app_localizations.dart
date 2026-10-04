@@ -437,7 +437,8 @@ class AppLocalizations {
       'welcome_to_ifrc_network_databank':
           'Welcome to the IFRC Network Databank',
       'splash_description':
-          'This is the one and only system for reporting data to IFRC. Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and logins — everything is now centralized and streamlined here.',
+          'This is the consolidated system for unified planning and reporting — with FDRS coming soon. One place to move away from scattered Excel files, KoBo forms, and multiple logins as workflows are brought together here.',
+      'one_database': 'One database',
       'powered_by_hum_databank': 'Powered by Humanitarian Databank',
       'open_on_github': 'Open on GitHub',
 
@@ -1631,6 +1632,7 @@ class AppLocalizations {
       'splash_description':
           'Este es el único sistema para reportar datos a la FICR. Di adiós a archivos Excel dispersos, formularios KoBo, múltiples plataformas e inicios de sesión: todo está ahora centralizado y optimizado aquí.',
       'powered_by_hum_databank': 'Impulsado por Humanitarian Databank',
+      'one_database': 'Una base de datos',
       'open_on_github': 'Abrir en GitHub',
 
       // Dashboard
@@ -2654,6 +2656,7 @@ class AppLocalizations {
       'splash_description':
           'C\'est le seul système pour rapporter des données à la FICR. Dites adieu aux fichiers Excel dispersés, aux formulaires KoBo, aux multiples plateformes et connexions — tout est maintenant centralisé et rationalisé ici.',
       'powered_by_hum_databank': 'Propulsé par Humanitarian Databank',
+      'one_database': 'Une seule base de données',
       'open_on_github': 'Ouvrir sur GitHub',
 
       // Dashboard
@@ -3677,6 +3680,7 @@ class AppLocalizations {
       'splash_description':
           'هذا هو النظام الوحيد للإبلاغ عن البيانات إلى الاتحاد الدولي. وداعاً لملفات Excel المتناثرة ونماذج KoBo والمنصات المتعددة وتسجيلات الدخول — كل شيء الآن مركزي ومبسط هنا.',
       'powered_by_hum_databank': 'مدعوم بواسطة Humanitarian Databank',
+      'one_database': 'قاعدة بيانات واحدة',
       'open_on_github': 'فتح على GitHub',
 
       // Dashboard
@@ -4666,6 +4670,7 @@ class AppLocalizations {
       'splash_description':
           'यह IFRC को डेटा रिपोर्ट करने के लिए एकमात्र प्रणाली है। बिखरे हुए Excel फ़ाइलों, KoBo फ़ॉर्म, कई प्लेटफ़ॉर्म और लॉगिन को अलविदा कहें — सब कुछ अब यहाँ केंद्रीकृत और सुव्यवस्थित है।',
       'powered_by_hum_databank': 'मानवीय डेटाबैंक द्वारा संचालित',
+      'one_database': 'एक डेटाबेस',
       'open_on_github': 'GitHub पर खोलें',
 
       // Dashboard
@@ -5681,6 +5686,7 @@ class AppLocalizations {
       'splash_description':
           'Это единственная система для отчетности данных в МФОКК. Попрощайтесь с разбросанными файлами Excel, формами KoBo, множественными платформами и входами — все теперь централизовано и оптимизировано здесь.',
       'powered_by_hum_databank': 'На платформе Humanitarian Databank',
+      'one_database': 'Одна база данных',
       'open_on_github': 'Открыть на GitHub',
 
       // Dashboard
@@ -6685,6 +6691,7 @@ class AppLocalizations {
       'splash_description':
           '这是向IFRC报告数据的唯一系统。告别分散的Excel文件、KoBo表单、多个平台和登录 — 现在一切都集中并简化在这里。',
       'powered_by_hum_databank': '由 Humanitarian Databank 提供支持',
+      'one_database': '一个数据库',
       'open_on_github': '在 GitHub 上打开',
 
       // Dashboard
@@ -8472,6 +8479,7 @@ class AppLocalizations {
   String get welcomeToIfrcNetworkDatabank =>
       translate('welcome_to_ifrc_network_databank');
   String get splashDescription => translate('splash_description');
+  String get oneDatabase => translate('one_database');
   String get poweredByHumDatabank => translate('powered_by_hum_databank');
   String get openOnGithub => translate('open_on_github');
 

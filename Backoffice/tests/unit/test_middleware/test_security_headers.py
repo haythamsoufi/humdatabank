@@ -263,6 +263,21 @@ class TestBaselineHeaders:
         hsts = _headers(app, secure=True).headers["Strict-Transport-Security"]
         assert "max-age=31536000" in hsts and "includeSubDomains" in hsts
 
+    def test_frameable_override_omits_x_frame_options(self, app):
+        from plugins.upr.plugin import UprPlugin
+
+        override = next(
+            item for item in UprPlugin().get_csp_overrides()
+            if item.endpoint == "upr.upr_documents_gallery"
+        )
+        with patch.object(app, "plugin_manager", create=True) as pm:
+            pm.get_csp_override.return_value = override
+            headers = _headers(app).headers
+        assert "X-Frame-Options" not in headers
+        assert headers["Cross-Origin-Resource-Policy"] == "cross-origin"
+        assert "frame-ancestors" not in headers["Content-Security-Policy"]
+        assert "script-src 'unsafe-inline'" in headers["Content-Security-Policy"]
+
     def test_plugin_override_path_still_gets_baseline_headers(self, app):
         from types import SimpleNamespace
 

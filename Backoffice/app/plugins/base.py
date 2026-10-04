@@ -26,11 +26,19 @@ class DataExplorerTabConfig:
 
 @dataclass(frozen=True)
 class CspOverride:
-    """Content-Security-Policy override for plugin-served HTML assets."""
+    """Content-Security-Policy override for plugin-served HTML assets.
+
+    ``x_frame_options`` defaults to ``SAMEORIGIN``. Pass ``None`` to omit the
+    header when the policy must allow a cross-origin parent (for example a
+    public page embedded by Power BI). ``cross_origin_resource_policy`` replaces
+    the baseline ``same-origin`` value when set.
+    """
 
     endpoint: str
     path_predicate: Callable[[str], bool]
     policy: str
+    x_frame_options: Optional[str] = "SAMEORIGIN"
+    cross_origin_resource_policy: Optional[str] = None
 
 
 @dataclass(frozen=True)

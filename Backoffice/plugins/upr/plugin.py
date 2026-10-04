@@ -26,6 +26,22 @@ _UPR_PDF_VIEWER_CSP = (
     "form-action 'none'"
 )
 
+# Public read-only catalogue. The script and styles are ours (nothing from the
+# IFRC payload is interpolated into them). frame-ancestors is omitted, and the
+# override clears X-Frame-Options, so Power BI — including Desktop visual hosts
+# whose origin is not a stable allow-list entry — can iframe the page.
+_UPR_DOCUMENTS_GALLERY_CSP = (
+    "default-src 'self'; "
+    "script-src 'unsafe-inline'; "
+    "style-src 'unsafe-inline'; "
+    "img-src 'self'; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'none'; "
+    "form-action 'self'"
+)
+
 
 class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
     @property
@@ -140,6 +156,13 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
                 endpoint="upr.assignment_narrative_file",
                 path_predicate=lambda path: True,
                 policy=_UPR_PDF_VIEWER_CSP,
+            ),
+            CspOverride(
+                endpoint="upr.upr_documents_gallery",
+                path_predicate=lambda path: True,
+                policy=_UPR_DOCUMENTS_GALLERY_CSP,
+                x_frame_options=None,
+                cross_origin_resource_policy="cross-origin",
             ),
         ]
 

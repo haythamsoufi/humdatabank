@@ -117,8 +117,17 @@ def add_security_headers(response):
         current_app.logger.debug("Extension CSP override lookup failed: %s", e)
 
     if csp_override is not None:
-        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        # None / "" omits the header so a cross-origin parent (Power BI) can frame
+        # a page whose CSP deliberately does not set frame-ancestors.
+        frame_options = getattr(csp_override, "x_frame_options", "SAMEORIGIN")
+        if frame_options:
+            response.headers['X-Frame-Options'] = frame_options
+        else:
+            response.headers.pop('X-Frame-Options', None)
         _apply_baseline_headers(response)
+        corp = getattr(csp_override, "cross_origin_resource_policy", None)
+        if corp:
+            response.headers['Cross-Origin-Resource-Policy'] = corp
         response.headers['Content-Security-Policy'] = csp_override.policy
         return response
 

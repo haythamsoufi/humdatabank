@@ -256,9 +256,9 @@ def test_import_funding_headers_follow_start_slot_order():
         warnings=[],
     )
     for item_id in (967, 968, 974):
-        assert matrices[item_id]["col_header|EA1"] == "Afghanistan - Earthquake (MDRAF019)"
+        assert matrices[item_id]["col_header|EA1"] == "MDRAF019 Afghanistan - Earthquake"
         assert matrices[item_id]["col_header|EA2"] == (
-            "Afghanistan - Population mvt from Pakistan (MDRAF018)"
+            "MDRAF018 Afghanistan - Population mvt from Pakistan"
         )
         assert "col_header|EA3" not in matrices[item_id]
     wb.close()

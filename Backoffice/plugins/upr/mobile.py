@@ -18,7 +18,7 @@ _UNIFIED_PLANNING_THUMB_MAX_ENTRIES = 128
 
 
 def unified_planning_config():
-    """Public config for unified planning documents: IFRC GO API URL and type IDs."""
+    """Public config for unified planning documents: appeals API URL and type IDs."""
     from app.routes.ai_documents.helpers import _get_ifrc_basic_auth
 
     base = "https://go-api.ifrc.org/Api/PublicSiteAppeals"
@@ -38,46 +38,69 @@ def unified_planning_config():
     )
 
 
-def unified_planning_thumbnail():
-    """Return a small JPEG of the PDF first page for unified-planning grid tiles."""
+def _decode_thumbnail_url_b64(url_b64: str, max_b64_len: int) -> tuple[str | None, str | None]:
+    """Decode a base64url PDF address. Returns ``(url, error)``."""
     import base64
+
+    token = (url_b64 or "").strip()
+    if len(token) > max_b64_len:
+        return None, "url_b64 is too long"
+    try:
+        pad = (-len(token)) % 4
+        if pad:
+            token += "=" * pad
+        return base64.urlsafe_b64decode(token.encode("ascii")).decode("utf-8"), None
+    except Exception:
+        return None, "Invalid url_b64"
+
+
+def _thumbnail_request_url(max_url_len: int, max_b64_len: int) -> tuple[str | None, str | None]:
+    """Read the PDF address from GET ``url_b64`` / ``url`` or the POST JSON body."""
     from urllib.parse import unquote
 
-    import fitz  # PyMuPDF
-    import requests
+    from app.utils.api_helpers import get_json_safe
 
+    raw = ""
+    if request.method == "POST":
+        data = get_json_safe()
+        if isinstance(data, dict):
+            url_b64 = (data.get("url_b64") or "").strip()
+            if url_b64:
+                decoded, error = _decode_thumbnail_url_b64(url_b64, max_b64_len)
+                if error:
+                    return None, error
+                raw = decoded or ""
+            else:
+                raw = (data.get("url") or "").strip()
+    else:
+        # GET uses url_b64 so the document host never appears in the query string
+        # (edge filters reject raw document URLs). ``url`` stays for older clients.
+        url_b64 = (request.args.get("url_b64") or "").strip()
+        if url_b64:
+            decoded, error = _decode_thumbnail_url_b64(url_b64, max_b64_len)
+            if error:
+                return None, error
+            raw = decoded or ""
+        else:
+            raw = (request.args.get("url") or "").strip()
+    if len(raw) > max_url_len:
+        return None, "url is too long"
+    return unquote(raw).strip(), None
+
+
+def unified_planning_thumbnail():
+    """Return a small JPEG of the PDF first page for unified-planning grid tiles."""
     from app.routes.ai_documents.helpers import (
         _get_ifrc_basic_auth,
         _ifrc_get_with_validated_redirects,
         _validate_ifrc_fetch_url,
     )
-    from app.utils.api_helpers import get_json_safe
 
     _max_url_len = int(current_app.config.get("UNIFIED_PLANNING_THUMB_MAX_URL_CHARS") or 16384)
     _max_b64_len = int(current_app.config.get("UNIFIED_PLANNING_THUMB_MAX_URL_B64_CHARS") or 32768)
-
-    if request.method == "POST":
-        data = get_json_safe()
-        raw = ""
-        if isinstance(data, dict):
-            url_b64 = (data.get("url_b64") or "").strip()
-            if url_b64:
-                if len(url_b64) > _max_b64_len:
-                    return mobile_bad_request("url_b64 is too long")
-                try:
-                    pad = (-len(url_b64)) % 4
-                    if pad:
-                        url_b64 += "=" * pad
-                    raw = base64.urlsafe_b64decode(url_b64.encode("ascii")).decode("utf-8")
-                except Exception:
-                    return mobile_bad_request("Invalid url_b64")
-            else:
-                raw = (data.get("url") or "").strip()
-    else:
-        raw = (request.args.get("url") or "").strip()
-    if len(raw) > _max_url_len:
-        return mobile_bad_request("url is too long")
-    url = unquote(raw).strip()
+    url, error = _thumbnail_request_url(_max_url_len, _max_b64_len)
+    if error or not url:
+        return mobile_bad_request(error or "url is required")
     ok, err = _validate_ifrc_fetch_url(url)
     if not ok:
         return mobile_bad_request(err)
@@ -91,6 +114,9 @@ def unified_planning_thumbnail():
             resp.headers["Content-Type"] = "image/jpeg"
             resp.headers["Cache-Control"] = "public, max-age=86400"
             return resp
+
+    import fitz  # PyMuPDF
+    import requests
 
     max_bytes = int(current_app.config.get("UNIFIED_PLANNING_THUMB_MAX_BYTES") or (12 * 1024 * 1024))
     auth = _get_ifrc_basic_auth()

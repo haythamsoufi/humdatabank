@@ -86,6 +86,21 @@ class TestMobilePaginated:
             body = json.loads(resp.get_data())
             assert body['meta']['total_pages'] == 3  # ceil(7/3)
 
+    def test_extra_meta(self, app):
+        with app.test_request_context():
+            from app.utils.mobile_responses import mobile_paginated
+            resp, status = mobile_paginated(
+                items=[],
+                total=0,
+                page=1,
+                per_page=50,
+                extra_meta={'document_types': ['Annual Report']},
+            )
+            assert status == 200
+            body = json.loads(resp.get_data())
+            assert body['meta']['document_types'] == ['Annual Report']
+            assert body['meta']['total_pages'] == 0
+
 
 @pytest.mark.unit
 class TestMobileError:

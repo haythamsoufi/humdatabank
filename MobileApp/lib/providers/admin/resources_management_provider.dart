@@ -60,43 +60,42 @@ class ResourcesManagementProvider with ChangeNotifier, AsyncOperationMixin {
   }
 
   Future<void> _loadFromAdminRoute(Map<String, String>? queryParams) async {
-    final response = await _api.get(
-      AppConfig.mobileResourcesEndpoint,
-      queryParams: queryParams,
-    );
-
-    if (response.statusCode == 200) {
-      // Try to parse as JSON first
-      try {
-        final jsonData = decodeJsonObject(response.body);
-        if (jsonData['success'] == true) {
-          final rawData = jsonData['data'];
-          final List<dynamic>? resourcesList = rawData is List
-              ? rawData
-              : rawData is Map ? (rawData['resources'] as List<dynamic>?) : (jsonData['resources'] as List<dynamic>?);
-          if (resourcesList != null) {
-            _resources = resourcesList
-                .map((json) => Resource.fromJson(json as Map<String, dynamic>))
-                .toList();
-          } else {
-            _resources = [];
-          }
-          _error = null;
-        } else {
-          // Fallback to HTML parsing for backward compatibility
+    final collected = <Resource>[];
+    var page = 1;
+    var totalPages = 1;
+    var lastStatus = 0;
+    while (page <= totalPages && page <= 25) {
+      final pageParams = {
+        ...?queryParams,
+        'page': '$page',
+        'per_page': '200',
+      };
+      final response = await _api.get(
+        AppConfig.mobileResourcesEndpoint,
+        queryParams: pageParams,
+      );
+      lastStatus = response.statusCode;
+      if (response.statusCode != 200) break;
+      final jsonData = decodeJsonObject(response.body);
+      if (jsonData['success'] != true) {
+        if (page == 1 && !response.body.trimLeft().startsWith('{')) {
           _resources = _parseResourcesFromHtml(response.body);
           _error = null;
+          return;
         }
-      } catch (e) {
-        // If JSON parsing fails, try HTML parsing as fallback
-        DebugLogger.logWarn('RESOURCES', 'JSON parse failed, trying HTML: $e');
-        _resources = _parseResourcesFromHtml(response.body);
-        _error = null;
+        break;
       }
-    } else {
-      _error = 'Failed to load resources: ${response.statusCode}';
-      _resources = [];
+      collected.addAll(mobileDataMaps(jsonData).map(Resource.fromJson));
+      totalPages = mobileTotalPages(jsonData);
+      page += 1;
     }
+    if (collected.isEmpty && lastStatus != 200) {
+      _error = 'Failed to load resources: $lastStatus';
+      _resources = [];
+      return;
+    }
+    _resources = collected;
+    _error = null;
   }
 
   List<Resource> _parseResourcesFromHtml(String html) {

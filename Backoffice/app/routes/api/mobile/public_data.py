@@ -356,9 +356,11 @@ def mobile_fdrs_overview():
 def mobile_disaggregation_overview():
     """Pre-aggregated sex/age/regional/country disaggregation breakdown for mobile analytics.
 
-    Anonymous callers receive global + regional aggregates only. Authenticated organization
-    users (IFRC staff, focal points with country access, data-explore RBAC) may receive
-    per-country breakdowns scoped to their permitted countries.
+    Figures come from the published snapshot (never the live editable value) and only
+    from form items marked privacy=public. Anonymous callers receive global + regional
+    aggregates only. Authenticated organization users (IFRC staff, focal points with
+    country access, data-explore RBAC) may receive per-country breakdowns scoped to
+    their permitted countries.
 
     Query params:
       - indicator_bank_id (optional, default 729 — people reached)
@@ -367,9 +369,10 @@ def mobile_disaggregation_overview():
       - country_id (optional, org users only): filter to one country
       - locale (optional, default 'en'): localized country names
     """
-    from app.models import FormData, FormItem, Country, AssignedForm, PublicSubmission
+    from app.models import FormData, Country, AssignedForm, PublicSubmission
     from app.models.assignments import AssignmentEntityStatus
     from app.services.organization.authorization_service import AuthorizationService
+    from plugins.fdrs.published_facts import public_form_item_ids, published_snapshot_clause
     from app.utils.mobile_disaggregation import (
         aggregate_disaggregation_rows,
         can_view_disaggregation_country_details,
@@ -414,12 +417,10 @@ def mobile_disaggregation_overview():
     }
 
     try:
-        form_item_ids = [
-            fi.id
-            for fi in FormItem.query.filter(
-                FormItem.indicator_bank_id == indicator_bank_id
-            ).all()
-        ]
+        form_item_ids = public_form_item_ids(
+            indicator_bank_id=indicator_bank_id,
+            template_id=template_id,
+        )
         if not form_item_ids:
             return mobile_ok(data=empty_payload)
 
@@ -427,16 +428,15 @@ def mobile_disaggregation_overview():
             db.session.query(
                 AssignmentEntityStatus.entity_id,
                 AssignedForm.period_name,
-                FormData.value,
-                FormData.disagg_data,
+                FormData.published_value,
+                FormData.published_disagg_data,
             )
             .join(FormData, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
             .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
             .filter(
                 FormData.form_item_id.in_(form_item_ids),
                 AssignmentEntityStatus.entity_type == 'country',
-                db.or_(FormData.data_not_available.is_(None), FormData.data_not_available == False),  # noqa: E712
-                db.or_(FormData.not_applicable.is_(None), FormData.not_applicable == False),  # noqa: E712
+                published_snapshot_clause(),
             )
         )
         if template_id:
@@ -452,16 +452,15 @@ def mobile_disaggregation_overview():
             db.session.query(
                 PublicSubmission.country_id,
                 AssignedForm.period_name,
-                FormData.value,
-                FormData.disagg_data,
+                FormData.published_value,
+                FormData.published_disagg_data,
             )
             .join(FormData, FormData.public_submission_id == PublicSubmission.id)
             .join(AssignedForm, AssignedForm.id == PublicSubmission.assigned_form_id)
             .filter(
                 FormData.form_item_id.in_(form_item_ids),
                 PublicSubmission.country_id.isnot(None),
-                db.or_(FormData.data_not_available.is_(None), FormData.data_not_available == False),  # noqa: E712
-                db.or_(FormData.not_applicable.is_(None), FormData.not_applicable == False),  # noqa: E712
+                published_snapshot_clause(),
             )
         )
         if template_id:

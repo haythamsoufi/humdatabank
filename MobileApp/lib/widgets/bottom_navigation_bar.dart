@@ -204,19 +204,19 @@ class AppBottomNavigationBar extends StatelessWidget {
 
     // The AI tab is identical in both admin and non-admin layouts — defined once here.
     Widget aiTab() => Flexible(
-      flex: 1,
-      child: _buildNavItem(
-        context: context,
-        index: aiChatNavIndex,
-        selectedTabIndex: selectedTabIndex,
-        icon: Icons.auto_awesome_outlined,
-        activeIcon: Icons.auto_awesome,
-        label: l10n.chatbot,
-        showBadge: false,
-        lightForegroundOnBar: lightForegroundOnBar,
-        onTap: () => _handleTap(context, aiChatNavIndex),
-      ),
-    );
+          flex: 1,
+          child: _buildNavItem(
+            context: context,
+            index: aiChatNavIndex,
+            selectedTabIndex: selectedTabIndex,
+            icon: Icons.assistant_outlined,
+            activeIcon: Icons.assistant_rounded,
+            label: l10n.chatbot,
+            showBadge: false,
+            lightForegroundOnBar: lightForegroundOnBar,
+            onTap: () => _handleTap(context, aiChatNavIndex),
+          ),
+        );
 
     return _barShell(
       context: context,

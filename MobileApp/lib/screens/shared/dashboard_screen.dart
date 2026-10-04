@@ -10,12 +10,11 @@ import '../../providers/shared/notification_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../providers/shared/offline_provider.dart';
-import '../../widgets/assignment_card.dart';
-import '../../widgets/app_bar.dart';
+import '../../widgets/dashboard_grouped_assignment_card.dart';
 import '../../config/routes.dart';
 import '../../config/app_config.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 import '../../utils/constants.dart';
-import '../../utils/theme_extensions.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
 import '../../l10n/app_localizations.dart';
@@ -53,9 +52,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   // Track if we've completed at least one load to avoid showing empty state prematurely
   bool _hasLoadedOnce = false;
 
-  /// Open-assignments [ExpansionTile] on the dashboard.
-  bool _currentAssignmentsExpanded = true;
-
   final Set<int> _offlineBundleAssignmentIds = {};
   final Set<int> _downloadingOfflineAssignmentIds = {};
   final Set<int> _staleOfflineBundleAssignmentIds = {};
@@ -75,15 +71,19 @@ class _DashboardScreenState extends State<DashboardScreen>
       curve: IOSCurves.easeOut,
     );
     // Get initial language
-    final languageProvider =
-        Provider.of<LanguageProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
     _previousLanguage = languageProvider.currentLanguage;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       _animationController.forward();
       if (!mounted) return;
-      _offlineProviderListenerRef =
-          Provider.of<OfflineProvider>(context, listen: false);
+      _offlineProviderListenerRef = Provider.of<OfflineProvider>(
+        context,
+        listen: false,
+      );
       _offlineProviderListenerRef!.addListener(_onOfflineProviderChanged);
     });
   }
@@ -115,10 +115,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _offlineStaleAutoRefreshInProgress = true;
     final loc = AppLocalizations.of(context)!;
-    final languageProvider =
-        Provider.of<LanguageProvider>(context, listen: false);
-    final dashboardProvider =
-        Provider.of<DashboardProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
+    final dashboardProvider = Provider.of<DashboardProvider>(
+      context,
+      listen: false,
+    );
 
     var anyOk = false;
     var anyFail = false;
@@ -171,10 +175,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
-    final dashboardProvider =
-        Provider.of<DashboardProvider>(context, listen: false);
-    final notificationProvider =
-        Provider.of<NotificationProvider>(context, listen: false);
+    final dashboardProvider = Provider.of<DashboardProvider>(
+      context,
+      listen: false,
+    );
+    final notificationProvider = Provider.of<NotificationProvider>(
+      context,
+      listen: false,
+    );
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final offline = Provider.of<OfflineProvider>(context, listen: false);
 
@@ -201,11 +209,15 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     // Force revalidation on dashboard load to ensure fresh session and role
     // This ensures we have a valid session before making API calls
-    final isAuthenticated = await authProvider.checkAuthStatus(forceRevalidate: true);
+    final isAuthenticated = await authProvider.checkAuthStatus(
+      forceRevalidate: true,
+    );
 
     // Load dashboard regardless of auth status (non-authenticated users can still view)
     // Force refresh if authenticated or if explicitly requested (e.g., language change)
-    await dashboardProvider.loadDashboard(forceRefresh: isAuthenticated || forceRefresh);
+    await dashboardProvider.loadDashboard(
+      forceRefresh: isAuthenticated || forceRefresh,
+    );
 
     await _syncOfflineBundleAndStaleState(
       dashboardProvider.currentAssignments,
@@ -248,7 +260,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (ids.isEmpty) {
       return;
     }
-    final byId = {for (final a in [...current, ...past]) a.id: a};
+    final byId = {
+      for (final a in [...current, ...past]) a.id: a,
+    };
     final svc = AssignmentOfflineBundleService();
     final bundles = <int>{};
     final stale = <int>{};
@@ -300,17 +314,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         return;
       }
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.offlineFormNotDownloaded)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.offlineFormNotDownloaded)));
       return;
     }
 
     if (!context.mounted) return;
-    Navigator.of(context).pushNamed(
-      AppRoutes.webview,
-      arguments: path,
-    );
+    Navigator.of(context).pushNamed(AppRoutes.webview, arguments: path);
   }
 
   /// Returns whether the download succeeded.
@@ -337,8 +348,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       _downloadingOfflineAssignmentIds.add(assignment.id);
     });
 
-    final cookie =
-        await sl<StorageService>().getSecure(AppConfig.sessionCookieKey);
+    final cookie = await sl<StorageService>().getSecure(
+      AppConfig.sessionCookieKey,
+    );
 
     try {
       await AssignmentOfflineBundleService().downloadAndSave(
@@ -346,8 +358,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         formPath: AppRoutes.formEntry(assignment.id),
         language: languageProvider.currentLanguage,
         sessionCookieHeader: cookie,
-        formDefinitionUpdatedAtIso:
-            assignment.formDefinitionUpdatedAt?.toUtc().toIso8601String(),
+        formDefinitionUpdatedAtIso: assignment.formDefinitionUpdatedAt
+            ?.toUtc()
+            .toIso8601String(),
       );
       if (!context.mounted) return false;
       setState(() {
@@ -356,9 +369,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         _staleOfflineBundleAssignmentIds.remove(assignment.id);
       });
       if (!silent && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.offlineFormSaved)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.offlineFormSaved)));
       }
       return true;
     } catch (e) {
@@ -383,8 +396,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     Assignment assignment,
   ) async {
     final loc = AppLocalizations.of(context)!;
-    final dashboardProvider =
-        Provider.of<DashboardProvider>(context, listen: false);
+    final dashboardProvider = Provider.of<DashboardProvider>(
+      context,
+      listen: false,
+    );
     try {
       await AssignmentOfflineBundleService().deleteBundle(assignment.id);
       if (!context.mounted) return;
@@ -393,9 +408,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         dashboardProvider.pastAssignments,
       );
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.offlineFormRemoved)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.offlineFormRemoved)));
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -412,8 +427,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (locale.languageCode == 'ar') {
       DateFormat.useNativeDigitsByDefaultFor('ar', false);
     }
-    var formatted = DateFormat('MMM d, y · HH:mm', locale.languageCode)
-        .format(date.toLocal());
+    var formatted = DateFormat(
+      'MMM d, y · HH:mm',
+      locale.languageCode,
+    ).format(date.toLocal());
     formatted = formatted
         .replaceAll('٠', '0')
         .replaceAll('١', '1')
@@ -435,17 +452,17 @@ class _DashboardScreenState extends State<DashboardScreen>
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final meta =
-        await AssignmentOfflineBundleService().readBundleMeta(assignment.id);
+    final meta = await AssignmentOfflineBundleService().readBundleMeta(
+      assignment.id,
+    );
     if (!context.mounted) return;
 
     final isStale = isAssignmentOfflineBundleStale(assignment, meta);
     final offline = Provider.of<OfflineProvider>(context, listen: false);
-    final canUpdateNow =
-        offline.isOnline && !shouldDeferRemoteFetch && isStale;
+    final canUpdateNow = offline.isOnline && !shouldDeferRemoteFetch && isStale;
 
-    final titleText = assignment.periodName != null &&
-            assignment.periodName!.isNotEmpty
+    final titleText =
+        assignment.periodName != null && assignment.periodName!.isNotEmpty
         ? '${assignment.templateName ?? assignment.name} — ${assignment.periodName}'
         : (assignment.templateName ?? assignment.name);
 
@@ -467,9 +484,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: [
                 Text(
                   loc.offlineCopySheetTitle,
-                  style: IOSTextStyle.title3(sheetContext).copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: IOSTextStyle.title3(
+                    sheetContext,
+                  ).copyWith(fontWeight: FontWeight.w700),
                 ),
                 SizedBox(height: IOSSpacing.smOf(sheetContext)),
                 Text(
@@ -494,17 +511,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                       sheetContext,
                       meta!.savedAtUtc!,
                     ),
-                    style: IOSTextStyle.body(sheetContext).copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: IOSTextStyle.body(
+                      sheetContext,
+                    ).copyWith(fontWeight: FontWeight.w500),
                   ),
                 ],
                 SizedBox(height: IOSSpacing.mdOf(sheetContext)),
                 Text(
                   loc.offlineCopyFilesCached(meta?.assetCount ?? 0),
-                  style: IOSTextStyle.footnote(sheetContext).copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.7),
-                  ),
+                  style: IOSTextStyle.footnote(
+                    sheetContext,
+                  ).copyWith(color: scheme.onSurface.withValues(alpha: 0.7)),
                 ),
                 if (isStale) ...[
                   SizedBox(height: IOSSpacing.mdOf(sheetContext)),
@@ -520,10 +537,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                       Expanded(
                         child: Text(
                           loc.offlineStaleBundleSheetNotice,
-                          style: IOSTextStyle.subheadline(sheetContext).copyWith(
-                            color: scheme.onSurface.withValues(alpha: 0.88),
-                            height: 1.35,
-                          ),
+                          style: IOSTextStyle.subheadline(sheetContext)
+                              .copyWith(
+                                color: scheme.onSurface.withValues(alpha: 0.88),
+                                height: 1.35,
+                              ),
                         ),
                       ),
                     ],
@@ -534,13 +552,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                   FilledButton.icon(
                     onPressed: () async {
                       Navigator.of(sheetContext).pop();
-                      final lang =
-                          Provider.of<LanguageProvider>(context, listen: false);
-                      await _downloadOfflineBundle(
+                      final lang = Provider.of<LanguageProvider>(
                         context,
-                        assignment,
-                        lang,
+                        listen: false,
                       );
+                      await _downloadOfflineBundle(context, assignment, lang);
                     },
                     icon: const Icon(Icons.sync_rounded, size: 20),
                     label: Text(loc.offlineStaleBundleUpdateNow),
@@ -552,10 +568,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Navigator.of(sheetContext).pop();
                     unawaited(_removeOfflineBundle(context, assignment));
                   },
-                  icon: Icon(
-                    Icons.delete_outline_rounded,
-                    color: scheme.error,
-                  ),
+                  icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
                   label: Text(loc.removeOfflineCopy),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: scheme.error,
@@ -647,10 +660,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: [
                 Text(
                   loc.offlineStaleBundleBannerTitle,
-                  style: IOSTextStyle.subheadline(context).copyWith(
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
+                  style: IOSTextStyle.subheadline(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w700, height: 1.25),
                 ),
                 SizedBox(height: IOSSpacing.xsOf(context)),
                 Text(
@@ -685,7 +697,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// Open assignments: collapsible "You have …" header + list or empty hint.
+  /// Open assignments as separate inset cards under a short section label.
   Widget _buildCurrentAssignmentsSection({
     required DashboardProvider provider,
     required AuthProvider authProvider,
@@ -693,166 +705,75 @@ class _DashboardScreenState extends State<DashboardScreen>
     required LanguageProvider languageProvider,
     required AppLocalizations localizations,
   }) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final n = provider.currentAssignments.length;
-    final titleText = localizations.dashboardYouHaveOpenAssignmentsTitle(n);
-    final iconColor = context.isDarkTheme
-        ? scheme.tertiary
-        : context.navyIconColor;
+    final assignments = provider.currentAssignments;
+    if (assignments.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Theme(
-          data: theme.copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: IOSSpacing.lg,
-              vertical: IOSSpacing.xs,
-            ),
-            minTileHeight: 44,
-            dense: true,
-            initiallyExpanded: _currentAssignmentsExpanded,
-            onExpansionChanged: (expanded) {
-              setState(() => _currentAssignmentsExpanded = expanded);
-              HapticFeedback.selectionClick();
-            },
-            backgroundColor: Colors.transparent,
-            collapsedBackgroundColor: Colors.transparent,
-            shape: const Border(),
-            collapsedShape: const Border(),
-            childrenPadding: EdgeInsets.zero,
-            title: Row(
-              children: [
-                Icon(Icons.assignment_rounded, size: 20, color: iconColor),
-                SizedBox(width: IOSSpacing.smOf(context)),
-                Expanded(
-                  child: Text(
-                    titleText,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: IOSTextStyle.subheadline(context).copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurface.withValues(alpha: 0.92),
-                      height: 1.25,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            children: [
-              if (provider.currentAssignments.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: IOSSpacing.lgOf(context),
-                  ),
-                  child: Column(
-                    children: provider.currentAssignments
-                        .asMap()
-                        .entries
-                        .map((entry) {
-                      final index = entry.key;
-                      final assignment = entry.value;
-                      final showEnter = _shouldShowEnterDataButton(
-                        authProvider.user?.role,
-                        assignment,
-                      );
-                      final hasBundle =
-                          _offlineBundleAssignmentIds.contains(assignment.id);
-                      return AppFadeInUp(
-                        staggerIndex: index,
-                        child: AssignmentCard(
-                          assignment: assignment,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            unawaited(
-                              _openAssignmentForm(context, assignment),
-                            );
-                          },
-                          showEnterDataButton: showEnter,
-                          enterDataButtonText: localizations.enterData,
-                          onEnterData: () {
-                            HapticFeedback.mediumImpact();
-                            unawaited(
-                              _openAssignmentForm(context, assignment),
-                            );
-                          },
-                          onDownloadForOffline: showEnter &&
-                                  offlineProvider.isOnline &&
-                                  !shouldDeferRemoteFetch
-                              ? () => _downloadOfflineBundle(
-                                    context,
-                                    assignment,
-                                    languageProvider,
-                                  )
-                              : null,
-                          onOfflineBundleDetails: hasBundle
-                              ? () {
-                                  HapticFeedback.lightImpact();
-                                  unawaited(
-                                    _showOfflineBundleDetailsSheet(
-                                      context,
-                                      assignment,
-                                    ),
-                                  );
-                                }
-                              : null,
-                          hasOfflineFormSnapshot: hasBundle,
-                          offlineBundleOutdated: _staleOfflineBundleAssignmentIds
-                              .contains(assignment.id),
-                          isDownloadingOfflineForm:
-                              _downloadingOfflineAssignmentIds
-                                  .contains(assignment.id),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                )
-              else if (provider.pastAssignments.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    IOSSpacing.lgOf(context),
-                    0,
-                    IOSSpacing.lgOf(context),
-                    IOSSpacing.lgOf(context),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline_rounded,
-                        size: 48,
-                        color: scheme.onSurface.withValues(alpha: 0.35),
-                      ),
-                      SizedBox(height: IOSSpacing.mdOf(context)),
-                      Text(
-                        localizations.noAssignmentsYet,
-                        style: IOSTextStyle.subheadline(context).copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface.withValues(alpha: 0.75),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: IOSSpacing.smOf(context)),
-                      Text(
-                        localizations.newAssignmentsWillAppear,
-                        style: IOSTextStyle.footnote(context).copyWith(
-                          color: scheme.onSurface.withValues(alpha: 0.55),
-                          height: 1.35,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
+          child: DashboardSectionLabel(
+            title: localizations.currentAssignments,
+            count: assignments.length,
           ),
         ),
-        if (provider.currentAssignments.isNotEmpty)
-          const SizedBox(height: IOSSpacing.xxl)
-        else if (provider.pastAssignments.isNotEmpty)
-          SizedBox(height: IOSSpacing.mdOf(context)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: assignments.asMap().entries.map((entry) {
+              final index = entry.key;
+              final assignment = entry.value;
+              final showEnter = _shouldShowEnterDataButton(
+                authProvider.user?.role,
+                assignment,
+              );
+              final hasBundle = _offlineBundleAssignmentIds.contains(
+                assignment.id,
+              );
+              return AppFadeInUp(
+                staggerIndex: index,
+                child: DashboardGroupedAssignmentCard(
+                  assignment: assignment,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    unawaited(_openAssignmentForm(context, assignment));
+                  },
+                  showEnterDataButton: showEnter,
+                  enterDataButtonText: localizations.enterData,
+                  onEnterData: () {
+                    HapticFeedback.mediumImpact();
+                    unawaited(_openAssignmentForm(context, assignment));
+                  },
+                  onDownloadForOffline:
+                      showEnter &&
+                          offlineProvider.isOnline &&
+                          !shouldDeferRemoteFetch
+                      ? () => _downloadOfflineBundle(
+                          context,
+                          assignment,
+                          languageProvider,
+                        )
+                      : null,
+                  onOfflineBundleDetails: hasBundle
+                      ? () {
+                          HapticFeedback.lightImpact();
+                          unawaited(
+                            _showOfflineBundleDetailsSheet(context, assignment),
+                          );
+                        }
+                      : null,
+                  hasOfflineFormSnapshot: hasBundle,
+                  offlineBundleOutdated: _staleOfflineBundleAssignmentIds
+                      .contains(assignment.id),
+                  isDownloadingOfflineForm: _downloadingOfflineAssignmentIds
+                      .contains(assignment.id),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ],
     );
   }
@@ -861,21 +782,23 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildPastAssignmentsSection(DashboardProvider provider) {
     final localizations = AppLocalizations.of(context)!;
     // Get unique values for filters
-    final periods = provider.pastAssignments
-        .map((a) => a.periodName)
-        .whereType<String>()
-        .where((p) => p.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final periods =
+        provider.pastAssignments
+            .map((a) => a.periodName)
+            .whereType<String>()
+            .where((p) => p.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
 
-    final templates = provider.pastAssignments
-        .map((a) => a.templateName)
-        .whereType<String>()
-        .where((t) => t.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final templates =
+        provider.pastAssignments
+            .map((a) => a.templateName)
+            .whereType<String>()
+            .where((t) => t.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
 
     final statuses =
         provider.pastAssignments.map((a) => a.status).toSet().toList()..sort();
@@ -900,178 +823,133 @@ class _DashboardScreenState extends State<DashboardScreen>
     final sortedPast = _sortedPastAssignments(filteredAssignments);
 
     final theme = Theme.of(context);
-    return Container(
-      margin: EdgeInsets.zero,
-      child: Theme(
-        data: theme.copyWith(
-          dividerColor: Colors.transparent,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+          child: DashboardSectionLabel(
+            title: localizations.pastAssignments,
+            count: filteredAssignments.length,
+          ),
         ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: IOSSpacing.lg,
-            vertical: IOSSpacing.xs,
-          ),
-          minTileHeight: 44,
-          dense: true,
-          initiallyExpanded: false,
-          backgroundColor: Colors.transparent,
-          collapsedBackgroundColor: Colors.transparent,
-          shape: const Border(),
-          collapsedShape: const Border(),
-          title: Row(
-            children: [
-              Icon(
-                Icons.history_rounded,
-                size: 20,
-                color: context.isDarkTheme
-                    ? theme.colorScheme.tertiary
-                    : context.navyIconColor,
-              ),
-              SizedBox(width: IOSSpacing.smOf(context)),
-              Expanded(
-                child: Text(
-                  localizations.pastAssignments,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: IOSTextStyle.subheadline(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.92),
-                    height: 1.25,
-                  ),
+        // Filters Section - iOS style
+        if (periods.isNotEmpty || templates.isNotEmpty || statuses.isNotEmpty)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final canFitInline =
+                  constraints.maxWidth > 400; // Approximate breakpoint
+              return Container(
+                padding: EdgeInsets.fromLTRB(
+                  IOSSpacing.lgOf(context),
+                  IOSSpacing.smOf(context),
+                  IOSSpacing.lgOf(context),
+                  IOSSpacing.mdOf(context),
                 ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: IOSSpacing.xsOf(context) + 6,
-                  vertical: IOSSpacing.xsOf(context) / 2 + 1,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(
-                    IOSDimensions.borderRadiusSmallOf(context),
-                  ),
-                ),
-                child: Text(
-                  '${filteredAssignments.length}',
-                  style: IOSTextStyle.caption2(context).copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          children: [
-            // Filters Section - iOS style
-            if (periods.isNotEmpty ||
-                templates.isNotEmpty ||
-                statuses.isNotEmpty)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final canFitInline = constraints.maxWidth > 400; // Approximate breakpoint
-                  return Container(
-                    padding: EdgeInsets.fromLTRB(
-                      IOSSpacing.lgOf(context),
-                      IOSSpacing.smOf(context),
-                      IOSSpacing.lgOf(context),
-                      IOSSpacing.mdOf(context),
-                    ),
-                    child: canFitInline
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                localizations.filters.toUpperCase(),
-                                style: IOSTextStyle.footnote(context).copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              SizedBox(width: IOSSpacing.mdOf(context)),
-                              Expanded(
-                                child: Wrap(
-                                  spacing: IOSSpacing.sm,
-                                  runSpacing: IOSSpacing.sm,
-                                  children: _buildFilterButtons(localizations, theme, periods, templates, statuses),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                localizations.filters.toUpperCase(),
-                                style: IOSTextStyle.footnote(context).copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              SizedBox(height: IOSSpacing.mdOf(context) - 4),
-                              Wrap(
-                                spacing: IOSSpacing.sm,
-                                runSpacing: IOSSpacing.sm,
-                                children: _buildFilterButtons(localizations, theme, periods, templates, statuses),
-                              ),
-                            ],
-                          ),
-                  );
-                },
-              ),
-
-            // Single list (dashboard.html: one table for all past rows)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 0, 0, IOSSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (sortedPast.isNotEmpty)
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: IOSSpacing.lgOf(context)),
-                      child: Column(
-                        children: sortedPast.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          return _buildPastAssignmentCard(entry.value, index);
-                        }).toList(),
-                      ),
-                    ),
-
-                  // Empty filtered state
-                  if (filteredAssignments.isEmpty)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: IOSSpacing.lg),
-                      padding: const EdgeInsets.all(IOSSpacing.xxl),
-                      child: Column(
+                child: canFitInline
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.filter_alt_off_rounded,
-                            size: 48,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.4),
-                          ),
-                          SizedBox(height: IOSSpacing.mdOf(context)),
                           Text(
-                            localizations.noAssignmentsMatchFilters,
-                            style: IOSTextStyle.subheadline(context).copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.6),
-                              fontWeight: FontWeight.w500,
+                            localizations.filters.toUpperCase(),
+                            style: IOSTextStyle.footnote(context).copyWith(
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
                             ),
-                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(width: IOSSpacing.mdOf(context)),
+                          Expanded(
+                            child: Wrap(
+                              spacing: IOSSpacing.sm,
+                              runSpacing: IOSSpacing.sm,
+                              children: _buildFilterButtons(
+                                localizations,
+                                theme,
+                                periods,
+                                templates,
+                                statuses,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            localizations.filters.toUpperCase(),
+                            style: IOSTextStyle.footnote(context).copyWith(
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(height: IOSSpacing.mdOf(context) - 4),
+                          Wrap(
+                            spacing: IOSSpacing.sm,
+                            runSpacing: IOSSpacing.sm,
+                            children: _buildFilterButtons(
+                              localizations,
+                              theme,
+                              periods,
+                              templates,
+                              statuses,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
+
+        // Single list (dashboard.html: one table for all past rows)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, IOSSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (sortedPast.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: sortedPast.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      return _buildPastAssignmentCard(entry.value, index);
+                    }).toList(),
+                  ),
+                ),
+
+              // Empty filtered state
+              if (filteredAssignments.isEmpty)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: IOSSpacing.lg),
+                  padding: const EdgeInsets.all(IOSSpacing.xxl),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.filter_alt_off_rounded,
+                        size: 48,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                      SizedBox(height: IOSSpacing.mdOf(context)),
+                      Text(
+                        localizations.noAssignmentsMatchFilters,
+                        style: IOSTextStyle.subheadline(context).copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1174,10 +1052,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               SizedBox(width: IOSSpacing.xsOf(context)),
-              Text(
-                localizations.clear,
-                style: IOSTextStyle.footnote(context),
-              ),
+              Text(localizations.clear, style: IOSTextStyle.footnote(context)),
             ],
           ),
         ),
@@ -1207,7 +1082,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       onPressed: onTap,
       minimumSize: Size.zero,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: IOSSpacing.md - 6, vertical: IOSSpacing.xs + 2),
+        padding: const EdgeInsets.symmetric(
+          horizontal: IOSSpacing.md - 6,
+          vertical: IOSSpacing.xs + 2,
+        ),
         decoration: BoxDecoration(
           color: hasSelection
               ? IOSColors.getSystemBlue(context).withValues(alpha: 0.1)
@@ -1215,7 +1093,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           borderRadius: BorderRadius.circular(6),
           border: hasSelection
               ? Border.all(
-                  color: IOSColors.getSystemBlue(context).withValues(alpha: 0.3),
+                  color: IOSColors.getSystemBlue(
+                    context,
+                  ).withValues(alpha: 0.3),
                   width: 0.5,
                 )
               : null,
@@ -1264,10 +1144,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     cupertino.showCupertinoModalPopup(
       context: context,
       builder: (context) => cupertino.CupertinoActionSheet(
-        title: Text(
-          title,
-          style: IOSTextStyle.headline(context),
-        ),
+        title: Text(title, style: IOSTextStyle.headline(context)),
         actions: [
           // "All" option
           cupertino.CupertinoActionSheetAction(
@@ -1281,14 +1158,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                 color: selectedValue == null
                     ? IOSColors.getSystemBlue(context)
                     : Theme.of(context).colorScheme.onSurface,
-                fontWeight: selectedValue == null ? FontWeight.w600 : FontWeight.w400,
+                fontWeight: selectedValue == null
+                    ? FontWeight.w600
+                    : FontWeight.w400,
               ),
             ),
           ),
           // Options
           ...options.map((option) {
             final displayText = isStatusFilter
-                ? (option != null ? localizations.localizeStatus(option) : localizations.nA)
+                ? (option != null
+                      ? localizations.localizeStatus(option)
+                      : localizations.nA)
                 : (option ?? localizations.nA);
             final isSelected = option == selectedValue;
 
@@ -1314,9 +1195,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           onPressed: () => Navigator.of(context).pop(),
           child: Text(
             localizations.cancel,
-            style: IOSTextStyle.body(context).copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: IOSTextStyle.body(
+              context,
+            ).copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -1326,7 +1207,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildPastAssignmentCard(Assignment assignment, int index) {
     return AppFadeInUp(
       staggerIndex: index,
-      child: AssignmentCard(
+      child: DashboardGroupedAssignmentCard(
         assignment: assignment,
         onTap: () {
           HapticFeedback.lightImpact();
@@ -1338,6 +1219,99 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _showEntitySelector(BuildContext context, DashboardProvider provider) {
     EntitySelectorBottomSheet.show(context, provider);
+  }
+
+  Widget _buildPageHeader(
+    DashboardProvider provider,
+    AppLocalizations localizations,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(AppConstants.defaultNavy);
+    final entity =
+        provider.selectedEntity ??
+        (provider.entities.isNotEmpty ? provider.entities.first : null);
+    final hasMultipleEntities = provider.entities.length > 1;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            localizations.dashboard,
+            style: IOSTextStyle.largeTitle(context).copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.6,
+              color: titleColor,
+            ),
+          ),
+          if (entity != null) ...[
+            const SizedBox(height: 12),
+            Material(
+              color: isDark
+                  ? theme.colorScheme.surfaceContainerHigh
+                  : GroupedDashboardPalette.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isDark
+                      ? theme.colorScheme.outlineVariant.withValues(alpha: 0.45)
+                      : GroupedDashboardPalette.hairline,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: hasMultipleEntities
+                    ? () {
+                        HapticFeedback.lightImpact();
+                        _showEntitySelector(context, provider);
+                      }
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        size: 16,
+                        color: titleColor.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          entity.displayLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: IOSTextStyle.footnote(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: titleColor,
+                          ),
+                        ),
+                      ),
+                      if (hasMultipleEntities) ...[
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.expand_more_rounded,
+                          size: 18,
+                          color: titleColor.withValues(alpha: 0.55),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -1352,8 +1326,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             // Language changed - clear cache and reload data
             _previousLanguage = languageProvider.currentLanguage;
-            final dashboardProvider =
-                Provider.of<DashboardProvider>(context, listen: false);
+            final dashboardProvider = Provider.of<DashboardProvider>(
+              context,
+              listen: false,
+            );
             // Clear cache to force fresh API data with new language
             dashboardProvider.clearCache();
             // Reload data with force refresh to get new language content
@@ -1361,11 +1337,18 @@ class _DashboardScreenState extends State<DashboardScreen>
           });
         }
 
+        final canPop = Navigator.of(context).canPop();
+        final groupedBackground = IOSColors.getGroupedBackground(context);
         return Scaffold(
-          appBar: AppAppBar(
-            title: localizations.dashboard,
-          ),
-          backgroundColor: IOSColors.getGroupedBackground(context), // iOS grouped background
+          appBar: canPop
+              ? AppBar(
+                  backgroundColor: groupedBackground,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                )
+              : null,
+          backgroundColor: groupedBackground,
           body: ColoredBox(
             color: IOSColors.getGroupedBackground(context),
             child: RefreshIndicator(
@@ -1385,7 +1368,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               child: Consumer<DashboardProvider>(
                 builder: (context, provider, child) {
                   // Show loading if currently loading OR if we haven't completed first load yet
-                  final bool shouldShowLoading = provider.isLoading || !_hasLoadedOnce;
+                  final bool shouldShowLoading =
+                      provider.isLoading || !_hasLoadedOnce;
 
                   if (shouldShowLoading &&
                       provider.currentAssignments.isEmpty &&
@@ -1418,74 +1402,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // National Society Title - Always show if we have any entity info
-                          if (provider.selectedEntity != null ||
-                              provider.entities.isNotEmpty)
-                            Builder(
-                              builder: (context) {
-                                // Get entity from selectedEntity or first entity
-                                final entity = provider.selectedEntity ??
-                                    provider.entities.first;
-                                final hasMultipleEntities =
-                                    provider.entities.length > 1;
-                                final theme = Theme.of(context);
-
-                                return GestureDetector(
-                                  onTap: hasMultipleEntities
-                                      ? () {
-                                          HapticFeedback.lightImpact();
-                                          _showEntitySelector(
-                                              context, provider);
-                                        }
-                                      : null,
-                                  child: Container(
-                                    margin: const EdgeInsets.fromLTRB(
-                                        IOSSpacing.lg, IOSSpacing.lg, IOSSpacing.lg, IOSSpacing.md),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: IOSSpacing.md, vertical: IOSSpacing.sm + 6),
-                                    decoration: BoxDecoration(
-                                      color: theme.cardTheme.color ??
-                                          theme.colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(IOSDimensions.borderRadiusLargeOf(context)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.location_on_rounded,
-                                          size: 20,
-                                          color: theme.colorScheme.onSurface
-                                              .withValues(alpha: 0.7),
-                                        ),
-                                        SizedBox(width: IOSSpacing.mdOf(context) - 4),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                entity.displayLabel,
-                                                style: IOSTextStyle.callout(context).copyWith(
-                                                  fontWeight: FontWeight.w600,
-                                                  color: theme.colorScheme
-                                                      .onSurface,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (hasMultipleEntities)
-                                          Icon(
-                                            Icons.chevron_right_rounded,
-                                            color: theme.colorScheme.onSurface
-                                                .withValues(alpha: 0.4),
-                                            size: 20,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                          _buildPageHeader(provider, localizations),
 
                           if (_staleOfflineBundleAssignmentIds.isNotEmpty &&
                               _dismissedStaleBundleSignature !=
@@ -1515,7 +1432,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                               provider.entities.isNotEmpty)
                             Builder(
                               builder: (context) {
-                                final entity = provider.selectedEntity ??
+                                final entity =
+                                    provider.selectedEntity ??
                                     provider.entities.first;
                                 return DashboardFocalPointsSection(
                                   entityLabel: entity.displayLabel,
@@ -1536,38 +1454,44 @@ class _DashboardScreenState extends State<DashboardScreen>
                               child: Center(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 40),
+                                    horizontal: 40,
+                                  ),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
-                          Icon(
-                            Icons.inbox_rounded,
-                            size: 72,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.25),
-                          ),
-                          SizedBox(height: IOSSpacing.xlOf(context)),
-                          Text(
-                            localizations.noAssignmentsYet,
-                            style: IOSTextStyle.title2(context),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: IOSSpacing.smOf(context)),
-                          Text(
-                            localizations.newAssignmentsWillAppear,
-                            style: IOSTextStyle.subheadline(context).copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.6),
-                              height: 1.4,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
+                                      Icon(
+                                        Icons.inbox_rounded,
+                                        size: 72,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.25),
+                                      ),
+                                      SizedBox(
+                                        height: IOSSpacing.xlOf(context),
+                                      ),
+                                      Text(
+                                        localizations.noAssignmentsYet,
+                                        style: IOSTextStyle.title2(context),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      SizedBox(
+                                        height: IOSSpacing.smOf(context),
+                                      ),
+                                      Text(
+                                        localizations.newAssignmentsWillAppear,
+                                        style: IOSTextStyle.subheadline(context)
+                                            .copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.6),
+                                              height: 1.4,
+                                            ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -1588,4 +1512,3 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 }
-

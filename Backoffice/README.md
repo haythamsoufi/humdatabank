@@ -38,7 +38,7 @@ Backoffice/
    ```bash
    python -m flask db upgrade
    python -m flask rbac seed          # recommended: default RBAC roles
-   python -m flask seed-test-data    # optional: test users (requires TEST_* passwords in .env — see env.quickstart.example)
+   python -m flask seed-test-data    # optional: test users, focal points, and sample assignments (requires TEST_* passwords in .env — see env.quickstart.example)
    python -m flask create-admin      # optional: interactive admin account (skip if seed-test-data is enough)
    ```
 

@@ -9,17 +9,53 @@ import '../../utils/mobile_api_json.dart';
 import '../../utils/network_availability.dart';
 import '../../di/service_locator.dart';
 
+class IndicatorTypeOption {
+  final String code;
+  final String label;
+
+  const IndicatorTypeOption({required this.code, required this.label});
+}
+
 class IndicatorBankAdminProvider with ChangeNotifier {
   final ApiService _api = sl<ApiService>();
   final ErrorHandler _errorHandler = ErrorHandler();
 
   List<Indicator> _indicators = [];
+  List<String> _sectorNames = [];
+  List<IndicatorTypeOption> _measurementTypes = [];
   bool _isLoading = false;
   String? _error;
 
   List<Indicator> get indicators => _indicators;
+  List<String> get sectorNames => List.unmodifiable(_sectorNames);
+  List<IndicatorTypeOption> get measurementTypes =>
+      List.unmodifiable(_measurementTypes);
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  /// Sector names from the current reference list, for the admin filter.
+  Future<void> loadSectorNames() async {
+    if (shouldDeferRemoteFetch) return;
+    try {
+      final response = await _api.get(AppConfig.mobileSectorsSubsectorsEndpoint);
+      if (response.statusCode != 200) return;
+      final decoded = decodeJsonObject(response.body);
+      final data = mobileDataMapLoose(decoded);
+      final raw = data['sectors'];
+      if (raw is! List) return;
+      final names = <String>[];
+      for (final row in raw) {
+        if (row is Map && row['name'] != null) {
+          final name = row['name'].toString().trim();
+          if (name.isNotEmpty && !names.contains(name)) names.add(name);
+        }
+      }
+      _sectorNames = names;
+      notifyListeners();
+    } catch (e) {
+      DebugLogger.logWarn('INDICATORS', 'Sector names unavailable: $e');
+    }
+  }
 
   Future<void> loadIndicators({
     String? search,
@@ -47,20 +83,63 @@ class IndicatorBankAdminProvider with ChangeNotifier {
         queryParams['sector'] = sectorFilter;
       }
 
-      // Use the admin HTML route (requires session authentication)
-      final response =
-          await _errorHandler.executeWithErrorHandling<http.Response>(
-        apiCall: () => _api.get(
-          AppConfig.mobileIndicatorBankEndpoint,
-          queryParams: queryParams.isNotEmpty ? queryParams : null,
-        ),
-        context: 'Load Indicators (Admin)',
-        defaultValue: null,
-        maxRetries: 1,
-        handleAuthErrors: true,
-      );
+      final collected = <Indicator>[];
+      var page = 1;
+      var totalPages = 1;
+      http.Response? response;
+      try {
+        while (page <= totalPages && page <= 25) {
+          final pageParams = {
+            ...queryParams,
+            'page': '$page',
+            'per_page': '200',
+          };
+          response = await _errorHandler.executeWithErrorHandling<http.Response>(
+            apiCall: () => _api.get(
+              AppConfig.mobileIndicatorBankEndpoint,
+              queryParams: pageParams,
+            ),
+            context: 'Load Indicators (Admin)',
+            defaultValue: null,
+            maxRetries: 1,
+            handleAuthErrors: true,
+          );
+          if (response == null || response.statusCode != 200) break;
+          final jsonData = decodeJsonObject(response.body);
+          if (!mobileResponseIsSuccess(jsonData)) break;
+          final typeRows = mobileMetaList(jsonData, 'measurement_types');
+          if (typeRows.isNotEmpty) {
+            final options = <IndicatorTypeOption>[];
+            for (final row in typeRows) {
+              if (row is! Map) continue;
+              final code = row['code']?.toString().trim() ?? '';
+              if (code.isEmpty) continue;
+              final name = row['name']?.toString().trim() ?? '';
+              options.add(IndicatorTypeOption(
+                code: code,
+                label: name.isEmpty ? code : name,
+              ));
+            }
+            if (options.isNotEmpty) _measurementTypes = options;
+          }
+          collected.addAll(mobileDataMaps(jsonData).map(Indicator.fromJson));
+          totalPages = mobileTotalPages(jsonData);
+          page += 1;
+        }
+      } catch (e, stackTrace) {
+        final error = _errorHandler.parseError(
+          error: e,
+          stackTrace: stackTrace,
+          context: 'Parse Indicators',
+        );
+        _error = error.getUserMessage();
+        _indicators = collected;
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
 
-      if (response == null) {
+      if (response == null && collected.isEmpty) {
         _error = 'Unable to load indicators. Please try again.';
         _indicators = [];
         _isLoading = false;
@@ -68,53 +147,18 @@ class IndicatorBankAdminProvider with ChangeNotifier {
         return;
       }
 
-      if (response.statusCode == 200) {
-        try {
-          // Try to parse as JSON first
-          try {
-            final jsonData = decodeJsonObject(response.body);
-            if (mobileResponseIsSuccess(jsonData)) {
-              final rawData = jsonData['data'];
-              final List<dynamic>? indicatorsList = rawData is List
-                  ? rawData
-                  : rawData is Map ? (rawData['indicators'] as List<dynamic>?) : (jsonData['indicators'] as List<dynamic>?);
-              if (indicatorsList != null) {
-                _indicators = indicatorsList
-                    .map((json) => Indicator.fromJson(json as Map<String, dynamic>))
-                    .toList();
-              } else {
-                _indicators = [];
-              }
-              _error = null;
-              DebugLogger.log(
-                  'INDICATORS', 'Parsed ${_indicators.length} indicators from JSON',
-                  level: LogLevel.debug);
-            } else {
-              // Fallback to HTML parsing for backward compatibility
-              _indicators = _parseIndicatorsFromHtml(response.body);
-              _error = null;
-            }
-          } catch (e) {
-            // If JSON parsing fails, try HTML parsing as fallback
-            DebugLogger.logWarn('INDICATORS', 'JSON parse failed, trying HTML: $e');
-            _indicators = _parseIndicatorsFromHtml(response.body);
-            _error = null;
-            DebugLogger.log(
-                'INDICATORS', 'Parsed ${_indicators.length} indicators from HTML',
-                level: LogLevel.debug);
-          }
-        } catch (e, stackTrace) {
-          final error = _errorHandler.parseError(
-            error: e,
-            stackTrace: stackTrace,
-            context: 'Parse Indicators',
-          );
-          _error = error.getUserMessage();
-          _indicators = [];
+      if (collected.isNotEmpty || (response != null && response.statusCode == 200)) {
+        if (collected.isNotEmpty ||
+            (response != null && response.body.trimLeft().startsWith('{'))) {
+          _indicators = collected;
+          _error = null;
+        } else if (response != null) {
+          _indicators = _parseIndicatorsFromHtml(response.body);
+          _error = null;
         }
       } else {
         final error = _errorHandler.parseError(
-          error: Exception('HTTP ${response.statusCode}'),
+          error: Exception('HTTP ${response?.statusCode ?? 'unknown'}'),
           response: response,
           context: 'Load Indicators (Admin)',
         );

@@ -429,6 +429,76 @@ class TestMobileFdrsOverview:
         _, status = _parse(resp)
         assert status == 200
 
+    def test_uses_published_snapshot_not_live_value(self, app, db_session):
+        from sqlalchemy.orm.attributes import flag_modified
+
+        from app.models import FormData, IndicatorBank
+        from app.routes.api.mobile.public_data import mobile_disaggregation_overview, mobile_fdrs_overview
+        from tests.factories import (
+            create_test_assignment_entity_status,
+            create_test_country,
+            create_test_item,
+            create_test_section,
+            create_test_template,
+        )
+
+        template = create_test_template(db_session, name="Mobile published overview")
+        section = create_test_section(db_session, template)
+        indicator = IndicatorBank(name="People reached published", type="number", unit="people", archived=False)
+        db_session.add(indicator)
+        db_session.commit()
+        item = create_test_item(
+            db_session,
+            section,
+            template,
+            label="Public people reached",
+            indicator_bank_id=indicator.id,
+        )
+        item.set_privacy("public")
+        flag_modified(item, "config")
+        db_session.commit()
+
+        country = create_test_country(db_session, name="Snapshotland", iso3="SNP")
+        aes = create_test_assignment_entity_status(
+            db_session, country=country, template=template, period_name="2024",
+        )
+        db_session.add(FormData(
+            assignment_entity_status_id=aes.id,
+            form_item_id=item.id,
+            value="999",
+            numeric_value=999,
+            published_value="40",
+            published_numeric_value=40,
+            published_disagg_data={"mode": "sex", "values": {"female": 30, "male": 10}},
+        ))
+        db_session.commit()
+
+        with app.test_request_context(
+            f"/api/mobile/v1/data/fdrs-overview?indicator_bank_id={indicator.id}&template_id={template.id}&period_name=2024",
+            method="GET",
+        ):
+            resp = mobile_fdrs_overview()
+
+        body, status = _parse(resp)
+        assert status == 200
+        by_country = body.get_json()["data"]["by_country"]
+        assert by_country.get(str(country.id)) == 40
+
+        with app.test_request_context(
+            f"/api/mobile/v1/data/disaggregation-overview?indicator_bank_id={indicator.id}&template_id={template.id}&period_name=2024",
+            method="GET",
+        ):
+            disagg_resp = mobile_disaggregation_overview()
+
+        disagg_body, disagg_status = _parse(disagg_resp)
+        assert disagg_status == 200
+        payload = disagg_body.get_json()["data"]
+        assert payload["record_count"] == 1
+        assert payload["total"] != 999
+        sexes = {row["category"]: row["value"] for row in payload["by_sex"]}
+        assert sexes.get("Female") == 30
+        assert sexes.get("Male") == 10
+
 
 # ---------------------------------------------------------------------------
 # public_resources

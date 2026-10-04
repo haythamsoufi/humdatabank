@@ -3,9 +3,32 @@
 
 import { getDataFromStore, getFormItemsFromStore, getCountriesFromStore } from '../../lib/dataStore';
 import { FDRS_TEMPLATE_ID } from '../../lib/constants';
+import {
+  adaptFlatDataPayload,
+  collectFormItems,
+  collectPublishedFdrsRows,
+  publishedFdrsSearchParams,
+  shouldUsePublishedFdrsFeed,
+} from '../../lib/apiContract.mjs';
 
 const BACKOFFICE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.INTERNAL_API_URL || 'http://localhost:5000';
 const API_KEY = (process.env.NEXT_PUBLIC_API_KEY || 'databank2026').replace(/^Bearer\s+/i, '').trim();
+
+function authHeaders() {
+  return { Accept: 'application/json', Authorization: `Bearer ${API_KEY}` };
+}
+
+async function fetchTemplateFormItems(templateId) {
+  return collectFormItems(async (page) => {
+    const url = `${BACKOFFICE_URL}/api/v1/form-items?template_id=${templateId}&per_page=1000&page=${page}`;
+    const response = await fetch(url, {
+      headers: authHeaders(),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!response.ok) return null;
+    return response.json();
+  });
+}
 
 async function fetchFromBackoffice(reqQuery, filters, perPage) {
   const params = new URLSearchParams();
@@ -20,15 +43,56 @@ async function fetchFromBackoffice(reqQuery, filters, perPage) {
   if (filters.submission_type) params.set('submission_type', filters.submission_type);
   if (reqQuery.page) params.set('page', String(reqQuery.page));
 
+  const templateId = filters.template_id || FDRS_TEMPLATE_ID;
+  if (shouldUsePublishedFdrsFeed(templateId, { ...filters, ...reqQuery })) {
+    try {
+      const publishedRows = await collectPublishedFdrsRows(async (page, perPage) => {
+        const publishedParams = new URLSearchParams(
+          publishedFdrsSearchParams({ ...filters, ...reqQuery }, page, perPage),
+        );
+        const publishedUrl = `${BACKOFFICE_URL}/api/v1/fdrs/published-data?${publishedParams.toString()}`;
+        const publishedResponse = await fetch(publishedUrl, {
+          headers: authHeaders(),
+          signal: AbortSignal.timeout(60000),
+        });
+        if (publishedResponse.status === 404) return null;
+        if (!publishedResponse.ok) {
+          throw new Error(`Published FDRS feed HTTP ${publishedResponse.status}`);
+        }
+        return publishedResponse.json();
+      });
+      if (publishedRows) {
+        let formItems = [];
+        try {
+          formItems = await fetchTemplateFormItems(templateId);
+        } catch (error) {
+          console.warn('[api/data] Form items for published FDRS failed:', error?.message);
+        }
+        return {
+          data: publishedRows,
+          form_items: formItems,
+          countries: [],
+          total_items: publishedRows.length,
+          total_pages: 1,
+          current_page: 1,
+          per_page: publishedRows.length,
+          source: 'fdrs-published',
+        };
+      }
+    } catch (error) {
+      console.warn('[api/data] Published FDRS feed failed, using /api/v1/data:', error?.message);
+    }
+  }
+
   const url = `${BACKOFFICE_URL}/api/v1/data?${params.toString()}`;
   const response = await fetch(url, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${API_KEY}` },
+    headers: authHeaders(),
     signal: AbortSignal.timeout(60000),
   });
   if (!response.ok) {
     return null;
   }
-  return response.json();
+  return adaptFlatDataPayload(await response.json());
 }
 
 export default async function handler(req, res) {
@@ -86,8 +150,12 @@ export default async function handler(req, res) {
         if (json) {
           data = Array.isArray(json) ? json : (json.data || []);
           if (returnFullResponse) {
-            formItems = json.form_items || formItems;
-            countries = json.countries || countries;
+            if (Array.isArray(json.form_items) && json.form_items.length) {
+              formItems = json.form_items;
+            }
+            if (Array.isArray(json.countries) && json.countries.length) {
+              countries = json.countries;
+            }
             pagination = {
               total_items: json.total_items ?? data.length,
               total_pages: json.total_pages ?? 1,

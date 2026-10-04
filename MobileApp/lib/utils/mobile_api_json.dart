@@ -32,6 +32,34 @@ Map<String, dynamic> mobileDataMapLoose(Map<String, dynamic> root) {
   return {};
 }
 
+/// List stored on `meta` (catalogs returned next to a page of rows).
+List<dynamic> mobileMetaList(Map<String, dynamic> root, String key) {
+  final meta = root['meta'];
+  if (meta is! Map) return const [];
+  final raw = meta[key];
+  if (raw is List) return raw;
+  return const [];
+}
+
+/// `meta.total_pages` from [mobile_paginated]. Missing meta is a single page.
+int mobileTotalPages(Map<String, dynamic> root) {
+  final meta = root['meta'];
+  if (meta is Map) {
+    final raw = meta['total_pages'];
+    if (raw is int && raw > 0) return raw;
+    final parsed = int.tryParse('${raw ?? ''}');
+    if (parsed != null && parsed > 0) return parsed;
+  }
+  return 1;
+}
+
+List<Map<String, dynamic>> mobileDataMaps(Map<String, dynamic> root) {
+  return mobileDataListLoose(root)
+      .whereType<Map>()
+      .map((row) => Map<String, dynamic>.from(row))
+      .toList();
+}
+
 /// List payload under `data` (e.g. paginated indicator bank).
 List<dynamic> mobileDataListLoose(Map<String, dynamic> root) {
   final data = root['data'];

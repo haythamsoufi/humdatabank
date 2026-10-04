@@ -17,9 +17,15 @@ export const GLOBAL_INITIATIVE_TEMPLATE_IDS = {
 };
 
 /**
- * Unified Planning and Reporting (UPR) template ID (set when backend template is available).
+ * Unified Planning and Reporting template ids. These match Backoffice
+ * `plugins/upr/catalog.py` (plan 24, country reporting 33).
  */
-export const UPR_TEMPLATE_ID = null;
+export const UPR_PLAN_TEMPLATE_ID = 24;
+export const UPR_REPORT_TEMPLATE_ID = 33;
+export const UPR_PNS_PLAN_TEMPLATE_ID = 22;
+export const UPR_PNS_REPORT_TEMPLATE_ID = 23;
+/** Country reporting template — the public UPR page's primary dataset. */
+export const UPR_TEMPLATE_ID = UPR_REPORT_TEMPLATE_ID;
 
 /**
  * Indicator bank IDs for the global overview map (FDRS template).

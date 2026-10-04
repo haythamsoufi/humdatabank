@@ -142,7 +142,7 @@ def list_assignments():
     for a in paginated.items:
         items.append({
             'id': a.id,
-            'period_name': a.period_name or 'Unnamed Assignment',
+            'period_name': (getattr(a, 'custom_name', None) or a.period_name or 'Unnamed Assignment'),
             'template_name': a.template.name if a.template else None,
             'template_id': a.template_id if a.template else None,
             'has_public_url': a.has_public_url() if hasattr(a, 'has_public_url') else False,
@@ -178,8 +178,35 @@ def get_assignment(assignment_id):
         except Exception:
             public_url = None
 
+    entity_rows = a.entity_statuses.order_by(AssignmentEntityStatus.id).all()
+    page_counts: dict[int, int] = {}
+    pages_submitted: dict[int, int] = {}
+    if entity_rows and getattr(a, 'enable_page_submission', False):
+        from app.models.assignments import AssignmentPageStatus
+
+        aes_ids = [row.id for row in entity_rows]
+        done_statuses = ('submitted', 'approved')
+        grouped = (
+            db.session.query(
+                AssignmentPageStatus.assignment_entity_status_id,
+                AssignmentPageStatus.status,
+                db.func.count(AssignmentPageStatus.id),
+            )
+            .filter(AssignmentPageStatus.assignment_entity_status_id.in_(aes_ids))
+            .group_by(
+                AssignmentPageStatus.assignment_entity_status_id,
+                AssignmentPageStatus.status,
+            )
+            .all()
+        )
+        for aes_id, status, count in grouped:
+            page_counts[aes_id] = page_counts.get(aes_id, 0) + int(count)
+            if status in done_statuses:
+                pages_submitted[aes_id] = pages_submitted.get(aes_id, 0) + int(count)
+
     entities = []
-    for aes in a.entity_statuses.order_by(AssignmentEntityStatus.id).all():
+    for aes in entity_rows:
+        completion = getattr(aes, 'completion_rate', None)
         entities.append({
             'id': aes.id,
             'entity_type': aes.entity_type,
@@ -193,12 +220,17 @@ def get_assignment(assignment_id):
             'submitted_at': aes.submitted_at.isoformat() if aes.submitted_at else None,
             'status_timestamp': aes.status_timestamp.isoformat()
             if aes.status_timestamp else None,
+            'completion_rate': float(completion) if completion is not None else None,
+            'published_at': aes.published_at.isoformat() if getattr(aes, 'published_at', None) else None,
+            'reopened_after_close': bool(getattr(aes, 'reopened_after_close', False)),
+            'page_count': page_counts.get(aes.id, 0),
+            'pages_submitted': pages_submitted.get(aes.id, 0),
         })
 
     earliest = a.earliest_due_date
     data = {
         'id': a.id,
-        'period_name': a.period_name or 'Unnamed Assignment',
+        'period_name': (getattr(a, 'custom_name', None) or a.period_name or 'Unnamed Assignment'),
         'template_id': a.template_id,
         'template_name': a.template.name if a.template else None,
         'assigned_at': a.assigned_at.isoformat() if a.assigned_at else None,
@@ -211,6 +243,7 @@ def get_assignment(assignment_id):
         'has_public_url': a.has_public_url() if hasattr(a, 'has_public_url') else False,
         'is_public_active': bool(a.is_public_active)
         if hasattr(a, 'is_public_active') else False,
+        'enable_page_submission': bool(getattr(a, 'enable_page_submission', False)),
         'public_url': public_url,
         'public_submission_count': public_submission_count,
         'entities': entities,
@@ -312,27 +345,54 @@ def list_documents():
     """List submitted documents with pagination."""
     from app.models import SubmittedDocument
 
+    from app.models.enums import DocumentStatus
+
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
     search = request.args.get('search', '').strip()
+    status = request.args.get('status', '').strip().lower()
+    document_type = (request.args.get('type') or request.args.get('document_type') or '').strip()
 
     query = SubmittedDocument.query.order_by(SubmittedDocument.uploaded_at.desc().nullslast())
     if search:
         query = query.filter(SubmittedDocument.filename.ilike(safe_ilike_pattern(search)))
+    if status in DocumentStatus.ALL:
+        query = query.filter(SubmittedDocument.status == status)
+    if document_type:
+        query = query.filter(
+            SubmittedDocument.document_type.ilike(safe_ilike_pattern(document_type))
+        )
 
     paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    from app.services.platform.app_settings_service import get_document_types
+
+    document_types = get_document_types(
+        default=list(current_app.config.get('DOCUMENT_TYPES') or [])
+    )
+
     items = []
     for doc in paginated.items:
+        country = doc.document_country
+        status_value = getattr(doc, 'status', None)
         items.append({
             'id': doc.id,
             'file_name': doc.filename,
             'document_type': getattr(doc, 'document_type', None),
             'language': getattr(doc, 'language', None),
-            'status': getattr(doc, 'status', None),
+            'status': getattr(status_value, 'value', status_value),
+            'country_name': country.name if country else None,
+            'period': getattr(doc, 'period', None),
+            'is_public': bool(getattr(doc, 'is_public', False)),
             'uploaded_at': doc.uploaded_at.isoformat() if doc.uploaded_at else None,
         })
 
-    return mobile_paginated(items=items, total=paginated.total, page=paginated.page, per_page=paginated.per_page)
+    return mobile_paginated(
+        items=items,
+        total=paginated.total,
+        page=paginated.page,
+        per_page=paginated.per_page,
+        extra_meta={'document_types': document_types},
+    )
 
 
 @mobile_bp.route('/admin/content/documents/<int:document_id>/file', methods=['GET'])
@@ -425,7 +485,7 @@ def list_resources():
     """List resources with pagination."""
     from app.models import Resource, ResourceTranslation
 
-    page, per_page = validate_pagination_params(request.args, default_per_page=10, max_per_page=100)
+    page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
     search = request.args.get('search', '').strip()
 
     query = Resource.query.order_by(Resource.publication_date.desc(), Resource.created_at.desc())
@@ -684,13 +744,32 @@ def list_indicators():
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
     search = request.args.get('search', '').strip()
-    indicator_type = request.args.get('type')
+    indicator_type = (request.args.get('type') or '').strip()
+    sector_name = (request.args.get('sector') or '').strip()
 
     query = IndicatorBank.query
     if search:
         query = query.filter(IndicatorBank.name.ilike(safe_ilike_pattern(search)))
     if indicator_type:
-        query = query.filter(IndicatorBank.type == indicator_type)
+        query = query.filter(db.func.lower(IndicatorBank.type) == indicator_type.lower())
+    if sector_name:
+        from sqlalchemy import or_
+
+        matching_ids = [
+            row.id
+            for row in Sector.query.filter(
+                Sector.name.ilike(safe_ilike_pattern(sector_name))
+            ).with_entities(Sector.id).all()
+        ]
+        if not matching_ids:
+            query = query.filter(db.false())
+        else:
+            id_text = [str(sector_id) for sector_id in matching_ids]
+            query = query.filter(or_(
+                IndicatorBank.sector['primary'].astext.in_(id_text),
+                IndicatorBank.sector['secondary'].astext.in_(id_text),
+                IndicatorBank.sector['tertiary'].astext.in_(id_text),
+            ))
 
     show_archived = request.args.get('show_archived', 'false').lower() in ('1', 'true', 'yes')
     if not show_archived:
@@ -737,7 +816,36 @@ def list_indicators():
             'usage_count': usage_counts.get(indicator.id, 0),
         })
 
-    return mobile_paginated(items=items, total=paginated.total, page=paginated.page, per_page=paginated.per_page)
+    return mobile_paginated(
+        items=items,
+        total=paginated.total,
+        page=paginated.page,
+        per_page=paginated.per_page,
+        extra_meta={'measurement_types': _active_measurement_types()},
+    )
+
+
+def _active_measurement_types():
+    """Active indicator measurement types for the mobile filter dropdown."""
+    try:
+        from app.models import IndicatorBankType
+
+        rows = (
+            IndicatorBankType.query.filter_by(is_active=True)
+            .order_by(IndicatorBankType.sort_order.asc(), IndicatorBankType.name.asc())
+            .all()
+        )
+    except Exception:
+        current_app.logger.debug('measurement types unavailable', exc_info=True)
+        return []
+    options = []
+    for row in rows:
+        code = (row.code or '').strip()
+        if not code:
+            continue
+        name = (row.name or code).strip()
+        options.append({'code': code, 'name': name or code})
+    return options
 
 
 @mobile_bp.route('/admin/content/indicator-bank/<int:indicator_id>', methods=['GET'])

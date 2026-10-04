@@ -1022,7 +1022,7 @@
       "errorsTitle": "Errors",
       "errors": {
         "400": "400: Invalid parameter or value",
-        "401": "401: Missing or invalid api_key",
+        "401": "401: Missing or invalid API key",
         "404": "404: Resource not found",
         "500": "500: Server error"
       }

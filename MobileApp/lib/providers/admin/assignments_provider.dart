@@ -6,7 +6,6 @@ import '../../models/admin/admin_assignment_detail.dart';
 import '../../utils/mobile_api_json.dart';
 import '../../services/api_service.dart';
 import '../../services/error_handler.dart';
-import '../../utils/debug_logger.dart';
 import '../../utils/network_availability.dart';
 import '../../di/service_locator.dart';
 import '../shared/async_operation_mixin.dart';
@@ -34,16 +33,45 @@ class AssignmentsProvider with ChangeNotifier, AsyncOperationMixin {
       _error = null;
       notifyListeners();
 
-      final response =
-          await _errorHandler.executeWithErrorHandling<http.Response>(
-        apiCall: () => _api.get(AppConfig.mobileAssignmentsEndpoint),
-        context: 'Load Assignments',
-        defaultValue: null,
-        maxRetries: 1,
-        handleAuthErrors: true,
-      );
+      final collected = <AdminAssignment>[];
+      var page = 1;
+      var totalPages = 1;
+      http.Response? response;
+      try {
+      while (page <= totalPages && page <= 25) {
+        response = await _errorHandler.executeWithErrorHandling<http.Response>(
+          apiCall: () => _api.get(
+            AppConfig.mobileAssignmentsEndpoint,
+            queryParams: {'page': '$page', 'per_page': '200'},
+          ),
+          context: 'Load Assignments',
+          defaultValue: null,
+          maxRetries: 1,
+          handleAuthErrors: true,
+        );
+        if (response == null || response.statusCode != 200) break;
+        final jsonData = decodeJsonObject(response.body);
+        if (jsonData['success'] != true) break;
+        collected.addAll(
+          mobileDataMaps(jsonData).map(AdminAssignment.fromJson),
+        );
+        totalPages = mobileTotalPages(jsonData);
+        page += 1;
+      }
+      } catch (e, stackTrace) {
+        final error = _errorHandler.parseError(
+          error: e,
+          stackTrace: stackTrace,
+          context: 'Parse Assignments',
+        );
+        _error = error.getUserMessage();
+        _assignments = collected;
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
 
-      if (response == null) {
+      if (response == null && collected.isEmpty) {
         _error = 'Unable to load assignments. Please try again.';
         _assignments = [];
         _isLoading = false;
@@ -51,35 +79,13 @@ class AssignmentsProvider with ChangeNotifier, AsyncOperationMixin {
         return;
       }
 
-      if (response.statusCode == 200) {
+      if (collected.isNotEmpty || (response != null && response.statusCode == 200)) {
         try {
-          // Try to parse as JSON first
-          try {
-            final jsonData = decodeJsonObject(response.body);
-            if (jsonData['success'] == true) {
-              final rawData = jsonData['data'];
-              final List<dynamic>? assignmentsList = rawData is List
-                  ? rawData
-                  : rawData is Map ? (rawData['assignments'] as List<dynamic>?) : (jsonData['assignments'] as List<dynamic>?);
-              if (assignmentsList != null) {
-                _assignments = assignmentsList
-                    .map((json) => AdminAssignment.fromJson(json as Map<String, dynamic>))
-                    .toList();
-              } else {
-                _assignments = [];
-              }
-              _error = null;
-            } else {
-              // Fallback to HTML parsing for backward compatibility
-              final html = response.body;
-              _assignments = _parseAssignmentsFromHtml(html);
-              _error = null;
-            }
-          } catch (e) {
-            // If JSON parsing fails, try HTML parsing as fallback
-            DebugLogger.logWarn('ASSIGNMENTS', 'JSON parse failed, trying HTML: $e');
-            final html = response.body;
-            _assignments = _parseAssignmentsFromHtml(html);
+          if (collected.isNotEmpty || (response != null && response.body.trimLeft().startsWith('{'))) {
+            _assignments = collected;
+            _error = null;
+          } else if (response != null) {
+            _assignments = _parseAssignmentsFromHtml(response.body);
             _error = null;
           }
         } catch (e, stackTrace) {
@@ -93,7 +99,7 @@ class AssignmentsProvider with ChangeNotifier, AsyncOperationMixin {
         }
       } else {
         final error = _errorHandler.parseError(
-          error: Exception('HTTP ${response.statusCode}'),
+          error: Exception('HTTP ${response?.statusCode ?? 'unknown'}'),
           response: response,
           context: 'Load Assignments',
         );

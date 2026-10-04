@@ -63,7 +63,35 @@ async function syncData() {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const rawData = await response.json();
+    const {
+      adaptFlatDataPayload,
+      collectPublishedFdrsRows,
+      replaceFdrsRowsWithPublished,
+    } = await import('../lib/apiContract.mjs');
+    const data = adaptFlatDataPayload(rawData);
+
+    try {
+      const publishedRows = await collectPublishedFdrsRows(async (page, perPage) => {
+        const publishedResponse = await fetchWithAuthFallback(
+          `/api/v1/fdrs/published-data?page=${page}&per_page=${perPage}`,
+        );
+        if (publishedResponse.status === 404) return null;
+        if (!publishedResponse.ok) {
+          throw new Error(`Published FDRS feed HTTP ${publishedResponse.status}`);
+        }
+        return publishedResponse.json();
+      });
+      if (publishedRows) {
+        const liveFdrs = (data.data || []).filter((row) => Number(row.template_id) === 21).length;
+        data.data = replaceFdrsRowsWithPublished(data.data, publishedRows);
+        console.log(
+          `   - Replaced ${liveFdrs} live FDRS rows with ${publishedRows.length} published rows`,
+        );
+      }
+    } catch (error) {
+      console.warn('⚠️ Published FDRS feed unavailable; keeping live FDRS rows:', error.message);
+    }
 
     console.log(`✅ Fetched:`);
     console.log(`   - ${data.data?.length || 0} data records`);

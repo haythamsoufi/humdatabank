@@ -60,22 +60,24 @@ def mobile_created(data=None, message=None, **extra):
     return jsonify(body), 201
 
 
-def mobile_paginated(items, total, page, per_page):
+def mobile_paginated(items, total, page, per_page, *, extra_meta=None):
     """
     Paginated mobile success response.
 
     Always returns ``data`` as a list and ``meta`` with pagination fields.
+    ``extra_meta`` is merged into ``meta`` for catalogs the client needs
+    alongside the page (document types, measurement types).
     """
     total_pages = -(-total // per_page) if per_page else 0
-    return mobile_ok(
-        data=items,
-        meta={
-            'total': total,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': total_pages,
-        },
-    )
+    meta = {
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': total_pages,
+    }
+    if extra_meta:
+        meta.update(extra_meta)
+    return mobile_ok(data=items, meta=meta)
 
 
 # ---------------------------------------------------------------------------

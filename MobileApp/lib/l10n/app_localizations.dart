@@ -162,6 +162,10 @@ class AppLocalizations {
       'assignment_open': 'Open',
       'entity_public_reporting': 'Public reporting available',
       'entity_submitted_at': 'Submitted',
+      'pages_submitted': 'Pages submitted',
+      'last_published': 'Last published',
+      'page_submission': 'Page submission',
+      'reopened_after_close': 'Reopened after close',
       'frontend_management': 'Website Management',
       'manage_resources': 'Manage Resources',
       'reference_data': 'Reference Data',
@@ -7492,6 +7496,10 @@ class AppLocalizations {
   String get assignmentOpen => translate('assignment_open');
   String get entityPublicReporting => translate('entity_public_reporting');
   String get entitySubmittedAt => translate('entity_submitted_at');
+  String get pagesSubmitted => translate('pages_submitted');
+  String get lastPublished => translate('last_published');
+  String get pageSubmission => translate('page_submission');
+  String get reopenedAfterClose => translate('reopened_after_close');
   String get frontendManagement => translate('frontend_management');
   String get manageResources => translate('manage_resources');
   String get referenceData => translate('reference_data');

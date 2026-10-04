@@ -11,15 +11,25 @@ abstract final class GroupedDashboardPalette {
   static const hairline = Color(0xFFE5E5EA);
 
   static const overdueWash = Color(0xFFFEE2E2);
+  static const overdueCard = Color(0xFFFFF1F2);
   static const submitted = Color(0xFF15803D);
   static const submittedWash = Color(0xFFDCFCE7);
+  static const submittedCard = Color(0xFFF0FDF4);
+  static const approved = Color(0xFF1D4ED8);
+  static const approvedDark = Color(0xFF93C5FD);
+  static const approvedWash = Color(0xFFDBEAFE);
+  static const approvedCard = Color(0xFFEFF6FF);
   static const muted = Color(0xFF6B7280);
   static const mutedDark = Color(0xFFD1D5DB);
   static const mutedWash = Color(0xFFF3F4F6);
   static const mutedWashDark = Color(0xFF374151);
   static const progressOnDark = Color(0xFFBFDBFE);
+  static const progressWash = Color(0xFFE8EEF6);
   static const amber = Color(0xFFB45309);
   static const amberWash = Color(0xFFFEF3C7);
+  static const amberCard = Color(0xFFFFFBEB);
+  static const mailAction = Color(0xFF011E41);
+  static const teamsAction = Color(0xFF5B5FC7);
 
   static const avatarColors = <Color>[
     Color(0xFF0F766E),

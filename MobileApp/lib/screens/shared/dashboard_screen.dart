@@ -59,6 +59,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   OfflineProvider? _offlineProviderListenerRef;
   bool _offlineStaleAutoRefreshInProgress = false;
 
+  /// Own controller so this list does not share the route's primary scroller
+  /// with the other tabs in the page view. Those siblings can leave a non-zero
+  /// offset, which is why the dashboard opened part-way down the list.
+  final ScrollController _scrollController = ScrollController();
+  bool _userDraggedDashboard = false;
+  bool _correctingScroll = false;
+  late final DateTime _scrollGuardUntil = DateTime.now().add(
+    const Duration(seconds: 3),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       listen: false,
     );
     _previousLanguage = languageProvider.currentLanguage;
+    _scrollController.addListener(_onDashboardScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       _animationController.forward();
@@ -91,8 +102,36 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void dispose() {
     _offlineProviderListenerRef?.removeListener(_onOfflineProviderChanged);
+    _scrollController.removeListener(_onDashboardScroll);
+    _scrollController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  /// Off-screen layout in the tab page view can park this list mid-content
+  /// before the user has touched it. Keep the header in view for the opening
+  /// moments, then leave the offset alone.
+  void _onDashboardScroll() {
+    if (_userDraggedDashboard ||
+        _correctingScroll ||
+        DateTime.now().isAfter(_scrollGuardUntil) ||
+        !_scrollController.hasClients ||
+        _scrollController.offset == 0) {
+      return;
+    }
+    _correctingScroll = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _correctingScroll = false;
+      if (!mounted ||
+          _userDraggedDashboard ||
+          DateTime.now().isAfter(_scrollGuardUntil) ||
+          !_scrollController.hasClients) {
+        return;
+      }
+      if (_scrollController.offset != 0) {
+        _scrollController.jumpTo(0);
+      }
+    });
   }
 
   void _onOfflineProviderChanged() {
@@ -1349,161 +1388,180 @@ class _DashboardScreenState extends State<DashboardScreen>
                 )
               : null,
           backgroundColor: groupedBackground,
-          body: ColoredBox(
-            color: IOSColors.getGroupedBackground(context),
-            child: RefreshIndicator(
-              onRefresh: () async {
-                HapticFeedback.lightImpact();
-                if (_animationController.isAnimating) {
-                  _animationController.stop();
-                }
-                _animationController.reset();
-                await _loadData();
-                _animationController.forward();
-              },
-              color: IOSColors.getSystemBlue(context),
-              strokeWidth: 2.5,
-              displacement: 40,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              child: Consumer<DashboardProvider>(
-                builder: (context, provider, child) {
-                  // Show loading if currently loading OR if we haven't completed first load yet
-                  final bool shouldShowLoading =
-                      provider.isLoading || !_hasLoadedOnce;
-
-                  if (shouldShowLoading &&
-                      provider.currentAssignments.isEmpty &&
-                      provider.pastAssignments.isEmpty) {
-                    return AppLoadingIndicator(
-                      message: localizations.loadingDashboard,
-                      color: Color(AppConstants.ifrcRed),
-                    );
+          body: SafeArea(
+            bottom: false,
+            child: ColoredBox(
+              color: IOSColors.getGroupedBackground(context),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  HapticFeedback.lightImpact();
+                  if (_animationController.isAnimating) {
+                    _animationController.stop();
                   }
+                  _animationController.reset();
+                  await _loadData();
+                  _animationController.forward();
+                },
+                color: IOSColors.getSystemBlue(context),
+                strokeWidth: 2.5,
+                displacement: 40,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                child: Consumer<DashboardProvider>(
+                  builder: (context, provider, child) {
+                    // Show loading if currently loading OR if we haven't completed first load yet
+                    final bool shouldShowLoading =
+                        provider.isLoading || !_hasLoadedOnce;
 
-                  if (provider.error != null &&
-                      provider.currentAssignments.isEmpty &&
-                      provider.pastAssignments.isEmpty &&
-                      _hasLoadedOnce) {
-                    return AppErrorState(
-                      message: provider.error,
-                      onRetry: () {
-                        provider.clearError();
-                        _loadData();
-                      },
-                      retryLabel: localizations.retry,
-                    );
-                  }
+                    if (shouldShowLoading &&
+                        provider.currentAssignments.isEmpty &&
+                        provider.pastAssignments.isEmpty) {
+                      return AppLoadingIndicator(
+                        message: localizations.loadingDashboard,
+                        color: Color(AppConstants.ifrcRed),
+                      );
+                    }
 
-                  return FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.zero,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildPageHeader(provider, localizations),
+                    if (provider.error != null &&
+                        provider.currentAssignments.isEmpty &&
+                        provider.pastAssignments.isEmpty &&
+                        _hasLoadedOnce) {
+                      return AppErrorState(
+                        message: provider.error,
+                        onRetry: () {
+                          provider.clearError();
+                          _loadData();
+                        },
+                        retryLabel: localizations.retry,
+                      );
+                    }
 
-                          if (_staleOfflineBundleAssignmentIds.isNotEmpty &&
-                              _dismissedStaleBundleSignature !=
-                                  _staleBundleSignature())
-                            _buildOfflineStaleBundleBanner(
-                              loc: localizations,
-                              offline: offlineProvider,
-                            ),
+                    return FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is ScrollStartNotification &&
+                              notification.dragDetails != null) {
+                            _userDraggedDashboard = true;
+                          }
+                          return false;
+                        },
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          primary: false,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildPageHeader(provider, localizations),
 
-                          // Open assignments (collapsible; title: "You have …")
-                          if (provider.currentAssignments.isNotEmpty ||
-                              provider.pastAssignments.isNotEmpty)
-                            _buildCurrentAssignmentsSection(
-                              provider: provider,
-                              authProvider: authProvider,
-                              offlineProvider: offlineProvider,
-                              languageProvider: languageProvider,
-                              localizations: localizations,
-                            ),
+                              if (_staleOfflineBundleAssignmentIds.isNotEmpty &&
+                                  _dismissedStaleBundleSignature !=
+                                      _staleBundleSignature())
+                                _buildOfflineStaleBundleBanner(
+                                  loc: localizations,
+                                  offline: offlineProvider,
+                                ),
 
-                          // Past assignments (dashboard.html: collapsible + slicers + one list)
-                          if (provider.pastAssignments.isNotEmpty) ...[
-                            _buildPastAssignmentsSection(provider),
-                          ],
+                              // Open assignments (collapsible; title: "You have …")
+                              if (provider.currentAssignments.isNotEmpty ||
+                                  provider.pastAssignments.isNotEmpty)
+                                _buildCurrentAssignmentsSection(
+                                  provider: provider,
+                                  authProvider: authProvider,
+                                  offlineProvider: offlineProvider,
+                                  languageProvider: languageProvider,
+                                  localizations: localizations,
+                                ),
 
-                          if (provider.selectedEntity != null ||
-                              provider.entities.isNotEmpty)
-                            Builder(
-                              builder: (context) {
-                                final entity =
-                                    provider.selectedEntity ??
-                                    provider.entities.first;
-                                return DashboardFocalPointsSection(
-                                  entityLabel: entity.displayLabel,
-                                  nsFocalPoints: provider.nsFocalPoints,
-                                  orgFocalPoints: provider.orgFocalPoints,
-                                );
-                              },
-                            ),
+                              // Past assignments (dashboard.html: collapsible + slicers + one list)
+                              if (provider.pastAssignments.isNotEmpty) ...[
+                                _buildPastAssignmentsSection(provider),
+                              ],
 
-                          // Empty State - only show after we've loaded at least once
-                          if (provider.currentAssignments.isEmpty &&
-                              provider.pastAssignments.isEmpty &&
-                              !provider.isLoading &&
-                              _hasLoadedOnce &&
-                              provider.error == null)
-                            SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.6,
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 40,
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.inbox_rounded,
-                                        size: 72,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.25),
+                              if (provider.selectedEntity != null ||
+                                  provider.entities.isNotEmpty)
+                                Builder(
+                                  builder: (context) {
+                                    final entity =
+                                        provider.selectedEntity ??
+                                        provider.entities.first;
+                                    return DashboardFocalPointsSection(
+                                      entityLabel: entity.displayLabel,
+                                      nsFocalPoints: provider.nsFocalPoints,
+                                      orgFocalPoints: provider.orgFocalPoints,
+                                    );
+                                  },
+                                ),
+
+                              // Empty State - only show after we've loaded at least once
+                              if (provider.currentAssignments.isEmpty &&
+                                  provider.pastAssignments.isEmpty &&
+                                  !provider.isLoading &&
+                                  _hasLoadedOnce &&
+                                  provider.error == null)
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.6,
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 40,
                                       ),
-                                      SizedBox(
-                                        height: IOSSpacing.xlOf(context),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.inbox_rounded,
+                                            size: 72,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.25),
+                                          ),
+                                          SizedBox(
+                                            height: IOSSpacing.xlOf(context),
+                                          ),
+                                          Text(
+                                            localizations.noAssignmentsYet,
+                                            style: IOSTextStyle.title2(context),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          SizedBox(
+                                            height: IOSSpacing.smOf(context),
+                                          ),
+                                          Text(
+                                            localizations
+                                                .newAssignmentsWillAppear,
+                                            style:
+                                                IOSTextStyle.subheadline(
+                                                  context,
+                                                ).copyWith(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurface
+                                                      .withValues(alpha: 0.6),
+                                                  height: 1.4,
+                                                ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
                                       ),
-                                      Text(
-                                        localizations.noAssignmentsYet,
-                                        style: IOSTextStyle.title2(context),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      SizedBox(
-                                        height: IOSSpacing.smOf(context),
-                                      ),
-                                      Text(
-                                        localizations.newAssignmentsWillAppear,
-                                        style: IOSTextStyle.subheadline(context)
-                                            .copyWith(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.6),
-                                              height: 1.4,
-                                            ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
 
-                          const SizedBox(height: 80), // Space for FAB
-                        ],
+                              const SizedBox(height: 80), // Space for FAB
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),

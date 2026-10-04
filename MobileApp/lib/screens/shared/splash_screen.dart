@@ -170,7 +170,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _BrandMark(reveal: _interval(t, 0.02, 0.42)),
+                          _BrandMark(opacity: _interval(t, 0.02, 0.42)),
                           const SizedBox(height: 28),
                           _SocietyStat(
                             count:
@@ -192,19 +192,13 @@ class _SplashScreenState extends State<SplashScreen>
                           const SizedBox(height: 18),
                           Opacity(
                             opacity: _interval(t, 0.42, 0.72),
-                            child: Transform.translate(
-                              offset: Offset(
-                                0,
-                                14 * (1 - _interval(t, 0.42, 0.72)),
-                              ),
-                              child: Text(
-                                localizations.splashDescription,
-                                style: const TextStyle(
-                                  color: SplashHeroPalette.inkBody,
-                                  fontSize: 15,
-                                  height: 1.55,
-                                  fontWeight: FontWeight.w400,
-                                ),
+                            child: Text(
+                              localizations.splashDescription,
+                              style: const TextStyle(
+                                color: SplashHeroPalette.inkBody,
+                                fontSize: 15,
+                                height: 1.55,
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ),
@@ -226,29 +220,59 @@ class _SplashScreenState extends State<SplashScreen>
                     opacity: _interval(t, 0.62, 0.92),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(28, 0, 28, 18),
-                      child: InkWell(
-                        onTap: _openHumDatabankGithub,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              localizations.poweredByHumDatabank,
-                              style: TextStyle(
-                                color: SplashHeroPalette.ink.withValues(
-                                  alpha: 0.42,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            localizations.poweredByHumDatabank,
+                            style: TextStyle(
+                              color: SplashHeroPalette.ink.withValues(
+                                alpha: 0.9,
+                              ),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Material(
+                            color: SplashHeroPalette.ink,
+                            elevation: 3,
+                            shadowColor: SplashHeroPalette.shadow.withValues(
+                              alpha: 0.45,
+                            ),
+                            shape: const StadiumBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: _openHumDatabankGithub,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 11,
                                 ),
-                                fontSize: 12,
-                                letterSpacing: 0.2,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const FaIcon(
+                                      FontAwesomeIcons.github,
+                                      size: 18,
+                                      color: SplashHeroPalette.navy,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      localizations.openOnGithub,
+                                      style: const TextStyle(
+                                        color: SplashHeroPalette.navy,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            const FaIcon(
-                              FontAwesomeIcons.github,
-                              size: 13,
-                              color: SplashHeroPalette.sky,
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -269,59 +293,56 @@ double _interval(double t, double start, double end) {
 }
 
 class _BrandMark extends StatelessWidget {
-  const _BrandMark({required this.reveal});
+  const _BrandMark({required this.opacity});
 
-  final double reveal;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: Align(
-        alignment: Alignment.topCenter,
-        heightFactor: reveal.clamp(0.001, 1),
-        child: Container(
-          width: 156,
-          decoration: BoxDecoration(
-            color: SplashHeroPalette.ink,
-            boxShadow: [
-              BoxShadow(
-                color: SplashHeroPalette.shadow.withValues(alpha: 0.28),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
+    return Opacity(
+      opacity: opacity.clamp(0, 1),
+      child: Container(
+        width: 156,
+        decoration: BoxDecoration(
+          color: SplashHeroPalette.ink,
+          boxShadow: [
+            BoxShadow(
+              color: SplashHeroPalette.shadow.withValues(alpha: 0.28),
+              blurRadius: 28,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(
+                width: 4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        SplashHeroPalette.blue,
+                        SplashHeroPalette.navy,
+                        SplashHeroPalette.red,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 12, 12, 12),
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
             ],
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(
-                  width: 4,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          SplashHeroPalette.blue,
-                          SplashHeroPalette.navy,
-                          SplashHeroPalette.red,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 12, 12, 12),
-                    child: Image.asset(
-                      'assets/images/app_icon.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -466,12 +487,6 @@ class _HeadlineWord extends StatelessWidget {
         child: Text(word, style: style),
       );
     }
-    return Opacity(
-      opacity: shown.clamp(0, 1),
-      child: Transform.translate(
-        offset: Offset(0, 10 * (1 - shown.clamp(0, 1))),
-        child: text,
-      ),
-    );
+    return Opacity(opacity: shown.clamp(0, 1), child: text);
   }
 }

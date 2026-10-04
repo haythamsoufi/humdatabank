@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/shared/focal_point_contact.dart';
@@ -221,9 +222,7 @@ class _ContactRow extends StatelessWidget {
                 backgroundColor: avatar,
                 child: Text(
                   contact.initials,
-                  style: IOSTextStyle.caption1(
-                    context,
-                  ).copyWith(
+                  style: IOSTextStyle.caption1(context).copyWith(
                     fontWeight: FontWeight.w700,
                     color: GroupedDashboardPalette.onFill,
                   ),
@@ -269,14 +268,9 @@ class _ContactRow extends StatelessWidget {
                 ),
               ),
               if (contact.email.isNotEmpty) ...[
-                IconButton(
-                  visualDensity: VisualDensity.compact,
+                _ContactAction(
                   tooltip: localizations.email,
-                  icon: Icon(
-                    Icons.mail_outline_rounded,
-                    size: 18,
-                    color: scheme.onSurface.withValues(alpha: 0.45),
-                  ),
+                  color: GroupedDashboardPalette.mailAction,
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     unawaited(
@@ -286,15 +280,15 @@ class _ContactRow extends StatelessWidget {
                       ),
                     );
                   },
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Teams',
-                  icon: Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    size: 18,
-                    color: scheme.onSurface.withValues(alpha: 0.45),
+                  child: const FaIcon(
+                    FontAwesomeIcons.solidEnvelope,
+                    size: 14,
+                    color: GroupedDashboardPalette.onFill,
                   ),
+                ),
+                _ContactAction(
+                  tooltip: 'Teams',
+                  color: GroupedDashboardPalette.teamsAction,
                   onPressed: () {
                     HapticFeedback.lightImpact();
                     final teamsUri = Uri.parse(
@@ -303,6 +297,10 @@ class _ContactRow extends StatelessWidget {
                     );
                     unawaited(onLaunch(context, teamsUri));
                   },
+                  child: const CustomPaint(
+                    size: Size(16, 16),
+                    painter: _TeamsGlyphPainter(GroupedDashboardPalette.onFill),
+                  ),
                 ),
               ],
             ],
@@ -316,4 +314,72 @@ class _ContactRow extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ContactAction extends StatelessWidget {
+  const _ContactAction({
+    required this.tooltip,
+    required this.color,
+    required this.onPressed,
+    required this.child,
+  });
+
+  final String tooltip;
+  final Color color;
+  final VoidCallback onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: color,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            child: SizedBox(width: 34, height: 34, child: Center(child: child)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-person mark used for the Microsoft Teams chat action.
+class _TeamsGlyphPainter extends CustomPainter {
+  const _TeamsGlyphPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final w = size.width;
+    final h = size.height;
+
+    canvas.drawCircle(Offset(w * 0.36, h * 0.26), w * 0.16, paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.12, h * 0.46, w * 0.48, h * 0.46),
+        Radius.circular(w * 0.16),
+      ),
+      paint,
+    );
+    canvas.drawCircle(Offset(w * 0.74, h * 0.32), w * 0.11, paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(w * 0.58, h * 0.48, w * 0.34, h * 0.32),
+        Radius.circular(w * 0.12),
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TeamsGlyphPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

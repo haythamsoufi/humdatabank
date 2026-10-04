@@ -66,10 +66,10 @@ Future<void> _pumpBar(
 
 void main() {
   test('iPhone home-indicator inset keeps a short clearance', () {
-    // 34pt inset → 18pt under the glyphs (indicator graphic is ~13pt).
-    expect(AppBottomNavigationBar.iosBottomPaddingForInset(34), 18);
+    // 34pt inset → 28pt under the glyphs (indicator graphic is ~13pt).
+    expect(AppBottomNavigationBar.iosBottomPaddingForInset(34), 28);
     expect(AppBottomNavigationBar.iosBottomPaddingForInset(0), 8);
-    expect(AppBottomNavigationBar.iosBottomPaddingForInset(21), 16);
+    expect(AppBottomNavigationBar.iosBottomPaddingForInset(21), 20);
     expect(AppBottomNavigationBar.iosBottomPaddingForInset(48), 48);
   });
 
@@ -86,9 +86,9 @@ void main() {
         bar.localToGlobal(Offset(0, bar.size.height)).dy -
         icon.localToGlobal(Offset(0, icon.size.height)).dy;
 
-    expect(bar.size.height, closeTo(35 + 18, 0.5));
+    expect(bar.size.height, closeTo(35 + 28, 0.5));
     // Old shell was 52 + 34, with the glyph centered, ~48pt under the icon.
-    expect(gap, closeTo(18, 0.5));
+    expect(gap, closeTo(28, 0.5));
     expect(gap, greaterThan(13));
   });
 

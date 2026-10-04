@@ -522,7 +522,9 @@ class AppBottomNavigationBar extends StatelessWidget {
     final Color stripeColor;
     if (lightForegroundOnBar) {
       stripeColor = ifrcRed;
-      iconFg = isSelected ? Colors.white : Colors.white.withValues(alpha: 0.62);
+      iconFg = isSelected
+          ? Colors.white
+          : Colors.white.withValues(alpha: 0.62);
     } else if (isSelected) {
       stripeColor = ifrcRed;
       iconFg = context.isDarkTheme

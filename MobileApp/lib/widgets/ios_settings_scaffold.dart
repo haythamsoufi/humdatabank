@@ -48,24 +48,17 @@ class IOSSettingsPageScaffold extends StatelessWidget {
             Expanded(
               child: SafeArea(
                 bottom: false,
-                child: ColoredBox(
-                  color: bg,
-                  child: scroll,
-                ),
+                child: ColoredBox(color: bg, child: scroll),
               ),
             ),
-            SafeArea(
-              top: false,
-              child: bottomNavigationBar!,
-            ),
+            // [AppBottomNavigationBar] applies its own bottom inset. Another
+            // SafeArea here stacks the full home-indicator gap under the icons.
+            bottomNavigationBar!,
           ],
         );
       } else {
         body = SafeArea(
-          child: ColoredBox(
-            color: bg,
-            child: scroll,
-          ),
+          child: ColoredBox(color: bg, child: scroll),
         );
       }
 
@@ -86,10 +79,7 @@ class IOSSettingsPageScaffold extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppAppBar(
-        title: title,
-        actions: materialAppBarActions,
-      ),
+      appBar: AppAppBar(title: title, actions: materialAppBarActions),
       backgroundColor: bg,
       bottomNavigationBar: bottomNavigationBar,
       body: SafeArea(

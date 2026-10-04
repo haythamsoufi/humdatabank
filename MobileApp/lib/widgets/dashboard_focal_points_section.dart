@@ -7,21 +7,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/shared/focal_point_contact.dart';
 import '../l10n/app_localizations.dart';
 import '../services/organization_config_service.dart';
+import '../theme/grouped_dashboard_palette.dart';
 import '../utils/constants.dart';
 import '../utils/ios_constants.dart';
 import 'dashboard_grouped_assignment_card.dart';
 
 /// Distinct, stable avatar colors so each person is easy to tell apart.
-const List<Color> _avatarPalette = [
-  Color(0xFF0F766E),
-  Color(0xFFB45309),
-  Color(0xFF011E41),
-  Color(0xFF1D4ED8),
-  Color(0xFF7C3AED),
-  Color(0xFFBE123C),
-  Color(0xFF0369A1),
-  Color(0xFF3F6212),
-];
+const List<Color> _avatarPalette = GroupedDashboardPalette.avatarColors;
 
 Color avatarColorFor(String key) {
   var hash = 0;
@@ -80,10 +72,12 @@ class DashboardFocalPointsSection extends StatelessWidget {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final hasContacts = nsFocalPoints.isNotEmpty || orgFocalPoints.isNotEmpty;
-    final cardColor = isDark ? scheme.surfaceContainerHigh : Colors.white;
+    final cardColor = isDark
+        ? scheme.surfaceContainerHigh
+        : GroupedDashboardPalette.card;
     final borderColor = isDark
         ? scheme.outlineVariant.withValues(alpha: 0.45)
-        : const Color(0xFFE5E5EA);
+        : GroupedDashboardPalette.hairline;
     final total = nsFocalPoints.length + orgFocalPoints.length;
 
     return Padding(
@@ -213,7 +207,7 @@ class _ContactRow extends StatelessWidget {
     );
     final borderColor = isDark
         ? scheme.outlineVariant.withValues(alpha: 0.35)
-        : const Color(0xFFE5E5EA);
+        : GroupedDashboardPalette.hairline;
 
     return Column(
       children: [
@@ -229,7 +223,10 @@ class _ContactRow extends StatelessWidget {
                   contact.initials,
                   style: IOSTextStyle.caption1(
                     context,
-                  ).copyWith(fontWeight: FontWeight.w700, color: Colors.white),
+                  ).copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: GroupedDashboardPalette.onFill,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

@@ -13,6 +13,7 @@ import '../../providers/shared/offline_provider.dart';
 import '../../widgets/dashboard_grouped_assignment_card.dart';
 import '../../config/routes.dart';
 import '../../config/app_config.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
@@ -1252,13 +1253,13 @@ class _DashboardScreenState extends State<DashboardScreen>
             Material(
               color: isDark
                   ? theme.colorScheme.surfaceContainerHigh
-                  : Colors.white,
+                  : GroupedDashboardPalette.card,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
                   color: isDark
                       ? theme.colorScheme.outlineVariant.withValues(alpha: 0.45)
-                      : const Color(0xFFE5E5EA),
+                      : GroupedDashboardPalette.hairline,
                 ),
               ),
               clipBehavior: Clip.antiAlias,

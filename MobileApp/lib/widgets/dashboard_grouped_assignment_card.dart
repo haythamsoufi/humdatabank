@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/shared/assignment.dart';
+import '../theme/grouped_dashboard_palette.dart';
 import '../utils/constants.dart';
 import '../utils/ios_constants.dart';
 
@@ -71,10 +72,12 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
         ? scheme.onSurface
         : const Color(AppConstants.defaultNavy);
     final metaColor = scheme.onSurface.withValues(alpha: 0.55);
-    final cardColor = isDark ? scheme.surfaceContainerHigh : Colors.white;
+    final cardColor = isDark
+        ? scheme.surfaceContainerHigh
+        : GroupedDashboardPalette.card;
     final borderColor = isDark
         ? scheme.outlineVariant.withValues(alpha: 0.45)
-        : const Color(0xFFE5E5EA);
+        : GroupedDashboardPalette.hairline;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -225,7 +228,7 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
       foreground: red,
       background: isDark
           ? red.withValues(alpha: 0.18)
-          : const Color(0xFFFEE2E2),
+          : GroupedDashboardPalette.overdueWash,
       outlined: false,
     );
   }
@@ -233,62 +236,70 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
   final status = assignment.status.toLowerCase().trim().replaceAll('_', ' ');
   switch (status) {
     case 'submitted':
-      const green = Color(0xFF15803D);
+      const green = GroupedDashboardPalette.submitted;
       return _StatusTone(
         label: localizations.localizeStatus(status),
         accent: green,
         foreground: green,
         background: isDark
             ? green.withValues(alpha: 0.18)
-            : const Color(0xFFDCFCE7),
+            : GroupedDashboardPalette.submittedWash,
         outlined: false,
       );
     case 'approved':
-      final gray = isDark ? const Color(0xFFD1D5DB) : const Color(0xFF6B7280);
+      final gray = isDark
+          ? GroupedDashboardPalette.mutedDark
+          : GroupedDashboardPalette.muted;
       return _StatusTone(
         label: localizations.localizeStatus(status),
         accent: gray,
         foreground: gray,
-        background: isDark ? const Color(0xFF374151) : const Color(0xFFF3F4F6),
+        background: isDark
+            ? GroupedDashboardPalette.mutedWashDark
+            : GroupedDashboardPalette.mutedWash,
         outlined: false,
       );
     case 'in progress':
       return _StatusTone(
         label: localizations.localizeStatus(status),
         accent: navy,
-        foreground: isDark ? const Color(0xFFBFDBFE) : navy,
+        foreground: isDark ? GroupedDashboardPalette.progressOnDark : navy,
         background: Colors.transparent,
         outlined: true,
       );
     case 'requires revision':
-      const amber = Color(0xFFB45309);
+      const amber = GroupedDashboardPalette.amber;
       return _StatusTone(
         label: localizations.localizeStatus(status),
         accent: amber,
         foreground: amber,
         background: isDark
             ? amber.withValues(alpha: 0.18)
-            : const Color(0xFFFEF3C7),
+            : GroupedDashboardPalette.amberWash,
         outlined: false,
       );
     case 'pending':
-      const amber = Color(0xFFB45309);
+      const amber = GroupedDashboardPalette.amber;
       return _StatusTone(
         label: localizations.localizeStatus(status),
         accent: amber,
         foreground: amber,
         background: isDark
             ? amber.withValues(alpha: 0.18)
-            : const Color(0xFFFEF3C7),
+            : GroupedDashboardPalette.amberWash,
         outlined: false,
       );
     default:
-      final gray = isDark ? const Color(0xFFD1D5DB) : const Color(0xFF6B7280);
+      final gray = isDark
+          ? GroupedDashboardPalette.mutedDark
+          : GroupedDashboardPalette.muted;
       return _StatusTone(
         label: localizations.localizeStatus(status),
         accent: gray,
         foreground: gray,
-        background: isDark ? const Color(0xFF374151) : const Color(0xFFF3F4F6),
+        background: isDark
+            ? GroupedDashboardPalette.mutedWashDark
+            : GroupedDashboardPalette.mutedWash,
         outlined: false,
       );
   }

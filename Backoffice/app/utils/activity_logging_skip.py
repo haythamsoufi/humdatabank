@@ -199,6 +199,7 @@ SKIP_ACTIVITY_ENDPOINT_SUFFIXES: frozenset[str] = frozenset(
         "api_get_notification_preferences",
         "service_worker",
         "device_heartbeat",
+        "upr_documents_gallery",
     }
 )
 

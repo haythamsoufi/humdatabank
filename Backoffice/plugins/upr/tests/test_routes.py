@@ -422,10 +422,24 @@ def test_plugin_static_cache_disabled_in_debug():
 
 @pytest.mark.unit
 def test_pdf_viewer_csp_allows_same_origin_frame():
-    from plugins.upr.plugin import UprPlugin, _UPR_PDF_VIEWER_CSP
+    from plugins.upr.plugin import (
+        UprPlugin,
+        _UPR_DOCUMENTS_GALLERY_CSP,
+        _UPR_PDF_VIEWER_CSP,
+    )
 
-    overrides = UprPlugin().get_csp_overrides()
-    endpoints = {item.endpoint for item in overrides}
-    assert endpoints == {"upr.assignment_pdf", "upr.assignment_narrative_file"}
-    assert all(item.policy == _UPR_PDF_VIEWER_CSP for item in overrides)
+    overrides = {item.endpoint: item for item in UprPlugin().get_csp_overrides()}
+    assert set(overrides) == {
+        "upr.assignment_pdf",
+        "upr.assignment_narrative_file",
+        "upr.upr_documents_gallery",
+    }
+    assert overrides["upr.assignment_pdf"].policy == _UPR_PDF_VIEWER_CSP
+    assert overrides["upr.assignment_narrative_file"].policy == _UPR_PDF_VIEWER_CSP
+    assert overrides["upr.assignment_pdf"].x_frame_options == "SAMEORIGIN"
     assert "frame-ancestors 'self'" in _UPR_PDF_VIEWER_CSP
+    gallery = overrides["upr.upr_documents_gallery"]
+    assert gallery.policy == _UPR_DOCUMENTS_GALLERY_CSP
+    assert "frame-ancestors" not in gallery.policy
+    assert gallery.x_frame_options is None
+    assert gallery.cross_origin_resource_policy == "cross-origin"

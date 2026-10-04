@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Unified plans and reports</title>
+  <style>
+    :root {
+      --navy: #011E41;
+      --red: #C8102E;
+      --ink: #1b2838;
+      --muted: #5d6d7e;
+      --line: #d5dee8;
+      --bg: #eef2f6;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 14px/1.4 "Segoe UI", system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      color-scheme: light;
+    }
+    .masthead {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px 14px;
+      background: linear-gradient(100deg, #011E41 0%, #04284f 62%, #0a3d6b 100%);
+      color: #fff;
+      border-bottom: 3px solid var(--red);
+    }
+    .kicker {
+      margin: 0 0 3px;
+      color: #f6c5cb;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.15;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      margin: 4px 0 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 13px;
+    }
+    .count {
+      margin: 0;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 12px;
+      padding: 12px 20px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .field.search { flex: 1 1 220px; }
+    .field span,
+    .filters .label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    input, select, .apply {
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+    input {
+      width: 100%;
+      padding: 0 12px 0 34px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d6d7e' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 10px 50%;
+      background-size: 16px;
+    }
+    select {
+      min-width: 168px;
+      max-width: 240px;
+      padding: 0 32px 0 12px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%235d6d7e' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 10px 7px;
+    }
+    .clear, .apply {
+      align-self: flex-end;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .clear { color: var(--red); border: 1px solid transparent; }
+    .clear:hover { background: #fdecee; }
+    .apply {
+      border: 0;
+      background: var(--navy);
+      color: #fff;
+      cursor: pointer;
+    }
+    .stage {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 16px 18px 28px;
+    }
+    .banner {
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fdecee;
+      color: #7a1020;
+      border: 1px solid #f3c2c8;
+    }
+    .banner a { color: var(--navy); font-weight: 700; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr) 28px;
+      min-height: 128px;
+      background: var(--card);
+      border: 1px solid #e1e7ee;
+      border-radius: 14px;
+      box-shadow: 0 1px 2px rgba(1, 30, 65, 0.04);
+      text-decoration: none;
+      color: inherit;
+      overflow: hidden;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .card:hover {
+      border-color: #c5d2e0;
+      box-shadow: 0 8px 22px rgba(1, 30, 65, 0.08);
+      transform: translateY(-1px);
+    }
+    .thumb {
+      position: relative;
+      background: linear-gradient(145deg, #4A148C, #7B1FA2);
+    }
+    .thumb::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: center / 42px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M6 2h8l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5z'/%3E%3C/svg%3E");
+      opacity: 0.22;
+    }
+    .type-plan .thumb { background: linear-gradient(145deg, #0D47A1, #1976D2); }
+    .type-myr .thumb { background: linear-gradient(145deg, #E65100, #FF6D00); }
+    .type-ar .thumb { background: linear-gradient(145deg, #1B5E20, #388E3C); }
+    .type-other .thumb { background: linear-gradient(145deg, #4A148C, #7B1FA2); }
+    .thumb img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    img[data-thumb]:not([src]) { display: none; }
+    .fresh {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--red);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      padding: 12px 6px 12px 14px;
+    }
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .chip {
+      max-width: 70%;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: #4A148C;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .type-plan .chip { background: #0D47A1; }
+    .type-myr .chip { background: #E65100; }
+    .type-ar .chip { background: #1B5E20; }
+    .type-other .chip { background: #4A148C; }
+    .year { color: var(--muted); font-size: 12px; }
+    .country {
+      color: #24344a;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .title {
+      color: var(--navy);
+      font-size: 14.5px;
+      font-weight: 700;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+    .date { color: var(--muted); font-size: 12px; }
+    .open {
+      width: 8px;
+      height: 8px;
+      margin-right: 12px;
+      border-right: 2px solid #8aa0b8;
+      border-top: 2px solid #8aa0b8;
+      transform: rotate(45deg);
+      align-self: center;
+      justify-self: center;
+    }
+    .card:hover .open { border-color: var(--red); }
+    .empty {
+      margin: 48px auto;
+      max-width: 420px;
+      text-align: center;
+      color: var(--muted);
+    }
+    :focus-visible {
+      outline: 2px solid var(--red);
+      outline-offset: 2px;
+    }
+    @media (max-width: 720px) {
+      .masthead { flex-direction: column; align-items: flex-start; }
+      .card { grid-template-columns: 104px minmax(0, 1fr) 22px; }
+      select { min-width: 140px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .card { transition: none; }
+      .card:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div>
+      <p class="kicker">IFRC GO</p>
+      <h1>Unified plans and reports</h1>
+      <p class="subtitle">Plans, mid-year reports, and annual reports from IFRC GO</p>
+    </div>
+    <p class="count" id="gallery-count" aria-live="polite">
+      {%- if error -%}
+        Documents unavailable
+      {%- elif shown == total -%}
+        {{ total }} document{% if total != 1 %}s{% endif %}
+      {%- else -%}
+        {{ shown }} of {{ total }}
+      {%- endif -%}
+    </p>
+  </header>
+  <form id="gallery-filters" class="filters" method="get" action="{{ form_action }}" autocomplete="off">
+    <label class="field search">
+      <span>Search</span>
+      <input type="search" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Search resources..." enterkeyhint="search">
+    </label>
+    <label class="field">
+      <span>Country</span>
+      <select name="country">
+        <option value="">All Countries</option>
+        {% if selected_country and selected_country not in countries %}
+          <option value="{{ selected_country }}" selected>{{ selected_country }}</option>
+        {% endif %}
+        {% for name in countries %}
+          <option value="{{ name }}" {% if name == selected_country %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span>Type</span>
+      <select name="type">
+        <option value="">All Types</option>
+        {% for type_id, label in types %}
+          <option value="{{ type_id }}" {% if filters.type_id == type_id %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span>Year</span>
+      <select name="year">
+        <option value="">All Years</option>
+        {% for year in years %}
+          <option value="{{ year }}" {% if filters.year == year %}selected{% endif %}>{{ year }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span>Sort by</span>
+      <select name="sort">
+        {% for key, label in sort_options %}
+          <option value="{{ key }}" {% if key == filters.sort %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <a class="clear" id="gallery-clear" href="{{ clear_url }}">Clear</a>
+    <noscript><button class="apply" type="submit">Apply</button></noscript>
+  </form>
+  <main class="stage">
+    {% if error %}
+      <div id="gallery-error" class="banner" role="alert">
+        {{ error }}
+        <a href="{{ retry_url }}">Try again</a>
+      </div>
+    {% endif %}
+    <div id="gallery-grid" class="grid">
+      {% for doc in documents %}
+        <a class="card {{ doc.type_class }}"
+           href="{{ doc.url }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="{{ doc.aria_label }}"
+           data-doc
+           data-search="{{ doc.search }}"
+           data-country="{{ doc.country_key }}"
+           data-type="{{ doc.type_key }}"
+           data-year="{{ doc.year_key }}"
+           data-published="{{ doc.published_sort }}"
+           data-title="{{ doc.title_key }}"
+           {% if not doc.visible %}hidden{% endif %}>
+          <span class="thumb">
+            <img alt="" data-thumb="{{ doc.thumb_url }}" decoding="async">
+            {% if doc.fresh %}<span class="fresh">Fresh</span>{% endif %}
+          </span>
+          <span class="body">
+            <span class="meta">
+              <span class="chip">{{ doc.type_label }}</span>
+              {% if doc.year %}<span class="year">{{ doc.year }}</span>{% endif %}
+            </span>
+            {% if doc.country_name %}<span class="country">{{ doc.country_name }}</span>{% endif %}
+            <span class="title">{{ doc.title }}</span>
+            {% if doc.published_label %}<span class="date">{{ doc.published_label }}</span>{% endif %}
+          </span>
+          <span class="open" aria-hidden="true"></span>
+        </a>
+      {% endfor %}
+    </div>
+    {% if not error %}
+      <p id="gallery-empty" class="empty" {% if shown %}hidden{% endif %}>
+        No unified planning documents match your search.
+      </p>
+    {% endif %}
+  </main>
+  <script>
+    (function () {
+      var form = document.getElementById("gallery-filters");
+      var grid = document.getElementById("gallery-grid");
+      var empty = document.getElementById("gallery-empty");
+      var count = document.getElementById("gallery-count");
+      var clearLink = document.getElementById("gallery-clear");
+      var cards = Array.prototype.slice.call(grid.querySelectorAll("[data-doc]"));
+      var total = cards.length;
+
+      function field(name) {
+        var el = form.elements[name];
+        return el && el.value ? String(el.value).trim() : "";
+      }
+
+      function matches(card) {
+        var q = field("q").toLowerCase();
+        var country = field("country").toLowerCase();
+        var typeId = field("type");
+        var year = field("year");
+        if (country && (card.getAttribute("data-country") || "") !== country) return false;
+        if (typeId && (card.getAttribute("data-type") || "") !== typeId) return false;
+        if (year && (card.getAttribute("data-year") || "") !== year) return false;
+        if (q && (card.getAttribute("data-search") || "").indexOf(q) === -1) return false;
+        return true;
+      }
+
+      function compare(a, b, mode) {
+        var title = (a.getAttribute("data-title") || "").localeCompare(b.getAttribute("data-title") || "");
+        if (mode === "country_az" || mode === "country_za") {
+          var ca = a.getAttribute("data-country") || "";
+          var cb = b.getAttribute("data-country") || "";
+          if (!ca && !cb) return title;
+          if (!ca) return 1;
+          if (!cb) return -1;
+          var byCountry = mode === "country_za" ? cb.localeCompare(ca) : ca.localeCompare(cb);
+          return byCountry || title;
+        }
+        var da = a.getAttribute("data-published") || "";
+        var db = b.getAttribute("data-published") || "";
+        if (!da && !db) return title;
+        if (!da) return 1;
+        if (!db) return -1;
+        if (da === db) return title;
+        if (mode === "oldest") return da < db ? -1 : 1;
+        return da > db ? -1 : 1;
+      }
+
+      function apply() {
+        var mode = field("sort") || "newest";
+        var visible = cards.filter(matches);
+        visible.sort(function (a, b) { return compare(a, b, mode); });
+        cards.forEach(function (card) { card.hidden = true; });
+        visible.forEach(function (card) {
+          card.hidden = false;
+          grid.appendChild(card);
+        });
+        if (empty) empty.hidden = visible.length !== 0;
+        if (count) {
+          count.textContent = visible.length === total
+            ? (total === 1 ? "1 document" : total + " documents")
+            : (visible.length + " of " + total);
+        }
+        var params = new URLSearchParams();
+        if (field("q")) params.set("q", field("q"));
+        if (field("country")) params.set("country", field("country"));
+        if (field("type")) params.set("type", field("type"));
+        if (field("year")) params.set("year", field("year"));
+        if (mode && mode !== "newest") params.set("sort", mode);
+        var query = params.toString();
+        history.replaceState(null, "", query ? (location.pathname + "?" + query) : location.pathname);
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        apply();
+      });
+      form.addEventListener("change", apply);
+      if (form.elements.q) form.elements.q.addEventListener("input", apply);
+      if (clearLink) {
+        clearLink.addEventListener("click", function (event) {
+          event.preventDefault();
+          form.elements.q.value = "";
+          form.elements.country.value = "";
+          form.elements.type.value = "";
+          form.elements.year.value = "";
+          form.elements.sort.value = "newest";
+          apply();
+        });
+      }
+      if (!document.getElementById("gallery-error")) apply();
+
+      var queue = [];
+      var active = 0;
+      var observer = null;
+      function pump() {
+        while (active < 3 && queue.length) {
+          var img = queue.shift();
+          if (!img || img.getAttribute("src")) continue;
+          var card = img.closest("[data-doc]");
+          if (card && card.hidden) {
+            if (observer) observer.observe(img);
+            continue;
+          }
+          active += 1;
+          img.addEventListener("load", done, { once: true });
+          img.addEventListener("error", (function (image) {
+            return function () {
+              image.remove();
+              done();
+            };
+          })(img), { once: true });
+          img.src = img.getAttribute("data-thumb");
+        }
+      }
+      function done() {
+        active -= 1;
+        pump();
+      }
+      var thumbs = document.querySelectorAll("img[data-thumb]");
+      if (!("IntersectionObserver" in window)) {
+        var shown = 0;
+        Array.prototype.forEach.call(thumbs, function (img) {
+          var card = img.closest("[data-doc]");
+          if (shown >= 12 || (card && card.hidden)) return;
+          img.src = img.getAttribute("data-thumb");
+          shown += 1;
+        });
+        return;
+      }
+      observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var img = entry.target;
+          var card = img.closest("[data-doc]");
+          if (card && card.hidden) return;
+          observer.unobserve(img);
+          queue.push(img);
+        });
+        pump();
+      }, { rootMargin: "240px" });
+      Array.prototype.forEach.call(thumbs, function (img) { observer.observe(img); });
+    })();
+  </script>
+</body>
+</html>

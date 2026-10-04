@@ -140,6 +140,60 @@ API_ENDPOINTS = [
             },
         ],
     },
+    {
+        "group": "UPR",
+        "path": "/api/v1/upr/documents",
+        "methods": ["GET"],
+        "auth": "public",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Landscape HTML gallery of the same IFRC GO unified plans and reports "
+            "as the mobile app. Public — no API key. Open the URL directly, or iframe it. "
+            "For a Power BI HTML visual, request format=powerbi to receive an iframe snippet. "
+            "Dropdowns filter by country, document type, and year; sort and search (q) match the app."
+        ),
+        "consumers": "Power BI HTML visual, browser",
+        "paginated": False,
+        "query_params": [
+            {
+                "name": "format",
+                "type": "text",
+                "placeholder": "powerbi",
+                "description": "Set to powerbi to return an iframe snippet for the HTML visual. Omit for the gallery page.",
+            },
+            {
+                "name": "q",
+                "type": "text",
+                "placeholder": "Kenya plan",
+                "description": "Search title, country, country code, and document type.",
+            },
+            {
+                "name": "country",
+                "type": "text",
+                "placeholder": "Kenya",
+                "description": "Country display name. Omit for every country.",
+            },
+            {
+                "name": "type",
+                "type": "text",
+                "placeholder": "1851",
+                "description": "Appeals type id: 1851 Plan, 10009 Mid-Year Report, 10011 Annual Report.",
+            },
+            {
+                "name": "year",
+                "type": "text",
+                "placeholder": "2026",
+                "description": "Document year taken from the IFRC title. Omit for every year.",
+            },
+            {
+                "name": "sort",
+                "type": "select",
+                "options": ["newest", "oldest", "country_az", "country_za"],
+                "description": "newest (default), oldest, country_az, or country_za.",
+            },
+        ],
+    },
 ]
 
 _TEMPLATE_FILTERS = frozenset(TEMPLATE_KIND.values())
@@ -169,7 +223,8 @@ def upr_api_documentation() -> dict:
     return {
         "auth": (
             "Bearer token, X-API-Key header, api_key query parameter, "
-            "or a Backoffice session"
+            "or a Backoffice session. "
+            "GET /api/v1/upr/documents is public and does not use this."
         ),
         "round_codes": {
             "report_midyear": "MYRyy, for example MYR26",
@@ -189,6 +244,8 @@ def _endpoint_doc(endpoint: dict) -> dict:
         "paginated": bool(endpoint.get("paginated")),
         "parameters": [_parameter_doc(param) for param in endpoint.get("query_params") or []],
     }
+    if endpoint.get("auth"):
+        doc["auth"] = endpoint["auth"]
     columns = _COLUMNS_BY_PATH.get(path)
     if columns:
         doc["columns"] = columns
@@ -213,6 +270,9 @@ def _parameter_doc(param: dict) -> dict:
         doc["example"] = param.get("placeholder")
     elif name == "iso3":
         doc["example"] = "AFG"
+    options = param.get("options")
+    if options and "values" not in doc:
+        doc["values"] = list(options)
     return doc
 
 

@@ -73,7 +73,7 @@ class TestResolveEmergencyOperationLabels:
         )
         assert name == "Nigeria - Floods"
         assert code == "MDRNG041"
-        assert display == "Nigeria - Floods (MDRNG041)"
+        assert display == "MDRNG041 Nigeria - Floods"
 
     def test_falls_back_to_excel_labels_when_code_missing_in_api(self):
         ctx = UprImportContext(template_ids=[33])
@@ -117,7 +117,7 @@ class TestResolveEmergencyRowKey:
             ea_code="MDRNG999",
             excel_name="Nigeria Floods EA",
         )
-        assert cell_key == f"Nigeria Floods EA (MDRNG999)_{EMERGENCY_APPEALS_COLUMN}"
+        assert cell_key == f"MDRNG999 Nigeria Floods EA_{EMERGENCY_APPEALS_COLUMN}"
         from upr_import_warnings import warning_text
 
         assert any("The Excel name and code were imported" in warning_text(w) for w in ctx.warnings)
@@ -135,7 +135,7 @@ class TestResolveEmergencyRowKey:
             ea_code="MDRNG041",
             excel_name="Excel-only name",
         )
-        assert cell_key == f"Nigeria - Floods (MDRNG041)_{EMERGENCY_APPEALS_COLUMN}"
+        assert cell_key == f"MDRNG041 Nigeria - Floods_{EMERGENCY_APPEALS_COLUMN}"
         from upr_import_warnings import warning_text
 
         assert not any("is not listed for this country in GO" in warning_text(w) for w in ctx.warnings)
@@ -154,7 +154,7 @@ class TestResolveEmergencyMatrixCells:
             excel_name="Nigeria Floods EA",
             amount=1200,
         )
-        row_label = "Nigeria Floods EA (MDRNG999)"
+        row_label = "MDRNG999 Nigeria Floods EA"
         assert cells[f"{row_label}_{EMERGENCY_APPEALS_COLUMN}"] == 1200
         assert cells[f"{ROW_GO_UNMATCHED_PREFIX}{row_label}"] == 1
 
@@ -172,7 +172,7 @@ class TestResolveEmergencyMatrixCells:
             excel_name="Excel-only name",
             amount=500,
         )
-        row_label = "Nigeria - Floods (MDRNG041)"
+        row_label = "MDRNG041 Nigeria - Floods"
         assert cells[f"{row_label}_{EMERGENCY_APPEALS_COLUMN}"] == 500
         assert f"{ROW_GO_UNMATCHED_PREFIX}{row_label}" not in cells
 
@@ -201,5 +201,5 @@ class TestFundingEaColHeaderGoUnmatched:
         )
         cells = matrix_cells[(aes_id, funding_item_id)]
         assert ok is True
-        assert cells["col_header|EA2"] == "Afghanistan: Population Movement (MDRAF070)"
+        assert cells["col_header|EA2"] == "MDRAF070 Afghanistan: Population Movement"
         assert cells[f"{COL_HEADER_GO_UNMATCHED_PREFIX}EA2"] == 1

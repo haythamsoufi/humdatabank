@@ -151,7 +151,7 @@ class TestSkippedLegacyFundingAreas:
         assert len(funding_rows) == 1
         cells = json.loads(funding_rows[0][COL_DISAGG])
         assert cells["IFRC Secretariat_EA1"] == 12000000
-        assert cells["col_header|EA1"] == "Afghanistan - Earthquake (MDRAF018)"
+        assert cells["col_header|EA1"] == "MDRAF018 Afghanistan - Earthquake"
 
 
 class TestMatrixKeyWarning:

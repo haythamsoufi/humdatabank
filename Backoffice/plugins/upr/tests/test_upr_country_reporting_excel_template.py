@@ -678,7 +678,7 @@ def test_parse_emergency_selection_from_entry_disagg():
     assert meta == {
         "code": "MDRAF019",
         "name": "Afghanistan - Earthquake",
-        "label": "Afghanistan - Earthquake (MDRAF019)",
+        "label": "MDRAF019 Afghanistan - Earthquake",
     }
 
 
@@ -691,7 +691,7 @@ def test_parse_emergency_selection_from_entry_display_value():
 
 def test_format_emergency_operation_display():
     assert _format_emergency_operation_display("Afghanistan - Earthquake", "MDRAF019") == (
-        "Afghanistan - Earthquake (MDRAF019)"
+        "MDRAF019 Afghanistan - Earthquake"
     )
     assert _format_emergency_operation_display("Appeal", "") == "Appeal"
     assert _format_emergency_operation_display("", "MDR001") == "MDR001"
@@ -724,7 +724,7 @@ def test_resolve_workbook_emergency_slot_metadata_uses_go_api_when_code_matches(
 
         assert resolved[1]["appeal_name"] == "Nigeria - Floods"
         assert resolved[1]["mdr_code"] == "MDRNG041"
-        assert resolved[1]["display_value"] == "Nigeria - Floods (MDRNG041)"
+        assert resolved[1]["display_value"] == "MDRNG041 Nigeria - Floods"
         assert ctx.warnings == []
     finally:
         wb.close()
@@ -821,7 +821,7 @@ def test_upsert_emergency_repeat_choice(app):
             )
 
             mock_rgd_cls.assert_called_once_with(repeat_instance_id=501, form_item_id=1374)
-            assert mock_entry.value == "Afghanistan - Earthquake (MDRAF019)"
+            assert mock_entry.value == "MDRAF019 Afghanistan - Earthquake"
             assert mock_entry.disagg_type == "emergency_operation"
             assert mock_entry.disagg_data == {"name": "Afghanistan - Earthquake", "code": "MDRAF019"}
 

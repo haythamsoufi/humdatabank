@@ -284,7 +284,7 @@ class SettingsScreen extends StatelessWidget {
           },
         ),
         IOSListSwitchTile(
-          leading: cupertino.CupertinoIcons.chat_bubble_2,
+          leading: Icons.assistant_outlined,
           title: localizations.chatbot,
           subtitle: localizations.enableChatbotAssistance,
           value: user.chatbotEnabled,

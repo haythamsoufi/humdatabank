@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../theme/splash_hero_palette.dart';
+
 /// Navy login-hero background: drifting aurora, grain, and a constellation
 /// of nodes with traveling pulses. Matches the backoffice sign-in scene.
 class SplashHeroBackdrop extends StatefulWidget {
@@ -52,7 +54,7 @@ class _SplashHeroBackdropState extends State<SplashHeroBackdrop>
     final reduced = MediaQuery.disableAnimationsOf(context);
     _field.reducedMotion = reduced;
     return ColoredBox(
-      color: const Color(0xFF011E41),
+      color: SplashHeroPalette.navy,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -204,7 +206,11 @@ class _HeroScenePainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF0A2F66), Color(0xFF011E41), Color(0xFF00060F)],
+        colors: [
+          SplashHeroPalette.navyMid,
+          SplashHeroPalette.navy,
+          SplashHeroPalette.navyDeep,
+        ],
         stops: [0.0, 0.42, 1.0],
       ).createShader(rect);
     canvas.drawRect(rect, paint);
@@ -228,19 +234,19 @@ class _HeroScenePainter extends CustomPainter {
       canvas,
       Offset(size.width * 0.08, size.height * 0.06) + driftA,
       size.shortestSide * 0.55,
-      const Color(0xFF3E7BFA).withValues(alpha: 0.45),
+      SplashHeroPalette.blue.withValues(alpha: 0.45),
     );
     _blob(
       canvas,
       Offset(size.width * 0.92, size.height * 0.88) + driftB,
       size.shortestSide * 0.48,
-      const Color(0xFFC8102E).withValues(alpha: 0.36),
+      SplashHeroPalette.red.withValues(alpha: 0.36),
     );
     _blob(
       canvas,
       Offset(size.width * 0.55, size.height * 0.42) + driftC,
       size.shortestSide * 0.32,
-      const Color(0xFFFFFFFF).withValues(alpha: 0.08),
+      SplashHeroPalette.ink.withValues(alpha: 0.08),
     );
   }
 
@@ -282,7 +288,7 @@ class _HeroScenePainter extends CustomPainter {
         if (!seen.add(key)) continue;
         final alpha = (0.16 + 0.16 * bootEase) * (1 - neighbor.d / linkNow);
         final paint = Paint()
-          ..color = Colors.white.withValues(alpha: alpha.clamp(0, 1))
+          ..color = SplashHeroPalette.ink.withValues(alpha: alpha.clamp(0, 1))
           ..strokeWidth = 0.7;
         canvas.drawLine(
           Offset(nodes[i].x, nodes[i].y),
@@ -294,7 +300,7 @@ class _HeroScenePainter extends CustomPainter {
     }
 
     final dot = Paint()
-      ..color = Colors.white.withValues(alpha: 0.4 + 0.4 * bootEase);
+      ..color = SplashHeroPalette.ink.withValues(alpha: 0.4 + 0.4 * bootEase);
     for (final n in nodes) {
       canvas.drawCircle(Offset(n.x, n.y), n.r, dot);
     }
@@ -306,8 +312,8 @@ class _HeroScenePainter extends CustomPainter {
       final paint = Paint()
         ..shader = RadialGradient(
           colors: [
-            Colors.white.withValues(alpha: 0.85 * a),
-            Colors.white.withValues(alpha: 0),
+            SplashHeroPalette.ink.withValues(alpha: 0.85 * a),
+            SplashHeroPalette.ink.withValues(alpha: 0),
           ],
         ).createShader(Rect.fromCircle(center: Offset(x, y), radius: 7));
       canvas.drawCircle(Offset(x, y), 7, paint);
@@ -315,7 +321,8 @@ class _HeroScenePainter extends CustomPainter {
   }
 
   void _paintGrain(Canvas canvas) {
-    final paint = Paint()..color = Colors.white.withValues(alpha: 0.035);
+    final paint = Paint()
+      ..color = SplashHeroPalette.ink.withValues(alpha: 0.035);
     for (final p in field.grain) {
       canvas.drawRect(Rect.fromCircle(center: p, radius: 0.6), paint);
     }

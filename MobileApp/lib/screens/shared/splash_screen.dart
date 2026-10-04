@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../config/routes.dart';
+import '../../theme/splash_hero_palette.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/performance_service.dart';
@@ -153,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen>
         : 'IFRC';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF011E41),
+      backgroundColor: SplashHeroPalette.navy,
       body: SplashHeroBackdrop(
         child: SafeArea(
           child: AnimatedBuilder(
@@ -199,7 +200,7 @@ class _SplashScreenState extends State<SplashScreen>
                               child: Text(
                                 localizations.splashDescription,
                                 style: const TextStyle(
-                                  color: Color(0xD1FFFFFF),
+                                  color: SplashHeroPalette.inkBody,
                                   fontSize: 15,
                                   height: 1.55,
                                   fontWeight: FontWeight.w400,
@@ -216,7 +217,7 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(28, 0, 28, 8),
                       child: AppLoadingIndicator(
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: SplashHeroPalette.ink.withValues(alpha: 0.85),
                         size: 18,
                       ),
                     ),
@@ -233,7 +234,9 @@ class _SplashScreenState extends State<SplashScreen>
                             Text(
                               localizations.poweredByHumDatabank,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.42),
+                                color: SplashHeroPalette.ink.withValues(
+                                  alpha: 0.42,
+                                ),
                                 fontSize: 12,
                                 letterSpacing: 0.2,
                               ),
@@ -242,7 +245,7 @@ class _SplashScreenState extends State<SplashScreen>
                             const FaIcon(
                               FontAwesomeIcons.github,
                               size: 13,
-                              color: Color(0xFF93C5FD),
+                              color: SplashHeroPalette.sky,
                             ),
                           ],
                         ),
@@ -279,10 +282,10 @@ class _BrandMark extends StatelessWidget {
         child: Container(
           width: 156,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: SplashHeroPalette.ink,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.28),
+                color: SplashHeroPalette.shadow.withValues(alpha: 0.28),
                 blurRadius: 28,
                 offset: const Offset(0, 12),
               ),
@@ -300,9 +303,9 @@ class _BrandMark extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Color(0xFF3E7BFA),
-                          Color(0xFF011E41),
-                          Color(0xFFC8102E),
+                          SplashHeroPalette.blue,
+                          SplashHeroPalette.navy,
+                          SplashHeroPalette.red,
                         ],
                       ),
                     ),
@@ -349,7 +352,7 @@ class _SocietyStat extends StatelessWidget {
           Text(
             '$count',
             style: const TextStyle(
-              color: Colors.white,
+              color: SplashHeroPalette.ink,
               fontSize: 44,
               fontWeight: FontWeight.w800,
               height: 1,
@@ -365,7 +368,7 @@ class _SocietyStat extends StatelessWidget {
                 Text(
                   label.toUpperCase(),
                   style: const TextStyle(
-                    color: Color(0xEBFFFFFF),
+                    color: SplashHeroPalette.inkLabel,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.7,
@@ -375,7 +378,7 @@ class _SocietyStat extends StatelessWidget {
                 Text(
                   caption,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: SplashHeroPalette.ink.withValues(alpha: 0.5),
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
                   ),
@@ -448,7 +451,7 @@ class _HeadlineWord extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = const TextStyle(
-      color: Colors.white,
+      color: SplashHeroPalette.ink,
       fontSize: 28,
       height: 1.15,
       fontWeight: FontWeight.w800,
@@ -458,7 +461,7 @@ class _HeadlineWord extends StatelessWidget {
     if (accent) {
       text = ShaderMask(
         shaderCallback: (bounds) => const LinearGradient(
-          colors: [Color(0xFFFF5470), Color(0xFFC8102E)],
+          colors: [SplashHeroPalette.redLight, SplashHeroPalette.red],
         ).createShader(bounds),
         child: Text(word, style: style),
       );

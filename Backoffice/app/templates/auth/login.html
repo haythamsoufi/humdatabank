@@ -53,9 +53,10 @@
   /* Scene                                                               */
   /* ------------------------------------------------------------------ */
   .scene{
+    --login-panel-w: 440px;
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 440px;
+    grid-template-columns: minmax(0, 1fr) var(--login-panel-w);
     width: 100%;
     max-width: 100vw;
     height: 100vh;
@@ -73,7 +74,8 @@
   /* ------------------------------------------------------------------ */
   .hero-visual{
     position: relative;
-    grid-column: 1;
+    /* Cover the panel column until the form slides in, so that strip matches the hero. */
+    grid-column: 1 / -1;
     grid-row: 1;
     min-width: 0;
     height: 100%;
@@ -126,7 +128,10 @@
   .grain{ position:absolute; inset:0; z-index:3; pointer-events:none; opacity:.04; mix-blend-mode: overlay; background-repeat: repeat; background-size: 128px 128px; }
 
   .hero-content{
-    position: relative; z-index:4; width:100%;
+    position: relative; z-index:4;
+    /* Stay in the hero column from first paint, even while the panel is still off-screen. */
+    width: calc(100% - var(--login-panel-w));
+    max-width: calc(100% - var(--login-panel-w));
     padding: clamp(32px, 5vh, 48px) clamp(28px, 5vw, 64px) clamp(32px, 5vh, 48px) clamp(28px, 6vw, 72px);
     will-change: transform;
   }
@@ -240,7 +245,7 @@
   @keyframes fadeUp{ to{ opacity:1; transform: translateY(0); } }
 
   .hero-footer{
-    position:absolute; z-index:4; inset-inline-start:7vw; bottom:26px;
+    position:absolute; z-index:4; inset-inline-start: clamp(28px, 6vw, 72px); bottom:26px;
     display:flex; flex-direction:row; align-items:center; gap:16px; white-space:nowrap;
     color: rgba(255,255,255,.38); font-size:.72rem; letter-spacing:.02em;
     opacity:0;
@@ -393,7 +398,7 @@
   /* Responsive                                                          */
   /* ------------------------------------------------------------------ */
   @media (max-width: 1200px){
-    .scene{ grid-template-columns: minmax(0, 1fr) 400px; }
+    .scene{ --login-panel-w: 400px; }
     .login-panel{ max-width: 400px; padding:48px 40px; }
     .hero-grid{ max-width:680px; }
     .brand-mark{ width:156px; }
@@ -486,6 +491,8 @@
       padding:28px 0 24px;
     }
     .hero-content{
+      width:100%;
+      max-width:none;
       padding:20px 6vw 12px;
       transform:none !important;
     }
@@ -936,7 +943,8 @@
       document.getElementById('brandMark').classList.add('in');
       document.getElementById('heroCopyCol').classList.add('in');
     }, 60);
-    setTimeout(function(){ document.getElementById('loginPanel').classList.add('in'); }, 140);
+    /* Side form waits until the hero visual has settled. */
+    setTimeout(function(){ document.getElementById('loginPanel').classList.add('in'); }, 1100);
     setTimeout(function(){
       document.getElementById('eyebrow').classList.add('in');
       animateCount(document.getElementById('statNum'), 191, 700);

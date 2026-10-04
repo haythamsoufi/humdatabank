@@ -68,8 +68,8 @@ final List<TabDefinition> allTabDefinitions = [
   ),
   TabDefinition(
     id: TabIds.aiChat,
-    icon: Icons.auto_awesome_outlined,
-    activeIcon: Icons.auto_awesome,
+    icon: Icons.assistant_outlined,
+    activeIcon: Icons.assistant_rounded,
     getLabel: (l) => l.chatbot,
   ),
   TabDefinition(

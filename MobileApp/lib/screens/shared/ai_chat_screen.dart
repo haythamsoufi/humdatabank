@@ -1080,10 +1080,20 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      Icon(
-                                        Icons.auto_awesome_outlined,
-                                        size: 48,
-                                        color: _chatMuted(theme),
+                                      Container(
+                                        width: 72,
+                                        height: 72,
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary
+                                              .withValues(alpha: 0.08),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Icon(
+                                          Icons.assistant_rounded,
+                                          size: 36,
+                                          color: theme.colorScheme.primary,
+                                        ),
                                       ),
                                       const SizedBox(height: 20),
                                       Text(
@@ -1994,7 +2004,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.chat_bubble_outline,
+                                  Icons.assistant_outlined,
                                   size: 48,
                                   color: _chatMuted(theme),
                                 ),

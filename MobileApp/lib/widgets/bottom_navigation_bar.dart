@@ -66,15 +66,15 @@ class AppBottomNavigationBar extends StatelessWidget {
 
   /// Space under the glyphs on iOS.
   ///
-  /// The home-indicator inset is about 34pt, but the indicator itself only
-  /// occupies the bottom ~13pt. Putting the whole inset under a fixed icon
-  /// row leaves a tall empty band. Phone-sized insets keep a short clearance
-  /// above the indicator; taller insets are left intact.
+  /// The home-indicator inset is about 34pt, but the indicator graphic only
+  /// occupies the bottom ~13pt. Using the full inset leaves a tall empty band.
+  /// Shaving it down to 18pt put the glyphs on top of that graphic, so phone
+  /// insets keep a clearer gap (34pt → 28pt). Taller insets stay intact.
   @visibleForTesting
   static double iosBottomPaddingForInset(double inset) {
     if (inset <= 0) return 8;
     if (inset > 40) return inset;
-    return math.max(16, inset - 16);
+    return math.max(20, inset - 6);
   }
 
   const AppBottomNavigationBar({
@@ -204,19 +204,19 @@ class AppBottomNavigationBar extends StatelessWidget {
 
     // The AI tab is identical in both admin and non-admin layouts — defined once here.
     Widget aiTab() => Flexible(
-          flex: 1,
-          child: _buildNavItem(
-            context: context,
-            index: aiChatNavIndex,
-            selectedTabIndex: selectedTabIndex,
-            icon: Icons.assistant_outlined,
-            activeIcon: Icons.assistant_rounded,
-            label: l10n.chatbot,
-            showBadge: false,
-            lightForegroundOnBar: lightForegroundOnBar,
-            onTap: () => _handleTap(context, aiChatNavIndex),
-          ),
-        );
+      flex: 1,
+      child: _buildNavItem(
+        context: context,
+        index: aiChatNavIndex,
+        selectedTabIndex: selectedTabIndex,
+        icon: Icons.assistant_outlined,
+        activeIcon: Icons.assistant_rounded,
+        label: l10n.chatbot,
+        showBadge: false,
+        lightForegroundOnBar: lightForegroundOnBar,
+        onTap: () => _handleTap(context, aiChatNavIndex),
+      ),
+    );
 
     return _barShell(
       context: context,

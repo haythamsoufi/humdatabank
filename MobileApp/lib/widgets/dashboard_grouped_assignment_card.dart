@@ -73,8 +73,11 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
         : const Color(AppConstants.defaultNavy);
     final metaColor = scheme.onSurface.withValues(alpha: 0.55);
     final cardColor = isDark
-        ? scheme.surfaceContainerHigh
-        : GroupedDashboardPalette.card;
+        ? Color.alphaBlend(
+            tone.accent.withValues(alpha: 0.22),
+            scheme.surfaceContainerHigh,
+          )
+        : tone.card;
     final borderColor = isDark
         ? scheme.outlineVariant.withValues(alpha: 0.45)
         : GroupedDashboardPalette.hairline;
@@ -94,7 +97,7 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ColoredBox(color: tone.accent, child: const SizedBox(width: 4)),
+                ColoredBox(color: tone.accent, child: const SizedBox(width: 6)),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 13, 12, 12),
@@ -205,6 +208,7 @@ class _StatusTone {
     required this.accent,
     required this.foreground,
     required this.background,
+    required this.card,
     required this.outlined,
   });
 
@@ -212,6 +216,7 @@ class _StatusTone {
   final Color accent;
   final Color foreground;
   final Color background;
+  final Color card;
   final bool outlined;
 }
 
@@ -229,6 +234,9 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
       background: isDark
           ? red.withValues(alpha: 0.18)
           : GroupedDashboardPalette.overdueWash,
+      card: isDark
+          ? red.withValues(alpha: 0.18)
+          : GroupedDashboardPalette.overdueCard,
       outlined: false,
     );
   }
@@ -244,27 +252,39 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
         background: isDark
             ? green.withValues(alpha: 0.18)
             : GroupedDashboardPalette.submittedWash,
+        card: isDark
+            ? green.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.submittedCard,
         outlined: false,
       );
     case 'approved':
-      final gray = isDark
-          ? GroupedDashboardPalette.mutedDark
-          : GroupedDashboardPalette.muted;
+      final blue = isDark
+          ? GroupedDashboardPalette.approvedDark
+          : GroupedDashboardPalette.approved;
       return _StatusTone(
         label: localizations.localizeStatus(status),
-        accent: gray,
-        foreground: gray,
+        accent: blue,
+        foreground: blue,
         background: isDark
-            ? GroupedDashboardPalette.mutedWashDark
-            : GroupedDashboardPalette.mutedWash,
+            ? blue.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.approvedWash,
+        card: isDark
+            ? blue.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.approvedCard,
         outlined: false,
       );
     case 'in progress':
+      final ink = isDark ? GroupedDashboardPalette.progressOnDark : navy;
       return _StatusTone(
         label: localizations.localizeStatus(status),
-        accent: navy,
-        foreground: isDark ? GroupedDashboardPalette.progressOnDark : navy,
-        background: Colors.transparent,
+        accent: ink,
+        foreground: ink,
+        background: isDark
+            ? navy.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.progressWash,
+        card: isDark
+            ? navy.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.progressWash,
         outlined: true,
       );
     case 'requires revision':
@@ -276,6 +296,9 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
         background: isDark
             ? amber.withValues(alpha: 0.18)
             : GroupedDashboardPalette.amberWash,
+        card: isDark
+            ? amber.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.amberCard,
         outlined: false,
       );
     case 'pending':
@@ -287,6 +310,9 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
         background: isDark
             ? amber.withValues(alpha: 0.18)
             : GroupedDashboardPalette.amberWash,
+        card: isDark
+            ? amber.withValues(alpha: 0.18)
+            : GroupedDashboardPalette.amberCard,
         outlined: false,
       );
     default:
@@ -300,6 +326,9 @@ _StatusTone _tone(BuildContext context, Assignment assignment) {
         background: isDark
             ? GroupedDashboardPalette.mutedWashDark
             : GroupedDashboardPalette.mutedWash,
+        card: isDark
+            ? GroupedDashboardPalette.mutedWashDark
+            : GroupedDashboardPalette.card,
         outlined: false,
       );
   }

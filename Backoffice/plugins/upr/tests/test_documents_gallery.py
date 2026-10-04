@@ -258,6 +258,9 @@ def test_gallery_page_escapes_titles_and_applies_dropdown_filters(monkeypatch):
     assert "url_b64=" in html
     assert 'loading="lazy"' in html
     assert "data-thumb" not in html
+    assert 'class="thumb-pending"' in html
+    assert 'class="thumb-shimmer"' in html
+    assert 'aria-busy="true"' in html
 
     hidden_at = html.index('data-year="2020"')
     tag = html[html.rfind("<a", 0, hidden_at): html.index(">", hidden_at)]

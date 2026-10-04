@@ -170,29 +170,81 @@
     .thumb {
       position: relative;
       background: linear-gradient(145deg, #4A148C, #7B1FA2);
-    }
-    .thumb::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: center / 42px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M6 2h8l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5z'/%3E%3C/svg%3E");
-      opacity: 0.22;
+      overflow: hidden;
     }
     .type-plan .thumb { background: linear-gradient(145deg, #0D47A1, #1976D2); }
     .type-myr .thumb { background: linear-gradient(145deg, #E65100, #FF6D00); }
     .type-ar .thumb { background: linear-gradient(145deg, #1B5E20, #388E3C); }
     .type-other .thumb { background: linear-gradient(145deg, #4A148C, #7B1FA2); }
+    .thumb-pending {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .thumb-sheet {
+      width: 48px;
+      height: 60px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1.5px solid rgba(255, 255, 255, 0.72);
+      box-shadow: 0 8px 18px rgba(1, 30, 65, 0.18);
+      position: relative;
+    }
+    .thumb-sheet::before {
+      content: "";
+      position: absolute;
+      top: -1px;
+      right: -1px;
+      width: 14px;
+      height: 14px;
+      background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.92) 50%);
+      border-bottom-left-radius: 3px;
+    }
+    .thumb-sheet::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 24px;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 8px 0 rgba(255, 255, 255, 0.55), 0 16px 0 rgba(255, 255, 255, 0.35);
+    }
+    .thumb-shimmer {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        transparent 32%,
+        rgba(255, 255, 255, 0.38) 50%,
+        transparent 68%
+      );
+      background-size: 220% 100%;
+      animation: thumb-shimmer 1.35s ease-in-out infinite;
+    }
+    @keyframes thumb-shimmer {
+      from { background-position: 120% 0; }
+      to { background-position: -120% 0; }
+    }
+    .thumb.is-ready .thumb-pending { display: none; }
+    .thumb.is-failed .thumb-shimmer { display: none; }
     .thumb img {
       position: absolute;
       inset: 0;
+      z-index: 1;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      background: transparent;
+      opacity: 0;
     }
-    .thumb img.is-broken { display: none; }
+    .thumb.is-ready img { opacity: 1; }
+    .thumb.is-failed img { display: none; }
     .fresh {
       position: absolute;
+      z-index: 2;
       left: 8px;
       bottom: 8px;
       padding: 2px 7px;
@@ -286,6 +338,7 @@
     @media (prefers-reduced-motion: reduce) {
       .card { transition: none; }
       .card:hover { transform: none; }
+      .thumb-shimmer { animation: none; opacity: 0.35; }
     }
   </style>
 </head>
@@ -373,7 +426,11 @@
            data-published="{{ doc.published_sort }}"
            data-title="{{ doc.title_key }}"
            {% if not doc.visible %}hidden{% endif %}>
-          <span class="thumb">
+          <span class="thumb" aria-busy="true">
+            <span class="thumb-pending" aria-hidden="true">
+              <span class="thumb-sheet"></span>
+              <span class="thumb-shimmer"></span>
+            </span>
             <img alt="" src="{{ doc.thumb_url }}" loading="lazy" decoding="async">
             {% if doc.fresh %}<span class="fresh">Fresh</span>{% endif %}
           </span>
@@ -489,9 +546,21 @@
       if (!document.getElementById("gallery-error")) apply();
 
       Array.prototype.forEach.call(document.querySelectorAll(".thumb img"), function (img) {
-        img.addEventListener("error", function () {
-          img.classList.add("is-broken");
-        });
+        var thumb = img.closest(".thumb");
+        function ready() {
+          thumb.classList.add("is-ready");
+          thumb.classList.remove("is-failed");
+          thumb.removeAttribute("aria-busy");
+        }
+        function failed() {
+          if (thumb.classList.contains("is-ready")) return;
+          thumb.classList.add("is-failed");
+          thumb.removeAttribute("aria-busy");
+        }
+        img.addEventListener("load", ready);
+        img.addEventListener("error", failed);
+        if (img.complete && img.naturalWidth > 0) ready();
+        else if (img.complete && img.currentSrc) failed();
       });
     })();
   </script>

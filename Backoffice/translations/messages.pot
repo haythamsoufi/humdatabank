@@ -30836,3 +30836,121 @@ msgstr ""
 msgid "✓"
 msgstr ""
 
+
+#: app/templates/admin/governance/dashboard.html:239
+#, python-format
+msgid "%(gap)s gap"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:239
+#, python-format
+msgid "%(gap)s gaps"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:85
+#: app/templates/admin/governance/dashboard.html:239
+#, python-format
+msgid "%(n)s not evaluated"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:239
+#, python-format
+msgid "%(pass)s passing"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:178
+msgid "Accept this risk"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:257
+msgid "Ascending"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:262
+msgid "At least 25"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:261
+msgid "At least 50"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:260
+msgid "At least 80"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:280
+msgid "Choose round"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:259
+msgid "Clear filter"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:123
+#: app/templates/admin/governance/dashboard.html:225
+msgid "Control"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:49
+msgid ""
+"Control register for ownership, access, reporting discipline, the indicator "
+"glossary, and public links."
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:91
+msgid "Data governance sections"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:76
+msgid "Decisions with a review date, not a pass"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:258
+msgid "Descending"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:219
+msgid ""
+"Every rule, who is accountable, and whether the live check passes. Open gaps"
+" are worked on the Issues tab."
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:68
+msgid "Gaps still waiting on a fix or a decision"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:124
+msgid "Issue"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:85
+msgid "Live checks that currently pass"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:253
+msgid "No countries match these column filters."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:279
+msgid "Round"
+msgstr ""
+
+#: app/templates/auth/login.html:733
+msgid ""
+"Sign in without a password as a role preset or any active user. Accounts "
+"that have not signed in yet are marked not registered."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:255
+msgid "Sort and filter"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:263
+msgid "Under 25"
+msgstr ""
+
+#: app/templates/admin/governance/dashboard.html:114
+msgid ""
+"Work these rows. An accepted row is a decision with a review date, not a "
+"pass."
+msgstr ""

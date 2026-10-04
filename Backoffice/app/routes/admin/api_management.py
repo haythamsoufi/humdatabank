@@ -573,8 +573,8 @@ MOBILE_ENDPOINT_REGISTRY = [
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/unified-planning-config', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True,
      'description': (
-         'IFRC GO PublicSiteAppeals base URL and unified planning AppealsTypeId list '
-         '(Plan, Mid-Year Report, Annual Report) for client-side IFRC document fetch.'
+         'PublicSiteAppeals base URL and unified planning AppealsTypeId list '
+         '(Plan, Mid-Year Report, Annual Report) for the client document catalogue.'
      ),
      'flutter': 'PublicResourcesProvider'},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/unified-planning-thumbnail', 'methods': ['GET'],

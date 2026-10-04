@@ -5,7 +5,7 @@ Auth policy:
   - Truly public (no login required): countrymap, sectors-subsectors, indicator-bank,
     indicator-suggestions, data/periods, data/fdrs-overview, data/disaggregation-overview
     (global/regional for anonymous; country breakdown for authenticated org users), data/resources,
-    data/unified-planning-config (IFRC GO URL + unified planning type IDs for the mobile app),
+    data/unified-planning-config (appeals URL + unified planning type IDs for the mobile app),
     data/unified-planning-thumbnail (JPEG first page — server-rendered; IFRC URL allowlist;
     prefer POST JSON ``{"url_b64": "<base64url>"}`` so Azure WAF does not inspect raw IFRC URLs).
     Rate-limited to prevent abuse.
@@ -687,7 +687,7 @@ def public_resources():
 @mobile_bp.route('/data/unified-planning-config', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=60)
 def unified_planning_config():
-    """Public config for unified planning documents: IFRC GO API URL and type IDs."""
+    """Public config for unified planning documents: appeals API URL and type IDs."""
     from plugins.upr.mobile import unified_planning_config as _impl
 
     return _impl()

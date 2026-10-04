@@ -38,14 +38,6 @@
       color: #fff;
       border-bottom: 3px solid var(--red);
     }
-    .kicker {
-      margin: 0 0 3px;
-      color: #f6c5cb;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
     h1 {
       margin: 0;
       font-size: 22px;
@@ -196,8 +188,9 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      background: transparent;
     }
-    img[data-thumb]:not([src]) { display: none; }
+    .thumb img.is-broken { display: none; }
     .fresh {
       position: absolute;
       left: 8px;
@@ -299,9 +292,8 @@
 <body>
   <header class="masthead">
     <div>
-      <p class="kicker">IFRC GO</p>
       <h1>Unified plans and reports</h1>
-      <p class="subtitle">Plans, mid-year reports, and annual reports from IFRC GO</p>
+      <p class="subtitle">Plans, mid-year reports, and annual reports</p>
     </div>
     <p class="count" id="gallery-count" aria-live="polite">
       {%- if error -%}
@@ -382,7 +374,7 @@
            data-title="{{ doc.title_key }}"
            {% if not doc.visible %}hidden{% endif %}>
           <span class="thumb">
-            <img alt="" data-thumb="{{ doc.thumb_url }}" decoding="async">
+            <img alt="" src="{{ doc.thumb_url }}" loading="lazy" decoding="async">
             {% if doc.fresh %}<span class="fresh">Fresh</span>{% endif %}
           </span>
           <span class="body">
@@ -496,56 +488,11 @@
       }
       if (!document.getElementById("gallery-error")) apply();
 
-      var queue = [];
-      var active = 0;
-      var observer = null;
-      function pump() {
-        while (active < 3 && queue.length) {
-          var img = queue.shift();
-          if (!img || img.getAttribute("src")) continue;
-          var card = img.closest("[data-doc]");
-          if (card && card.hidden) {
-            if (observer) observer.observe(img);
-            continue;
-          }
-          active += 1;
-          img.addEventListener("load", done, { once: true });
-          img.addEventListener("error", (function (image) {
-            return function () {
-              image.remove();
-              done();
-            };
-          })(img), { once: true });
-          img.src = img.getAttribute("data-thumb");
-        }
-      }
-      function done() {
-        active -= 1;
-        pump();
-      }
-      var thumbs = document.querySelectorAll("img[data-thumb]");
-      if (!("IntersectionObserver" in window)) {
-        var shown = 0;
-        Array.prototype.forEach.call(thumbs, function (img) {
-          var card = img.closest("[data-doc]");
-          if (shown >= 12 || (card && card.hidden)) return;
-          img.src = img.getAttribute("data-thumb");
-          shown += 1;
+      Array.prototype.forEach.call(document.querySelectorAll(".thumb img"), function (img) {
+        img.addEventListener("error", function () {
+          img.classList.add("is-broken");
         });
-        return;
-      }
-      observer = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting) return;
-          var img = entry.target;
-          var card = img.closest("[data-doc]");
-          if (card && card.hidden) return;
-          observer.unobserve(img);
-          queue.push(img);
-        });
-        pump();
-      }, { rootMargin: "240px" });
-      Array.prototype.forEach.call(thumbs, function (img) { observer.observe(img); });
+      });
     })();
   </script>
 </body>

@@ -148,7 +148,7 @@ API_ENDPOINTS = [
         "rate_limited": True,
         "featured": True,
         "description": (
-            "Landscape HTML gallery of the same IFRC GO unified plans and reports "
+            "Landscape HTML gallery of the same unified plans and reports "
             "as the mobile app. Public — no API key. Open the URL directly, or iframe it. "
             "For a Power BI HTML visual, request format=powerbi to receive an iframe snippet. "
             "Dropdowns filter by country, document type, and year; sort and search (q) match the app."

@@ -254,6 +254,10 @@ def test_gallery_page_escapes_titles_and_applies_dropdown_filters(monkeypatch):
     assert "Mid-Year Report" not in html
     assert "Fresh" in html
     assert 'value="2026" selected' in html
+    assert "IFRC GO" not in html
+    assert "url_b64=" in html
+    assert 'loading="lazy"' in html
+    assert "data-thumb" not in html
 
     hidden_at = html.index('data-year="2020"')
     tag = html[html.rfind("<a", 0, hidden_at): html.index(">", hidden_at)]
@@ -290,7 +294,8 @@ def test_gallery_error_page_has_filters_and_no_secret(monkeypatch):
     response = _gallery_app().test_client().get("/api/v1/upr/documents")
     html = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "IFRC documents are not available" in html
+    assert "Documents are not available" in html
+    assert "IFRC GO" not in html
     assert "Documents unavailable" in html
     assert 'name="country"' in html
     assert "secret" not in html.lower()
@@ -319,6 +324,43 @@ def test_gallery_headers_allow_power_bi_framing():
     assert "X-Frame-Options" not in headers
     assert headers["Cross-Origin-Resource-Policy"] == "cross-origin"
     assert "frame-ancestors" not in headers["Content-Security-Policy"]
+
+
+def test_thumbnail_get_uses_url_b64_and_serves_cached_jpeg():
+    import base64
+    from hashlib import sha256
+
+    from plugins.upr.mobile import (
+        _UNIFIED_PLANNING_THUMB_JPEG,
+        _UNIFIED_PLANNING_THUMB_LOCK,
+        _decode_thumbnail_url_b64,
+        unified_planning_thumbnail,
+    )
+
+    pdf_url = "https://go.ifrc.org/DownloadFile/10/kenya.pdf"
+    src = gallery._thumbnail_src(pdf_url)
+    token = src.split("url_b64=", 1)[1]
+    decoded, error = _decode_thumbnail_url_b64(token, 32768)
+    assert error is None
+    assert decoded == pdf_url
+    assert "go.ifrc.org" not in token
+    assert base64.urlsafe_b64decode(token + "=" * ((-len(token)) % 4)).decode() == pdf_url
+
+    cache_key = sha256(pdf_url.encode("utf-8")).hexdigest()
+    jpeg = b"\xff\xd8\xff\xe0cached-cover"
+    app = Flask(__name__)
+    app.config["IFRC_DOCUMENT_ALLOWED_HOSTS"] = ["go.ifrc.org"]
+    with _UNIFIED_PLANNING_THUMB_LOCK:
+        _UNIFIED_PLANNING_THUMB_JPEG[cache_key] = jpeg
+    try:
+        with app.test_request_context("/api/mobile/v1/data/unified-planning-thumbnail?" + src.split("?", 1)[1]):
+            response = unified_planning_thumbnail()
+        assert response.status_code == 200
+        assert response.mimetype == "image/jpeg"
+        assert response.get_data() == jpeg
+    finally:
+        with _UNIFIED_PLANNING_THUMB_LOCK:
+            _UNIFIED_PLANNING_THUMB_JPEG.pop(cache_key, None)
 
 
 def test_api_docs_list_the_public_gallery():

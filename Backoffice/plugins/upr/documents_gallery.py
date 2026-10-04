@@ -1,4 +1,4 @@
-"""Public landscape gallery of IFRC GO unified plans and reports.
+"""Public landscape gallery of unified plans and reports.
 
 Same catalogue as the mobile app's unified-planning documents screen: PublicSiteAppeals
 types Plan (1851), Mid-Year Report (10009), and Annual Report (10011). The page is
@@ -8,6 +8,7 @@ meant to be opened directly or iframed from a Power BI HTML visual
 
 from __future__ import annotations
 
+import base64
 import logging
 import re
 import time
@@ -57,9 +58,9 @@ _SORT_LABELS = (
 )
 
 _ERROR_MESSAGES = {
-    "credentials": "IFRC documents are not available. Contact your administrator.",
-    "auth": "Could not access IFRC documents. Contact your administrator if this continues.",
-    "upstream": "Could not load documents from IFRC GO. Try again later.",
+    "credentials": "Documents are not available. Contact your administrator.",
+    "auth": "Could not access documents. Contact your administrator if this continues.",
+    "upstream": "Could not load documents. Try again later.",
 }
 
 _CACHE_TTL_SECONDS = 10 * 60
@@ -390,7 +391,7 @@ def _row(doc: UprGalleryDocument, filters: GalleryFilters, now: datetime) -> dic
         "year": doc.year,
         "published_label": _published_label(doc.published_at),
         "published_sort": _published_sort(doc.published_at),
-        "thumb_url": _THUMB_PATH + "?url=" + quote(doc.url, safe=""),
+        "thumb_url": _thumbnail_src(doc.url),
         "type_class": _type_css_class(doc.document_type_label),
         "fresh": is_published_recently(doc.published_at, now),
         "visible": document_matches(doc, filters),
@@ -401,6 +402,12 @@ def _row(doc: UprGalleryDocument, filters: GalleryFilters, now: datetime) -> dic
         "title_key": doc.title.lower(),
         "aria_label": "PDF: " + ", ".join(aria_bits),
     }
+
+
+def _thumbnail_src(pdf_url: str) -> str:
+    """Same-origin cover URL. The PDF address is base64url so it is not a raw query value."""
+    token = base64.urlsafe_b64encode(pdf_url.encode("utf-8")).decode("ascii").rstrip("=")
+    return _THUMB_PATH + "?url_b64=" + quote(token, safe="")
 
 
 def _page_url(filters: GalleryFilters) -> str:

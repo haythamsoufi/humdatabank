@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shared/notification_provider.dart';
@@ -48,6 +50,33 @@ class AppBottomNavigationBar extends StatelessWidget {
   /// Light icon colours for dark translucent bars ([backgroundColor] with low opacity).
   final bool lightForegroundOnBar;
 
+  /// Selection stripe at the top of each tab slot.
+  static const double _stripeHeight = 3;
+
+  /// Tab glyph size.
+  static const double _iconExtent = 24;
+
+  /// Gap under the stripe on iOS. Clears the notification badge, which is
+  /// drawn 6px above the glyph.
+  static const double _iosStripeToIconGap = 8;
+
+  /// iOS icon row: stripe + gap + glyph. Home-indicator space sits below this.
+  static const double _iosIconRowHeight =
+      _stripeHeight + _iosStripeToIconGap + _iconExtent;
+
+  /// Space under the glyphs on iOS.
+  ///
+  /// The home-indicator inset is about 34pt, but the indicator itself only
+  /// occupies the bottom ~13pt. Putting the whole inset under a fixed icon
+  /// row leaves a tall empty band. Phone-sized insets keep a short clearance
+  /// above the indicator; taller insets are left intact.
+  @visibleForTesting
+  static double iosBottomPaddingForInset(double inset) {
+    if (inset <= 0) return 8;
+    if (inset > 40) return inset;
+    return math.max(16, inset - 16);
+  }
+
   const AppBottomNavigationBar({
     super.key,
     required this.currentIndex,
@@ -66,7 +95,11 @@ class AppBottomNavigationBar extends StatelessWidget {
     // Use listen: false — consistent with _isAdmin / _isAuthenticated / _isFocalPoint.
     // Auth-state changes trigger parent rebuilds (e.g. Consumer in MainNavigationScreen)
     // which reconstruct this widget with updated values.
-    return Provider.of<AuthProvider>(context, listen: false).user?.chatbotEnabled ?? false;
+    return Provider.of<AuthProvider>(
+          context,
+          listen: false,
+        ).user?.chatbotEnabled ??
+        false;
   }
 
   void _handleTap(BuildContext context, int index) {
@@ -171,19 +204,19 @@ class AppBottomNavigationBar extends StatelessWidget {
 
     // The AI tab is identical in both admin and non-admin layouts — defined once here.
     Widget aiTab() => Flexible(
-          flex: 1,
-          child: _buildNavItem(
-            context: context,
-            index: aiChatNavIndex,
-            selectedTabIndex: selectedTabIndex,
-            icon: Icons.auto_awesome_outlined,
-            activeIcon: Icons.auto_awesome,
-            label: l10n.chatbot,
-            showBadge: false,
-            lightForegroundOnBar: lightForegroundOnBar,
-            onTap: () => _handleTap(context, aiChatNavIndex),
-          ),
-        );
+      flex: 1,
+      child: _buildNavItem(
+        context: context,
+        index: aiChatNavIndex,
+        selectedTabIndex: selectedTabIndex,
+        icon: Icons.auto_awesome_outlined,
+        activeIcon: Icons.auto_awesome,
+        label: l10n.chatbot,
+        showBadge: false,
+        lightForegroundOnBar: lightForegroundOnBar,
+        onTap: () => _handleTap(context, aiChatNavIndex),
+      ),
+    );
 
     return _barShell(
       context: context,
@@ -419,26 +452,37 @@ class AppBottomNavigationBar extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.14)
         : context.borderColor;
 
+    final safe = MediaQuery.paddingOf(context);
+    final ios = Theme.of(context).platform == TargetPlatform.iOS;
+    // iOS: shorten the home-indicator gap. Other platforms keep the previous
+    // shell (52px icon slot plus the full system inset).
+    final Widget barBody = ios
+        ? Padding(
+            padding: EdgeInsets.fromLTRB(
+              6 + safe.left,
+              0,
+              6 + safe.right,
+              iosBottomPaddingForInset(safe.bottom),
+            ),
+            child: SizedBox(height: _iosIconRowHeight, child: child),
+          )
+        : SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 52,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
+                child: child,
+              ),
+            ),
+          );
+
     Widget bar = Container(
       decoration: BoxDecoration(
         color: barBg,
-        border: Border(
-          top: BorderSide(
-            color: topBorderColor,
-            width: 0.5,
-          ),
-        ),
+        border: Border(top: BorderSide(color: topBorderColor, width: 0.5)),
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 52,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
-            child: child,
-          ),
-        ),
-      ),
+      child: barBody,
     );
 
     if (enableCustomization) {
@@ -462,6 +506,7 @@ class AppBottomNavigationBar extends StatelessWidget {
     required IconData icon,
     required IconData activeIcon,
     required String label,
+
     /// When true, wraps the icon in a [Consumer<NotificationProvider>] badge.
     required bool showBadge,
     required bool lightForegroundOnBar,
@@ -477,9 +522,7 @@ class AppBottomNavigationBar extends StatelessWidget {
     final Color stripeColor;
     if (lightForegroundOnBar) {
       stripeColor = ifrcRed;
-      iconFg = isSelected
-          ? Colors.white
-          : Colors.white.withValues(alpha: 0.62);
+      iconFg = isSelected ? Colors.white : Colors.white.withValues(alpha: 0.62);
     } else if (isSelected) {
       stripeColor = ifrcRed;
       iconFg = context.isDarkTheme
@@ -487,8 +530,9 @@ class AppBottomNavigationBar extends StatelessWidget {
           : primary;
     } else {
       stripeColor = Colors.transparent;
-      iconFg = context.iconColor
-          .withValues(alpha: context.isDarkTheme ? 0.72 : 0.55);
+      iconFg = context.iconColor.withValues(
+        alpha: context.isDarkTheme ? 0.72 : 0.55,
+      );
     }
 
     Widget iconChild;
@@ -501,7 +545,7 @@ class AppBottomNavigationBar extends StatelessWidget {
             children: [
               Icon(
                 isSelected ? activeIcon : icon,
-                size: 24,
+                size: _iconExtent,
                 color: iconFg,
               ),
               if (provider.unreadCount > 0)
@@ -510,7 +554,9 @@ class AppBottomNavigationBar extends StatelessWidget {
                   top: -6,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 4, vertical: 2),
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Color(AppConstants.ifrcRed),
                       borderRadius: BorderRadius.circular(8),
@@ -540,10 +586,18 @@ class AppBottomNavigationBar extends StatelessWidget {
     } else {
       iconChild = Icon(
         isSelected ? activeIcon : icon,
-        size: 24,
+        size: _iconExtent,
         color: iconFg,
       );
     }
+
+    final scaledIcon = AnimatedScale(
+      scale: isSelected ? 1.0 : 0.94,
+      duration: AppConstants.animationFast,
+      curve: Curves.easeOutCubic,
+      child: iconChild,
+    );
+    final pinIconUnderStripe = Theme.of(context).platform == TargetPlatform.iOS;
 
     return Semantics(
       label: label,
@@ -566,7 +620,7 @@ class AppBottomNavigationBar extends StatelessWidget {
                 AnimatedContainer(
                   duration: AppConstants.animationFast,
                   curve: Curves.easeOutCubic,
-                  height: 3,
+                  height: _stripeHeight,
                   margin: EdgeInsets.symmetric(horizontal: isSelected ? 10 : 0),
                   decoration: BoxDecoration(
                     color: isSelected ? stripeColor : Colors.transparent,
@@ -575,16 +629,11 @@ class AppBottomNavigationBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                Expanded(
-                  child: Center(
-                    child: AnimatedScale(
-                      scale: isSelected ? 1.0 : 0.94,
-                      duration: AppConstants.animationFast,
-                      curve: Curves.easeOutCubic,
-                      child: iconChild,
-                    ),
-                  ),
-                ),
+                if (pinIconUnderStripe) ...[
+                  const SizedBox(height: _iosStripeToIconGap),
+                  scaledIcon,
+                ] else
+                  Expanded(child: Center(child: scaledIcon)),
               ],
             ),
           ),

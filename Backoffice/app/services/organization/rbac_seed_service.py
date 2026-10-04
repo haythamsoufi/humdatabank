@@ -412,15 +412,11 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "code": "admin_data_explorer_analysis",
             "name": "Admin: Data Explorer (Analysis)",
             "description": "Access the Analysis tab in Data Explorer.",
-            # admin.reports.{view,edit} were backfilled onto this exact role by the
-            # add_reports_permissions migration ("backfill from data explorer
-            # analysis") when Reports split off from Analysis, to avoid an abrupt
-            # access loss for existing holders. Reconciliation below deletes any
-            # rbac_role_permission link for a *catalog* permission that isn't in a
-            # role's permission_codes -- omitting these here would make the very
-            # next `flask rbac seed` run silently revoke that migration's grant.
-            # Keep in sync with the dedicated admin_reports_viewer/editor roles.
-            "permission_codes": ["admin.data_explore.analysis", "admin.reports.view", "admin.reports.edit"],
+            # Report builder access is admin.reports.{view,edit} on
+            # admin_reports_viewer / admin_reports_editor only. add_reports_permissions
+            # once copied those onto this role; they are omitted here so the next
+            # flask rbac seed removes that grant.
+            "permission_codes": ["admin.data_explore.analysis"],
         },
         {
             "code": "admin_data_explorer_compliance",

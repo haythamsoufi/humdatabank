@@ -61,7 +61,7 @@ pip install -r requirements.txt
 # 3) Database
 python -m flask db upgrade
 python -m flask rbac seed
-python -m flask seed-test-data
+python -m flask seed-test-data   # Testland, test users, focal points, sample assignments
 
 # 4) Run
 python run.py
@@ -116,7 +116,7 @@ python -m flask db upgrade
 # Create admin user (interactive prompt)
 python -m flask create-admin
 
-# Seed test users (System Manager, Admin, Focal Point)
+# Seed test users (System Manager, Admin, Focal Point), extra focal points, and sample assignments
 python -m flask seed-test-data
 
 # Session management

@@ -107,6 +107,48 @@ def _assign_roles_to_user(user_id: int, role_codes) -> int:
     return added
 
 
+# Stable names for the local dashboard sample. Re-running seed refreshes due
+# dates and statuses on these rows so "overdue" stays overdue.
+_DEV_SAMPLE_ASSIGNMENTS = (
+    {
+        "template_name": "Annual Statistical Report",
+        "description": "Yearly figures for the Testland national society.",
+        "period_name": "2026",
+        "status": "in_progress",
+        "due_in_days": 18,
+        "completion_rate": 45,
+        "is_closed": False,
+    },
+    {
+        "template_name": "Quarterly Health Update",
+        "description": "Health programme update for the current quarter.",
+        "period_name": "2026 Q1",
+        "status": "pending",
+        "due_in_days": -8,
+        "completion_rate": 12,
+        "is_closed": False,
+    },
+    {
+        "template_name": "Volunteer Census",
+        "description": "Headcount of active volunteers.",
+        "period_name": "2025",
+        "status": "submitted",
+        "due_in_days": -2,
+        "completion_rate": 100,
+        "is_closed": False,
+    },
+    {
+        "template_name": "Emergency Appeal Report",
+        "description": "Closed appeal from the previous cycle.",
+        "period_name": "2024",
+        "status": "approved",
+        "due_in_days": -90,
+        "completion_rate": 100,
+        "is_closed": True,
+    },
+)
+
+
 def _ensure_user_country_entity_permission(user, country_id: int | None, app_instance) -> None:
     """Grant Testland via UserEntityPermission (User.countries is view-only)."""
     from app.models.core import UserEntityPermission
@@ -197,6 +239,210 @@ def _clear_dev_test_sys_manager_entity_permissions(user, app_instance) -> None:
         app_instance.logger.debug(
             "Clearing entity permissions failed for '%s': %s", user.email, e
         )
+
+
+def _published_dev_template(name: str, description: str, owner_id: int | None):
+    """Return a published form template with this exact version name, creating it if needed."""
+    from app.models.enums import FormTemplateVersionStatusValue
+    from app.models.forms import FormTemplate, FormTemplateVersion
+
+    version = FormTemplateVersion.query.filter_by(name=name).first()
+    if version is not None:
+        template = version.template
+        if template is not None and template.published_version_id != version.id:
+            template.published_version_id = version.id
+        return template
+
+    template = FormTemplate(created_by=owner_id, owned_by=owner_id)
+    db.session.add(template)
+    db.session.flush()
+    version = FormTemplateVersion(
+        template_id=template.id,
+        version_number=1,
+        status=FormTemplateVersionStatusValue.published,
+        name=name,
+        description=description,
+        created_by=owner_id,
+    )
+    db.session.add(version)
+    db.session.flush()
+    template.published_version_id = version.id
+    return template
+
+
+def _ensure_dev_focal_user(
+    *,
+    email: str,
+    name: str,
+    title: str,
+    password: str,
+    country_id: int,
+    app_instance,
+):
+    """Create a focal-point user for Testland, or fill in a missing title."""
+    from app.models import User
+
+    user = User.query.filter_by(email=email).first()
+    created = False
+    if user is None:
+        user = User(email=email, name=name, title=title, active=True)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.flush()
+        created = True
+        app_instance.logger.info("Created dev focal point '%s'", email)
+    elif not (user.title or "").strip():
+        user.title = title
+    if not (user.name or "").strip():
+        user.name = name
+
+    _assign_role_to_user(
+        int(user.id),
+        "assignment_editor_submitter",
+        name="Assignment Editor/Submitter",
+        description="Enter/edit/submit assignments for assigned entities",
+    )
+    user.add_entity_permission(entity_type="country", entity_id=country_id)
+    return user, created
+
+
+def _seed_dev_dashboard_samples(app_instance, test_country, org_email_domain: str) -> None:
+    """Add focal points and a few assignments so the local dashboard is not empty.
+
+    Safe to run more than once. Sample assignment due dates are refreshed from
+    today so the overdue row stays overdue.
+    """
+    from datetime import timedelta
+    from decimal import Decimal
+
+    from sqlalchemy.orm.exc import DetachedInstanceError
+
+    from app.models import AssignedForm, AssignmentEntityStatus, Country, User
+    from app.models.enums import AssignmentEntityStatusValue
+    from app.utils.datetime_helpers import utcnow
+
+    country_id = None
+    if test_country is not None:
+        try:
+            country_id = int(test_country.id)
+        except (DetachedInstanceError, TypeError, ValueError):
+            country_id = None
+    if country_id is None:
+        country = Country.query.filter_by(name="Testland").first()
+        country_id = int(country.id) if country is not None else None
+    if country_id is None:
+        return
+
+    required_tables = (
+        "form_template",
+        "form_template_version",
+        "assigned_form",
+        "assignment_entity_status",
+    )
+    try:
+        inspector = inspect(db.engine)
+        table_flags = [inspector.has_table(table_name) for table_name in required_tables]
+    except Exception:
+        app_instance.logger.info(
+            "Skipping dashboard sample seed: database is not ready."
+        )
+        return
+    if not all(isinstance(flag, bool) and flag for flag in table_flags):
+        app_instance.logger.info(
+            "Skipping dashboard sample seed: form assignment tables are not ready."
+        )
+        return
+
+    password = os.environ.get("TEST_FOCAL_PASSWORD") or secrets.token_urlsafe(16)
+    now = utcnow()
+
+    primary = User.query.filter_by(email=f"test_focal@{org_email_domain}").first()
+    if primary is not None and not (primary.title or "").strip():
+        primary.title = "Country Support Focal Point"
+
+    extra_focal_points = (
+        {
+            "email": f"test_focal_region@{org_email_domain}",
+            "name": "Jordan Hale",
+            "title": "Regional Data Officer",
+        },
+        {
+            "email": "amina.okonkwo@testland.example",
+            "name": "Amina Okonkwo",
+            "title": "NS Health Focal Point",
+        },
+        {
+            "email": "luis.herrera@testland.example",
+            "name": "Luis Herrera",
+            "title": "Branch Reporting Lead",
+        },
+    )
+    for spec in extra_focal_points:
+        _ensure_dev_focal_user(
+            email=spec["email"],
+            name=spec["name"],
+            title=spec["title"],
+            password=password,
+            country_id=country_id,
+            app_instance=app_instance,
+        )
+
+    owner_id = int(primary.id) if primary is not None else None
+    for spec in _DEV_SAMPLE_ASSIGNMENTS:
+        template = _published_dev_template(
+            spec["template_name"],
+            spec["description"],
+            owner_id,
+        )
+        if template is None:
+            continue
+        assigned_form = AssignedForm.query.filter_by(
+            template_id=template.id,
+            period_name=spec["period_name"],
+        ).first()
+        if assigned_form is None:
+            assigned_form = AssignedForm(
+                template_id=template.id,
+                period_name=spec["period_name"],
+                is_active=True,
+                is_closed=spec["is_closed"],
+            )
+            db.session.add(assigned_form)
+            db.session.flush()
+        else:
+            assigned_form.is_active = True
+            assigned_form.is_closed = spec["is_closed"]
+
+        status = AssignmentEntityStatusValue(spec["status"])
+        entity_status = AssignmentEntityStatus.query.filter_by(
+            assigned_form_id=assigned_form.id,
+            entity_type="country",
+            entity_id=country_id,
+        ).first()
+        if entity_status is None:
+            entity_status = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type="country",
+                entity_id=country_id,
+            )
+            db.session.add(entity_status)
+
+        entity_status.status = status
+        entity_status.due_date = now + timedelta(days=spec["due_in_days"])
+        entity_status.status_timestamp = now
+        entity_status.completion_rate = Decimal(str(spec["completion_rate"]))
+        if status == AssignmentEntityStatusValue.submitted and primary is not None:
+            entity_status.submitted_by_user_id = int(primary.id)
+            entity_status.submitted_at = now - timedelta(days=1)
+        else:
+            entity_status.submitted_by_user_id = None
+            entity_status.submitted_at = None
+
+    db.session.commit()
+    app_instance.logger.info(
+        "Dev dashboard samples ready: %d assignments and extra focal points for Testland.",
+        len(_DEV_SAMPLE_ASSIGNMENTS),
+    )
 
 
 _LOCAL_DB_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "host.docker.internal"})
@@ -328,7 +574,7 @@ def create_default_data(app_instance):
 
             if test_country:
                 ns_exists = NationalSociety.query.filter_by(
-                    country_id=test_country.id, name="Testlandic Red Emblem Society"
+                    country_id=test_country.id, name="Testland NS"
                 ).first()
                 if not ns_exists:
                     ns = NationalSociety(
@@ -472,6 +718,8 @@ def create_default_data(app_instance):
                 )
                 _ensure_dev_test_sys_manager_role(sys_manager_user, app_instance)
                 _clear_dev_test_sys_manager_entity_permissions(sys_manager_user, app_instance)
+
+            _seed_dev_dashboard_samples(app_instance, test_country, org_email_domain)
 
         except Exception as e:
             db.session.rollback()

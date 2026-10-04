@@ -38,6 +38,13 @@ def _make_ctx(app):
     return ctx
 
 
+@pytest.fixture(autouse=True)
+def skip_dashboard_sample_seed():
+    """Dashboard samples hit real form tables. Keep these unit tests on mocks."""
+    with patch("app.seeding._seed_dev_dashboard_samples") as mocked:
+        yield mocked
+
+
 # ===========================================================================
 # Production / staging guard
 # ===========================================================================
@@ -198,7 +205,7 @@ class TestSystemSettingsInit:
         # set_supported_languages should NOT have been called
         app.logger.info.assert_called()
 
-    def test_skips_system_settings_when_already_populated(self):
+    def test_skips_system_settings_when_already_populated(self, skip_dashboard_sample_seed):
         from app.seeding import create_default_data
 
         app, mock_country_cls, mock_user_cls, mock_ns_cls, mock_db = self._build_app_and_mocks()
@@ -221,6 +228,7 @@ class TestSystemSettingsInit:
                                                     create_default_data(app)
 
         sl.assert_not_called()
+        skip_dashboard_sample_seed.assert_called_once()
 
 
 # ===========================================================================

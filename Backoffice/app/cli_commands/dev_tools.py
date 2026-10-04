@@ -145,9 +145,15 @@ def register_dev_tools_commands(app):
           - test_admin@<domain> (Admin with admin_full role)
           - test_focal@<domain> (Focal Point)
 
+        Also creates extra focal points (one more organisation user and two
+        national-society users) and four sample assignments on Testland so the
+        dashboard is not empty. Re-running the command refreshes those sample
+        due dates.
+
         Passwords come from TEST_SYS_MANAGER_PASSWORD, TEST_ADMIN_PASSWORD,
-        TEST_FOCAL_PASSWORD env vars (or are generated randomly).
-        Set these in your .env so the quick-login buttons work on the login page.
+        TEST_FOCAL_PASSWORD env vars (or are generated randomly). Extra focal
+        points use TEST_FOCAL_PASSWORD. Set these in your .env so the
+        quick-login buttons work on the login page.
 
         Refuses to run unless FLASK_CONFIG=development and the database host is local.
         """

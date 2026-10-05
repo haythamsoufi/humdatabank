@@ -1,0 +1,625 @@
+<style nonce="{{ csp_nonce() }}">
+    .ecr-card-value { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.02em; color: #111827; }
+    .ecr-list { margin: 0; padding-left: 1.25rem; }
+    .ecr-list li + li { margin-top: 0.35rem; }
+    .ecr-refresh { border: 1px solid #d1d5db; background: #fff; color: #374151; font-size: 0.75rem; font-weight: 600; line-height: 1; padding: 0.4rem 0.75rem; border-radius: 999px; cursor: pointer; }
+    .ecr-refresh:hover { background: #f9fafb; color: #111827; }
+    .ecr-subtabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .ecr-subtab { border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.8125rem; font-weight: 600; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer; }
+    .ecr-subtab[aria-selected="true"] { background: #111827; color: #fff; border-color: #111827; }
+    .ecr-legend { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; margin-top: 0.75rem; }
+    .ecr-legend span { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #374151; }
+    .ecr-swatch { width: 0.75rem; height: 0.75rem; border-radius: 999px; display: inline-block; }
+    .ecr-provisional { color: #9a3412; }
+    .ecr-chart { width: 100%; overflow-x: auto; }
+    .ecr-chart svg { display: block; width: 100%; height: auto; }
+    .ecr-note { color: #4b5563; }
+    .ecr-warning { color: #9a3412; }
+    .ecr-missing { background: #f9fafb; border: 1px dashed #d1d5db; padding: 0.9rem 1rem; }
+    .ecr-stack { display: flex; height: 1.15rem; width: 100%; background: #f3f4f6; overflow: hidden; }
+    .ecr-scroll { max-height: 28rem; overflow: auto; }
+    .ecr-rank { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+    .ecr-rank-name { font-size: 0.8125rem; color: #111827; }
+    .ecr-rank-detail { font-size: 0.75rem; color: #6b7280; }
+    .ecr-rank-track { background: #f3f4f6; height: 0.45rem; }
+    .ecr-rank-bar { height: 0.45rem; background: #1e3a5f; }
+    .ecr-output + .ecr-output { margin-top: 1rem; }
+</style>
+
+<div id="panel-everyone-counts" class="explore-panel{% if explore_first_tab != 'everyone-counts' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-everyone-counts">
+    <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 mb-6">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="max-w-4xl">
+                <h3 class="text-lg font-semibold text-gray-900">{{ _('Everyone Counts') }}</h3>
+                <p class="text-sm text-gray-600 mt-1">
+                    {{ _('Every figure and table from Everyone Counts 2026, calculated from current FDRS assignments. Closed years use the published value. A figure that needs a source outside the databank is still listed, with that source named.') }}
+                </p>
+            </div>
+            <button type="button" id="ecr-refresh-world-bank" class="ecr-refresh">{{ _('Refresh World Bank snapshot') }}</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-3" id="ecr-external"></p>
+    </div>
+
+    <div id="ecr-loading" class="bg-white p-6 shadow-md border border-gray-200 mb-6 hidden">
+        <div class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p class="text-lg text-gray-600">{{ _('Calculating Everyone Counts indicators...') }}</p>
+        </div>
+    </div>
+
+    <div id="ecr-error" class="bg-white p-6 shadow-md border border-red-200 mb-6 hidden">
+        <p class="text-red-700" id="ecr-error-text"></p>
+    </div>
+
+    <div id="ecr-content" class="hidden">
+        <p id="ecr-warning" class="text-sm ecr-warning mb-4 hidden"></p>
+        <div id="ecr-cards" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+
+        <div class="ecr-subtabs mb-3" id="ecr-subtabs" role="tablist" aria-label="{{ _('Everyone Counts chapters') }}"></div>
+        <p class="text-xs text-gray-500 mb-4" id="ecr-chapter-meta"></p>
+        <div id="ecr-chapter"></div>
+
+        <div class="bg-white p-4 sm:p-6 shadow border border-gray-200 mt-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('How these figures are calculated') }}</h4>
+            <ul class="text-sm ecr-note ecr-list list-disc" id="ecr-notes"></ul>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var loaded = false;
+    var loading = false;
+    var chapterId = null;
+    var labels = {
+        loadFailed: {{ _('Could not calculate Everyone Counts indicators.')|tojson }},
+        noData: {{ _('No FDRS indicator values were found for this analysis.')|tojson }},
+        provisional: {{ _('provisional')|tojson }},
+        volunteers: {{ _('Volunteers, 3-year mean')|tojson }},
+        reporting: {{ _('Societies reporting volunteers')|tojson }},
+        ratio: {{ _('Median volunteers per paid staff')|tojson }},
+        women: {{ _('Median share of women volunteers')|tojson }},
+        settled: {{ _('Latest closed year')|tojson }},
+        open: {{ _('Open year')|tojson }},
+        calculated: {{ _('calculated from current data')|tojson }},
+        noPoints: {{ _('No data for this figure.')|tojson }},
+        sourceNeeded: {{ _('Source still needed')|tojson }},
+        notCalculated: {{ _('Not re-estimated')|tojson }},
+        notStored: {{ _('Not stored')|tojson }}
+    };
+
+    function byId(id) { return document.getElementById(id); }
+
+    function formatCount(value) {
+        if (value == null || !isFinite(value)) return '\u2014';
+        var abs = Math.abs(value);
+        if (abs >= 1e9) return (value / 1e9).toLocaleString('en-GB', { maximumFractionDigits: 2 }) + ' billion';
+        if (abs >= 1e6) return (value / 1e6).toLocaleString('en-GB', { maximumFractionDigits: 2 }) + ' million';
+        return Math.round(value).toLocaleString('en-GB');
+    }
+
+    function formatRatio(value) {
+        if (value == null || !isFinite(value)) return '\u2014';
+        return value.toLocaleString('en-GB', { maximumFractionDigits: 1 });
+    }
+
+    function formatShare(value) {
+        if (value == null || !isFinite(value)) return '\u2014';
+        return Math.round(value * 100) + '%';
+    }
+
+    function formatPercent(value) {
+        if (value == null || !isFinite(value)) return '\u2014';
+        return (value * 100).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    }
+
+    function formatByUnit(value, unit) {
+        if (unit === 'share') return formatShare(value);
+        if (unit === 'percent') return formatPercent(value);
+        if (unit === 'ratio') return formatRatio(value);
+        if (unit === 'number') {
+            if (value == null || !isFinite(value)) return '\u2014';
+            return Math.round(value).toLocaleString('en-GB');
+        }
+        return formatCount(value);
+    }
+
+    function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text != null) node.textContent = text;
+        return node;
+    }
+
+    function svgEl(tag) {
+        return document.createElementNS('http://www.w3.org/2000/svg', tag);
+    }
+
+    function showError(message) {
+        byId('ecr-loading').classList.add('hidden');
+        byId('ecr-content').classList.add('hidden');
+        byId('ecr-error').classList.remove('hidden');
+        byId('ecr-error-text').textContent = message || labels.loadFailed;
+    }
+
+    function card(label, value, detail, provisional) {
+        var box = el('div', 'bg-white p-4 shadow border border-gray-200');
+        box.appendChild(el('p', 'text-xs text-gray-500', label));
+        box.appendChild(el('p', provisional ? 'ecr-card-value ecr-provisional' : 'ecr-card-value', value));
+        if (detail) box.appendChild(el('p', 'text-xs text-gray-500 mt-1', detail));
+        return box;
+    }
+
+    function renderCards(data) {
+        var host = byId('ecr-cards');
+        host.replaceChildren();
+        var snap = data.snapshot;
+        if (!snap) return;
+        var yearLabel = String(snap.year) + (snap.provisional ? ' (' + labels.provisional + ')' : '');
+        var yearKind = snap.provisional ? labels.open : labels.settled;
+        host.appendChild(card(
+            labels.volunteers,
+            formatCount(snap.rolling_volunteers),
+            yearKind + ' ' + yearLabel + (snap.societies_rolling ? ' \u00b7 ' + snap.societies_rolling + ' National Societies' : ''),
+            snap.provisional
+        ));
+        host.appendChild(card(
+            labels.reporting,
+            snap.societies_reporting != null ? String(snap.societies_reporting) : '\u2014',
+            yearLabel,
+            snap.provisional
+        ));
+        host.appendChild(card(
+            labels.ratio,
+            formatRatio(snap.median_volunteers_per_staff),
+            snap.societies_in_ratio ? snap.societies_in_ratio + ' National Societies with both figures' : yearLabel,
+            false
+        ));
+        host.appendChild(card(
+            labels.women,
+            formatShare(snap.median_female_share),
+            snap.societies_with_sex ? snap.societies_with_sex + ' National Societies reporting sex' : yearLabel,
+            false
+        ));
+    }
+
+    function renderExternal(data) {
+        var host = byId('ecr-external');
+        var ext = (data.external && data.external.world_bank) || {};
+        if (!ext.available) {
+            host.textContent = ext.refresh_error || {{ _('No World Bank snapshot is saved yet. Refresh to download population and income groups.')|tojson }};
+            return;
+        }
+        var when = ext.fetched_at ? String(ext.fetched_at).slice(0, 10) : '';
+        var sentence = {{ _('World Bank snapshot')|tojson }} + (when ? ' ' + when : '') + '. ' +
+            {{ _('Income group is the current classification, held fixed across years.')|tojson }};
+        if (ext.refresh_error) sentence += ' ' + ext.refresh_error;
+        host.textContent = sentence;
+    }
+
+    function renderSubtabs(chapters) {
+        var bar = byId('ecr-subtabs');
+        bar.replaceChildren();
+        if (!chapters.length) return;
+        if (!chapterId || !chapters.some(function (chapter) { return chapter.id === chapterId; })) {
+            chapterId = chapters[0].id;
+        }
+        chapters.forEach(function (chapter) {
+            var button = el('button', 'ecr-subtab', chapter.label);
+            button.type = 'button';
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', chapter.id === chapterId ? 'true' : 'false');
+            button.addEventListener('click', function () {
+                chapterId = chapter.id;
+                renderSubtabs(chapters);
+                renderChapter(chapters);
+            });
+            bar.appendChild(button);
+        });
+    }
+
+    function renderChapter(chapters) {
+        var host = byId('ecr-chapter');
+        var meta = byId('ecr-chapter-meta');
+        host.replaceChildren();
+        var chapter = null;
+        chapters.forEach(function (item) {
+            if (item.id === chapterId) chapter = item;
+        });
+        if (!chapter) {
+            meta.textContent = '';
+            return;
+        }
+        var outputs = chapter.outputs || [];
+        var ready = outputs.filter(function (item) { return item.available; }).length;
+        meta.textContent = ready + ' of ' + outputs.length + ' ' + labels.calculated;
+        outputs.forEach(function (output) {
+            host.appendChild(renderOutput(output));
+        });
+    }
+
+    function renderOutput(output) {
+        var article = el('article', 'bg-white p-4 sm:p-6 shadow border border-gray-200 ecr-output');
+        if (output.number) article.appendChild(el('p', 'text-xs font-semibold text-gray-500', output.number));
+        article.appendChild(el('h4', 'text-sm font-medium text-gray-900 mt-1', output.title || ''));
+        if (output.caption) article.appendChild(el('p', 'text-xs text-gray-500 mt-1 mb-3', output.caption));
+        var body = el('div', '');
+        renderPiece(body, output);
+        article.appendChild(body);
+        if (output.note) article.appendChild(el('p', 'text-xs text-gray-500 mt-2', output.note));
+        return article;
+    }
+
+    function renderPiece(host, piece) {
+        if (piece.kind === 'missing') {
+            var box = el('div', 'ecr-missing');
+            var heading = labels.sourceNeeded + ': ' + (piece.source || '');
+            if (piece.blocker === 'method') heading = labels.notCalculated;
+            if (piece.blocker === 'withheld') heading = labels.notStored;
+            box.appendChild(el('p', 'text-xs font-semibold text-gray-700', heading));
+            if (piece.detail && piece.detail !== piece.caption) {
+                box.appendChild(el('p', 'text-sm text-gray-600 mt-1', piece.detail));
+            }
+            host.appendChild(box);
+            return;
+        }
+        if (piece.kind === 'sections') {
+            (piece.sections || []).forEach(function (section, index) {
+                var block = el('div', index ? 'mt-4' : '');
+                renderPiece(block, section);
+                if (section.note) block.appendChild(el('p', 'text-xs text-gray-500 mt-2', section.note));
+                host.appendChild(block);
+            });
+            return;
+        }
+        if (piece.kind === 'lines') renderLines(host, piece);
+        else if (piece.kind === 'bars') renderBars(host, piece);
+        else if (piece.kind === 'stacked') renderStacked(host, piece);
+        else if (piece.kind === 'ranked') renderRanked(host, piece);
+        else if (piece.kind === 'table') renderTable(host, piece);
+        else host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+    }
+
+    function chartFrame(host, width, height) {
+        var frame = el('div', 'ecr-chart');
+        var svg = svgEl('svg');
+        svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+        svg.setAttribute('role', 'img');
+        frame.appendChild(svg);
+        host.appendChild(frame);
+        return svg;
+    }
+
+    function renderLines(host, piece) {
+        var series = (piece.series || []).filter(function (item) { return (item.points || []).length; });
+        if (!series.length) {
+            host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+            return;
+        }
+        var width = 640, height = 280, left = 56, right = 16, top = 16, bottom = 32;
+        var svg = chartFrame(host, width, height);
+        var plotW = width - left - right;
+        var plotH = height - top - bottom;
+        var years = [];
+        var maxY = 1;
+        series.forEach(function (item) {
+            item.points.forEach(function (point) {
+                years.push(point.year);
+                if (point.value > maxY) maxY = point.value;
+            });
+        });
+        var minX = Math.min.apply(null, years);
+        var maxX = Math.max.apply(null, years);
+        function xOf(year) {
+            if (maxX === minX) return left + plotW / 2;
+            return left + ((year - minX) / (maxX - minX)) * plotW;
+        }
+        function yOf(value) { return top + (1 - value / maxY) * plotH; }
+        var axis = svgEl('line');
+        axis.setAttribute('x1', left);
+        axis.setAttribute('x2', left + plotW);
+        axis.setAttribute('y1', top + plotH);
+        axis.setAttribute('y2', top + plotH);
+        axis.setAttribute('stroke', '#e5e7eb');
+        svg.appendChild(axis);
+        var legend = el('div', 'ecr-legend');
+        series.forEach(function (item) {
+            var swatch = el('span', '');
+            var dot = el('i', 'ecr-swatch');
+            dot.style.background = item.color || '#1e3a5f';
+            swatch.appendChild(dot);
+            swatch.appendChild(document.createTextNode(item.name || ''));
+            legend.appendChild(swatch);
+            var points = item.points;
+            for (var i = 1; i < points.length; i++) {
+                var line = svgEl('line');
+                line.setAttribute('x1', xOf(points[i - 1].year));
+                line.setAttribute('y1', yOf(points[i - 1].value));
+                line.setAttribute('x2', xOf(points[i].year));
+                line.setAttribute('y2', yOf(points[i].value));
+                line.setAttribute('stroke', item.color || '#1e3a5f');
+                line.setAttribute('stroke-width', '2');
+                if (points[i].provisional || points[i].dashed) line.setAttribute('stroke-dasharray', '4 3');
+                svg.appendChild(line);
+            }
+            points.forEach(function (point) {
+                var mark = svgEl('circle');
+                mark.setAttribute('cx', xOf(point.year));
+                mark.setAttribute('cy', yOf(point.value));
+                mark.setAttribute('r', '3');
+                var open = point.provisional || point.dashed;
+                mark.setAttribute('fill', open ? '#fff' : (item.color || '#1e3a5f'));
+                mark.setAttribute('stroke', item.color || '#1e3a5f');
+                mark.setAttribute('stroke-width', '2');
+                svg.appendChild(mark);
+            });
+        });
+        var topLabel = svgEl('text');
+        topLabel.setAttribute('x', 4);
+        topLabel.setAttribute('y', 14);
+        topLabel.setAttribute('font-size', '11');
+        topLabel.setAttribute('fill', '#6b7280');
+        topLabel.textContent = formatByUnit(maxY, piece.unit);
+        svg.appendChild(topLabel);
+        for (var year = minX; year <= maxX; year++) {
+            if ((year - minX) % 2 !== 0 && year !== maxX) continue;
+            var tick = svgEl('text');
+            tick.setAttribute('x', xOf(year));
+            tick.setAttribute('y', height - 10);
+            tick.setAttribute('text-anchor', 'middle');
+            tick.setAttribute('font-size', '11');
+            tick.setAttribute('fill', '#6b7280');
+            tick.textContent = String(year);
+            svg.appendChild(tick);
+        }
+        host.appendChild(legend);
+    }
+
+    function renderBars(host, piece) {
+        var points = piece.points || [];
+        if (!points.length) {
+            host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+            return;
+        }
+        var categorical = points[0].label != null;
+        if (categorical) {
+            var width = 640;
+            var height = Math.max(160, points.length * 28 + 12);
+            var svg = chartFrame(host, width, height);
+            var left = 88;
+            var plotW = width - left - 64;
+            var maxY = Math.max.apply(null, points.map(function (item) { return item.value || 0; }).concat([0.01]));
+            points.forEach(function (item, index) {
+                var y = 8 + index * 28;
+                var label = svgEl('text');
+                label.setAttribute('x', 4);
+                label.setAttribute('y', y + 12);
+                label.setAttribute('font-size', '12');
+                label.setAttribute('fill', '#374151');
+                label.textContent = item.label;
+                svg.appendChild(label);
+                var bar = svgEl('rect');
+                bar.setAttribute('x', left);
+                bar.setAttribute('y', y);
+                bar.setAttribute('width', Math.max(plotW * ((item.value || 0) / maxY), 1));
+                bar.setAttribute('height', 16);
+                bar.setAttribute('fill', '#1e3a5f');
+                svg.appendChild(bar);
+                var pct = svgEl('text');
+                pct.setAttribute('x', left + plotW * ((item.value || 0) / maxY) + 6);
+                pct.setAttribute('y', y + 12);
+                pct.setAttribute('font-size', '12');
+                pct.setAttribute('fill', '#374151');
+                pct.textContent = formatByUnit(item.value, piece.unit);
+                svg.appendChild(pct);
+            });
+            return;
+        }
+        var svgYear = chartFrame(host, 640, 260);
+        var plotLeft = 36, plotRight = 12, plotTop = 16, plotBottom = 32;
+        var plotWYear = 640 - plotLeft - plotRight;
+        var plotH = 260 - plotTop - plotBottom;
+        var maxBar = Math.max.apply(null, points.map(function (item) { return item.value || 0; }).concat([1]));
+        var slot = plotWYear / points.length;
+        points.forEach(function (item, index) {
+            var barH = ((item.value || 0) / maxBar) * plotH;
+            var rect = svgEl('rect');
+            rect.setAttribute('x', plotLeft + index * slot + slot * 0.18);
+            rect.setAttribute('y', plotTop + plotH - barH);
+            rect.setAttribute('width', slot * 0.64);
+            rect.setAttribute('height', Math.max(barH, 0));
+            rect.setAttribute('fill', item.provisional ? '#fdba74' : '#e11b22');
+            svgYear.appendChild(rect);
+            if (index % 2 === 0 || index === points.length - 1) {
+                var tick = svgEl('text');
+                tick.setAttribute('x', plotLeft + index * slot + slot / 2);
+                tick.setAttribute('y', 250);
+                tick.setAttribute('text-anchor', 'middle');
+                tick.setAttribute('font-size', '11');
+                tick.setAttribute('fill', '#6b7280');
+                tick.textContent = String(item.year);
+                svgYear.appendChild(tick);
+            }
+        });
+    }
+
+    function renderStacked(host, piece) {
+        var rows = piece.rows || [];
+        if (!rows.length) {
+            host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+            return;
+        }
+        var legend = el('div', 'ecr-legend');
+        (piece.segments || []).forEach(function (segment) {
+            var swatch = el('span', '');
+            var dot = el('i', 'ecr-swatch');
+            dot.style.background = segment.color || '#9ca3af';
+            swatch.appendChild(dot);
+            swatch.appendChild(document.createTextNode(segment.name || ''));
+            legend.appendChild(swatch);
+        });
+        host.appendChild(legend);
+        rows.forEach(function (row) {
+            var block = el('div', 'mt-3');
+            var heading = el('div', 'flex justify-between text-xs text-gray-600 mb-1');
+            heading.appendChild(el('span', '', row.category || ''));
+            heading.appendChild(el('span', '', row.n != null ? String(row.n) : ''));
+            block.appendChild(heading);
+            var stack = el('div', 'ecr-stack');
+            var total = row.n || 0;
+            (piece.segments || []).forEach(function (segment) {
+                var count = row.counts ? (row.counts[segment.name] || 0) : 0;
+                if (!count || !total) return;
+                var part = el('div', '');
+                part.style.width = (100 * count / total) + '%';
+                part.style.background = segment.color || '#9ca3af';
+                part.title = segment.name + ': ' + formatShare(count / total);
+                stack.appendChild(part);
+            });
+            block.appendChild(stack);
+            host.appendChild(block);
+        });
+    }
+
+    function renderRanked(host, piece) {
+        var rows = piece.rows || [];
+        if (!rows.length) {
+            host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+            return;
+        }
+        var max = Math.max.apply(null, rows.map(function (item) { return item.value || 0; })) || 1;
+        var wrap = el('div', rows.length > 12 ? 'ecr-scroll' : '');
+        rows.forEach(function (item) {
+            var row = el('div', 'ecr-rank');
+            row.appendChild(el('div', 'text-xs text-gray-500', item.rank != null ? String(item.rank) : ''));
+            var mid = el('div', '');
+            var name = el('div', 'ecr-rank-name', item.name || '');
+            mid.appendChild(name);
+            if (item.detail) mid.appendChild(el('div', 'ecr-rank-detail', item.detail));
+            var track = el('div', 'ecr-rank-track');
+            var bar = el('div', 'ecr-rank-bar');
+            bar.style.width = Math.max(100 * ((item.value || 0) / max), 1) + '%';
+            track.appendChild(bar);
+            mid.appendChild(track);
+            row.appendChild(mid);
+            var value = formatByUnit(item.value, piece.unit);
+            if (item.share != null) value += ' \u00b7 ' + formatShare(item.share);
+            row.appendChild(el('div', 'text-xs text-gray-700', value));
+            wrap.appendChild(row);
+        });
+        host.appendChild(wrap);
+    }
+
+    function renderTable(host, piece) {
+        var columns = piece.columns || [];
+        var rows = piece.rows || [];
+        if (!columns.length || !rows.length) {
+            host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+            return;
+        }
+        var wrap = el('div', 'overflow-x-auto' + (piece.scroll ? ' ecr-scroll' : ''));
+        var table = el('table', 'min-w-full text-sm text-left');
+        var head = el('thead', '');
+        var headRow = el('tr', 'border-b border-gray-200 text-gray-600');
+        columns.forEach(function (column, index) {
+            var cell = el('th', index ? 'py-2 pr-4 font-medium text-right' : 'py-2 pr-4 font-medium', column.label || '');
+            headRow.appendChild(cell);
+        });
+        head.appendChild(headRow);
+        table.appendChild(head);
+        var body = el('tbody', '');
+        rows.forEach(function (item) {
+            var row = el('tr', 'border-b border-gray-100');
+            columns.forEach(function (column, index) {
+                var raw = item[column.key];
+                var text = column.format === 'text' || column.format == null
+                    ? (raw == null || raw === '' ? '\u2014' : String(raw))
+                    : formatByUnit(raw, column.format);
+                row.appendChild(el('td', index ? 'py-2 pr-4 text-right' : 'py-2 pr-4', text));
+            });
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        wrap.appendChild(table);
+        host.appendChild(wrap);
+    }
+
+    function renderNotes(notes) {
+        var list = byId('ecr-notes');
+        list.replaceChildren();
+        (notes || []).forEach(function (note) {
+            list.appendChild(el('li', '', note));
+        });
+    }
+
+    function applyPayload(data) {
+        if (!data) {
+            showError(labels.noData);
+            return;
+        }
+        byId('ecr-error').classList.add('hidden');
+        byId('ecr-content').classList.remove('hidden');
+        var warning = byId('ecr-warning');
+        if (data.warning) {
+            warning.textContent = data.warning;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        renderCards(data);
+        renderExternal(data);
+        var chapters = data.chapters || [];
+        renderSubtabs(chapters);
+        renderChapter(chapters);
+        renderNotes(data.notes);
+    }
+
+    function loadAnalysis(refresh) {
+        if (loading) return;
+        if (loaded && !refresh) return;
+        loading = true;
+        byId('ecr-error').classList.add('hidden');
+        if (!loaded) byId('ecr-loading').classList.remove('hidden');
+        var url = '/admin/data-exploration/everyone-counts' + (refresh ? '?refresh=1' : '');
+        fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (response) {
+            if (!response.ok) throw new Error(labels.loadFailed);
+            return response.json();
+        }).then(function (payload) {
+            loading = false;
+            loaded = true;
+            byId('ecr-loading').classList.add('hidden');
+            applyPayload(payload.data || payload);
+        }).catch(function () {
+            loading = false;
+            byId('ecr-loading').classList.add('hidden');
+            if (!loaded) showError(labels.loadFailed);
+        });
+    }
+
+    function boot() {
+        if (!byId('panel-everyone-counts')) return;
+        var refreshBtn = byId('ecr-refresh-world-bank');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function () {
+                loadAnalysis(true);
+            });
+        }
+        var tab = byId('tab-everyone-counts');
+        if (tab) {
+            tab.addEventListener('click', function () {
+                if (!loaded) loadAnalysis(false);
+            });
+        }
+        if (tab && tab.getAttribute('aria-selected') === 'true') loadAnalysis(false);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+</script>

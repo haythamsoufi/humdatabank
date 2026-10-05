@@ -272,7 +272,9 @@ def create_blueprint():
     @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def update_config_section_custom(section):
         """Update specific configuration section with section mapping."""
-        payload = get_json_safe()
+        from app.plugins.plugin_utils import _plugin_config_payload
+
+        payload = _plugin_config_payload()
         mapping = {
             'api': 'api',
             'query': 'query_defaults',

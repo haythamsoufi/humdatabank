@@ -26,6 +26,7 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
         return (
             "Federation-wide Databank & Reporting System: data-api sync, "
             "document fetch, disaggregation analysis, service-income estimate, "
+            "Everyone Counts report, "
             "document compliance, P&B visuals, matrix validation, and quality methodology."
         )
 
@@ -70,6 +71,16 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
                 panel_template="plugins/fdrs/service_income/tab_panel.html",
                 plugin_id=self.plugin_id,
                 icon="fas fa-coins",
+                manage_requires_system_manager=False,
+            ),
+            DataExplorerTabConfig(
+                tab_id="everyone-counts",
+                label="Everyone Counts",
+                permission="admin.data_explore.analysis",
+                priority=27,
+                panel_template="plugins/fdrs/ecr/tab_panel.html",
+                plugin_id=self.plugin_id,
+                icon="fas fa-users",
                 manage_requires_system_manager=False,
             ),
             DataExplorerTabConfig(

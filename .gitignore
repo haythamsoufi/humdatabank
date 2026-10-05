@@ -158,6 +158,7 @@ pnpm-debug.log*
 /*.ps1
 /*.png
 /*.pdf
+/*.twb
 
 # Accidental files
 .tmp/
@@ -201,6 +202,11 @@ MobileApp/android/key.properties
 # Emergency Operations plugin — server-side data cache (can be large, regenerated via admin refresh)
 Backoffice/plugins/emergency_operations/data/appeals_cache.json
 Backoffice/plugins/emergency_operations/data/appeals_cache.tmp
+
+# Everyone Counts external snapshots (World Bank and similar). Regenerated from the source.
+Backoffice/plugins/fdrs/data/snapshots/*.json
+Backoffice/plugins/fdrs/data/snapshots/*.json.tmp
+Backoffice/plugins/fdrs/data/snapshots/*.xlsx
 
 # Azure load test run artifacts (downloaded engine logs, run details, prod webapp dumps)
 Backoffice/azure/loadtest/logs/

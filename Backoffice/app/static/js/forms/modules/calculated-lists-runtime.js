@@ -18,6 +18,19 @@ function calculatedListAdapterFor(lookupListId) {
     return calculatedListAdapters.get(String(lookupListId)) || null;
 }
 
+/**
+ * Plugin modules are served by the app, not the static CDN.
+ * This file itself is often loaded from blob storage, and import() resolves
+ * a root-relative URL against the module host — which 404s on the CDN.
+ */
+export function resolveCalculatedListModuleUrl(moduleUrl) {
+    const value = String(moduleUrl || '');
+    if (value.startsWith('/') && !value.startsWith('//') && typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin + value;
+    }
+    return value;
+}
+
 function declaredCalculatedListAdapterSpecs() {
     const node = document.getElementById('calculated-list-adapters');
     if (!node || !node.textContent || !node.textContent.trim()) return [];
@@ -36,7 +49,7 @@ async function loadDeclaredCalculatedListAdapters() {
         if (!spec || !spec.module || !spec.id) return;
         if (calculatedListAdapters.has(String(spec.id))) return;
         try {
-            const mod = await import(/* @vite-ignore */ spec.module);
+            const mod = await import(/* @vite-ignore */ resolveCalculatedListModuleUrl(spec.module));
             const adapter = mod.calculatedListAdapter || mod.default;
             if (adapter) {
                 registerCalculatedListAdapter({ ...adapter, id: adapter.id || spec.id });
@@ -226,7 +239,7 @@ function initCalculatedListsCore() {
     window.refreshCalculatedSelect = refreshCalculatedSelect;
     window.refreshCalculatedMultiSelect = refreshCalculatedMultiSelect;
     window.preserveCalculatedSelectStaleValue = markSelectStaleSavedValue;
-    window.syncEmergencyOperationMetadata = syncEmergencyOperationMetadata;
+    window.syncCalculatedListSelection = syncCalculatedListSelection;
 }
 
 function setupGlobalCalculatedListsListener() {
@@ -571,7 +584,7 @@ function setSelectValueRobust(selectElement, value) {
     const inputEvent = new Event('input', { bubbles: true });
     selectElement.dispatchEvent(inputEvent);
 
-    syncEmergencyOperationMetadata(selectElement);
+    syncCalculatedListSelection(selectElement);
 
     debugLog(MODULE, `🔧 Select value set to: "${selectElement.value}" (events triggered)`);
 }
@@ -585,7 +598,7 @@ function resolveCalculatedSelectFieldId(selectElement) {
     return standardMatch ? standardMatch[1] : null;
 }
 
-export function syncEmergencyOperationMetadata(selectElement) {
+export function syncCalculatedListSelection(selectElement) {
     const adapter = calculatedListAdapterFor(selectElement?.dataset?.lookupListId);
     if (adapter?.syncSelection) {
         adapter.syncSelection(selectElement);
@@ -748,6 +761,9 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             fieldId,
         });
         if (!url) return;
+    } else if (declaredCalculatedListAdapterSpecs().some((spec) => spec && spec.id === lookupListId)) {
+        debugWarn(MODULE, `Calculated list adapter ${lookupListId} did not load; not using the unfiltered lookup`);
+        return;
     } else if (lookupListId === 'reporting_currency') {
 
         // Core system list: Reporting Currency
@@ -860,7 +876,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             }
             debugLog(MODULE, `Restored previous selection: "${previousValue}"`);
             debugLog(MODULE, `✅ Restored previous selection: "${previousValue}"`);
-            syncEmergencyOperationMetadata(selectElement);
+            syncCalculatedListSelection(selectElement);
 
             // Add verification that the value actually stuck
             setTimeout(() => {
@@ -917,7 +933,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             window.revealRepeatEntryTitleSelect(selectElement);
         }
 
-        syncEmergencyOperationMetadata(selectElement);
+        syncCalculatedListSelection(selectElement);
         selectElement.dispatchEvent(new CustomEvent('ifrc:calculated-list-refreshed', { bubbles: true }));
     } catch (err) {
         debugError(MODULE, `❌ Exception during API call:`, err);

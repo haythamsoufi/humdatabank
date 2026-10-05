@@ -1,9 +1,6 @@
 /**
- * Exported / window-syncable behaviour of calculated-lists-runtime.js.
- *
- * Covers syncEmergencyOperationMetadata (hidden input name, placement, JSON)
- * and the parts of initCalculatedLists that run without a successful network
- * fetch: readiness retry, listener attach, and window helper assignment.
+ * Calculated-list runtime: readiness, window helpers, and adapter delegation.
+ * Lookup-specific behaviour lives in the plugin adapter tests.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -32,20 +29,13 @@ class IdleIntersectionObserver {
 
 async function loadRuntime() {
     vi.resetModules();
-    const runtime = await import('../../../app/static/js/forms/modules/calculated-lists-runtime.js');
-    const adapter = await import('../../../plugins/emergency_operations/static/js/calculated_list_adapter.js');
-    runtime.registerCalculatedListAdapter(adapter.calculatedListAdapter);
-    return runtime;
-}
-
-function hiddenInputs(root = document.querySelector('form') || document) {
-    return [...root.querySelectorAll('input[type="hidden"]')];
+    return import('../../../app/static/js/forms/modules/calculated-lists-runtime.js');
 }
 
 function createSelect({
     id = 'field-42',
     name = 'field_value[42]',
-    lookupListId = 'emergency_operations',
+    lookupListId = 'example_list',
     fieldItemId,
     inForm = true,
 } = {}) {
@@ -69,17 +59,6 @@ function createSelect({
     return select;
 }
 
-function addOption(select, { value, emergencyName, emergencyCode, selected = false } = {}) {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = value;
-    if (emergencyName != null) option.dataset.emergencyName = emergencyName;
-    if (emergencyCode != null) option.dataset.emergencyCode = emergencyCode;
-    select.appendChild(option);
-    if (selected) select.value = value;
-    return option;
-}
-
 function resetWindowState() {
     document.body.innerHTML = '';
     delete window.existingData;
@@ -92,7 +71,7 @@ function resetWindowState() {
     delete window.refreshCalculatedSelect;
     delete window.refreshCalculatedMultiSelect;
     delete window.preserveCalculatedSelectStaleValue;
-    delete window.syncEmergencyOperationMetadata;
+    delete window.syncCalculatedListSelection;
 }
 
 describe('calculated-lists-runtime', () => {
@@ -109,216 +88,19 @@ describe('calculated-lists-runtime', () => {
         resetWindowState();
     });
 
-    describe('syncEmergencyOperationMetadata', () => {
-        it('is a no-op unless lookupListId is emergency_operations', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ lookupListId: 'reporting_currency' });
-            addOption(select, { value: 'Flood (MDRXX001)', selected: true });
+    describe('syncCalculatedListSelection', () => {
+        it('calls the adapter registered for that lookup and ignores other lookups', async () => {
+            const { registerCalculatedListAdapter, syncCalculatedListSelection } = await loadRuntime();
+            const syncSelection = vi.fn();
+            registerCalculatedListAdapter({ id: 'example_list', syncSelection });
 
-            syncEmergencyOperationMetadata(select);
+            const matched = createSelect({ lookupListId: 'example_list' });
+            const other = createSelect({ id: 'field-43', lookupListId: 'other_list' });
+            syncCalculatedListSelection(matched);
+            syncCalculatedListSelection(other);
 
-            expect(hiddenInputs()).toHaveLength(0);
-        });
-
-        it('is a no-op when the select is not inside a form', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ inForm: false });
-            addOption(select, { value: 'Flood (MDRXX001)', selected: true });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(document.querySelector('input[type="hidden"]')).toBeNull();
-        });
-
-        it('is a no-op when the hidden input name cannot be resolved', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'emops-orphan', name: 'not_a_field_pattern' });
-            addOption(select, { value: 'Flood (MDRXX001)', selected: true });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(hiddenInputs()).toHaveLength(0);
-        });
-
-        it('creates field_disagg_metadata[id] from select#field-N and appends it to the form', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-42', name: 'field_value[42]' });
-            addOption(select, {
-                value: 'Cyclone (MDRPH001)',
-                emergencyName: 'Cyclone',
-                emergencyCode: 'MDRPH001',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            const hidden = hiddenInputs()[0];
-            expect(hidden).toBeTruthy();
-            expect(hidden.name).toBe('field_disagg_metadata[42]');
-            expect(hidden.parentElement.tagName).toBe('FORM');
-            expect(JSON.parse(hidden.value)).toEqual({ name: 'Cyclone', code: 'MDRPH001' });
-        });
-
-        it('uses data-field-item-id for the hidden input name when present', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({
-                id: 'field-ignored',
-                name: 'field_value[ignored]',
-                fieldItemId: '99',
-            });
-            addOption(select, {
-                value: 'Drought (MDRKE002)',
-                emergencyName: 'Drought',
-                emergencyCode: 'MDRKE002',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(hiddenInputs()[0].name).toBe('field_disagg_metadata[99]');
-        });
-
-        it('derives repeat_*_emergency_metadata from a trailing numeric suffix', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({
-                id: 'repeat-title-select',
-                name: 'repeat_5_1_field_3',
-            });
-            addOption(select, {
-                value: 'Flood (MDRXX001)',
-                emergencyName: 'Flood',
-                emergencyCode: 'MDRXX001',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            const hidden = hiddenInputs()[0];
-            expect(hidden.name).toBe('repeat_5_1_field_emergency_metadata');
-            expect(hidden.parentElement).toBe(select.form);
-        });
-
-        it('reuses an existing hidden input with the same name instead of creating another', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-7' });
-            const existing = document.createElement('input');
-            existing.type = 'hidden';
-            existing.name = 'field_disagg_metadata[7]';
-            existing.value = '{"name":"old","code":"OLD"}';
-            select.form.appendChild(existing);
-            addOption(select, {
-                value: 'Flood (MDRXX001)',
-                emergencyName: 'Flood',
-                emergencyCode: 'MDRXX001',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(hiddenInputs()).toHaveLength(1);
-            expect(hiddenInputs()[0]).toBe(existing);
-            expect(JSON.parse(existing.value)).toEqual({ name: 'Flood', code: 'MDRXX001' });
-        });
-
-        it('clears the hidden input when the select value is empty', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-8' });
-            const hidden = document.createElement('input');
-            hidden.type = 'hidden';
-            hidden.name = 'field_disagg_metadata[8]';
-            hidden.value = '{"name":"Flood","code":"MDRXX001"}';
-            select.form.appendChild(hidden);
-            select.value = '';
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(hidden.value).toBe('');
-        });
-
-        it('writes JSON {name, code} from data-emergency-name / data-emergency-code', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-11' });
-            addOption(select, {
-                value: 'ignored display',
-                emergencyName: '  Typhoon  ',
-                emergencyCode: '  MDRPH099  ',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(JSON.parse(hiddenInputs()[0].value)).toEqual({
-                name: 'Typhoon',
-                code: 'MDRPH099',
-            });
-        });
-
-        it('clears the hidden input when emergency name is [object Object]', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-12' });
-            addOption(select, {
-                value: 'Flood (MDRXX001)',
-                emergencyName: '[object Object]',
-                emergencyCode: 'MDRXX001',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(hiddenInputs()[0].value).toBe('');
-        });
-
-        it('parses "Name (CODE)" from option.value when emergency datasets are absent', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-13' });
-            addOption(select, {
-                value: 'Flood Response Operation (MDRXX001)',
-                selected: true,
-            });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(JSON.parse(hiddenInputs()[0].value)).toEqual({
-                name: 'Flood Response Operation',
-                code: 'MDRXX001',
-            });
-        });
-
-        it('parses a bare option.value as {name, code: ""}', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({ id: 'field-14' });
-            addOption(select, { value: 'Uncoded emergency', selected: true });
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(JSON.parse(hiddenInputs()[0].value)).toEqual({
-                name: 'Uncoded emergency',
-                code: '',
-            });
-        });
-
-        it('parses Other please-specify text including the MDR code', async () => {
-            const { syncEmergencyOperationMetadata } = await loadRuntime();
-            const select = createSelect({
-                id: 'repeat-title-select',
-                name: 'repeat_5_1_field_0',
-            });
-            addOption(select, { value: '__other__', selected: true });
-            const wrap = document.createElement('div');
-            wrap.className = 'repeat-entry__title-select-wrap';
-            select.parentElement.appendChild(wrap);
-            wrap.appendChild(select);
-            const other = document.createElement('input');
-            other.className = 'other-text-input';
-            other.value = 'Bangladesh Population Movement (MDRBD018)';
-            wrap.appendChild(other);
-
-            syncEmergencyOperationMetadata(select);
-
-            expect(JSON.parse(hiddenInputs()[0].value)).toEqual({
-                name: 'Bangladesh Population Movement',
-                code: 'MDRBD018',
-            });
+            expect(syncSelection).toHaveBeenCalledTimes(1);
+            expect(syncSelection).toHaveBeenCalledWith(matched);
         });
     });
 
@@ -337,7 +119,7 @@ describe('calculated-lists-runtime', () => {
             await vi.advanceTimersByTimeAsync(50);
 
             expect(typeof window.preserveCalculatedSelectStaleValue).toBe('function');
-            expect(typeof window.syncEmergencyOperationMetadata).toBe('function');
+            expect(typeof window.syncCalculatedListSelection).toBe('function');
             expect(typeof window.refreshCalculatedSelect).toBe('function');
             expect(typeof window.refreshCalculatedMultiSelect).toBe('function');
         });
@@ -384,40 +166,6 @@ describe('calculated-lists-runtime', () => {
             expect(indicator.getAttribute('role')).toBe('img');
         });
 
-        it('attaches EmOps listeners without fetching until the field is visible', async () => {
-            window.existingData = {};
-            document.body.innerHTML = `
-                <form>
-                    <select id="field-30"
-                        name="field_value[30]"
-                        data-options-source="calculated"
-                        data-lookup-list-id="emergency_operations"
-                        data-display-column="name"
-                        data-list-filters="[]">
-                        <option value=""></option>
-                        <option value="Flood (MDRXX001)">Flood (MDRXX001)</option>
-                    </select>
-                </form>`;
-
-            const { initCalculatedLists } = await loadRuntime();
-            initCalculatedLists();
-
-            const select = document.getElementById('field-30');
-            expect(select.dataset.staleListenerAttached).toBe('true');
-            expect(select.dataset.emergencyMetadataListenerAttached).toBe('true');
-            expect(fetch).not.toHaveBeenCalled();
-
-            select.value = 'Flood (MDRXX001)';
-            select.dispatchEvent(new Event('change', { bubbles: true }));
-
-            const hidden = hiddenInputs()[0];
-            expect(hidden.name).toBe('field_disagg_metadata[30]');
-            expect(JSON.parse(hidden.value)).toEqual({
-                name: 'Flood',
-                code: 'MDRXX001',
-            });
-        });
-
         it('attaches a dependency listener that refreshes the calculated select', async () => {
             window.existingData = {};
             document.body.innerHTML = `
@@ -447,6 +195,16 @@ describe('calculated-lists-runtime', () => {
 
             expect(fetch.mock.calls.length).toBeGreaterThan(callsAfterInit);
             expect(String(fetch.mock.calls.at(-1)[0])).toContain('/api/forms/lookup-lists/countries/options');
+        });
+    });
+
+    describe('resolveCalculatedListModuleUrl', () => {
+        it('loads plugin adapters from the page origin, not the static CDN that served this module', async () => {
+            const { resolveCalculatedListModuleUrl } = await loadRuntime();
+            expect(resolveCalculatedListModuleUrl('/plugins/static/example_plugin/js/adapter.js'))
+                .toBe(`${window.location.origin}/plugins/static/example_plugin/js/adapter.js`);
+            expect(resolveCalculatedListModuleUrl('https://cdn.example/adapter.js'))
+                .toBe('https://cdn.example/adapter.js');
         });
     });
 });

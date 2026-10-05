@@ -23,6 +23,13 @@ import json
 PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
 
 
+def _plugin_config_payload():
+    """Read a plugin config POST, including a base64 WAF envelope."""
+    from app.utils.request_utils import unwrap_waf_json_envelope
+
+    return unwrap_waf_json_envelope(get_json_safe())
+
+
 def load_plugin_config(
     module_dir,
     plugin_id: str,
@@ -193,7 +200,7 @@ class BasePluginRoutes:
             if not self.plugin_config:
                 raise PluginConfigError("Plugin configuration not available", self.display_name)
 
-            payload = get_json_safe()
+            payload = _plugin_config_payload()
             success = self.plugin_config.update_config(payload)
 
             if not success:
@@ -208,7 +215,7 @@ class BasePluginRoutes:
             if not self.plugin_config:
                 raise PluginConfigError("Plugin configuration not available", self.display_name)
 
-            payload = get_json_safe()
+            payload = _plugin_config_payload()
             success = self.plugin_config.update_section(section, payload)
 
             if not success:

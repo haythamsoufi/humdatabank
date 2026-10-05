@@ -991,6 +991,26 @@ class TestCreateStandardRoutesSuccessPaths:
                     with patch("app.plugins.plugin_utils.json_ok", return_value=("ok", 200)):
                         response = app.test_client().post("/pp/api/config", json={"k": "v"})
 
+    def test_update_full_config_unwraps_waf_payload(self):
+        import base64
+
+        app, cfg, _ = self._setup_with_config("/pw")
+        inner = {
+            "api": {
+                "feed": "appeal_group",
+                "base_url": "https://go-api.ifrc.org/api/appealgroupchild",
+            },
+            "query_defaults": {"end_date_gt": "2022-12-31"},
+        }
+        encoded = base64.b64encode(json.dumps(inner).encode("utf-8")).decode("ascii")
+        cfg.update_config.return_value = True
+        with patch("app.plugins.plugin_utils.is_json_request", return_value=True):
+            with patch("app.plugins.plugin_utils.current_app") as mca:
+                mca.logger = MagicMock()
+                with patch("app.plugins.plugin_utils.json_ok", return_value=("ok", 200)):
+                    app.test_client().post("/pw/api/config", json={"payload_b64": encoded})
+        cfg.update_config.assert_called_once_with(inner)
+
     def test_update_config_section_route_success(self):
         app, cfg, _ = self._setup_with_config("/ps")
         with patch("app.plugins.plugin_utils.get_json_safe", return_value={}):

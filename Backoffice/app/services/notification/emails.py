@@ -151,10 +151,40 @@ def _retry_digest_email_log(user, log) -> bool:
     return result or log.status == 'sent'
 
 
+def _assignment_snapshot_note(locale: str, has_attachments: bool) -> str:
+    if not has_attachments:
+        return ''
+    return (
+        _with_user_locale(locale, lambda g: g('A snapshot of this assignment is attached.'))
+        or 'A snapshot of this assignment is attached.'
+    )
+
+
+def _assignment_snapshot_send_kwargs(attachments) -> dict:
+    if not attachments:
+        return {}
+    return {'attachments': attachments}
+
+
 def _retry_instant_notification_email_log(user, log, notification) -> bool:
     locale = _user_locale(user)
+    from app.services.forms.assignment_email_snapshot import attachments_for_assignment_notification
+
+    try:
+        attachments = attachments_for_assignment_notification(notification)
+    except Exception:
+        current_app.logger.exception(
+            "Failed building assignment email snapshot for retry of notification %s",
+            getattr(notification, "id", None),
+        )
+        attachments = []
     subject = _instant_notification_subject(notification, locale)
-    body = render_instant_email(user, notification, locale=locale)
+    body = render_instant_email(
+        user,
+        notification,
+        locale=locale,
+        attachment_note=_assignment_snapshot_note(locale, bool(attachments)),
+    )
 
     _failure_info: list = []
     try:
@@ -164,6 +194,7 @@ def _retry_instant_notification_email_log(user, log, notification) -> bool:
             html=body,
             sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
             _failure_info=_failure_info,
+            **_assignment_snapshot_send_kwargs(attachments),
         )
 
         if success:
@@ -950,7 +981,9 @@ def send_assignment_submitted_team_email(
     assignment_title: str,
     submitter_name: str,
     related_url: str,
+    country: str,
     notification_by_user_id=None,
+    assignment_entity_status=None,
 ):
     """
     Send one team email to all entity focal points (visible To list), separate from per-user in-app notifications.
@@ -969,10 +1002,14 @@ def send_assignment_submitted_team_email(
         return False
 
     locale = 'en'
+    country_name = (country or '').strip() or 'your entity'
     params = {
         'assignment_title': assignment_title,
         'submitter_name': submitter_name,
+        'country': country_name,
     }
+    # Title and message are the same sentence. The instant template shows the title
+    # once and skips an identical message, so the country is named without a second line.
     title = translate_notification_message(
         'notification.assignment_submitted.team_email.title', params, locale=locale
     )
@@ -990,12 +1027,24 @@ def send_assignment_submitted_team_email(
             self.related_url = url
 
     pseudo_notification = _TeamEmailNotification(title, message, related_url)
-    subject = _instant_notification_subject(pseudo_notification, locale)
+    # Subject is the sentence itself ("Ada submitted Report for Moldova."), not
+    # "New Notification: Team update: …".
+    subject = title
     i18n = _build_instant_email_i18n(locale, '', False, 'assignment_submitted')
     i18n['greeting'] = _with_user_locale(locale, lambda g: g('Hello,')) or 'Hello,'
 
     base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
     org_name = get_org_name()
+    from app.services.forms.assignment_email_snapshot import build_assignment_email_attachments
+
+    try:
+        attachments = build_assignment_email_attachments(assignment_entity_status)
+    except Exception:
+        current_app.logger.exception(
+            "Failed building assignment email snapshot for submitted team email"
+        )
+        attachments = []
+    attachment_note = _assignment_snapshot_note(locale, bool(attachments))
     sanitized_notification = {
         'title': sanitize_for_email(title),
         'message': sanitize_for_email(message),
@@ -1009,6 +1058,7 @@ def send_assignment_submitted_team_email(
         base_url=base_url,
         org_name=org_name,
         is_action_required=False,
+        attachment_note=sanitize_for_email(attachment_note) if attachment_note else '',
         **i18n,
     )
 
@@ -1023,6 +1073,7 @@ def send_assignment_submitted_team_email(
             expose_recipients_in_to=True,
             _filtered_out=filtered_out,
             _failure_info=_failure_info,
+            **_assignment_snapshot_send_kwargs(attachments),
         )
         if not success and not filtered_out:
             current_app.logger.error(
@@ -1110,12 +1161,27 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
                 return
 
     user_locale = _user_locale(user)
+    from app.services.forms.assignment_email_snapshot import attachments_for_assignment_notification
+
+    try:
+        attachments = attachments_for_assignment_notification(notification)
+    except Exception:
+        current_app.logger.exception(
+            "Failed building assignment email snapshot for notification %s",
+            getattr(notification, "id", None),
+        )
+        attachments = []
     if notification.priority in ('high', 'urgent'):
         translated_title, _ = _translate_notification_for_email(notification, user_locale)
         subject = translated_title or notification.title
     else:
         subject = _instant_notification_subject(notification, user_locale)
-    body = render_instant_email(user, notification, locale=user_locale)
+    body = render_instant_email(
+        user,
+        notification,
+        locale=user_locale,
+        attachment_note=_assignment_snapshot_note(user_locale, bool(attachments)),
+    )
 
     # Determine email importance: pass actual priority so subject shows [URGENT] vs [HIGH PRIORITY]
     importance = (notification.priority or 'normal').lower() if notification.priority in ('high', 'urgent') else None
@@ -1134,6 +1200,7 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
             importance=importance,
             _filtered_out=filtered_out,
             _failure_info=_failure_info,
+            **_assignment_snapshot_send_kwargs(attachments),
         )
 
         if success:
@@ -1722,7 +1789,12 @@ _INSTANT_TEMPLATE_SRC = """
                     <p>{{ greeting }}</p>
                     <div class="message-panel {% if is_action_required %}action-required{% endif %}">
                         <h2>{{ notification.title }}</h2>
+                        {% if notification.message and notification.message != notification.title %}
                         <p>{{ notification.message }}</p>
+                        {% endif %}
+                        {% if attachment_note %}
+                        <p>{{ attachment_note }}</p>
+                        {% endif %}
                         {% if show_type_meta %}
                         <p class="meta">
                             {{ notification.notification_type.value.replace('_', ' ').title() }}
@@ -1752,7 +1824,14 @@ _INSTANT_TEMPLATE_SRC = """
     """
 
 
-def render_instant_email(user, notification, locale: Optional[str] = None, *, email_audience: str | None = None):
+def render_instant_email(
+    user,
+    notification,
+    locale: Optional[str] = None,
+    *,
+    email_audience: str | None = None,
+    attachment_note: str = '',
+):
     """Render HTML email template for instant notification."""
     is_action_required = (notification.priority or 'normal') in ('high', 'urgent')
     user_locale = locale or _user_locale(user)
@@ -1783,5 +1862,6 @@ def render_instant_email(user, notification, locale: Optional[str] = None, *, em
         base_url=base_url,
         org_name=org_name,
         is_action_required=is_action_required,
+        attachment_note=sanitize_for_email(attachment_note) if attachment_note else '',
         **i18n,
     )

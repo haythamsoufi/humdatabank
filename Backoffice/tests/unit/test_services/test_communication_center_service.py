@@ -16,6 +16,7 @@ from app.services.communication.center_service import (
     build_notification_grid_rows,
     ensure_notifications_for_attention_failures,
     get_orphan_email_delivery_logs_for_grid,
+    is_assignment_submitted_team_email_subject,
 )
 from app.services.email.delivery import get_email_delivery_logs_needing_attention
 from app.services.notification.service import NotificationService
@@ -361,3 +362,100 @@ class TestCommunicationCenterService:
         assert rows[0]['included_for_email_failure'] is True
         assert rows[0]['email_status'] == 'failed'
         assert rows[0]['record_type'] == RECORD_TYPE_BOTH
+
+    def test_orphan_team_email_recipients_are_marked_grouped(self, app):
+        """Recipients of one country-team email stay grouped even without an in-app notification."""
+        with app.app_context():
+            notified = _make_user('notified')
+            email_only = _make_user('email-only')
+            db.session.add_all([notified, email_only])
+            db.session.flush()
+
+            sent_at = utcnow()
+            subject = (
+                'New Notification: Team update: Unified Country Plan submitted by Elena Ciorba'
+            )
+            notification = Notification(
+                user_id=notified.id,
+                notification_type=NotificationType.assignment_submitted,
+                title='Team update: Unified Country Plan submitted',
+                message='Elena Ciorba submitted Unified Country Plan for Moldova.',
+                title_key='notification.assignment_submitted.title',
+                related_url='/assignment/4406',
+                created_at=sent_at - timedelta(seconds=8),
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            linked = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=notified.id,
+                email_address=notified.email,
+                subject=subject,
+                status='sent',
+                sent_at=sent_at,
+                created_at=sent_at,
+            )
+            orphan = EmailDeliveryLog(
+                notification_id=None,
+                user_id=email_only.id,
+                email_address=email_only.email,
+                subject=subject,
+                status='sent',
+                sent_at=sent_at,
+                created_at=sent_at + timedelta(milliseconds=20),
+            )
+            unrelated = EmailDeliveryLog(
+                notification_id=None,
+                user_id=email_only.id,
+                email_address=email_only.email,
+                subject='Daily Notification Digest - 1 new notification(s)',
+                status='sent',
+                created_at=sent_at,
+            )
+            db.session.add_all([linked, orphan, unrelated])
+            db.session.commit()
+
+            actor_fields_by_id = NotificationService.build_actor_display_fields_map([notification], {})
+            email_fields_by_id = NotificationService.build_email_delivery_fields_map(
+                [notification.id],
+                notifications=[notification],
+                actor_fields_by_id=actor_fields_by_id,
+            )
+            rows = build_communications_center_grid(
+                [notification],
+                [orphan, unrelated],
+                actor_fields_by_id=actor_fields_by_id,
+                email_fields_by_id=email_fields_by_id,
+            )
+
+        orphan_row = next(row for row in rows if row['has_email'] and not row['has_notification'] and row['email_subject'] == subject)
+        notified_row = next(row for row in rows if row['has_notification'])
+        unrelated_row = next(row for row in rows if row['email_subject'].startswith('Daily'))
+
+        assert notified_row['email_is_grouped'] is True
+        assert orphan_row['email_is_grouped'] is True
+        assert orphan_row['team_email_without_notification'] is True
+        assert orphan_row['notification_type'] == 'assignment_submitted'
+        assert orphan_row['related_url'] == '/assignment/4406'
+        assert 'No in-app notification' in orphan_row['title']
+        assert orphan_row['email_content']
+        assert orphan_row['created_at']
+        assert unrelated_row['email_is_grouped'] is False
+        assert unrelated_row.get('team_email_without_notification') is not True
+
+    def test_team_email_subject_detection_covers_current_and_legacy_copy(self):
+        current = (
+            'Elena Ciorba submitted Midyear Reporting 2026 - Unified Country Report '
+            'for Moldova, Republic of.'
+        )
+        legacy = (
+            'New Notification: Team update: Midyear Reporting 2026 - Unified Country Report '
+            'submitted by Elena Ciorba'
+        )
+        assert is_assignment_submitted_team_email_subject(current) is True
+        assert is_assignment_submitted_team_email_subject(legacy) is True
+        assert is_assignment_submitted_team_email_subject(
+            'New Notification: Team update: Unified Country Report submitted'
+        ) is False
+        assert is_assignment_submitted_team_email_subject('Daily Notification Digest - 1 new notification(s)') is False

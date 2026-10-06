@@ -1608,6 +1608,7 @@ class TestSendAssignmentSubmittedTeamEmail:
                     user_ids=[user.id],
                     assignment_title='Unified Country Report',
                     submitter_name='Jamie Example',
+                    country='Moldova, Republic of',
                     related_url='/forms/assignment/1',
                     notification_by_user_id={user.id: notification},
                 )
@@ -1620,3 +1621,189 @@ class TestSendAssignmentSubmittedTeamEmail:
         assert log is not None
         assert log.notification_id == notification.id
         assert log.status in ('failed', 'unknown', 'pending')
+
+    def test_body_names_country_once_without_team_update_prefix(self, app, db_session):
+        from app.models import User
+        from app import db
+
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with app.app_context():
+            user = User(email='team-copy@example.com', name='Team User', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.commit()
+
+            with patch('app.services.notification.emails.send_email', side_effect=_capture), \
+                 patch('app.services.notification.emails.get_org_name', return_value='Test Org'):
+                result = send_assignment_submitted_team_email(
+                    user_ids=[user.id],
+                    assignment_title='Midyear Reporting 2026 - Unified Country Report',
+                    submitter_name='Elena Ciorba',
+                    country='Moldova, Republic of',
+                    related_url='/assignment/1684',
+                )
+
+        sentence = (
+            'Elena Ciorba submitted Midyear Reporting 2026 - Unified Country Report '
+            'for Moldova, Republic of.'
+        )
+        assert result is True
+        assert captured['subject'] == sentence
+        assert 'Team update:' not in captured['subject']
+        assert 'New Notification:' not in captured['subject']
+        assert captured['html'].count(sentence) == 1
+        assert 'for your entity team' not in captured['html']
+        assert 'Team update:' not in captured['html']
+
+    def test_passes_snapshot_attachments_and_notes_them(self, app, db_session):
+        from app.models import User
+        from app import db
+
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        snapshot = [('report.pdf', b'%PDF', 'application/pdf')]
+        aes = MagicMock()
+        with app.app_context():
+            user = User(email='team-attach@example.com', name='Team User', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.commit()
+
+            with patch('app.services.notification.emails.send_email', side_effect=_capture), \
+                 patch('app.services.notification.emails.get_org_name', return_value='Test Org'), \
+                 patch(
+                     'app.services.forms.assignment_email_snapshot.build_assignment_email_attachments',
+                     return_value=snapshot,
+                 ):
+                result = send_assignment_submitted_team_email(
+                    user_ids=[user.id],
+                    assignment_title='Unified Country Report',
+                    submitter_name='Jamie Example',
+                    country='Kenya',
+                    related_url='/assignment/1',
+                    assignment_entity_status=aes,
+                )
+
+        assert result is True
+        assert captured['attachments'] == snapshot
+        assert 'A snapshot of this assignment is attached.' in captured['html']
+
+
+class TestAssignmentSnapshotInstantEmail:
+    def _make_user(self, email='snap@test.com'):
+        user = MagicMock()
+        user.id = 1
+        user.email = email
+        user.name = 'Snap User'
+        user.preferred_language = 'en'
+        return user
+
+    def _make_assignment_notification(self, nt_value='assignment_submitted'):
+        notif = MagicMock()
+        notif.id = 9
+        notif.title = 'Submitted'
+        notif.message = 'Submitted.'
+        nt = MagicMock()
+        nt.value = nt_value
+        notif.notification_type = nt
+        notif.priority = 'high'
+        notif.related_url = '/assignment/1'
+        notif.related_object_type = 'assignment'
+        notif.related_object_id = 44
+        return notif
+
+    def test_submitted_instant_email_passes_attachments(self, app, db_session):
+        snapshot = [('form.xlsx', b'xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')]
+        mock_log = MagicMock()
+        mock_log.id = 1
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with app.app_context():
+            with patch('app.services.notification.emails.log_email_attempt', return_value=mock_log), \
+                 patch('app.services.notification.emails.send_email', side_effect=_capture), \
+                 patch('app.services.notification.emails.mark_email_sent'), \
+                 patch(
+                     'app.services.forms.assignment_email_snapshot.attachments_for_assignment_notification',
+                     return_value=snapshot,
+                 ), \
+                 patch('app.services.notification.emails.render_instant_email', return_value='<html>note</html>'):
+                send_instant_notification_email(
+                    self._make_user(),
+                    self._make_assignment_notification(),
+                    override_preferences=True,
+                )
+
+        assert captured['attachments'] == snapshot
+
+    def test_approved_instant_email_passes_attachments(self, app, db_session):
+        snapshot = [('form.pdf', b'%PDF', 'application/pdf')]
+        mock_log = MagicMock()
+        mock_log.id = 1
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with app.app_context():
+            with patch('app.services.notification.emails.log_email_attempt', return_value=mock_log), \
+                 patch('app.services.notification.emails.send_email', side_effect=_capture), \
+                 patch('app.services.notification.emails.mark_email_sent'), \
+                 patch(
+                     'app.services.forms.assignment_email_snapshot.attachments_for_assignment_notification',
+                     return_value=snapshot,
+                 ), \
+                 patch('app.services.notification.emails.render_instant_email', return_value='<html>note</html>'):
+                send_instant_notification_email(
+                    self._make_user(),
+                    self._make_assignment_notification('assignment_approved'),
+                    override_preferences=True,
+                )
+
+        assert captured['attachments'] == snapshot
+
+    def test_other_notification_types_omit_attachments_kw(self, app, db_session):
+        mock_log = MagicMock()
+        mock_log.id = 1
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        notif = MagicMock()
+        notif.id = 3
+        notif.title = 'Hello'
+        notif.message = 'Hello'
+        nt = MagicMock()
+        nt.value = 'admin_message'
+        notif.notification_type = nt
+        notif.priority = 'normal'
+        notif.related_url = None
+        notif.related_object_type = None
+
+        with app.app_context():
+            with patch('app.services.notification.emails.log_email_attempt', return_value=mock_log), \
+                 patch('app.services.notification.emails.send_email', side_effect=_capture), \
+                 patch('app.services.notification.emails.mark_email_sent'), \
+                 patch('app.services.notification.emails.render_instant_email', return_value='<html>'):
+                send_instant_notification_email(
+                    self._make_user(),
+                    notif,
+                    override_preferences=True,
+                )
+
+        assert 'attachments' not in captured

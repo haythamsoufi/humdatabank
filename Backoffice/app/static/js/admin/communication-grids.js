@@ -343,6 +343,10 @@ class CommunicationsGridManager {
         return !!(data && data.has_notification);
     }
 
+    showsTeamEmailWithoutNotification(data) {
+        return !!(data && data.team_email_without_notification);
+    }
+
     buildColumnDefs() {
         const t = this.translations;
         const self = this;
@@ -450,7 +454,7 @@ class CommunicationsGridManager {
                     maxWidth: 250,
                     filter: 'agTextColumnFilter',
                     sortable: true,
-                    cellRenderer: (params) => this.hasNotificationFields(params.data)
+                    cellRenderer: (params) => (this.hasNotificationFields(params.data) || this.showsTeamEmailWithoutNotification(params.data))
                         ? AgGridRenderers.dateTime(params)
                         : this.renderNotApplicable()
                 }
@@ -547,10 +551,12 @@ class CommunicationsGridManager {
     }
 
     renderNotificationField(params, fieldName) {
-        if (!this.hasNotificationFields(params.data)) {
+        const data = params.data || {};
+        const teamEmailGap = this.showsTeamEmailWithoutNotification(data);
+        if (!this.hasNotificationFields(data) && !teamEmailGap) {
             return this.renderNotApplicable();
         }
-        const value = params.data ? params.data[fieldName] : '';
+        const value = data[fieldName];
         if (!value) {
             return this.renderNotApplicable();
         }
@@ -559,7 +565,11 @@ class CommunicationsGridManager {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
-        return `<span class="text-sm text-gray-900 break-words">${esc(value)}</span>`;
+        const tone = teamEmailGap ? 'text-gray-600' : 'text-gray-900';
+        const titleAttr = teamEmailGap && data.message
+            ? ` title="${esc(data.message)}"`
+            : '';
+        return `<span class="text-sm ${tone} break-words"${titleAttr}>${esc(value)}</span>`;
     }
 
     renderEmailField(params, fieldName, asDateTime) {
@@ -617,7 +627,11 @@ class CommunicationsGridManager {
             return statusBadge;
         }
         const groupLabel = t.groupedEmail || 'Group';
-        const groupTitle = (t.groupedEmailTooltip || 'One shared email to the entity team (all recipients on the To line).').replace(/"/g, '&quot;');
+        const groupTitle = (
+            d.team_email_without_notification
+                ? (t.groupedEmailNoNotificationTooltip || 'One shared email to the entity team. No in-app notification is stored for this user.')
+                : (t.groupedEmailTooltip || 'One shared email to the entity team (all recipients on the To line).')
+        ).replace(/"/g, '&quot;');
         return `<span class="inline-flex items-center gap-1 flex-wrap">${statusBadge}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-50 text-sky-800" title="${groupTitle}">${groupLabel}</span></span>`;
     }
 
@@ -680,13 +694,14 @@ class CommunicationsGridManager {
      * Render notification type cell
      */
     renderNotificationType(params) {
-        if (!this.hasNotificationFields(params.data)) {
+        const data = params.data || {};
+        if (!this.hasNotificationFields(data) && !this.showsTeamEmailWithoutNotification(data)) {
             return this.renderNotApplicable();
         }
-        if (!params.value) {
+        if (!params.value && !data.notification_type_display) {
             return this.renderNotApplicable();
         }
-        return params.data.notification_type_display || params.value.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+        return data.notification_type_display || String(params.value || '').replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     }
 
     /**

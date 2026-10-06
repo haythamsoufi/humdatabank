@@ -10,7 +10,7 @@ Not every notification has email; not every email has a notification.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 
 from flask_babel import gettext as _
@@ -32,6 +32,9 @@ RECORD_TYPE_BOTH = 'both'
 
 DEFAULT_CENTER_PAGE_SIZE = 50
 MAX_CENTER_PAGE_SIZE = 200
+# One country-team send writes a delivery log per recipient within the same second.
+# A few minutes covers clock skew without merging two later submissions that share a subject.
+_TEAM_EMAIL_SIBLING_WINDOW = timedelta(minutes=5)
 
 
 def count_attention_needed_email_deliveries() -> int:
@@ -44,6 +47,120 @@ def _format_datetime(value: Optional[datetime]) -> str:
         return ''
     dt_utc = ensure_utc(value)
     return dt_utc.isoformat() if dt_utc else ''
+
+
+def is_assignment_submitted_team_email_subject(subject: Optional[str]) -> bool:
+    """True for the shared assignment-submitted country-team email subject.
+
+    Older sends used "Team update: … submitted by {name}".
+    Current sends are one sentence: "{name} submitted {assignment} for {country}."
+    """
+    text = (subject or '').strip().lower()
+    if 'team update:' in text and 'submitted by' in text:
+        return True
+    if text.startswith('new notification:') or 'team update:' in text or 'no action needed' in text:
+        return False
+    submitted_at = text.find(' submitted ')
+    if submitted_at < 0:
+        return False
+    return ' for ' in text[submitted_at:] and text.endswith('.')
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    return ensure_utc(parsed)
+
+
+def _row_email_time(row: Dict[str, Any]) -> Optional[datetime]:
+    for key in ('email_logged_at', 'email_sent_at', 'sort_at'):
+        parsed = _parse_iso_datetime(row.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _notification_type_display(notification_type_value: str) -> str:
+    return notification_type_value.replace('_', ' ').title()
+
+
+def annotate_grouped_team_email_rows(rows: List[Dict[str, Any]]) -> None:
+    """Mark every recipient of a country-team email as grouped.
+
+    Recipients who also have an in-app notification already get the Group badge.
+    Recipients who were on the same To line but have no stored notification were
+    left as blank email-only rows. Fill those rows so the grid shows one shared
+    send, and say that no in-app notification was stored for that user.
+    """
+    siblings_by_subject: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        if not row.get('has_notification') or not row.get('has_email'):
+            continue
+        subject = (row.get('email_subject') or '').strip()
+        if not is_assignment_submitted_team_email_subject(subject):
+            continue
+        siblings_by_subject.setdefault(subject, []).append(row)
+
+    for row in rows:
+        if row.get('has_notification') or not row.get('has_email'):
+            continue
+        subject = (row.get('email_subject') or '').strip()
+        if not is_assignment_submitted_team_email_subject(subject):
+            continue
+
+        sibling = _closest_team_email_sibling(siblings_by_subject.get(subject, []), row)
+        notification_type = (sibling or {}).get('notification_type') or 'assignment_submitted'
+        row['email_is_grouped'] = True
+        row['team_email_without_notification'] = True
+        row['notification_type'] = notification_type
+        row['notification_type_display'] = (
+            (sibling or {}).get('notification_type_display')
+            or _notification_type_display(notification_type)
+        )
+        row['title'] = _('Shared team email. No in-app notification is stored for this user.')
+        row['message'] = _(
+            'This person was on the same country team email. '
+            'An in-app notification is stored only when Assignment submitted is enabled for them.'
+        )
+        if sibling:
+            if sibling.get('related_url'):
+                row['related_url'] = sibling['related_url']
+            if sibling.get('email_content'):
+                row['email_content'] = sibling['email_content']
+        if not row.get('email_content'):
+            row['email_content'] = subject
+        if not row.get('created_at'):
+            row['created_at'] = row.get('email_logged_at') or row.get('sort_at') or ''
+
+
+def _closest_team_email_sibling(
+    candidates: List[Dict[str, Any]],
+    orphan_row: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Pick the linked row from the same send (same subject, closest timestamp)."""
+    if not candidates:
+        return None
+    orphan_time = _row_email_time(orphan_row)
+    if orphan_time is None:
+        return candidates[0]
+
+    best = None
+    best_delta = None
+    for candidate in candidates:
+        candidate_time = _row_email_time(candidate)
+        if candidate_time is None:
+            continue
+        delta = abs(candidate_time - orphan_time)
+        if delta > _TEAM_EMAIL_SIBLING_WINDOW:
+            continue
+        if best_delta is None or delta < best_delta:
+            best = candidate
+            best_delta = delta
+    return best
 
 
 def _record_type_display(record_type: str) -> str:
@@ -385,6 +502,7 @@ def build_communications_center_grid(
         iso_dates=iso_dates,
     )
     rows.extend(build_email_grid_rows(orphan_email_logs, iso_dates=iso_dates))
+    annotate_grouped_team_email_rows(rows)
     rows.sort(key=lambda row: row.get('sort_at') or '', reverse=True)
     return rows
 

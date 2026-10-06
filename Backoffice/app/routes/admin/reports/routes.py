@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request, send_file, url_for
+from flask import Blueprint, abort, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 import io
 
@@ -14,6 +14,7 @@ from app.services.data_quality.helpers import list_exploration_period_names
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.reports.build_service import ReportBuildService
 from app.services.reports.data_service import ReportDataService
+from app.services.reports.asset_service import asset_belongs_to_report, build_asset_key, read_upload
 from app.services.reports.definition_service import (
     REPORTS_EDIT,
     REPORTS_VIEW,
@@ -33,6 +34,13 @@ from app.utils.request_validation import enforce_csrf_json
 bp = Blueprint("reports", __name__, url_prefix="/admin/reports")
 
 
+def _report_or_404(report_id: int):
+    try:
+        return ReportDefinitionService.get_report(report_id, current_user)
+    except ReportDefinitionError:
+        abort(404)
+
+
 def _forbidden_if_no_view():
     if not (
         AuthorizationService.is_system_manager(current_user)
@@ -47,9 +55,6 @@ def _forbidden_if_no_view():
 @login_required
 @permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def reports_list():
-    denied = _forbidden_if_no_view()
-    if denied:
-        return denied
     reports = ReportDefinitionService.list_reports(current_user)
     return render_template(
         "admin/reports/list.html",
@@ -75,13 +80,7 @@ def reports_new():
 @login_required
 @permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def reports_view(report_id: int):
-    denied = _forbidden_if_no_view()
-    if denied:
-        return denied
-    try:
-        report = ReportDefinitionService.get_report(report_id, current_user)
-    except ReportDefinitionError:
-        return json_not_found("Report not found"), 404
+    report = _report_or_404(report_id)
     return render_template(
         "admin/reports/view.html",
         report=report,
@@ -93,12 +92,9 @@ def reports_view(report_id: int):
 @login_required
 @permission_required(REPORTS_EDIT)
 def reports_edit(report_id: int):
-    try:
-        report = ReportDefinitionService.get_report(report_id, current_user)
-    except ReportDefinitionError:
-        return json_not_found("Report not found"), 404
+    report = _report_or_404(report_id)
     if not user_can_edit_report(current_user, report):
-        return json_forbidden("Access denied")
+        abort(403)
     return render_template(
         "admin/reports/builder.html",
         report=report,
@@ -272,14 +268,20 @@ def api_upload_asset(report_id: int):
     from app.services.platform import storage_service
 
     try:
-        ReportDefinitionService.get_report(report_id, current_user)
+        report = ReportDefinitionService.get_report(report_id, current_user)
     except ReportDefinitionError:
         return json_not_found("Report not found")
+    if not user_can_edit_report(current_user, report):
+        return json_forbidden("Access denied")
     file = request.files.get("file")
     if not file or not file.filename:
         return json_bad_request("file is required")
-    asset_key = f"{report_id}/assets/{file.filename}"
-    storage_service.upload("reports", asset_key, file.read())
+    try:
+        asset_key = build_asset_key(report_id, file.filename)
+        payload = read_upload(file)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    storage_service.upload("reports", asset_key, payload)
     return json_ok(asset_key=asset_key, url=url_for("reports.api_serve_asset", report_id=report_id, asset_key=asset_key))
 
 
@@ -287,17 +289,29 @@ def api_upload_asset(report_id: int):
 @login_required
 @permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_serve_asset(report_id: int, asset_key: str):
+    from werkzeug.exceptions import NotFound
+
     from app.services.platform import storage_service
 
     denied = _forbidden_if_no_view()
     if denied:
         return denied
+    if not asset_belongs_to_report(report_id, asset_key):
+        return json_not_found("File not found")
     try:
         ReportDefinitionService.get_report(report_id, current_user)
     except ReportDefinitionError:
         return json_not_found("Report not found")
-    data, content_type = storage_service.download("reports", asset_key)
-    return send_file(io.BytesIO(data), mimetype=content_type or "application/octet-stream")
+    filename = asset_key.rsplit("/", 1)[-1]
+    try:
+        return storage_service.stream_response(
+            "reports",
+            asset_key,
+            filename,
+            as_attachment=False,
+        )
+    except (NotFound, PermissionError, FileNotFoundError, OSError):
+        return json_not_found("File not found")
 
 
 @bp.route("/api/<int:report_id>/revisions", methods=["GET"])
@@ -365,13 +379,7 @@ def api_template_gallery():
 @login_required
 @permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def reports_print(report_id: int):
-    denied = _forbidden_if_no_view()
-    if denied:
-        return denied
-    try:
-        report = ReportDefinitionService.get_report(report_id, current_user)
-    except ReportDefinitionError:
-        return json_not_found("Report not found"), 404
+    report = _report_or_404(report_id)
     language = request.args.get("language")
     return render_template(
         "admin/reports/print.html",
@@ -468,11 +476,15 @@ def api_publish_report(report_id: int):
     if csrf_error:
         return csrf_error
     try:
-        ReportDefinitionService.update_report(report_id, current_user, status="published")
+        report = ReportDefinitionService.get_report(report_id, current_user)
+        if not user_can_edit_report(current_user, report):
+            return json_forbidden("Access denied")
         run = ReportBuildService.start_publish(report_id, current_user)
         return json_ok(run=ReportBuildService.serialize_run(run))
     except ReportDefinitionError as exc:
         return json_forbidden(str(exc))
+    except ValueError:
+        return json_not_found("Report not found")
 
 
 @bp.route("/api/runs/<run_id>", methods=["GET"])
@@ -484,6 +496,10 @@ def api_get_run(run_id: str):
         return denied
     run = ReportBuildService.get_run(run_id)
     if not run:
+        return json_not_found("Run not found")
+    try:
+        ReportDefinitionService.get_report(run.report_id, current_user)
+    except ReportDefinitionError:
         return json_not_found("Run not found")
     return json_ok(run=ReportBuildService.serialize_run(run))
 
@@ -660,6 +676,10 @@ def api_metadata_indicator_rule_preview():
     payload = get_json_safe() or {}
     rule = payload.get("rule") or payload
     full_list = bool(payload.get("full_list"))
-    sample_limit = int(payload.get("sample_limit") or 8)
+    try:
+        sample_limit = int(payload.get("sample_limit") or 8)
+    except (TypeError, ValueError):
+        sample_limit = 8
+    sample_limit = max(1, min(sample_limit, 100))
     group_by = payload.get("group_by")
     return json_ok(preview=preview_indicator_rule(rule, sample_limit=sample_limit, full_list=full_list, group_by=group_by))

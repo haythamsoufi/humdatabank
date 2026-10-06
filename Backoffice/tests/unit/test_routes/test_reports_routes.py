@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 
 import pytest
@@ -90,3 +91,50 @@ class TestReportsApiCrud:
 
         delete = logged_in_sm_client.delete(f"{API}/{report_id}", headers=JSON_HEADERS)
         assert delete.status_code == 200
+
+    def test_missing_report_page_is_not_a_json_body(self, logged_in_sm_client):
+        resp = logged_in_sm_client.get("/admin/reports/999999999")
+        assert resp.status_code == 404
+        assert "html" in (resp.content_type or "")
+
+    def test_asset_upload_rejects_non_images_and_foreign_keys(self, logged_in_sm_client):
+        create = logged_in_sm_client.post(
+            API,
+            data=json.dumps({
+                "title": "Asset report",
+                "definition": {
+                    "schema_version": 1,
+                    "filters": {"template_ids": [], "period_names": [], "assignment_statuses": ["approved"]},
+                    "sections": [],
+                },
+            }),
+            headers=JSON_HEADERS,
+        )
+        assert create.status_code == 200
+        report_id = create.get_json()["report"]["id"]
+
+        rejected = logged_in_sm_client.post(
+            f"{API}/{report_id}/assets",
+            data={"file": (io.BytesIO(b"not-an-image"), "notes.txt")},
+            content_type="multipart/form-data",
+        )
+        assert rejected.status_code == 400
+
+        uploaded = logged_in_sm_client.post(
+            f"{API}/{report_id}/assets",
+            data={"file": (io.BytesIO(b"\x89PNG\r\n\x1a\n"), "photo.png")},
+            content_type="multipart/form-data",
+        )
+        assert uploaded.status_code == 200
+        asset_key = uploaded.get_json()["asset_key"]
+        assert asset_key.startswith(f"{report_id}/assets/")
+        assert asset_key.endswith(".png")
+
+        foreign = logged_in_sm_client.get(f"{API}/{report_id}/assets/999999/assets/secret.png")
+        assert foreign.status_code == 404
+
+        served = logged_in_sm_client.get(f"{API}/{report_id}/assets/{asset_key}")
+        assert served.status_code == 200
+        assert served.data.startswith(b"\x89PNG")
+
+        logged_in_sm_client.delete(f"{API}/{report_id}", headers=JSON_HEADERS)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, false, func, or_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -23,6 +23,9 @@ class AggregationFilters:
     assignment_statuses: list[str] = field(default_factory=lambda: ["submitted", "approved"])
     indicator_bank_ids: list[int] = field(default_factory=list)
     include_public_submissions: bool = False
+    # When True, an empty id list matches nothing. When False, an empty list adds no predicate.
+    constrain_templates: bool = False
+    constrain_countries: bool = False
 
 
 def _period_filter(column, period_names: list[str]):
@@ -36,6 +39,20 @@ def _period_filter(column, period_names: list[str]):
 def _status_values(statuses: list[str]) -> list[str]:
     allowed = {s.value for s in AssignmentEntityStatusValue}
     return [s for s in statuses if s in allowed] or ["submitted", "approved"]
+
+
+def _apply_optional_ids(query, column, ids: list[int] | None, *, constrained: bool):
+    """Apply an id predicate.
+
+    A non-empty list filters to those ids. An empty list matches nothing when
+    ``constrained`` is set (a restricted user with no grants) and is ignored
+    otherwise (an unrestricted user who did not narrow the query).
+    """
+    if ids:
+        return query.filter(column.in_(list(ids)))
+    if constrained:
+        return query.filter(false())
+    return query
 
 
 def _base_form_data_query(filters: AggregationFilters):
@@ -56,10 +73,16 @@ def _base_form_data_query(filters: AggregationFilters):
             AssignedForm.template_id.in_(filters.template_ids),
             FormItem.template_id.in_(filters.template_ids),
         )
+    elif filters.constrain_templates:
+        q = q.filter(false())
     if filters.period_names:
         q = q.filter(_period_filter(AssignedForm.period_name, filters.period_names))
-    if filters.country_ids:
-        q = q.filter(AssignmentEntityStatus.entity_id.in_(filters.country_ids))
+    q = _apply_optional_ids(
+        q,
+        AssignmentEntityStatus.entity_id,
+        filters.country_ids,
+        constrained=filters.constrain_countries,
+    )
     if filters.indicator_bank_ids:
         q = q.filter(FormItem.indicator_bank_id.in_(filters.indicator_bank_ids))
     return q
@@ -72,6 +95,7 @@ def aggregate_indicator(
     period_name: str,
     country_ids: list[int] | None = None,
     assignment_statuses: list[str] | None = None,
+    constrain_countries: bool = False,
 ) -> dict[str, Any]:
     """Per-indicator period aggregation (value, implementing, reported counts)."""
     filters = AggregationFilters(
@@ -112,8 +136,12 @@ def aggregate_indicator(
     base = base.filter(AssignmentEntityStatus.status.in_(statuses))
     if period_name:
         base = base.filter(_period_filter(AssignedForm.period_name, [period_name]))
-    if country_ids:
-        base = base.filter(AssignmentEntityStatus.entity_id.in_(country_ids))
+    base = _apply_optional_ids(
+        base,
+        AssignmentEntityStatus.entity_id,
+        country_ids,
+        constrained=constrain_countries,
+    )
     row = base.one()
     total_value = row.total_value
     return {
@@ -156,6 +184,7 @@ def aggregate_indicator_by_country(
     country_ids: list[int] | None = None,
     assignment_statuses: list[str] | None = None,
     metric: str = "sum",
+    constrain_countries: bool = False,
 ) -> list[dict[str, Any]]:
     statuses = _status_values(assignment_statuses or ["submitted", "approved"])
     value_expr = func.sum(FormData.numeric_value)
@@ -196,8 +225,12 @@ def aggregate_indicator_by_country(
     )
     if period_names:
         q = q.filter(_period_filter(AssignedForm.period_name, period_names))
-    if country_ids:
-        q = q.filter(AssignmentEntityStatus.entity_id.in_(country_ids))
+    q = _apply_optional_ids(
+        q,
+        AssignmentEntityStatus.entity_id,
+        country_ids,
+        constrained=constrain_countries,
+    )
 
     country_map = {c.id: c.name for c in Country.query.filter(Country.id.in_([r.country_id for r in q.all()])).all()}
     results = []
@@ -223,6 +256,7 @@ def aggregate_indicator_timeseries(
     country_ids: list[int] | None = None,
     assignment_statuses: list[str] | None = None,
     limit_periods: int = 20,
+    constrain_countries: bool = False,
 ) -> list[dict[str, Any]]:
     statuses = _status_values(assignment_statuses or ["submitted", "approved"])
     q = (
@@ -245,8 +279,12 @@ def aggregate_indicator_timeseries(
         .group_by(AssignedForm.period_name)
         .order_by(AssignedForm.period_name.asc())
     )
-    if country_ids:
-        q = q.filter(AssignmentEntityStatus.entity_id.in_(country_ids))
+    q = _apply_optional_ids(
+        q,
+        AssignmentEntityStatus.entity_id,
+        country_ids,
+        constrained=constrain_countries,
+    )
 
     series: list[dict[str, Any]] = []
     for row in q.limit(limit_periods).all():
@@ -278,6 +316,7 @@ def list_indicator_period_years(
     assignment_statuses: list[str] | None = None,
     period_names: list[str] | None = None,
     limit_periods: int = 20,
+    constrain_countries: bool = False,
 ) -> list[tuple[int, str]]:
     """Distinct calendar years for an indicator, with a representative period_name."""
     statuses = _status_values(assignment_statuses or ["submitted", "approved"])
@@ -298,8 +337,12 @@ def list_indicator_period_years(
         .distinct()
         .order_by(AssignedForm.period_name.asc())
     )
-    if country_ids:
-        q = q.filter(AssignmentEntityStatus.entity_id.in_(country_ids))
+    q = _apply_optional_ids(
+        q,
+        AssignmentEntityStatus.entity_id,
+        country_ids,
+        constrained=constrain_countries,
+    )
     if period_names:
         q = q.filter(_period_filter(AssignedForm.period_name, period_names))
 
@@ -324,6 +367,7 @@ def aggregate_indicator_dashboard(
     assignment_statuses: list[str] | None = None,
     period_names: list[str] | None = None,
     limit_periods: int = 20,
+    constrain_countries: bool = False,
 ) -> dict[str, Any]:
     """Per-year value plus NS reporting/implementing counts (P&B dashboard parity)."""
     years: list[str] = []
@@ -339,6 +383,7 @@ def aggregate_indicator_dashboard(
         assignment_statuses=assignment_statuses,
         period_names=period_names,
         limit_periods=limit_periods,
+        constrain_countries=constrain_countries,
     ):
         agg = aggregate_indicator(
             template_id=template_id,
@@ -346,6 +391,7 @@ def aggregate_indicator_dashboard(
             period_name=period_name,
             country_ids=country_ids,
             assignment_statuses=assignment_statuses,
+            constrain_countries=constrain_countries,
         )
         year_str = str(year_int)
         val = agg.get("value")
@@ -377,10 +423,16 @@ def assignment_status_counts(filters: AggregationFilters) -> list[dict[str, Any]
     )
     if filters.template_ids:
         q = q.filter(AssignedForm.template_id.in_(filters.template_ids))
+    elif filters.constrain_templates:
+        q = q.filter(false())
     if filters.period_names:
         q = q.filter(_period_filter(AssignedForm.period_name, filters.period_names))
-    if filters.country_ids:
-        q = q.filter(AssignmentEntityStatus.entity_id.in_(filters.country_ids))
+    q = _apply_optional_ids(
+        q,
+        AssignmentEntityStatus.entity_id,
+        filters.country_ids,
+        constrained=filters.constrain_countries,
+    )
     if statuses:
         q = q.filter(AssignmentEntityStatus.status.in_(statuses))
     q = q.group_by(AssignmentEntityStatus.status)
@@ -395,10 +447,16 @@ def assignment_list_rows(filters: AggregationFilters, *, limit: int = 500) -> li
     )
     if filters.template_ids:
         q = q.filter(AssignedForm.template_id.in_(filters.template_ids))
+    elif filters.constrain_templates:
+        q = q.filter(false())
     if filters.period_names:
         q = q.filter(_period_filter(AssignedForm.period_name, filters.period_names))
-    if filters.country_ids:
-        q = q.filter(AssignmentEntityStatus.entity_id.in_(filters.country_ids))
+    q = _apply_optional_ids(
+        q,
+        AssignmentEntityStatus.entity_id,
+        filters.country_ids,
+        constrained=filters.constrain_countries,
+    )
     statuses = _status_values(filters.assignment_statuses)
     if statuses:
         q = q.filter(AssignmentEntityStatus.status.in_(statuses))

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+from flask import has_request_context, url_for
 
 from app.extensions import db
 from app.models import IndicatorBank, ReportDefinition, User
@@ -17,6 +20,8 @@ from app.services.data_retrieval.aggregation import (
     assignment_status_counts,
     indicator_value_rows,
 )
+from app.models.enums import AssignmentEntityStatusValue
+from app.services.reports.asset_service import asset_belongs_to_report
 from app.services.reports.definition_service import (
     ReportDefinitionService,
     narrow_id_list,
@@ -39,6 +44,12 @@ from app.services.reports.translation_helpers import (
     resolve_translation,
 )
 
+logger = logging.getLogger(__name__)
+
+_MAX_WIDGET_ROWS = 1000
+_DEFAULT_STATUSES = ("submitted", "approved")
+_WIDGET_LOAD_ERROR = "This widget could not be loaded."
+
 
 @dataclass
 class FilterContext:
@@ -49,6 +60,51 @@ class FilterContext:
     include_public_submissions: bool = False
     warnings: list[str] = field(default_factory=list)
     adhoc_filters: dict[str, Any] = field(default_factory=dict)
+    # Empty id lists match nothing when these are set. Unrestricted users leave them false.
+    constrain_templates: bool = False
+    constrain_countries: bool = False
+
+
+def _bounded_limit(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    if parsed < 1:
+        return default
+    return min(parsed, _MAX_WIDGET_ROWS)
+
+
+def _narrow_statuses(saved: Any, requested: Any) -> list[str]:
+    """Runtime status filters can only narrow the statuses stored on the report."""
+    allowed = {status.value for status in AssignmentEntityStatusValue}
+    source = saved if isinstance(saved, list) and saved else list(_DEFAULT_STATUSES)
+    base = [status for status in source if status in allowed] or list(_DEFAULT_STATUSES)
+    if not isinstance(requested, list) or not requested:
+        return base
+    narrowed = [status for status in requested if status in set(base)]
+    return narrowed or base
+
+
+def _apply_adhoc_country(
+    country_ids: list[int],
+    raw: Any,
+    *,
+    constrained: bool,
+) -> tuple[list[int], list[str]]:
+    if raw is None or raw == "":
+        return country_ids, []
+    try:
+        country_id = int(raw)
+    except (TypeError, ValueError):
+        return country_ids, ["Ignored country filter."]
+    if country_id < 1:
+        return country_ids, ["Ignored country filter."]
+    if not constrained:
+        return [country_id], []
+    if country_id in set(country_ids):
+        return [country_id], []
+    return [], ["Country filter is outside your scope."]
 
 
 class ReportDataService:
@@ -64,35 +120,67 @@ class ReportDataService:
         user: User,
         runtime_overrides: dict[str, Any] | None = None,
     ) -> FilterContext:
-        definition = migrate_v1_to_v2(report.definition_json or {})
+        return ReportDataService.build_filter_context(
+            user,
+            definition=report.definition_json or {},
+            scope_json=report.scope_json or {},
+            runtime_overrides=runtime_overrides,
+        )
+
+    @staticmethod
+    def build_filter_context(
+        user: User,
+        *,
+        definition: dict[str, Any] | None,
+        scope_json: dict[str, Any] | None = None,
+        runtime_overrides: dict[str, Any] | None = None,
+    ) -> FilterContext:
+        """Intersect requested filters with the caller's template and country grants.
+
+        An empty allow-list stays empty and is marked constrained, so query code
+        returns no rows instead of treating "no grants" as "every row".
+        """
+        definition = migrate_v1_to_v2(definition or {})
         filters = definition.get("filters") or {}
-        scope = report.scope_json or {}
+        scope = scope_json or {}
         user_scope = resolve_user_scope(user)
         warnings: list[str] = []
         overrides = runtime_overrides or {}
 
-        template_ids, w1 = narrow_id_list(
+        template_ids, template_warnings = narrow_id_list(
             overrides.get("template_ids") or filters.get("template_ids") or scope.get("template_ids"),
             user_scope["template_ids"],
         )
-        country_ids, w2 = narrow_id_list(
+        country_ids, country_warnings = narrow_id_list(
             overrides.get("country_ids") or filters.get("country_ids") or scope.get("country_ids"),
             user_scope["country_ids"],
         )
-        warnings.extend(w1)
-        warnings.extend(w2)
+        warnings.extend(template_warnings)
+        warnings.extend(country_warnings)
 
-        period_names = list(overrides.get("period_names") or filters.get("period_names") or [])
-        statuses = list(overrides.get("assignment_statuses") or filters.get("assignment_statuses") or ["submitted", "approved"])
+        constrain_templates = user_scope["template_ids"] is not None
+        constrain_countries = user_scope["country_ids"] is not None
+        adhoc = dict(overrides.get("adhoc_filters") or {})
+        country_ids, adhoc_warnings = _apply_adhoc_country(
+            country_ids,
+            adhoc.pop("country_id", None),
+            constrained=constrain_countries,
+        )
+        warnings.extend(adhoc_warnings)
 
         return FilterContext(
             template_ids=template_ids,
-            period_names=period_names,
+            period_names=list(overrides.get("period_names") or filters.get("period_names") or []),
             country_ids=country_ids,
-            assignment_statuses=statuses,
+            assignment_statuses=_narrow_statuses(
+                filters.get("assignment_statuses"),
+                overrides.get("assignment_statuses"),
+            ),
             include_public_submissions=bool(filters.get("include_public_submissions")),
             warnings=warnings,
-            adhoc_filters=dict(overrides.get("adhoc_filters") or {}),
+            adhoc_filters=adhoc,
+            constrain_templates=constrain_templates,
+            constrain_countries=constrain_countries,
         )
 
     @staticmethod
@@ -113,24 +201,45 @@ class ReportDataService:
     def _aggregation_filters(ctx: FilterContext, data_source: dict[str, Any]) -> AggregationFilters:
         warnings = list(ctx.warnings)
         ib_ids = ReportDataService._resolve_indicator_ids(data_source, warnings)
-        country_ids = list(ctx.country_ids)
-        if ctx.adhoc_filters.get("country_id"):
-            country_ids = [int(ctx.adhoc_filters["country_id"])]
         return AggregationFilters(
-            template_ids=ctx.template_ids,
+            template_ids=list(ctx.template_ids),
             period_names=ctx.period_names,
-            country_ids=country_ids,
+            country_ids=list(ctx.country_ids),
             assignment_statuses=ctx.assignment_statuses,
             indicator_bank_ids=list(ib_ids),
             include_public_submissions=ctx.include_public_submissions,
+            constrain_templates=ctx.constrain_templates,
+            constrain_countries=ctx.constrain_countries,
         )
+
+    @staticmethod
+    def _country_scope_kwargs(ctx: FilterContext) -> dict[str, Any]:
+        return {
+            "country_ids": list(ctx.country_ids),
+            "constrain_countries": ctx.constrain_countries,
+        }
+
+    @staticmethod
+    def _image_asset_url(report_id: int | None, asset_key: Any) -> str | None:
+        if not report_id or not isinstance(asset_key, str) or not asset_key:
+            return None
+        if not asset_belongs_to_report(report_id, asset_key):
+            return None
+        if not has_request_context():
+            return None
+        return url_for("reports.api_serve_asset", report_id=report_id, asset_key=asset_key)
 
     @staticmethod
     def _primary_template_id(ctx: FilterContext) -> int | None:
         return ctx.template_ids[0] if ctx.template_ids else None
 
     @staticmethod
-    def _finalize_widget_payload(widget: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    def _finalize_widget_payload(
+        widget: dict[str, Any],
+        payload: dict[str, Any],
+        *,
+        report_id: int | None = None,
+    ) -> dict[str, Any]:
         footnote = resolve_widget_footnote(widget)
         if footnote:
             payload["footnote"] = footnote
@@ -138,6 +247,10 @@ class ReportDataService:
             payload["chart_options"] = widget["chart_options"]
         if widget.get("layout"):
             payload["layout"] = widget["layout"]
+        if payload.get("type") == "image":
+            asset_url = ReportDataService._image_asset_url(report_id, payload.get("asset_key"))
+            if asset_url:
+                payload["asset_url"] = asset_url
         return payload
 
     @staticmethod
@@ -375,7 +488,7 @@ class ReportDataService:
             }
 
         if kind == "assignment_list":
-            limit = int(data_source.get("limit") or 500)
+            limit = _bounded_limit(data_source.get("limit"), 500)
             rows = assignment_list_rows(ReportDataService._aggregation_filters(ctx, data_source), limit=limit)
             return {
                 "widget_id": widget.get("id"),
@@ -389,7 +502,7 @@ class ReportDataService:
         resolved_ids = ReportDataService._resolve_indicator_ids(data_source, meta["warnings"])
 
         if kind == "indicator_values":
-            limit = int(data_source.get("limit") or 1000)
+            limit = _bounded_limit(data_source.get("limit"), 1000)
             rows = indicator_value_rows(ReportDataService._aggregation_filters(ctx, data_source), limit=limit)
             return {
                 "widget_id": widget.get("id"),
@@ -411,7 +524,7 @@ class ReportDataService:
                         template_id=template_id,
                         indicator_bank_id=int(ib_id),
                         period_name=period,
-                        country_ids=ctx.country_ids or None,
+                        **ReportDataService._country_scope_kwargs(ctx),
                         assignment_statuses=ctx.assignment_statuses,
                     )
                     indicator = db.session.get(IndicatorBank, int(ib_id))
@@ -457,7 +570,7 @@ class ReportDataService:
                 template_id=template_id,
                 indicator_bank_id=int(indicator_id),
                 period_name=period,
-                country_ids=ctx.country_ids or None,
+                **ReportDataService._country_scope_kwargs(ctx),
                 assignment_statuses=ctx.assignment_statuses,
             )
             key = metric if metric in agg else "value"
@@ -477,7 +590,7 @@ class ReportDataService:
             series = aggregate_indicator_timeseries(
                 template_id=template_id,
                 indicator_bank_id=int(indicator_id),
-                country_ids=ctx.country_ids or None,
+                **ReportDataService._country_scope_kwargs(ctx),
                 assignment_statuses=ctx.assignment_statuses,
             )
             indicator = db.session.get(IndicatorBank, int(indicator_id))
@@ -496,7 +609,7 @@ class ReportDataService:
             dashboard = aggregate_indicator_dashboard(
                 template_id=template_id,
                 indicator_bank_id=int(indicator_id),
-                country_ids=ctx.country_ids or None,
+                **ReportDataService._country_scope_kwargs(ctx),
                 assignment_statuses=ctx.assignment_statuses,
                 period_names=ctx.period_names or None,
             )
@@ -531,7 +644,7 @@ class ReportDataService:
                 template_id=template_id,
                 indicator_bank_id=int(indicator_id),
                 period_names=ctx.period_names,
-                country_ids=ctx.country_ids or None,
+                **ReportDataService._country_scope_kwargs(ctx),
                 assignment_statuses=ctx.assignment_statuses,
                 metric=metric,
             )
@@ -559,7 +672,10 @@ class ReportDataService:
                     "type": "bar",
                     "title": title or f"{metric_name} by country",
                     "metric": metric_name,
-                    "categories": [{"label": c["country"], "value": c["value"]} for c in countries],
+                    "categories": [
+                        {"label": c["country"], "value": c["value"], "country_id": c.get("country_id")}
+                        for c in countries
+                    ],
                     "orientation": "horizontal" if len(countries) > 6 else "vertical",
                 },
                 "meta": meta,
@@ -580,7 +696,7 @@ class ReportDataService:
             }
 
         if kind == "raw_data":
-            limit = int(data_source.get("limit") or 500)
+            limit = _bounded_limit(data_source.get("limit"), 500)
             rows = indicator_value_rows(ReportDataService._aggregation_filters(ctx, data_source), limit=limit)
             columns = data_source.get("columns") or ["indicator", "country_id", "period_name", "value"]
             return {
@@ -613,8 +729,9 @@ class ReportDataService:
         definition = migrate_v1_to_v2(report.definition_json or {})
         lang, default_lang = ReportDataService._definition_language(definition, language)
         widgets_out: dict[str, Any] = {}
+        sections = ReportDataService.expand_sections(definition, language=lang)
 
-        for section in ReportDataService.expand_sections(definition, language=lang):
+        for section in sections:
             for widget in section.get("widgets") or []:
                 wid = widget.get("id")
                 if not wid:
@@ -622,13 +739,16 @@ class ReportDataService:
                 localized = apply_language_to_widget(widget, language=lang, default_language=default_lang)
                 try:
                     payload = ReportDataService.execute_widget(localized, ctx)
-                    widgets_out[wid] = ReportDataService._finalize_widget_payload(localized, payload)
-                except Exception as exc:
+                    widgets_out[wid] = ReportDataService._finalize_widget_payload(
+                        localized, payload, report_id=report.id
+                    )
+                except Exception:
+                    logger.exception("Report widget %s failed on report %s", wid, report.id)
                     widgets_out[wid] = {
                         "widget_id": wid,
                         "type": widget.get("type"),
                         "title": localized.get("title"),
-                        "error": str(exc),
+                        "error": _WIDGET_LOAD_ERROR,
                         "meta": {"warnings": list(ctx.warnings)},
                     }
 
@@ -637,7 +757,7 @@ class ReportDataService:
             "language": lang,
             "languages": definition.get("languages") or [default_lang],
             "theme": definition.get("theme") or {},
-            "sections": ReportDataService.expand_sections(definition, language=lang),
+            "sections": sections,
             "widgets": widgets_out,
             "meta": {"warnings": ctx.warnings},
         }
@@ -659,9 +779,20 @@ class ReportDataService:
             for widget in section.get("widgets") or []:
                 if widget.get("id") == widget_id:
                     localized = apply_language_to_widget(widget, language=lang, default_language=default_lang)
+                    try:
+                        payload = ReportDataService.execute_widget(localized, ctx)
+                    except Exception:
+                        logger.exception("Report widget %s failed on report %s", widget_id, report_id)
+                        payload = {
+                            "widget_id": widget_id,
+                            "type": widget.get("type"),
+                            "title": localized.get("title"),
+                            "error": _WIDGET_LOAD_ERROR,
+                        }
                     return ReportDataService._finalize_widget_payload(
                         localized,
-                        ReportDataService.execute_widget(localized, ctx),
+                        payload,
+                        report_id=report.id,
                     )
         return {"widget_id": widget_id, "error": "Widget not found", "meta": {"warnings": ctx.warnings}}
 
@@ -678,16 +809,33 @@ class ReportDataService:
     ) -> dict[str, Any]:
         definition = migrate_v1_to_v2(definition)
         lang, default_lang = ReportDataService._definition_language(definition, language)
-        ctx = FilterContext(warnings=[])
+        scope_json = None
         if report_id:
             report = ReportDefinitionService.get_report(report_id, user)
-            ctx = ReportDataService.resolve_report_filters(report, user, runtime_overrides)
+            scope_json = report.scope_json or {}
+        ctx = ReportDataService.build_filter_context(
+            user,
+            definition=definition,
+            scope_json=scope_json,
+            runtime_overrides=runtime_overrides,
+        )
 
         if widget:
             localized = apply_language_to_widget(widget, language=lang, default_language=default_lang)
+            try:
+                payload = ReportDataService.execute_widget(localized, ctx)
+            except Exception:
+                logger.exception("Report preview widget failed")
+                payload = {
+                    "widget_id": widget.get("id"),
+                    "type": widget.get("type"),
+                    "title": localized.get("title"),
+                    "error": _WIDGET_LOAD_ERROR,
+                }
             payload = ReportDataService._finalize_widget_payload(
                 localized,
-                ReportDataService.execute_widget(localized, ctx),
+                payload,
+                report_id=report_id,
             )
             return {"widget": payload, "language": lang}
 
@@ -702,8 +850,19 @@ class ReportDataService:
                 if not wid:
                     continue
                 localized = apply_language_to_widget(item, language=lang, default_language=default_lang)
+                try:
+                    payload = ReportDataService.execute_widget(localized, ctx)
+                except Exception:
+                    logger.exception("Report preview widget %s failed", wid)
+                    payload = {
+                        "widget_id": wid,
+                        "type": item.get("type"),
+                        "title": localized.get("title"),
+                        "error": _WIDGET_LOAD_ERROR,
+                    }
                 widgets_out[wid] = ReportDataService._finalize_widget_payload(
                     localized,
-                    ReportDataService.execute_widget(localized, ctx),
+                    payload,
+                    report_id=report_id,
                 )
         return {"sections": sections, "widgets": widgets_out, "language": lang}

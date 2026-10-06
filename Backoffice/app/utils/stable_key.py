@@ -16,6 +16,14 @@ def generate_stable_key() -> str:
     return str(uuid.uuid4())
 
 
+# Template 22 matrices. These are the production keys (published version 22,
+# items 1314 and 1303). Filled in only where stable_key is still null. Do not
+# overwrite a key that is already set.
+T22_STAFF_MATRIX_STABLE_KEY = "f4fa6b32-3141-4a15-a572-637e7d3f1f94"
+T22_FUNDING_MATRIX_STABLE_KEY = "24b9438d-f937-4c99-802a-eccb1ffccc19"
+T22_STAFF_MATRIX_COLUMN = "intl_delegates_hns"
+
+
 def is_valid_stable_key(value: Optional[str]) -> bool:
     """Return True if value is a valid UUID string suitable for stable_key."""
     if not value or not isinstance(value, str):

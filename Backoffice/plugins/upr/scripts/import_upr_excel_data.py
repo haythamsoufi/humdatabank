@@ -138,7 +138,8 @@ STAFF_INDICATOR_COLUMNS: Dict[str, str] = {
     "# of national staff hired through the IFRC (PNS operating under IFRC legal umbrella)": "national_staff_ifrc_ifrc",
 }
 
-STAFF_MATRIX_LABEL = "PNS staff contributions"
+# Published label is "Staff contributions". Older versions used "PNS staff contributions".
+STAFF_MATRIX_LABEL = "Staff contributions"
 
 # Last-known published item ids (local snapshot). Live import overwrites these from the
 # published form in build_import_context; never write an id that did not resolve.
@@ -189,7 +190,11 @@ REPORTING_SPECIAL_ITEM_LABELS: Dict[str, Tuple[str, ...]] = {
     "sp_breakdown": ("optional breakdown by sp/ef",),
     "support": ("received support",),
 }
-T22_STAFF_MATRIX_LABELS: Tuple[str, ...] = ("pns staff contributions",)
+T22_STAFF_MATRIX_LABELS: Tuple[str, ...] = (
+    "pns staff contributions",
+    "staff contributions",
+)
+T22_STAFF_COLUMN = "intl_delegates_hns"
 T23_PNS_FUNDING_LABELS: Tuple[str, ...] = ("pns funding", "funding matrix")
 T23_PNS_FUNDING_REQUIRED_COLUMNS = frozenset({"total funding", "total expenditure"})
 
@@ -2139,8 +2144,50 @@ def _resolve_labeled_published_item(
     return int(found) if found else None
 
 
+def t22_matrix_is_staff(item) -> bool:
+    """True when a matrix has the T22 PNS staff column set."""
+    names = {name.strip().lower() for name in _form_item_matrix_column_names(item)}
+    return T22_STAFF_COLUMN in names
+
+
+def _resolve_published_stable_item(template_id: int, stable_key: str) -> Optional[int]:
+    from app.utils.stable_key import resolve_published_form_item_id
+
+    item_id = resolve_published_form_item_id(int(template_id), stable_key)
+    return int(item_id) if item_id else None
+
+
+def _resolve_t22_staff_item_id(ctx: "UprImportContext") -> Optional[int]:
+    """Published T22 staff matrix.
+
+    Prefer ``stable_key`` (the same value on every version). Fall back to the
+    staff column, then the label, when this database already keyed the field
+    with a different UUID.
+    """
+    from app.utils.stable_key import T22_STAFF_MATRIX_STABLE_KEY
+
+    staff_id = _resolve_published_stable_item(22, T22_STAFF_MATRIX_STABLE_KEY)
+    if staff_id:
+        return staff_id
+    pub_vid = ctx.published_version_ids.get(22)
+    if not pub_vid:
+        return None
+    items = _load_published_form_items(22, int(pub_vid), item_type="matrix")
+    for item in items:
+        if t22_matrix_is_staff(item):
+            return int(item.id)
+    return _resolve_labeled_published_item(
+        ctx, 22, *T22_STAFF_MATRIX_LABELS, item_type="matrix"
+    )
+
+
 def _resolve_t22_funding_item_id(ctx: "UprImportContext") -> Optional[int]:
-    """Published T22 funding matrix — exact label, else SP/EF columns (not staff)."""
+    """Published T22 funding matrix — stable_key, else label, else SP/EF columns."""
+    from app.utils.stable_key import T22_FUNDING_MATRIX_STABLE_KEY
+
+    fund_id = _resolve_published_stable_item(22, T22_FUNDING_MATRIX_STABLE_KEY)
+    if fund_id:
+        return fund_id
     pub_vid = ctx.published_version_ids.get(22)
     if not pub_vid:
         return None
@@ -3045,9 +3092,7 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
                     ctx.emergency_choice_item_id
                 )
     if 22 in ids:
-        staff_id = _resolve_labeled_published_item(
-            ctx, 22, *T22_STAFF_MATRIX_LABELS, item_type="matrix"
-        )
+        staff_id = _resolve_t22_staff_item_id(ctx)
         ctx.staff_matrix_item_id = int(staff_id) if staff_id else 0
         fund_id = _resolve_t22_funding_item_id(ctx)
         ctx.t22_funding_item_id = int(fund_id) if fund_id else 0

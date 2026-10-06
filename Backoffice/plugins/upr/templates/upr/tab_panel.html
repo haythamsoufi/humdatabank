@@ -190,8 +190,20 @@
 }
 .upr-vis-filters__field {
     flex: 1 1 16rem;
-    min-width: 12rem;
+    min-width: 0;
     max-width: 28rem;
+}
+@media (max-width: 639px) {
+    .upr-vis-filters__field {
+        flex-basis: 100%;
+        max-width: none;
+    }
+    .upr-vis-card__links {
+        margin-left: 0;
+    }
+    .upr-vis-card__header {
+        flex-wrap: wrap;
+    }
 }
 .upr-vis-filters__field[hidden] {
     display: none;
@@ -244,7 +256,7 @@
     font-size: 0.8125rem;
     color: #374151;
     cursor: pointer;
-    white-space: nowrap;
+    white-space: normal;
 }
 .upr-vis-narrative-check[hidden] {
     display: none;

@@ -100,19 +100,19 @@
                 </div>
             </div>
             <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
+                <div class="flex flex-wrap items-center gap-2">
                     <button id="apply-filters-btn" class="btn btn-primary">
                         <i class="fas fa-download mr-2"></i>{{ _('Load Data') }}
                     </button>
-                    <button id="clear-filters-btn" class="btn btn-secondary ml-2">
+                    <button id="clear-filters-btn" class="btn btn-secondary">
                         <i class="fas fa-times mr-2"></i>{{ _('Clear Parameters') }}
                     </button>
                 </div>
-                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <label class="inline-flex items-start gap-2 text-sm text-gray-700 min-w-0 max-w-full">
                     <input id="include-non-reported"
                            type="checkbox"
-                           class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <span>{{ _('Include non-reported items (no saved value)') }}</span>
+                           class="mt-0.5 h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <span class="min-w-0">{{ _('Include non-reported items (no saved value)') }}</span>
                     <span id="include-non-reported-help" class="text-xs text-gray-500"></span>
                 </label>
             </div>
@@ -135,11 +135,11 @@
 
     <!-- Main Grid Card -->
     <div id="grid-card" class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative" style="display: none;">
-        <div class="flex justify-between items-center mb-4 gap-3">
-            <div id="data-info" class="text-sm text-gray-600" style="display: none;">
+        <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:justify-between sm:items-center">
+            <div id="data-info" class="text-sm text-gray-600 min-w-0" style="display: none;">
                 {{ _('Showing') }} <span id="data-count-filtered" class="font-semibold">0</span> {{ _('of') }} <span id="data-count-total" class="font-semibold">0</span> {{ _('records') }}
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 {% if user_has_ai_beta_access(current_user) %}
                 <div id="ai-validation-run-group" class="inline-flex items-stretch">
                     <button id="run-ai-validation-btn"

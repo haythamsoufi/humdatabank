@@ -162,6 +162,19 @@ html[dir="rtl"] .fb-access-btn__chevron {
         display: none;
     }
 
+    /* The type icon distinguishes Standard, Dynamic, Repeat, and Discussion. */
+    #form-builder-ui .fb-section-type-badge {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
     #form-builder-ui table.table-fixed {
         table-layout: auto;
         width: 100%;
@@ -396,6 +409,11 @@ html[dir="rtl"] .fb-access-btn__chevron {
 /* handlers keep working. .fb-actions-ready is set by JS; without it the     */
 /* icons stay inline.                                                         */
 /* -------------------------------------------------------------------------- */
+#form-builder-ui .fb-section-type-icon--standard { color: #6b7280; }
+#form-builder-ui .fb-section-type-icon--dynamic { color: #4f46e5; }
+#form-builder-ui .fb-section-type-icon--repeat { color: #16a34a; }
+#form-builder-ui .fb-section-type-icon--discussion { color: #0284c7; }
+
 #form-builder-ui .fb-actions {
     position: relative;
     display: flex;
@@ -479,9 +497,31 @@ html[dir="rtl"] .fb-access-btn__chevron {
         line-height: 1.25rem;
     }
 
-    #form-builder-ui.fb-actions-ready td:has(> .fb-actions) {
-        vertical-align: top;
-        width: 1%;
+    /* Drop the Actions column. The ⋮ sits at the end of the row. */
+    #form-builder-ui.fb-actions-ready th.fb-col-actions {
+        display: none;
+    }
+
+    #form-builder-ui.fb-actions-ready tbody tr:has(> td.fb-col-actions) {
+        position: relative;
+    }
+
+    #form-builder-ui.fb-actions-ready td.fb-col-actions {
+        display: block;
+        position: absolute;
+        inset-inline-end: 0.125rem;
+        top: 0.25rem;
+        width: auto;
+        max-width: none;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        white-space: nowrap;
+        z-index: 1;
+    }
+
+    #form-builder-ui.fb-actions-ready td.fb-col-label {
+        padding-inline-end: 2.75rem;
     }
 }
 

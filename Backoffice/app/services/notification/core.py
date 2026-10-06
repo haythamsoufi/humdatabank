@@ -103,10 +103,10 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         ),
 
         'notification.assignment_submitted.team_email.title': _notification_msgid(
-            'Team update: %(assignment_title)s submitted by %(submitter_name)s'
+            '%(submitter_name)s submitted %(assignment_title)s for %(country)s.'
         ),
         'notification.assignment_submitted.team_email.message': _notification_msgid(
-            '%(submitter_name)s submitted %(assignment_title)s for your entity team.'
+            '%(submitter_name)s submitted %(assignment_title)s for %(country)s.'
         ),
 
         'notification.assignment_submitted.admin.title': _notification_msgid(

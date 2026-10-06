@@ -638,8 +638,10 @@ def notify_assignment_submitted(assignment_entity_status):
                     user_ids=focal_point_ids,
                     assignment_title=assignment_title,
                     submitter_name=submitter_name,
+                    country=entity_name,
                     related_url=related_url,
                     notification_by_user_id=notification_by_user_id,
+                    assignment_entity_status=aes,
                 )
             except Exception as e:
                 current_app.logger.error(

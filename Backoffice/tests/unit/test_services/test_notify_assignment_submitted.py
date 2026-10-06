@@ -92,6 +92,7 @@ class TestNotifyAssignmentSubmitted:
                 mock_team_email.assert_called_once()
                 assert mock_team_email.call_args.kwargs["submitter_name"] == "Submitter User"
                 assert "assignment_title" in mock_team_email.call_args.kwargs
+                assert mock_team_email.call_args.kwargs["country"]
 
     def test_excludes_submitter_from_admin_review_channel(self, app, submitted_aes):
         submitter_id = submitted_aes._test_submitter.id
@@ -140,6 +141,10 @@ class TestNotifyAssignmentSubmitted:
                 "notification.assignment_submitted.message",
                 params,
             )
+            team_email_title = translate_notification_message(
+                "notification.assignment_submitted.team_email.title",
+                params,
+            )
             team_email = translate_notification_message(
                 "notification.assignment_submitted.team_email.message",
                 params,
@@ -151,4 +156,8 @@ class TestNotifyAssignmentSubmitted:
         assert "Sabrina Raff" in peer_message
         assert "Kenya" in peer_message
         assert "no action needed from you" in peer_message.lower()
+        assert team_email_title == team_email
         assert "Sabrina Raff" in team_email
+        assert "Kenya" in team_email
+        assert "Team update:" not in team_email
+        assert "entity team" not in team_email

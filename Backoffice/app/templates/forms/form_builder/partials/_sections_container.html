@@ -1,5 +1,10 @@
 {# Existing Sections and their Items (Indicators, Document Fields, or Questions) #}
 {% from "components/_status_label.html" import status_label %}
+{% macro fb_actions_toggle() %}
+<button type="button" class="fb-actions-toggle fb-icon-btn fb-icon-btn--neutral" aria-haspopup="true" aria-expanded="false" title="{{ _('Actions')|forceescape }}" aria-label="{{ _('Actions')|forceescape }}">
+    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+</button>
+{% endmacro %}
 <div id="sections-container" class="space-y-6">
     {# Group sections hierarchically - only show main sections, sub-sections will be nested #}
     {% set main_sections = [] %}
@@ -105,8 +110,14 @@
                     <button type="button" class="section-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse section')|forceescape }}">
                         <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
                     </button>
-                    <div class="flex items-center">
-                    <i class="fas fa-layer-group w-5 h-5 mr-2 text-gray-500"></i>
+                    <div class="section-header-title flex items-center min-w-0">
+                    {% set _section_type_value = item_s_f.section.section_type_enum.value %}
+                    {% set _section_type_meta = {
+                        'Dynamic Indicators': ('fa-wand-magic-sparkles fb-section-type-icon--dynamic', _('Dynamic Indicators'), 'info'),
+                        'Repeat': ('fa-repeat fb-section-type-icon--repeat', _('Repeat Group'), 'success'),
+                        'Discussion': ('fa-comments fb-section-type-icon--discussion', _('Discussion'), 'info')
+                    }.get(_section_type_value, ('fa-layer-group fb-section-type-icon--standard', _('Standard'), 'neutral')) %}
+                    <i class="fas {{ _section_type_meta[0] }} fb-section-type-icon w-5 h-5 mr-2 flex-shrink-0" title="{{ _section_type_meta[1]|forceescape }}" aria-hidden="true"></i>
                     {# Avoid decimal-style display; show integer section position #}
                     <span class="text-lg font-semibold text-gray-800 mr-1">{{ item_s_f.section.display_order.split('.')[0] }}.</span>
                         <h3 class="text-lg font-semibold text-gray-800 {{ 'text-gray-500' if is_section_archived else '' }}">{{ item_s_f.section.name }}</h3>
@@ -114,18 +125,12 @@
                     {% if is_section_archived %}
                         <span class="ml-3">{{ status_label(_('Archived'), 'neutral') }}</span>
                     {% endif %}
-                    {# NEW: Section Type Badge #}
-                    {% if item_s_f.section.section_type_enum.value == 'Dynamic Indicators' %}
-                        <span class="ml-3">{{ status_label(_('Dynamic Indicators'), 'info') }}</span>
-                    {% elif item_s_f.section.section_type_enum.value == 'Repeat' %}
-                        <span class="ml-3">{{ status_label(_('Repeat Group'), 'success') }}</span>
-                    {% elif item_s_f.section.section_type_enum.value == 'Discussion' %}
-                        <span class="ml-3">{{ status_label(_('Discussion'), 'info') }}</span>
-                    {% else %}
-                        <span class="ml-3">{{ status_label(_('Standard'), 'neutral') }}</span>
-                    {% endif %}
+                    {# Type badge stays for desktop. On a phone the type icon above replaces it. #}
+                    <span class="fb-section-type-badge ml-3">{{ status_label(_section_type_meta[1], _section_type_meta[2]) }}</span>
                 </div>
-                <div class="section-header-actions space-x-2 flex items-center flex-shrink-0">
+                <div class="fb-actions section-header-actions">
+                    {{ fb_actions_toggle() }}
+                    <div class="fb-actions-panel">
                     {% if is_section_archived %}
                         {# Show unarchive button for archived sections #}
                         <form action="{{ url_for('form_builder.unarchive_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block">
@@ -188,6 +193,7 @@
                         </button>
                     </form>
                     {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -291,7 +297,7 @@
                                 <span class="fb-table-order-number">{{ item_instance.display_order.split('.')[-1] }}</span>
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2">
+                        <td class="fb-col-label px-4 py-3 text-sm text-gray-700 break-words w-1/2">
                             <div class="fb-table-label-cell">
                                 <i class="fas fa-indent w-4 h-4 flex-shrink-0 text-teal-600" aria-hidden="true"></i>
                                 <span class="fb-table-label-cell__text">
@@ -309,8 +315,10 @@
                                 <p class="mb-1"><strong>{{ _('Relevance') }}:</strong> <span class="rule-display text-blue-700" data-rule-json="{{ item_instance.relevance_condition if item_instance.relevance_condition is string else (item_instance.relevance_condition | tojson | e) }}" data-rule-type="relevance">{{ _('Loading...') }}</span></p>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
-                            <div class="space-x-2 flex items-center">
+                        <td class="fb-col-actions px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
+                            <div class="fb-actions">
+                                {{ fb_actions_toggle() }}
+                                <div class="fb-actions-panel">
                                 {% if is_subsection_archived %}
                                     {# Show unarchive button for archived subsections #}
                                     <form action="{{ url_for('form_builder.unarchive_section', section_id=item_instance.id) }}" method="POST" class="inline-block">
@@ -361,6 +369,7 @@
                                     </button>
                                 </form>
                                 {% endif %}
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -405,7 +414,7 @@
                                 </div>
                             </td>
                             {% set _display_item_id = item_instance.id %}
-                            <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2" title="{{ _('Item ID')|forceescape }}: {{ _display_item_id }}">
+                            <td class="fb-col-label px-4 py-3 text-sm text-gray-700 break-words w-1/2" title="{{ _('Item ID')|forceescape }}: {{ _display_item_id }}">
                             {% set _item_type_icon = {
                                 'indicator': 'fas fa-chart-bar text-purple-600',
                                 'question': 'fas fa-question-circle text-green-600',
@@ -584,7 +593,10 @@
                                     <p class="mb-1"><strong>{{ _('Validation') }}:</strong> <span class="rule-display text-red-700" data-rule-json="{{ item_instance.validation_condition if item_instance.validation_condition is string else (item_instance.validation_condition | tojson | e) }}" data-rule-type="validation">{{ _('Loading...') }}</span></p>
                                 {% endif %}
                             </td>
-                            <td class="px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
+                            <td class="fb-col-actions px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
+                                <div class="fb-actions">
+                                {{ fb_actions_toggle() }}
+                                <div class="fb-actions-panel">
                                 {% if is_archived %}
                                     {# Show unarchive button for archived items #}
                                     <form action="{{ url_for('form_builder.unarchive_item', item_id=item_instance.id) }}" method="POST" class="inline-block">
@@ -828,6 +840,8 @@
                                         </button>
                                     </form>
                                 {% endif %}
+                                </div>
+                                </div>
                             </td>
                         </tr>
                     {% endif %}

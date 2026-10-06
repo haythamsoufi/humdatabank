@@ -5,6 +5,7 @@
 
 import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
 import { initExcelIoModal } from '../../components/excel-io-modal.js';
+import { initFormBuilderActionOverflow } from './action-overflow.js';
 
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
@@ -1084,6 +1085,7 @@ export function initFormBuilder() {
     initExcelModal();
     initArchivedItemsToggle();
     initStableKeyCopyButton();
+    initFormBuilderActionOverflow();
 }
 
 function initStableKeyCopyButton() {

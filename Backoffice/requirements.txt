@@ -12,7 +12,7 @@ Flask-Babel==4.0.0
 Flask-Compress==1.14
 Flask-Limiter==3.5.0
 flask-sock==0.7.0
-Werkzeug==3.1.7
+Werkzeug==3.1.9                # was 3.1.7 — CVE-2026-102598 (safe_join Windows device names)
 polib==1.2.0
 filelock==3.20.3                # cross-process PO file write locking (prevents Gunicorn race conditions)
 APScheduler==3.10.4

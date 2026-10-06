@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function selectedTemplateIds() {
-    return Array.from(document.querySelectorAll('.template-checkbox:checked'))
+    return Array.from(document.querySelectorAll('.upr-excel-template-checkbox:checked'))
       .map(function (el) { return parseInt(el.value, 10); });
   }
 
@@ -327,12 +327,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var DZ = 'excel-io-dropzone'; // CSS class prefix from excel-import-dropzone.js
 
+  var notImportedTitle = {{ _("Not imported")|tojson }};
+  var skippedRoundsHint = {{ _("Grey rounds are in the workbook and are not imported.")|tojson }};
+
+  function formatRoundList(codes, excluded) {
+    return (codes || []).map(function (code) {
+      var skipped = !!excluded[String(code).toUpperCase()];
+      if (!skipped) return escapeHtml(code);
+      return '<span class="upr-excel-round--skipped" title="' + escapeHtml(notImportedTitle) + '">'
+        + escapeHtml(code) + '</span>';
+    }).join(', ');
+  }
+
   function buildUprWorkbookPreviewHtml(preview) {
     var lines = [];
     var parts = [];
     if (preview.total_rows != null) parts.push(escapeHtml(String(preview.total_rows)) + ' ' + {{ _("rows")|tojson|safe }});
     if (preview.countries   != null) parts.push(escapeHtml(String(preview.countries)) + ' ' + {{ _("countries")|tojson|safe }});
     if (parts.length) lines.push('<p class="' + DZ + '__preview-line">' + parts.join(' &middot; ') + '</p>');
+    var excluded = {};
+    (preview.excluded_rounds || []).forEach(function (code) {
+      excluded[String(code).toUpperCase()] = true;
+    });
     var roundGroups = [
       { label: {{ _("Planning")|tojson|safe }}, key: 'planning_rounds' },
       { label: {{ _("AR")|tojson|safe }},       key: 'ar_rounds' },
@@ -344,16 +360,15 @@ document.addEventListener('DOMContentLoaded', function () {
         lines.push(
           '<p class="' + DZ + '__preview-line">'
           + '<span class="' + DZ + '__preview-meta-label">' + escapeHtml(g.label) + ' ' + {{ _("rounds")|tojson|safe }} + ': </span>'
-          + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(rr.join(', ')) + '</span>'
+          + '<span class="' + DZ + '__preview-meta-value">' + formatRoundList(rr, excluded) + '</span>'
           + '</p>'
         );
       }
     });
     if (preview.excluded_rounds && preview.excluded_rounds.length) {
       lines.push(
-        '<p class="' + DZ + '__preview-line">'
-        + '<span class="' + DZ + '__preview-meta-label">' + {{ _("Later rounds (not imported)")|tojson|safe }} + ': </span>'
-        + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(preview.excluded_rounds.join(', ')) + '</span>'
+        '<p class="' + DZ + '__preview-line upr-excel-round-legend">'
+        + escapeHtml(skippedRoundsHint)
         + '</p>'
       );
     }

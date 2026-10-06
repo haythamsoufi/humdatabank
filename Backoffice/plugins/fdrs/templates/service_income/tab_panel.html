@@ -7,7 +7,11 @@
     .si-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 1px solid #d1d5db; border-radius: 999px; background: #fff; color: #374151; cursor: pointer; flex: none; }
     .si-icon:hover { background: #f9fafb; color: #111827; }
     .si-overlay-label { position: absolute; background: #7c2d12; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; padding: 4px 5px; border-radius: 2px; pointer-events: none; white-space: nowrap; z-index: 5; }
-    .si-pin { position: sticky; top: 0; z-index: 20; display: flex; justify-content: flex-end; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.5rem 0; background: #fff; box-shadow: 0 1px 0 #e5e7eb; }
+    .si-pin { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.5rem 0; background: #fff; box-shadow: 0 1px 0 #e5e7eb; }
+    .si-chart { width: 100%; max-width: 52rem; margin-inline: auto; }
+    @media (min-width: 640px) {
+        .si-pin { justify-content: flex-end; }
+    }
 </style>
 
 <div id="panel-service-income" class="explore-panel{% if explore_first_tab != 'service-income' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-service-income">
@@ -52,17 +56,17 @@
                     <button type="button" id="service-income-total-toggle" class="si-toggle" aria-pressed="false">{{ _('Show total income') }}</button>
                 </div>
             </div>
-            <div id="service-income-chart"></div>
+            <div id="service-income-chart" class="si-chart"></div>
         </div>
 
         <div class="bg-white p-4 sm:p-6 shadow border border-gray-200 mb-6 overflow-x-auto">
-            <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <h4 class="text-sm font-medium text-gray-700">{{ _('Yearly comparison') }}</h4>
                 <button type="button" id="service-income-copy-table" class="si-icon" data-icon="fa-copy" title="{{ _('Copy table for Excel') }}" aria-label="{{ _('Copy table for Excel') }}">
                     <i class="fas fa-copy" aria-hidden="true"></i>
                 </button>
             </div>
-            <table class="min-w-full text-sm text-left">
+            <table class="min-w-full text-sm text-left whitespace-nowrap">
                 <thead>
                     <tr class="border-b border-gray-200 text-gray-600">
                         <th class="py-2 pr-4 font-medium">{{ _('Year') }}</th>

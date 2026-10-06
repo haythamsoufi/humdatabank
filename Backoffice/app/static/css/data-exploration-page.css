@@ -40,3 +40,13 @@
 
         /* Column visibility toolbar: ag-column-visibility-manager.css */
         /* Additional template-specific overrides can be added here if needed */
+
+        @media (max-width: 639px) {
+            #pageContentContainer:has(#explore-data-tabs) {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            #dataExplorationGrid {
+                height: min(70vh, 480px) !important;
+            }
+        }

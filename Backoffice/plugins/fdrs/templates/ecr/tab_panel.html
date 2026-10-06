@@ -4,26 +4,46 @@
     .ecr-list li + li { margin-top: 0.35rem; }
     .ecr-refresh { border: 1px solid #d1d5db; background: #fff; color: #374151; font-size: 0.75rem; font-weight: 600; line-height: 1; padding: 0.4rem 0.75rem; border-radius: 999px; cursor: pointer; }
     .ecr-refresh:hover { background: #f9fafb; color: #111827; }
+    .ecr-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
     .ecr-subtabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-    .ecr-subtab { border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.8125rem; font-weight: 600; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer; }
+    .ecr-subtab { border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.8125rem; font-weight: 600; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer; flex: none; }
     .ecr-subtab[aria-selected="true"] { background: #111827; color: #fff; border-color: #111827; }
     .ecr-legend { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; margin-top: 0.75rem; }
     .ecr-legend span { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: #374151; }
     .ecr-swatch { width: 0.75rem; height: 0.75rem; border-radius: 999px; display: inline-block; }
     .ecr-provisional { color: #9a3412; }
-    .ecr-chart { width: 100%; overflow-x: auto; }
-    .ecr-chart svg { display: block; width: 100%; height: auto; }
+    /* Charts are drawn in a 640-wide viewBox. Keep that size so labels stay
+       readable on a phone (scroll sideways) and do not balloon on a wide monitor. */
+    .ecr-chart { width: 100%; max-width: 40rem; margin-inline: auto; overflow-x: auto; }
+    .ecr-chart svg { display: block; width: 100%; min-width: 36rem; height: auto; }
     .ecr-note { color: #4b5563; }
     .ecr-warning { color: #9a3412; }
     .ecr-missing { background: #f9fafb; border: 1px dashed #d1d5db; padding: 0.9rem 1rem; }
     .ecr-stack { display: flex; height: 1.15rem; width: 100%; background: #f3f4f6; overflow: hidden; }
     .ecr-scroll { max-height: 28rem; overflow: auto; }
-    .ecr-rank { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+    .ecr-rank { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) minmax(0, max-content); gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+    .ecr-rank > :last-child { justify-self: end; max-width: 9rem; text-align: right; overflow-wrap: anywhere; }
+    #ecr-chapter { display: grid; gap: 1rem; align-items: start; }
+    @media (min-width: 640px) {
+        .ecr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 639px) {
+        .ecr-subtabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 0.25rem; }
+        .ecr-chart { max-width: none; }
+        .ecr-chart svg { min-width: 0; width: 100%; }
+        .ecr-chart svg text { font-size: 22px; }
+    }
+    @media (min-width: 1536px) {
+        .ecr-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1800px) {
+        #ecr-chapter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .ecr-output--span { grid-column: 1 / -1; }
+    }
     .ecr-rank-name { font-size: 0.8125rem; color: #111827; }
     .ecr-rank-detail { font-size: 0.75rem; color: #6b7280; }
     .ecr-rank-track { background: #f3f4f6; height: 0.45rem; }
     .ecr-rank-bar { height: 0.45rem; background: #1e3a5f; }
-    .ecr-output + .ecr-output { margin-top: 1rem; }
 </style>
 
 <div id="panel-everyone-counts" class="explore-panel{% if explore_first_tab != 'everyone-counts' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-everyone-counts">
@@ -53,7 +73,7 @@
 
     <div id="ecr-content" class="hidden">
         <p id="ecr-warning" class="text-sm ecr-warning mb-4 hidden"></p>
-        <div id="ecr-cards" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+        <div id="ecr-cards" class="ecr-cards mb-6"></div>
 
         <div class="ecr-subtabs mb-3" id="ecr-subtabs" role="tablist" aria-label="{{ _('Everyone Counts chapters') }}"></div>
         <p class="text-xs text-gray-500 mb-4" id="ecr-chapter-meta"></p>
@@ -239,7 +259,8 @@
     }
 
     function renderOutput(output) {
-        var article = el('article', 'bg-white p-4 sm:p-6 shadow border border-gray-200 ecr-output');
+        var wide = output.kind === 'table' || output.kind === 'ranked' || output.kind === 'sections' || output.kind === 'missing';
+        var article = el('article', 'bg-white p-4 sm:p-6 shadow border border-gray-200 ecr-output' + (wide ? ' ecr-output--span' : ''));
         if (output.number) article.appendChild(el('p', 'text-xs font-semibold text-gray-500', output.number));
         article.appendChild(el('h4', 'text-sm font-medium text-gray-900 mt-1', output.title || ''));
         if (output.caption) article.appendChild(el('p', 'text-xs text-gray-500 mt-1 mb-3', output.caption));

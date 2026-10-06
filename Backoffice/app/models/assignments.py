@@ -95,6 +95,10 @@ class AssignedForm(db.Model):
     # PDF export on entry form
     enable_export_pdf = Column(Boolean, default=False, nullable=False)
 
+    # Attach the entry-form PDF / filled Excel snapshot to submit and approve emails
+    email_attach_pdf = Column(Boolean, default=False, nullable=False)
+    email_attach_excel = Column(Boolean, default=False, nullable=False)
+
     # When true, each form page can be saved/submitted independently
     enable_page_submission = Column(Boolean, default=False, nullable=False)
 

@@ -74,6 +74,16 @@ class AssignedFormForm(BaseForm):
         default=False,
     )
 
+    email_attach_pdf = BooleanField(
+        "Attach a PDF summary to submit and approve emails",
+        default=False,
+    )
+
+    email_attach_excel = BooleanField(
+        "Attach a filled Excel snapshot to submit and approve emails",
+        default=False,
+    )
+
     # Data owner governance — who is accountable for this collection cycle
     data_owner_id = SelectField(
         "Data Owner",

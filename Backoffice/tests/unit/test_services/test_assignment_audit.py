@@ -77,6 +77,8 @@ def _make_assignment(**overrides):
     assignment.enable_export_excel = False
     assignment.enable_import_excel = False
     assignment.enable_export_pdf = False
+    assignment.email_attach_pdf = False
+    assignment.email_attach_excel = False
     assignment.submission_review_recipient_mode = SUBMISSION_REVIEW_RECIPIENT_FDS
     assignment.submission_review_recipient_users = []
     assignment.country_statuses = _FakeDynamicRelation(country_statuses)
@@ -103,6 +105,9 @@ class TestAssignmentSettingsSnapshot:
         assert snapshot["data_owner"] == "Ada Lovelace (ada@example.org)"
         assert snapshot["enable_export_excel"] is True
         assert snapshot["enable_import_excel"] is False
+        assert snapshot["enable_export_pdf"] is False
+        assert snapshot["email_attach_pdf"] is False
+        assert snapshot["email_attach_excel"] is False
         assert snapshot["enable_page_submission"] is False
         assert snapshot["submission_review_mode"].startswith("Designated FDS member")
 

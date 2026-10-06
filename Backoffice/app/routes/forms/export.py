@@ -782,6 +782,934 @@ def register_export_routes(bp):
         return _import_excel_impl(aes_id)
 
 
+class AssignmentPdfUnavailable(Exception):
+    """WeasyPrint is missing or cannot produce a PDF on this deployment."""
+
+
+def build_assignment_pdf_bytes(assignment_entity_status):
+    """Return ``(pdf_bytes, filename)`` using the entry-form PDF export."""
+    assignment = assignment_entity_status.assigned_form
+    if not assignment:
+        raise ValueError("Assignment is missing for PDF export.")
+    from app.utils.api_serialization import _country_for_aes
+    country = _country_for_aes(assignment_entity_status)
+    form_template_for_export = assignment.template
+
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+    from app.models import FormTemplateVersion
+
+    template_version = None
+    resolved_variables = {}
+    variable_configs = {}
+    if form_template_for_export.published_version_id:
+        template_version = FormTemplateVersion.query.get(form_template_for_export.published_version_id)
+        if template_version:
+            variable_configs = template_version.variables or {}
+            resolved_variables = VariableResolutionService.resolve_variables(
+                template_version,
+                assignment_entity_status
+            )
+
+    if country:
+        try:
+            # Binding-aware resolution: keeps EO1/EO2/EO3 in the export aligned with the appeal
+            # codes the data was actually entered against (see plugins/emergency_operations/section_binding).
+            from app.services.forms.section_binding import resolve_section_variables
+            eo_vars = resolve_section_variables(assignment_entity_status)
+            for key, value in eo_vars.items():
+                resolved_variables[key] = value or ''
+        except Exception as e:
+            current_app.logger.debug(
+                f"Could not resolve EO1/EO2/EO3 for PDF export (plugin or API): {e}"
+            )
+
+    translation_key = get_translation_key()
+
+    assignment_display_name = None
+    with suppress(Exception):
+        assignment_display_name = get_localized_template_name(
+            form_template_for_export,
+            locale=translation_key,
+            version=template_version,
+        )
+    country_display_name = None
+    with suppress(Exception):
+        country_display_name = get_localized_country_name(country) if country else None
+
+    from app.services.organization.entity_service import EntityService
+    entity_display_name = None
+    with suppress(Exception):
+        entity_display_name = EntityService.get_localized_entity_name(
+            assignment_entity_status.entity_type,
+            assignment_entity_status.entity_id,
+        )
+
+    sections_by_page = {}
+    default_page_id = 0
+
+    section_nodes_by_id = {}
+    ordered_section_ids = []
+
+    for section_model in form_template_for_export.sections.order_by(FormSection.order).all():
+        section_display_name = None
+        with suppress(Exception):
+            section_display_name = get_localized_section_name(section_model)
+        if not section_display_name:
+            section_display_name = getattr(section_model, 'display_name', None) or section_model.name
+        if resolved_variables and section_display_name:
+            try:
+                section_display_name = VariableResolutionService.replace_variables_in_text(
+                    section_display_name,
+                    resolved_variables,
+                    variable_configs
+                )
+            except Exception as e:
+                current_app.logger.warning(
+                    f"Error resolving variables in section name for section {section_model.id}: {e}",
+                    exc_info=True
+                )
+
+        section_data_for_export = {
+            'name': section_model.name,
+            'display_name': section_display_name,
+            'id': section_model.id,
+            'order': section_model.order,
+            'page_id': section_model.page_id,
+            'parent_section_id': section_model.parent_section_id,
+            'relevance_condition': getattr(section_model, 'relevance_condition', None),
+            'subsections': [],
+            'fields_ordered': []
+        }
+
+        temp_fields = []
+        form_items = FormItem.query.filter_by(section_id=section_model.id, archived=False).order_by(FormItem.order).all()
+        if form_items:
+            for form_item in form_items:
+                display_label = None
+                with suppress(Exception):
+                    lt = getattr(form_item, 'label_translations', None)
+                    if isinstance(lt, dict) and lt:
+                        candidate = lt.get(translation_key) or lt.get('en')
+                        if isinstance(candidate, str) and candidate.strip():
+                            display_label = candidate.strip()
+                if not display_label:
+                    display_label = getattr(form_item, 'display_label', None) or form_item.label
+                if resolved_variables and display_label:
+                    try:
+                        display_label = VariableResolutionService.replace_variables_in_text(
+                            display_label,
+                            resolved_variables,
+                            variable_configs
+                        )
+                    except Exception as e:
+                        current_app.logger.warning(
+                            f"Error resolving variables in display_label for form_item {form_item.id}: {e}",
+                            exc_info=True
+                        )
+
+                base = {
+                    'id': form_item.id,
+                    'order': form_item.order,
+                    'label': form_item.label,
+                    'display_label': display_label,
+                    'unit': getattr(form_item, 'unit', None),
+                    'type': getattr(form_item, 'type', None),
+                    'conditions': getattr(form_item, 'conditions', None),
+                }
+                if form_item.is_indicator:
+                    base.update({'kind': 'indicator', 'model': form_item})
+                    temp_fields.append(base)
+                elif form_item.is_question:
+                    is_blank_note = (
+                        getattr(form_item, 'type', None) == 'blank'
+                        or (getattr(form_item, 'question_type', None) and getattr(form_item.question_type, 'value', None) == 'blank')
+                    )
+                    if is_blank_note:
+                        note_body = _resolve_note_body(
+                            form_item,
+                            translation_key,
+                            resolved_variables,
+                            variable_configs,
+                        )
+                        base.update({
+                            'kind': 'note',
+                            'model': form_item,
+                            'note_label': display_label or '',
+                            'note_body': note_body,
+                        })
+                    else:
+                        base.update({'kind': 'question', 'model': form_item})
+                    temp_fields.append(base)
+                elif getattr(form_item, 'item_type', None) == 'matrix' or getattr(form_item, 'is_matrix', False):
+                    matrix_config = {}
+                    try:
+                        if isinstance(getattr(form_item, 'config', None), dict):
+                            matrix_config = form_item.config.get('matrix_config') or form_item.config or {}
+                    except Exception as e:
+                        current_app.logger.debug("matrix_config parse failed: %s", e)
+                        matrix_config = {}
+
+                    matrix_rows = getattr(form_item, '_display_matrix_rows', None)
+                    if not matrix_rows and isinstance(matrix_config, dict):
+                        matrix_rows = matrix_config.get('rows', []) or []
+
+                    try:
+                        if isinstance(matrix_config, dict):
+                            row_mode = str(matrix_config.get('row_mode') or 'manual').strip().lower()
+                            if resolved_variables and matrix_rows and isinstance(matrix_rows, list):
+                                if row_mode in ('', 'manual'):
+                                    resolved_rows = []
+                                    for r in matrix_rows:
+                                        if isinstance(r, str):
+                                            resolved_rows.append(
+                                                VariableResolutionService.replace_variables_in_text(
+                                                    r, resolved_variables, variable_configs
+                                                )
+                                            )
+                                        elif isinstance(r, dict):
+                                            row_text = r.get('text', '')
+                                            resolved_text = VariableResolutionService.replace_variables_in_text(
+                                                row_text, resolved_variables, variable_configs
+                                            ) if row_text else row_text
+                                            resolved_rows.append({**r, 'text': resolved_text})
+                                        else:
+                                            resolved_rows.append(r)
+                                    matrix_rows = resolved_rows
+                                elif row_mode == 'hybrid':
+                                    matrix_rows = _resolve_hybrid_fixed_row_displays(
+                                        matrix_rows, resolved_variables, variable_configs
+                                    )
+                    except Exception as e:
+                        current_app.logger.warning(
+                            f"Error resolving variables in matrix row labels for form_item {form_item.id}: {e}",
+                            exc_info=True
+                        )
+                    matrix_columns = matrix_config.get('columns', []) if isinstance(matrix_config, dict) else []
+                    matrix_column_groups = (
+                        matrix_config.get('column_groups', {})
+                        if isinstance(matrix_config, dict) else {}
+                    )
+                    try:
+                        resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+                            matrix_config,
+                            resolved_variables,
+                            variable_configs,
+                            replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
+                                text,
+                                resolved_variables,
+                                variable_configs,
+                            ),
+                        )
+                        if resolved_columns:
+                            matrix_columns = resolved_columns
+                        if resolved_groups:
+                            matrix_column_groups = resolved_groups
+                    except Exception as e:
+                        current_app.logger.debug(
+                            "resolve_matrix_display_headers failed for form_item %s: %s",
+                            form_item.id,
+                            e,
+                        )
+
+                    base.update({
+                        'kind': 'matrix',
+                        'model': form_item,
+                        'matrix_config': matrix_config,
+                        'matrix_rows': matrix_rows,
+                        'matrix_columns': matrix_columns,
+                        'matrix_column_groups': matrix_column_groups,
+                    })
+                    temp_fields.append(base)
+                elif form_item.is_document_field:
+                    base.update({'kind': 'document', 'model': form_item})
+                    temp_fields.append(base)
+
+        section_type = getattr(section_model, 'section_type', None) or 'standard'
+        if section_type == 'dynamic_indicators':
+            dynamic_assignments = DynamicIndicatorData.query.filter_by(
+                assignment_entity_status_id=assignment_entity_status.id,
+                section_id=section_model.id,
+            ).order_by(DynamicIndicatorData.order).all()
+            for dyn in dynamic_assignments:
+                display_label = dyn.custom_label
+                if not (display_label and str(display_label).strip()):
+                    with suppress(Exception):
+                        display_label = get_localized_indicator_name(dyn.indicator_bank)
+                if not display_label:
+                    display_label = getattr(dyn.indicator_bank, 'name', '') or ''
+                if resolved_variables and display_label:
+                    try:
+                        display_label = VariableResolutionService.replace_variables_in_text(
+                            display_label, resolved_variables, variable_configs
+                        )
+                    except Exception as e:
+                        current_app.logger.debug("replace_variables for display_label failed: %s", e)
+                temp_fields.append({
+                    'id': f'dynamic_{dyn.id}',
+                    'order': dyn.order,
+                    'label': display_label,
+                    'display_label': display_label,
+                    'unit': getattr(dyn.indicator_bank, 'unit', None),
+                    'type': getattr(dyn.indicator_bank, 'type', None),
+                    'conditions': None,
+                    'kind': 'indicator',
+                    'model': None,
+                })
+
+        temp_fields.sort(key=lambda x: (x.get('order') is None, x.get('order')))
+        section_data_for_export['fields_ordered'] = temp_fields
+
+        section_nodes_by_id[section_model.id] = section_data_for_export
+        ordered_section_ids.append(section_model.id)
+
+    for section_id in ordered_section_ids:
+        node = section_nodes_by_id.get(section_id)
+        if not node:
+            continue
+        parent_id = node.get('parent_section_id')
+        if parent_id and parent_id in section_nodes_by_id:
+            section_nodes_by_id[parent_id]['subsections'].append(node)
+
+    for section_id in ordered_section_ids:
+        node = section_nodes_by_id.get(section_id)
+        if not node or node.get('parent_section_id') is not None:
+            continue
+        page_id = node.get('page_id') if node.get('page_id') is not None else default_page_id
+        if page_id not in sections_by_page:
+            sections_by_page[page_id] = []
+        sections_by_page[page_id].append(node)
+
+    existing_data_processed_for_export = _load_existing_data_for_pdf_export(
+        assignment_entity_status,
+        form_template_for_export,
+    )
+
+    def _parse_hidden_ids_arg(arg_name):
+        raw = (request.args.get(arg_name) or '').strip()
+        if not raw:
+            return set()
+        out = set()
+        for part in raw.split(','):
+            part = (part or '').strip()
+            if not part:
+                continue
+            if part.isdigit():
+                try:
+                    out.add(int(part))
+                except (ValueError, TypeError):
+                    continue
+        return out
+
+    hidden_section_ids_from_client = _parse_hidden_ids_arg('hidden_sections')
+    hidden_field_ids_from_client = _parse_hidden_ids_arg('hidden_fields')
+
+    def _filter_section_node(section_node):
+        if not isinstance(section_node, dict):
+            return None
+
+        try:
+            if section_node.get('id') in hidden_section_ids_from_client:
+                return None
+        except Exception as e:
+            current_app.logger.debug("hidden section filter failed: %s", e)
+
+        kept_fields = []
+        for f in (section_node.get('fields_ordered') or []):
+            if not isinstance(f, dict):
+                continue
+            try:
+                if f.get('id') in hidden_field_ids_from_client:
+                    continue
+            except Exception as e:
+                current_app.logger.debug("hidden field filter failed: %s", e)
+            kept_fields.append(f)
+        section_node['fields_ordered'] = kept_fields
+
+        kept_children = []
+        for child in (section_node.get('subsections') or []):
+            kept = _filter_section_node(child)
+            if kept is not None:
+                kept_children.append(kept)
+        section_node['subsections'] = kept_children
+        return section_node
+
+    filtered_sections_by_page = {}
+    for page_id, root_sections in (sections_by_page or {}).items():
+        kept_roots = []
+        for sec in (root_sections or []):
+            kept = _filter_section_node(sec)
+            if kept is not None:
+                kept_roots.append(kept)
+        filtered_sections_by_page[page_id] = kept_roots
+    sections_by_page = filtered_sections_by_page
+
+    export_country_iso = None
+    if country is not None:
+        export_country_iso = getattr(country, 'iso3', None) or getattr(country, 'iso2', None)
+
+    def _walk_sections_for_export(section_node):
+        if not isinstance(section_node, dict):
+            return
+        fields = section_node.get('fields_ordered') or []
+        if isinstance(fields, list):
+            for f in fields:
+                if isinstance(f, dict) and f.get('kind') == 'matrix':
+                    item_key = f"form_item_{f.get('id')}"
+                    try:
+                        apply_matrix_rows_for_pdf_export(
+                            f,
+                            existing_data_processed_for_export.get(item_key),
+                            country_iso=export_country_iso,
+                        )
+                    except Exception as e:
+                        current_app.logger.warning(
+                            f"Failed to infer matrix rows for PDF: {e}",
+                            exc_info=True,
+                        )
+        for child in section_node.get('subsections', []) or []:
+            _walk_sections_for_export(child)
+
+    for page_id, root_sections in (sections_by_page or {}).items():
+        for sec in root_sections or []:
+            _walk_sections_for_export(sec)
+
+    if template_version:
+        for page_id, root_sections in (sections_by_page or {}).items():
+            for sec in root_sections or []:
+                _enrich_matrix_export_data(
+                    sec,
+                    existing_data_processed_for_export,
+                    template_version,
+                    assignment_entity_status,
+                )
+
+    pages = list(form_template_for_export.pages) if form_template_for_export.is_paginated else [None]
+
+    html_content = render_template(
+        'forms/entry_form/export_pdf.html',
+        assignment=assignment,
+        assignment_display_name=assignment_display_name,
+        country=country,
+        country_display_name=country_display_name,
+        entity_display_name=entity_display_name,
+        aes=assignment_entity_status,
+        form_template=form_template_for_export,
+        sections_by_page=sections_by_page,
+        pages=pages,
+        existing_data=existing_data_processed_for_export,
+        generated_at=utcnow(),
+        get_localized_page_name=get_localized_page_name,
+        matrix_cell_is_prefilled_highlight=matrix_cell_is_prefilled_highlight,
+        matrix_pdf_layout_strategy=matrix_pdf_layout_strategy,
+        matrix_portrait_column_widths_mm=matrix_portrait_column_widths_mm,
+    )
+
+    try:
+        from weasyprint import HTML, CSS  # type: ignore
+    except Exception as e:
+        current_app.logger.error(f"WeasyPrint not available: {e}", exc_info=True)
+        raise AssignmentPdfUnavailable(
+            "PDF generation is not available on this deployment."
+        ) from e
+
+    static_dir = os.path.join(current_app.root_path, 'static')
+
+    pdf_css_string = '''
+        @page {
+            size: A4;
+            margin: 16mm 6mm 14mm 6mm;
+            @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+            color: #111827;
+            line-height: 1.5;
+        }
+        h1, h2, h3, h4 { color: #111827; margin: 0 0 8px 0; }
+        h1 { font-size: 20pt; }
+        h2 { font-size: 14pt; border-bottom: 2px solid #cc0000; padding-bottom: 4px; margin-top: 16px; margin-bottom: 12px; }
+        .form-page-title { page-break-after: avoid; }
+        h3 { font-size: 12pt; margin-top: 10px; margin-bottom: 8px; color: #374151; }
+        h4 { font-size: 11pt; margin-top: 8px; margin-bottom: 6px; color: #374151; }
+        .meta {
+            color: #374151;
+            font-size: 10pt;
+            margin-bottom: 16px;
+            padding: 8px;
+            background: #f9fafb;
+            border-left: 3px solid #cc0000;
+        }
+        .meta div { margin: 4px 0; }
+        .field-flag {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 8pt;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+        .field-flag-prefilled {
+            background: #fef9c3;
+            color: #854d0e;
+            border: 1px solid #fde047;
+        }
+        .field-flag-imputed {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .matrix-legend {
+            margin: 0 0 8px 0;
+            padding: 6px 8px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            font-size: 9pt;
+            color: #374151;
+            page-break-inside: avoid;
+        }
+        .matrix-field-flag {
+            text-align: right;
+            margin: 0 0 6px 0;
+            page-break-inside: avoid;
+        }
+        .matrix-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .matrix-legend-swatch {
+            width: 14px;
+            height: 14px;
+            border: 1px solid #fde047;
+            background: #fef9c3;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .field-box-imputed {
+            background: #eff6ff;
+            border-color: #93c5fd;
+        }
+        .cell-prefilled {
+            background: #fef9c3 !important;
+        }
+        .cell-imputed {
+            background: #eff6ff !important;
+        }
+        .field-value-prefilled {
+            display: inline-block;
+            background: #fef9c3;
+            border: 1px solid #fde047;
+            border-radius: 3px;
+            padding: 2px 6px;
+        }
+        .field-value-imputed {
+            display: inline-block;
+            background: #eff6ff;
+            border: 1px solid #93c5fd;
+            border-radius: 3px;
+            padding: 2px 6px;
+        }
+        .section {
+            margin-bottom: 16px;
+        }
+        .section h2, .section h3, .section h4 {
+            page-break-after: avoid;
+        }
+        .subsection {
+            margin-left: 12px;
+            padding-left: 10px;
+            border-left: 2px solid #e5e7eb;
+        }
+        .section-empty-note {
+            color: #6b7280;
+            font-size: 10pt;
+            font-style: italic;
+            margin: 8px 0 0 0;
+        }
+        .form-note {
+            margin: 8px 0;
+            padding: 8px 12px;
+            background: #f9fafb;
+            border-left: 3px solid #9ca3af;
+            border-radius: 0 4px 4px 0;
+        }
+        .form-note-heading {
+            color: #111827;
+            font-size: 10pt;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            white-space: pre-wrap;
+        }
+        .form-note-body {
+            color: #374151;
+            font-size: 10pt;
+            line-height: 1.25;
+        }
+        .form-note-body p {
+            margin: 0;
+        }
+        .form-note-body ul, .form-note-body ol { margin: 4px 0 6px 1.2em; padding: 0; }
+        .form-note-body li { margin: 2px 0; }
+        .form-note-body a { color: #2563eb; text-decoration: underline; }
+        .form-note-body strong, .form-note-body b { font-weight: 600; }
+
+        .field-box {
+            border: 1.5px solid #e5e7eb;
+            border-radius: 4px;
+            margin: 8px 0;
+            page-break-inside: avoid;
+            background: #ffffff;
+        }
+        .field-unlabeled {
+            margin: 8px 0;
+            border: none;
+            background: transparent;
+            page-break-inside: auto;
+        }
+        .field-content-unlabeled {
+            padding: 0;
+            min-height: 0;
+        }
+        .field-box-matrix {
+            page-break-inside: auto;
+        }
+        /* Wide matrices (8–13 cols): squeeze into portrait via fixed layout + narrow columns */
+        .field-box-matrix-wide.wide-matrix-portrait-compact,
+        .field-unlabeled.field-box-matrix-wide.wide-matrix-portrait-compact {
+            page-break-inside: auto;
+        }
+        .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table {
+            table-layout: fixed;
+            width: 100%;
+            font-size: 7pt;
+        }
+        .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table th,
+        .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table td {
+            padding: 2px 3px;
+            font-size: 7pt;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            hyphens: auto;
+            vertical-align: top;
+        }
+        .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table th:first-child,
+        .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table td:first-child {
+            min-width: 0;
+            max-width: none;
+        }
+        .wide-matrix-portrait-compact .wide-matrix-compact .matrix-group-header {
+            font-size: 6.5pt;
+            padding: 2px 2px;
+            text-align: center;
+        }
+        /* Wide matrices sit inside the field box. Drop the inner side padding
+           so the grid can use the page width instead of being clipped on the right. */
+        .field-box-matrix-wide .field-header {
+            padding: 6px 6px;
+        }
+        .field-box-matrix-wide .field-content {
+            padding: 4px 2px 6px 2px;
+        }
+        /* Wide matrices (14+ cols): landscape page, fitted to the content box.
+           Scaling the table and hiding overflow clipped the last columns. */
+        .field-box-matrix-wide.wide-matrix-landscape,
+        .field-box-matrix-wide.wide-matrix-landscape-scale {
+            page: wide;
+            page-break-before: always;
+            page-break-inside: auto;
+        }
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
+            font-size: 6.5pt;
+        }
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table th,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td {
+            padding: 2px 2px;
+            overflow-wrap: anywhere;
+        }
+        .field-box-matrix .matrix-table {
+            page-break-inside: auto;
+        }
+        .field-box-matrix .matrix-table thead {
+            display: table-header-group;
+        }
+        .field-box-matrix .matrix-table thead tr {
+            page-break-inside: avoid;
+            page-break-after: avoid;
+        }
+        .field-box-matrix .matrix-table tbody tr {
+            page-break-inside: avoid;
+        }
+        .field-box-matrix .matrix-table td:first-child,
+        .field-box-matrix .matrix-table th:first-child {
+            min-width: 22mm;
+            max-width: 34mm;
+            vertical-align: top;
+        }
+        .field-box-matrix-wide.field-box-matrix .matrix-table td:first-child,
+        .field-box-matrix-wide.field-box-matrix .matrix-table th:first-child {
+            min-width: 0;
+            max-width: none;
+        }
+        .matrix-group-header {
+            background: #eef2ff;
+            color: #3730a3;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .field-filled {
+            border-left: 4px solid #10b981;
+        }
+
+        .field-empty {
+            border-left: 4px solid #d1d5db;
+            background: #f9fafb;
+        }
+
+        .field-empty-required {
+            border-left: 4px solid #ef4444;
+            background: #fef2f2;
+        }
+
+        .field-empty-optional {
+            border-left: 4px solid #d1d5db;
+            background: #f9fafb;
+        }
+
+        .field-header {
+            background: #f9fafb;
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+        }
+
+        .field-label {
+            color: #111827;
+            font-size: 11pt;
+            display: block;
+        }
+
+        .field-unit {
+            color: #6b7280;
+            font-size: 9pt;
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        .field-content {
+            padding: 10px 12px;
+            min-height: 20px;
+        }
+
+        .field-value {
+            color: #111827;
+            font-size: 10pt;
+            word-wrap: break-word;
+            display: block;
+        }
+        .field-value-multiline {
+            line-height: 1.4;
+        }
+
+        .disaggregation-caption {
+            font-size: 9pt;
+            font-weight: 600;
+            color: #374151;
+            margin: 6px 0 4px 0;
+            display: block;
+        }
+
+        .not-reported {
+            color: #dc2626;
+            font-size: 10pt;
+            font-weight: 600;
+            font-style: italic;
+            display: block;
+        }
+
+        .not-reported-optional {
+            color: #6b7280;
+            font-size: 10pt;
+            font-weight: 600;
+            font-style: italic;
+            display: block;
+        }
+
+        html[dir="rtl"] body {
+            direction: rtl;
+            font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+        }
+        html[dir="rtl"] h1,
+        html[dir="rtl"] h2,
+        html[dir="rtl"] h3,
+        html[dir="rtl"] h4,
+        html[dir="rtl"] .meta,
+        html[dir="rtl"] .field-header,
+        html[dir="rtl"] .field-content,
+        html[dir="rtl"] .field-value,
+        html[dir="rtl"] .disaggregation-caption,
+        html[dir="rtl"] .not-reported,
+        html[dir="rtl"] .not-reported-optional {
+            text-align: right;
+            font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+        }
+        html[dir="rtl"] .meta { border-left: none; border-right: 3px solid #cc0000; }
+        html[dir="rtl"] .form-note { border-left: none; border-right: 3px solid #9ca3af; border-radius: 4px 0 0 4px; }
+        html[dir="rtl"] .form-note-heading,
+        html[dir="rtl"] .form-note-body { text-align: right; }
+        html[dir="rtl"] .subsection { margin-left: 0; margin-right: 12px; padding-left: 0; padding-right: 10px; border-left: none; border-right: 2px solid #e5e7eb; }
+        html[dir="rtl"] table th, html[dir="rtl"] table td {
+            text-align: right;
+            font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+        }
+
+        .document-note {
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 9pt;
+        }
+        .table th, .table td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+        }
+        .table th {
+            background: #f3f4f6;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+        }
+        .table td {
+            background: #ffffff;
+        }
+        .table tbody tr:nth-child(even) td {
+            background: #f9fafb;
+        }
+        .table td.cell-tick {
+            text-align: center;
+        }
+        /* Wide matrices (8+ columns): tighter cells */
+        .wide-matrix-compact table.table,
+        .wide-matrix-compact table.matrix-table {
+            font-size: 7.5pt;
+        }
+        .wide-matrix-compact table.table th,
+        .wide-matrix-compact table.table td,
+        .wide-matrix-compact table.matrix-table th,
+        .wide-matrix-compact table.matrix-table td {
+            padding: 3px 4px;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            hyphens: auto;
+        }
+        .wide-matrix-compact table.table th:first-child,
+        .wide-matrix-compact table.table td:first-child,
+        .wide-matrix-compact table.matrix-table th:first-child,
+        .wide-matrix-compact table.matrix-table td:first-child {
+            max-width: 28mm;
+        }
+        .wide-matrix-scale {
+            width: 100%;
+            overflow: hidden;
+        }
+        .wide-matrix-scale table.table {
+            transform: scale(0.72);
+            transform-origin: top left;
+        }
+        /* Matrix alignment — explicit classes; keep after generic table/RTL rules */
+        html[dir="ltr"] .matrix-table thead th.matrix-row-header,
+        html[dir="ltr"] .matrix-table thead th.matrix-col-header {
+            text-align: left;
+            hyphens: none;
+        }
+        html[dir="ltr"] .matrix-table thead th.matrix-group-header {
+            text-align: center;
+        }
+        html[dir="ltr"] .matrix-table thead th.cell-tick,
+        html[dir="ltr"] .matrix-table tbody td.cell-tick {
+            text-align: center;
+        }
+        html[dir="ltr"] .matrix-table tbody td.matrix-col-data,
+        html[dir="ltr"] .matrix-table tbody td.matrix-column-total-cell,
+        html[dir="ltr"] .matrix-table tbody td.matrix-row-total-cell,
+        html[dir="ltr"] .matrix-table tbody td.matrix-grand-total-cell {
+            text-align: right;
+        }
+        html[dir="ltr"] .matrix-table tbody td.matrix-row-label {
+            text-align: left;
+        }
+        /* Tick cells also carry matrix-col-data, which is right-aligned above. */
+        html[dir="ltr"] .matrix-table tbody td.matrix-col-data.cell-tick,
+        html[dir="rtl"] .matrix-table tbody td.matrix-col-data.cell-tick,
+        html[dir="ltr"] .matrix-table thead th.matrix-col-header.cell-tick,
+        html[dir="rtl"] .matrix-table thead th.matrix-col-header.cell-tick {
+            text-align: center;
+            vertical-align: middle;
+        }
+        .tick-icon {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            line-height: 0;
+            vertical-align: middle;
+        }
+        .tick-icon svg {
+            display: block;
+            width: 12px;
+            height: 12px;
+        }
+        html[dir="rtl"] .matrix-table thead th.matrix-row-header,
+        html[dir="rtl"] .matrix-table thead th.matrix-col-header {
+            text-align: right;
+        }
+        html[dir="rtl"] .matrix-table thead th.matrix-group-header {
+            text-align: center;
+        }
+        html[dir="rtl"] .matrix-table tbody td.matrix-col-data,
+        html[dir="rtl"] .matrix-table tbody td.matrix-column-total-cell,
+        html[dir="rtl"] .matrix-table tbody td.matrix-row-total-cell,
+        html[dir="rtl"] .matrix-table tbody td.matrix-grand-total-cell {
+            text-align: left;
+        }
+        @page wide {
+            size: A4 landscape;
+            margin: 12mm 6mm 12mm 6mm;
+            @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
+        }
+        .page-break { page-break-before: always; }
+    '''
+    with suppress(Exception):
+        pdf_css_string = pdf_css_string.replace('content: "Page "', f'content: "{_("Page")} "')
+    pdf_css = CSS(string=pdf_css_string)
+
+    pdf_buffer = io.BytesIO()
+    HTML(string=html_content, base_url=static_dir).write_pdf(
+        pdf_buffer,
+        stylesheets=[pdf_css],
+        optimize_images=True,
+    )
+
+    pdf_buffer.seek(0)
+    filename = _make_assignment_pdf_download_name(
+        entity_display_name or country_display_name,
+        assignment_display_name or (assignment.template.name if assignment and assignment.template else None),
+    )
+
+    return pdf_buffer.getvalue(), filename
+
+
 def _export_pdf_impl(aes_id):
     """Generate a high-quality PDF for an assignment using a print-optimized HTML template.
 
@@ -803,928 +1731,18 @@ def _export_pdf_impl(aes_id):
             flash("PDF export is not enabled for this assignment.", "warning")
             return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
-        from app.utils.api_serialization import _country_for_aes
-        country = _country_for_aes(assignment_entity_status)
-        form_template_for_export = assignment.template
-
-        from app.services.forms.variable_resolution_service import VariableResolutionService
-        from app.models import FormTemplateVersion
-
-        template_version = None
-        resolved_variables = {}
-        variable_configs = {}
-        if form_template_for_export.published_version_id:
-            template_version = FormTemplateVersion.query.get(form_template_for_export.published_version_id)
-            if template_version:
-                variable_configs = template_version.variables or {}
-                resolved_variables = VariableResolutionService.resolve_variables(
-                    template_version,
-                    assignment_entity_status
-                )
-
-        if country:
-            try:
-                # Binding-aware resolution: keeps EO1/EO2/EO3 in the export aligned with the appeal
-                # codes the data was actually entered against (see plugins/emergency_operations/section_binding).
-                from app.services.forms.section_binding import resolve_section_variables
-                eo_vars = resolve_section_variables(assignment_entity_status)
-                for key, value in eo_vars.items():
-                    resolved_variables[key] = value or ''
-            except Exception as e:
-                current_app.logger.debug(
-                    f"Could not resolve EO1/EO2/EO3 for PDF export (plugin or API): {e}"
-                )
-
-        translation_key = get_translation_key()
-
-        assignment_display_name = None
-        with suppress(Exception):
-            assignment_display_name = get_localized_template_name(
-                form_template_for_export,
-                locale=translation_key,
-                version=template_version,
-            )
-        country_display_name = None
-        with suppress(Exception):
-            country_display_name = get_localized_country_name(country) if country else None
-
-        from app.services.organization.entity_service import EntityService
-        entity_display_name = None
-        with suppress(Exception):
-            entity_display_name = EntityService.get_localized_entity_name(
-                assignment_entity_status.entity_type,
-                assignment_entity_status.entity_id,
-            )
-
-        sections_by_page = {}
-        default_page_id = 0
-
-        section_nodes_by_id = {}
-        ordered_section_ids = []
-
-        for section_model in form_template_for_export.sections.order_by(FormSection.order).all():
-            section_display_name = None
-            with suppress(Exception):
-                section_display_name = get_localized_section_name(section_model)
-            if not section_display_name:
-                section_display_name = getattr(section_model, 'display_name', None) or section_model.name
-            if resolved_variables and section_display_name:
-                try:
-                    section_display_name = VariableResolutionService.replace_variables_in_text(
-                        section_display_name,
-                        resolved_variables,
-                        variable_configs
-                    )
-                except Exception as e:
-                    current_app.logger.warning(
-                        f"Error resolving variables in section name for section {section_model.id}: {e}",
-                        exc_info=True
-                    )
-
-            section_data_for_export = {
-                'name': section_model.name,
-                'display_name': section_display_name,
-                'id': section_model.id,
-                'order': section_model.order,
-                'page_id': section_model.page_id,
-                'parent_section_id': section_model.parent_section_id,
-                'relevance_condition': getattr(section_model, 'relevance_condition', None),
-                'subsections': [],
-                'fields_ordered': []
-            }
-
-            temp_fields = []
-            form_items = FormItem.query.filter_by(section_id=section_model.id, archived=False).order_by(FormItem.order).all()
-            if form_items:
-                for form_item in form_items:
-                    display_label = None
-                    with suppress(Exception):
-                        lt = getattr(form_item, 'label_translations', None)
-                        if isinstance(lt, dict) and lt:
-                            candidate = lt.get(translation_key) or lt.get('en')
-                            if isinstance(candidate, str) and candidate.strip():
-                                display_label = candidate.strip()
-                    if not display_label:
-                        display_label = getattr(form_item, 'display_label', None) or form_item.label
-                    if resolved_variables and display_label:
-                        try:
-                            display_label = VariableResolutionService.replace_variables_in_text(
-                                display_label,
-                                resolved_variables,
-                                variable_configs
-                            )
-                        except Exception as e:
-                            current_app.logger.warning(
-                                f"Error resolving variables in display_label for form_item {form_item.id}: {e}",
-                                exc_info=True
-                            )
-
-                    base = {
-                        'id': form_item.id,
-                        'order': form_item.order,
-                        'label': form_item.label,
-                        'display_label': display_label,
-                        'unit': getattr(form_item, 'unit', None),
-                        'type': getattr(form_item, 'type', None),
-                        'conditions': getattr(form_item, 'conditions', None),
-                    }
-                    if form_item.is_indicator:
-                        base.update({'kind': 'indicator', 'model': form_item})
-                        temp_fields.append(base)
-                    elif form_item.is_question:
-                        is_blank_note = (
-                            getattr(form_item, 'type', None) == 'blank'
-                            or (getattr(form_item, 'question_type', None) and getattr(form_item.question_type, 'value', None) == 'blank')
-                        )
-                        if is_blank_note:
-                            note_body = _resolve_note_body(
-                                form_item,
-                                translation_key,
-                                resolved_variables,
-                                variable_configs,
-                            )
-                            base.update({
-                                'kind': 'note',
-                                'model': form_item,
-                                'note_label': display_label or '',
-                                'note_body': note_body,
-                            })
-                        else:
-                            base.update({'kind': 'question', 'model': form_item})
-                        temp_fields.append(base)
-                    elif getattr(form_item, 'item_type', None) == 'matrix' or getattr(form_item, 'is_matrix', False):
-                        matrix_config = {}
-                        try:
-                            if isinstance(getattr(form_item, 'config', None), dict):
-                                matrix_config = form_item.config.get('matrix_config') or form_item.config or {}
-                        except Exception as e:
-                            current_app.logger.debug("matrix_config parse failed: %s", e)
-                            matrix_config = {}
-
-                        matrix_rows = getattr(form_item, '_display_matrix_rows', None)
-                        if not matrix_rows and isinstance(matrix_config, dict):
-                            matrix_rows = matrix_config.get('rows', []) or []
-
-                        try:
-                            if isinstance(matrix_config, dict):
-                                row_mode = str(matrix_config.get('row_mode') or 'manual').strip().lower()
-                                if resolved_variables and matrix_rows and isinstance(matrix_rows, list):
-                                    if row_mode in ('', 'manual'):
-                                        resolved_rows = []
-                                        for r in matrix_rows:
-                                            if isinstance(r, str):
-                                                resolved_rows.append(
-                                                    VariableResolutionService.replace_variables_in_text(
-                                                        r, resolved_variables, variable_configs
-                                                    )
-                                                )
-                                            elif isinstance(r, dict):
-                                                row_text = r.get('text', '')
-                                                resolved_text = VariableResolutionService.replace_variables_in_text(
-                                                    row_text, resolved_variables, variable_configs
-                                                ) if row_text else row_text
-                                                resolved_rows.append({**r, 'text': resolved_text})
-                                            else:
-                                                resolved_rows.append(r)
-                                        matrix_rows = resolved_rows
-                                    elif row_mode == 'hybrid':
-                                        matrix_rows = _resolve_hybrid_fixed_row_displays(
-                                            matrix_rows, resolved_variables, variable_configs
-                                        )
-                        except Exception as e:
-                            current_app.logger.warning(
-                                f"Error resolving variables in matrix row labels for form_item {form_item.id}: {e}",
-                                exc_info=True
-                            )
-                        matrix_columns = matrix_config.get('columns', []) if isinstance(matrix_config, dict) else []
-                        matrix_column_groups = (
-                            matrix_config.get('column_groups', {})
-                            if isinstance(matrix_config, dict) else {}
-                        )
-                        try:
-                            resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
-                                matrix_config,
-                                resolved_variables,
-                                variable_configs,
-                                replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
-                                    text,
-                                    resolved_variables,
-                                    variable_configs,
-                                ),
-                            )
-                            if resolved_columns:
-                                matrix_columns = resolved_columns
-                            if resolved_groups:
-                                matrix_column_groups = resolved_groups
-                        except Exception as e:
-                            current_app.logger.debug(
-                                "resolve_matrix_display_headers failed for form_item %s: %s",
-                                form_item.id,
-                                e,
-                            )
-
-                        base.update({
-                            'kind': 'matrix',
-                            'model': form_item,
-                            'matrix_config': matrix_config,
-                            'matrix_rows': matrix_rows,
-                            'matrix_columns': matrix_columns,
-                            'matrix_column_groups': matrix_column_groups,
-                        })
-                        temp_fields.append(base)
-                    elif form_item.is_document_field:
-                        base.update({'kind': 'document', 'model': form_item})
-                        temp_fields.append(base)
-
-            section_type = getattr(section_model, 'section_type', None) or 'standard'
-            if section_type == 'dynamic_indicators':
-                dynamic_assignments = DynamicIndicatorData.query.filter_by(
-                    assignment_entity_status_id=assignment_entity_status.id,
-                    section_id=section_model.id,
-                ).order_by(DynamicIndicatorData.order).all()
-                for dyn in dynamic_assignments:
-                    display_label = dyn.custom_label
-                    if not (display_label and str(display_label).strip()):
-                        with suppress(Exception):
-                            display_label = get_localized_indicator_name(dyn.indicator_bank)
-                    if not display_label:
-                        display_label = getattr(dyn.indicator_bank, 'name', '') or ''
-                    if resolved_variables and display_label:
-                        try:
-                            display_label = VariableResolutionService.replace_variables_in_text(
-                                display_label, resolved_variables, variable_configs
-                            )
-                        except Exception as e:
-                            current_app.logger.debug("replace_variables for display_label failed: %s", e)
-                    temp_fields.append({
-                        'id': f'dynamic_{dyn.id}',
-                        'order': dyn.order,
-                        'label': display_label,
-                        'display_label': display_label,
-                        'unit': getattr(dyn.indicator_bank, 'unit', None),
-                        'type': getattr(dyn.indicator_bank, 'type', None),
-                        'conditions': None,
-                        'kind': 'indicator',
-                        'model': None,
-                    })
-
-            temp_fields.sort(key=lambda x: (x.get('order') is None, x.get('order')))
-            section_data_for_export['fields_ordered'] = temp_fields
-
-            section_nodes_by_id[section_model.id] = section_data_for_export
-            ordered_section_ids.append(section_model.id)
-
-        for section_id in ordered_section_ids:
-            node = section_nodes_by_id.get(section_id)
-            if not node:
-                continue
-            parent_id = node.get('parent_section_id')
-            if parent_id and parent_id in section_nodes_by_id:
-                section_nodes_by_id[parent_id]['subsections'].append(node)
-
-        for section_id in ordered_section_ids:
-            node = section_nodes_by_id.get(section_id)
-            if not node or node.get('parent_section_id') is not None:
-                continue
-            page_id = node.get('page_id') if node.get('page_id') is not None else default_page_id
-            if page_id not in sections_by_page:
-                sections_by_page[page_id] = []
-            sections_by_page[page_id].append(node)
-
-        existing_data_processed_for_export = _load_existing_data_for_pdf_export(
-            assignment_entity_status,
-            form_template_for_export,
-        )
-
-        def _parse_hidden_ids_arg(arg_name):
-            raw = (request.args.get(arg_name) or '').strip()
-            if not raw:
-                return set()
-            out = set()
-            for part in raw.split(','):
-                part = (part or '').strip()
-                if not part:
-                    continue
-                if part.isdigit():
-                    try:
-                        out.add(int(part))
-                    except (ValueError, TypeError):
-                        continue
-            return out
-
-        hidden_section_ids_from_client = _parse_hidden_ids_arg('hidden_sections')
-        hidden_field_ids_from_client = _parse_hidden_ids_arg('hidden_fields')
-
-        def _filter_section_node(section_node):
-            if not isinstance(section_node, dict):
-                return None
-
-            try:
-                if section_node.get('id') in hidden_section_ids_from_client:
-                    return None
-            except Exception as e:
-                current_app.logger.debug("hidden section filter failed: %s", e)
-
-            kept_fields = []
-            for f in (section_node.get('fields_ordered') or []):
-                if not isinstance(f, dict):
-                    continue
-                try:
-                    if f.get('id') in hidden_field_ids_from_client:
-                        continue
-                except Exception as e:
-                    current_app.logger.debug("hidden field filter failed: %s", e)
-                kept_fields.append(f)
-            section_node['fields_ordered'] = kept_fields
-
-            kept_children = []
-            for child in (section_node.get('subsections') or []):
-                kept = _filter_section_node(child)
-                if kept is not None:
-                    kept_children.append(kept)
-            section_node['subsections'] = kept_children
-            return section_node
-
-        filtered_sections_by_page = {}
-        for page_id, root_sections in (sections_by_page or {}).items():
-            kept_roots = []
-            for sec in (root_sections or []):
-                kept = _filter_section_node(sec)
-                if kept is not None:
-                    kept_roots.append(kept)
-            filtered_sections_by_page[page_id] = kept_roots
-        sections_by_page = filtered_sections_by_page
-
-        export_country_iso = None
-        if country is not None:
-            export_country_iso = getattr(country, 'iso3', None) or getattr(country, 'iso2', None)
-
-        def _walk_sections_for_export(section_node):
-            if not isinstance(section_node, dict):
-                return
-            fields = section_node.get('fields_ordered') or []
-            if isinstance(fields, list):
-                for f in fields:
-                    if isinstance(f, dict) and f.get('kind') == 'matrix':
-                        item_key = f"form_item_{f.get('id')}"
-                        try:
-                            apply_matrix_rows_for_pdf_export(
-                                f,
-                                existing_data_processed_for_export.get(item_key),
-                                country_iso=export_country_iso,
-                            )
-                        except Exception as e:
-                            current_app.logger.warning(
-                                f"Failed to infer matrix rows for PDF: {e}",
-                                exc_info=True,
-                            )
-            for child in section_node.get('subsections', []) or []:
-                _walk_sections_for_export(child)
-
-        for page_id, root_sections in (sections_by_page or {}).items():
-            for sec in root_sections or []:
-                _walk_sections_for_export(sec)
-
-        if template_version:
-            for page_id, root_sections in (sections_by_page or {}).items():
-                for sec in root_sections or []:
-                    _enrich_matrix_export_data(
-                        sec,
-                        existing_data_processed_for_export,
-                        template_version,
-                        assignment_entity_status,
-                    )
-
-        pages = list(form_template_for_export.pages) if form_template_for_export.is_paginated else [None]
-
-        html_content = render_template(
-            'forms/entry_form/export_pdf.html',
-            assignment=assignment,
-            assignment_display_name=assignment_display_name,
-            country=country,
-            country_display_name=country_display_name,
-            entity_display_name=entity_display_name,
-            aes=assignment_entity_status,
-            form_template=form_template_for_export,
-            sections_by_page=sections_by_page,
-            pages=pages,
-            existing_data=existing_data_processed_for_export,
-            generated_at=utcnow(),
-            get_localized_page_name=get_localized_page_name,
-            matrix_cell_is_prefilled_highlight=matrix_cell_is_prefilled_highlight,
-            matrix_pdf_layout_strategy=matrix_pdf_layout_strategy,
-            matrix_portrait_column_widths_mm=matrix_portrait_column_widths_mm,
-        )
-
-        try:
-            from weasyprint import HTML, CSS  # type: ignore
-        except Exception as e:
-            current_app.logger.error(f"WeasyPrint not available: {e}", exc_info=True)
-            return current_app.response_class(
-                response="PDF generation is not available on this deployment.",
-                status=503,
-                mimetype='text/plain'
-            )
-
-        static_dir = os.path.join(current_app.root_path, 'static')
-
-        pdf_css_string = '''
-            @page {
-                size: A4;
-                margin: 16mm 6mm 14mm 6mm;
-                @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
-            }
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-                color: #111827;
-                line-height: 1.5;
-            }
-            h1, h2, h3, h4 { color: #111827; margin: 0 0 8px 0; }
-            h1 { font-size: 20pt; }
-            h2 { font-size: 14pt; border-bottom: 2px solid #cc0000; padding-bottom: 4px; margin-top: 16px; margin-bottom: 12px; }
-            .form-page-title { page-break-after: avoid; }
-            h3 { font-size: 12pt; margin-top: 10px; margin-bottom: 8px; color: #374151; }
-            h4 { font-size: 11pt; margin-top: 8px; margin-bottom: 6px; color: #374151; }
-            .meta {
-                color: #374151;
-                font-size: 10pt;
-                margin-bottom: 16px;
-                padding: 8px;
-                background: #f9fafb;
-                border-left: 3px solid #cc0000;
-            }
-            .meta div { margin: 4px 0; }
-            .field-flag {
-                display: inline-block;
-                margin-left: 8px;
-                padding: 1px 6px;
-                border-radius: 3px;
-                font-size: 8pt;
-                font-weight: 600;
-                vertical-align: middle;
-            }
-            .field-flag-prefilled {
-                background: #fef9c3;
-                color: #854d0e;
-                border: 1px solid #fde047;
-            }
-            .field-flag-imputed {
-                background: #dbeafe;
-                color: #1e40af;
-                border: 1px solid #93c5fd;
-            }
-            .matrix-legend {
-                margin: 0 0 8px 0;
-                padding: 6px 8px;
-                background: #f9fafb;
-                border: 1px solid #e5e7eb;
-                border-radius: 4px;
-                font-size: 9pt;
-                color: #374151;
-                page-break-inside: avoid;
-            }
-            .matrix-field-flag {
-                text-align: right;
-                margin: 0 0 6px 0;
-                page-break-inside: avoid;
-            }
-            .matrix-legend-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            .matrix-legend-swatch {
-                width: 14px;
-                height: 14px;
-                border: 1px solid #fde047;
-                background: #fef9c3;
-                border-radius: 2px;
-                flex-shrink: 0;
-            }
-            .field-box-imputed {
-                background: #eff6ff;
-                border-color: #93c5fd;
-            }
-            .cell-prefilled {
-                background: #fef9c3 !important;
-            }
-            .cell-imputed {
-                background: #eff6ff !important;
-            }
-            .field-value-prefilled {
-                display: inline-block;
-                background: #fef9c3;
-                border: 1px solid #fde047;
-                border-radius: 3px;
-                padding: 2px 6px;
-            }
-            .field-value-imputed {
-                display: inline-block;
-                background: #eff6ff;
-                border: 1px solid #93c5fd;
-                border-radius: 3px;
-                padding: 2px 6px;
-            }
-            .section {
-                margin-bottom: 16px;
-            }
-            .section h2, .section h3, .section h4 {
-                page-break-after: avoid;
-            }
-            .subsection {
-                margin-left: 12px;
-                padding-left: 10px;
-                border-left: 2px solid #e5e7eb;
-            }
-            .section-empty-note {
-                color: #6b7280;
-                font-size: 10pt;
-                font-style: italic;
-                margin: 8px 0 0 0;
-            }
-            .form-note {
-                margin: 8px 0;
-                padding: 8px 12px;
-                background: #f9fafb;
-                border-left: 3px solid #9ca3af;
-                border-radius: 0 4px 4px 0;
-            }
-            .form-note-heading {
-                color: #111827;
-                font-size: 10pt;
-                font-weight: 600;
-                margin: 0 0 4px 0;
-                white-space: pre-wrap;
-            }
-            .form-note-body {
-                color: #374151;
-                font-size: 10pt;
-                line-height: 1.25;
-            }
-            .form-note-body p {
-                margin: 0;
-            }
-            .form-note-body ul, .form-note-body ol { margin: 4px 0 6px 1.2em; padding: 0; }
-            .form-note-body li { margin: 2px 0; }
-            .form-note-body a { color: #2563eb; text-decoration: underline; }
-            .form-note-body strong, .form-note-body b { font-weight: 600; }
-
-            .field-box {
-                border: 1.5px solid #e5e7eb;
-                border-radius: 4px;
-                margin: 8px 0;
-                page-break-inside: avoid;
-                background: #ffffff;
-            }
-            .field-unlabeled {
-                margin: 8px 0;
-                border: none;
-                background: transparent;
-                page-break-inside: auto;
-            }
-            .field-content-unlabeled {
-                padding: 0;
-                min-height: 0;
-            }
-            .field-box-matrix {
-                page-break-inside: auto;
-            }
-            /* Wide matrices (8–13 cols): squeeze into portrait via fixed layout + narrow columns */
-            .field-box-matrix-wide.wide-matrix-portrait-compact,
-            .field-unlabeled.field-box-matrix-wide.wide-matrix-portrait-compact {
-                page-break-inside: auto;
-            }
-            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table {
-                table-layout: fixed;
-                width: 100%;
-                font-size: 7pt;
-            }
-            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table th,
-            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table td {
-                padding: 2px 3px;
-                font-size: 7pt;
-                line-height: 1.25;
-                overflow-wrap: anywhere;
-                hyphens: auto;
-                vertical-align: top;
-            }
-            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table th:first-child,
-            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table td:first-child {
-                min-width: 0;
-                max-width: none;
-            }
-            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-group-header {
-                font-size: 6.5pt;
-                padding: 2px 2px;
-                text-align: center;
-            }
-            /* Wide matrices sit inside the field box. Drop the inner side padding
-               so the grid can use the page width instead of being clipped on the right. */
-            .field-box-matrix-wide .field-header {
-                padding: 6px 6px;
-            }
-            .field-box-matrix-wide .field-content {
-                padding: 4px 2px 6px 2px;
-            }
-            /* Wide matrices (14+ cols): landscape page, fitted to the content box.
-               Scaling the table and hiding overflow clipped the last columns. */
-            .field-box-matrix-wide.wide-matrix-landscape,
-            .field-box-matrix-wide.wide-matrix-landscape-scale {
-                page: wide;
-                page-break-before: always;
-                page-break-inside: auto;
-            }
-            .field-box-matrix-wide.wide-matrix-landscape .matrix-table,
-            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
-                table-layout: fixed;
-                width: 100%;
-            }
-            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
-                font-size: 6.5pt;
-            }
-            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table th,
-            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td {
-                padding: 2px 2px;
-                overflow-wrap: anywhere;
-            }
-            .field-box-matrix .matrix-table {
-                page-break-inside: auto;
-            }
-            .field-box-matrix .matrix-table thead {
-                display: table-header-group;
-            }
-            .field-box-matrix .matrix-table thead tr {
-                page-break-inside: avoid;
-                page-break-after: avoid;
-            }
-            .field-box-matrix .matrix-table tbody tr {
-                page-break-inside: avoid;
-            }
-            .field-box-matrix .matrix-table td:first-child,
-            .field-box-matrix .matrix-table th:first-child {
-                min-width: 22mm;
-                max-width: 34mm;
-                vertical-align: top;
-            }
-            .field-box-matrix-wide.field-box-matrix .matrix-table td:first-child,
-            .field-box-matrix-wide.field-box-matrix .matrix-table th:first-child {
-                min-width: 0;
-                max-width: none;
-            }
-            .matrix-group-header {
-                background: #eef2ff;
-                color: #3730a3;
-                font-weight: 600;
-                text-align: center;
-            }
-
-            .field-filled {
-                border-left: 4px solid #10b981;
-            }
-
-            .field-empty {
-                border-left: 4px solid #d1d5db;
-                background: #f9fafb;
-            }
-
-            .field-empty-required {
-                border-left: 4px solid #ef4444;
-                background: #fef2f2;
-            }
-
-            .field-empty-optional {
-                border-left: 4px solid #d1d5db;
-                background: #f9fafb;
-            }
-
-            .field-header {
-                background: #f9fafb;
-                padding: 8px 12px;
-                border-bottom: 1px solid #e5e7eb;
-                font-weight: 600;
-            }
-
-            .field-label {
-                color: #111827;
-                font-size: 11pt;
-                display: block;
-            }
-
-            .field-unit {
-                color: #6b7280;
-                font-size: 9pt;
-                font-weight: normal;
-                font-style: italic;
-            }
-
-            .field-content {
-                padding: 10px 12px;
-                min-height: 20px;
-            }
-
-            .field-value {
-                color: #111827;
-                font-size: 10pt;
-                word-wrap: break-word;
-                display: block;
-            }
-            .field-value-multiline {
-                line-height: 1.4;
-            }
-
-            .disaggregation-caption {
-                font-size: 9pt;
-                font-weight: 600;
-                color: #374151;
-                margin: 6px 0 4px 0;
-                display: block;
-            }
-
-            .not-reported {
-                color: #dc2626;
-                font-size: 10pt;
-                font-weight: 600;
-                font-style: italic;
-                display: block;
-            }
-
-            .not-reported-optional {
-                color: #6b7280;
-                font-size: 10pt;
-                font-weight: 600;
-                font-style: italic;
-                display: block;
-            }
-
-            html[dir="rtl"] body {
-                direction: rtl;
-                font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-            }
-            html[dir="rtl"] h1,
-            html[dir="rtl"] h2,
-            html[dir="rtl"] h3,
-            html[dir="rtl"] h4,
-            html[dir="rtl"] .meta,
-            html[dir="rtl"] .field-header,
-            html[dir="rtl"] .field-content,
-            html[dir="rtl"] .field-value,
-            html[dir="rtl"] .disaggregation-caption,
-            html[dir="rtl"] .not-reported,
-            html[dir="rtl"] .not-reported-optional {
-                text-align: right;
-                font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-            }
-            html[dir="rtl"] .meta { border-left: none; border-right: 3px solid #cc0000; }
-            html[dir="rtl"] .form-note { border-left: none; border-right: 3px solid #9ca3af; border-radius: 4px 0 0 4px; }
-            html[dir="rtl"] .form-note-heading,
-            html[dir="rtl"] .form-note-body { text-align: right; }
-            html[dir="rtl"] .subsection { margin-left: 0; margin-right: 12px; padding-left: 0; padding-right: 10px; border-left: none; border-right: 2px solid #e5e7eb; }
-            html[dir="rtl"] table th, html[dir="rtl"] table td {
-                text-align: right;
-                font-family: "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
-            }
-
-            .document-note {
-                color: #6b7280;
-                font-style: italic;
-            }
-
-            .table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 8px 0;
-                font-size: 9pt;
-            }
-            .table th, .table td {
-                border: 1px solid #d1d5db;
-                padding: 6px 8px;
-            }
-            .table th {
-                background: #f3f4f6;
-                text-align: left;
-                font-weight: 600;
-                color: #374151;
-            }
-            .table td {
-                background: #ffffff;
-            }
-            .table tbody tr:nth-child(even) td {
-                background: #f9fafb;
-            }
-            .table td.cell-tick {
-                text-align: center;
-            }
-            /* Wide matrices (8+ columns): tighter cells */
-            .wide-matrix-compact table.table,
-            .wide-matrix-compact table.matrix-table {
-                font-size: 7.5pt;
-            }
-            .wide-matrix-compact table.table th,
-            .wide-matrix-compact table.table td,
-            .wide-matrix-compact table.matrix-table th,
-            .wide-matrix-compact table.matrix-table td {
-                padding: 3px 4px;
-                word-wrap: break-word;
-                overflow-wrap: anywhere;
-                hyphens: auto;
-            }
-            .wide-matrix-compact table.table th:first-child,
-            .wide-matrix-compact table.table td:first-child,
-            .wide-matrix-compact table.matrix-table th:first-child,
-            .wide-matrix-compact table.matrix-table td:first-child {
-                max-width: 28mm;
-            }
-            .wide-matrix-scale {
-                width: 100%;
-                overflow: hidden;
-            }
-            .wide-matrix-scale table.table {
-                transform: scale(0.72);
-                transform-origin: top left;
-            }
-            /* Matrix alignment — explicit classes; keep after generic table/RTL rules */
-            html[dir="ltr"] .matrix-table thead th.matrix-row-header,
-            html[dir="ltr"] .matrix-table thead th.matrix-col-header {
-                text-align: left;
-                hyphens: none;
-            }
-            html[dir="ltr"] .matrix-table thead th.matrix-group-header {
-                text-align: center;
-            }
-            html[dir="ltr"] .matrix-table thead th.cell-tick,
-            html[dir="ltr"] .matrix-table tbody td.cell-tick {
-                text-align: center;
-            }
-            html[dir="ltr"] .matrix-table tbody td.matrix-col-data,
-            html[dir="ltr"] .matrix-table tbody td.matrix-column-total-cell,
-            html[dir="ltr"] .matrix-table tbody td.matrix-row-total-cell,
-            html[dir="ltr"] .matrix-table tbody td.matrix-grand-total-cell {
-                text-align: right;
-            }
-            html[dir="ltr"] .matrix-table tbody td.matrix-row-label {
-                text-align: left;
-            }
-            /* Tick cells also carry matrix-col-data, which is right-aligned above. */
-            html[dir="ltr"] .matrix-table tbody td.matrix-col-data.cell-tick,
-            html[dir="rtl"] .matrix-table tbody td.matrix-col-data.cell-tick,
-            html[dir="ltr"] .matrix-table thead th.matrix-col-header.cell-tick,
-            html[dir="rtl"] .matrix-table thead th.matrix-col-header.cell-tick {
-                text-align: center;
-                vertical-align: middle;
-            }
-            .tick-icon {
-                display: inline-block;
-                width: 12px;
-                height: 12px;
-                line-height: 0;
-                vertical-align: middle;
-            }
-            .tick-icon svg {
-                display: block;
-                width: 12px;
-                height: 12px;
-            }
-            html[dir="rtl"] .matrix-table thead th.matrix-row-header,
-            html[dir="rtl"] .matrix-table thead th.matrix-col-header {
-                text-align: right;
-            }
-            html[dir="rtl"] .matrix-table thead th.matrix-group-header {
-                text-align: center;
-            }
-            html[dir="rtl"] .matrix-table tbody td.matrix-col-data,
-            html[dir="rtl"] .matrix-table tbody td.matrix-column-total-cell,
-            html[dir="rtl"] .matrix-table tbody td.matrix-row-total-cell,
-            html[dir="rtl"] .matrix-table tbody td.matrix-grand-total-cell {
-                text-align: left;
-            }
-            @page wide {
-                size: A4 landscape;
-                margin: 12mm 6mm 12mm 6mm;
-                @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
-            }
-            .page-break { page-break-before: always; }
-        '''
-        with suppress(Exception):
-            pdf_css_string = pdf_css_string.replace('content: "Page "', f'content: "{_("Page")} "')
-        pdf_css = CSS(string=pdf_css_string)
-
-        pdf_buffer = io.BytesIO()
-        HTML(string=html_content, base_url=static_dir).write_pdf(
-            pdf_buffer,
-            stylesheets=[pdf_css],
-            optimize_images=True,
-        )
-
-        pdf_buffer.seek(0)
-        filename = _make_assignment_pdf_download_name(
-            entity_display_name or country_display_name,
-            assignment_display_name or (assignment.template.name if assignment and assignment.template else None),
-        )
+        pdf_bytes, filename = build_assignment_pdf_bytes(assignment_entity_status)
         return send_file(
-            pdf_buffer,
+            io.BytesIO(pdf_bytes),
             download_name=filename,
             as_attachment=True,
             mimetype='application/pdf'
+        )
+    except AssignmentPdfUnavailable:
+        return current_app.response_class(
+            response="PDF generation is not available on this deployment.",
+            status=503,
+            mimetype='text/plain'
         )
     except Exception as e:
         current_app.logger.error(f"Error generating PDF for ACS {aes_id}: {e}", exc_info=True)

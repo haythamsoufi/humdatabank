@@ -492,6 +492,14 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Enable Export PDF button",
         default=False,
     )
+    email_attach_pdf = BooleanField(
+        "Attach a PDF summary to submit and approve emails",
+        default=False,
+    )
+    email_attach_excel = BooleanField(
+        "Attach a filled Excel snapshot to submit and approve emails",
+        default=False,
+    )
     submission_review_recipient_mode = SelectField(
         "Submission review notification",
         choices=_submission_review_recipient_mode_choices(),
@@ -567,6 +575,8 @@ def manage_assignments():
                 'enable_export_excel': bool(getattr(assignment, 'enable_export_excel', False)),
                 'enable_import_excel': bool(getattr(assignment, 'enable_import_excel', False)),
                 'enable_export_pdf': bool(getattr(assignment, 'enable_export_pdf', False)),
+                'email_attach_pdf': bool(getattr(assignment, 'email_attach_pdf', False)),
+                'email_attach_excel': bool(getattr(assignment, 'email_attach_excel', False)),
             })
         return json_ok(assignments=assignments_data, count=len(assignments_data))
 
@@ -749,6 +759,8 @@ def new_assignment():
                 enable_export_excel=bool(form.enable_export_excel.data),
                 enable_import_excel=bool(form.enable_import_excel.data),
                 enable_export_pdf=bool(form.enable_export_pdf.data),
+                email_attach_pdf=bool(form.email_attach_pdf.data),
+                email_attach_excel=bool(form.email_attach_excel.data),
                 activated_by_user_id=current_user.id,
             )
             _apply_submission_review_recipient_from_form(new_assignment, form)
@@ -1229,6 +1241,8 @@ def edit_assignment(assignment_id):
             assignment.enable_export_excel = bool(form.enable_export_excel.data)
             assignment.enable_import_excel = bool(form.enable_import_excel.data)
             assignment.enable_export_pdf = bool(form.enable_export_pdf.data)
+            assignment.email_attach_pdf = bool(form.email_attach_pdf.data)
+            assignment.email_attach_excel = bool(form.email_attach_excel.data)
             sync_assignment_custom_excel_flags(assignment)
             _apply_submission_review_recipient_from_form(assignment, form)
 

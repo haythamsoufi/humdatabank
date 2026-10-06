@@ -61,18 +61,31 @@
             flex-shrink: 0;
         }
 
+        @media (min-width: 1024px) {
+            .compliance-toolbar {
+                justify-content: flex-end;
+                flex-shrink: 0;
+                max-width: 36rem;
+            }
+        }
+        @media (max-width: 639px) {
+            #complianceGrid {
+                height: min(70vh, 480px) !important;
+            }
+        }
+
 </style>
 
     <div id="panel-compliance" class="explore-panel{% if explore_first_tab != 'compliance' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-compliance">
         <div>
-            <div class="flex justify-between items-center mb-4">
-                <div>
+            <div class="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0">
                     <h3 class="text-lg font-semibold text-gray-900">{{ _('FDRS Document Compliance') }}</h3>
                     <p class="text-sm text-gray-600 mt-1">
                         {{ _('Compliance requires at least one Annual Report AND one Audited Financial Statement in the past 3 years. Inactive countries and National Societies stay in the table but are left out of the counts.') }}
                     </p>
                 </div>
-                <div class="flex gap-2 items-center flex-wrap">
+                <div class="compliance-toolbar flex gap-2 items-center flex-wrap">
                     <div class="flex items-center gap-2">
                         <label for="compliance-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('As of Year:') }}</label>
                         <select id="compliance-year-filter" class="pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">

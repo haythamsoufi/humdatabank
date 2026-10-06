@@ -33,15 +33,19 @@
             width: 0;
             height: 0;
         }
-        .disagg-subtabs-divider {
-            width: 1px;
-            height: 1.5rem;
-            background-color: #d1d5db;
-            margin: 0 0.5rem;
-            flex-shrink: 0;
-        }
         /* ApexCharts container styling */
         .chart-container { min-height: 0; overflow: visible; }
+        .disagg-chart-tall { min-height: 450px; position: relative; }
+        .disagg-chart-country { min-height: 500px; }
+        #disagg-template-filter { width: 100%; max-width: 100%; min-width: 0; }
+        @media (min-width: 640px) {
+            #disagg-template-filter { width: auto; min-width: 12rem; max-width: 20rem; }
+        }
+        @media (max-width: 639px) {
+            .disagg-content { padding: 1rem; }
+            .disagg-chart-tall,
+            .disagg-chart-country { min-height: 280px; }
+        }
         .apexcharts-canvas { margin: 0 auto; }
         .apexcharts-tooltip { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border-radius: 8px; }
         .apexcharts-menu { border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
@@ -52,26 +56,27 @@
     <div id="panel-disaggregation" class="explore-panel{% if explore_first_tab != 'disaggregation' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-disaggregation">
         <!-- Sub-tabs for Disaggregation (template selector + analysis views) -->
         <div class="bg-white shadow-md border border-gray-200 mb-6">
-            <div class="border-b border-gray-200 px-3 sm:px-4">
-                <div class="flex flex-nowrap items-center gap-1 overflow-x-auto py-1" id="disagg-subtabs">
-                    <div id="disagg-template-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
+            <div class="border-b border-gray-200 px-3 sm:px-4 py-2 flex flex-col gap-2">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div id="disagg-template-filter-wrap" class="flex items-center gap-2 min-w-0 w-full sm:w-auto sm:flex-none">
                         <label for="disagg-template-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Template') }}</label>
                         <select id="disagg-template-filter"
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 max-w-[7rem] py-1.5 pl-2 pr-8 text-gray-700">
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md py-1.5 pl-2 pr-8 text-gray-700">
                             {% for template in templates %}
                             <option value="{{ template.id }}"{% if template.id == fdrs_template_id %} selected{% endif %}>{{ template.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div id="disagg-year-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
+                    <div id="disagg-year-filter-wrap" class="flex items-center gap-2 shrink-0">
                         <label for="disagg-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Year') }}</label>
                         <select id="disagg-year-filter"
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-20 max-w-[5rem] py-1.5 pl-2 pr-8 text-gray-700"
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 py-1.5 pl-2 pr-8 text-gray-700"
                                 disabled>
                             <option value="">{{ _('Loading...') }}</option>
                         </select>
                     </div>
-                    <div class="disagg-subtabs-divider" aria-hidden="true"></div>
+                </div>
+                <div class="flex flex-nowrap items-center gap-1 overflow-x-auto" id="disagg-subtabs" role="tablist" aria-label="{{ _('Disaggregation views') }}">
                     <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600" data-subtab="overview">{{ _('Overview') }}</button>
                     <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-indicator">{{ _('By Indicator') }}</button>
                     <button type="button" class="disagg-subtab shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600" data-subtab="by-country">{{ _('By Country') }}</button>
@@ -105,7 +110,7 @@
         <div id="disagg-content-overview" class="disagg-content bg-white p-6 shadow border border-gray-200 mb-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ _('Overview') }}</h3>
             <!-- Summary stats bar (5 cards) - Modern gradient design with inline styles for color compatibility -->
-            <div id="disagg-stats-bar" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="display: none;">
+            <div id="disagg-stats-bar" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="display: none;">
                 <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);"
                      title="{{ _('Percentage of eligible indicators reported with sex, age, sex-and-age, matrix, or disability disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
                      aria-label="{{ _('Disaggregation coverage: percentage of eligible indicators reported with disaggregation.')|forceescape }}">
@@ -190,7 +195,7 @@
         <div id="disagg-content-by-indicator" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Indicator') }}</h3>
             <p class="text-sm text-gray-600 mb-4">{{ _('Shows disaggregation coverage by indicator, not summed values across mixed units.') }}</p>
-            <div class="chart-container" style="min-height: 450px; position: relative;">
+            <div class="chart-container disagg-chart-tall">
                 <div id="chart-by-indicator"></div>
             </div>
             <p id="by-indicator-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No eligible indicators found.') }}</p>
@@ -198,7 +203,7 @@
         <div id="disagg-content-by-country" class="disagg-content hidden bg-white p-6 shadow border border-gray-200 mb-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ _('By Country') }}</h3>
             <p class="text-sm text-gray-600 mb-4">{{ _('Shows country-level disaggregation coverage for eligible indicators in the current filters.') }}</p>
-            <div class="bg-gray-50 rounded-xl p-4" style="min-height: 500px;">
+            <div class="bg-gray-50 rounded-xl p-4 disagg-chart-country">
                 <div id="chart-by-country"></div>
             </div>
             <p id="by-country-no-data" class="text-gray-500 text-center py-8 hidden">{{ _('No country coverage data found for eligible indicators.') }}</p>

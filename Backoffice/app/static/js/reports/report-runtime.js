@@ -75,7 +75,7 @@ async function renderSections(definition, widgets, language) {
             grid.appendChild(host);
             const payload = widgets[widget.id] || { title: widget.title, error: 'No data' };
             await renderWidget(host, payload);
-            attachCrossFilter(host, payload, section, configRef);
+            attachCrossFilter(host, section, configRef);
         }
         sec.appendChild(grid);
         appendSectionFootnote(sec, resolveTranslation(section.footnote_translations, language, section.footnote));
@@ -86,17 +86,18 @@ async function renderSections(definition, widgets, language) {
 let configRef = null;
 let activeLanguage = 'en';
 
-function attachCrossFilter(host, payload, section, config) {
+function attachCrossFilter(host, section, config) {
     const interactions = section.interactions || [];
     if (!interactions.length || !config) return;
-    host.addEventListener('click', async function () {
+    host.addEventListener('report-chart-select', async function (event) {
         const sourceId = host.dataset.widgetId;
         const interaction = interactions.find(function (item) { return item.source_widget_id === sourceId; });
         if (!interaction) return;
-        const filterValue = payload?.chart_payload?.categories?.[0]?.label || payload?.value;
+        const countryId = event.detail && event.detail.countryId;
+        if (!countryId) return;
         const result = await apiPost(config.apiBase + '/run', {
             language: activeLanguage,
-            filters: { adhoc_filters: { country_id: filterValue } }
+            filters: { adhoc_filters: { country_id: countryId } }
         }, config.csrfToken);
         for (const targetId of interaction.target_widget_ids || []) {
             const targetHost = document.querySelector('[data-widget-id="' + targetId + '"]');
@@ -216,10 +217,6 @@ async function init() {
         });
     }
 
-    const publishStatus = document.getElementById('report-publish-status');
-    if (publishStatus && configRef.reportId) {
-        fetch(configRef.apiBase.replace(/\/api\/\d+$/, '') + '/api/runs?report_id=' + configRef.reportId).catch(function () {});
-    }
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -97,7 +97,21 @@ export async function renderBarChart(container, payload) {
     const ApexCharts = await ensureApexCharts();
     const horizontal = normalized.orientation === 'horizontal';
     const chart = new ApexCharts(container, {
-        chart: { type: 'bar', height: 300, toolbar: { show: false } },
+        chart: {
+            type: 'bar',
+            height: 300,
+            toolbar: { show: false },
+            events: {
+                dataPointSelection: function (_event, _chartContext, config) {
+                    const category = normalized.categories[config.dataPointIndex];
+                    if (!category || category.country_id == null) return;
+                    container.dispatchEvent(new CustomEvent('report-chart-select', {
+                        bubbles: true,
+                        detail: { countryId: category.country_id, label: category.label }
+                    }));
+                }
+            }
+        },
         plotOptions: { bar: { horizontal: horizontal } },
         series: [{ name: normalized.metric, data: normalized.categories.map(function (c) { return c.value; }) }],
         xaxis: { categories: normalized.categories.map(function (c) { return c.label; }) }

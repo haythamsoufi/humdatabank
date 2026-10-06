@@ -48,7 +48,8 @@ export function normalizeBarChartPayload(payload) {
         const label = String(c.label || c.name || '').trim();
         const value = Number(c.value);
         if (!label || !Number.isFinite(value)) return null;
-        return { label, value };
+        const countryId = Number(c.country_id);
+        return { label, value, country_id: Number.isFinite(countryId) ? countryId : null };
     }).filter(Boolean);
     if (categories.length < 1) return null;
     return {

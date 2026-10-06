@@ -1260,29 +1260,42 @@ class ReportBuilder {
     async publish() {
         await this.save();
         if (!this.config.reportId) return;
-        const statusRes = await fetch(this.config.apiBase + '/' + this.config.reportId, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.config.csrfToken,
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ status: 'published' })
-        });
-        const statusData = await statusRes.json().catch(function () { return {}; });
-        if (!statusRes.ok) {
-            alert(statusData.error || statusData.message || 'Publish failed');
-            return;
-        }
-        await fetch(this.config.apiBase + '/' + this.config.reportId + '/publish', {
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this.config.csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        };
+        const statusEl = document.getElementById('rb-save-status');
+        const res = await fetch(this.config.apiBase + '/' + this.config.reportId + '/publish', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.config.csrfToken,
-                'X-Requested-With': 'XMLHttpRequest'
-            },
+            headers: headers,
             body: '{}'
         });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            alert(data.error || data.message || 'Publish failed');
+            return;
+        }
+        const runId = data.run && data.run.id;
+        if (!runId) return;
+        if (statusEl) statusEl.textContent = 'Publishing…';
+        const runUrl = this.config.apiBase.replace(/\/$/, '') + '/runs/' + runId;
+        for (let attempt = 0; attempt < 60; attempt += 1) {
+            await new Promise(function (resolve) { setTimeout(resolve, 2000); });
+            const poll = await fetch(runUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const body = await poll.json().catch(function () { return {}; });
+            const status = body.run && body.run.status;
+            if (status === 'completed') {
+                if (statusEl) statusEl.textContent = 'Published';
+                return;
+            }
+            if (status === 'failed' || status === 'cancelled') {
+                alert((body.run && body.run.error) || 'Publish failed');
+                if (statusEl) statusEl.textContent = '';
+                return;
+            }
+        }
+        if (statusEl) statusEl.textContent = 'Publish still running';
     }
 }
 

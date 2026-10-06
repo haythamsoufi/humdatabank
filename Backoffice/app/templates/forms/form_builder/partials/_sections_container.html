@@ -1,5 +1,10 @@
 {# Existing Sections and their Items (Indicators, Document Fields, or Questions) #}
 {% from "components/_status_label.html" import status_label %}
+{% macro fb_actions_toggle() %}
+<button type="button" class="fb-actions-toggle fb-icon-btn fb-icon-btn--neutral" aria-haspopup="true" aria-expanded="false" title="{{ _('Actions')|forceescape }}" aria-label="{{ _('Actions')|forceescape }}">
+    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+</button>
+{% endmacro %}
 <div id="sections-container" class="space-y-6">
     {# Group sections hierarchically - only show main sections, sub-sections will be nested #}
     {% set main_sections = [] %}
@@ -105,7 +110,7 @@
                     <button type="button" class="section-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse section')|forceescape }}">
                         <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
                     </button>
-                    <div class="flex items-center">
+                    <div class="section-header-title flex items-center min-w-0">
                     <i class="fas fa-layer-group w-5 h-5 mr-2 text-gray-500"></i>
                     {# Avoid decimal-style display; show integer section position #}
                     <span class="text-lg font-semibold text-gray-800 mr-1">{{ item_s_f.section.display_order.split('.')[0] }}.</span>
@@ -125,7 +130,9 @@
                         <span class="ml-3">{{ status_label(_('Standard'), 'neutral') }}</span>
                     {% endif %}
                 </div>
-                <div class="section-header-actions space-x-2 flex items-center flex-shrink-0">
+                <div class="fb-actions section-header-actions">
+                    {{ fb_actions_toggle() }}
+                    <div class="fb-actions-panel">
                     {% if is_section_archived %}
                         {# Show unarchive button for archived sections #}
                         <form action="{{ url_for('form_builder.unarchive_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block">
@@ -188,6 +195,7 @@
                         </button>
                     </form>
                     {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -310,7 +318,9 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
-                            <div class="space-x-2 flex items-center">
+                            <div class="fb-actions">
+                                {{ fb_actions_toggle() }}
+                                <div class="fb-actions-panel">
                                 {% if is_subsection_archived %}
                                     {# Show unarchive button for archived subsections #}
                                     <form action="{{ url_for('form_builder.unarchive_section', section_id=item_instance.id) }}" method="POST" class="inline-block">
@@ -361,6 +371,7 @@
                                     </button>
                                 </form>
                                 {% endif %}
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -585,6 +596,9 @@
                                 {% endif %}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap text-left text-sm font-medium w-1/8">
+                                <div class="fb-actions">
+                                {{ fb_actions_toggle() }}
+                                <div class="fb-actions-panel">
                                 {% if is_archived %}
                                     {# Show unarchive button for archived items #}
                                     <form action="{{ url_for('form_builder.unarchive_item', item_id=item_instance.id) }}" method="POST" class="inline-block">
@@ -828,6 +842,8 @@
                                         </button>
                                     </form>
                                 {% endif %}
+                                </div>
+                                </div>
                             </td>
                         </tr>
                     {% endif %}

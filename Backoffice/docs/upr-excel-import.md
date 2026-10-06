@@ -135,7 +135,7 @@ Built once per import run by `build_import_context()`. Caches all DB lookups so 
 | `country_id_by_iso3` | `{ISO3: Country.id}` — row key for `country_map` list_library matrices (template 22) |
 | `emergency_matrix_plugin_config` | Plugin config from the published T24 Emergency Appeals matrix |
 | `emergency_ops_by_iso` / `_ordered_by_iso` | Lazy GO-API cache per country |
-| `staff_matrix_item_id` | Published T22 `PNS staff contributions` matrix (currently **1314**, resolved by label) |
+| `staff_matrix_item_id` | Published T22 staff matrix, resolved by `stable_key` (`f4fa6b32-3141-4a15-a572-637e7d3f1f94`), else column `intl_delegates_hns` (currently **1314**) |
 | `iso3_to_hns_id` | `{ISO3: NationalSociety.id}` — host country's primary active NS; row key for T22 Staff and T23 Funding |
 | `percentage_bank_ids` | Indicator bank ids whose `IndicatorBank.type` is Percentage — used to sanity-check resolved values against the 0-100 range **and** to scale 0–1 source values (Excel `%` cells / past-round unit interval) to stored 0–100 |
 | `percentage_allow_over_100_bank_ids` | Subset of `percentage_bank_ids` where a live `FormItem.config.allow_over_100` explicitly permits values above 100 (cumulative/ratio indicators) |
@@ -315,7 +315,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 
 - Section `Staff`, `Entity = PNS`, non-zero `ValueNum` only
 - Imported **only** when the same `(PNS assignment, host ISO3)` has **`PNS reported = Yes`** on at least one Funding row in the workbook (see §6.2)
-- Target: published **PNS staff contributions** matrix (currently item **1314**, resolved by label — not 1367)
+- Target: published staff matrix (currently item **1314**). Resolve by `stable_key` `f4fa6b32-3141-4a15-a572-637e7d3f1f94`, else by column `intl_delegates_hns` — not 1367
 - AES resolved by **PNS home country ISO3** (same path as PNS Funding, via `ns_name → ns_home_country_iso3`)
 - Row key: **host country's `NationalSociety.id`** (`iso3_to_hns_id[host_ISO3]`) — the HNS receiving staff
 - Column key: indicator string mapped via `STAFF_INDICATOR_COLUMNS`

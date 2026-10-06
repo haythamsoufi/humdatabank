@@ -553,6 +553,34 @@
                     </div>
                 </div>
                 {% endif %}
+
+                {% if form.email_attach_pdf is defined %}
+                <div class="border-t border-gray-200 pt-3" id="assignment-email-attach-pdf-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.email_attach_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_pdf") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.email_attach_pdf.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach the same PDF as the entry-form export to the emails sent when an entity submits or is approved.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if form.email_attach_excel is defined %}
+                <div class="border-t border-gray-200 pt-3" id="assignment-email-attach-excel-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.email_attach_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_excel") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.email_attach_excel.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach a filled Excel snapshot to those emails. A custom workbook is used when a plugin already has one set up for this assignment; otherwise the generic item-row workbook is used. Independent of the Export Excel button.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -616,6 +644,30 @@
                 <div class="min-w-0 flex-1">
                     {{ form.enable_export_pdf.label(class="text-sm font-medium text-gray-800") }}
                     <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Export PDF button on the entry form.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.email_attach_pdf is defined %}
+            <div class="flex items-start gap-3" id="assignment-email-attach-pdf-row">
+                <div class="pt-0.5">
+                    {{ form.email_attach_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_pdf") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.email_attach_pdf.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach the same PDF as the entry-form export to the emails sent when an entity submits or is approved.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.email_attach_excel is defined %}
+            <div class="flex items-start gap-3" id="assignment-email-attach-excel-row">
+                <div class="pt-0.5">
+                    {{ form.email_attach_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="email_attach_excel") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.email_attach_excel.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Attach a filled Excel snapshot to those emails. A custom workbook is used when a plugin already has one set up for this assignment; otherwise the generic item-row workbook is used. Independent of the Export Excel button.') }}</p>
                 </div>
             </div>
             {% endif %}

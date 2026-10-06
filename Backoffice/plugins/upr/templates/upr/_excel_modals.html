@@ -75,4 +75,72 @@
         import_hidden_fields=_csrf_field,
         import_note=_('The file is checked for template version, country, and planning period before import.')
     ) %}{% endcall %}
+{% elif _use_pns_planning_excel %}
+    {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('PNS Planning') }}{% endset %}
+    {% call excel_io_modal(
+        'excel-options-modal',
+        modal_title=excel_title,
+        aria_label=_('PNS Planning'),
+        max_width='max-w-4xl',
+        content_class='excel-io-modal-shell-content',
+        close_class='close-modal-btn',
+        layout='guide-split',
+        default_tab='export',
+        export_tab_label=_('Download template'),
+        import_tab_label=_('Upload & import'),
+        intro_html='<p class="text-sm text-gray-700 m-0">' ~ _('Download the PNS Planning workbook, edit funding and staff figures for this National Society, then upload it here and save the assignment.') ~ '</p>',
+        export_intro_html='<p class="excel-io-modal__panel-lead">' ~ _('Pre-filled with your National Society and the funding and staff figures saved on this assignment.') ~ '</p>',
+        import_intro_html='<p class="excel-io-modal__panel-lead">' ~ _('Upload the saved .xlsx. Load into form is enabled after validation passes.') ~ '</p>',
+        show_export=_show_export,
+        show_import=_show_import,
+        export_url=url_for('excel.export_pns_planning_template', aes_id=aes_id),
+        export_label=_('Export PNS Planning (.xlsx)'),
+        import_form_id='modalImportExcelForm',
+        import_action=url_for('excel.import_pns_planning_template', aes_id=aes_id),
+        validate_url=url_for('excel.validate_pns_planning_template', aes_id=aes_id),
+        dropzone_id='entry-excel-dropzone',
+        dropzone_input_id='modal_excel_file',
+        dropzone_accept='.xlsx',
+        dropzone_max_size_bytes=10485760,
+        dropzone_title=_('Drop your saved workbook here'),
+        dropzone_hint=_('or click to browse — .xlsx only'),
+        import_submit_label=_('Load into form'),
+        import_submit_disabled=not can_edit,
+        import_hidden_fields=_csrf_field,
+        import_note=_('The file is checked for the PNS Planning sheets and your National Society before import.')
+    ) %}{% endcall %}
+{% elif _use_pns_reporting_excel %}
+    {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('PNS Reporting') }}{% endset %}
+    {% call excel_io_modal(
+        'excel-options-modal',
+        modal_title=excel_title,
+        aria_label=_('PNS Reporting'),
+        max_width='max-w-4xl',
+        content_class='excel-io-modal-shell-content',
+        close_class='close-modal-btn',
+        layout='guide-split',
+        default_tab='export',
+        export_tab_label=_('Download template'),
+        import_tab_label=_('Upload & import'),
+        intro_html='<p class="text-sm text-gray-700 m-0">' ~ _('Download the PNS Reporting workbook, edit funding by host country, then upload it here and save the assignment.') ~ '</p>',
+        export_intro_html='<p class="excel-io-modal__panel-lead">' ~ _('Pre-filled with your National Society and the funding figures saved on this assignment.') ~ '</p>',
+        import_intro_html='<p class="excel-io-modal__panel-lead">' ~ _('Upload the saved .xlsx. Load into form is enabled after validation passes.') ~ '</p>',
+        show_export=_show_export,
+        show_import=_show_import,
+        export_url=url_for('excel.export_pns_reporting_template', aes_id=aes_id),
+        export_label=_('Export PNS Reporting (.xlsx)'),
+        import_form_id='modalImportExcelForm',
+        import_action=url_for('excel.import_pns_reporting_template', aes_id=aes_id),
+        validate_url=url_for('excel.validate_pns_reporting_template', aes_id=aes_id),
+        dropzone_id='entry-excel-dropzone',
+        dropzone_input_id='modal_excel_file',
+        dropzone_accept='.xlsx',
+        dropzone_max_size_bytes=10485760,
+        dropzone_title=_('Drop your saved workbook here'),
+        dropzone_hint=_('or click to browse — .xlsx only'),
+        import_submit_label=_('Load into form'),
+        import_submit_disabled=not can_edit,
+        import_hidden_fields=_csrf_field,
+        import_note=_('The file is checked for the PNS Reporting sheets and your National Society before import.')
+    ) %}{% endcall %}
 {% endif %}

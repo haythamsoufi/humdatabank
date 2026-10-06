@@ -1,8 +1,9 @@
 """Assignment-level flags for form Excel export/import and PDF export.
 
 Admins only toggle the standard Export/Import Excel buttons. UPR Country
-Reporting and Unified Country Plan then resolve to their structured
-workbooks; every other template uses the generic item-row workbook.
+Reporting, Unified Country Plan, PNS Planning, PNS Reporting, and FDRS
+then resolve to their structured workbooks; every other template uses
+the generic item-row workbook.
 
 Dedicated ``enable_upr_country_reporting_excel`` /
 ``enable_unified_country_plan_excel`` columns are legacy and still honored
@@ -86,18 +87,27 @@ def assignment_excel_import_enabled(assigned_form) -> bool:
     )
 
 
+def _structured_excel_mode(assigned_form) -> str | None:
+    """UPR and FDRS structured workbooks replace the generic item-row workbook."""
+    _, _, resolve_mode, _ = _upr_assignment_access()
+    mode = resolve_mode(assigned_form)
+    if mode:
+        return mode
+    from plugins.fdrs.excel.assignment_access import resolve_fdrs_excel_mode
+
+    return resolve_fdrs_excel_mode(assigned_form)
+
+
 def assignment_uses_export_excel(assigned_form) -> bool:
     """Return True when this assignment has generic Excel export enabled."""
-    _, _, resolve_mode, _ = _upr_assignment_access()
-    if resolve_mode(assigned_form):
+    if _structured_excel_mode(assigned_form):
         return False
     return bool(getattr(assigned_form, "enable_export_excel", False))
 
 
 def assignment_uses_import_excel(assigned_form) -> bool:
     """Return True when this assignment has generic Excel import enabled."""
-    _, _, resolve_mode, _ = _upr_assignment_access()
-    if resolve_mode(assigned_form):
+    if _structured_excel_mode(assigned_form):
         return False
     return bool(getattr(assigned_form, "enable_import_excel", False))
 
@@ -109,10 +119,9 @@ def assignment_uses_export_pdf(assigned_form) -> bool:
 
 def resolve_assignment_excel_ui(assigned_form) -> dict:
     """Return entry-form Excel UI flags derived from template + standard toggles."""
-    _, _, resolve_mode, _ = _upr_assignment_access()
     show_export = assignment_excel_export_enabled(assigned_form)
     show_import = assignment_excel_import_enabled(assigned_form)
-    mode = resolve_mode(assigned_form)
+    mode = _structured_excel_mode(assigned_form)
     if not mode and (show_export or show_import):
         mode = "generic"
     return {

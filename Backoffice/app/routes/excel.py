@@ -252,5 +252,7 @@ def import_assignment_excel(aes_id):
     return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
 from plugins.upr.excel.assignment_routes import register_upr_excel_routes
+from plugins.fdrs.excel.assignment_routes import register_fdrs_excel_routes
 
 register_upr_excel_routes(excel_bp)
+register_fdrs_excel_routes(excel_bp)

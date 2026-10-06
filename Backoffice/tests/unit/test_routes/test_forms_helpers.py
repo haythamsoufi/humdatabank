@@ -1244,7 +1244,7 @@ class TestBuildEntryFormFeatures:
     def test_excel_export_follows_assignment_generic_flags(self):
         template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
         assigned_form = SimpleNamespace(
-            template_id=21,
+            template_id=99,
             enable_upr_country_reporting_excel=False,
             enable_unified_country_plan_excel=False,
             enable_export_excel=True,
@@ -1255,6 +1255,20 @@ class TestBuildEntryFormFeatures:
         assert features['excelMode'] == 'generic'
         assert features['excelShowExport'] is True
         assert features['excelShowImport'] is False
+
+    def test_excel_export_uses_structured_workbook_for_templates_21_22_23(self):
+        template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
+        for template_id, mode in ((21, 'fdrs'), (22, 'pns_plan'), (23, 'pns_report')):
+            assigned_form = SimpleNamespace(
+                template_id=template_id,
+                enable_upr_country_reporting_excel=False,
+                enable_unified_country_plan_excel=False,
+                enable_export_excel=True,
+                enable_import_excel=True,
+            )
+            features = build_entry_form_features([], template, assigned_form=assigned_form)
+            assert features['excelExport'] is True
+            assert features['excelMode'] == mode
 
     def test_excel_export_uses_upr_workbook_for_template_33(self):
         template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)

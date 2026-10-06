@@ -148,6 +148,8 @@ pnpm-debug.log*
 *.docx
 *.xlsx
 !Backoffice/app/static/templates/*.xlsx
+!Backoffice/plugins/upr/static/templates/*.xlsx
+!Backoffice/plugins/fdrs/static/templates/*.xlsx
 *.toml
 # Exceptions — project-level config files that must be committed
 !pyproject.toml

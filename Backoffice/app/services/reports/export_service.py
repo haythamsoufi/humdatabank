@@ -16,6 +16,32 @@ from app.services.reports.translation_helpers import normalize_language, resolve
 
 logger = logging.getLogger(__name__)
 
+_MAX_CHART_IMAGE_CHARS = 2_000_000
+
+
+def _html_widgets(widgets: dict[str, Any] | None) -> dict[str, Any]:
+    from app.services.reports.sanitize_service import sanitize_html
+
+    safe: dict[str, Any] = {}
+    for wid, payload in (widgets or {}).items():
+        item = dict(payload or {})
+        if item.get("content"):
+            item["content"] = sanitize_html(str(item.get("content")))
+        if item.get("embed_html"):
+            item["embed_html"] = sanitize_html(str(item.get("embed_html")))
+        safe[wid] = item
+    return safe
+
+
+def _png_data_urls(raw: dict[str, str] | None) -> dict[str, str]:
+    safe: dict[str, str] = {}
+    for wid, data_url in (raw or {}).items():
+        if not isinstance(data_url, str) or len(data_url) > _MAX_CHART_IMAGE_CHARS:
+            continue
+        if re.match(r"^data:image/png;base64,[A-Za-z0-9+/=\s]+$", data_url.strip()):
+            safe[str(wid)] = data_url.strip()
+    return safe
+
 
 class ReportExportService:
     @staticmethod
@@ -89,8 +115,8 @@ class ReportExportService:
         html = render_template(
             "admin/reports/export_pdf.html",
             report=report,
-            widgets=run_result.get("widgets") or {},
-            chart_images=chart_images or {},
+            widgets=_html_widgets(run_result.get("widgets")),
+            chart_images=_png_data_urls(chart_images),
             language=language,
             rtl=normalize_language(language) == "ar",
         )
@@ -104,11 +130,11 @@ class ReportExportService:
         chart_images: dict[str, str] | None = None,
         language: str = "en",
     ) -> bytes:
-        chart_images = chart_images or {}
+        chart_images = _png_data_urls(chart_images)
         html = render_template(
             "admin/reports/export_pdf.html",
             report=report,
-            widgets=run_result.get("widgets") or {},
+            widgets=_html_widgets(run_result.get("widgets")),
             chart_images=chart_images,
             language=language,
             rtl=normalize_language(language) == "ar",
@@ -201,7 +227,7 @@ class ReportExportService:
             return {}
         decoded: dict[str, bytes] = {}
         for wid, data_url in raw.items():
-            if not isinstance(data_url, str):
+            if not isinstance(data_url, str) or len(data_url) > _MAX_CHART_IMAGE_CHARS:
                 continue
             match = re.match(r"^data:image/png;base64,(.+)$", data_url.strip())
             if not match:

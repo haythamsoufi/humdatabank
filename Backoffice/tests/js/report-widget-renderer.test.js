@@ -26,6 +26,15 @@ describe('ReportChartNormalize', () => {
         });
         expect(out).not.toBeNull();
         expect(out.categories).toHaveLength(2);
+        expect(out.categories[0].country_id).toBeNull();
+    });
+
+    test('normalizeBarChartPayload keeps a numeric country id', () => {
+        const out = normalizeBarChartPayload({
+            type: 'bar',
+            categories: [{ label: 'Kenya', value: 4, country_id: 12 }]
+        });
+        expect(out.categories[0].country_id).toBe(12);
     });
 
     test('normalizePieChartPayload accepts slices', () => {

@@ -57,11 +57,12 @@ def user_can_edit_report(user: User, report: ReportDefinition) -> bool:
 def user_can_view_report(user: User, report: ReportDefinition) -> bool:
     if user_can_manage_all(user):
         return True
-    if not AuthorizationService.has_rbac_permission(user, REPORTS_VIEW):
-        return False
-    if report.owner_user_id == user.id:
+    is_owner = report.owner_user_id == user.id
+    can_view = AuthorizationService.has_rbac_permission(user, REPORTS_VIEW)
+    can_edit = AuthorizationService.has_rbac_permission(user, REPORTS_EDIT)
+    if is_owner and (can_view or can_edit):
         return True
-    if report.status != "published":
+    if not can_view or report.status != "published":
         return False
     return True
 
@@ -102,12 +103,15 @@ class ReportDefinitionService:
     def list_reports(user: User) -> list[ReportDefinition]:
         q = ReportDefinition.query.filter(ReportDefinition.status != "archived")
         if not user_can_manage_all(user):
-            q = q.filter(
-                db.or_(
-                    ReportDefinition.owner_user_id == user.id,
-                    ReportDefinition.status == "published",
+            if AuthorizationService.has_rbac_permission(user, REPORTS_VIEW):
+                q = q.filter(
+                    db.or_(
+                        ReportDefinition.owner_user_id == user.id,
+                        ReportDefinition.status == "published",
+                    )
                 )
-            )
+            else:
+                q = q.filter(ReportDefinition.owner_user_id == user.id)
         return q.order_by(ReportDefinition.updated_at.desc()).all()
 
     @staticmethod
@@ -221,7 +225,9 @@ class ReportDefinitionService:
         revision = db.session.get(ReportDefinitionRevision, revision_id)
         if not revision or revision.report_id != report.id:
             raise ReportDefinitionError("Revision not found")
-        definition = _normalize_definition(copy.deepcopy(revision.definition_json or {}))
+        from app.services.reports.sanitize_service import sanitize_definition
+
+        definition = _normalize_definition(sanitize_definition(copy.deepcopy(revision.definition_json or {})))
         report.definition_json = definition
         report.schema_version = definition.get("schema_version", 2)
         report.updated_by_id = user.id

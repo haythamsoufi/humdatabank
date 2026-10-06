@@ -17,7 +17,7 @@ from plugins.upr.catalog import (
 
 def _assignment(**kwargs):
     defaults = {
-        "template_id": 21,
+        "template_id": 99,
         "enable_export_excel": False,
         "enable_import_excel": False,
         "enable_upr_country_reporting_excel": False,
@@ -74,6 +74,29 @@ class TestAssignmentExcelAccess:
         assigned = _assignment(template_id=UPR_REPORTING_TEMPLATE_ID)
         assert assignment_uses_upr_country_reporting_excel(assigned) is False
         assert resolve_assignment_excel_ui(assigned)["mode"] is None
+
+    def test_template_22_uses_pns_planning_workbook(self):
+        assigned = _assignment(template_id=22, enable_export_excel=True, enable_import_excel=True)
+        ui = resolve_assignment_excel_ui(assigned)
+        assert ui["mode"] == "pns_plan"
+        assert assignment_uses_export_excel(assigned) is False
+        assert ui["show_export"] is True
+        assert ui["show_import"] is True
+
+    def test_template_23_uses_pns_reporting_workbook(self):
+        assigned = _assignment(template_id=23, enable_import_excel=True)
+        ui = resolve_assignment_excel_ui(assigned)
+        assert ui["mode"] == "pns_report"
+        assert ui["show_export"] is False
+        assert ui["show_import"] is True
+
+    def test_template_21_uses_fdrs_workbook(self):
+        assigned = _assignment(template_id=21, enable_export_excel=True)
+        ui = resolve_assignment_excel_ui(assigned)
+        assert ui["mode"] == "fdrs"
+        assert assignment_uses_export_excel(assigned) is False
+        assert ui["show_export"] is True
+        assert ui["show_import"] is False
 
     def test_sync_writes_legacy_columns_from_standard_flags(self):
         assigned = _assignment(

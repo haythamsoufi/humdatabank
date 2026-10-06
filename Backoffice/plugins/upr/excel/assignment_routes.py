@@ -22,9 +22,23 @@ from plugins.upr.excel.country_reporting_excel_service import (
     UPR_COUNTRY_REPORTING_LABEL,
     UprCountryReportingExcelService,
 )
+from plugins.upr.excel.assignment_access import (
+    assignment_uses_pns_planning_excel,
+    assignment_uses_pns_reporting_excel,
+)
+from plugins.upr.excel.pns_excel_service import (
+    PNS_PLANNING_LABEL,
+    PNS_REPORTING_LABEL,
+    PnsPlanningExcelService,
+    PnsReportingExcelService,
+)
 from plugins.upr.excel.unified_country_plan_excel_service import (
     UNIFIED_COUNTRY_PLAN_LABEL,
     UnifiedCountryPlanExcelService,
+)
+from app.services.imports.structured_excel_routes import (
+    register_structured_excel_builder,
+    register_structured_excel_routes,
 )
 
 
@@ -91,6 +105,15 @@ def _validate_excel_upload(excel_file, *, is_ajax: bool, aes_id: int):
 
 def register_upr_excel_routes(excel_bp):
     """Attach UPR Excel handlers to the core ``excel`` blueprint (same URLs/endpoint names)."""
+    register_structured_excel_builder(
+        assignment_uses_upr_country_reporting_excel,
+        UprCountryReportingExcelService.build_workbook,
+    )
+    register_structured_excel_builder(
+        assignment_uses_unified_country_plan_excel,
+        UnifiedCountryPlanExcelService.build_workbook,
+    )
+    _register_pns_excel_routes(excel_bp)
 
     @excel_bp.route("/assignment/<int:aes_id>/export-upr-country-reporting", methods=["GET"])
     @excel_bp.route("/assignment/<int:aes_id>/export-myr", methods=["GET"])  # legacy URL
@@ -376,3 +399,24 @@ def register_upr_excel_routes(excel_bp):
                 return json_bad_request(error_msg, warnings=result.get("warnings"))
 
         return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
+
+
+def _register_pns_excel_routes(excel_bp):
+    register_structured_excel_routes(
+        excel_bp,
+        url_slug="pns-planning",
+        endpoint="pns_planning_template",
+        label=PNS_PLANNING_LABEL,
+        export_type="pns_planning",
+        uses_assignment=assignment_uses_pns_planning_excel,
+        service=PnsPlanningExcelService,
+    )
+    register_structured_excel_routes(
+        excel_bp,
+        url_slug="pns-reporting",
+        endpoint="pns_reporting_template",
+        label=PNS_REPORTING_LABEL,
+        export_type="pns_reporting",
+        uses_assignment=assignment_uses_pns_reporting_excel,
+        service=PnsReportingExcelService,
+    )

@@ -368,7 +368,8 @@
                                     {% if is_variable and column_variable %}
                                         {# Variable column - type can be number or tick, will be resolved via JavaScript with row entity context #}
                                         {% set variable_readonly = column.variable_readonly if column.variable_readonly is defined else True %}
-                                        {% set variable_save_value = column.variable_save_value if column.variable_save_value is defined else True %}
+                                        {# Read-only variable columns always show the live lookup, even if an older config still has save value ticked. #}
+                                        {% set variable_save_value = (not variable_readonly) and (column.variable_save_value if column.variable_save_value is defined else True) %}
                                         {% if column_type == 'tick' %}
                                             {# Variable tick column #}
                                             <input type="checkbox"
@@ -381,7 +382,7 @@
                                                    data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="1"
-                                                   {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
+                                                   {% if variable_save_value and (cell_value == '1' or cell_value == 1) %}checked{% endif %}
                                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
                                                    aria-label="{{ _('Variable tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                    {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
@@ -398,7 +399,7 @@
                                                    data-variable-name="{{ column_variable }}"
                                                    data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
-                                                   value="{{ cell_value }}"
+                                                   value="{% if variable_save_value %}{{ cell_value }}{% endif %}"
                                                    {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
                                                    class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
                                                    aria-label="{{ _('Variable value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"

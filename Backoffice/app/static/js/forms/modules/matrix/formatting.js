@@ -301,6 +301,19 @@ export function __persistVariableCellScalar(rawValue, maxDecimals) {
 }
 
 
+/**
+ * Read-only variable columns always display the live lookup and are not stored.
+ * A missing variable_readonly flag means read-only, matching the form builder.
+ */
+export function __variableColumnPersistsValue(column) {
+    if (!column || typeof column !== 'object') return true;
+    const isVariable = column.is_variable === true || column.type === 'variable';
+    if (!isVariable) return true;
+    if (column.variable_readonly !== false) return false;
+    return column.variable_save_value !== false;
+}
+
+
 export function __variableCellDiffersFromLookup(lookupValue, savedValue, inputType, maxDecimals) {
     if (inputType === 'checkbox') {
         const lookupNorm = __formatSavedScalarForInput('checkbox', lookupValue);

@@ -5,6 +5,7 @@ import {
     __configFlag,
     __getSavedMatrixCellScalar,
     __parseMatrixCellKey,
+    __variableColumnPersistsValue,
     __resolveColumnMaxDecimals,
     __serializeMatrixData,
     __setMatrixNumericCellDisplay,
@@ -178,7 +179,7 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
             // Variable column - type can be number or tick, will be resolved via API
             const variableName = typeof column === 'object' ? (column.variable || column.variable_name) : null;
             const variableReadonly = typeof column === 'object' ? (column.variable_readonly !== false) : true;
-            const variableSaveValue = typeof column === 'object' ? (column.variable_save_value !== false) : true;
+            const variableSaveValue = __variableColumnPersistsValue(column);
 
             if (columnType === 'tick') {
                 // Variable tick column
@@ -641,20 +642,13 @@ restoreRowData(fieldId, rowId, rowInfo) {
         // Check if this is a variable column (new structure: is_variable, or legacy: type === 'variable')
         const isVariable = column && typeof column === 'object' && (column.is_variable === true || column.type === 'variable');
 
-        if (isVariable) {
-            // Check if variable should be restored (variable_save_value: true)
-            const variableSaveValue = column.variable_save_value !== false; // Default to true
-            if (!variableSaveValue) {
-                // This is a variable column that shouldn't be restored - it will be resolved fresh
-                debugLog('matrix-handler', `Skipping restoration of variable column: ${cellKey} (variable_save_value=false, will be resolved fresh)`);
-            // Remove from matrix data if it exists (it was saved but shouldn't be restored)
+        if (isVariable && !__variableColumnPersistsValue(column)) {
+            // Read-only (or save-value off): drop any previously stored cell and resolve fresh.
+            debugLog('matrix-handler', `Skipping restoration of variable column: ${cellKey} (not persisted)`);
             if (updatedMatrix.data[cellKey] !== undefined) {
                 delete updatedMatrix.data[cellKey];
             }
             return;
-            }
-            // If variable_save_value is true, continue to restore the saved value
-            debugLog('matrix-handler', `Restoring variable column: ${cellKey} (variable_save_value=true)`);
         }
 
         const value = rowInfo.values[cellKey];
@@ -729,15 +723,12 @@ restoreStaticMatrixValues(fieldId) {
         // Check if this is a variable column (new structure: is_variable, or legacy: type === 'variable')
         const isVariable = column && typeof column === 'object' && (column.is_variable === true || column.type === 'variable');
 
-        if (isVariable) {
-            // Check if variable should be restored (variable_save_value: true)
-            const variableSaveValue = column.variable_save_value !== false; // Default to true
-            if (!variableSaveValue) {
-                // Skip restoration for variables that shouldn't be saved/restored
-                debugLog('matrix-handler', `Skipping restoration of variable column: ${cellKey} (variable_save_value=false)`);
-                return;
+        if (isVariable && !__variableColumnPersistsValue(column)) {
+            debugLog('matrix-handler', `Skipping restoration of variable column: ${cellKey} (not persisted)`);
+            if (data[cellKey] !== undefined) {
+                delete data[cellKey];
             }
-            debugLog('matrix-handler', `Restoring variable column: ${cellKey} (variable_save_value=true)`);
+            return;
         }
 
         const value = data[cellKey];

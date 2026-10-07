@@ -172,7 +172,11 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         # Data Explorer - granular permissions per tab
         ("admin.data_explore.data_table", "Data Explorer: Data Table", "Access the Data Table tab in Data Explorer"),
         ("admin.data_explore.impute", "Data Explorer: Apply imputed values", "Write accepted imputed values into submission data from the Data Table tab (requires Data Table access and template/country scope)"),
-        ("admin.data_explore.analysis", "Data Explorer: Analysis", "Access the Analysis tab in Data Explorer"),
+        (
+            "admin.data_explore.analysis",
+            "Data Explorer: Analysis (legacy)",
+            "Legacy grant. Disaggregation, Service income, and Everyone Counts each have their own permission.",
+        ),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
         ("admin.data_explore.reports", "Data Explorer: Reports", "Access published reports in Data Explorer"),
         # Reports builder
@@ -408,16 +412,13 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "description": "Access the Data Table tab in Data Explorer, including applying accepted imputed values within template/country scope.",
             "permission_codes": ["admin.data_explore.data_table", "admin.data_explore.impute"],
         },
-        {
-            "code": "admin_data_explorer_analysis",
-            "name": "Admin: Data Explorer (Analysis)",
-            "description": "Access the Analysis tab in Data Explorer.",
-            # Report builder access is admin.reports.{view,edit} on
-            # admin_reports_viewer / admin_reports_editor only. add_reports_permissions
-            # once copied those onto this role; they are omitted here so the next
-            # flask rbac seed removes that grant.
-            "permission_codes": ["admin.data_explore.analysis"],
-        },
+        # admin_data_explorer_analysis used to open Disaggregation, Service income,
+        # and Everyone Counts together. Those tabs now have their own plugin roles
+        # (Admin: Data Explorer (Disaggregation Analysis) and the matching Service
+        # income / Everyone Counts roles). This role is intentionally absent so
+        # flask rbac seed does not put a leftover Analysis checkbox back on the
+        # user form. The legacy permission stays in the catalog so existing links
+        # on Admin: Full and custom roles remain valid.
         {
             "code": "admin_data_explorer_compliance",
             "name": "Admin: Data Explorer (Compliance)",

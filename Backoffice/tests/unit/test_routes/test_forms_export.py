@@ -321,7 +321,13 @@ class TestAssignmentPdfHelpers:
         field = {
             'id': 1,
             'matrix_columns': [
-                {'name': 'Funding Requirement', 'is_variable': True, 'variable': 'funding_req'},
+                {
+                    'name': 'Funding Requirement',
+                    'is_variable': True,
+                    'variable': 'funding_req',
+                    'variable_readonly': False,
+                    'variable_save_value': True,
+                },
             ],
             'matrix_rows': ['101'],
         }
@@ -332,6 +338,31 @@ class TestAssignmentPdfHelpers:
             merged = _merge_matrix_variable_values(field, matrix_data, MagicMock(), MagicMock())
 
         assert merged['101_Funding Requirement']['modified'] == 200
+
+    def test_merge_matrix_variable_values_ignores_saved_value_when_readonly(self):
+        from app.routes.forms.export import _merge_matrix_variable_values
+
+        field = {
+            'id': 1407,
+            'matrix_columns': [
+                {
+                    'name': 'SP1 Planned',
+                    'type': 'tick',
+                    'is_variable': True,
+                    'variable': 'planned_sp1',
+                    'variable_readonly': True,
+                    'variable_save_value': True,
+                },
+            ],
+            'matrix_rows': ['10'],
+        }
+        matrix_data = {'10_SP1 Planned': '0'}
+
+        with patch('app.services.forms.variable_resolution_service.VariableResolutionService') as mock_vrs:
+            mock_vrs.resolve_variables_batch.return_value = {10: {'planned_sp1': '1'}}
+            merged = _merge_matrix_variable_values(field, matrix_data, MagicMock(), MagicMock())
+
+        assert merged['10_SP1 Planned'] == '1'
 
 
 # ---------------------------------------------------------------------------

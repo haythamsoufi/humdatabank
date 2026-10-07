@@ -21,6 +21,7 @@ import {
     __formatSavedScalarForInput,
     __persistVariableCellScalar,
     __variableCellDiffersFromLookup,
+    __variableColumnPersistsValue,
     __resolveMatrixLocalizedLabel,
     __serializeMatrixData,
     __getMatrixColumnNames,
@@ -1075,25 +1076,19 @@ class MatrixHandler {
             const config = matrix.config;
             const columns = config.columns || [];
 
-            // Remove variable columns that have variable_save_value: false
+            // Read-only variable columns are never stored, even if an older config
+            // still has variable_save_value: true. Save-value off is the same rule.
             columns.forEach(column => {
                 const columnName = typeof column === 'object' ? column.name : column;
-                const columnType = typeof column === 'object' ? column.type : 'number';
-                // Check if this is a variable column (new structure: is_variable, or legacy: type === 'variable')
                 const isVariable = typeof column === 'object' && (column.is_variable === true || column.type === 'variable');
 
-                if (isVariable) {
-                    const variableSaveValue = typeof column === 'object' ? (column.variable_save_value !== false) : true;
-
-                    if (!variableSaveValue) {
-                        // Remove all cell keys for this column
-                        Object.keys(dataToSave).forEach(cellKey => {
-                            if (cellKey.endsWith(`_${columnName}`)) {
-                                delete dataToSave[cellKey];
-                                debugLog('matrix-handler', `Excluded variable column ${columnName} from saved data (save_value=false)`);
-                            }
-                        });
-                    }
+                if (isVariable && !__variableColumnPersistsValue(column)) {
+                    Object.keys(dataToSave).forEach(cellKey => {
+                        if (cellKey.endsWith(`_${columnName}`)) {
+                            delete dataToSave[cellKey];
+                            debugLog('matrix-handler', `Excluded variable column ${columnName} from saved data (read-only or save_value=false)`);
+                        }
+                    });
                 }
             });
 

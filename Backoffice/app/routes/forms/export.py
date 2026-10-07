@@ -674,6 +674,17 @@ def _matrix_row_entity_ids(field_dict):
     return row_ids
 
 
+def _variable_column_persists_value(column):
+    """Read-only variable columns always use the live lookup and are not stored."""
+    if not isinstance(column, dict):
+        return True
+    if not (column.get('is_variable') or column.get('type') == 'variable'):
+        return True
+    if column.get('variable_readonly', True) is not False:
+        return False
+    return column.get('variable_save_value', True) is not False
+
+
 def _matrix_has_variable_columns(columns):
     for col in columns or []:
         if isinstance(col, dict) and (col.get('is_variable') or col.get('type') == 'variable'):
@@ -723,8 +734,9 @@ def _merge_matrix_variable_values(field_dict, matrix_data, template_version, ass
             if not col_name or not var_name:
                 continue
             cell_key = f"{row_key}_{col_name}"
+            persists = _variable_column_persists_value(col)
             existing = enriched.get(cell_key)
-            if existing is not None and existing != '':
+            if persists and existing is not None and existing != '':
                 if isinstance(existing, dict):
                     if existing.get('modified') not in (None, ''):
                         continue
@@ -735,6 +747,8 @@ def _merge_matrix_variable_values(field_dict, matrix_data, template_version, ass
             val = var_map.get(var_name)
             if val is not None and val != '':
                 enriched[cell_key] = val
+            elif not persists:
+                enriched.pop(cell_key, None)
     return enriched
 
 

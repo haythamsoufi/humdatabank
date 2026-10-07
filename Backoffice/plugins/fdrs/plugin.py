@@ -4,8 +4,37 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.plugins.base import BasePlugin, DataExplorerTabConfig
+from app.plugins.base import BasePlugin, DataExplorerTabConfig, SeedPermission, SeedRole
 from plugins.metadata import FirstPartyPluginMetadata
+
+# Tabs that used to share admin.data_explore.analysis. Each one is its own
+# permission and its own "Admin: Data Explorer (...)" role on the user form.
+_SPLIT_ANALYSIS_TABS: tuple[tuple[str, str, str, str, int, str], ...] = (
+    (
+        "disaggregation",
+        "Disaggregation Analysis",
+        "admin.data_explore.disaggregation",
+        "admin_data_explorer_disaggregation",
+        20,
+        "fas fa-chart-pie",
+    ),
+    (
+        "service-income",
+        "Service income",
+        "admin.data_explore.service_income",
+        "admin_data_explorer_service_income",
+        25,
+        "fas fa-coins",
+    ),
+    (
+        "everyone-counts",
+        "Everyone Counts",
+        "admin.data_explore.everyone_counts",
+        "admin_data_explorer_everyone_counts",
+        27,
+        "fas fa-users",
+    ),
+)
 
 
 class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
@@ -52,37 +81,21 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
         return list(API_ENDPOINTS)
 
     def get_data_explorer_tabs(self) -> list[DataExplorerTabConfig]:
+        split_tabs = [
+            DataExplorerTabConfig(
+                tab_id=tab_id,
+                label=label,
+                permission=permission,
+                priority=priority,
+                panel_template=f"plugins/fdrs/{self._panel_dir(tab_id)}/tab_panel.html",
+                plugin_id=self.plugin_id,
+                icon=icon,
+                manage_requires_system_manager=False,
+            )
+            for tab_id, label, permission, _role_code, priority, icon in _SPLIT_ANALYSIS_TABS
+        ]
         return [
-            DataExplorerTabConfig(
-                tab_id="disaggregation",
-                label="Disaggregation Analysis",
-                permission="admin.data_explore.analysis",
-                priority=20,
-                panel_template="plugins/fdrs/disaggregation/tab_panel.html",
-                plugin_id=self.plugin_id,
-                icon="fas fa-chart-pie",
-                manage_requires_system_manager=False,
-            ),
-            DataExplorerTabConfig(
-                tab_id="service-income",
-                label="Service income",
-                permission="admin.data_explore.analysis",
-                priority=25,
-                panel_template="plugins/fdrs/service_income/tab_panel.html",
-                plugin_id=self.plugin_id,
-                icon="fas fa-coins",
-                manage_requires_system_manager=False,
-            ),
-            DataExplorerTabConfig(
-                tab_id="everyone-counts",
-                label="Everyone Counts",
-                permission="admin.data_explore.analysis",
-                priority=27,
-                panel_template="plugins/fdrs/ecr/tab_panel.html",
-                plugin_id=self.plugin_id,
-                icon="fas fa-users",
-                manage_requires_system_manager=False,
-            ),
+            *split_tabs,
             DataExplorerTabConfig(
                 tab_id="compliance",
                 label="Compliance",
@@ -103,6 +116,35 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
                 icon="fas fa-chart-line",
                 manage_requires_system_manager=True,
             ),
+        ]
+
+    @staticmethod
+    def _panel_dir(tab_id: str) -> str:
+        return {
+            "disaggregation": "disaggregation",
+            "service-income": "service_income",
+            "everyone-counts": "ecr",
+        }[tab_id]
+
+    def get_seed_permissions(self) -> list[SeedPermission]:
+        return [
+            SeedPermission(
+                code=permission,
+                name=f"Data Explorer: {label}",
+                description=f"Access the {label} tab in Data Explorer",
+            )
+            for _tab_id, label, permission, _role_code, _priority, _icon in _SPLIT_ANALYSIS_TABS
+        ]
+
+    def get_seed_roles(self) -> list[SeedRole]:
+        return [
+            SeedRole(
+                code=role_code,
+                name=f"Admin: Data Explorer ({label})",
+                description=f"Access the {label} tab in Data Explorer.",
+                permission_codes=[permission],
+            )
+            for _tab_id, label, permission, role_code, _priority, _icon in _SPLIT_ANALYSIS_TABS
         ]
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @bp.route("/admin/data-exploration/service-income", methods=["GET"])
-@permission_required("admin.data_explore.analysis")
+@permission_required("admin.data_explore.service_income")
 def get_service_income_analysis():
     """Yearly FDRS income and service income, with the closed-round reference."""
     published_only = (request.args.get("published_only") or "").strip().lower() in {"1", "true", "yes"}

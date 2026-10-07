@@ -8354,6 +8354,10 @@ msgstr "Деагрегация для допустимых индикаторо�
 msgid "Disaggregation preset"
 msgstr "Пресет для разложения"
 
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:79
+msgid "Disaggregation views"
+msgstr ""
+
 #: app/templates/forms/form_builder/form_builder.html:393
 #: app/templates/forms/form_builder/form_builder.html:402
 msgid "Discard"

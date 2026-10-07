@@ -62,8 +62,10 @@ def can_view_non_public_form_items(user) -> bool:
             return False
         if AuthorizationService.is_system_manager(user) or AuthorizationService.is_admin(user):
             return True
+        from app.plugins.data_explorer import user_has_analysis_family_permission
+
         if (AuthorizationService.has_rbac_permission(user, "admin.data_explore.data_table") or
-            AuthorizationService.has_rbac_permission(user, "admin.data_explore.analysis") or
+            user_has_analysis_family_permission(user) or
             AuthorizationService.has_rbac_permission(user, "admin.data_explore.compliance")):
             return True
         # Same-org users (email domain matches organization_email_domain from settings)

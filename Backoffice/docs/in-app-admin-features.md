@@ -162,13 +162,15 @@ Guides: [Manage users](user-guides/admin/manage-users.md), [Add a user](user-gui
 
 **Where:** Admin → **Explore Data** → `/admin/data-exploration`.
 
-**Who:** At least one of `admin.data_explore.data_table`, `admin.data_explore.analysis`, `admin.data_explore.compliance` (tabs hide if you lack the matching permission).
+**Who:** Any Explore Data tab permission. Each tab has its own code, assigned on the user form under Data Explorer: `admin.data_explore.data_table`, `admin.data_explore.disaggregation`, `admin.data_explore.service_income`, `admin.data_explore.everyone_counts`, `admin.data_explore.compliance`, plus plugin tabs `admin.data_explore.pb_progress` and `admin.data_explore.upr`. A tab stays hidden without its permission.
 
 **What you get:**
 
 - **Data Table** — Parameterized extraction of submission/form data into **AG Grid** (filtering, column visibility, export paths as implemented).
-- **Analysis** — Same filtered cohort aggregated for **disaggregation / charts** (ApexCharts), including demographic breakdowns where configured.
+- **Disaggregation Analysis** — Same filtered cohort aggregated for **disaggregation / charts** (ApexCharts), including demographic breakdowns where configured.
+- **Service income** and **Everyone Counts** — FDRS income and headline visuals, each with its own permission.
 - **Compliance** — **FDRS document compliance** view (annual report + audited financial statement rules over a selectable window), summary badges, downloadable tables.
+- **P&B visuals** and **UPR** — plugin tabs, each with its own permission.
 
 Cross-guide: [Export and download data](user-guides/admin/export-download-data.md) for general export concepts; compliance logic is specific to this explorer.
 

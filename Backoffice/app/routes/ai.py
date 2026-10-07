@@ -641,7 +641,20 @@ def _build_access_context(identity) -> Dict[str, Any]:
         "admin.plugins.manage": AuthorizationService.has_rbac_permission(user, "admin.plugins.manage"),
         "admin.data_explore.data_table": AuthorizationService.has_rbac_permission(user, "admin.data_explore.data_table"),
         "admin.data_explore.analysis": AuthorizationService.has_rbac_permission(user, "admin.data_explore.analysis"),
+        "admin.data_explore.disaggregation": AuthorizationService.has_rbac_permission(
+            user, "admin.data_explore.disaggregation"
+        ),
+        "admin.data_explore.service_income": AuthorizationService.has_rbac_permission(
+            user, "admin.data_explore.service_income"
+        ),
+        "admin.data_explore.everyone_counts": AuthorizationService.has_rbac_permission(
+            user, "admin.data_explore.everyone_counts"
+        ),
         "admin.data_explore.compliance": AuthorizationService.has_rbac_permission(user, "admin.data_explore.compliance"),
+        "admin.data_explore.pb_progress": AuthorizationService.has_rbac_permission(
+            user, "admin.data_explore.pb_progress"
+        ),
+        "admin.data_explore.upr": AuthorizationService.has_rbac_permission(user, "admin.data_explore.upr"),
         "admin.validation.dashboard": AuthorizationService.has_rbac_permission(user, "admin.validation.dashboard"),
         "admin.validation.questions": AuthorizationService.has_rbac_permission(user, "admin.validation.questions"),
         "admin.validation.rules": AuthorizationService.has_rbac_permission(user, "admin.validation.rules"),

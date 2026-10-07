@@ -204,27 +204,36 @@ class TestBaselineRolesPreserveMigrationBackfilledPermissions:
     catalog permission that isn't in that role's `permission_codes`, so those
     codes must stay listed or the next `flask rbac seed` revokes them.
 
-    `add_reports_permissions` did the same for `admin_data_explorer_analysis`,
-    which made Analysis holders see /admin/reports. That grant is no longer
-    wanted: report builder access is only `admin_reports_viewer` /
-    `admin_reports_editor`. Omitting the report codes from Analysis is what
-    makes seed revoke them.
+    `add_reports_permissions` copied report-builder access onto
+    `admin_data_explorer_analysis`. That role is retired: Disaggregation,
+    Service income, and Everyone Counts each have their own role, and seed
+    must not recreate the shared Analysis checkbox (which would also risk
+    putting report-builder permissions back on a Data Explorer grant).
     """
 
-    def test_analysis_role_does_not_include_report_builder_permissions(self, app):
-        core_permissions, extension_permissions, baseline_roles, _ = _full_catalog(app)
-        roles_by_code = {str(r.get("code")): r for r in baseline_roles}
-        role = roles_by_code.get("admin_data_explorer_analysis")
-        assert role is not None, "admin_data_explorer_analysis role definition is missing from _baseline_roles()"
+    def test_shared_analysis_role_is_not_reseeded(self, app):
+        _, _, baseline_roles, extension_roles = _full_catalog(app)
+        codes = {str(r.get("code")) for r in baseline_roles + extension_roles}
+        assert "admin_data_explorer_analysis" not in codes
 
-        codes = set(role.get("permission_codes") or [])
-        leaked = {"admin.reports.view", "admin.reports.edit"} & codes
-        assert not leaked, (
-            f"admin_data_explorer_analysis still includes {sorted(leaked)}. "
-            "Report builder access belongs on admin_reports_viewer / "
-            "admin_reports_editor only; leaving these here lets Analysis holders "
-            "open /admin/reports."
-        )
+    def test_split_analysis_tabs_do_not_include_report_builder_permissions(self, app):
+        _, _, baseline_roles, extension_roles = _full_catalog(app)
+        roles_by_code = {str(r.get("code")): r for r in baseline_roles + extension_roles}
+        expected = {
+            "admin_data_explorer_disaggregation": "admin.data_explore.disaggregation",
+            "admin_data_explorer_service_income": "admin.data_explore.service_income",
+            "admin_data_explorer_everyone_counts": "admin.data_explore.everyone_counts",
+        }
+        for role_code, permission in expected.items():
+            role = roles_by_code.get(role_code)
+            assert role is not None, f"{role_code} is missing from plugin seed roles"
+            codes = set(role.get("permission_codes") or [])
+            assert codes == {permission}
+            leaked = {"admin.reports.view", "admin.reports.edit"} & codes
+            assert not leaked, (
+                f"{role_code} includes {sorted(leaked)}. Report builder access "
+                "belongs on admin_reports_viewer / admin_reports_editor only."
+            )
 
     def test_compliance_role_keeps_backfilled_validation_permissions(self, app):
         core_permissions, extension_permissions, baseline_roles, _ = _full_catalog(app)

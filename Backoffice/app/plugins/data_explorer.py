@@ -21,12 +21,35 @@ CORE_DATA_EXPLORER_PERMISSIONS: tuple[str, ...] = tuple(
     tab["permission"] for tab in CORE_DATA_EXPLORER_TABS
 )
 
+# Disaggregation, Service income, and Everyone Counts used to share this code.
+LEGACY_ANALYSIS_PERMISSION = "admin.data_explore.analysis"
+DISAGGREGATION_PERMISSION = "admin.data_explore.disaggregation"
+SERVICE_INCOME_PERMISSION = "admin.data_explore.service_income"
+EVERYONE_COUNTS_PERMISSION = "admin.data_explore.everyone_counts"
+SPLIT_ANALYSIS_TAB_PERMISSIONS: tuple[str, ...] = (
+    DISAGGREGATION_PERMISSION,
+    SERVICE_INCOME_PERMISSION,
+    EVERYONE_COUNTS_PERMISSION,
+)
+
+
+def user_has_analysis_family_permission(user) -> bool:
+    """True when the user holds the legacy Analysis grant or any tab that replaced it."""
+    from app.services.organization.authorization_service import AuthorizationService
+
+    for code in (LEGACY_ANALYSIS_PERMISSION, *SPLIT_ANALYSIS_TAB_PERMISSIONS):
+        if AuthorizationService.has_rbac_permission(user, code):
+            return True
+    return False
+
 
 def user_can_read_disaggregation_template(user, template_id) -> bool:
-    """Analysis permission reads the FDRS template without a share or country grant.
+    """Disaggregation permission reads the FDRS template without a share or country grant.
 
     The Disaggregation tab aggregates that template for every country. Owning the
-    template or holding entity access is not required.
+    template or holding entity access is not required. The legacy Analysis grant
+    still counts so holders keep access until the split migration assigns the
+    dedicated role.
     """
     from app.services.organization.authorization_service import AuthorizationService
     from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
@@ -38,7 +61,9 @@ def user_can_read_disaggregation_template(user, template_id) -> bool:
         return False
     if AuthorizationService.is_system_manager(user):
         return True
-    return AuthorizationService.has_rbac_permission(user, "admin.data_explore.analysis")
+    return AuthorizationService.has_rbac_permission(
+        user, DISAGGREGATION_PERMISSION
+    ) or AuthorizationService.has_rbac_permission(user, LEGACY_ANALYSIS_PERMISSION)
 
 
 def tab_flag_key(tab_id: str, *, prefix: str = "can_access") -> str:

@@ -456,7 +456,11 @@ def get_form_items_for_template():
 
 
 @bp.route("/data-exploration/assignment-filters", methods=["GET"])
-@permission_required_any('admin.data_explore.data_table', 'admin.data_explore.analysis')
+@permission_required_any(
+    'admin.data_explore.data_table',
+    'admin.data_explore.disaggregation',
+    'admin.data_explore.analysis',
+)
 def get_assignment_filters_for_template():
     """Get assignment periods and countries for a specific template (for filter dropdowns)."""
     try:

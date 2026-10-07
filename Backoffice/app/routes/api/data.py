@@ -1286,10 +1286,11 @@ def get_all_data():
 
         analysis_requested = str(request.args.get('analysis', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
         if analysis_requested and not elevated_access and auth_user is not None:
+            from app.plugins.data_explorer import user_has_analysis_family_permission
             from app.services.organization.authorization_service import AuthorizationService
             if not (
                 AuthorizationService.is_system_manager(auth_user)
-                or AuthorizationService.has_rbac_permission(auth_user, 'admin.data_explore.analysis')
+                or user_has_analysis_family_permission(auth_user)
             ):
                 return api_error('Forbidden: analysis access is required', 403)
 

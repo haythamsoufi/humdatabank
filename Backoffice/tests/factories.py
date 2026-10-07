@@ -234,8 +234,12 @@ def create_test_admin(db_session, **kwargs):
     if kwargs.get("can_explore_data", True):
         _grant(role_id, "admin.data_explore.data_table")
         _grant(role_id, "admin.data_explore.analysis")
+        _grant(role_id, "admin.data_explore.disaggregation")
+        _grant(role_id, "admin.data_explore.service_income")
+        _grant(role_id, "admin.data_explore.everyone_counts")
         _grant(role_id, "admin.data_explore.compliance")
         _grant(role_id, "admin.data_explore.pb_progress")
+        _grant(role_id, "admin.data_explore.upr")
     if kwargs.get("can_manage_validation", True):
         _grant(role_id, "admin.validation.dashboard")
         _grant(role_id, "admin.validation.questions")

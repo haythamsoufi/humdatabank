@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @bp.route("/admin/data-exploration/everyone-counts", methods=["GET"])
-@permission_required("admin.data_explore.analysis")
+@permission_required("admin.data_explore.everyone_counts")
 def get_everyone_counts_analysis():
     """Live FDRS headline series used by Everyone Counts.
 

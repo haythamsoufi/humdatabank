@@ -5,6 +5,7 @@ import { _t, __canEditMatrixContainer, ROW_TOTAL_COLUMN_NAME } from './shared.js
 import {
     __formatInteger,
     __integerInputValue,
+    __setMatrixNumericCellDisplay,
     __setMatrixNumericInputValue,
     __serializeMatrixData,
     __configFlag,
@@ -13,11 +14,14 @@ import {
     __parseMatrixCellKey,
 } from './formatting.js';
 import {
+    calculatedOverrideDiffers,
     calculationIsReadonly,
+    calculationSavesValue,
     columnCountsTowardRowTotal,
     evaluateCalculatedForRows,
     formatFormulaNumberForDisplay,
     paintCalculatedCells,
+    parseCalculatedManualNumber,
 } from './calculation.js';
 
 export { ROW_TOTAL_COLUMN_NAME };
@@ -179,20 +183,27 @@ export function __populateRowTotalConflictTooltip(tooltip, cell) {
 
     tooltip.replaceChildren();
 
+    const calculatedOverride = !!cell._calculatedOverride;
     const title = document.createElement('div');
     title.style.fontWeight = 'bold';
     title.style.marginBottom = '4px';
-    title.textContent = conflictType === 'error' ? _t('Total mismatch') : _t('Manual total');
+    title.textContent = calculatedOverride
+        ? _t('Manual value')
+        : (conflictType === 'error' ? _t('Total mismatch') : _t('Manual total'));
 
     const summaryRow = document.createElement('div');
     summaryRow.style.lineHeight = '1.4';
     summaryRow.style.marginBottom = '2px';
 
     const manualLine = document.createElement('div');
-    manualLine.textContent = `${_t('Manual total:')} ${__formatInteger(manualVal)}`;
+    manualLine.textContent = calculatedOverride
+        ? `${_t('Your value:')} ${formatFormulaNumberForDisplay(manualVal, cell._calculatedDecimals)}`
+        : `${_t('Manual total:')} ${__formatInteger(manualVal)}`;
 
     const breakdownLine = document.createElement('div');
-    breakdownLine.textContent = `${_t('Breakdown sum:')} ${__formatInteger(autoSum)}`;
+    breakdownLine.textContent = calculatedOverride
+        ? `${_t('Calculated value:')} ${formatFormulaNumberForDisplay(autoSum, cell._calculatedDecimals)}`
+        : `${_t('Breakdown sum:')} ${__formatInteger(autoSum)}`;
 
     summaryRow.append(manualLine, breakdownLine);
 
@@ -205,7 +216,7 @@ export function __populateRowTotalConflictTooltip(tooltip, cell) {
         restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
         const restoreBtn = document.createElement('button');
         restoreBtn.type = 'button';
-        restoreBtn.className = 'row-total-restore';
+        restoreBtn.className = calculatedOverride ? 'calculated-value-restore' : 'row-total-restore';
         restoreBtn.setAttribute('data-cell-key', cellKey);
         restoreBtn.setAttribute('data-row-id', rowId);
         restoreBtn.setAttribute('aria-label', _t('Restore to calculated'));
@@ -214,7 +225,9 @@ export function __populateRowTotalConflictTooltip(tooltip, cell) {
         restoreBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (typeof window.matrixHandler?.handleRowTotalRestore === 'function') {
+            if (calculatedOverride && typeof window.matrixHandler?.handleCalculatedValueRestore === 'function') {
+                window.matrixHandler.handleCalculatedValueRestore(restoreBtn);
+            } else if (typeof window.matrixHandler?.handleRowTotalRestore === 'function') {
                 window.matrixHandler.handleRowTotalRestore(restoreBtn);
             }
             const currentTooltip = cell._rowTotalTooltipId ? document.getElementById(cell._rowTotalTooltipId) : null;
@@ -404,6 +417,103 @@ export function __updateRowTotalConflict(input, autoSum, manualVal, validation, 
 }
 
 
+function __clearCalculatedOverride(cell, input) {
+    if (!cell) return;
+    cell.classList.remove('bg-orange-50', 'cursor-help');
+    input?.classList.remove('border-orange-400', 'ring-1', 'ring-orange-300');
+    const indicator = cell.querySelector('.calculated-value-conflict');
+    if (indicator) {
+        indicator.className = `${__ROW_TOTAL_CONFLICT_INDICATOR_BASE} calculated-value-conflict hidden`;
+        indicator.setAttribute('aria-hidden', 'true');
+    }
+    cell._calculatedOverride = false;
+    __teardownRowTotalConflictTooltip(cell);
+}
+
+
+function __showCalculatedOverride(cell, input, formulaValue, manualValue, decimals) {
+    if (!cell || !input) return;
+    let wrapper = input.parentElement;
+    if (!wrapper || !wrapper.classList.contains('calculated-value-wrap')) {
+        wrapper = document.createElement('div');
+        wrapper.className = 'calculated-value-wrap flex items-center w-full gap-1.5';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+        input.classList.add('flex-1', 'min-w-0');
+    }
+    let indicator = wrapper.querySelector('.calculated-value-conflict');
+    if (!indicator) {
+        indicator = __createRowTotalConflictIndicator();
+        indicator.classList.add('calculated-value-conflict');
+        wrapper.appendChild(indicator);
+    }
+    const msg = `${_t('Your value:')} ${formatFormulaNumberForDisplay(manualValue, decimals)}. ${_t('Calculated value:')} ${formatFormulaNumberForDisplay(formulaValue, decimals)}`;
+    __syncRowTotalConflictIndicator(indicator, 'warning', msg);
+    indicator.classList.add('calculated-value-conflict');
+    cell.classList.add('bg-orange-50', 'cursor-help');
+    input.classList.add('border-orange-400', 'ring-1', 'ring-orange-300');
+    cell._calculatedOverride = true;
+    cell._calculatedDecimals = decimals;
+    cell._rowTotalAutoSum = formulaValue;
+    cell._rowTotalManualVal = manualValue;
+    cell._rowTotalConflictType = 'warning';
+    cell._rowTotalConflictMessage = msg;
+    if (!cell._rowTotalTooltipId) {
+        __setupRowTotalConflictTooltip(cell, input);
+    } else {
+        cell._rowTotalInput = input;
+        cell._rowTotalTooltipTrigger = cell;
+        const tooltip = document.getElementById(cell._rowTotalTooltipId);
+        if (tooltip && tooltip.style.opacity === '1') {
+            __populateRowTotalConflictTooltip(tooltip, cell);
+            __positionRowTotalConflictTooltip(tooltip, cell);
+        }
+    }
+}
+
+
+function __syncCalculatedOverrides(container, columns, formulaByRow, data) {
+    if (!container) return;
+    container.querySelectorAll('input[data-calculated="true"]').forEach((input) => {
+        const name = input.getAttribute('data-column');
+        const column = (columns || []).find((item) => item && item.name === name);
+        const cell = input.closest('td');
+        if (!cell || !column || calculationIsReadonly(column)) {
+            __clearCalculatedOverride(cell, input);
+            return;
+        }
+        const decimals = column.calculation && column.calculation.decimals != null
+            ? column.calculation.decimals
+            : 2;
+        const rowId = input.getAttribute('data-row-id');
+        const pack = formulaByRow && formulaByRow.get(String(rowId));
+        const formulaValue = pack && pack.values ? pack.values[name] : null;
+        const cellKey = input.getAttribute('data-cell-key');
+        const stored = data && cellKey ? data[cellKey] : undefined;
+        const storedOverride = calculationSavesValue(column)
+            && calculatedOverrideDiffers(stored, formulaValue, decimals);
+        if (storedOverride && input.dataset.userEdited !== '1' && document.activeElement !== input) {
+            input.dataset.userEdited = '1';
+            __setMatrixNumericCellDisplay(input, parseCalculatedManualNumber(stored));
+        }
+        const typedOverride = input.dataset.userEdited === '1'
+            && calculatedOverrideDiffers(input.value, formulaValue, decimals);
+        if (!typedOverride && !storedOverride) {
+            if (cellKey && data && Object.prototype.hasOwnProperty.call(data, cellKey)
+                && !calculatedOverrideDiffers(data[cellKey], formulaValue, decimals)) {
+                delete data[cellKey];
+            }
+            __clearCalculatedOverride(cell, input);
+            return;
+        }
+        const manualValue = parseCalculatedManualNumber(
+            input.dataset.userEdited === '1' ? input.value : stored
+        );
+        __showCalculatedOverride(cell, input, formulaValue, manualValue, decimals);
+    });
+}
+
+
 export function __storedRowTotalManualScalar(stored) {
     if (stored === null || stored === undefined || stored === '') return null;
     if (typeof stored === 'object') {
@@ -513,6 +623,7 @@ calculateMatrixTotals(fieldId) {
     const rowTotalValidation = __rowTotalValidation(config);
     const formulaByRow = evaluateCalculatedForRows(columns, data, Array.from(rowIdMap.values()));
     paintCalculatedCells(container, columns, formulaByRow);
+    __syncCalculatedOverrides(container, columns, formulaByRow, data);
     const adjustsRowTotal = columns.some((column) => (
         column && typeof column === 'object' && (
             column.type === 'calculated' || column.include_in_row_total === false
@@ -806,6 +917,36 @@ handleRowTotalRestore(button) {
     __setMatrixNumericInputValue(input, autoSum || '');
     delete matrix.data[cellKey];
     __updateRowTotalConflict(input, autoSum, '', __rowTotalValidation(matrix.config), false);
+    if (matrix.hiddenField) {
+        matrix.hiddenField.value = __serializeMatrixData(matrix.data);
+    }
+},
+
+/**
+ * Drop a manual calculated-cell override and show the formula again.
+ */
+handleCalculatedValueRestore(button) {
+    const cellKey = button.getAttribute('data-cell-key');
+    if (!cellKey) return;
+
+    let container = button.closest('.matrix-container');
+    let input = container?.querySelector(`input[data-calculated="true"][data-cell-key="${CSS.escape(cellKey)}"]`);
+    if (!input) {
+        input = document.querySelector(`input[data-calculated="true"][data-cell-key="${CSS.escape(cellKey)}"]`);
+        container = input?.closest('.matrix-container');
+    }
+    if (container && !this._canEditMatrix(container)) return;
+    const fieldId = container?.dataset?.fieldId;
+    if (!fieldId || !input) return;
+
+    const matrix = this.matrices.get(fieldId);
+    if (!matrix) return;
+
+    delete input.dataset.userEdited;
+    delete matrix.data[cellKey];
+    const cell = input.closest('td');
+    __clearCalculatedOverride(cell, input);
+    this.calculateMatrixTotals(fieldId);
     if (matrix.hiddenField) {
         matrix.hiddenField.value = __serializeMatrixData(matrix.data);
     }

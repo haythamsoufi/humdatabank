@@ -233,8 +233,8 @@
                                 {% endif %}
                             {% endif %}
                             {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
-                            {# Manual and list-library rows sort A–Z. Hybrid keeps fixed rows in config order
-                               (already arranged by the export route) and only alphabetizes list rows. #}
+                            {# Period row headers stay in calendar order. Other labels sort A–Z.
+                               Hybrid keeps fixed rows in config order (already arranged by the export route). #}
                             {# Rows may be plain strings (legacy) or {text, name_translations} objects #}
                             {% set _preserve_row_order = field.matrix_skip_row_sort if field.matrix_skip_row_sort is defined else false %}
                             {% set ns = namespace(rows_for_sort=[]) %}
@@ -260,7 +260,7 @@
                             {% if _preserve_row_order %}
                                 {% set sorted_matrix_rows = ns.rows_for_sort %}
                             {% else %}
-                                {% set sorted_matrix_rows = ns.rows_for_sort | sort(attribute='sort_label', case_sensitive=False) %}
+                                {% set sorted_matrix_rows = sort_matrix_display_rows(ns.rows_for_sort) %}
                             {% endif %}
                             {% if matrix_columns %}
                                 {# Precompute column totals (and grand total) for the totals row, matching matrix-handler.js #}

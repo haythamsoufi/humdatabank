@@ -792,11 +792,11 @@ async autoLoadEntities(fieldId) {
             }
             this.pendingVariableResolution.delete(fieldId);
 
+            // Order rows before totals. A totals error must not leave the table unsorted.
+            this.sortMatrixRows(fieldId);
             this.calculateMatrixTotals(fieldId);
             // Batch resolve variables for all auto-loaded rows (optimized)
             await this.resolveVariablesForAllRows(fieldId);
-            // Sort rows alphabetically after auto-loading
-            this.sortMatrixRows(fieldId);
             // Check for and highlight duplicates
             this.applyDuplicateEntityHighlighting(fieldId);
             // Update legend visibility after auto-load

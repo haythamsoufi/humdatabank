@@ -445,6 +445,7 @@
                                     {% elif column_type == 'calculated' %}
                                         {% set calc_saved = _cell_display_scalar if (column.calculation_save_value and _cell_display_scalar not in (none, '')) else none %}
                                         {% set calc_decimals = column.calculation.decimals if (column.calculation is mapping and column.calculation.decimals is not none) else 2 %}
+                                        <div class="calculated-value-wrap flex items-center w-full gap-1.5">
                                         <input type="text"
                                                data-numeric="true"
                                                data-row="{{ row_id }}"
@@ -456,10 +457,11 @@
                                                data-max-decimals="{{ calc_decimals }}"
                                                {% if calc_saved is not none %}data-user-edited="1"{% endif %}
                                                value="{{ calc_saved if calc_saved is not none else (matrix_formula_display(matrix_columns, existing_matrix_data, row_id, column) or '') }}"
-                                               class="w-full px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-0"
+                                               class="flex-1 min-w-0 w-full px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-0"
                                                aria-label="{{ _('Calculated value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                inputmode="decimal"
                                                {% if not can_edit or _col_header_gated %}disabled{% endif %}>
+                                        </div>
                                     {% elif is_variable and column_variable %}
                                         {# Variable column - type can be number or tick, will be resolved via JavaScript with row entity context #}
                                         {% set variable_readonly = column.variable_readonly if column.variable_readonly is defined else True %}

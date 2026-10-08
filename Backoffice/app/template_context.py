@@ -125,6 +125,10 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['matrix_formula_display'] = matrix_formula_display
     app.jinja_env.globals['matrix_formula_number'] = matrix_formula_number
 
+    from app.utils.matrix_row_order import sort_matrix_display_rows
+
+    app.jinja_env.globals['sort_matrix_display_rows'] = sort_matrix_display_rows
+
     @app.context_processor
     def inject_staging_environment_banner():
         """Expose whether to show the staging-environment warning banner."""

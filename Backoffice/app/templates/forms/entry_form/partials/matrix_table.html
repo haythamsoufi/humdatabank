@@ -441,7 +441,7 @@
                                               data-row-id="{{ row_id }}"
                                               data-column="{{ column_name }}"
                                               data-calculated="true"
-                                              title="{{ _('Calculated from other columns in this row') }}">{{ matrix_formula_display(matrix_columns, existing_matrix_data, row_id, column) or '—' }}</span>
+                                              title="{{ _('Calculated from other columns in this row')|forceescape }}">{{ matrix_formula_display(matrix_columns, existing_matrix_data, row_id, column) or '—' }}</span>
                                     {% elif column_type == 'calculated' %}
                                         {% set calc_saved = _cell_display_scalar if (column.calculation_save_value and _cell_display_scalar not in (none, '')) else none %}
                                         {% set calc_decimals = column.calculation.decimals if (column.calculation is mapping and column.calculation.decimals is not none) else 2 %}

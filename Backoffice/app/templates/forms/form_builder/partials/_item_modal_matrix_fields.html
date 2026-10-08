@@ -397,9 +397,11 @@
                                     </label>
                                     <div class="column-calc-sources">
                                         <p class="column-calc-sources-label text-gray-700 mb-1"
-                                           data-label-columns="{{ _('Columns') }}"
-                                           data-label-numerator="{{ _('Numerator') }}"
-                                           data-label-add="{{ _('Columns to add') }}">{{ _('Columns') }}</p>
+                                           data-label-columns="{{ _('Columns')|forceescape }}"
+                                           data-label-numerator="{{ _('Numerator')|forceescape }}"
+                                           data-label-add="{{ _('Columns to add')|forceescape }}">
+                                            {{ _('Columns') }}
+                                        </p>
                                         <div class="column-calc-source-list flex flex-wrap gap-2"></div>
                                     </div>
                                     <div class="column-calc-subtrahends hidden">
@@ -441,7 +443,7 @@
                                             </span>
                                         </label>
                                     </div>
-                                    <p class="column-calc-status text-gray-500 break-words" data-empty-message="{{ _('Choose columns or enter a formula') }}"></p>
+                                    <p class="column-calc-status text-gray-500 break-words" data-empty-message="{{ _('Choose columns or enter a formula')|forceescape }}"></p>
                                 </div>
                             </div>
                         </template>

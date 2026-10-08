@@ -4,8 +4,10 @@ When the entry script is loaded via static_url() (e.g. entry-form.js?v=561aa…)
 relative imports like ``import './main.js'`` resolve without the query string.
 That splits the browser cache and causes duplicate network fetches on CDN origins.
 
-An import map scoped to each directory under ``js/forms/`` maps every relative
-specifier found in source to the same versioned URL that static_url() emits.
+An import map scoped to each directory under ``js/forms/`` maps the absolute,
+unversioned URL of every relatively-imported module to the same versioned URL
+that static_url() emits. Keys must be absolute: relative keys ("./x.js") are
+resolved against the HTML document URL by the browser, so they never match.
 """
 
 from __future__ import annotations
@@ -48,6 +50,7 @@ def build_scoped_import_map(
     cdn_base: str,
     origin: str,
     versioned_url_for,
+    unversioned_url_for=None,
 ) -> dict:
     """Return ``{"scopes": {...}}`` for all relative imports under *tree_relative*."""
     tree_path = static_root / tree_relative.replace("/", posixpath.sep)
@@ -75,7 +78,13 @@ def build_scoped_import_map(
             target_path = static_root / target_rel.replace("/", posixpath.sep)
             if not target_path.is_file():
                 continue
-            scopes.setdefault(scope_key, {})[specifier] = versioned_url_for(target_rel)
+            # The key MUST be the absolute, unversioned URL the browser resolves the
+            # specifier to. Import-map keys such as "./main.js" are resolved against the
+            # *document* URL (e.g. /forms/assignment/5), not the importing module, so a
+            # relative key never matches and every nested import silently loads an
+            # unversioned (immutable-cached) URL -> stale module / missing-export errors.
+            key = unversioned_url_for(target_rel) if unversioned_url_for else specifier
+            scopes.setdefault(scope_key, {})[key] = versioned_url_for(target_rel)
 
     return {"scopes": scopes}
 
@@ -99,12 +108,19 @@ def _cached_forms_import_map(
             return f"{cdn_base}/{rel_path}?v={version}"
         return f"{origin.rstrip('/')}/static/{rel_path}?v={version}"
 
+    def unversioned_url_for(rel_path: str) -> str:
+        rel_path = rel_path.lstrip("/")
+        if cdn_base:
+            return f"{cdn_base}/{rel_path}"
+        return f"{origin.rstrip('/')}/static/{rel_path}"
+
     return build_scoped_import_map(
         static_root=static_root,
         tree_relative=tree_relative,
         cdn_base=cdn_base,
         origin=origin,
         versioned_url_for=versioned_url_for,
+        unversioned_url_for=unversioned_url_for,
     )
 
 

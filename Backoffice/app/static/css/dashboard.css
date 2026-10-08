@@ -10,6 +10,13 @@
     overflow: visible;
 }
 
+/* Hover lift (translate) traps the contributors tooltip in this card's stacking
+   context. Sit above the page header (z-index: 20) and under the top nav (z-index: 30). */
+.dashboard-assignment-card:hover,
+.dashboard-assignment-card:focus-within {
+    z-index: 21;
+}
+
 /* Card action row: Enter Data stays visible; overflow moves other actions to ⋮ menu */
 .dashboard-card-actions {
     min-width: 0;

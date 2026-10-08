@@ -906,7 +906,7 @@ export function initAuthDrafts() {
       await baselineReady;
       const { data: restorableData } = resolveDraftPayloadForRestore(record, baselineSnapshot);
       if (!draftHasContent({ data: restorableData })) {
-        if (!record.diffBased) void deleteDraft(key);
+        if (baselineSnapshot) void deleteDraft(key);
         authDraftLog('restore_skip', { ok: true, reason: 'nothing_to_restore' });
         return;
       }

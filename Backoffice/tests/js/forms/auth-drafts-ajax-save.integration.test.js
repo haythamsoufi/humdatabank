@@ -22,6 +22,8 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
 
 vi.mock('../../../app/static/js/forms/modules/entry-form-progress.js', () => ({
   applyEntryFormProgress: vi.fn(),
+  coerceCompletionRate: vi.fn(() => 100),
+  refreshVisibleCompletionRate: vi.fn(() => Promise.resolve()),
 }));
 
 const DRAFT_KEY = 'auth:42:100';

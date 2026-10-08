@@ -60,6 +60,30 @@ describe('auth-drafts-core helpers', () => {
     expect(draftValuesEqual(['a'], ['a', 'b'])).toBe(false);
   });
 
+  it('draftValuesEqual compares matrix payloads by cell values', () => {
+    const b64 = (obj) => 'b64:' + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    const saved = b64({ '1_SP1': '150000', '1_SP2': 0, '2_SP1': 'Élan' });
+    const drifted = b64({
+      '2_SP1': 'Élan',
+      '1_SP1': { original: '150000', modified: null, isModified: false },
+      '1_SP2': '0',
+      '1_SP3': { original: '', modified: '' },
+      _meta: 'x',
+    });
+    expect(draftValuesEqual(saved, drifted)).toBe(true);
+    expect(draftValuesEqual(saved, JSON.stringify({ '1_SP1': 150000, '1_SP2': '0', '2_SP1': 'Élan' }))).toBe(true);
+    expect(draftValuesEqual(saved, b64({ '1_SP1': '150001', '1_SP2': 0, '2_SP1': 'Élan' }))).toBe(false);
+    expect(draftValuesEqual(
+      b64({ '1_SP1': { original: '5', modified: '7', isModified: true } }),
+      b64({ '1_SP1': '5' }),
+    )).toBe(false);
+  });
+
+  it('draftValuesEqual keeps strict comparison for plain text', () => {
+    expect(draftValuesEqual('abc', 'abc ')).toBe(false);
+    expect(draftValuesEqual('b64:not-json', 'b64:not-json!')).toBe(false);
+  });
+
   it('isEmptyDraftValue treats false and empty arrays as empty', () => {
     expect(isEmptyDraftValue('')).toBe(true);
     expect(isEmptyDraftValue(false)).toBe(true);
@@ -168,6 +192,20 @@ describe('resolveDraftPayloadForRestore', () => {
       data: { x: '1' },
       diffBased: true,
     });
+  });
+
+  it('drops diff-based fields the server already saved', () => {
+    const record = { diffBased: true, data: { x: '1', y: 'draft' } };
+    expect(resolveDraftPayloadForRestore(record, { x: '1', y: 'db' })).toEqual({
+      data: { y: 'draft' },
+      diffBased: true,
+    });
+    expect(resolveDraftPayloadForRestore(record, { x: '1', y: 'draft' }).data).toEqual({});
+  });
+
+  it('keeps diff-based records as-is without a baseline', () => {
+    const record = { diffBased: true, data: { x: '1' } };
+    expect(resolveDraftPayloadForRestore(record, null).data).toEqual({ x: '1' });
   });
 
   it('converts legacy snapshots to safe diffs', () => {

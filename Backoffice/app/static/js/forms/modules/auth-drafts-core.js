@@ -90,12 +90,71 @@ function sortedArrayKey(arr) {
   return JSON.stringify([...arr].map(String).sort());
 }
 
+function parseMatrixPayload(value) {
+  if (typeof value !== 'string') return null;
+  let json = value;
+  if (value.startsWith('b64:')) {
+    try {
+      json = decodeURIComponent(escape(atob(value.slice(4))));
+    } catch (_) {
+      return null;
+    }
+  } else if (!value.startsWith('{')) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeMatrixCell(value) {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    if (value.modified != null && value.modified !== '') return normalizeMatrixCell(value.modified);
+    if (value.original != null && value.original !== '') return normalizeMatrixCell(value.original);
+    return '';
+  }
+  if (value === true || value === 'true') return '1';
+  if (value === false || value === 'false') return '0';
+  const str = String(value).trim();
+  const plain = str.replace(/,/g, '');
+  if (/^-?\d+(\.\d+)?$/.test(plain)) return String(Number(plain));
+  return str;
+}
+
+/**
+ * Canonical form of a serialized matrix payload (`b64:` or raw JSON): the same
+ * figures may be stored as scalars or `{original, modified}` cells, numbers or
+ * strings, depending on which matrix code path last wrote the hidden input.
+ */
+export function canonicalMatrixPayload(value) {
+  const data = parseMatrixPayload(value);
+  if (!data) return null;
+  const out = {};
+  Object.keys(data).sort().forEach((key) => {
+    if (key.startsWith('_')) return;
+    const cell = normalizeMatrixCell(data[key]);
+    if (cell !== '') out[key] = cell;
+  });
+  return JSON.stringify(out);
+}
+
 export function draftValuesEqual(a, b) {
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
     return sortedArrayKey(a) === sortedArrayKey(b);
   }
-  return a === b;
+  if (a === b) return true;
+  if (typeof a === 'string' && typeof b === 'string') {
+    const ca = canonicalMatrixPayload(a);
+    if (ca === null) return false;
+    const cb = canonicalMatrixPayload(b);
+    return cb !== null && ca === cb;
+  }
+  return false;
 }
 
 export function diffAgainstBaseline(current, baseline) {
@@ -131,9 +190,16 @@ export function legacySnapshotToSafeDiff(snapshot, baseline) {
   return safe;
 }
 
+/**
+ * Draft payload still worth restoring. Diff-based drafts drop fields the server
+ * already has (e.g. the draft was written after a successful save), so a fully
+ * saved draft resolves to an empty payload.
+ */
 export function resolveDraftPayloadForRestore(record, baseline) {
   if (!record?.data) return { data: null, diffBased: true };
-  if (record.diffBased) return { data: record.data, diffBased: true };
+  if (record.diffBased) {
+    return { data: baseline ? diffAgainstBaseline(record.data, baseline) : record.data, diffBased: true };
+  }
   if (!baseline) return { data: null, diffBased: true };
   return { data: legacySnapshotToSafeDiff(record.data, baseline), diffBased: true };
 }

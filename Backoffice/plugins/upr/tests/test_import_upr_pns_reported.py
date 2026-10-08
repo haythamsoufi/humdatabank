@@ -21,6 +21,8 @@ from import_upr_excel_data import (  # noqa: E402
     _pns_pending_reset_needs_update,
     _t22_pns_import_cell_value,
     canonical_upr_period,
+    T22_CONFIRMED_FUNDING_COLUMN,
+    is_planning_confirmed_funding_row,
     is_planning_funding_requirement_row,
     is_pns_data_source,
     parse_pns_reported_yes,
@@ -120,13 +122,13 @@ class TestTransformT22PnsReportedGate:
         assert item_rows == []
 
 
-class TestConfirmedFundingSkipped:
+class TestConfirmedFundingColumn:
     def test_is_planning_funding_requirement_row_rejects_confirmed_funding(self):
-        assert is_planning_funding_requirement_row(
-            {"Indicator": "Confirmed Funding", "indicatorId": "", "PNS Value": 850000}
-        ) is False
+        row = {"Indicator": "Confirmed Funding", "indicatorId": "", "PNS Value": 850000}
+        assert is_planning_confirmed_funding_row(row) is True
+        assert is_planning_funding_requirement_row(row) is False
 
-    def test_confirmed_funding_does_not_overwrite_funding_requirement_total(self):
+    def test_confirmed_funding_writes_confirmedfn_without_overwriting_total(self):
         ctx = UprImportContext(template_ids=[24, 22])
         ctx.ns_home_country_iso3 = {"finnish red cross": "FIN"}
         ctx.country_id_by_iso3 = {"BDI": 27}
@@ -149,6 +151,7 @@ class TestConfirmedFundingSkipped:
                 Area="Total",
                 Indicator="Confirmed Funding",
                 indicatorId="",
+                Year=2026,
                 **{
                     "Country Value": None,
                     "PNS Value": 850000,
@@ -156,12 +159,59 @@ class TestConfirmedFundingSkipped:
                 },
                 ValueNum=850000,
             ),
+            _funding_row(
+                ISO3="BDI",
+                NS="Finnish Red Cross",
+                Area="Total",
+                Indicator="Confirmed Funding",
+                indicatorId="",
+                Year=2027,
+                **{
+                    "Country Value": None,
+                    "PNS Value": 400000,
+                    "PNS reported": "Yes",
+                },
+                ValueNum=400000,
+            ),
         ]
         import_rows = transform_to_import_rows(rows, ctx, template_ids=[24, 22], rounds={"P26"})
         item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
         assert cells["27_Total"] == 1350000
+        assert cells[f"27_{T22_CONFIRMED_FUNDING_COLUMN}"] == 850000
+        assert 400000 not in cells.values()
+
+    def test_confirmed_funding_alone_marks_pns_reported(self):
+        ctx = UprImportContext(template_ids=[24, 22])
+        ctx.ns_home_country_iso3 = {"belgian red cross": "BEL"}
+        ctx.country_id_by_iso3 = {"BEN": 29}
+        ctx.assignment_by_template = {22: {("2026", "BEL"): 4101}, 24: {("2026", "BEN"): 9001}}
+        rows = [
+            _funding_row(
+                ISO3="BEN",
+                NS="Belgian Red Cross",
+                Area="Total",
+                Indicator="Confirmed Funding",
+                indicatorId="",
+                Year=2026,
+                **{
+                    "Country Value": None,
+                    "PNS Value": 164817,
+                    "PNS reported": "Yes",
+                    "Source": "PNS Data",
+                },
+                ValueNum=164817,
+            )
+        ]
+        t22_yes, _ = _build_pns_reported_yes_sets(rows, ctx, [22], rounds={"P26"})
+        assert t22_yes == {(4101, "BEN")}
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[24, 22], rounds={"P26"})
+        item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
+        assert len(item_rows) == 1
+        cells = json.loads(item_rows[0]["disagg_data"])
+        assert cells == {f"29_{T22_CONFIRMED_FUNDING_COLUMN}": 164817}
+        assert not any(r["item_id"] != str(ITEM_FUNDING_REQUIREMENTS_T22) for r in import_rows)
 
 
 class TestT22PnsValueOnlyWhenReported:

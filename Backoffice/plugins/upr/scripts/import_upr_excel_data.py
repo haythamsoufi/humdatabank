@@ -73,7 +73,7 @@ from upr_import_warnings import make_import_warning, summarize_warnings  # noqa:
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 11
+TRANSFORM_CACHE_VERSION = 12
 _ROWS_CACHE_LOCKS: Dict[str, threading.Lock] = {}
 _ROWS_CACHE_LOCKS_GUARD = threading.Lock()
 
@@ -159,6 +159,8 @@ T24_EMERGENCY_LABELS: Tuple[str, ...] = ("emergency appeal",)
 T24_BILATERAL_LABELS: Tuple[str, ...] = ("supporting bilaterally", "list national societies")
 T22_FUNDING_LABELS: Tuple[str, ...] = ("funding requirements",)
 T22_ROW_TOTAL_COLUMN = "Total"  # matrix row-total cell suffix (row_total_manual_enabled)
+# Plain number column on the T22 funding matrix (not a variable SP/EF column).
+T22_CONFIRMED_FUNDING_COLUMN = "confirmedfn"
 # Item 1303 variable columns (Excel Area names) — overridden when PNS reports totals only.
 T22_BREAKDOWN_AREAS: Tuple[str, ...] = ("SP1", "SP2", "SP3", "SP4", "SP5", "EFs")
 # Legacy UPR Master ``Area`` codes on Funding rows (pre-SP1/EFs workbook naming).
@@ -423,15 +425,25 @@ def is_skipped_legacy_funding_area(area: Any) -> bool:
     return str(area or "").strip() in SKIPPED_LEGACY_FUNDING_AREAS
 
 
+def is_planning_confirmed_funding_row(row: Dict[str, Any]) -> bool:
+    """True for UPR Master ``Confirmed Funding`` rows (no indicator bank id).
+
+    Those amounts land on the template 22 funding matrix column
+    ``confirmedfn``, not on the funding-requirement total or SP/EF columns.
+    """
+    indicator = str(row.get("Indicator") or "").strip().lower()
+    return indicator == "confirmed funding"
+
+
 def is_planning_funding_requirement_row(row: Dict[str, Any]) -> bool:
     """True for planning ``Funding Requirement`` rows (bank id 2) we import to templates 24/22.
 
-    ``Confirmed Funding`` is a separate UPR Master indicator with no backoffice form field yet —
-    those rows are ignored by the import.
+    ``Confirmed Funding`` is a separate indicator imported only to the template 22
+    ``confirmedfn`` column — see ``is_planning_confirmed_funding_row``.
     """
-    indicator = str(row.get("Indicator") or "").strip().lower()
-    if indicator == "confirmed funding":
+    if is_planning_confirmed_funding_row(row):
         return False
+    indicator = str(row.get("Indicator") or "").strip().lower()
     indicator_id = normalize_indicator_id(row.get("indicatorId"))
     return indicator_id == FUNDING_REQUIREMENT_BANK_ID or indicator == "funding requirement"
 
@@ -508,7 +520,10 @@ def _build_pns_reported_yes_sets(
         if rnd.startswith("P") and 22 in template_ids:
             if not parse_pns_reported_yes(row):
                 continue
-            if not is_planning_funding_requirement_row(row):
+            if not (
+                is_planning_funding_requirement_row(row)
+                or is_planning_confirmed_funding_row(row)
+            ):
                 continue
             pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
             if pns_aes:
@@ -3430,6 +3445,8 @@ def transform_to_import_rows(
     pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]] = {}
     # Area=Total rows (PNS reported aggregate only) → row-total column on item 1303.
     pns_t22_total_staging: Dict[Tuple[int, int], Tuple[Optional[float], Optional[float]]] = {}
+    # Confirmed Funding (Area=Total, current year) → plain ``confirmedfn`` number column.
+    pns_t22_confirmed_staging: Dict[Tuple[int, int], float] = {}
 
     # ── Reporting country funding staging ─────────────────────────────────────
     # Entity=IFRC/PNS/Other rows (Attribute=Funding Source only, Indicator=Funding) accumulated
@@ -3526,7 +3543,8 @@ def transform_to_import_rows(
 
         # --- Funding (T24: HNS/IFRC/PNS Country-Value; T22: PNS-reported) ---
         if sec == "Funding" and rnd_is_planning:
-            if not is_planning_funding_requirement_row(row):
+            is_confirmed = is_planning_confirmed_funding_row(row)
+            if not is_confirmed and not is_planning_funding_requirement_row(row):
                 continue
             if year_val in (None, ""):
                 ctx.warnings.append(f"Funding row missing Year for {iso3} {rnd}")
@@ -3538,6 +3556,34 @@ def transform_to_import_rows(
             ent_upper = entity.upper()
             country_val = parse_value_num(row.get("Country Value"))
             pns_val = parse_value_num(row.get("PNS Value"))
+
+            # Confirmed Funding is a single plain number on the current-year T22 matrix.
+            # Later years have no column; SP/EF breakdowns are not part of this indicator.
+            if is_confirmed:
+                if (
+                    area == "Total"
+                    and offset == 0
+                    and 22 in tids
+                    and ent_upper == "PNS"
+                    and parse_pns_reported_yes(row)
+                    and pns_val
+                ):
+                    pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
+                    if not pns_iso3:
+                        ctx.warnings.append(f"Cannot resolve home country for NS: {ns_name!r}")
+                    else:
+                        pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
+                        if not pns_aes:
+                            ctx.warnings.append(
+                                f"No template 22 assignment for {pns_iso3} {period} (NS: {ns_name!r})"
+                            )
+                        else:
+                            host_cid = ctx.country_id_by_iso3.get(iso3)
+                            if not host_cid:
+                                ctx.warnings.append(f"Cannot resolve Country.id for ISO3: {iso3!r}")
+                            else:
+                                pns_t22_confirmed_staging[(pns_aes, host_cid)] = pns_val
+                continue
 
             # Aggregate Excel areas (Total) → T22 row-total column when PNS has no SP/EF breakdown.
             if (not area or area in AGGREGATE_AREA):
@@ -4097,6 +4143,14 @@ def transform_to_import_rows(
                     )
                     if breakdown_cell is not None:
                         item_cells[f"{host_cid}_{area}"] = breakdown_cell
+
+        for (pns_aes, host_cid), amount in pns_t22_confirmed_staging.items():
+            host_iso3 = iso3_by_host_cid.get(host_cid)
+            if not host_iso3 or (pns_aes, host_iso3) not in pns_t22_reported_yes:
+                continue
+            matrix_cells[(pns_aes, ctx.t22_funding_item_id)][
+                f"{host_cid}_{T22_CONFIRMED_FUNDING_COLUMN}"
+            ] = amount
 
     # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
     reporting_funding_col = reporting_funding_matrix_column(ctx)

@@ -126,6 +126,28 @@
         {% endif %}
         <fieldset {% if assignment and not can_edit_assignment_details %}disabled class="opacity-75"{% endif %}>
 
+        {% if not assignment and copy_source_groups %}
+        <div class="mb-4 p-4 rounded-lg border border-blue-200 bg-blue-50">
+            <label for="copy-config-source" class="block text-gray-700 text-sm font-semibold mb-2">
+                <i class="fas fa-copy mr-1.5 text-blue-500" aria-hidden="true"></i>{{ _('Copy configuration from') }}
+                <span class="ml-1 font-normal text-gray-400 text-xs">({{ _('optional') }})</span>
+            </label>
+            <select id="copy-config-source"
+                    class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                <option value="">{{ _("Don't copy") }}</option>
+                {% for group in copy_source_groups %}
+                <optgroup label="{{ group.template_name }}">
+                    {% for item in group.assignments %}
+                    <option value="{{ item.id }}">{{ item.label }}</option>
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+            <p class="mt-1 text-xs text-gray-600">{{ _('Fills this form with that assignment\'s template, period, options, and entities. Change anything you need, then create the assignment. Nothing is saved until you submit.') }}</p>
+            <p id="copy-config-status" class="mt-2 text-xs text-blue-800 hidden" role="status"></p>
+        </div>
+        {% endif %}
+
         {% set existing_trans = (assignment.custom_name_translations or {}) if assignment else {} %}
 
         {# Form identity #}
@@ -1344,6 +1366,7 @@ window.manageAssignmentConfig = {
         secretariatHierarchy: {{ url_for('user_management.get_secretariat_hierarchy')|tojson }},
         secretariatRegionsHierarchy: {{ url_for('user_management.get_secretariat_regions_hierarchy')|tojson }},
         templateOwnedByBase: {{ url_for('form_builder.get_template_owned_by', template_id=99999)|replace('/99999', '')|tojson }},
+        copyConfig: {{ url_for('assignment_management.assignment_copy_config', assignment_id=99999)|tojson }},
         {% if assignment %}
         assignmentBulkRemove: {{ url_for('assignment_management.bulk_remove_entities_from_assignment', assignment_id=assignment.id)|tojson }},
         assignmentBulkUpdateStatus: {{ url_for('assignment_management.bulk_update_entity_status', assignment_id=assignment.id)|tojson }},
@@ -1389,7 +1412,16 @@ window.manageAssignmentConfig = {
         noUsersFound: {{ _('No users found.')|tojson }},
         completionRate: {{ _('Completion Rate')|tojson }},
         statusSetBy: {{ _('Status set by')|tojson }},
-        entities: {{ _('Entities')|tojson }}
+        entities: {{ _('Entities')|tojson }},
+        copyConfigLoading: {{ _('Loading configuration…')|tojson }},
+        copyConfigFailed: {{ _('Could not load that assignment. Try again.')|tojson }},
+        copyConfigApplied: {{ _('Copied from {name}. Review the fields below, then create the assignment.')|tojson }},
+        copyConfigPeriodKept: {{ _('The period "{period}" does not match the year or month controls, so it was kept as entered. Changing those controls replaces it.')|tojson }},
+        copyConfigDueDatesVary: {{ _('Entities on the source use different due dates. The earliest ({date}) was filled in.')|tojson }},
+        copyConfigTemplateMissing: {{ _('That template cannot be selected. The other settings were still copied.')|tojson }},
+        copyConfigOwnerMissing: {{ _('The source data owner is not in the list, so the current data owner was left unchanged.')|tojson }},
+        copyConfigEntities: {{ _('{countries} countries and {others} other entities selected.')|tojson }},
+        copyConfigKept: {{ _('Copied values stay in the form. Reload the page to clear them.')|tojson }}
     },
     currentUser: {
         id: {{ (current_user.id if current_user and current_user.is_authenticated else none)|tojson }},

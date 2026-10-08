@@ -347,6 +347,91 @@ class TestNewAssignmentNotificationDispatch:
 
 
 # ---------------------------------------------------------------------------
+# copy configuration (create-assignment prefill)
+# ---------------------------------------------------------------------------
+
+class TestAssignmentCopyConfig:
+    def test_new_page_lists_copy_sources(self, logged_in_client, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session, name="Copy Source Template")
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template, period_name="2024"
+            )
+            aes.assigned_form.custom_name = "Annual copy source"
+            db_session.commit()
+        resp = logged_in_client.get("/admin/assignments/new")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="copy-config-source"' in html
+        assert "Annual copy source" in html
+        assert "Copy Source Template" in html
+
+    def test_copy_config_payload(self, logged_in_client, db_session, app):
+        from datetime import date
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template, period_name="2024"
+            )
+            assignment = aes.assigned_form
+            assignment.custom_name = "Annual copy"
+            assignment.custom_name_translations = {"fr": "Copie annuelle"}
+            assignment.requires_delegation_review = True
+            assignment.enable_page_submission = True
+            assignment.enable_export_excel = True
+            assignment.enable_export_pdf = True
+            assignment.expiry_date = date(2025, 12, 31)
+            assignment.unique_token = "copy-config-token"
+            assignment.is_public_active = True
+            aes.due_date = date(2025, 6, 1)
+            db_session.commit()
+            assignment_id = assignment.id
+            template_id = template.id
+            country_id = country.id
+
+        resp = logged_in_client.get(f"/admin/assignments/{assignment_id}/copy-config")
+        assert resp.status_code == 200
+        data = _get_json(resp)
+        assert data["success"] is True
+        config = data["config"]
+        assert config["template_id"] == template_id
+        assert config["custom_name"] == "Annual copy"
+        assert config["custom_name_translations"]["fr"] == "Copie annuelle"
+        assert config["period_name"] == "2024"
+        assert config["due_date"] == "2025-06-01"
+        assert config["due_dates_vary"] is False
+        assert config["expiry_date"] == "2025-12-31"
+        assert config["requires_delegation_review"] is True
+        assert config["enable_page_submission"] is True
+        assert config["enable_export_excel"] is True
+        assert config["enable_export_pdf"] is True
+        assert config["generate_public_url"] is True
+        assert config["public_url_active"] is True
+        assert country_id in config["country_ids"]
+        assert config["entities"] == []
+
+    def test_copy_config_missing_assignment(self, logged_in_client, db_session):
+        resp = logged_in_client.get("/admin/assignments/999999/copy-config")
+        assert resp.status_code == 404
+
+    def test_copy_config_rejects_unpublished_template(self, logged_in_client, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template, period_name="2023"
+            )
+            template.published_version_id = None
+            db_session.commit()
+            assignment_id = aes.assigned_form.id
+        resp = logged_in_client.get(f"/admin/assignments/{assignment_id}/copy-config")
+        assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
 # check_assignment_duplicate
 # ---------------------------------------------------------------------------
 

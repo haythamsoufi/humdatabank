@@ -2970,6 +2970,242 @@
             }
         }
 
+        // Optional "copy configuration" dropdown on the create form.
+        // Loads another assignment's settings into the form; the user edits, then submits.
+        (function initCopyAssignmentConfig() {
+            const sourceSelect = document.getElementById('copy-config-source');
+            const statusEl = document.getElementById('copy-config-status');
+            if (!sourceSelect || !cfg.isNew || !cfg.urls || !cfg.urls.copyConfig) return;
+
+            const mainForm = document.getElementById('manageAssignmentForm');
+            if (!mainForm) return;
+
+            let requestSeq = 0;
+            let appliedCopy = false;
+
+            function setCopyStatus(message, isError) {
+                if (!statusEl) return;
+                if (!message) {
+                    statusEl.textContent = '';
+                    statusEl.classList.add('hidden');
+                    return;
+                }
+                statusEl.textContent = message;
+                statusEl.classList.remove('hidden');
+                statusEl.classList.toggle('text-red-600', !!isError);
+                statusEl.classList.toggle('text-blue-800', !isError);
+            }
+
+            function setNamedCheckbox(name, checked) {
+                const el = mainForm.querySelector('input[type="checkbox"][name="' + name + '"]');
+                if (!el) return;
+                el.checked = !!checked;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            function setSelectIfPresent(select, value, dispatchChange) {
+                if (!select || value == null || value === '') return false;
+                const str = String(value);
+                const hasOption = Array.from(select.options).some(function (opt) {
+                    return opt.value === str;
+                });
+                if (!hasOption) return false;
+                select.value = str;
+                if (dispatchChange) {
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                return true;
+            }
+
+            function applyCustomNameTranslations(translations) {
+                const map = (translations && typeof translations === 'object') ? translations : {};
+                if (typeof window.syncCustomNameTranslationsToForm === 'function') {
+                    window.syncCustomNameTranslationsToForm(map);
+                    return;
+                }
+                const hiddenJson = document.getElementById('custom-name-translations');
+                if (hiddenJson) hiddenJson.value = JSON.stringify(map);
+                document.querySelectorAll('input[name^="custom_name_"]').forEach(function (field) {
+                    const name = field.getAttribute('name') || '';
+                    if (name === 'custom_name_translations') return;
+                    const code = name.slice('custom_name_'.length);
+                    if (code) field.value = map[code] || '';
+                });
+            }
+
+            function applyCopiedPeriod(periodName) {
+                const period = (periodName || '').trim();
+                if (!period) return true;
+                parseExistingPeriodName(period);
+                const generated = hiddenPeriodNameField ? (hiddenPeriodNameField.value || '').trim() : '';
+                if (generated === period) {
+                    yearFields.forEach(function (el) {
+                        if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                    return true;
+                }
+                if (hiddenPeriodNameField) hiddenPeriodNameField.value = period;
+                return false;
+            }
+
+            function applyCopiedCountries(countryIds) {
+                const wanted = new Set((countryIds || []).map(function (id) { return String(id); }));
+                const regions = new Set();
+                document.querySelectorAll('.country-checkbox-entity:not([disabled])').forEach(function (cb) {
+                    cb.checked = wanted.has(String(cb.value));
+                    const region = cb.closest('.region-countries-entity');
+                    if (region && region.dataset.region) regions.add(region.dataset.region);
+                });
+                regions.forEach(function (region) {
+                    updateEntityRegionSelectAll(region);
+                });
+                updateEntityGlobalSelectAll();
+                syncCountriesToMainForm();
+                let matched = 0;
+                wanted.forEach(function (id) {
+                    const cb = document.getElementById('country-entity-' + id);
+                    if (cb && cb.checked) matched += 1;
+                });
+                return matched;
+            }
+
+            function replaceSelectorEntities(selector, keys) {
+                if (!selector || !selector.assignedEntities) return 0;
+                const types = {};
+                (selector.entityTypes || []).forEach(function (type) { types[type] = true; });
+                Array.from(selector.assignedEntities).forEach(function (key) {
+                    const type = String(key).split(':')[0];
+                    if (types[type]) selector.assignedEntities.delete(key);
+                });
+                let count = 0;
+                (keys || []).forEach(function (key) {
+                    const type = String(key).split(':')[0];
+                    if (!types[type]) return;
+                    selector.assignedEntities.add(String(key));
+                    count += 1;
+                });
+                if (typeof selector.updateHiddenFormFields === 'function') {
+                    selector.updateHiddenFormFields();
+                }
+                if (selector.hierarchy && selector.hierarchy.length && typeof selector.render === 'function') {
+                    selector.render();
+                }
+                return count;
+            }
+
+            function applyCopiedConfig(config) {
+                const notes = [];
+                const templateSelect = mainForm.querySelector('select[name="template_id"]');
+                const dataOwnerSelect = document.getElementById('data_owner_id_select');
+
+                // Flags first so template-default sync treats Excel/PDF as already chosen.
+                setNamedCheckbox('generate_public_url', config.generate_public_url);
+                setNamedCheckbox('public_url_active', config.public_url_active);
+                setNamedCheckbox('requires_delegation_review', config.requires_delegation_review);
+                setNamedCheckbox('enable_page_submission', config.enable_page_submission);
+                setNamedCheckbox('enable_export_excel', config.enable_export_excel);
+                setNamedCheckbox('enable_import_excel', config.enable_import_excel);
+                setNamedCheckbox('enable_export_pdf', config.enable_export_pdf);
+                setNamedCheckbox('email_attach_pdf', config.email_attach_pdf);
+                setNamedCheckbox('email_attach_excel', config.email_attach_excel);
+
+                if (config.data_owner_id && !setSelectIfPresent(dataOwnerSelect, config.data_owner_id, false)) {
+                    notes.push(cfg.t.copyConfigOwnerMissing || '');
+                }
+                if (!setSelectIfPresent(templateSelect, config.template_id, true)) {
+                    notes.push(cfg.t.copyConfigTemplateMissing || '');
+                }
+
+                const nameInput = mainForm.querySelector('input[name="custom_name"]');
+                if (nameInput) nameInput.value = config.custom_name || '';
+                applyCustomNameTranslations(config.custom_name_translations);
+
+                if (!applyCopiedPeriod(config.period_name)) {
+                    notes.push((cfg.t.copyConfigPeriodKept || '').replace('{period}', config.period_name || ''));
+                }
+
+                const dueInput = mainForm.querySelector('input[name="due_date"]');
+                if (dueInput) dueInput.value = config.due_date || '';
+                const expiryInput = mainForm.querySelector('input[name="expiry_date"]');
+                if (expiryInput) expiryInput.value = config.expiry_date || '';
+                if (config.due_dates_vary && config.due_date) {
+                    notes.push((cfg.t.copyConfigDueDatesVary || '').replace('{date}', config.due_date));
+                }
+
+                if (typeof window.applySubmissionReviewRecipients === 'function') {
+                    window.applySubmissionReviewRecipients(
+                        config.submission_review_recipient_mode || 'fds_member',
+                        config.submission_review_recipient_users || []
+                    );
+                }
+
+                const countryCount = applyCopiedCountries(config.country_ids || []);
+                const otherKeys = (config.entities || []).map(function (entity) {
+                    return String(entity.entity_type) + ':' + String(entity.entity_id);
+                });
+                const otherCount = (
+                    replaceSelectorEntities(nsStructureSelector, otherKeys) +
+                    replaceSelectorEntities(secretariatSelector, otherKeys) +
+                    replaceSelectorEntities(secretariatRegionsSelector, otherKeys)
+                );
+                notes.push(
+                    (cfg.t.copyConfigEntities || '{countries} countries and {others} other entities selected.')
+                        .replace('{countries}', String(countryCount))
+                        .replace('{others}', String(otherCount))
+                );
+
+                const confirmField = document.getElementById('confirm_duplicate');
+                if (confirmField) confirmField.value = '0';
+
+                const lead = (cfg.t.copyConfigApplied || 'Copied from {name}.')
+                    .replace('{name}', config.label || config.period_name || '');
+                appliedCopy = true;
+                setCopyStatus([lead].concat(notes.filter(Boolean)).join(' '), false);
+            }
+
+            sourceSelect.addEventListener('change', function () {
+                const seq = ++requestSeq;
+                const assignmentId = (sourceSelect.value || '').trim();
+                if (!assignmentId) {
+                    setCopyStatus(appliedCopy ? (cfg.t.copyConfigKept || '') : '', false);
+                    sourceSelect.disabled = false;
+                    return;
+                }
+                sourceSelect.disabled = true;
+                setCopyStatus(cfg.t.copyConfigLoading || 'Loading configuration…', false);
+                const url = String(cfg.urls.copyConfig).replace('99999', assignmentId);
+                fetch(url, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                })
+                    .then(function (resp) {
+                        return resp.json().then(function (data) {
+                            return { ok: resp.ok, data: data };
+                        }).catch(function () {
+                            return { ok: false, data: null };
+                        });
+                    })
+                    .then(function (result) {
+                        if (seq !== requestSeq) return;
+                        sourceSelect.disabled = false;
+                        const data = result && result.data;
+                        if (!result.ok || !data || data.success === false || !data.config) {
+                            setCopyStatus(
+                                (data && (data.message || data.error)) || cfg.t.copyConfigFailed || 'Could not load that assignment.',
+                                true
+                            );
+                            return;
+                        }
+                        applyCopiedConfig(data.config);
+                    })
+                    .catch(function () {
+                        if (seq !== requestSeq) return;
+                        sourceSelect.disabled = false;
+                        setCopyStatus(cfg.t.copyConfigFailed || 'Could not load that assignment.', true);
+                    });
+            });
+        })();
+
         // Secretariat sub-tabs behavior
         const secretariatSubtabButtons = document.querySelectorAll('#secretariat-subtabs button[role="tab"]');
         const secretariatSubtabPanels = document.querySelectorAll('#secretariat-subtabs-content > div[role="tabpanel"]');
@@ -4128,6 +4364,24 @@
     modeRadios.forEach(function (radio) {
         radio.addEventListener('change', togglePickerVisibility);
     });
+
+    window.applySubmissionReviewRecipients = function (mode, users) {
+        var allowed = mode === 'specific_admin' ? 'specific_admin' : 'fds_member';
+        modeRadios.forEach(function (radio) {
+            radio.checked = radio.value === allowed;
+        });
+        selectedUsers = (users || []).map(function (user) {
+            return {
+                id: user.id,
+                name: user.name || user.email || '',
+                email: user.email || ''
+            };
+        }).filter(function (user) {
+            return user.id != null && user.id !== '';
+        });
+        togglePickerVisibility();
+        renderSelectedUsers();
+    };
 
     searchInput.addEventListener('input', function () {
         var query = (searchInput.value || '').trim();

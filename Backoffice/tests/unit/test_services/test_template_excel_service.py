@@ -1957,12 +1957,14 @@ class TestNormalizeMatrixItemConfig:
             'row_total_manual_enabled': True,
             'row_total_validation': 'strict',
             'include_calculated_totals_in_api': False,
+            'row_total_position': 1,
         }
         normalized = TemplateExcelService._normalize_matrix_item_config('matrix', flat)
         mc = normalized['matrix_config']
         assert mc['row_total_manual_enabled'] is True
         assert mc['row_total_validation'] == 'strict'
         assert mc['include_calculated_totals_in_api'] is False
+        assert mc['row_total_position'] == 1
 
     def test_hoists_root_column_groups_into_matrix_config(self):
         config = {

@@ -264,6 +264,7 @@
                                         <option value="number_whole">{{ _('Number (Whole)') }}</option>
                                         <option value="number_decimal">{{ _('Number (Decimal)') }}</option>
                                         <option value="tick">{{ _('Tick (✓)') }}</option>
+                                        <option value="calculated">{{ _('Calculated') }}</option>
                                     </select>
                                     <label class="column-decimals-label flex items-center text-xs text-gray-600 whitespace-nowrap shrink-0" style="display: none;">
                                         <span class="mr-1">{{ _('Decimals') }}</span>
@@ -295,6 +296,14 @@
                                             </span>
                                         </label>
                                     </div>
+                                    <label class="column-include-in-row-total-label flex items-center text-xs text-gray-600 whitespace-nowrap shrink-0">
+                                        <input type="checkbox" class="column-include-in-row-total mr-1" checked>
+                                        <span>{{ _('In row total') }}</span>
+                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                            <span class="tooltip-text">{{ _('Uncheck to leave this column out of the row total and the grand total. Calculated columns stay out unless you check this.') }}</span>
+                                        </span>
+                                    </label>
                                     <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
@@ -369,6 +378,71 @@
                                         </label>
                                     </div>
                                 </div>
+                                <div class="column-calculation-panel hidden mt-2 p-2 bg-gray-50 border border-gray-200 rounded space-y-2 text-xs">
+                                    <p class="text-gray-600">{{ _('Calculated for each row from the other columns in that row. The column footer sums those results.') }}</p>
+                                    <label class="flex items-center gap-2">
+                                        <span class="text-gray-700 whitespace-nowrap">{{ _('Calculation') }}</span>
+                                        <select class="column-calc-operation shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                            <option value="sum">{{ _('Sum') }}</option>
+                                            <option value="average">{{ _('Average') }}</option>
+                                            <option value="min">{{ _('Minimum') }}</option>
+                                            <option value="max">{{ _('Maximum') }}</option>
+                                            <option value="count">{{ _('Count numbers') }}</option>
+                                            <option value="count_filled">{{ _('Count filled cells') }}</option>
+                                            <option value="difference">{{ _('Difference') }}</option>
+                                            <option value="percentage">{{ _('Percentage') }}</option>
+                                            <option value="product">{{ _('Product') }}</option>
+                                            <option value="formula">{{ _('Custom formula') }}</option>
+                                        </select>
+                                    </label>
+                                    <div class="column-calc-sources">
+                                        <p class="column-calc-sources-label text-gray-700 mb-1"
+                                           data-label-columns="{{ _('Columns') }}"
+                                           data-label-numerator="{{ _('Numerator') }}"
+                                           data-label-add="{{ _('Columns to add') }}">{{ _('Columns') }}</p>
+                                        <div class="column-calc-source-list flex flex-wrap gap-2"></div>
+                                    </div>
+                                    <div class="column-calc-subtrahends hidden">
+                                        <p class="text-gray-700 mb-1">{{ _('Subtract') }}</p>
+                                        <div class="column-calc-subtrahend-list flex flex-wrap gap-2"></div>
+                                    </div>
+                                    <div class="column-calc-denominators hidden">
+                                        <p class="text-gray-700 mb-1">{{ _('Divide by') }}</p>
+                                        <div class="column-calc-denominator-list flex flex-wrap gap-2"></div>
+                                    </div>
+                                    <div class="column-calc-formula-wrap hidden space-y-1">
+                                        <label class="block text-gray-700" for="">{{ _('Formula') }}</label>
+                                        <textarea class="column-calc-formula w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" rows="2" placeholder="SUM(income, grant) - expenditure"></textarea>
+                                        <p class="text-gray-500">{{ _('Write the column code directly, for example income + grant. Codes cannot contain spaces. Functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, ABS, ROUND, IF, BLANK. Operators: + − × ÷ and comparisons. Blank numbers are skipped by SUM and AVERAGE. Ticks are 0 or 1. Division by zero is blank.') }}</p>
+                                    </div>
+                                    <div class="flex items-center gap-4 flex-wrap">
+                                        <label class="flex items-center text-gray-600">
+                                            <span class="mr-1">{{ _('Decimals') }}</span>
+                                            <input type="number" class="column-calc-decimals shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-14 sm:text-sm border-gray-300 rounded-md" min="0" max="6" step="1" value="0">
+                                        </label>
+                                        <label class="flex items-center text-gray-600">
+                                            <input type="checkbox" class="column-calc-blank-as-zero mr-1" checked>
+                                            <span>{{ _('Treat blanks as zero in + − × ÷') }}</span>
+                                        </label>
+                                        <label class="flex items-center text-gray-600">
+                                            <input type="checkbox" class="column-calc-readonly mr-1" checked>
+                                            <span>{{ _('Read-only') }}</span>
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                                <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                                <span class="tooltip-text">{{ _('When checked, people filling the form cannot type over this result. Uncheck to let them replace the calculated number.') }}</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex items-center text-gray-600">
+                                            <input type="checkbox" class="column-calc-save-value mr-1">
+                                            <span>{{ _('Save value') }}</span>
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                                <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                                <span class="tooltip-text">{{ _('When checked, the calculated value is saved with the form and restored when the form is reopened. When unchecked, the value is always recalculated and not stored.') }}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <p class="column-calc-status text-gray-500 break-words" data-empty-message="{{ _('Choose columns or enter a formula') }}"></p>
+                                </div>
                             </div>
                         </template>
 
@@ -388,6 +462,18 @@
                                 <button type="button" class="column-header-option-add-btn inline-flex items-center justify-center p-1 min-w-[1.5rem] min-h-[1.5rem] text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-green-300" title="{{ _('Add Option')|forceescape }}">
                                     <i class="fas fa-plus w-3 h-3"></i>
                                 </button>
+                            </div>
+                        </template>
+
+                        {# Shown in the column list while Show Row Totals is on. Reorderable; not a data column. #}
+                        <template id="matrix-row-total-column-template">
+                            <div class="matrix-row-total-column flex items-center gap-2 px-2 py-1.5 bg-orange-100 border border-orange-200 rounded-md" draggable="true">
+                                <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-400 hover:text-gray-600 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder')|forceescape }}" draggable="false">
+                                    <i class="fas fa-grip-vertical"></i>
+                                </span>
+                                <span class="text-sm font-medium text-gray-800">{{ _('Total') }}</span>
+                                <span class="text-xs text-gray-600">{{ _('Row total') }}</span>
+                                <span class="ml-auto text-xs text-gray-500">{{ _('Drag to reorder. New columns are added at the end of this list.') }}</span>
                             </div>
                         </template>
 

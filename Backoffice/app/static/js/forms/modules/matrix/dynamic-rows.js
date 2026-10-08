@@ -1,6 +1,7 @@
 /** Dynamic matrix rows: add, remove, restore, sort, and legend highlighting. */
 import { debugLog, debugError, debugWarn } from '../debug.js';
-import { _t, __canEditMatrixContainer, ROW_TOTAL_COLUMN_NAME } from './shared.js';
+import { calculationIsReadonly } from './calculation.js';
+import { _t, __canEditMatrixContainer, __rowTotalColumnIndex, ROW_TOTAL_COLUMN_NAME } from './shared.js';
 import {
     __configFlag,
     __getSavedMatrixCellScalar,
@@ -165,10 +166,47 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
         // Determine if this is a readonly variable column
         const isReadonlyVariable = isVariable &&
             (typeof column === 'object' ? (column.variable_readonly !== false) : true);
+        const isReadonlyCalculated = columnType === 'calculated' && calculationIsReadonly(column);
 
         const cell = document.createElement('td');
-        cell.className = `border border-gray-300 px-2 py-1${columnType === 'tick' ? ' text-center' : ''}${isReadonlyVariable ? ' bg-gray-100' : ''}`;
+        cell.className = `border border-gray-300 px-2 py-1${columnType === 'tick' || columnType === 'calculated' ? ' text-center' : ''}${isReadonlyVariable || isReadonlyCalculated ? ' bg-gray-100' : ''}`;
         cell.setAttribute('role', 'gridcell');
+
+        if (columnType === 'calculated' && calculationIsReadonly(column)) {
+            const span = document.createElement('span');
+            span.className = 'matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-medium text-gray-700';
+            span.setAttribute('data-row', rowLabel);
+            span.setAttribute('data-row-id', finalRowId);
+            span.setAttribute('data-column', columnName);
+            span.setAttribute('data-calculated', 'true');
+            span.textContent = '—';
+            cell.appendChild(span);
+            row.appendChild(cell);
+            return;
+        }
+
+        if (columnType === 'calculated') {
+            const calcInput = document.createElement('input');
+            calcInput.type = 'text';
+            calcInput.setAttribute('data-numeric', 'true');
+            calcInput.className = 'w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center';
+            calcInput.setAttribute('data-row', rowLabel);
+            calcInput.setAttribute('data-row-id', finalRowId);
+            calcInput.setAttribute('data-column', columnName);
+            calcInput.setAttribute('data-cell-key', `${finalRowId}_${columnName}`);
+            calcInput.setAttribute('data-column-type', 'calculated');
+            calcInput.setAttribute('data-calculated', 'true');
+            const calcDecimals = column && column.calculation && column.calculation.decimals != null
+                ? column.calculation.decimals
+                : 2;
+            calcInput.setAttribute('data-max-decimals', String(calcDecimals));
+            calcInput.setAttribute('aria-label', `Calculated value for ${rowLabel} and ${columnDisplayName}`);
+            calcInput.value = '';
+            this._applyMatrixInputEditability(calcInput, container, false);
+            cell.appendChild(calcInput);
+            row.appendChild(cell);
+            return;
+        }
 
         // Use row ID instead of row label for the cell key
         const cellKey = `${finalRowId}_${columnName}`;
@@ -282,7 +320,13 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
             totalCell.appendChild(totalSpan);
         }
 
-        row.appendChild(totalCell);
+        const totalIndex = __rowTotalColumnIndex(matrixInfo.config, columns.length);
+        const anchor = row.children[(totalIndex == null ? columns.length : totalIndex) + 1];
+        if (anchor) {
+            row.insertBefore(totalCell, anchor);
+        } else {
+            row.appendChild(totalCell);
+        }
     }
 
     // Insert data rows after the totals row (always first) and before the search bar when present

@@ -10,6 +10,7 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
   debugError: vi.fn(),
 }));
 
+import { __rowTotalColumnIndex } from '../../../app/static/js/forms/modules/matrix/shared.js';
 import {
   __isRowTotalCellKey,
   __rowTotalCellKey,
@@ -22,6 +23,17 @@ import {
   __computedRowTotalFromData,
   __effectiveRowTotalValue,
 } from '../../../app/static/js/forms/modules/matrix/totals.js';
+
+describe('__rowTotalColumnIndex', () => {
+  it('defaults to the end and honors an explicit index', () => {
+    const columns = [{ name: 'A' }, { name: 'B' }, { name: 'C' }];
+    expect(__rowTotalColumnIndex({ show_row_totals: true, columns }, 3)).toBe(3);
+    expect(__rowTotalColumnIndex({ show_row_totals: true, row_total_position: 1 }, 3)).toBe(1);
+    expect(__rowTotalColumnIndex({ show_row_totals: true, row_total_position: 0 }, 3)).toBe(0);
+    expect(__rowTotalColumnIndex({ show_row_totals: true, row_total_position: 9 }, 3)).toBe(3);
+    expect(__rowTotalColumnIndex({ show_row_totals: false, row_total_position: 1 }, 3)).toBe(null);
+  });
+});
 
 describe('matrix row-total helpers', () => {
   beforeEach(() => {

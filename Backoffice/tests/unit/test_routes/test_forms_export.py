@@ -313,7 +313,15 @@ class TestAssignmentPdfHelpers:
         assert widths[0] == ('__row__', 22)
         assert widths[1][0] == 'Amount'
         assert widths[2] == ('Done', 7.0)
+        assert widths[-1][0] == '__total__'
         assert sum(w for _, w in widths) <= 192
+
+        moved = matrix_portrait_column_widths_mm(
+            10, columns, show_row_totals=True, row_total_position=1,
+        )
+        assert [name for name, _ in moved] == [
+            '__row__', 'Amount', '__total__', 'Done', 'Funding Requirement',
+        ]
 
     def test_merge_matrix_variable_values_preserves_saved_override(self):
         from app.routes.forms.export import _merge_matrix_variable_values

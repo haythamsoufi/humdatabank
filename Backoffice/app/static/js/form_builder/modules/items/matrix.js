@@ -2,6 +2,7 @@
 // Depends on global Utils and standard DOM APIs
 
 import { FALSY_CONFIG_STRINGS, TRUTHY_CONFIG_STRINGS } from '../../../lib/matrix-boolean.js';
+import { checkFormulaSyntax, compileCalculation } from '../../../forms/modules/matrix/calculation.js';
 
 const truthyMatrixValues = TRUTHY_CONFIG_STRINGS;
 const falsyMatrixValues = FALSY_CONFIG_STRINGS;
@@ -67,6 +68,10 @@ export const MatrixItem = {
         if (modalElement._matrixClickHandler) {
             document.removeEventListener('click', modalElement._matrixClickHandler);
             modalElement._matrixClickHandler = null;
+        }
+        if (modalElement._matrixColumnCodeHandler) {
+            document.removeEventListener('input', modalElement._matrixColumnCodeHandler);
+            modalElement._matrixColumnCodeHandler = null;
         }
         if (modalElement._dndObserver) {
             modalElement._dndObserver.disconnect();
@@ -179,6 +184,7 @@ export const MatrixItem = {
             this.addColumn(modalElement, 'Column 1', 'number_whole');
             this.addColumn(modalElement, 'Column 2', 'number_whole');
         }
+        this.syncRowTotalColumn(modalElement);
     },
 
     showVariableOptionsForAllColumns(modalElement) {
@@ -210,6 +216,9 @@ export const MatrixItem = {
             document.removeEventListener('change', modalElement._matrixChangeHandler);
             document.removeEventListener('click', modalElement._matrixClickHandler);
         }
+        if (modalElement._matrixColumnCodeHandler) {
+            document.removeEventListener('input', modalElement._matrixColumnCodeHandler);
+        }
 
         modalElement._matrixChangeHandler = (e) => {
             if (
@@ -228,12 +237,41 @@ export const MatrixItem = {
                 e.target.classList.contains('column-header-list-display-column') ||
                 e.target.classList.contains('column-header-placeholder') ||
                 e.target.classList.contains('column-header-option-text') ||
-                e.target.classList.contains('column-header-allow-other')
+                e.target.classList.contains('column-header-allow-other') ||
+                e.target.classList.contains('column-include-in-row-total') ||
+                e.target.classList.contains('column-calc-operation') ||
+                e.target.classList.contains('column-calc-source') ||
+                e.target.classList.contains('column-calc-subtrahend') ||
+                e.target.classList.contains('column-calc-denominator') ||
+                e.target.classList.contains('column-calc-formula') ||
+                e.target.classList.contains('column-calc-decimals') ||
+                e.target.classList.contains('column-calc-blank-as-zero') ||
+                e.target.classList.contains('column-calc-readonly') ||
+                e.target.classList.contains('column-calc-save-value')
             ) {
                 // Show the "Decimals" input only for columns configured as Number (Decimal)
                 if (e.target.classList.contains('column-type')) {
                     const columnDiv = e.target.closest('.matrix-column');
                     this.updateColumnDecimalsVisibility(columnDiv);
+                    this.updateColumnCalculationVisibility(columnDiv);
+                }
+                if (e.target.classList.contains('column-text')) {
+                    const cleaned = e.target.value.replace(/\s+/g, '');
+                    if (cleaned !== e.target.value) e.target.value = cleaned;
+                    this._renameCalculationSource(modalElement, e.target);
+                }
+                if (e.target.classList.contains('column-include-in-row-total')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    if (columnDiv) columnDiv.dataset.includeTouched = '1';
+                }
+                if (e.target.classList.contains('column-calc-decimals')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    if (columnDiv) columnDiv.dataset.decimalsTouched = '1';
+                }
+                if (e.target.classList.contains('column-calc-operation')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    this._applyCalculationOperationDefaults(columnDiv);
+                    this._syncCalculationPanel(columnDiv);
                 }
                 // Handle "Is Variable" checkbox change to show/hide variable selector and save/readonly options
                 if (e.target.classList.contains('column-is-variable')) {
@@ -398,6 +436,18 @@ export const MatrixItem = {
         };
 
         document.addEventListener('change', modalElement._matrixChangeHandler);
+        modalElement._matrixColumnCodeHandler = (e) => {
+            if (!modalElement.contains(e.target) || !e.target.classList?.contains('column-text')) return;
+            const cleaned = e.target.value.replace(/\s+/g, '');
+            if (cleaned === e.target.value) return;
+            const pos = e.target.selectionStart;
+            e.target.value = cleaned;
+            if (pos != null) {
+                const next = Math.max(0, pos - 1);
+                e.target.setSelectionRange(next, next);
+            }
+        };
+        document.addEventListener('input', modalElement._matrixColumnCodeHandler);
         document.addEventListener('click', modalElement._matrixClickHandler);
     },
 
@@ -516,10 +566,212 @@ export const MatrixItem = {
     _normalizeColumnTypeForUi(type) {
         if (type === 'tick') return 'tick';
         if (type === 'number_decimal') return 'number_decimal';
+        if (type === 'calculated') return 'calculated';
         return 'number_whole';
     },
 
-    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2, selectableHeaderConfig = null) {
+    updateColumnCalculationVisibility(columnDiv) {
+        if (!columnDiv) return;
+        const type = columnDiv.querySelector('.column-type')?.value;
+        const isCalculated = type === 'calculated';
+        const panel = columnDiv.querySelector('.column-calculation-panel');
+        const selectable = columnDiv.querySelector('.column-selectable-header-wrapper');
+        const variableOptions = columnDiv.querySelector('.column-variable-options');
+        const includeCheckbox = columnDiv.querySelector('.column-include-in-row-total');
+        panel?.classList.toggle('hidden', !isCalculated);
+        selectable?.classList.toggle('hidden', isCalculated);
+        if (isCalculated) {
+            if (variableOptions) variableOptions.style.display = 'none';
+            const isVariableCheckbox = columnDiv.querySelector('.column-is-variable');
+            if (isVariableCheckbox) isVariableCheckbox.checked = false;
+            const variableSelect = columnDiv.querySelector('.column-variable-select');
+            if (variableSelect) variableSelect.style.display = 'none';
+            if (includeCheckbox && !columnDiv.dataset.includeTouched) includeCheckbox.checked = false;
+            this._syncCalculationPanel(columnDiv);
+        } else if (variableOptions) {
+            const templateVariables = window.templateVariables || {};
+            const metadata = Array.isArray(window.builtInMetadataVariables) ? window.builtInMetadataVariables : [];
+            const hasVariables = Object.keys(templateVariables).length > 0 || metadata.length > 0;
+            variableOptions.style.display = hasVariables ? 'flex' : 'none';
+            if (includeCheckbox && !columnDiv.dataset.includeTouched) includeCheckbox.checked = true;
+        }
+    },
+
+    _applyCalculationOperationDefaults(columnDiv) {
+        if (!columnDiv || columnDiv.dataset.decimalsTouched) return;
+        const operation = columnDiv.querySelector('.column-calc-operation')?.value || 'sum';
+        const decimals = columnDiv.querySelector('.column-calc-decimals');
+        if (!decimals) return;
+        decimals.value = ['average', 'difference', 'percentage', 'product', 'formula'].includes(operation) ? '2' : '0';
+    },
+
+    _syncCalculationPanel(columnDiv) {
+        if (!columnDiv) return;
+        const operation = columnDiv.querySelector('.column-calc-operation')?.value || 'sum';
+        columnDiv.querySelector('.column-calc-sources')?.classList.toggle('hidden', operation === 'formula');
+        columnDiv.querySelector('.column-calc-subtrahends')?.classList.toggle('hidden', operation !== 'difference');
+        columnDiv.querySelector('.column-calc-denominators')?.classList.toggle('hidden', operation !== 'percentage');
+        columnDiv.querySelector('.column-calc-formula-wrap')?.classList.toggle('hidden', operation !== 'formula');
+        const sourcesLabel = columnDiv.querySelector('.column-calc-sources-label');
+        if (sourcesLabel) {
+            if (operation === 'percentage') sourcesLabel.textContent = sourcesLabel.dataset.labelNumerator || 'Numerator';
+            else if (operation === 'difference') sourcesLabel.textContent = sourcesLabel.dataset.labelAdd || 'Columns to add';
+            else sourcesLabel.textContent = sourcesLabel.dataset.labelColumns || 'Columns';
+        }
+    },
+
+    _renameCalculationSource(modalElement, input) {
+        if (!modalElement || !input) return;
+        const previous = input.dataset.prevName || '';
+        const next = input.value.trim();
+        if (previous && next && previous !== next) {
+            modalElement.querySelectorAll('.column-calc-source, .column-calc-subtrahend, .column-calc-denominator').forEach((checkbox) => {
+                if (checkbox.value === previous) checkbox.value = next;
+            });
+        }
+        input.dataset.prevName = next;
+    },
+
+    _checkedCalculationNames(columnDiv, datasetKey, selector, availableNames) {
+        const checked = new Set(
+            Array.from(columnDiv.querySelectorAll(selector))
+                .filter((checkbox) => checkbox.checked)
+                .map((checkbox) => checkbox.value)
+        );
+        if (!columnDiv.dataset[datasetKey]) return checked;
+        let saved = [];
+        try {
+            const parsed = JSON.parse(columnDiv.dataset[datasetKey]);
+            saved = Array.isArray(parsed) ? parsed : [];
+        } catch (_error) {
+            saved = [];
+        }
+        const available = new Set(availableNames || []);
+        const pending = [];
+        saved.forEach((name) => {
+            if (available.has(name)) checked.add(name);
+            else pending.push(name);
+        });
+        if (pending.length) columnDiv.dataset[datasetKey] = JSON.stringify(pending);
+        else delete columnDiv.dataset[datasetKey];
+        return checked;
+    },
+
+    refreshCalculationSourceLists(modalElement) {
+        if (!modalElement) return;
+        const columns = Array.from(modalElement.querySelectorAll('.matrix-column'));
+        const names = columns
+            .map((columnDiv) => columnDiv.querySelector('.column-text')?.value?.trim() || '')
+            .filter(Boolean);
+        columns.forEach((columnDiv) => {
+            if (columnDiv.querySelector('.column-type')?.value !== 'calculated') return;
+            const selfName = columnDiv.querySelector('.column-text')?.value?.trim() || '';
+            const lists = [
+                ['calcSources', '.column-calc-source-list', 'column-calc-source'],
+                ['calcSubtrahends', '.column-calc-subtrahend-list', 'column-calc-subtrahend'],
+                ['calcDenominators', '.column-calc-denominator-list', 'column-calc-denominator'],
+            ];
+            lists.forEach(([datasetKey, listSelector, inputClass]) => {
+                const list = columnDiv.querySelector(listSelector);
+                if (!list) return;
+                const checked = this._checkedCalculationNames(columnDiv, datasetKey, `.${inputClass}`, names);
+                list.replaceChildren();
+                names.forEach((name) => {
+                    if (name === selfName) return;
+                    const label = document.createElement('label');
+                    label.className = 'inline-flex items-center text-gray-700';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = `${inputClass} mr-1`;
+                    checkbox.value = name;
+                    checkbox.checked = checked.has(name);
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(name));
+                    list.appendChild(label);
+                });
+            });
+            this._updateCalculationStatus(columnDiv, names.filter((name) => name !== selfName));
+        });
+    },
+
+    _readCalculation(columnDiv) {
+        const operation = columnDiv.querySelector('.column-calc-operation')?.value || 'sum';
+        const selected = (selector) => Array.from(columnDiv.querySelectorAll(selector))
+            .filter((checkbox) => checkbox.checked)
+            .map((checkbox) => checkbox.value);
+        const parsedDecimals = parseInt(columnDiv.querySelector('.column-calc-decimals')?.value, 10);
+        const calculation = {
+            operation,
+            sources: selected('.column-calc-source'),
+            subtrahends: selected('.column-calc-subtrahend'),
+            denominators: selected('.column-calc-denominator'),
+            decimals: Number.isFinite(parsedDecimals) ? Math.min(6, Math.max(0, parsedDecimals)) : 0,
+            blank_as_zero: !!columnDiv.querySelector('.column-calc-blank-as-zero')?.checked,
+            formula: columnDiv.querySelector('.column-calc-formula')?.value?.trim() || '',
+        };
+        if (operation !== 'formula') calculation.formula = compileCalculation(calculation);
+        return calculation;
+    },
+
+    _updateCalculationStatus(columnDiv, knownNames) {
+        const status = columnDiv.querySelector('.column-calc-status');
+        if (!status) return;
+        const calculation = this._readCalculation(columnDiv);
+        const formula = calculation.formula || '';
+        const emptyMessage = status.dataset.emptyMessage || 'Choose columns or enter a formula';
+        const error = formula ? checkFormulaSyntax(formula, knownNames) : emptyMessage;
+        status.textContent = error || formula;
+        status.classList.toggle('text-red-600', !!error);
+        status.classList.toggle('text-gray-500', !error);
+    },
+
+    _applyCalculationConfig(columnDiv, calculation, includeInRowTotal, calculationOptions = null) {
+        if (!columnDiv) return;
+        const type = columnDiv.querySelector('.column-type')?.value;
+        const includeCheckbox = columnDiv.querySelector('.column-include-in-row-total');
+        const isCalculated = type === 'calculated';
+        const defaultInclude = !isCalculated;
+        const include = includeInRowTotal === undefined || includeInRowTotal === null
+            ? defaultInclude
+            : includeInRowTotal !== false && includeInRowTotal !== 'false';
+        if (includeCheckbox) {
+            includeCheckbox.checked = !!include;
+            if (!!include !== defaultInclude) columnDiv.dataset.includeTouched = '1';
+        }
+        const calcReadonly = columnDiv.querySelector('.column-calc-readonly');
+        const calcSaveValue = columnDiv.querySelector('.column-calc-save-value');
+        const readonlyFlag = calculationOptions ? calculationOptions.readonly : undefined;
+        const saveFlag = calculationOptions ? calculationOptions.saveValue : undefined;
+        if (calcReadonly) {
+            calcReadonly.checked = readonlyFlag === undefined || readonlyFlag === null
+                ? true
+                : readonlyFlag !== false && readonlyFlag !== 'false';
+        }
+        if (calcSaveValue) {
+            calcSaveValue.checked = saveFlag === true || saveFlag === 'true';
+        }
+        if (!calculation || typeof calculation !== 'object') {
+            this.updateColumnCalculationVisibility(columnDiv);
+            return;
+        }
+        const operation = columnDiv.querySelector('.column-calc-operation');
+        if (operation && calculation.operation) operation.value = calculation.operation;
+        const formula = columnDiv.querySelector('.column-calc-formula');
+        if (formula) formula.value = calculation.formula || '';
+        const decimals = columnDiv.querySelector('.column-calc-decimals');
+        if (decimals && calculation.decimals != null) {
+            decimals.value = String(calculation.decimals);
+            columnDiv.dataset.decimalsTouched = '1';
+        }
+        const blankAsZero = columnDiv.querySelector('.column-calc-blank-as-zero');
+        if (blankAsZero) blankAsZero.checked = calculation.blank_as_zero !== false;
+        columnDiv.dataset.calcSources = JSON.stringify(calculation.sources || []);
+        columnDiv.dataset.calcSubtrahends = JSON.stringify(calculation.subtrahends || []);
+        columnDiv.dataset.calcDenominators = JSON.stringify(calculation.denominators || []);
+        this.updateColumnCalculationVisibility(columnDiv);
+    },
+
+    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2, selectableHeaderConfig = null, calculation = null, includeInRowTotal = undefined, calculationOptions = null) {
         const columnsContainer = Utils.getElementById('matrix-columns-container');
         const template = Utils.getElementById('matrix-column-template');
         if (!template) {
@@ -551,7 +803,10 @@ export const MatrixItem = {
             radio.name = headerSourceGroupName;
         });
 
-        if (input) input.value = text || '';
+        if (input) {
+            input.value = text || '';
+            input.dataset.prevName = (text || '').trim();
+        }
         if (translationsInput) {
             try {
                 const normalized = (nameTranslations && typeof nameTranslations === 'object') ? nameTranslations : {};
@@ -697,6 +952,8 @@ export const MatrixItem = {
             if (allowOtherCb) allowOtherCb.checked = !!shd.header_allow_other;
         }
         appendTarget.appendChild(clone);
+        this._applyCalculationConfig(columnDiv, calculation, includeInRowTotal, calculationOptions);
+        this.refreshCalculationSourceLists(modalElement);
         // Bind custom tooltips on newly added column (e.g. Save value ?)
         if (typeof window.initTooltips === 'function') {
             window.initTooltips();
@@ -775,7 +1032,7 @@ export const MatrixItem = {
             } catch (_) {}
         }
 
-        if (isVariable && variableSelect?.value) {
+        if (columnType !== 'calculated' && isVariable && variableSelect?.value) {
             columnConfig.is_variable = true;
             columnConfig.variable = variableSelect.value;
             columnConfig.variable_name = variableSelect.value;
@@ -789,9 +1046,21 @@ export const MatrixItem = {
                 : (saveValueCheckbox ? saveValueCheckbox.checked : true);
         }
 
+        const includeInRowTotal = columnDiv.querySelector('.column-include-in-row-total');
+        if (columnType === 'calculated') {
+            columnConfig.calculation = this._readCalculation(columnDiv);
+            const calcReadonly = columnDiv.querySelector('.column-calc-readonly');
+            const calcSaveValue = columnDiv.querySelector('.column-calc-save-value');
+            if (calcReadonly && !calcReadonly.checked) columnConfig.calculation_readonly = false;
+            if (calcSaveValue?.checked) columnConfig.calculation_save_value = true;
+            if (includeInRowTotal?.checked) columnConfig.include_in_row_total = true;
+        } else if (includeInRowTotal && !includeInRowTotal.checked) {
+            columnConfig.include_in_row_total = false;
+        }
+
         // ── Selectable header ──────────────────────────────────────────────
         const selectableHdrCheckbox = columnDiv.querySelector('.column-selectable-header');
-        if (selectableHdrCheckbox?.checked) {
+        if (columnType !== 'calculated' && selectableHdrCheckbox?.checked) {
             columnConfig.header_type = 'selectable';
 
             const placeholderInput = columnDiv.querySelector('.column-header-placeholder');
@@ -831,6 +1100,94 @@ export const MatrixItem = {
         }
 
         return columnConfig;
+    },
+
+    /**
+     * How many persisted data columns this top-level column-list child represents.
+     * Unnamed non-variable columns are skipped, matching updateConfig.
+     */
+    _savedLeafCount(element) {
+        if (!element) return 0;
+        if (element.classList.contains('matrix-group')) {
+            let count = 0;
+            element.querySelectorAll('.matrix-group-columns > .matrix-column').forEach(columnDiv => {
+                if (this._extractColumnConfig(columnDiv)) count += 1;
+            });
+            return count;
+        }
+        if (element.classList.contains('matrix-column')) {
+            return this._extractColumnConfig(element) ? 1 : 0;
+        }
+        return 0;
+    },
+
+    /**
+     * Index in the saved columns array where the row-total column currently sits.
+     * Returns null when the total column is not in the list.
+     */
+    _rowTotalPositionFromDom(columnsContainer) {
+        if (!columnsContainer) return null;
+        let position = 0;
+        let found = false;
+        Array.from(columnsContainer.children).forEach(child => {
+            if (found) return;
+            if (child.classList.contains('matrix-row-total-column')) {
+                found = true;
+                return;
+            }
+            position += this._savedLeafCount(child);
+        });
+        return found ? position : null;
+    },
+
+    _createRowTotalColumnNode() {
+        const template = Utils.getElementById('matrix-row-total-column-template');
+        const source = template?.content?.querySelector('.matrix-row-total-column');
+        return source ? source.cloneNode(true) : null;
+    },
+
+    /**
+     * Show the row-total column in the table-columns list while Show Row Totals is on.
+     * `position` is the count of data columns that should appear before it.
+     * Omit position to append (historical default: last).
+     */
+    syncRowTotalColumn(modalElement, position) {
+        const container = Utils.getElementById('matrix-columns-container')
+            || modalElement?.querySelector('#matrix-columns-container');
+        if (!container) return;
+        const checkbox = modalElement?.querySelector('#matrix-show-row-totals')
+            || Utils.getElementById('matrix-show-row-totals');
+        const show = checkbox ? checkbox.checked : true;
+        container.querySelectorAll('.matrix-row-total-column').forEach(el => el.remove());
+        if (!show) return;
+
+        const node = this._createRowTotalColumnNode();
+        if (!node) return;
+
+        let target = Infinity;
+        if (position !== undefined && position !== null && position !== '') {
+            const parsed = Number(position);
+            if (Number.isFinite(parsed)) target = Math.max(0, Math.trunc(parsed));
+        }
+
+        let seen = 0;
+        let beforeEl = null;
+        for (const child of Array.from(container.children)) {
+            if (seen >= target) {
+                beforeEl = child;
+                break;
+            }
+            const count = this._savedLeafCount(child);
+            // A position that lands inside a group stays outside that group so the
+            // group header is not split. Place the total after the group instead.
+            if (child.classList.contains('matrix-group') && seen < target && target < seen + count) {
+                seen += count;
+                continue;
+            }
+            seen += count;
+        }
+        if (beforeEl) container.insertBefore(node, beforeEl);
+        else container.appendChild(node);
     },
 
     /**
@@ -894,8 +1251,9 @@ export const MatrixItem = {
         const getInsertionInfo = (e) => {
             if (!dragged) return null;
             const isDraggingColumn = dragged.classList.contains('matrix-column');
+            const isDraggingRowTotal = dragged.classList.contains('matrix-row-total-column');
 
-            if (isDraggingColumn) {
+            if (isDraggingColumn && !isDraggingRowTotal) {
                 // Over a group-columns area → insert inside the group at the right position
                 const groupCols = e.target.closest('.matrix-group-columns');
                 if (groupCols) {
@@ -914,8 +1272,10 @@ export const MatrixItem = {
                 }
             }
 
-            // Outer-level insertion (not inside any .matrix-group-columns)
-            if (!e.target.closest('.matrix-group-columns')) {
+            // Outer-level insertion. The row-total column stays outside groups,
+            // so a pointer inside a group's columns still targets the outer list.
+            const pointerInsideGroupCols = e.target.closest('.matrix-group-columns');
+            if (!pointerInsideGroupCols || isDraggingRowTotal || dragged.classList.contains('matrix-group')) {
                 const siblings = Array.from(container.children).filter(c => c !== dragged && c !== indicator);
                 for (const sib of siblings) {
                     const r = sib.getBoundingClientRect();
@@ -937,7 +1297,7 @@ export const MatrixItem = {
 
             // e.target is the draggable element itself (.matrix-column or .matrix-group)
             const t = e.target;
-            if (t.classList.contains('matrix-column') || t.classList.contains('matrix-group')) {
+            if (t.classList.contains('matrix-column') || t.classList.contains('matrix-group') || t.classList.contains('matrix-row-total-column')) {
                 dragged = t;
             } else {
                 // Shouldn't happen, but bail safely
@@ -993,8 +1353,8 @@ export const MatrixItem = {
             const info = getInsertionInfo(e);
             removeIndicator();
             if (!info) return;
-            // Groups stay at the outer level only
-            if (dragged.classList.contains('matrix-group') && info.cont !== container) return;
+            // Groups and the row-total column stay at the outer level only
+            if ((dragged.classList.contains('matrix-group') || dragged.classList.contains('matrix-row-total-column')) && info.cont !== container) return;
             if (info.before) {
                 info.cont.insertBefore(dragged, info.before);
             } else {
@@ -1005,7 +1365,7 @@ export const MatrixItem = {
 
         // Set draggable="true" on all items, current and future
         const markDraggable = () => {
-            container.querySelectorAll('.matrix-column:not([draggable]), .matrix-group:not([draggable])')
+            container.querySelectorAll('.matrix-column:not([draggable]), .matrix-group:not([draggable]), .matrix-row-total-column:not([draggable])')
                 .forEach(el => el.setAttribute('draggable', 'true'));
         };
         markDraggable();
@@ -1112,6 +1472,19 @@ export const MatrixItem = {
         if (rowTotalsCheckbox) {
             if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
                 rowTotalsCheckbox.addEventListener('change', () => {
+                    const columnsContainer = Utils.getElementById('matrix-columns-container');
+                    if (rowTotalsCheckbox.checked) {
+                        const raw = columnsContainer?.dataset.rowTotalPosition;
+                        const remembered = raw === undefined || raw === '' ? undefined : Number(raw);
+                        this.syncRowTotalColumn(
+                            modalElement,
+                            remembered !== undefined && Number.isFinite(remembered) ? remembered : undefined
+                        );
+                    } else if (columnsContainer) {
+                        const current = this._rowTotalPositionFromDom(columnsContainer);
+                        if (current !== null) columnsContainer.dataset.rowTotalPosition = String(current);
+                        columnsContainer.querySelectorAll('.matrix-row-total-column').forEach(el => el.remove());
+                    }
                     this.updateRowTotalOptionsVisibility(modalElement);
                     this.updateIncludeTotalsInApiVisibility(modalElement);
                     this.updateConfig(modalElement);
@@ -1946,6 +2319,8 @@ export const MatrixItem = {
         const configInput = Utils.getElementById('item-matrix-config');
         if (!columnsContainer || !configInput) return;
 
+        this.refreshCalculationSourceLists(modalElement);
+
         const columns = [];
         const column_groups = {};
 
@@ -2003,6 +2378,10 @@ export const MatrixItem = {
             config.row_total_manual_enabled = rowTotalManualEnabled;
             if (rowTotalManualEnabled) {
                 config.row_total_validation = rowTotalValidation;
+            }
+            const rowTotalPosition = this._rowTotalPositionFromDom(columnsContainer);
+            if (rowTotalPosition !== null && rowTotalPosition < columns.length) {
+                config.row_total_position = rowTotalPosition;
             }
         }
 
@@ -2326,7 +2705,7 @@ export const MatrixItem = {
                             item.columns.forEach(colData => {
                                 if (!colData || typeof colData !== 'object') return;
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer, colData.decimals, colData.header_type ? colData : null);
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value });
                             });
                         } else {
                             const colData = item.data;
@@ -2334,7 +2713,7 @@ export const MatrixItem = {
                                 this.addColumn(modalElement, colData, 'number_whole');
                             } else if (colData && typeof colData === 'object' && (colData.name || colData.is_variable || colData.type === 'variable')) {
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null);
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value });
                             }
                         }
                     });
@@ -2440,6 +2819,14 @@ export const MatrixItem = {
                         }
                     }
                 }
+
+                const rawRowTotalPosition = matrixConfig.row_total_position;
+                this.syncRowTotalColumn(
+                    modalElement,
+                    (rawRowTotalPosition === undefined || rawRowTotalPosition === null || rawRowTotalPosition === '')
+                        ? undefined
+                        : Number(rawRowTotalPosition)
+                );
 
                 // Update auto-load visibility after columns are populated
                 this.updateAutoLoadVisibility(modalElement);

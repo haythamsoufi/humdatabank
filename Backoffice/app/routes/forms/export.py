@@ -165,11 +165,37 @@ def matrix_pdf_layout_strategy(col_count):
     return 'landscape-scale'
 
 
+def matrix_row_total_insert_index(column_count, row_total_position=None):
+    """Index among data columns where the row-total column is shown.
+
+    ``None`` and invalid values keep the historical placement: after every
+    data column. The result is clamped to ``0 .. column_count``.
+    """
+    try:
+        count = int(column_count or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count < 0:
+        count = 0
+    if isinstance(row_total_position, bool) or row_total_position is None:
+        return count
+    try:
+        position = int(row_total_position)
+    except (TypeError, ValueError):
+        return count
+    if position < 0:
+        return 0
+    if position > count:
+        return count
+    return position
+
+
 def matrix_portrait_column_widths_mm(
     col_count,
     columns,
     *,
     show_row_totals=True,
+    row_total_position=None,
     table_width_mm=192,
 ):
     """Return ``(name, width_mm)`` pairs for a portrait-compact matrix ``colgroup``."""
@@ -198,7 +224,10 @@ def matrix_portrait_column_widths_mm(
         specs.append({'name': name, 'is_tick': col_type == 'tick'})
 
     if show_row_totals:
-        specs.append({'name': '__total__', 'is_tick': False})
+        specs.insert(
+            matrix_row_total_insert_index(len(specs), row_total_position),
+            {'name': '__total__', 'is_tick': False},
+        )
 
     tick_total_mm = tick_mm * sum(1 for spec in specs if spec['is_tick'])
     number_count = sum(1 for spec in specs if not spec['is_tick'])

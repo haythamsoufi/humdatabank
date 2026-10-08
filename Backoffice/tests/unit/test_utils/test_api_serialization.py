@@ -1504,6 +1504,15 @@ class TestResolveMatrixJoinMetadataTotalsFlags:
         assert meta['show_column_totals'] is False
         assert meta['row_total_manual_enabled'] is True
 
+    def test_preserves_row_total_position(self):
+        meta = resolve_matrix_join_metadata({
+            'row_mode': 'manual',
+            'columns': [{'name': 'c1'}, {'name': 'c2'}],
+            'show_row_totals': True,
+            'row_total_position': 1,
+        })
+        assert meta['row_total_position'] == 1
+
     def test_preserves_include_calculated_totals_in_api_flag(self):
         """The API-only decoupling flag must survive the same trimming pass as its
         show_row_totals/show_column_totals siblings, since it's this trimmed-down

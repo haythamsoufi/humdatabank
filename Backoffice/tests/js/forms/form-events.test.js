@@ -199,10 +199,49 @@ describe('initFormEvents', () => {
     const onConfirm = window.showConfirmation.mock.calls[0][1];
     onConfirm();
 
+    expect(form.dataset.confirmed).toBe('true');
     expect(form.dataset.ifrcForcePresave).toBe('1');
     expect(form.querySelector('input[name="action"][type="hidden"]').value).toBe('submit');
     expect(form.requestSubmit).toHaveBeenCalledWith(submitBtn);
     expect(submitBtn.dataset.confirmInProgress).toBe('false');
+    expect(submitBtn.disabled).toBe(false);
+  });
+
+  it('marks the form confirmed before requestSubmit so the global confirm handler does not open a second dialog', () => {
+    const form = mountForm({ confirmMessage: 'Really submit this form?' });
+    let confirmedWhenSubmitFired = null;
+    let openedSecondDialog = false;
+    const globalConfirm = (event) => {
+      if (event.target !== form) return;
+      confirmedWhenSubmitFired = form.dataset.confirmed || '';
+      if (form.dataset.confirmed === 'true') return;
+      openedSecondDialog = true;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.submitter) event.submitter.disabled = true;
+    };
+    document.addEventListener('submit', globalConfirm, true);
+
+    window.showSubmitConfirmation = (_message, onConfirm) => onConfirm();
+    initFormEvents();
+
+    const submitBtn = form.querySelector('button[value="submit"]');
+    form.requestSubmit = (submitter) => {
+      const event = new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter });
+      if (submitter && event.submitter !== submitter) {
+        Object.defineProperty(event, 'submitter', { value: submitter });
+      }
+      form.dispatchEvent(event);
+    };
+
+    try {
+      submitBtn.click();
+      expect(confirmedWhenSubmitFired).toBe('true');
+      expect(openedSecondDialog).toBe(false);
+      expect(submitBtn.disabled).toBe(false);
+    } finally {
+      document.removeEventListener('submit', globalConfirm, true);
+    }
   });
 
   it('refreshes CSRF on init when the form is a public submission', () => {

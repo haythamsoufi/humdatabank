@@ -153,6 +153,33 @@ class TestSkippedLegacyFundingAreas:
         assert cells["IFRC Secretariat_EA1"] == 12000000
         assert cells["col_header|EA1"] == "MDRAF018 Afghanistan - Earthquake"
 
+    def test_planning_funding_skips_ea_when_later_year_matrix_has_no_ea_column(self, monkeypatch):
+        from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
+
+        _clear_matrix_key_schema_cache()
+        monkeypatch.setitem(
+            _MATRIX_KEY_SCHEMA_CACHE,
+            968,
+            {"columns": {"SP1", "SP2", "SP3", "SP4", "SP5", "EFs"}, "rows": None, "label": "Funding +1"},
+        )
+        ctx = UprImportContext(template_ids=[24])
+        ctx.assignment_by_template = {24: {("2026", "AFG"): 9001}}
+        ctx.emergency_ops_by_iso["AFG"] = {
+            "MDRAF018": {"name": "Afghanistan - Earthquake", "code": "MDRAF018"}
+        }
+        ctx.emergency_ops_ordered_by_iso["AFG"] = [ctx.emergency_ops_by_iso["AFG"]["MDRAF018"]]
+        rows = [
+            _planning_funding_row(
+                Round="P26",
+                Year=2027,
+                Area="EA1",
+                **{"Country Value": 12000000, "EA Code": "MDRAF018"},
+            )
+        ]
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[24], rounds={"P26"})
+        assert import_rows == []
+        assert any("968" in warning_text(w) and "EA1" in warning_text(w) for w in ctx.warnings)
+
 
 class TestMatrixKeyWarning:
     """_matrix_key_warning/_matrix_key_schema: catch a form admin renaming a matrix

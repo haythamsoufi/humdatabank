@@ -213,6 +213,9 @@ def resolve_matrix_join_metadata(matrix_config):
     ):
         if flag in matrix_config:
             meta[flag] = matrix_config[flag]
+    position = matrix_config.get('row_total_position')
+    if isinstance(position, int) and not isinstance(position, bool) and position >= 0:
+        meta['row_total_position'] = position
     return meta
 
 
@@ -485,6 +488,8 @@ def _matrix_config_flag(matrix_config, key, default=True):
 
 
 def _matrix_column_defs(matrix_config):
+    from app.utils.matrix_calculation import column_counts_toward_row_total
+
     columns = (matrix_config or {}).get('columns') or []
     defs = []
     for col in columns:
@@ -496,10 +501,16 @@ def _matrix_column_defs(matrix_config):
                 'name': str(name),
                 'type': col.get('type') or 'number',
                 'label': col.get('label') or str(name),
+                'counts_toward_row_total': column_counts_toward_row_total(col),
             })
         elif col:
             name = str(col)
-            defs.append({'name': name, 'type': 'number', 'label': name})
+            defs.append({
+                'name': name,
+                'type': 'number',
+                'label': name,
+                'counts_toward_row_total': True,
+            })
     return defs
 
 
@@ -589,8 +600,13 @@ def prune_stale_matrix_cell_keys(matrix_data, matrix_config):
     return pruned
 
 
-def _iter_matrix_data_cells(values, matrix_config):
-    column_names = {col['name'] for col in _matrix_column_defs(matrix_config)}
+def _iter_matrix_data_cells(values, matrix_config, *, row_total_only=False):
+    column_defs = _matrix_column_defs(matrix_config)
+    column_names = {col['name'] for col in column_defs}
+    included = {
+        col['name'] for col in column_defs
+        if col.get('counts_toward_row_total') and col.get('type') != 'calculated'
+    }
     for key, raw in (values or {}).items():
         row_id, column_key = _parse_matrix_cell_key(key, matrix_config)
         if row_id is None or not column_key:
@@ -599,11 +615,91 @@ def _iter_matrix_data_cells(values, matrix_config):
             continue
         if column_names and column_key not in column_names:
             continue
+        if row_total_only and included and column_key not in included:
+            continue
         yield row_id, column_key, _matrix_cell_value_to_number(raw)
 
 
-def _effective_matrix_row_total(values, row_id, matrix_config):
-    row_sum = sum(value for rid, _, value in _iter_matrix_data_cells(values, matrix_config) if rid == row_id)
+def _matrix_formula_by_row(values, matrix_config):
+    """Per-row calculated-column numbers. Blank and error results are None."""
+    from app.utils.matrix_calculation import evaluate_matrix_row
+
+    columns = (matrix_config or {}).get('columns') or []
+    if not any(isinstance(col, dict) and col.get('type') == 'calculated' for col in columns):
+        return {}
+    row_ids = []
+    seen = set()
+    for key in values or {}:
+        row_id, column_key = _parse_matrix_cell_key(key, matrix_config)
+        if not row_id or column_key == MATRIX_ROW_TOTAL_COLUMN or row_id in seen:
+            continue
+        seen.add(row_id)
+        row_ids.append(row_id)
+    by_row = {}
+    for row_id in row_ids:
+        inputs = {}
+        for col in columns:
+            if isinstance(col, dict) and col.get('name') and col.get('type') != 'calculated':
+                inputs[col['name']] = (values or {}).get(f"{row_id}_{col['name']}")
+        results = evaluate_matrix_row(columns, inputs)
+        by_row[row_id] = {
+            name: (result.value if result.error is None else None)
+            for name, result in results.items()
+        }
+    return by_row
+
+
+def _matrix_formula_long_rows(values, matrix_config):
+    from app.utils.matrix_calculation import column_counts_toward_row_total, stored_calculation_value
+
+    formula_by_row = _matrix_formula_by_row(values, matrix_config)
+    columns = (matrix_config or {}).get('columns') or []
+    rows = []
+    for row_id, by_name in formula_by_row.items():
+        for col in columns:
+            if not isinstance(col, dict) or col.get('type') != 'calculated' or not col.get('name'):
+                continue
+            if stored_calculation_value(col, values, row_id) is not None:
+                continue
+            value = by_name.get(col['name'])
+            if value is None:
+                continue
+            cell = {
+                'row_entity_id': _coerce_matrix_entity_id(row_id),
+                'column_key': col['name'],
+                'value': value,
+                'is_formula': True,
+            }
+            if column_counts_toward_row_total(col):
+                cell['include_in_row_total'] = True
+            label = _lookup_matrix_column_label(matrix_config, col['name'])
+            if label:
+                cell['column_label'] = label
+            rows.append(cell)
+    return rows, formula_by_row
+
+
+def _effective_matrix_row_total(values, row_id, matrix_config, formula_by_row=None):
+    from app.utils.matrix_calculation import column_counts_toward_row_total, stored_calculation_value
+
+    row_sum = sum(
+        value for rid, _, value in _iter_matrix_data_cells(values, matrix_config, row_total_only=True)
+        if rid == row_id
+    )
+    if formula_by_row is None:
+        formula_by_row = _matrix_formula_by_row(values, matrix_config)
+    for col in (matrix_config or {}).get('columns') or []:
+        if not isinstance(col, dict) or col.get('type') != 'calculated':
+            continue
+        if not column_counts_toward_row_total(col):
+            continue
+        stored = stored_calculation_value(col, values, row_id)
+        if stored is not None:
+            row_sum += stored
+            continue
+        value = (formula_by_row.get(row_id) or {}).get(col.get('name'))
+        if value is not None:
+            row_sum += value
     if not _matrix_config_flag(matrix_config, 'row_total_manual_enabled', False):
         return row_sum
     manual = _stored_matrix_row_total_manual_scalar(
@@ -612,7 +708,7 @@ def _effective_matrix_row_total(values, row_id, matrix_config):
     return manual if manual is not None else row_sum
 
 
-def _compute_matrix_calculated_total_rows(values, matrix_config):
+def _compute_matrix_calculated_total_rows(values, matrix_config, formula_by_row=None):
     if not isinstance(values, dict) or not values:
         return []
     matrix_config = matrix_config or {}
@@ -627,12 +723,20 @@ def _compute_matrix_calculated_total_rows(values, matrix_config):
     if not show_row_totals and not show_column_totals:
         return []
 
+    if formula_by_row is None:
+        formula_by_row = _matrix_formula_by_row(values, matrix_config)
     data_cells = list(_iter_matrix_data_cells(values, matrix_config))
     row_ids = sorted(
         {row_id for row_id, _, _ in data_cells},
         key=lambda x: (0, int(x)) if str(x).lstrip('-').isdigit() else (1, str(x)),
     )
     column_defs = _matrix_column_defs(matrix_config)
+    adjusts_row_total = any(
+        isinstance(col, dict) and (
+            col.get('type') == 'calculated' or col.get('include_in_row_total') is False
+        )
+        for col in (matrix_config.get('columns') or [])
+    )
     totals = []
 
     if show_row_totals:
@@ -641,17 +745,35 @@ def _compute_matrix_calculated_total_rows(values, matrix_config):
                 'row_entity_id': _coerce_matrix_entity_id(row_id),
                 'column_key': MATRIX_ROW_TOTAL_COLUMN,
                 'column_label': MATRIX_ROW_TOTAL_COLUMN,
-                'value': _effective_matrix_row_total(values, row_id, matrix_config),
+                'value': _effective_matrix_row_total(values, row_id, matrix_config, formula_by_row),
                 'is_calculated_total': True,
                 'total_kind': 'row',
             })
 
     if show_column_totals and column_defs:
         for col in column_defs:
-            col_sum = sum(
-                value for _, column_key, value in data_cells
-                if column_key == col['name']
-            )
+            if col.get('type') == 'calculated':
+                from app.utils.matrix_calculation import stored_calculation_value
+
+                source = next(
+                    (
+                        item for item in (matrix_config.get('columns') or [])
+                        if isinstance(item, dict) and item.get('name') == col['name']
+                    ),
+                    None,
+                )
+                col_sum = 0
+                for row_id in formula_by_row:
+                    stored = stored_calculation_value(source, values, row_id) if source else None
+                    if stored is not None:
+                        col_sum += stored
+                    else:
+                        col_sum += (formula_by_row.get(row_id) or {}).get(col['name']) or 0
+            else:
+                col_sum = sum(
+                    value for _, column_key, value in data_cells
+                    if column_key == col['name']
+                )
             totals.append({
                 'row_entity_id': None,
                 'column_key': col['name'],
@@ -662,9 +784,9 @@ def _compute_matrix_calculated_total_rows(values, matrix_config):
             })
 
     if show_row_totals and show_column_totals:
-        if _matrix_config_flag(matrix_config, 'row_total_manual_enabled', False):
+        if _matrix_config_flag(matrix_config, 'row_total_manual_enabled', False) or adjusts_row_total:
             grand_total = sum(
-                _effective_matrix_row_total(values, row_id, matrix_config)
+                _effective_matrix_row_total(values, row_id, matrix_config, formula_by_row)
                 for row_id in row_ids
             )
         else:
@@ -682,6 +804,14 @@ def _compute_matrix_calculated_total_rows(values, matrix_config):
 
 
 def _build_matrix_long_rows_from_values(values, matrix_config):
+    from app.utils.matrix_calculation import calculation_saves_value
+
+    calculated_names = {
+        col.get('name')
+        for col in ((matrix_config or {}).get('columns') or [])
+        if isinstance(col, dict) and col.get('type') == 'calculated' and col.get('name')
+        and not calculation_saves_value(col)
+    }
     rows = []
     for key, val in (values or {}).items():
         if _is_matrix_row_total_key(key) and _matrix_config_flag(matrix_config, 'show_row_totals', True):
@@ -689,7 +819,7 @@ def _build_matrix_long_rows_from_values(values, matrix_config):
         row_entity_raw, column_key = _parse_matrix_cell_key(key, matrix_config)
         if row_entity_raw is None or not column_key:
             continue
-        if column_key == MATRIX_ROW_TOTAL_COLUMN:
+        if column_key == MATRIX_ROW_TOTAL_COLUMN or column_key in calculated_names:
             continue
         cell = {
             'row_entity_id': _coerce_matrix_entity_id(row_entity_raw),
@@ -700,7 +830,9 @@ def _build_matrix_long_rows_from_values(values, matrix_config):
         if column_label:
             cell['column_label'] = column_label
         rows.append(cell)
-    rows.extend(_compute_matrix_calculated_total_rows(values, matrix_config))
+    formula_rows, formula_by_row = _matrix_formula_long_rows(values, matrix_config)
+    rows.extend(formula_rows)
+    rows.extend(_compute_matrix_calculated_total_rows(values, matrix_config, formula_by_row))
     return rows
 
 
@@ -773,7 +905,7 @@ def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip
                     'source': source,
                     **({
                         k: cell[k]
-                        for k in ('is_calculated_total', 'total_kind')
+                        for k in ('is_calculated_total', 'total_kind', 'is_formula')
                         if k in cell
                     }),
                 })
@@ -2300,7 +2432,7 @@ def format_bridge_disagg_rows(
                 'value': cell.get('value'),
                 **({
                     k: cell[k]
-                    for k in ('is_calculated_total', 'total_kind')
+                    for k in ('is_calculated_total', 'total_kind', 'is_formula')
                     if k in cell
                 }),
             })

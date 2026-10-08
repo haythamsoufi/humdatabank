@@ -113,6 +113,18 @@ def register_template_context(app, config_class):
 
     app.jinja_env.globals["inject_js_translations"] = inject_js_translations
 
+    from app.utils.matrix_calculation import (
+        matrix_counts_toward_row_total,
+        matrix_formula_column_sum,
+        matrix_formula_display,
+        matrix_formula_number,
+    )
+
+    app.jinja_env.globals['matrix_counts_toward_row_total'] = matrix_counts_toward_row_total
+    app.jinja_env.globals['matrix_formula_column_sum'] = matrix_formula_column_sum
+    app.jinja_env.globals['matrix_formula_display'] = matrix_formula_display
+    app.jinja_env.globals['matrix_formula_number'] = matrix_formula_number
+
     @app.context_processor
     def inject_staging_environment_banner():
         """Expose whether to show the staging-environment warning banner."""

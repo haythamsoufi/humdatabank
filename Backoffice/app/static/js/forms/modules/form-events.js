@@ -309,10 +309,18 @@ export function initFormEvents() {
             }
             pageInput.value = pageId;
           };
+          // This dialog already confirmed. Mark the form before requestSubmit so
+          // the document-level confirm handler does not open a second dialog,
+          // disable the button, and stop the save-before-submit listener.
+          const markUserConfirmed = (targetForm) => {
+            if (!targetForm) return;
+            targetForm.dataset.confirmed = 'true';
+            targetForm.dataset.ifrcForcePresave = '1';
+          };
           try {
             const form = document.getElementById('focalDataEntryForm');
             if (form) {
-              form.dataset.ifrcForcePresave = '1';
+              markUserConfirmed(form);
               setHiddenAction(action);
               applySectionId(form);
               applyPageId(form);
@@ -325,6 +333,7 @@ export function initFormEvents() {
           } catch (error) {
             const form = document.getElementById('focalDataEntryForm');
             if (form) {
+              markUserConfirmed(form);
               setHiddenAction(action);
               applySectionId(form);
               applyPageId(form);
@@ -388,7 +397,11 @@ export function initFormEvents() {
       if (!confirmMessage) return;
       event.preventDefault();
       event.stopPropagation();
-      const submitScoped = () => targetForm.requestSubmit ? targetForm.requestSubmit() : targetForm.submit();
+      const submitScoped = () => {
+        targetForm.dataset.confirmed = 'true';
+        if (targetForm.requestSubmit) targetForm.requestSubmit();
+        else targetForm.submit();
+      };
       if (window.showSubmitConfirmation) {
         window.showSubmitConfirmation(confirmMessage, submitScoped, null, confirmText, _t('Cancel'), title);
       } else if (window.showConfirmation) {
@@ -571,6 +584,10 @@ export function initFormEvents() {
       const confirmLabel = activeOptions.confirmText;
 
       const doSubmit = () => {
+        form.dataset.confirmed = 'true';
+        if (activeAction === 'submit' || activeAction === 'submit_page') {
+          form.dataset.ifrcForcePresave = '1';
+        }
         if (activeSubmitter) {
           setHiddenAction(activeAction);
           if (form.requestSubmit) {

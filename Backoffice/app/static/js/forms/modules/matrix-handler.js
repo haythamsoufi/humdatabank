@@ -4,6 +4,12 @@
  */
 
 import { debugLog, debugError, debugWarn } from './debug.js';
+import {
+    calculationIsReadonly,
+    calculationSavesValue,
+    evaluateCalculatedForRows,
+    formatFormulaNumber,
+} from './matrix/calculation.js';
 import { _t, __canEditMatrixContainer } from './matrix/shared.js';
 import {
     __formatInteger,
@@ -783,6 +789,10 @@ class MatrixHandler {
             return;
         }
 
+        if (input.getAttribute('data-calculated') === 'true') {
+            input.dataset.userEdited = '1';
+        }
+
         // Clear any existing validation errors for this input
         this.clearInputError(input);
 
@@ -1081,6 +1091,40 @@ class MatrixHandler {
             columns.forEach(column => {
                 const columnName = typeof column === 'object' ? column.name : column;
                 const isVariable = typeof column === 'object' && (column.is_variable === true || column.type === 'variable');
+                const isCalculated = typeof column === 'object' && column.type === 'calculated';
+
+                if (isCalculated && columnName) {
+                    if (!calculationSavesValue(column)) {
+                        Object.keys(dataToSave).forEach(cellKey => {
+                            if (cellKey.endsWith(`_${columnName}`)) {
+                                delete dataToSave[cellKey];
+                            }
+                        });
+                    } else if (calculationIsReadonly(column)) {
+                        const rowIds = new Set();
+                        matrix.container.querySelectorAll('tr.matrix-data-row').forEach((row) => {
+                            const rowId = row.getAttribute('data-row-id');
+                            if (rowId) rowIds.add(rowId);
+                        });
+                        Object.keys(dataToSave).forEach((cellKey) => {
+                            const parsed = __parseMatrixCellKey(cellKey, config);
+                            if (parsed && parsed.rowId) rowIds.add(parsed.rowId);
+                        });
+                        const byRow = evaluateCalculatedForRows(columns, dataToSave, Array.from(rowIds));
+                        const decimals = column.calculation ? column.calculation.decimals : 2;
+                        byRow.forEach((pack, rowId) => {
+                            const key = `${rowId}_${columnName}`;
+                            const value = pack && pack.values ? pack.values[columnName] : null;
+                            if (value == null) {
+                                delete dataToSave[key];
+                            } else {
+                                const shown = formatFormulaNumber(value, decimals);
+                                dataToSave[key] = shown === '' ? '' : Number(shown);
+                            }
+                        });
+                    }
+                    return;
+                }
 
                 if (isVariable && !__variableColumnPersistsValue(column)) {
                     Object.keys(dataToSave).forEach(cellKey => {

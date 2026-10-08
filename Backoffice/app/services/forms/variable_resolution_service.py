@@ -397,13 +397,56 @@ class VariableResolutionService:
         return cell_value
 
     @classmethod
-    def _matrix_row_total(cls, disagg_data: Optional[Dict], row_entity_id: Any) -> Optional[float]:
+    def _matrix_columns_from_entry(cls, entry) -> Optional[list]:
+        item = getattr(entry, 'form_item', None)
+        config = getattr(item, 'config', None) if item is not None else None
+        if not isinstance(config, dict):
+            return None
+        matrix_config = config.get('matrix_config')
+        if not isinstance(matrix_config, dict):
+            return None
+        columns = matrix_config.get('columns')
+        return columns if isinstance(columns, list) else None
+
+    @classmethod
+    def _matrix_calculated_lookup(cls, disagg_data, row_entity_id, column_name, columns):
+        """Return (True, value) when column_name is a calculated column, else (False, None)."""
+        if not columns or not isinstance(disagg_data, dict):
+            return False, None
+        column = next(
+            (
+                col for col in columns
+                if isinstance(col, dict) and col.get('name') == column_name and col.get('type') == 'calculated'
+            ),
+            None,
+        )
+        if column is None:
+            return False, None
+        from app.utils.matrix_calculation import evaluate_matrix_row, stored_calculation_value
+
+        stored = stored_calculation_value(column, disagg_data, row_entity_id)
+        if stored is not None:
+            return True, stored
+
+        inputs = {}
+        for col in columns:
+            if isinstance(col, dict) and col.get('name') and col.get('type') != 'calculated':
+                inputs[col['name']] = disagg_data.get(f"{row_entity_id}_{col['name']}")
+        result = evaluate_matrix_row(columns, inputs).get(column_name)
+        if result and result.error is None and result.value is not None:
+            return True, float(result.value)
+        return True, None
+
+    @classmethod
+    def _matrix_row_total(cls, disagg_data: Optional[Dict], row_entity_id: Any, columns: Optional[list] = None) -> Optional[float]:
         """
         Compute the row total (sum of all column values) for a given row in matrix disagg_data.
         Used when variable config matrix_column_name is MATRIX_COLUMN_ROW_TOTAL.
         Handles variable-column format (original/modified) per cell.
         When an explicit manual row-total cell ({rowId}_Total) is present, prefer it over
         summing breakdown columns so PNS total-only rows do not double-count.
+        When columns are provided, columns with include_in_row_total false are skipped and
+        calculated columns are added only when they opt in.
         """
         if not disagg_data or not isinstance(disagg_data, dict):
             return None
@@ -416,6 +459,34 @@ class VariableResolutionService:
                     return parsed if parsed else None
                 except (ValueError, TypeError):
                     pass
+        if columns:
+            from app.utils.matrix_calculation import column_counts_toward_row_total, evaluate_matrix_row
+
+            total = 0.0
+            inputs = {}
+            for col in columns:
+                if not isinstance(col, dict) or not col.get('name') or col.get('type') == 'calculated':
+                    continue
+                inputs[col['name']] = disagg_data.get(f"{row_entity_id}_{col['name']}")
+                if not column_counts_toward_row_total(col):
+                    continue
+                effective = cls._effective_matrix_cell_value(inputs[col['name']])
+                if effective is None:
+                    continue
+                try:
+                    total += float(str(effective).replace(',', ''))
+                except (ValueError, TypeError):
+                    pass
+            results = evaluate_matrix_row(columns, inputs)
+            for col in columns:
+                if not isinstance(col, dict) or col.get('type') != 'calculated':
+                    continue
+                if not column_counts_toward_row_total(col):
+                    continue
+                result = results.get(col.get('name'))
+                if result and result.error is None and result.value is not None:
+                    total += float(result.value)
+            return total if total else None
         prefix = f"{row_entity_id}_"
         total = 0.0
         for key, cell_value in disagg_data.items():
@@ -1119,10 +1190,16 @@ class VariableResolutionService:
 
         if matrix_column_name and row_entity_id is not None and entry.disagg_data:
             if isinstance(entry.disagg_data, dict):
+                columns = cls._matrix_columns_from_entry(entry)
                 if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
-                    # Row total: sum of all column values for this row
-                    total = cls._matrix_row_total(entry.disagg_data, row_entity_id)
+                    # Row total: sum of columns that count toward the row total
+                    total = cls._matrix_row_total(entry.disagg_data, row_entity_id, columns)
                     return total
+                is_calculated, calculated_value = cls._matrix_calculated_lookup(
+                    entry.disagg_data, row_entity_id, matrix_column_name, columns
+                )
+                if is_calculated:
+                    return calculated_value
                 lookup_key = f"{row_entity_id}_{matrix_column_name}"
                 matrix_value = entry.disagg_data.get(lookup_key)
                 if matrix_value is not None:
@@ -1380,9 +1457,15 @@ class VariableResolutionService:
             # or with variable-column format: {"61_Planned": {"original": "...", "modified": "...", "isModified": bool}}
             # When matrix_column_name is _row_total, use sum of all column values for this row.
             if isinstance(entry.disagg_data, dict):
+                columns = cls._matrix_columns_from_entry(entry)
                 if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
-                    total = cls._matrix_row_total(entry.disagg_data, row_entity_id)
+                    total = cls._matrix_row_total(entry.disagg_data, row_entity_id, columns)
                     return total
+                is_calculated, calculated_value = cls._matrix_calculated_lookup(
+                    entry.disagg_data, row_entity_id, matrix_column_name, columns
+                )
+                if is_calculated:
+                    return calculated_value
                 lookup_key = f"{row_entity_id}_{matrix_column_name}"
                 matrix_value = entry.disagg_data.get(lookup_key)
                 if matrix_value is not None:
@@ -1515,13 +1598,19 @@ class VariableResolutionService:
         # Look up the actual cell value (or row total) using lookup key or row total
         # In entities_containing, the "row" in the source matrix is the current assignment's entity (lookup_entity_id)
         if isinstance(form_data_entry.disagg_data, dict):
+            columns = cls._matrix_columns_from_entry(form_data_entry)
             if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
-                total = cls._matrix_row_total(form_data_entry.disagg_data, lookup_entity_id)
+                total = cls._matrix_row_total(form_data_entry.disagg_data, lookup_entity_id, columns)
                 numeric_value = total if total is not None else 0
                 logger.debug(
                     f"_resolve_entities_containing_for_matrix_cell: Row total for row_entity_id={row_entity_id} = {numeric_value}"
                 )
                 return numeric_value
+            is_calculated, calculated_value = cls._matrix_calculated_lookup(
+                form_data_entry.disagg_data, lookup_entity_id, matrix_column_name, columns
+            )
+            if is_calculated:
+                return calculated_value if calculated_value is not None else 0
             lookup_key = f"{lookup_entity_id}_{matrix_column_name}"
             cell_value = form_data_entry.disagg_data.get(lookup_key)
             if cell_value is not None:

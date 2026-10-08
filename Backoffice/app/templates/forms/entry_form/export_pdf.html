@@ -222,6 +222,16 @@
                             {% set matrix_config = field.matrix_config if field.matrix_config is defined else {} %}
                             {% set matrix_column_groups = field.matrix_column_groups if field.matrix_column_groups is defined else matrix_config.get('column_groups', {}) %}
                             {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
+                            {% set row_total_ns = namespace(index=matrix_columns|length) %}
+                            {% if show_row_totals %}
+                                {% set _rtp = matrix_config.get('row_total_position') %}
+                                {% if _rtp is not none and (_rtp is number or (_rtp is string and _rtp|trim)) %}
+                                    {% set row_total_ns.index = _rtp|int %}
+                                {% endif %}
+                                {% if row_total_ns.index < 0 %}
+                                    {% set row_total_ns.index = 0 %}
+                                {% endif %}
+                            {% endif %}
                             {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
                             {# Manual and list-library rows sort A–Z. Hybrid keeps fixed rows in config order
                                (already arranged by the export route) and only alphabetizes list rows. #}
@@ -259,6 +269,9 @@
                                     {% set col_name = col.get('name') if col is mapping and col.get('name') else col %}
                                     {% set col_type = col.get('type') if col is mapping and col.get('type') else 'number' %}
                                     {% set ns = namespace(col_total=0) %}
+                                    {% if col_type == 'calculated' %}
+                                        {% set ns.col_total = matrix_formula_column_sum(matrix_columns, matrix_data, sorted_matrix_rows, col_name) %}
+                                    {% else %}
                                     {% for item in sorted_matrix_rows %}
                                         {% set row = item.row_id %}
                                         {% set cell_key = row ~ '_' ~ col_name %}
@@ -278,8 +291,11 @@
                                         {% endif %}
                                         {% set ns.col_total = ns.col_total + add %}
                                     {% endfor %}
+                                    {% endif %}
                                     {% set _ = ns_ct.col_totals.append(ns.col_total) %}
-                                    {% set ns_ct.grand_total = ns_ct.grand_total + ns.col_total %}
+                                    {% if matrix_counts_toward_row_total(col) %}
+                                        {% set ns_ct.grand_total = ns_ct.grand_total + ns.col_total %}
+                                    {% endif %}
                                 {% endfor %}
                                 {% if _wide_matrix %}
                                 <div class="wide-matrix-compact">
@@ -300,7 +316,7 @@
                                 <table class="table matrix-table">
                                     {% if _matrix_strategy == 'portrait-compact' %}
                                     <colgroup>
-                                        {% for col_name, width_mm in matrix_portrait_column_widths_mm(_layout_col_count, matrix_columns, show_row_totals=show_row_totals) %}
+                                        {% for col_name, width_mm in matrix_portrait_column_widths_mm(_layout_col_count, matrix_columns, show_row_totals=show_row_totals, row_total_position=matrix_config.get('row_total_position')) %}
                                         <col{% if col_name == '__row__' %} class="matrix-col-row-label"{% elif width_mm <= 7.5 %} class="matrix-col-tick"{% else %} class="matrix-col-data"{% endif %} style="width: {{ width_mm }}mm">
                                         {% endfor %}
                                     </colgroup>
@@ -316,6 +332,9 @@
                                             <tr>
                                                 <th rowspan="2" class="matrix-row-header"></th>
                                                 {% for column in matrix_columns %}
+                                                    {% if show_row_totals and loop.index0 == row_total_ns.index %}
+                                                        <th rowspan="2" class="matrix-col-header">{{ _('Total') }}</th>
+                                                    {% endif %}
                                                     {% set _col_group = column.get('group', '') if column is mapping else '' %}
                                                     {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
                                                     {% set _col_display = _col_key %}
@@ -349,10 +368,10 @@
                                                             <th colspan="{{ _span.value }}" class="matrix-group-header">{{ _grp_display }}</th>
                                                         {% endif %}
                                                     {% endif %}
+                                                    {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
+                                                        <th rowspan="2" class="matrix-col-header">{{ _('Total') }}</th>
+                                                    {% endif %}
                                                 {% endfor %}
-                                                {% if show_row_totals %}
-                                                    <th rowspan="2" class="matrix-col-header">{{ _('Total') }}</th>
-                                                {% endif %}
                                             </tr>
                                             <tr>
                                                 {% for column in matrix_columns %}
@@ -373,6 +392,9 @@
                                         <tr>
                                             <th class="matrix-row-header"></th>
                                             {% for col in matrix_columns %}
+                                                {% if show_row_totals and loop.index0 == row_total_ns.index %}
+                                                    <th class="matrix-col-header">{{ _('Total') }}</th>
+                                                {% endif %}
                                                 {% if col is mapping %}
                                                     {% set col_name = col.get('name') if col.get('name') else col %}
                                                     {% set col_display = col_name %}
@@ -387,10 +409,10 @@
                                                     {% set col_type = 'number' %}
                                                 {% endif %}
                                                 <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(col, col_display, matrix_data) }}</th>
+                                                {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
+                                                    <th class="matrix-col-header">{{ _('Total') }}</th>
+                                                {% endif %}
                                             {% endfor %}
-                                            {% if show_row_totals %}
-                                                <th class="matrix-col-header">{{ _('Total') }}</th>
-                                            {% endif %}
                                         </tr>
                                         {% endif %}
                                     </thead>
@@ -399,11 +421,14 @@
                                             <tr>
                                                 <td><strong>{{ _('No rows added') }}</strong></td>
                                                 {% for col in matrix_columns %}
+                                                    {% if show_row_totals and loop.index0 == row_total_ns.index %}
+                                                        <td></td>
+                                                    {% endif %}
                                                     <td></td>
+                                                    {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
+                                                        <td></td>
+                                                    {% endif %}
                                                 {% endfor %}
-                                                {% if show_row_totals %}
-                                                    <td></td>
-                                                {% endif %}
                                             </tr>
                                         {% endif %}
                                         {% for item in sorted_matrix_rows %}
@@ -426,19 +451,26 @@
                                                 {% else %}
                                                     {% set display_cell = cell_value %}
                                                 {% endif %}
-                                                {% if col_type == 'tick' %}
-                                                    {% set add = 1 if display_cell in [1, '1', true, 'true', 'True'] else 0 %}
-                                                {% else %}
-                                                    {% set add = 0 %}
-                                                    {% if display_cell is not none and display_cell != '' and (display_cell|string|trim) != '' %}
-                                                        {% set add = (display_cell | to_number) | round(0, 'common') %}
+                                                {% if matrix_counts_toward_row_total(col) %}
+                                                    {% if col_type == 'calculated' %}
+                                                        {% set add = matrix_formula_number(matrix_columns, matrix_data, row, col_name) %}
+                                                    {% elif col_type == 'tick' %}
+                                                        {% set add = 1 if display_cell in [1, '1', true, 'true', 'True'] else 0 %}
+                                                    {% else %}
+                                                        {% set add = 0 %}
+                                                        {% if display_cell is not none and display_cell != '' and (display_cell|string|trim) != '' %}
+                                                            {% set add = (display_cell | to_number) | round(0, 'common') %}
+                                                        {% endif %}
                                                     {% endif %}
+                                                    {% set ns_rt.row_total = ns_rt.row_total + add %}
                                                 {% endif %}
-                                                {% set ns_rt.row_total = ns_rt.row_total + add %}
                                             {% endfor %}
                                             <tr>
                                                 <td class="matrix-row-label"><strong>{{ row_display }}</strong></td>
                                                 {% for col in matrix_columns %}
+                                                    {% if show_row_totals and loop.index0 == row_total_ns.index %}
+                                                        <td class="matrix-row-total-cell"><strong>{{ ns_rt.row_total | format_number }}</strong></td>
+                                                    {% endif %}
                                                     {% if col is mapping %}
                                                         {% set col_name = col.get('name') if col.get('name') else col %}
                                                         {% set col_type = col.get('type') if col.get('type') else 'number' %}
@@ -464,27 +496,32 @@
                                                         is_variable_readonly=is_variable_col and variable_readonly
                                                     ) %}
                                                     <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}">
-                                                        {% if col_type == 'tick' %}
+                                                        {% if col_type == 'calculated' %}
+                                                            {{ matrix_formula_display(matrix_columns, matrix_data, row, col) }}
+                                                        {% elif col_type == 'tick' %}
                                                             {{ matrix_tick_mark(display_cell in [1, '1', true, 'true', 'True']) }}
                                                         {% else %}
                                                             {{ (display_cell | format_number) if display_cell is not none and display_cell|string|trim != '' else '' }}
                                                         {% endif %}
                                                     </td>
+                                                    {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
+                                                        <td class="matrix-row-total-cell"><strong>{{ ns_rt.row_total | format_number }}</strong></td>
+                                                    {% endif %}
                                                 {% endfor %}
-                                                {% if show_row_totals %}
-                                                    <td class="matrix-row-total-cell"><strong>{{ ns_rt.row_total | format_number }}</strong></td>
-                                                {% endif %}
                                             </tr>
                                         {% endfor %}
                                         {% if show_column_totals %}
                                             <tr class="matrix-totals-row">
                                                 <td><strong>{{ _('Total') }}</strong></td>
                                                 {% for col_total in ns_ct.col_totals %}
+                                                    {% if show_row_totals and loop.index0 == row_total_ns.index %}
+                                                        <td class="matrix-grand-total-cell"><strong>{{ ns_ct.grand_total | format_number }}</strong></td>
+                                                    {% endif %}
                                                     <td class="matrix-column-total-cell"><strong>{{ col_total | format_number }}</strong></td>
+                                                    {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
+                                                        <td class="matrix-grand-total-cell"><strong>{{ ns_ct.grand_total | format_number }}</strong></td>
+                                                    {% endif %}
                                                 {% endfor %}
-                                                {% if show_row_totals %}
-                                                    <td class="matrix-grand-total-cell"><strong>{{ ns_ct.grand_total | format_number }}</strong></td>
-                                                {% endif %}
                                             </tr>
                                         {% endif %}
                                     </tbody>

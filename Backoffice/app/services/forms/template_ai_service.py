@@ -66,7 +66,7 @@ SYSTEM_LOOKUP_LISTS = {"country_map", "indicator_bank", "national_society", "eme
 
 # "number" is accepted as a legacy alias for "number_whole" for backward compatibility with
 # older AI prompts/specs; it is normalized to the explicit type below.
-MATRIX_COLUMN_TYPES = {"number", "number_whole", "number_decimal", "tick"}
+MATRIX_COLUMN_TYPES = {"number", "number_whole", "number_decimal", "tick", "calculated"}
 
 # Per-target-type condition types. Restricted to what the data-entry runtime
 # evaluator actually implements (contains/starts_with/ends_with are offered by
@@ -1500,6 +1500,23 @@ class FormTemplateAIService:
             group = _clean_str(c.get("group"), 200)
             if group:
                 col_entry["group"] = group
+            if col_type == "calculated":
+                from app.utils.matrix_calculation import normalize_calculation
+
+                calc = normalize_calculation(c.get("calculation"))
+                if not calc:
+                    raise FormTemplateAIError(
+                        f"Matrix '{label}': calculated column '{col_entry['name']}' needs a calculation."
+                    )
+                col_entry["calculation"] = calc
+                if c.get("calculation_readonly") is False:
+                    col_entry["calculation_readonly"] = False
+                if c.get("calculation_save_value") is True:
+                    col_entry["calculation_save_value"] = True
+                if c.get("include_in_row_total") is True:
+                    col_entry["include_in_row_total"] = True
+            elif c.get("include_in_row_total") is False:
+                col_entry["include_in_row_total"] = False
             columns.append(col_entry)
 
         config: Dict[str, Any] = {
@@ -1510,6 +1527,10 @@ class FormTemplateAIService:
             "show_column_totals": _as_bool(value.get("show_column_totals")),
             "include_calculated_totals_in_api": _as_bool(value.get("include_calculated_totals_in_api"), True),
         }
+        if config["show_row_totals"]:
+            raw_pos = value.get("row_total_position")
+            if isinstance(raw_pos, int) and not isinstance(raw_pos, bool) and 0 <= raw_pos < len(columns):
+                config["row_total_position"] = raw_pos
 
         if row_mode == "manual":
             rows_in = value.get("rows")

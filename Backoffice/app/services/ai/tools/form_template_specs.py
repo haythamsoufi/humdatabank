@@ -162,14 +162,22 @@ _ITEM_SCHEMA: Dict[str, Any] = {
             "type": "object",
             "description": (
                 "Required for item_type=matrix. {row_mode: 'manual'|'list_library', "
-                "columns: [{name (stable code/slug), type: 'number_whole'|'number_decimal'|'tick', "
+                "columns: [{name (stable code/slug), type: 'number_whole'|'number_decimal'|'tick'|'calculated', "
                 "decimals (int, only for number_decimal, default 2), "
-                "name_translations: {en: 'Column label', ...}, optional group}], "
+                "name_translations: {en: 'Column label', ...}, optional group, "
+                "include_in_row_total (default true for data columns, false for calculated), "
+                "calculation for type calculated: {operation: 'sum'|'average'|'min'|'max'|'count'|"
+                "'count_filled'|'difference'|'percentage'|'product'|'formula', sources: [column codes], "
+                "subtrahends (difference), denominators (percentage), decimals 0-6, blank_as_zero, "
+                "formula using column codes directly (income + grant, SUM(income, grant)); codes have no spaces; {code} still works, "
+                "calculation_readonly (default true), calculation_save_value (default false)}], "
                 "rows: [{text, name_translations?}] (manual mode), "
                 "lookup_list_id + list_display_column (list_library mode), "
                 "show_row_totals, show_column_totals, include_calculated_totals_in_api "
                 "(default true; set false to keep calculated totals visible on-screen "
-                "but excluded from API/export output for this matrix)}."
+                "but excluded from API/export output for this matrix), "
+                "row_total_position (optional int; index among data columns where the "
+                "Total column appears when show_row_totals is on; omit to keep it last)}."
             ),
         },
         "relevance": {**_RULE_SCHEMA, "description": "Skip logic: show this field only when the rule passes."},

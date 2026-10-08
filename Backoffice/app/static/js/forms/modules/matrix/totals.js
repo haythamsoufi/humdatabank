@@ -12,6 +12,13 @@ import {
     __getMatrixColumnNames,
     __parseMatrixCellKey,
 } from './formatting.js';
+import {
+    calculationIsReadonly,
+    columnCountsTowardRowTotal,
+    evaluateCalculatedForRows,
+    formatFormulaNumberForDisplay,
+    paintCalculatedCells,
+} from './calculation.js';
 
 export { ROW_TOTAL_COLUMN_NAME };
 
@@ -409,10 +416,23 @@ export function __storedRowTotalManualScalar(stored) {
 }
 
 
-export function __computedRowTotalFromData(data, rowId, columns) {
+export function __computedRowTotalFromData(data, rowId, columns, formulaPack) {
     let rowTotal = 0;
     (columns || []).forEach((column) => {
+        if (!columnCountsTowardRowTotal(column)) return;
         const columnName = typeof column === 'object' ? column.name : column;
+        if (column && typeof column === 'object' && column.type === 'calculated') {
+            if (!calculationIsReadonly(column)) {
+                const raw = data[`${rowId}_${columnName}`];
+                if (raw != null && raw !== '') {
+                    rowTotal += __cellValueToNumber(raw);
+                    return;
+                }
+            }
+            const value = formulaPack && formulaPack.values ? formulaPack.values[columnName] : null;
+            if (typeof value === 'number' && isFinite(value)) rowTotal += value;
+            return;
+        }
         const cellKey = `${rowId}_${columnName}`;
         rowTotal += __cellValueToNumber(data[cellKey]);
     });
@@ -420,8 +440,8 @@ export function __computedRowTotalFromData(data, rowId, columns) {
 }
 
 
-export function __effectiveRowTotalValue(data, rowId, columns, rowTotalManual) {
-    const computed = __computedRowTotalFromData(data, rowId, columns);
+export function __effectiveRowTotalValue(data, rowId, columns, rowTotalManual, formulaPack) {
+    const computed = __computedRowTotalFromData(data, rowId, columns, formulaPack);
     if (!rowTotalManual) return computed;
     const manualScalar = __storedRowTotalManualScalar(data[__rowTotalCellKey(rowId)]);
     return manualScalar != null ? manualScalar : computed;
@@ -491,6 +511,13 @@ calculateMatrixTotals(fieldId) {
     const showColumnTotals = config.show_column_totals !== false; // Default to true
     const rowTotalManual = __rowTotalManualEnabled(config);
     const rowTotalValidation = __rowTotalValidation(config);
+    const formulaByRow = evaluateCalculatedForRows(columns, data, Array.from(rowIdMap.values()));
+    paintCalculatedCells(container, columns, formulaByRow);
+    const adjustsRowTotal = columns.some((column) => (
+        column && typeof column === 'object' && (
+            column.type === 'calculated' || column.include_in_row_total === false
+        )
+    ));
 
     debugLog('matrix-handler', `Calculating totals for matrix ${fieldId}`, { rows, columns, showRowTotals, showColumnTotals, data });
     debugLog('matrix-handler', `Matrix data keys:`, Object.keys(data));
@@ -509,9 +536,23 @@ calculateMatrixTotals(fieldId) {
             }
 
             // Calculate row total by iterating through columns for this row
+            const formulaPack = formulaByRow.get(String(rowId));
             columns.forEach((column, colIndex) => {
+                if (!columnCountsTowardRowTotal(column)) return;
                 const columnName = typeof column === 'object' ? column.name : column;
                 const columnType = typeof column === 'object' ? column.type : 'number';
+                if (columnType === 'calculated') {
+                    if (!calculationIsReadonly(column)) {
+                        const edited = data[`${rowId}_${columnName}`];
+                        if (edited != null && edited !== '') {
+                            rowTotal += __cellValueToNumber(edited);
+                            return;
+                        }
+                    }
+                    const calculated = formulaPack && formulaPack.values ? formulaPack.values[columnName] : null;
+                    if (typeof calculated === 'number' && isFinite(calculated)) rowTotal += calculated;
+                    return;
+                }
                 // Always use ID-based cell key: rowId_columnName
                 const cellKey = `${rowId}_${columnName}`;
                 const rawValue = data[cellKey];
@@ -600,18 +641,32 @@ calculateMatrixTotals(fieldId) {
             const columnType = typeof column === 'object' ? column.type : 'number';
             let columnTotal = 0;
 
-            // Sum values from the pre-built map (use numeric coercion for variable column objects)
-            const values = columnValuesMap.get(columnName) || [];
-            values.forEach((rawValue) => {
-                const value = __cellValueToNumber(rawValue);
-                if (columnType === 'tick') {
-                    // For tick columns, count checked items (1) as 1, unchecked (0) as 0
-                    columnTotal += value;
-                } else {
-                    // For number columns, sum the values
-                    columnTotal += value;
-                }
-            });
+            if (columnType === 'calculated') {
+                formulaByRow.forEach((pack, rowId) => {
+                    if (!calculationIsReadonly(column)) {
+                        const edited = data[`${rowId}_${columnName}`];
+                        if (edited != null && edited !== '') {
+                            columnTotal += __cellValueToNumber(edited);
+                            return;
+                        }
+                    }
+                    const calculated = pack && pack.values ? pack.values[columnName] : null;
+                    if (typeof calculated === 'number' && isFinite(calculated)) columnTotal += calculated;
+                });
+            } else {
+                // Sum values from the pre-built map (use numeric coercion for variable column objects)
+                const values = columnValuesMap.get(columnName) || [];
+                values.forEach((rawValue) => {
+                    const value = __cellValueToNumber(rawValue);
+                    if (columnType === 'tick') {
+                        // For tick columns, count checked items (1) as 1, unchecked (0) as 0
+                        columnTotal += value;
+                    } else {
+                        // For number columns, sum the values
+                        columnTotal += value;
+                    }
+                });
+            }
 
             // Ensure we're searching within the correct matrix container
             const totalElement = container.querySelector(`.matrix-column-total[data-column="${columnName}"]`);
@@ -623,7 +678,12 @@ calculateMatrixTotals(fieldId) {
                 debugLog('matrix-handler', `Element current text:`, totalElement.textContent);
             }
             if (totalElement) {
-                const newValue = __formatInteger(columnTotal);
+                const calcDecimals = column && typeof column === 'object' && column.calculation
+                    ? column.calculation.decimals
+                    : null;
+                const newValue = columnType === 'calculated'
+                    ? formatFormulaNumberForDisplay(columnTotal, calcDecimals == null || calcDecimals === '' ? 0 : calcDecimals)
+                    : __formatInteger(columnTotal);
                 totalElement.textContent = newValue;
                 totalElement.style.display = 'block';
                 totalElement.style.visibility = 'visible';
@@ -641,12 +701,19 @@ calculateMatrixTotals(fieldId) {
     // Calculate grand total (only if both row and column totals are shown)
     if (showRowTotals && showColumnTotals) {
         let grandTotal = 0;
-        if (rowTotalManual) {
+        if (rowTotalManual || adjustsRowTotal) {
             // Manual row totals may differ from column sums — grand total = sum of effective row totals.
+            // Excluded and calculated columns use the same per-row total, so the grand total matches it.
             rows.forEach((row) => {
                 const rowId = rowIdMap.get(row);
                 if (!rowId) return;
-                grandTotal += __effectiveRowTotalValue(data, rowId, columns, true);
+                grandTotal += __effectiveRowTotalValue(
+                    data,
+                    rowId,
+                    columns,
+                    rowTotalManual,
+                    formulaByRow.get(String(rowId)),
+                );
             });
         } else {
             Object.entries(data).forEach(([key, value]) => {

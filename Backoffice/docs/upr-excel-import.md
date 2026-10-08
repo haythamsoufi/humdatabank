@@ -1,8 +1,9 @@
 # UPR Excel Import — Design, Implementation & Handover Guide
 
-> **Status:** Active / In progress  
-> **Last updated:** June 2026  
-> **Primary files:** `Backoffice/plugins/upr/scripts/import_upr_excel_data.py` · `Backoffice/plugins/upr/excel/excel_import_service.py` · `Backoffice/plugins/upr/excel/import_routes.py` · `Backoffice/plugins/upr/templates/admin/upr_excel_import.html`
+> **Status:** Active  
+> **Last updated:** October 2026  
+> **Primary files:** `Backoffice/plugins/upr/scripts/import_upr_excel_data.py` · `Backoffice/plugins/upr/excel/excel_import_service.py` · `Backoffice/plugins/upr/excel/import_routes.py` · `Backoffice/plugins/upr/templates/admin/_upr_excel_import_panel.html`  
+> **Reviews:** [UPR Excel import review](upr-excel-import-review.md) — whenever an import review is requested, review published **template variables** as well as form items and the script.
 
 > **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 33 + 23 are implemented, including Emergency 1/2/3 on T33 (repeat group + dynamic indicators).
 
@@ -85,7 +86,7 @@ upsert_form_data_rows()        ← shared helper in import_fdrs_form_data.py; ba
 ```
 
 The script can be run:
-- **CLI:** `python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --rounds P26 --templates 24,22 --dry-run`
+- **CLI** (from `Backoffice/`): `python plugins/upr/scripts/import_upr_excel_data.py --input "UPR Master.xlsx" --rounds P26 --templates 24,22 --dry-run`
 - **UI wizard:** in-page **Excel Import** tab on `/admin/upr-tools` (3-step wizard, async background job). `/admin/upr-excel-import/` and `/admin/upr-sync-imputation` redirect there (`#excel-import` for the former). Reachable from the **UPR Tools** tile on the Admin Dashboard.
 
 ---
@@ -173,7 +174,7 @@ The `Country Value` and `PNS Value` columns are processed **independently** — 
 
 **Zero / blank values:** Matrix imports skip falsy numeric values (`0`, empty) when writing cells — only non-zero amounts are stored. Scalar NS Data still allows zero KPIs.
 
-**Legacy Funding `Area` codes:** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO` — alongside the current `SP1`–`SP5` / `EFs` codes and emergency slots `EA1`–`EA3`. The import **does not write** `E1`/`E2`/`E3`/`EO` (legacy SP/EF naming and EO roll-up totals). **`EA1`–`EA3` are imported** to hybrid funding matrices **967 / 968 / 974** when those columns exist with selectable emergency-appeal headers: cell keys `{row}_{EA*}` plus `col_header|EA*` set to the resolved GO operation (`name_with_code`, same rules as Reach §6.3). When Funding rows lack `EA Code`, the importer falls back to the Reach row for the same country/round/slot, then to positional GO slot order.
+**Legacy Funding `Area` codes:** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO` — alongside the current `SP1`–`SP5` / `EFs` codes and emergency slots `EA1`–`EA3`. The import **does not write** `E1`/`E2`/`E3`/`EO` (legacy SP/EF naming and EO roll-up totals). **`EA1`–`EA3` are imported** only onto a hybrid funding matrix that actually has that column. On the October 2026 published form that is the current-year matrix **967** (selectable emergency-appeal headers). Year+1 **968** and year+2 **974** have SP1–SP5 and EFs only; EA rows for those offsets are skipped and one warning is recorded. Cell keys are `{row}_{EA*}` plus `col_header|EA*` set to the resolved GO operation (`name_with_code`, same rules as Reach §6.3). When Funding rows lack `EA Code`, the importer falls back to the Reach row for the same country/round/slot, then to positional GO slot order. If the published column list cannot be read, the EA cell is still written.
 
 #### Country Value → Template 24 (hybrid funding matrix)
 
@@ -394,7 +395,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 - `Entity = IFRC Secretariat` → row `IFRC Secretariat`
 - `Entity = PNS` (excluding NS name `Country`) → accumulated into row `PNSs`
 - `Entity = Other sources` → row `HNS other sources`
-- Single column `NS 2025 Total Funding`; cell key = `{row_name}_NS 2025 Total Funding`
+- Single column name `ns_fun` (label is the assignment-year funding heading); cell key = `{row_name}_ns_fun`
 
 **Template 23 — PNS-reported Funding (published untitled matrix, currently item 1433):**
 - T23 has a **single published version**. The funding matrix often has an **empty label**; resolve it by columns `Total Funding` + `Total Expenditure`. There is **no item 952**.
@@ -471,7 +472,7 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 |----------------|---------|-------------|-------------|
 | 1404 Reporting Expenditure | — | — | plain scalar (`Attribute = Total`) |
 | 1405 Reporting SP/EF breakdown | manual row label | `Funding (CHF)` / `Expenditure (CHF)` | `Resilience - Climate and environment_Funding (CHF)` |
-| 1403 Reporting Total Funding | row name string | `NS 2025 Total Funding` | `PNSs_NS 2025 Total Funding` |
+| 1403 Reporting Total Funding | row name string | `ns_fun` | `PNSs_ns_fun` |
 | 1407 Reporting Received Support | `NationalSociety.id` (PNS) | `{area} Supported` | `49_SP1 Supported` |
 | T23 PNS Funding (published matrix, e.g. 1433) | host `NationalSociety.id` (HNS) | column name | `49_Total Funding` |
 
@@ -616,7 +617,8 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 | 2 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
 | 3 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
 | 4 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
-| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, …)** | UPR Master still has ~360 Funding rows using pre-SP1/EFs codes (`E1`, `E2`, `E3`, `EO`). These remain **skipped** (`EO` is typically the EA1+EA2+EA3 roll-up). **`EA1`–`EA3` are covered** when the published template 24 funding matrix defines matching selectable-header columns (see §6.2). Re-import after form changes. |
+| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, …)** | UPR Master still has ~360 Funding rows using pre-SP1/EFs codes (`E1`, `E2`, `E3`, `EO`). These remain **skipped** (`EO` is typically the EA1+EA2+EA3 roll-up). **`EA1`–`EA3` are covered** on the current-year hybrid matrix when it defines those columns (see §6.2). Year+1/+2 matrices without EA columns skip those rows. |
+| 6 | **Template variables are outside the importer** | Auto-load, “manually added” rows, T23 Funding Requirement, and T33 Planned ticks come from published template variables. Review them with the script — see [upr-excel-import-review.md](upr-excel-import-review.md). As of October 2026, `planned_sp*` / `planned_efs` and `fdrs_val` still use a fixed year (`2026` and `2024`). |
 
 ---
 
@@ -624,28 +626,19 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 
 ```
 Backoffice/
+├── plugins/upr/
+│   ├── scripts/import_upr_excel_data.py          ← main import script
+│   ├── excel/excel_import_service.py             ← upload, analyze, preview, run
+│   ├── excel/import_routes.py                    ← /admin/upr-excel-import/*
+│   └── templates/admin/_upr_excel_import_panel.html
 ├── scripts/
-│   ├── imports/
-│   │   └── import_upr_excel_data.py       ← main import script (this feature)
-│   ├── codemods/
-│   │   └── migrate_t24_hybrid_funding_matrix.py  ← one-off: merge 970/973/975 → 967/968/974
-│   └── import_fdrs_form_data.py           ← shared upsert helper + FDRS importer
-├── app/
-│   ├── static/js/forms/modules/
-│   │   └── matrix-handler.js            ← variable matrix {original, modified, isModified} display
-│   ├── services/
-│   │   └── upr_excel_import_service.py  ← Flask service: upload, analyze, preview, run
-│   ├── routes/admin/
-│   │   ├── upr_excel_import.py          ← blueprint routes: /admin/templates/upr-excel-import/*
-│   │   └── __init__.py                  ← registers upr_excel_import blueprint
-│   └── templates/admin/templates/
-│   │   ├── upr_excel_import.html        ← 3-step wizard UI
-│   │   └── data_sync_imputation.html    ← FDRS or UPR family page; UPR header links to wizard
-├── plugins/emergency_operations/
-│   ├── routes.py                        ← get_emergency_operations_data()
-│   └── section_binding.py               ← GO API slot resolution (used by EA mapping)
+│   ├── imports/form_row_upsert.py                ← shared upsert helper
+│   └── codemods/migrate_t24_hybrid_funding_matrix.py  ← one-off: merge 970/973/975 → 967/968/974
+├── app/static/js/forms/modules/matrix-handler.js ← {original, modified, isModified} display
+├── plugins/emergency_operations/                 ← GO API slot resolution for EA mapping
 └── docs/
-    └── upr-excel-import.md              ← this document
+    ├── upr-excel-import.md                       ← this document
+    └── upr-excel-import-review.md                ← review checklist (includes variables)
 ```
 
 ---
@@ -654,19 +647,19 @@ Backoffice/
 
 ```bash
 # Analyze workbook only (shows all rounds, sections, row counts)
-python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --analyze-only
+python plugins/upr/scripts/import_upr_excel_data.py --input "UPR Master.xlsx" --analyze-only
 
 # ── Planning ──────────────────────────────────────────────────────────────────
 
 # Dry run for P26 (templates 24 + 22)
-python scripts/imports/import_upr_excel_data.py \
+python plugins/upr/scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds P26 \
   --templates 24,22 \
   --dry-run
 
 # Live import P26
-python scripts/imports/import_upr_excel_data.py \
+python plugins/upr/scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds P26 \
   --templates 24,22
@@ -674,14 +667,14 @@ python scripts/imports/import_upr_excel_data.py \
 # ── Reporting — Annual Report (AR) ────────────────────────────────────────────
 
 # Dry run for AR25 (country + PNS reporting)
-python scripts/imports/import_upr_excel_data.py \
+python plugins/upr/scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds AR25 \
   --templates 33,23 \
   --dry-run
 
 # Live import AR25
-python scripts/imports/import_upr_excel_data.py \
+python plugins/upr/scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds AR25 \
   --templates 33,23
@@ -690,14 +683,14 @@ python scripts/imports/import_upr_excel_data.py \
 # Later rounds (MYR26, AR26, P27) are not imported from UPR Master.
 
 # Dry run for historical MYR25
-python scripts/imports/import_upr_excel_data.py \
+python plugins/upr/scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds MYR25 \
   --templates 33 \
   --dry-run
 
 # Live import MYR25
-python scripts/imports/import_upr_excel_data.py \
+python plugins/upr/scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds MYR25 \
   --templates 33

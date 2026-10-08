@@ -14,12 +14,12 @@ Reporting templates:
 
 UPR Master never writes later rounds (P27+, AR26+, MYR26+).
 
-Usage:
-    python scripts/imports/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
-    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
-    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
-    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR25 --templates 33
-    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
+Usage (from Backoffice/):
+    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
+    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
+    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
+    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR25 --templates 33
+    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
 """
 
 from __future__ import annotations
@@ -2446,6 +2446,20 @@ def _clear_matrix_key_schema_cache() -> None:
     _MATRIX_KEY_SCHEMA_CACHE.clear()
 
 
+def _matrix_accepts_column(item_id: Optional[int], column_name: str) -> bool:
+    """True when ``column_name`` is on the live matrix, or when the schema cannot be read.
+
+    Unit tests and a missing DB row return "can't verify" (``None`` schema). Treat that as
+    allowed so a transient lookup failure does not drop funding. A schema that loads and
+    simply lacks the column is a real skip — later-year hybrid matrices have SP/EF columns
+    and no EA1–EA3 selectable headers.
+    """
+    schema = _matrix_key_schema(item_id)
+    if not schema or not schema.get("columns"):
+        return True
+    return _matrix_name_in(column_name, schema["columns"])
+
+
 def _matrix_key_warning(
     *,
     item_id: Optional[int],
@@ -3639,6 +3653,13 @@ def transform_to_import_rows(
                 if not funding_item_id:
                     continue
                 if area in PLANNING_EA_FUNDING_AREAS:
+                    if not _matrix_accepts_column(funding_item_id, area):
+                        _warn_once(
+                            ctx,
+                            f"Skipping {area} funding on matrix {funding_item_id}: "
+                            "the published form has no matching column",
+                        )
+                        continue
                     if not _ensure_funding_ea_col_header(
                         matrix_cells,
                         ctx,
@@ -3667,6 +3688,13 @@ def transform_to_import_rows(
                     ns_id = _resolve_ns_row_id(ctx, ns_name)
                     if ns_id is not None:
                         if area in PLANNING_EA_FUNDING_AREAS:
+                            if not _matrix_accepts_column(funding_item_id, area):
+                                _warn_once(
+                                    ctx,
+                                    f"Skipping {area} funding on matrix {funding_item_id}: "
+                                    "the published form has no matching column",
+                                )
+                                continue
                             if not _ensure_funding_ea_col_header(
                                 matrix_cells,
                                 ctx,

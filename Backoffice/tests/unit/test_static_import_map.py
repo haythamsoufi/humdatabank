@@ -31,16 +31,17 @@ def test_build_scoped_import_map_maps_relative_imports(tmp_path):
         cdn_base="https://cdn.example/static",
         origin="https://app.example/",
         versioned_url_for=url_for,
+        unversioned_url_for=lambda rel: f"https://cdn.example/static/{rel}",
     )
 
     scopes = result["scopes"]
     forms_scope = scopes["https://cdn.example/static/js/forms/"]
     modules_scope = scopes["https://cdn.example/static/js/forms/modules/"]
 
-    assert forms_scope["./main.js"] == "https://cdn.example/static/js/forms/main.js?v=test"
-    assert forms_scope["./modules/debug.js"] == "https://cdn.example/static/js/forms/modules/debug.js?v=test"
-    assert forms_scope["./modules/matrix-handler.js"] == "https://cdn.example/static/js/forms/modules/matrix-handler.js?v=test"
-    assert modules_scope["../modules/debug.js"] == "https://cdn.example/static/js/forms/modules/debug.js?v=test"
+    assert forms_scope["https://cdn.example/static/js/forms/main.js"] == "https://cdn.example/static/js/forms/main.js?v=test"
+    assert forms_scope["https://cdn.example/static/js/forms/modules/debug.js"] == "https://cdn.example/static/js/forms/modules/debug.js?v=test"
+    assert forms_scope["https://cdn.example/static/js/forms/modules/matrix-handler.js"] == "https://cdn.example/static/js/forms/modules/matrix-handler.js?v=test"
+    assert modules_scope["https://cdn.example/static/js/forms/modules/debug.js"] == "https://cdn.example/static/js/forms/modules/debug.js?v=test"
 
 
 def test_forms_module_import_map_uses_flask_static_without_cdn(app):
@@ -71,3 +72,20 @@ def test_forms_module_import_map_uses_cdn_when_configured(app):
     sample_url = next(iter(sample_scope.values()))
     assert sample_url.startswith("https://blob.example/static/")
     assert "?v=deploy1." in sample_url
+
+
+def test_import_map_keys_are_absolute_urls(app):
+    """Relative keys never match (resolved against the document URL) -> stale imports."""
+    clear_import_map_cache()
+    app.config["STATIC_CDN_URL"] = "https://blob.example/static"
+    app.config["ASSET_VERSION"] = "deploy1"
+
+    with app.test_request_context("/"):
+        result = forms_module_import_map(app, "http://localhost:5000/")
+
+    cdn_scope = result["scopes"]["https://blob.example/static/js/forms/modules/"]
+    key = "https://blob.example/static/js/forms/modules/matrix/formatting.js"
+    assert key in cdn_scope
+    assert cdn_scope[key].startswith(key + "?v=deploy1.")
+    for scope in result["scopes"].values():
+        assert not any(k.startswith(".") for k in scope)

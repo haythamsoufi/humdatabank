@@ -169,7 +169,7 @@ Special matrix/scalar items (T22 funding/staff, T23 funding, T24 reach/support/h
 
 The `Country Value` and `PNS Value` columns are processed **independently** — a single Excel row can contribute to both templates. The `Source` column is **not** used for routing (it only indicates which column `ValueNum` was derived from in the export).
 
-**Planning funding indicators:** Only rows with `Indicator = Funding Requirement` (`indicatorId = 2`) are imported. **`Confirmed Funding`** appears in UPR Master and on the **`PNS Data`** sheet as a separate indicator, but there is **no backoffice form field for it yet** — those rows are **skipped** (including duplicate `Area = Total` rows that carry confirmed amounts only).
+**Planning funding indicators:** Rows with `Indicator = Funding Requirement` (`indicatorId = 2`) are imported to templates 24 and 22 as before. **`Confirmed Funding`** (no indicator bank id; UPR Master stores it as `Area = Total`, `Entity = PNS`) is imported only to template 22, column **`confirmedfn`**, for the current planning year (year offset 0). The cell is the plain `PNS Value` (`{host Country.id}_confirmedfn`). Later-year confirmed amounts and funding-requirement totals are left unchanged.
 
 **Zero / blank values:** Matrix imports skip falsy numeric values (`0`, empty) when writing cells — only non-zero amounts are stored. Scalar NS Data still allows zero KPIs.
 

@@ -243,6 +243,46 @@ def test_one_unpublished_society_does_not_drop_the_year():
     assert figure["series"][0]["points"][0]["year"] == 2024
 
 
+def test_volunteer_age_figure_uses_the_current_groups():
+    panel = build_panel([
+        _cell(
+            published_disagg_data={
+                "mode": "sex_age",
+                "values": {
+                    "female_5_17": 20,
+                    "male_5_17": 20,
+                    "female_18_49": 30,
+                    "male_18_49": 30,
+                    "female_50_": 20,
+                    "male_50_": 20,
+                },
+            }
+        )
+    ])
+    assert panel[0]["age_bands"] == {"5_17": 40.0, "18_49": 60.0, "50": 40.0}
+    figure = _find(
+        build_chapters(
+            panel,
+            world_bank={
+                "fetched_at": "2026-10-05T00:00:00+00:00",
+                "population": [{"iso3": "KEN", "year": 2024, "population": 1_000_000}],
+                "income_groups": [{"iso3": "KEN", "income_group": "LM"}],
+            },
+            sources={
+                "median_age": {
+                    "fetched_at": "2026-10-05T00:00:00+00:00",
+                    "rows": [{"iso3": "KEN", "year": 2024, "median_age": 20}],
+                }
+            },
+        ),
+        "c3-volage-bar-pop-4inc",
+    )
+    assert figure["rows"][0]["income"] == "Lower-middle income"
+    assert figure["rows"][0]["societies"] == 1
+    assert figure["rows"][0]["volunteer_mean"] == 34
+    assert figure["note"] == ""
+
+
 def test_summary_includes_chapters():
     summary = build_everyone_counts([_cell()], template_id=21)
     assert summary["chapters"][0]["id"] == "volunteers"

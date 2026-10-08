@@ -505,6 +505,9 @@ def _excluding_big5(ctx: dict[str, Any]) -> dict[str, Any]:
         kind="lines",
         unit="count",
         series=series,
+        note=""
+        if series
+        else "No closed year has a published volunteer total yet. A year is left out when most Societies still have no published value, so this figure stays empty even when the open year has reported counts.",
     )
 
 
@@ -1533,7 +1536,7 @@ def _age_gap(ctx: dict[str, Any]) -> dict[str, Any]:
         "Figure 2.14",
         "c3-volage-bar-pop-4inc",
         "Volunteer age and the population’s median age, 2020–2024",
-        "Volunteer age is interpolated inside the FDRS age bands, averaged over 2020–2024 for each Society, then summarised within the income group. Population age uses the same countries and the World Bank age-band median."
+        "Volunteer age is interpolated inside the FDRS age groups 5–17, 18–49 and 50+, averaged over 2020–2024 for each Society, then summarised within the income group. Population age uses the same countries and the World Bank age-band median."
         + _stamp(ages),
         kind="table",
         columns=[
@@ -1544,7 +1547,9 @@ def _age_gap(ctx: dict[str, Any]) -> dict[str, Any]:
             {"key": "societies", "label": "Societies", "format": "number"},
         ],
         rows=table,
-        note="" if table else "Fewer than three age bands were reported, so a volunteer median age could not be interpolated.",
+        note=""
+        if table
+        else "Fewer than three of the age groups 5–17, 18–49 and 50+ were reported, so a volunteer median age could not be interpolated.",
     )
 
 

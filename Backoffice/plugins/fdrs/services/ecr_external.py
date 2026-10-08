@@ -1,19 +1,22 @@
 """Saved external series for Everyone Counts figures.
 
 Each snapshot is a JSON file under the FDRS snapshot directory. The page
-reads those files. Fetching happens in the snapshot build, not on the
-page request. Motiro survey rows and the named deaths register are not
-stored; the deaths snapshot keeps counts only.
+reads those files and can refresh one file at a time. Motiro survey rows
+and the named deaths register are not stored; the deaths snapshot keeps
+counts only.
 """
 
 from __future__ import annotations
 
+import logging
 import math
 from collections import defaultdict
 from statistics import median
 from typing import Any, Mapping
 
 from plugins.fdrs.services.external_snapshots import load_snapshot
+
+logger = logging.getLogger(__name__)
 
 GO_NAME = "go_appeals"
 WGI_NAME = "world_giving_index"
@@ -52,16 +55,12 @@ VIOLENCE_MECHANISMS = (
     "Aerial bombardment / airstrike",
     "Bladed weapon / assault",
 )
+# Current FDRS volunteer groups. 50+ is treated as 50–89, the same 40-year
+# span the old 50–59, 60–69, 70–79 and 80+ bands covered.
 VOLUNTEER_AGE_BANDS = (
-    ("6_12", 6, 7),
-    ("13_17", 13, 5),
-    ("18_29", 18, 12),
-    ("30_39", 30, 10),
-    ("40_49", 40, 10),
-    ("50_59", 50, 10),
-    ("60_69", 60, 10),
-    ("70_79", 70, 10),
-    ("80", 80, 10),
+    ("5_17", 5, 13),
+    ("18_49", 18, 32),
+    ("50", 50, 40),
 )
 ANNUAL_PAID_HOURS = 2000
 WAGE_BASES = (
@@ -83,6 +82,201 @@ def load_sources() -> dict[str, dict[str, Any] | None]:
         "wages": load_snapshot(WAGES_NAME),
         "hours": load_snapshot(HOURS_NAME),
     }
+
+
+_REFRESH_FAILED = "The snapshot could not be refreshed. The saved file is unchanged."
+
+
+def _refresh_world_bank() -> str | None:
+    from plugins.fdrs.services.world_bank_snapshot import ensure_world_bank_snapshot
+
+    saved = ensure_world_bank_snapshot(refresh=True)
+    return saved.get("refresh_error") or None
+
+
+def _refresh_go() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import build_go
+
+    build_go()
+
+
+def _refresh_wgi() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import _country_maps, build_wgi
+
+    by_name, _by_iso2 = _country_maps()
+    build_wgi(by_name)
+
+
+def _refresh_median_age() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import build_median_age
+
+    build_median_age()
+
+
+def _refresh_awsd() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import build_awsd
+
+    build_awsd()
+
+
+def _refresh_deaths() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import build_deaths
+
+    build_deaths()
+
+
+def _refresh_ocac() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import _country_maps, build_ocac
+
+    _by_name, by_iso2 = _country_maps()
+    build_ocac(by_iso2)
+
+
+def _refresh_wages() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import build_wages
+
+    build_wages()
+
+
+def _refresh_hours() -> None:
+    from plugins.fdrs.scripts.build_ecr_snapshots import build_hours
+
+    build_hours()
+
+
+# id, file key in load_sources / world_bank, list key, count noun, refresh
+_SOURCE_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "id": "world_bank",
+        "label": "World Bank population and income",
+        "detail": "Population, the current income group, and GNI per capita. Volunteer density and income splits use this file.",
+        "list_key": "population",
+        "count_label": "population rows",
+        "refresh": "_refresh_world_bank",
+    },
+    {
+        "id": "go",
+        "label": "IFRC GO operations",
+        "detail": "Emergency Appeals and DREF operations. The operations charts use this file.",
+        "list_key": "appeals",
+        "count_label": "operations",
+        "refresh": "_refresh_go",
+    },
+    {
+        "id": "wgi",
+        "label": "World Giving Index",
+        "detail": "Charities Aid Foundation country scores for helping, donating, and volunteering time.",
+        "list_key": "rows",
+        "count_label": "country-years",
+        "refresh": "_refresh_wgi",
+    },
+    {
+        "id": "median_age",
+        "label": "World Bank median age",
+        "detail": "Median age from population by age band. Refreshing this file downloads many World Bank tables and can take several minutes.",
+        "list_key": "rows",
+        "count_label": "country-years",
+        "refresh": "_refresh_median_age",
+    },
+    {
+        "id": "awsd",
+        "label": "Aid Worker Security Database",
+        "detail": "Yearly counts of aid workers killed. Names are not stored.",
+        "list_key": "rows",
+        "count_label": "year rows",
+        "refresh": "_refresh_awsd",
+    },
+    {
+        "id": "deaths",
+        "label": "Security-unit death counts",
+        "detail": "Counts from the IFRC security-unit register. Names are not stored.",
+        "list_key": "rows",
+        "count_label": "count rows",
+        "refresh": "_refresh_deaths",
+    },
+    {
+        "id": "ocac",
+        "label": "OCAC volunteer management",
+        "detail": "Baseline score for volunteer recruitment and volunteering strategy only.",
+        "list_key": "rows",
+        "count_label": "National Societies",
+        "refresh": "_refresh_ocac",
+    },
+    {
+        "id": "wages",
+        "label": "ILO wages",
+        "detail": "Monthly minimum and average wages, with gaps filled from GNI. Used for the value of volunteer time.",
+        "list_key": "rows",
+        "count_label": "countries",
+        "refresh": "_refresh_wages",
+    },
+    {
+        "id": "hours",
+        "label": "Americas volunteer hours",
+        "detail": "Monthly hours from the IFRC Americas study, used with wages for the Americas value tables.",
+        "list_key": "rows",
+        "count_label": "National Societies",
+        "refresh": "_refresh_hours",
+    },
+)
+_SOURCE_BY_ID = {spec["id"]: spec for spec in _SOURCE_SPECS}
+
+
+def _source_rows(payload: Mapping[str, Any] | None, list_key: str) -> list[Any] | None:
+    if not isinstance(payload, Mapping):
+        return None
+    rows = payload.get(list_key)
+    if not isinstance(rows, list):
+        return None
+    return rows
+
+
+def _describe_one(spec: Mapping[str, Any], payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    rows = _source_rows(payload, spec["list_key"])
+    fetched = str((payload or {}).get("fetched_at") or "")[:10]
+    available = rows is not None and (spec["id"] != "world_bank" or bool(rows))
+    return {
+        "id": spec["id"],
+        "label": spec["label"],
+        "detail": spec["detail"],
+        "available": available,
+        "fetched_at": fetched or None,
+        "count": len(rows) if available else 0,
+        "count_label": spec["count_label"],
+        "error": None,
+    }
+
+
+def describe_sources(
+    sources: Mapping[str, Any] | None,
+    world_bank: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Status of each saved file, for the Everyone Counts page."""
+    loaded: dict[str, Any] = {"world_bank": world_bank}
+    if sources:
+        loaded.update(sources)
+    return [_describe_one(spec, loaded.get(spec["id"])) for spec in _SOURCE_SPECS]
+
+
+def refresh_source(source_id: str) -> dict[str, Any]:
+    """Download one snapshot and return its new status. Unknown ids raise KeyError."""
+    spec = _SOURCE_BY_ID.get(source_id)
+    if spec is None:
+        raise KeyError(source_id)
+    error = None
+    try:
+        error = globals()[spec["refresh"]]()
+    except Exception:
+        logger.exception("Everyone Counts source %s was not refreshed", source_id)
+        error = _REFRESH_FAILED
+    if source_id == "world_bank":
+        payload = load_snapshot("world_bank")
+    else:
+        payload = load_sources().get(source_id)
+    row = _describe_one(spec, payload)
+    if error:
+        row["error"] = error
+    return row
 
 
 def hazard_group(disaster_type: str | None) -> str:

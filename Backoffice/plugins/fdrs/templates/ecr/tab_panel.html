@@ -4,6 +4,13 @@
     .ecr-list li + li { margin-top: 0.35rem; }
     .ecr-refresh { border: 1px solid #d1d5db; background: #fff; color: #374151; font-size: 0.75rem; font-weight: 600; line-height: 1; padding: 0.4rem 0.75rem; border-radius: 999px; cursor: pointer; }
     .ecr-refresh:hover { background: #f9fafb; color: #111827; }
+    .ecr-refresh:disabled { opacity: 0.6; cursor: progress; }
+    .ecr-source { display: grid; gap: 0.35rem 1rem; align-items: center; padding: 0.75rem 0; border-top: 1px solid #e5e7eb; }
+    .ecr-source-status { font-size: 0.75rem; color: #374151; }
+    .ecr-source-missing { color: #9a3412; }
+    @media (min-width: 768px) {
+        .ecr-source { grid-template-columns: minmax(0, 1fr) minmax(10rem, 16rem) auto; }
+    }
     .ecr-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
     .ecr-subtabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
     .ecr-subtab { border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.8125rem; font-weight: 600; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer; flex: none; }
@@ -23,7 +30,38 @@
     .ecr-scroll { max-height: 28rem; overflow: auto; }
     .ecr-rank { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) minmax(0, max-content); gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
     .ecr-rank > :last-child { justify-self: end; max-width: 9rem; text-align: right; overflow-wrap: anywhere; }
-    #ecr-chapter { display: grid; gap: 1rem; align-items: start; }
+    /* Pair chart cards once two 40rem columns fit. Tables and multi-chart
+       groups span the row. min(100%, 40rem) keeps a narrow window on one column. */
+    #ecr-chapter {
+        display: grid;
+        gap: 1rem;
+        align-items: start;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 40rem), 1fr));
+    }
+    .ecr-output { min-width: 0; }
+    .ecr-output--span { grid-column: 1 / -1; }
+    /* Several charts inside one figure (income-group lines, and the same
+       pattern elsewhere). Two columns once each can stay at the 36rem chart floor. */
+    .ecr-section-frame { container-type: inline-size; container-name: ecr-sections; }
+    .ecr-section-grid { display: grid; gap: 1.5rem 1.25rem; align-items: start; }
+    .ecr-section { min-width: 0; }
+    .ecr-section-title { margin: 0; }
+    .ecr-section--span { grid-column: 1 / -1; }
+    /* Title, plot, and legend share rows so those bands line up across panels. */
+    .ecr-section-grid--align { row-gap: 0.35rem; align-items: stretch; }
+    .ecr-section-grid--align > .ecr-section {
+        display: grid;
+        grid-template-rows: subgrid;
+        grid-row: span 3;
+    }
+    .ecr-section-grid--align .ecr-legend { margin-top: 0; padding-bottom: 1rem; }
+    @container ecr-sections (min-width: 74rem) {
+        .ecr-section-grid {
+            grid-template-columns: repeat(2, minmax(36rem, 40rem));
+            justify-content: start;
+        }
+        .ecr-section-grid .ecr-chart { max-width: none; margin-inline: 0; }
+    }
     @media (min-width: 640px) {
         .ecr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -36,14 +74,76 @@
     @media (min-width: 1536px) {
         .ecr-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
-    @media (min-width: 1800px) {
-        #ecr-chapter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .ecr-output--span { grid-column: 1 / -1; }
-    }
     .ecr-rank-name { font-size: 0.8125rem; color: #111827; }
     .ecr-rank-detail { font-size: 0.75rem; color: #6b7280; }
     .ecr-rank-track { background: #f3f4f6; height: 0.45rem; }
     .ecr-rank-bar { height: 0.45rem; background: #1e3a5f; }
+    .ecr-output { scroll-margin-top: 0.75rem; }
+    .ecr-body-frame { container-type: inline-size; container-name: ecr-body; }
+    .ecr-body { display: grid; gap: 1rem; align-items: start; }
+    .ecr-toc {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        padding: 0.75rem 0.5rem 0.85rem;
+        max-height: 14rem;
+        overflow: auto;
+    }
+    .ecr-toc-label {
+        margin: 0 0.5rem 0.45rem;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
+    }
+    .ecr-toc-group + .ecr-toc-group { margin-top: 0.65rem; }
+    .ecr-toc-chapter, .ecr-toc-link {
+        display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        border-radius: 0.35rem;
+    }
+    .ecr-toc-chapter {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    .ecr-toc-chapter.is-active { color: #9f1239; }
+    .ecr-toc-list { list-style: none; margin: 0; padding: 0; }
+    .ecr-toc-link {
+        display: grid;
+        grid-template-columns: 2.5rem minmax(0, 1fr);
+        gap: 0.35rem;
+        align-items: baseline;
+        padding: 0.28rem 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1.3;
+        color: #374151;
+    }
+    .ecr-toc-link:hover { background: #f9fafb; color: #111827; }
+    .ecr-toc-link[aria-current="true"] {
+        background: #fef2f2;
+        color: #111827;
+        box-shadow: inset 2px 0 0 #e11b22;
+    }
+    .ecr-toc-num { font-variant-numeric: tabular-nums; color: #6b7280; font-weight: 600; }
+    .ecr-toc-link[aria-current="true"] .ecr-toc-num { color: #9f1239; }
+    .ecr-toc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ecr-toc-link--missing { color: #9ca3af; }
+    @container ecr-body (min-width: 94rem) {
+        .ecr-body { grid-template-columns: 15rem minmax(0, 1fr); }
+        .ecr-toc {
+            position: sticky;
+            top: 0.5rem;
+            max-height: calc(100vh - 5.5rem);
+            padding: 0.85rem 0.45rem 1rem;
+        }
+    }
 </style>
 
 <div id="panel-everyone-counts" class="explore-panel{% if explore_first_tab != 'everyone-counts' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-everyone-counts">
@@ -55,9 +155,7 @@
                     {{ _('Every figure and table from Everyone Counts 2026, calculated from current FDRS assignments. Closed years use the published value. A figure that needs a source outside the databank is still listed, with that source named.') }}
                 </p>
             </div>
-            <button type="button" id="ecr-refresh-world-bank" class="ecr-refresh">{{ _('Refresh World Bank snapshot') }}</button>
         </div>
-        <p class="text-xs text-gray-500 mt-3" id="ecr-external"></p>
     </div>
 
     <div id="ecr-loading" class="bg-white p-6 shadow-md border border-gray-200 mb-6 hidden">
@@ -75,13 +173,20 @@
         <p id="ecr-warning" class="text-sm ecr-warning mb-4 hidden"></p>
         <div id="ecr-cards" class="ecr-cards mb-6"></div>
 
-        <div class="ecr-subtabs mb-3" id="ecr-subtabs" role="tablist" aria-label="{{ _('Everyone Counts chapters') }}"></div>
-        <p class="text-xs text-gray-500 mb-4" id="ecr-chapter-meta"></p>
-        <div id="ecr-chapter"></div>
+        <div class="ecr-body-frame">
+            <div class="ecr-body">
+                <nav id="ecr-toc" class="ecr-toc" aria-label="{{ _('Contents') }}"></nav>
+                <div class="ecr-reading">
+                    <div class="ecr-subtabs mb-3" id="ecr-subtabs" role="tablist" aria-label="{{ _('Everyone Counts chapters') }}"></div>
+                    <p class="text-xs text-gray-500 mb-4" id="ecr-chapter-meta"></p>
+                    <div id="ecr-chapter"></div>
 
-        <div class="bg-white p-4 sm:p-6 shadow border border-gray-200 mt-6">
-            <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('How these figures are calculated') }}</h4>
-            <ul class="text-sm ecr-note ecr-list list-disc" id="ecr-notes"></ul>
+                    <div class="bg-white p-4 sm:p-6 shadow border border-gray-200 mt-6">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('How these figures are calculated') }}</h4>
+                        <ul class="text-sm ecr-note ecr-list list-disc" id="ecr-notes"></ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -91,6 +196,10 @@
     var loaded = false;
     var loading = false;
     var chapterId = null;
+    var currentOutputId = null;
+    var latestData = null;
+    var figureObserver = null;
+    var suppressSpy = false;
     var labels = {
         loadFailed: {{ _('Could not calculate Everyone Counts indicators.')|tojson }},
         noData: {{ _('No FDRS indicator values were found for this analysis.')|tojson }},
@@ -105,7 +214,16 @@
         noPoints: {{ _('No data for this figure.')|tojson }},
         sourceNeeded: {{ _('Source still needed')|tojson }},
         notCalculated: {{ _('Not re-estimated')|tojson }},
-        notStored: {{ _('Not stored')|tojson }}
+        notStored: {{ _('Not stored')|tojson }},
+        contents: {{ _('Contents')|tojson }},
+        sourcesTitle: {{ _('External sources')|tojson }},
+        sourcesLead: {{ _('These files are saved on the server. Figures keep using the saved copy until you refresh that file.')|tojson }},
+        sourcesFdrs: {{ _('Volunteer figures, including “Volunteers without the five largest Societies”, come from FDRS assignments in the databank, not from these files. That comparison only uses a year when most Societies have a published value.')|tojson }},
+        savedOn: {{ _('Saved')|tojson }},
+        notSaved: {{ _('Not saved')|tojson }},
+        refresh: {{ _('Refresh')|tojson }},
+        refreshing: {{ _('Refreshing…')|tojson }},
+        refreshFailed: {{ _('The snapshot could not be refreshed. The saved file is unchanged.')|tojson }}
     };
 
     function byId(id) { return document.getElementById(id); }
@@ -203,25 +321,98 @@
         ));
     }
 
-    function renderExternal(data) {
-        var host = byId('ecr-external');
-        var ext = (data.external && data.external.world_bank) || {};
-        if (!ext.available) {
-            host.textContent = ext.refresh_error || {{ _('No World Bank snapshot is saved yet. Refresh to download population and income groups.')|tojson }};
+    function sourceList() {
+        return (latestData && latestData.external && latestData.external.sources) || [];
+    }
+
+    function renderExternal(host) {
+        var panel = el('article', 'bg-white p-4 sm:p-6 shadow border border-gray-200 ecr-output ecr-output--span');
+        panel.id = 'ecr-sources';
+        panel.appendChild(el('h4', 'text-sm font-medium text-gray-900', labels.sourcesTitle));
+        panel.appendChild(el('p', 'text-xs text-gray-500 mt-1', labels.sourcesLead));
+        panel.appendChild(el('p', 'text-xs text-gray-600 mt-2 mb-2', labels.sourcesFdrs));
+        sourceList().forEach(function (source) {
+            panel.appendChild(renderSource(source));
+        });
+        host.appendChild(panel);
+    }
+
+    function renderSource(source) {
+        var row = el('div', 'ecr-source');
+        row.setAttribute('data-source-id', source.id || '');
+        var copy = el('div', '');
+        copy.appendChild(el('p', 'text-sm font-medium text-gray-900', source.label || ''));
+        if (source.detail) copy.appendChild(el('p', 'text-xs text-gray-500 mt-1', source.detail));
+        if (source.error) copy.appendChild(el('p', 'text-xs ecr-warning mt-1', source.error));
+        row.appendChild(copy);
+        var status = el('p', 'ecr-source-status' + (source.available ? '' : ' ecr-source-missing'));
+        if (source.available) {
+            var when = source.fetched_at ? labels.savedOn + ' ' + source.fetched_at : labels.savedOn;
+            var count = source.count != null ? Number(source.count).toLocaleString('en-GB') : '';
+            status.textContent = when + (count ? ' · ' + count + ' ' + (source.count_label || '') : '');
+        } else {
+            status.textContent = labels.notSaved;
+        }
+        row.appendChild(status);
+        var button = el('button', 'ecr-refresh', labels.refresh);
+        button.type = 'button';
+        button.addEventListener('click', function () { refreshSource(source.id, button); });
+        row.appendChild(button);
+        return row;
+    }
+
+    function refreshSource(sourceId, button) {
+        if (!sourceId || loading) return;
+        var buttons = byId('ecr-sources').querySelectorAll('button');
+        buttons.forEach(function (item) { item.disabled = true; });
+        button.textContent = labels.refreshing;
+        fetch('/admin/data-exploration/everyone-counts/sources/' + encodeURIComponent(sourceId), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (response) {
+            return response.json().then(function (payload) {
+                if (!response.ok) throw new Error((payload && (payload.error || payload.message)) || labels.refreshFailed);
+                return payload;
+            });
+        }).then(function (payload) {
+            var source = payload.source || {};
+            if (source.error) {
+                sourceRowError(sourceId, source.error);
+                buttons.forEach(function (item) {
+                    item.disabled = false;
+                    item.textContent = labels.refresh;
+                });
+                return;
+            }
+            loaded = false;
+            loadAnalysis(false, true);
+        }).catch(function () {
+            sourceRowError(sourceId, labels.refreshFailed);
+            buttons.forEach(function (item) {
+                item.disabled = false;
+                item.textContent = labels.refresh;
+            });
+        });
+    }
+
+    function sourceRowError(sourceId, message) {
+        var row = byId('ecr-sources').querySelector('[data-source-id="' + sourceId + '"]');
+        if (!row) return;
+        var existing = row.querySelector('.ecr-warning');
+        if (existing) {
+            existing.textContent = message;
             return;
         }
-        var when = ext.fetched_at ? String(ext.fetched_at).slice(0, 10) : '';
-        var sentence = {{ _('World Bank snapshot')|tojson }} + (when ? ' ' + when : '') + '. ' +
-            {{ _('Income group is the current classification, held fixed across years.')|tojson }};
-        if (ext.refresh_error) sentence += ' ' + ext.refresh_error;
-        host.textContent = sentence;
+        var copy = row.firstChild;
+        if (copy) copy.appendChild(el('p', 'text-xs ecr-warning mt-1', message));
     }
 
     function renderSubtabs(chapters) {
         var bar = byId('ecr-subtabs');
         bar.replaceChildren();
         if (!chapters.length) return;
-        if (!chapterId || !chapters.some(function (chapter) { return chapter.id === chapterId; })) {
+        if (!chapterId || (chapterId !== 'sources' && !chapters.some(function (chapter) { return chapter.id === chapterId; }))) {
             chapterId = chapters[0].id;
         }
         chapters.forEach(function (chapter) {
@@ -230,12 +421,140 @@
             button.setAttribute('role', 'tab');
             button.setAttribute('aria-selected', chapter.id === chapterId ? 'true' : 'false');
             button.addEventListener('click', function () {
-                chapterId = chapter.id;
-                renderSubtabs(chapters);
-                renderChapter(chapters);
+                var first = (chapter.outputs || [])[0];
+                openOutput(chapters, chapter.id, first && first.id);
             });
             bar.appendChild(button);
         });
+        var sourcesTab = el('button', 'ecr-subtab', labels.sourcesTitle);
+        sourcesTab.type = 'button';
+        sourcesTab.setAttribute('role', 'tab');
+        sourcesTab.setAttribute('aria-selected', chapterId === 'sources' ? 'true' : 'false');
+        sourcesTab.addEventListener('click', function () { openSources(chapters); });
+        bar.appendChild(sourcesTab);
+    }
+
+    function openSources(chapters) {
+        chapterId = 'sources';
+        currentOutputId = null;
+        renderSubtabs(chapters);
+        renderChapter(chapters);
+    }
+
+    function shortNumber(number) {
+        return String(number || '').replace(/^(Figure|Table)\s+/i, '');
+    }
+
+    function renderToc(chapters) {
+        var nav = byId('ecr-toc');
+        nav.replaceChildren();
+        nav.appendChild(el('p', 'ecr-toc-label', labels.contents));
+        chapters.forEach(function (chapter) {
+            var group = el('div', 'ecr-toc-group');
+            var head = el('button', 'ecr-toc-chapter', chapter.label);
+            head.type = 'button';
+            head.setAttribute('data-chapter-id', chapter.id);
+            head.addEventListener('click', function () {
+                var first = (chapter.outputs || [])[0];
+                openOutput(chapters, chapter.id, first && first.id);
+            });
+            group.appendChild(head);
+            var list = el('ul', 'ecr-toc-list');
+            (chapter.outputs || []).forEach(function (output) {
+                var item = el('li', '');
+                var button = el('button', 'ecr-toc-link' + (output.available ? '' : ' ecr-toc-link--missing'));
+                button.type = 'button';
+                button.setAttribute('data-output-id', output.id || '');
+                var full = ((output.number ? output.number + '. ' : '') + (output.title || '')).trim();
+                if (full) button.title = full;
+                if (output.number) button.appendChild(el('span', 'ecr-toc-num', shortNumber(output.number)));
+                else button.appendChild(el('span', 'ecr-toc-num', ''));
+                button.appendChild(el('span', 'ecr-toc-name', output.title || output.number || chapter.label));
+                button.addEventListener('click', function () {
+                    openOutput(chapters, chapter.id, output.id);
+                });
+                item.appendChild(button);
+                list.appendChild(item);
+            });
+            group.appendChild(list);
+            nav.appendChild(group);
+        });
+        var sourcesHead = el('button', 'ecr-toc-chapter', labels.sourcesTitle);
+        sourcesHead.type = 'button';
+        sourcesHead.setAttribute('data-chapter-id', 'sources');
+        sourcesHead.addEventListener('click', function () { openSources(chapters); });
+        nav.appendChild(sourcesHead);
+    }
+
+    function setCurrent(outputId) {
+        currentOutputId = outputId || null;
+        var nav = byId('ecr-toc');
+        if (!nav) return;
+        nav.querySelectorAll('.ecr-toc-link').forEach(function (button) {
+            if (button.getAttribute('data-output-id') === currentOutputId) button.setAttribute('aria-current', 'true');
+            else button.removeAttribute('aria-current');
+        });
+        nav.querySelectorAll('.ecr-toc-chapter').forEach(function (button) {
+            if (button.getAttribute('data-chapter-id') === 'sources') {
+                button.classList.toggle('is-active', chapterId === 'sources');
+                return;
+            }
+            var group = button.parentElement;
+            button.classList.toggle('is-active', chapterId !== 'sources' && !!(group && group.querySelector('[aria-current="true"]')));
+        });
+        var current = nav.querySelector('[aria-current="true"]');
+        if (!current) return;
+        var navBox = nav.getBoundingClientRect();
+        var box = current.getBoundingClientRect();
+        if (box.top < navBox.top) nav.scrollTop -= navBox.top - box.top;
+        else if (box.bottom > navBox.bottom) nav.scrollTop += box.bottom - navBox.bottom;
+    }
+
+    function scrollToOutput(outputId) {
+        var node = document.getElementById('ecr-fig-' + outputId);
+        if (!node) return;
+        suppressSpy = true;
+        var scroller = document.querySelector('main.admin-scroll-main');
+        if (scroller) {
+            var top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 12;
+            scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+        } else {
+            node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        window.setTimeout(function () { suppressSpy = false; }, 800);
+    }
+
+    function openOutput(chapters, nextChapterId, outputId) {
+        var changed = chapterId !== nextChapterId;
+        chapterId = nextChapterId;
+        renderSubtabs(chapters);
+        if (changed) renderChapter(chapters);
+        if (outputId) {
+            setCurrent(outputId);
+            scrollToOutput(outputId);
+        }
+    }
+
+    function watchFigures() {
+        if (figureObserver) figureObserver.disconnect();
+        if (!window.IntersectionObserver) return;
+        var host = byId('ecr-chapter');
+        var articles = host ? host.querySelectorAll('article[data-output-id]') : [];
+        if (!articles.length) return;
+        var scroller = document.querySelector('main.admin-scroll-main');
+        var seen = new Map();
+        figureObserver = new IntersectionObserver(function (entries) {
+            if (suppressSpy) return;
+            entries.forEach(function (entry) { seen.set(entry.target, entry); });
+            var best = null;
+            seen.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                if (!best || entry.boundingClientRect.top < best.boundingClientRect.top) best = entry;
+            });
+            if (!best) return;
+            setCurrent(best.target.getAttribute('data-output-id'));
+        }, { root: scroller || null, rootMargin: '0px 0px -70% 0px', threshold: [0, 0.15] });
+        articles.forEach(function (article) { figureObserver.observe(article); });
     }
 
     function renderChapter(chapters) {
@@ -246,6 +565,14 @@
         chapters.forEach(function (item) {
             if (item.id === chapterId) chapter = item;
         });
+        if (chapterId === 'sources') {
+            var saved = sourceList().filter(function (source) { return source.available; }).length;
+            meta.textContent = saved + ' of ' + sourceList().length + ' ' + labels.savedOn.toLowerCase();
+            renderExternal(host);
+            if (figureObserver) figureObserver.disconnect();
+            setCurrent(null);
+            return;
+        }
         if (!chapter) {
             meta.textContent = '';
             return;
@@ -256,11 +583,21 @@
         outputs.forEach(function (output) {
             host.appendChild(renderOutput(output));
         });
+        var ids = outputs.map(function (output) { return output.id; });
+        if (!currentOutputId || ids.indexOf(currentOutputId) === -1) {
+            currentOutputId = ids.length ? ids[0] : null;
+        }
+        setCurrent(currentOutputId);
+        watchFigures();
     }
 
     function renderOutput(output) {
         var wide = output.kind === 'table' || output.kind === 'ranked' || output.kind === 'sections' || output.kind === 'missing';
         var article = el('article', 'bg-white p-4 sm:p-6 shadow border border-gray-200 ecr-output' + (wide ? ' ecr-output--span' : ''));
+        if (output.id) {
+            article.id = 'ecr-fig-' + output.id;
+            article.setAttribute('data-output-id', output.id);
+        }
         if (output.number) article.appendChild(el('p', 'text-xs font-semibold text-gray-500', output.number));
         article.appendChild(el('h4', 'text-sm font-medium text-gray-900 mt-1', output.title || ''));
         if (output.caption) article.appendChild(el('p', 'text-xs text-gray-500 mt-1 mb-3', output.caption));
@@ -271,7 +608,83 @@
         return article;
     }
 
-    function renderPiece(host, piece) {
+    function isChartKind(kind) {
+        return kind === 'lines' || kind === 'bars' || kind === 'stacked';
+    }
+
+    function renderSections(host, sections) {
+        var chartCount = sections.filter(function (section) { return isChartKind(section.kind); }).length;
+        if (chartCount < 2) {
+            sections.forEach(function (section, index) {
+                var block = el('div', index ? 'mt-4' : '');
+                renderPiece(block, section);
+                if (section.note) block.appendChild(el('p', 'text-xs text-gray-500 mt-2', section.note));
+                host.appendChild(block);
+            });
+            return;
+        }
+        var frame = el('div', 'ecr-section-frame');
+        var grid = el('div', 'ecr-section-grid');
+        var align = sections.every(function (section) { return isChartKind(section.kind); });
+        if (align) grid.classList.add('ecr-section-grid--align');
+        var lineScale = sharedLineScale(sections);
+        sections.forEach(function (section) {
+            var chart = isChartKind(section.kind);
+            var block = el('div', chart ? 'ecr-section' : 'ecr-section ecr-section--span');
+            if (chart && section.note) block.appendChild(el('p', 'ecr-section-title text-sm font-medium text-gray-900', section.note));
+            renderPiece(block, section, lineScale);
+            if (!chart && section.note) block.appendChild(el('p', 'text-xs text-gray-500 mt-2', section.note));
+            grid.appendChild(block);
+        });
+        frame.appendChild(grid);
+        host.appendChild(frame);
+    }
+
+    function axisTicks(maxY) {
+        var max = maxY > 0 ? maxY : 1;
+        var rough = max / 4;
+        var pow = Math.pow(10, Math.floor(Math.log10(rough)));
+        var steps = [1, 2, 2.5, 5, 10];
+        var step = 10 * pow;
+        for (var i = 0; i < steps.length; i++) {
+            if (rough <= steps[i] * pow + pow * 1e-9) {
+                step = steps[i] * pow;
+                break;
+            }
+        }
+        var cap = step * Math.ceil(max / step - 1e-9);
+        if (!(cap > 0)) cap = step;
+        var values = [];
+        for (var value = 0; value <= cap + step * 0.001; value += step) {
+            values.push(Math.round(value * 1e6) / 1e6);
+        }
+        return { max: values[values.length - 1], values: values };
+    }
+
+    function sharedLineScale(sections) {
+        var lineSections = sections.filter(function (section) { return section.kind === 'lines'; });
+        if (lineSections.length < 2) return null;
+        var minX = Infinity;
+        var maxX = -Infinity;
+        var maxY = 0;
+        var found = false;
+        lineSections.forEach(function (section) {
+            (section.series || []).forEach(function (series) {
+                (series.points || []).forEach(function (point) {
+                    if (typeof point.year !== 'number' || typeof point.value !== 'number' || !isFinite(point.value)) return;
+                    found = true;
+                    if (point.year < minX) minX = point.year;
+                    if (point.year > maxX) maxX = point.year;
+                    if (point.value > maxY) maxY = point.value;
+                });
+            });
+        });
+        if (!found) return null;
+        var ticks = axisTicks(maxY);
+        return { minX: minX, maxX: maxX, maxY: ticks.max, ticks: ticks.values };
+    }
+
+    function renderPiece(host, piece, scale) {
         if (piece.kind === 'missing') {
             var box = el('div', 'ecr-missing');
             var heading = labels.sourceNeeded + ': ' + (piece.source || '');
@@ -285,15 +698,10 @@
             return;
         }
         if (piece.kind === 'sections') {
-            (piece.sections || []).forEach(function (section, index) {
-                var block = el('div', index ? 'mt-4' : '');
-                renderPiece(block, section);
-                if (section.note) block.appendChild(el('p', 'text-xs text-gray-500 mt-2', section.note));
-                host.appendChild(block);
-            });
+            renderSections(host, piece.sections || []);
             return;
         }
-        if (piece.kind === 'lines') renderLines(host, piece);
+        if (piece.kind === 'lines') renderLines(host, piece, scale);
         else if (piece.kind === 'bars') renderBars(host, piece);
         else if (piece.kind === 'stacked') renderStacked(host, piece);
         else if (piece.kind === 'ranked') renderRanked(host, piece);
@@ -311,38 +719,72 @@
         return svg;
     }
 
-    function renderLines(host, piece) {
+    function gridLine(x1, y1, x2, y2, stroke) {
+        var line = svgEl('line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('stroke', stroke);
+        line.setAttribute('stroke-width', '1');
+        line.setAttribute('shape-rendering', 'crispEdges');
+        return line;
+    }
+
+    function axisText(x, y, anchor, content) {
+        var text = svgEl('text');
+        text.setAttribute('x', x);
+        text.setAttribute('y', y);
+        text.setAttribute('text-anchor', anchor);
+        text.setAttribute('font-size', '11');
+        text.setAttribute('fill', '#6b7280');
+        text.textContent = content;
+        return text;
+    }
+
+    function renderLines(host, piece, scale) {
         var series = (piece.series || []).filter(function (item) { return (item.points || []).length; });
         if (!series.length) {
-            host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
+            if (!piece.note) host.appendChild(el('p', 'text-sm text-gray-500', labels.noPoints));
             return;
         }
-        var width = 640, height = 280, left = 56, right = 16, top = 16, bottom = 32;
-        var svg = chartFrame(host, width, height);
-        var plotW = width - left - right;
-        var plotH = height - top - bottom;
         var years = [];
-        var maxY = 1;
+        var localMax = 1;
         series.forEach(function (item) {
             item.points.forEach(function (point) {
                 years.push(point.year);
-                if (point.value > maxY) maxY = point.value;
+                if (point.value > localMax) localMax = point.value;
             });
         });
-        var minX = Math.min.apply(null, years);
-        var maxX = Math.max.apply(null, years);
+        var ticks = scale && scale.ticks ? scale.ticks : axisTicks(localMax).values;
+        var maxY = scale && scale.maxY ? scale.maxY : ticks[ticks.length - 1];
+        var minX = scale && typeof scale.minX === 'number' ? scale.minX : Math.min.apply(null, years);
+        var maxX = scale && typeof scale.maxX === 'number' ? scale.maxX : Math.max.apply(null, years);
+        var tickLabels = ticks.map(function (value) { return formatByUnit(value, piece.unit); });
+        var longest = tickLabels.reduce(function (best, label) { return Math.max(best, label.length); }, 1);
+        var width = 640, height = 280, right = 18, top = 14, bottom = 28;
+        var left = Math.max(48, Math.ceil(longest * 6.6) + 16);
+        var svg = chartFrame(host, width, height);
+        var plotW = width - left - right;
+        var plotH = height - top - bottom;
         function xOf(year) {
             if (maxX === minX) return left + plotW / 2;
             return left + ((year - minX) / (maxX - minX)) * plotW;
         }
         function yOf(value) { return top + (1 - value / maxY) * plotH; }
-        var axis = svgEl('line');
-        axis.setAttribute('x1', left);
-        axis.setAttribute('x2', left + plotW);
-        axis.setAttribute('y1', top + plotH);
-        axis.setAttribute('y2', top + plotH);
-        axis.setAttribute('stroke', '#e5e7eb');
-        svg.appendChild(axis);
+        var yearTicks = [];
+        for (var year = minX; year <= maxX; year++) {
+            if ((year - minX) % 2 !== 0 && year !== maxX) continue;
+            yearTicks.push(year);
+        }
+        yearTicks.forEach(function (year) {
+            svg.appendChild(gridLine(xOf(year), top, xOf(year), top + plotH, '#f3f4f6'));
+        });
+        ticks.forEach(function (value, index) {
+            var y = yOf(value);
+            svg.appendChild(gridLine(left, y, left + plotW, y, value === 0 ? '#d1d5db' : '#f3f4f6'));
+            svg.appendChild(axisText(left - 6, y + 4, 'end', tickLabels[index]));
+        });
         var legend = el('div', 'ecr-legend');
         series.forEach(function (item) {
             var swatch = el('span', '');
@@ -375,24 +817,9 @@
                 svg.appendChild(mark);
             });
         });
-        var topLabel = svgEl('text');
-        topLabel.setAttribute('x', 4);
-        topLabel.setAttribute('y', 14);
-        topLabel.setAttribute('font-size', '11');
-        topLabel.setAttribute('fill', '#6b7280');
-        topLabel.textContent = formatByUnit(maxY, piece.unit);
-        svg.appendChild(topLabel);
-        for (var year = minX; year <= maxX; year++) {
-            if ((year - minX) % 2 !== 0 && year !== maxX) continue;
-            var tick = svgEl('text');
-            tick.setAttribute('x', xOf(year));
-            tick.setAttribute('y', height - 10);
-            tick.setAttribute('text-anchor', 'middle');
-            tick.setAttribute('font-size', '11');
-            tick.setAttribute('fill', '#6b7280');
-            tick.textContent = String(year);
-            svg.appendChild(tick);
-        }
+        yearTicks.forEach(function (year) {
+            svg.appendChild(axisText(xOf(year), height - 8, 'middle', String(year)));
+        });
         host.appendChild(legend);
     }
 
@@ -587,20 +1014,21 @@
         } else {
             warning.classList.add('hidden');
         }
+        latestData = data;
         renderCards(data);
-        renderExternal(data);
         var chapters = data.chapters || [];
+        renderToc(chapters);
         renderSubtabs(chapters);
         renderChapter(chapters);
         renderNotes(data.notes);
     }
 
-    function loadAnalysis(refresh) {
+    function loadAnalysis(refresh, quiet) {
         if (loading) return;
         if (loaded && !refresh) return;
         loading = true;
         byId('ecr-error').classList.add('hidden');
-        if (!loaded) byId('ecr-loading').classList.remove('hidden');
+        if (!loaded && !quiet) byId('ecr-loading').classList.remove('hidden');
         var url = '/admin/data-exploration/everyone-counts' + (refresh ? '?refresh=1' : '');
         fetch(url, {
             credentials: 'same-origin',
@@ -616,18 +1044,19 @@
         }).catch(function () {
             loading = false;
             byId('ecr-loading').classList.add('hidden');
+            var sourceButtons = byId('ecr-sources') && byId('ecr-sources').querySelectorAll('button');
+            if (sourceButtons) {
+                sourceButtons.forEach(function (item) {
+                    item.disabled = false;
+                    item.textContent = labels.refresh;
+                });
+            }
             if (!loaded) showError(labels.loadFailed);
         });
     }
 
     function boot() {
         if (!byId('panel-everyone-counts')) return;
-        var refreshBtn = byId('ecr-refresh-world-bank');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', function () {
-                loadAnalysis(true);
-            });
-        }
         var tab = byId('tab-everyone-counts');
         if (tab) {
             tab.addEventListener('click', function () {

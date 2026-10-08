@@ -121,7 +121,7 @@ NOTES = (
     "The volunteer headline is a three-year trailing mean. A Society is included only when it has a positive count in that year and the two years before it.",
     "Totals and medians leave out zeros and blanks. People-reached indicators are shown separately and are not added together.",
     "Volunteer density uses a saved World Bank population snapshot. The income group is the Bank’s current classification, held fixed for every year. Population after the snapshot’s last year is carried forward.",
-    "World Giving Index, IFRC GO, OCAC, ILO wages, World Bank median age, the Aid Worker Security Database, and the security-unit death counts are read from saved snapshots. Each chart states the snapshot date. Refresh those files with the snapshot build; the page does not download them.",
+    "World Giving Index, IFRC GO, OCAC, ILO wages, World Bank median age, the Aid Worker Security Database, and the security-unit death counts are read from saved snapshots. Each chart states the snapshot date. Refresh a file from External sources on this page; until then the page keeps the saved copy.",
     "The printed reach models (Figures 3.8 to 3.10 and Table A.1) are multilevel models. This view shows the unadjusted comparison for Figures 3.8 and 3.9 and does not re-estimate the model.",
     "President and Secretary General sex come from the FDRS questions, not from the indicator bank. Motiro survey rows and the named deaths register are not imported.",
 )
@@ -662,6 +662,15 @@ def volunteer_density_by_income(
     return series
 
 
+def _describe_external_sources(
+    sources: Mapping[str, Any] | None,
+    world_bank: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    from plugins.fdrs.services.ecr_external import describe_sources
+
+    return describe_sources(sources, world_bank)
+
+
 def _world_bank_status(world_bank: Mapping[str, Any] | None, series: list[dict[str, Any]]) -> dict[str, Any]:
     if not world_bank or not world_bank.get("population"):
         return {
@@ -825,7 +834,10 @@ def summarize_panel(
         "reach": reach,
         "age_bands": age_bands,
         "volunteer_density": density,
-        "external": {"world_bank": _world_bank_status(world_bank, density)},
+        "external": {
+            "world_bank": _world_bank_status(world_bank, density),
+            "sources": _describe_external_sources(sources, world_bank),
+        },
         "flags": {
             "duplicate_rows": sum(1 for row in rows if row["flag_duplicate_within_ns"]),
             "extreme_share_rows": sum(1 for row in rows if row["flag_extreme_share"]),

@@ -5,6 +5,7 @@
 
 import { debugLog, debugError, debugWarn } from './debug.js';
 import {
+    calculatedOverrideDiffers,
     calculationIsReadonly,
     calculationSavesValue,
     evaluateCalculatedForRows,
@@ -25,7 +26,7 @@ import {
     __savedVariableCellIsStaleLookupMirror,
     __formatLookupValueForInput,
     __formatSavedScalarForInput,
-    __persistVariableCellScalar,
+    __nextVariableCellValue,
     __variableCellDiffersFromLookup,
     __variableColumnPersistsValue,
     __resolveMatrixLocalizedLabel,
@@ -460,6 +461,11 @@ class MatrixHandler {
                 e.preventDefault();
                 this.handleRowTotalRestore(e.target.closest('.row-total-restore'));
             }
+            if (e.target.closest('.calculated-value-restore')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleCalculatedValueRestore(e.target.closest('.calculated-value-restore'));
+            }
             if (e.target.closest('.matrix-search-option')) {
                 this.selectRowOption(e.target.closest('.matrix-search-option'));
             }
@@ -789,7 +795,7 @@ class MatrixHandler {
             return;
         }
 
-        if (input.getAttribute('data-calculated') === 'true') {
+        if (input.getAttribute('data-cell-key')) {
             input.dataset.userEdited = '1';
         }
 
@@ -860,8 +866,27 @@ class MatrixHandler {
     }
 
     /**
-     * Update matrix data when input changes
+     * True when the user (or "data not available") changed this cell, so an empty
+     * input means "cleared" rather than "not filled in yet".
      */
+    _matrixInputWasEdited(input) {
+        return input.dataset.userEdited === '1' || input.disabled === true;
+    }
+
+    /**
+     * Write one variable cell without turning an untouched structured value into a blank.
+     */
+    _writeVariableCellFromInput(matrix, input, cellKey) {
+        const next = __nextVariableCellValue({
+            existing: matrix.data[cellKey],
+            rawValue: __inputValueForMatrixCompare(input),
+            maxDecimals: __readMatrixMaxDecimals(input),
+            userEdited: this._matrixInputWasEdited(input),
+        });
+        if (next.action === 'set') {
+            matrix.data[cellKey] = next.value;
+        }
+    }
 
     /**
      * Update matrix data when input changes
@@ -922,15 +947,14 @@ class MatrixHandler {
         if (input.type === 'checkbox') {
             value = input.checked ? 1 : 0;
             if (isVariable && cellKey) {
-                matrix.data[cellKey] = input.checked ? '1' : '0';
+                this._writeVariableCellFromInput(matrix, input, cellKey);
                 this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else if (isVariable) {
-            const maxDecimals = __readMatrixMaxDecimals(input);
             const rawValue = __inputValueForMatrixCompare(input);
             value = rawValue;
             if (cellKey) {
-                matrix.data[cellKey] = __persistVariableCellScalar(rawValue, maxDecimals);
+                this._writeVariableCellFromInput(matrix, input, cellKey);
                 this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else {
@@ -955,7 +979,11 @@ class MatrixHandler {
         // Update the data object using the cell key (for non-variable columns, use simple value)
         if (cellKey && columnType !== 'variable') {
             if (omitNumericCell) {
-                if (matrix.data[cellKey] !== undefined) {
+                const userCleared = this._matrixInputWasEdited(input);
+                const existing = matrix.data[cellKey];
+                if (!userCleared && existing !== undefined && existing !== '') {
+                    debugLog('matrix-handler', `Kept stored matrix cell ${cellKey}; empty input was not edited`);
+                } else if (existing !== undefined) {
                     delete matrix.data[cellKey];
                     debugLog('matrix-handler', `Removed empty matrix cell ${cellKey} from data`);
                 }
@@ -1022,6 +1050,7 @@ class MatrixHandler {
             if (isDisabled) {
                 input.disabled = true;
                 input.value = '';
+                if (input.getAttribute('data-cell-key')) input.dataset.userEdited = '1';
             } else {
                 const variableReadonly = input.getAttribute('data-variable-readonly') === 'true';
                 this._applyMatrixInputEditability(input, container, variableReadonly);
@@ -1120,6 +1149,25 @@ class MatrixHandler {
                             } else {
                                 const shown = formatFormulaNumber(value, decimals);
                                 dataToSave[key] = shown === '' ? '' : Number(shown);
+                            }
+                        });
+                    } else {
+                        const rowIds = new Set();
+                        matrix.container.querySelectorAll('tr.matrix-data-row').forEach((row) => {
+                            const rowId = row.getAttribute('data-row-id');
+                            if (rowId) rowIds.add(rowId);
+                        });
+                        Object.keys(dataToSave).forEach((cellKey) => {
+                            const parsed = __parseMatrixCellKey(cellKey, config);
+                            if (parsed && parsed.rowId) rowIds.add(parsed.rowId);
+                        });
+                        const byRow = evaluateCalculatedForRows(columns, dataToSave, Array.from(rowIds));
+                        const decimals = column.calculation ? column.calculation.decimals : 2;
+                        byRow.forEach((pack, rowId) => {
+                            const key = `${rowId}_${columnName}`;
+                            const formula = pack && pack.values ? pack.values[columnName] : null;
+                            if (!calculatedOverrideDiffers(dataToSave[key], formula, decimals)) {
+                                delete dataToSave[key];
                             }
                         });
                     }
@@ -1254,6 +1302,13 @@ class MatrixHandler {
                         input.checked = checked;
                     } else {
                         __setMatrixNumericCellDisplay(input, displayValue != null ? String(displayValue) : '');
+                    }
+                    if (input.getAttribute('data-calculated') === 'true' && String(input.value || '').trim() !== '') {
+                        const columnName = input.getAttribute('data-column');
+                        const column = (matrix.config?.columns || []).find((col) => col && col.name === columnName);
+                        if (column && !calculationIsReadonly(column) && calculationSavesValue(column)) {
+                            input.dataset.userEdited = '1';
+                        }
                     }
                 }
             });

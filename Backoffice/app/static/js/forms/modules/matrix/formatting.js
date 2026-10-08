@@ -301,6 +301,32 @@ export function __persistVariableCellScalar(rawValue, maxDecimals) {
 }
 
 
+function __isStructuredVariableCell(value) {
+    return value !== null && typeof value === 'object' && ('original' in value || 'modified' in value);
+}
+
+
+/**
+ * Decide what a variable cell should store.
+ * An input the user has not touched never replaces what is already saved:
+ * a structured {original, modified, isModified} cell stays as it is, and an
+ * empty input does not overwrite a stored value. Once the user edits the cell
+ * (or the cell is disabled/cleared programmatically), the displayed value is
+ * stored as a plain scalar, and an empty input stores "" (the figure was cleared).
+ * Returns { action: 'keep'|'set', value? }.
+ */
+export function __nextVariableCellValue({ existing, rawValue, maxDecimals, userEdited }) {
+    const persisted = __persistVariableCellScalar(rawValue, maxDecimals);
+
+    if (!userEdited) {
+        if (__isStructuredVariableCell(existing)) return { action: 'keep' };
+        if (persisted === '') return { action: 'keep' };
+        return { action: 'set', value: persisted };
+    }
+    return { action: 'set', value: persisted };
+}
+
+
 /**
  * Read-only variable columns always display the live lookup and are not stored.
  * A missing variable_readonly flag means read-only, matching the form builder.

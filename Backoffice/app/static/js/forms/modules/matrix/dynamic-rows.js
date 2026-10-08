@@ -1,6 +1,7 @@
 /** Dynamic matrix rows: add, remove, restore, sort, and legend highlighting. */
 import { debugLog, debugError, debugWarn } from '../debug.js';
-import { calculationIsReadonly } from './calculation.js';
+import { calculationIsReadonly, calculationSavesValue } from './calculation.js';
+import { compareMatrixRowLabels } from './row-order.js';
 import { _t, __canEditMatrixContainer, __rowTotalColumnIndex, ROW_TOTAL_COLUMN_NAME } from './shared.js';
 import {
     __configFlag,
@@ -715,6 +716,13 @@ restoreRowData(fieldId, rowId, rowInfo) {
                 } else {
                     __setMatrixNumericCellDisplay(input, displayValue);
                 }
+                if (input.getAttribute('data-calculated') === 'true'
+                    && column
+                    && !calculationIsReadonly(column)
+                    && calculationSavesValue(column)
+                    && String(input.value || '').trim() !== '') {
+                    input.dataset.userEdited = '1';
+                }
 
                 if (isVariable && column) {
                     const variableReadonly = typeof column === 'object' ? (column.variable_readonly !== false) : true;
@@ -791,6 +799,13 @@ restoreStaticMatrixValues(fieldId) {
                     input.checked = checkedValue;
                 } else {
                     __setMatrixNumericCellDisplay(input, displayValue);
+                }
+                if (input.getAttribute('data-calculated') === 'true'
+                    && column
+                    && !calculationIsReadonly(column)
+                    && calculationSavesValue(column)
+                    && String(input.value || '').trim() !== '') {
+                    input.dataset.userEdited = '1';
                 }
 
                 if (isVariable && column) {
@@ -932,11 +947,10 @@ async restoreDynamicRows(fieldId) {
                 updatedMatrix.hiddenField.value = __serializeMatrixData(updatedMatrix.data);
             }
 
-            // Recalculate totals after all rows are restored
-            this.calculateMatrixTotals(fieldId);
-
-            // Sort rows alphabetically after restoration
+            // Order rows before totals. A totals error must not leave the table unsorted.
             this.sortMatrixRows(fieldId);
+
+            this.calculateMatrixTotals(fieldId);
 
             // Batch resolve variables for all restored rows (optimized)
             await this.resolveVariablesForAllRows(fieldId);
@@ -987,7 +1001,7 @@ _applyGoUnmatchedRowHeadersFromData(fieldId) {
 },
 
 /**
- * Sort matrix rows alphabetically by row label
+ * Sort matrix rows by the row header: periods in calendar order, other labels A–Z.
  */
 sortMatrixRows(fieldId) {
     const matrix = this.matrices.get(fieldId);
@@ -1040,9 +1054,9 @@ sortMatrixRows(fieldId) {
             const gB = (b.getAttribute('data-group') || 'zzz').toLowerCase();
             if (gA !== gB) return gA.localeCompare(gB);
         }
-        const labelA = (a.getAttribute('data-row-label') || '').toLowerCase().trim();
-        const labelB = (b.getAttribute('data-row-label') || '').toLowerCase().trim();
-        return labelA.localeCompare(labelB);
+        const labelA = a.getAttribute('data-row-label') || '';
+        const labelB = b.getAttribute('data-row-label') || '';
+        return compareMatrixRowLabels(labelA, labelB);
     });
 
     // Remove all sortable rows (static rows removed too so we can re-insert them at top)

@@ -106,6 +106,31 @@ export function formatFormulaNumber(value, decimals) {
     return text === '' ? '0' : text;
 }
 
+export function parseCalculatedManualNumber(raw) {
+    if (raw == null || raw === '') return null;
+    if (typeof raw === 'object') {
+        const inner = raw.isModified
+            ? raw.modified
+            : (raw.modified != null && raw.modified !== '' ? raw.modified : raw.original);
+        return parseCalculatedManualNumber(inner);
+    }
+    const text = (typeof window !== 'undefined' && typeof window.__numericUnformat === 'function')
+        ? window.__numericUnformat(String(raw))
+        : String(raw).trim().replace(/,/g, '').replace(/\u00a0/g, '').replace(/\u202f/g, '');
+    if (text == null || text === '') return null;
+    const num = Number(text);
+    return Number.isFinite(num) ? num : null;
+}
+
+/** True when a typed calculated cell should stay as a manual override of the formula. */
+export function calculatedOverrideDiffers(manualRaw, formulaValue, decimals) {
+    const manual = parseCalculatedManualNumber(manualRaw);
+    if (manual == null) return false;
+    if (formulaValue == null || !Number.isFinite(Number(formulaValue))) return true;
+    const digits = decimals == null || decimals === '' ? 2 : Math.max(0, Math.min(6, Number(decimals) || 0));
+    return formatFormulaNumber(manual, digits) !== formatFormulaNumber(formulaValue, digits);
+}
+
 /** Display form of a calculated result, with the same thousands grouping as other matrix numbers. */
 export function formatFormulaNumberForDisplay(value, decimals) {
     const plain = formatFormulaNumber(value, decimals);
@@ -644,9 +669,17 @@ export function paintCalculatedCells(container, columns, byRow) {
         if (!pack) return;
         tr.querySelectorAll('[data-calculated="true"]').forEach((cell) => {
             const isInput = cell.tagName === 'INPUT';
-            if (isInput && cell.dataset.userEdited === '1') return;
             const name = cell.getAttribute('data-column');
             const col = (columns || []).find((item) => item && item.name === name);
+            const decimals = calculationDecimals(col);
+            if (isInput && cell.dataset.userEdited === '1') {
+                const formulaValue = pack.values[name];
+                if (calculatedOverrideDiffers(cell.value, formulaValue, decimals)) {
+                    cell.dataset.formulaValue = formulaValue == null ? '' : String(formulaValue);
+                    return;
+                }
+                delete cell.dataset.userEdited;
+            }
             const error = pack.errors[name];
             const blank = () => {
                 if (isInput) {

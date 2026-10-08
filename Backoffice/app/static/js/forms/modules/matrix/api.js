@@ -733,10 +733,13 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
             }
             savedScalar = lookupValue;
             if (cellKey && saveValue) {
-                matrix.data[cellKey] = __persistVariableCellScalar(
+                const persisted = __persistVariableCellScalar(
                     lookupValue,
                     __readMatrixMaxDecimals(input)
                 );
+                if (persisted !== '') {
+                    matrix.data[cellKey] = persisted;
+                }
             }
         }
 

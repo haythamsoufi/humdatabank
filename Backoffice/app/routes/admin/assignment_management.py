@@ -200,6 +200,112 @@ def _manage_assignment_country_context():
     }
 
 
+def _copy_source_assignment_label(assignment):
+    """Dropdown label: custom name plus period, with a closed/inactive hint."""
+    period = (assignment.period_name or "").strip()
+    if assignment.custom_name:
+        label = assignment.custom_name.strip()
+        if period and period not in label:
+            label = f"{label} — {period}"
+    else:
+        label = assignment.display_name
+    if assignment.is_effectively_closed:
+        label = f"{label} ({_('closed')})"
+    elif not assignment.is_active:
+        label = f"{label} ({_('inactive')})"
+    return label
+
+
+def _copy_source_assignment_groups():
+    """Assignments whose template can still be selected on the create form."""
+    rows = (
+        AssignedForm.query
+        .options(joinedload(AssignedForm.template).joinedload(FormTemplate.published_version))
+        .join(FormTemplate, AssignedForm.template_id == FormTemplate.id)
+        .filter(FormTemplate.published_version_id.isnot(None))
+        .order_by(AssignedForm.assigned_at.desc())
+        .all()
+    )
+    grouped = {}
+    for assignment in rows:
+        template_name = (assignment.template.name if assignment.template else None) or _("Template")
+        grouped.setdefault(template_name, []).append({
+            "id": assignment.id,
+            "label": _copy_source_assignment_label(assignment),
+        })
+    return [
+        {"template_name": name, "assignments": grouped[name]}
+        for name in sorted(grouped, key=lambda item: item.lower())
+    ]
+
+
+def _assignment_copy_config(assignment):
+    """Settings and entity ids used to prefill the create-assignment form."""
+    statuses = AssignmentEntityStatus.query.filter_by(assigned_form_id=assignment.id).all()
+    due_days = sorted({
+        aes.due_date.date() if isinstance(aes.due_date, datetime) else aes.due_date
+        for aes in statuses
+        if aes.due_date
+    })
+    due_date = due_days[0] if due_days else None
+
+    def _date_value(value):
+        if not value:
+            return ""
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        return value.isoformat()
+    raw_translations = assignment.custom_name_translations
+    translations = {}
+    if isinstance(raw_translations, dict):
+        for key, value in raw_translations.items():
+            text = str(value or "").strip()
+            if text:
+                translations[str(key)] = text
+    reviewers = [
+        {
+            "id": user.id,
+            "name": user.name or user.email or "",
+            "email": user.email or "",
+        }
+        for user in (assignment.submission_review_recipient_users or [])
+    ]
+    return {
+        "id": assignment.id,
+        "label": _copy_source_assignment_label(assignment),
+        "template_id": assignment.template_id,
+        "data_owner_id": assignment.data_owner_id,
+        "custom_name": assignment.custom_name or "",
+        "custom_name_translations": translations,
+        "period_name": assignment.period_name or "",
+        "due_date": _date_value(due_date),
+        "due_dates_vary": len(due_days) > 1,
+        "expiry_date": _date_value(assignment.expiry_date),
+        "generate_public_url": bool(assignment.has_public_url()),
+        "public_url_active": bool(assignment.is_public_active),
+        "requires_delegation_review": bool(assignment.requires_delegation_review),
+        "enable_page_submission": bool(assignment.enable_page_submission),
+        "enable_export_excel": bool(assignment.enable_export_excel),
+        "enable_import_excel": bool(assignment.enable_import_excel),
+        "enable_export_pdf": bool(assignment.enable_export_pdf),
+        "email_attach_pdf": bool(assignment.email_attach_pdf),
+        "email_attach_excel": bool(assignment.email_attach_excel),
+        "submission_review_recipient_mode": (
+            assignment.submission_review_recipient_mode or "fds_member"
+        ),
+        "submission_review_recipient_users": reviewers,
+        "country_ids": [
+            aes.entity_id for aes in statuses
+            if aes.entity_type == EntityType.country.value
+        ],
+        "entities": [
+            {"entity_type": aes.entity_type, "entity_id": aes.entity_id}
+            for aes in statuses
+            if aes.entity_type != EntityType.country.value
+        ],
+    }
+
+
 # --- Internal utilities ---
 def _supported_language_codes():
     """Return configured ISO language codes (includes 'en')."""
@@ -709,6 +815,7 @@ def assignments_gantt():
 def new_assignment():
     form = AssignedFormForm()
     enabled_entity_groups = get_enabled_entity_groups()
+    copy_source_groups = _copy_source_assignment_groups()
 
     if form.validate_on_submit():
         try:
@@ -723,6 +830,7 @@ def new_assignment():
                                      title="Create New Assignment",
                                      get_localized_country_name=get_localized_country_name,
                                      enabled_entity_types=enabled_entity_groups,
+                                     copy_source_groups=copy_source_groups,
                                      submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
                                      **_manage_assignment_permission_context(is_create=True),
                                      **_manage_assignment_country_context())
@@ -907,9 +1015,25 @@ def new_assignment():
                          title="Create New Assignment",
                          get_localized_country_name=get_localized_country_name,
                          enabled_entity_types=enabled_entity_groups,
+                         copy_source_groups=copy_source_groups,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
                          **_manage_assignment_permission_context(is_create=True),
                          **_manage_assignment_country_context())
+
+
+@bp.route("/assignments/<int:assignment_id>/copy-config", methods=["GET"])
+@permission_required('admin.assignments.create')
+def assignment_copy_config(assignment_id):
+    """Prefill payload for the create-assignment 'copy configuration' dropdown."""
+    assignment = AssignedForm.query.filter_by(id=assignment_id).first()
+    if not assignment:
+        return json_not_found(_("Assignment not found."))
+    template = assignment.template
+    if not template or not template.published_version_id:
+        return json_bad_request(
+            _("This assignment's template has no published version, so it cannot be copied.")
+        )
+    return json_ok(config=_assignment_copy_config(assignment))
 
 
 @bp.route("/assignments/check_duplicate", methods=["GET"])

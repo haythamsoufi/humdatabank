@@ -8,21 +8,21 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-06 21:56+0000\n"
+"POT-Creation-Date: 2026-10-08 17:01+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: Babel 2.17.0\n"
 
 #: app/routes/admin/utilities/translations.py:1666
 #, python-format
 msgid " (and %(count)d more)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1381
+#: app/templates/admin/assignments/manage_assignment.html:1404
 msgid " Org admin notifications disabled in Settings."
 msgstr ""
 
@@ -414,26 +414,26 @@ msgstr ""
 msgid "-- none --"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1379
+#: app/templates/admin/assignments/manage_assignment.html:1402
 msgid ". Tick \"CC admins\" below to add admins to email"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1378
+#: app/templates/admin/assignments/manage_assignment.html:1401
 #, python-brace-format
 msgid ". {admin_email_users} admins on email CC"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1376
+#: app/templates/admin/assignments/manage_assignment.html:1399
 #, python-brace-format
 msgid ". {admin_total} admins in-app (already focal on selected countries)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1375
+#: app/templates/admin/assignments/manage_assignment.html:1398
 #, python-brace-format
 msgid ". {admin_users} admins in-app"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1374
+#: app/templates/admin/assignments/manage_assignment.html:1397
 #, python-brace-format
 msgid ". {no_focal} countries have no focal points"
 msgstr ""
@@ -447,7 +447,7 @@ msgstr ""
 msgid ".xlsx or .xls (max 50 MB)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:750
+#: app/templates/admin/assignments/manage_assignment.html:772
 #: app/templates/admin/translations/quality_dashboard.html:228
 #: app/templates/admin/translations/quality_dashboard.html:300
 msgid "0 selected"
@@ -458,7 +458,7 @@ msgstr ""
 msgid "1 field failed validation across %(total)s reviewed fields."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:621
+#: plugins/fdrs/templates/compliance/tab_panel.html:634
 msgid "1 inactive country or National Society is excluded from these counts."
 msgstr ""
 
@@ -466,7 +466,7 @@ msgstr ""
 msgid "1 indicator references this"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:578
+#: plugins/fdrs/templates/compliance/tab_panel.html:591
 msgid "1 non-compliant country has compliance documents pending validation."
 msgstr ""
 
@@ -490,11 +490,11 @@ msgstr ""
 msgid "3. Response Compression"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:466
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:552
 msgid "50%"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:465
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:551
 msgid "75%"
 msgstr ""
 
@@ -1163,6 +1163,7 @@ msgstr ""
 #: app/templates/core/dashboard/_assignments_tab.html:508
 #: app/templates/forms/form_builder/field_mapping.html:320
 #: app/templates/forms/form_builder/field_mapping.html:341
+#: app/templates/forms/form_builder/partials/_sections_container.html:4
 #: app/templates/forms/form_builder/partials/_variables_modal.html:17
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:57
 msgid "Actions"
@@ -1175,7 +1176,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:131
-#: app/templates/admin/assignments/manage_assignment.html:698
+#: app/templates/admin/assignments/manage_assignment.html:720
 #: app/templates/admin/plugin_management.html:213
 #: app/templates/admin/translations/quality_dashboard.html:229
 #: app/templates/admin/translations/quality_dashboard.html:371
@@ -1367,7 +1368,7 @@ msgstr ""
 msgid "Add Column"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:414
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:500
 msgid "Add Column inside Group"
 msgstr ""
 
@@ -1406,7 +1407,7 @@ msgid "Add Indicator"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:402
-#: app/templates/forms/form_builder/partials/_sections_container.html:140
+#: app/templates/forms/form_builder/partials/_sections_container.html:145
 msgid "Add Item"
 msgstr ""
 
@@ -1414,7 +1415,7 @@ msgstr ""
 msgid "Add Item to"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:324
+#: app/templates/forms/form_builder/partials/_sections_container.html:332
 msgid "Add Item to Sub-section"
 msgstr ""
 
@@ -1483,7 +1484,7 @@ msgstr ""
 msgid "Add New Version"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:388
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:462
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:210
 msgid "Add Option"
 msgstr ""
@@ -1515,7 +1516,7 @@ msgstr ""
 msgid "Add Selected"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:147
+#: app/templates/forms/form_builder/partials/_sections_container.html:152
 msgid "Add Subsection"
 msgstr ""
 
@@ -1579,7 +1580,7 @@ msgstr ""
 msgid "Add discussion section to form"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:788
+#: app/templates/admin/assignments/manage_assignment.html:810
 msgid "Add entities by"
 msgstr ""
 
@@ -1653,23 +1654,23 @@ msgstr ""
 msgid "Add to self-report"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:171
-#: app/templates/admin/assignments/manage_assignment.html:172
+#: app/templates/admin/assignments/manage_assignment.html:193
+#: app/templates/admin/assignments/manage_assignment.html:194
 #: app/templates/admin/indicator_bank/_indicator_bank_translation_helpers.html:7
 #: app/templates/forms/form_builder/partials/_item_modal.html:91
 #: app/templates/forms/form_builder/partials/_item_modal.html:106
 #: app/templates/forms/form_builder/partials/_item_modal.html:388
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:6
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:32
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:12
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:23
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:50
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:6
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:21
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:146
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:212
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:222
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:427
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:441
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:513
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:527
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:28
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:54
 #: app/templates/forms/form_builder/partials/_section_modal.html:34
@@ -1684,7 +1685,7 @@ msgstr ""
 msgid "Add translations for the aggregated label in different languages."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1085
+#: app/templates/admin/assignments/manage_assignment.html:1107
 msgid ""
 "Add translations for this assignment name in different languages. English"
 " is entered in the Custom Name field above."
@@ -1774,7 +1775,7 @@ msgstr ""
 
 #: app/routes/admin/documentation.py:41
 #: app/services/documentation/service.py:808
-#: app/templates/admin/_validation_admin_shell.html:54
+#: app/templates/admin/_validation_admin_shell.html:107
 #: app/templates/admin/ai/conversation_traces.html:12
 #: app/templates/admin/ai/dashboard.html:12
 #: app/templates/admin/ai/knowledge_base.html:25
@@ -1991,14 +1992,14 @@ msgstr ""
 msgid "After importing, click \"Compile Translations\" to apply changes."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:298
+#: app/templates/admin/assignments/manage_assignment.html:320
 msgid ""
 "After this date the assignment will be treated as Closed. Leave empty for"
 " no automatic closure."
 msgstr ""
 
 #: app/templates/components/_builder_items.html:62
-#: app/templates/forms/form_builder/partials/_sections_container.html:457
+#: app/templates/forms/form_builder/partials/_sections_container.html:466
 msgid "Age"
 msgstr ""
 
@@ -2010,11 +2011,11 @@ msgstr ""
 msgid "Age Groups (comma-separated)"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:167
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:172
 msgid "Age breakdown coverage"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:163
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:168
 msgid ""
 "Age breakdown coverage: percentage of eligible indicators with age or "
 "sex-and-age disaggregation."
@@ -2047,7 +2048,7 @@ msgstr ""
 msgid "Alerts"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:454
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:540
 msgid "Alignment"
 msgstr ""
 
@@ -2306,7 +2307,7 @@ msgstr ""
 msgid "All sections completed."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:342
+#: app/routes/admin/assignment_management.py:448
 msgid "All selected reviewers must be active IFRC admins."
 msgstr ""
 
@@ -2358,7 +2359,7 @@ msgstr ""
 msgid "Allow \"Not applicable\" option"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:368
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:377
 msgid "Allow \"Other\" (free text)"
 msgstr ""
 
@@ -2388,7 +2389,7 @@ msgstr ""
 msgid "Allow disability questions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:424
+#: app/templates/admin/assignments/manage_assignment.html:446
 msgid "Allow external submissions via a public link."
 msgstr ""
 
@@ -2437,7 +2438,7 @@ msgid "Also:"
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:872
-#: app/templates/forms/form_builder/partials/_sections_container.html:539
+#: app/templates/forms/form_builder/partials/_sections_container.html:548
 msgid "Alt text"
 msgstr ""
 
@@ -2462,7 +2463,7 @@ msgid ""
 " rows from before this field existed are not part of this control."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:742
+#: app/routes/admin/assignment_management.py:850
 #, python-format
 msgid ""
 "An assignment already exists for this template and period (ID %(id)s). "
@@ -2470,7 +2471,7 @@ msgid ""
 "instead."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:486
+#: plugins/fdrs/templates/compliance/tab_panel.html:499
 msgid "An error occurred while loading compliance data"
 msgstr ""
 
@@ -2537,7 +2538,7 @@ msgstr ""
 msgid "Analysis failed. Check that the file contains the UPR Data sheet."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:176
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:181
 msgid ""
 "Analysis is limited to eligible indicators with people-oriented units or "
 "configured disaggregation options. Percentages reflect the current "
@@ -2584,7 +2585,7 @@ msgstr ""
 msgid "Analyzing Unified Plans focus areas…"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:98
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:103
 msgid "Analyzing data..."
 msgstr ""
 
@@ -2613,7 +2614,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/core/dashboard.html:1271
-#: plugins/fdrs/templates/compliance/tab_panel.html:217
+#: plugins/fdrs/templates/compliance/tab_panel.html:230
 msgid "Annual Report"
 msgstr ""
 
@@ -2682,7 +2683,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1869
 #: app/templates/forms/entry_form/entry_form.html:2586
 #: app/templates/forms/entry_form/entry_form.html:2601
-#: app/templates/forms/entry_form/partials/matrix_table.html:555
+#: app/templates/forms/entry_form/partials/matrix_table.html:612
 msgid "Applicable but data not available"
 msgstr ""
 
@@ -2701,11 +2702,11 @@ msgid ""
 " and content are not affected."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:316
+#: app/templates/admin/assignments/manage_assignment.html:338
 msgid "Applies to all entities on this assignment."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:290
+#: app/templates/admin/assignments/manage_assignment.html:312
 msgid "Applies to all selected countries."
 msgstr ""
 
@@ -2721,8 +2722,8 @@ msgstr ""
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
 #: app/templates/admin/analytics/page_path_analytics.html:52
-#: app/templates/admin/assignments/manage_assignment.html:1145
-#: app/templates/admin/assignments/manage_assignment.html:1160
+#: app/templates/admin/assignments/manage_assignment.html:1167
+#: app/templates/admin/assignments/manage_assignment.html:1182
 #: app/templates/admin/communication/registry.html:32
 #: app/templates/components/ag_grid_i18n_js.html:18
 #: app/templates/forms/entry_form/partials/_preview_banner.html:47
@@ -2812,8 +2813,8 @@ msgstr ""
 #: app/templates/admin/validation_dashboard.html:298
 #: app/templates/components/_status_label.html:41
 #: app/templates/components/ag_grid_i18n_js.html:29
-#: plugins/fdrs/templates/compliance/tab_panel.html:133
-#: plugins/fdrs/templates/compliance/tab_panel.html:224
+#: plugins/fdrs/templates/compliance/tab_panel.html:146
+#: plugins/fdrs/templates/compliance/tab_panel.html:237
 msgid "Approved"
 msgstr ""
 
@@ -2831,8 +2832,8 @@ msgstr ""
 msgid "Approving…"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:252
-#: app/templates/admin/assignments/manage_assignment.html:272
+#: app/templates/admin/assignments/manage_assignment.html:274
+#: app/templates/admin/assignments/manage_assignment.html:294
 #: app/templates/admin/documents/documents.html:291
 #: app/templates/admin/documents/documents.html:317
 #: app/templates/forms/entry_form/entry_form.html:3055
@@ -2845,7 +2846,7 @@ msgid "Apr"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:145
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:110
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:123
 msgid "Arabic"
 msgstr ""
 
@@ -2862,9 +2863,9 @@ msgstr ""
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:238
 #: app/templates/admin/indicator_bank/view_indicator_bank.html:40
 #: app/templates/components/ag_grid_i18n_js.html:41
-#: app/templates/forms/form_builder/partials/_sections_container.html:115
-#: app/templates/forms/form_builder/partials/_sections_container.html:299
-#: app/templates/forms/form_builder/partials/_sections_container.html:425
+#: app/templates/forms/form_builder/partials/_sections_container.html:126
+#: app/templates/forms/form_builder/partials/_sections_container.html:305
+#: app/templates/forms/form_builder/partials/_sections_container.html:434
 #: app/templates/notifications/center.html:78
 msgid "Archived"
 msgstr ""
@@ -2992,7 +2993,7 @@ msgid ""
 "division will also be deleted."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:718
+#: app/templates/forms/form_builder/partials/_sections_container.html:730
 msgid ""
 "Are you sure you want to delete this document field and any associated "
 "uploaded documents?"
@@ -3008,11 +3009,11 @@ msgstr ""
 msgid "Are you sure you want to delete this entry?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:784
+#: app/templates/forms/form_builder/partials/_sections_container.html:796
 msgid "Are you sure you want to delete this image item?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:636
+#: app/templates/forms/form_builder/partials/_sections_container.html:648
 msgid "Are you sure you want to delete this indicator instance?"
 msgstr ""
 
@@ -3027,15 +3028,15 @@ msgstr ""
 msgid "Are you sure you want to delete this local unit?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:752
+#: app/templates/forms/form_builder/partials/_sections_container.html:764
 msgid "Are you sure you want to delete this matrix table?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:823
+#: app/templates/forms/form_builder/partials/_sections_container.html:835
 msgid "Are you sure you want to delete this plugin item?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:685
+#: app/templates/forms/form_builder/partials/_sections_container.html:697
 msgid "Are you sure you want to delete this question?"
 msgstr ""
 
@@ -3049,7 +3050,7 @@ msgid ""
 " under it will also be deleted."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:183
+#: app/templates/forms/form_builder/partials/_sections_container.html:188
 msgid "Are you sure you want to delete this section and all its contents?"
 msgstr ""
 
@@ -3069,7 +3070,7 @@ msgstr ""
 msgid "Are you sure you want to delete this sub-branch?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:356
+#: app/templates/forms/form_builder/partials/_sections_container.html:364
 msgid "Are you sure you want to delete this sub-section and all its contents?"
 msgstr ""
 
@@ -3167,7 +3168,7 @@ msgstr ""
 msgid "Area"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:77
+#: plugins/fdrs/templates/compliance/tab_panel.html:90
 msgid "As of Year:"
 msgstr ""
 
@@ -3207,7 +3208,7 @@ msgstr ""
 msgid "Assessment"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:827
+#: app/templates/admin/assignments/manage_assignment.html:849
 msgid "Assign Countries"
 msgstr ""
 
@@ -3221,7 +3222,7 @@ msgid ""
 "access to data at the level they are assigned."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1369
+#: app/templates/admin/assignments/manage_assignment.html:1392
 msgid ""
 "Assigned entities (focal points) will be notified about this new "
 "assignment. Do you want to continue?"
@@ -3249,7 +3250,7 @@ msgstr ""
 msgid "Assignment %(id)s"
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1813
+#: app/routes/admin/assignment_management.py:1937
 #, python-format
 msgid "Assignment '%(name)s' has been closed."
 msgstr ""
@@ -3365,6 +3366,10 @@ msgstr ""
 msgid "Assignment is closed"
 msgstr ""
 
+#: app/routes/admin/assignment_management.py:1030
+msgid "Assignment not found."
+msgstr ""
+
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:17
 msgid "Assignment period"
 msgstr ""
@@ -3454,7 +3459,7 @@ msgstr ""
 msgid "Assignment submitted: %(template)s"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:372
+#: plugins/upr/templates/upr/tab_panel.html:384
 #, python-brace-format
 msgid "Assignment {id}"
 msgstr ""
@@ -3527,8 +3532,8 @@ msgstr ""
 msgid "Attach"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:579
-#: app/templates/admin/assignments/manage_assignment.html:670
+#: app/templates/admin/assignments/manage_assignment.html:601
+#: app/templates/admin/assignments/manage_assignment.html:692
 msgid ""
 "Attach a filled Excel snapshot to those emails. A custom workbook is used"
 " when a plugin already has one set up for this assignment; otherwise the "
@@ -3542,8 +3547,8 @@ msgid ""
 "entity will be generated from the chosen assignment."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:565
-#: app/templates/admin/assignments/manage_assignment.html:658
+#: app/templates/admin/assignments/manage_assignment.html:587
+#: app/templates/admin/assignments/manage_assignment.html:680
 msgid ""
 "Attach the same PDF as the entry-form export to the emails sent when an "
 "entity submits or is approved."
@@ -3583,12 +3588,12 @@ msgid "Audit logging for security events (without storing your message content).
 msgstr ""
 
 #: app/templates/core/dashboard.html:1272
-#: plugins/fdrs/templates/compliance/tab_panel.html:218
+#: plugins/fdrs/templates/compliance/tab_panel.html:231
 msgid "Audited Financial Statement"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:256
-#: app/templates/admin/assignments/manage_assignment.html:276
+#: app/templates/admin/assignments/manage_assignment.html:278
+#: app/templates/admin/assignments/manage_assignment.html:298
 #: app/templates/admin/documents/documents.html:295
 #: app/templates/admin/documents/documents.html:321
 #: app/templates/forms/entry_form/entry_form.html:3059
@@ -3624,7 +3629,7 @@ msgid "Author"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:180
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:467
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:553
 msgid "Auto"
 msgstr ""
 
@@ -3700,7 +3705,7 @@ msgstr ""
 msgid "Auto-Translate All Translation Fields"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:307
+#: app/templates/admin/assignments/manage_assignment.html:329
 msgid "Auto-closes the assignment after this date."
 msgstr ""
 
@@ -3842,6 +3847,10 @@ msgstr ""
 msgid "Available User Types"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:387
+msgid "Average"
+msgstr ""
+
 #: app/templates/core/dashboard/_admin_panel.html:97
 msgid "Average Completion Rate (Past 3 Periods)"
 msgstr ""
@@ -3850,7 +3859,7 @@ msgstr ""
 msgid "Average Submission Timeliness (Days Early/Late)"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:111
+#: plugins/fdrs/templates/service_income/tab_panel.html:115
 msgid "Average service income"
 msgstr ""
 
@@ -3972,7 +3981,7 @@ msgstr ""
 msgid "Bar"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:46
+#: plugins/fdrs/templates/service_income/tab_panel.html:50
 msgid ""
 "Bars are reported service income, in billions of Swiss francs. The open "
 "round is amber and shows the amount reported so far. The dashed line is "
@@ -3984,7 +3993,7 @@ msgstr ""
 msgid "Based on"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:208
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:213
 msgid ""
 "Based on FDRS governing board, volunteers, and staff indicators when "
 "available in the current filters."
@@ -4083,8 +4092,8 @@ msgstr ""
 
 #: app/templates/components/_builder_items.html:127
 #: app/templates/components/_builder_items.html:129
-#: app/templates/forms/form_builder/partials/_sections_container.html:572
-#: app/templates/forms/form_builder/partials/_sections_container.html:574
+#: app/templates/forms/form_builder/partials/_sections_container.html:581
+#: app/templates/forms/form_builder/partials/_sections_container.html:583
 msgid "Break after"
 msgstr ""
 
@@ -4173,7 +4182,7 @@ msgstr ""
 msgid "Bulk User Selection"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:339
+#: plugins/upr/templates/upr/tab_panel.html:351
 msgid "Bulk export is available to system managers."
 msgstr ""
 
@@ -4198,18 +4207,18 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1622
 #: app/templates/forms/entry_form/entry_form.html:2310
 #: app/templates/forms/entry_form/entry_form.html:2460
-#: app/templates/forms/entry_form/export_pdf.html:546
+#: app/templates/forms/entry_form/export_pdf.html:583
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:206
 msgid "By Age:"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:77
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:199
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:82
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:204
 msgid "By Country"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:76
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:191
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:81
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:196
 msgid "By Indicator"
 msgstr ""
 
@@ -4218,7 +4227,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1626
 #: app/templates/forms/entry_form/entry_form.html:2333
 #: app/templates/forms/entry_form/entry_form.html:2464
-#: app/templates/forms/entry_form/export_pdf.html:565
+#: app/templates/forms/entry_form/export_pdf.html:602
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:210
 msgid "By Sex and Age:"
 msgstr ""
@@ -4228,7 +4237,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1618
 #: app/templates/forms/entry_form/entry_form.html:2288
 #: app/templates/forms/entry_form/entry_form.html:2456
-#: app/templates/forms/entry_form/export_pdf.html:527
+#: app/templates/forms/entry_form/export_pdf.html:564
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:202
 msgid "By Sex:"
 msgstr ""
@@ -4265,12 +4274,12 @@ msgstr ""
 msgid "By type"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1056
+#: app/templates/admin/assignments/manage_assignment.html:1078
 #: app/templates/admin/communication/center.html:369
 msgid "CC"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:121
+#: plugins/fdrs/templates/service_income/tab_panel.html:125
 msgid "CHF billions"
 msgstr ""
 
@@ -4291,11 +4300,29 @@ msgstr ""
 msgid "Cached machine-translation results"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:46
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:267
+msgid "Calculated"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:382
+msgid ""
+"Calculated for each row from the other columns in that row. The column "
+"footer sums those results."
+msgstr ""
+
+#: app/templates/forms/entry_form/partials/matrix_table.html:444
+msgid "Calculated from other columns in this row"
+msgstr ""
+
+#: app/templates/forms/entry_form/partials/matrix_table.html:460
+msgid "Calculated value for"
+msgstr ""
+
+#: plugins/fdrs/templates/ecr/tab_panel.html:164
 msgid "Calculating Everyone Counts indicators..."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:24
+#: plugins/fdrs/templates/service_income/tab_panel.html:28
 msgid "Calculating service income..."
 msgstr ""
 
@@ -4305,6 +4332,10 @@ msgstr ""
 
 #: app/templates/components/auto_translate_modal.html:442
 msgid "Calculating..."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:384
+msgid "Calculation"
 msgstr ""
 
 #: app/templates/admin/communication/center.html:1257
@@ -4363,9 +4394,9 @@ msgstr ""
 #: app/templates/admin/api_keys/revoke.html:21
 #: app/templates/admin/api_keys/revoke.html:80
 #: app/templates/admin/assignments/gantt_chart.html:246
-#: app/templates/admin/assignments/manage_assignment.html:1144
-#: app/templates/admin/assignments/manage_assignment.html:1159
-#: app/templates/admin/assignments/manage_assignment.html:1360
+#: app/templates/admin/assignments/manage_assignment.html:1166
+#: app/templates/admin/assignments/manage_assignment.html:1181
+#: app/templates/admin/assignments/manage_assignment.html:1383
 #: app/templates/admin/assignments/public_submissions.html:382
 #: app/templates/admin/common_words/manage_common_words.html:912
 #: app/templates/admin/common_words/manage_common_words.html:914
@@ -4447,7 +4478,7 @@ msgstr ""
 #: app/templates/notifications/center.html:208
 #: app/templates/tours/tours.html:16
 #: plugins/pb_progress/templates/pb_progress/manage.html:83
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:83
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:96
 #: plugins/upr/templates/upr/_manage_tools.html:119
 #: plugins/upr/templates/upr/_narrative_modal.html:63
 msgid "Cancel"
@@ -4466,7 +4497,7 @@ msgid "Cancel failed (connection issue)."
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:227
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:163
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:176
 msgid "Cancel generation"
 msgstr ""
 
@@ -4486,7 +4517,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/validation_summary_progress.html:370
 #: plugins/pb_progress/templates/pb_progress/manage.html:228
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:164
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:177
 msgid "Cancelling…"
 msgstr ""
 
@@ -4510,15 +4541,15 @@ msgstr ""
 msgid "Cannot delete: remove the 1 sub-sector first."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:536
+#: app/templates/forms/form_builder/partials/_sections_container.html:545
 msgid "Caption"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:426
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:512
 msgid "Caption (optional)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:431
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:517
 msgid "Caption shown below the image"
 msgstr ""
 
@@ -4530,8 +4561,8 @@ msgstr ""
 msgid "Cards"
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:296
-#: app/templates/forms/entry_form/partials/matrix_table.html:124
+#: app/templates/forms/entry_form/export_pdf.html:312
+#: app/templates/forms/entry_form/partials/matrix_table.html:179
 msgid "Carried forward value"
 msgstr ""
 
@@ -4564,7 +4595,7 @@ msgstr ""
 msgid "Category Name"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:457
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:543
 msgid "Center"
 msgstr ""
 
@@ -4585,15 +4616,15 @@ msgstr ""
 msgid "Change Type"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:761
+#: app/templates/admin/assignments/manage_assignment.html:783
 msgid "Change due date"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1151
+#: app/templates/admin/assignments/manage_assignment.html:1173
 msgid "Change due date of selected"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:74
+#: plugins/fdrs/templates/service_income/tab_panel.html:78
 msgid "Change in service"
 msgstr ""
 
@@ -4609,11 +4640,11 @@ msgstr ""
 msgid "Change rows"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:758
+#: app/templates/admin/assignments/manage_assignment.html:780
 msgid "Change status"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1132
+#: app/templates/admin/assignments/manage_assignment.html:1154
 msgid "Change status of selected"
 msgstr ""
 
@@ -4659,7 +4690,7 @@ msgstr ""
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:610
+#: app/templates/admin/assignments/manage_assignment.html:632
 msgid ""
 "Changing this asks for confirmation. Turning it off unlocks pages that "
 "were submitted while the assignment is still in progress, and keeps "
@@ -4745,7 +4776,7 @@ msgstr ""
 msgid "Checking indicator usage…"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1372
+#: app/templates/admin/assignments/manage_assignment.html:1395
 msgid "Checking notification recipients…"
 msgstr ""
 
@@ -4792,6 +4823,10 @@ msgstr ""
 msgid "Choose an option:"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:444
+msgid "Choose columns or enter a formula"
+msgstr ""
+
 #: app/templates/admin/indicator_bank/indicator_bank.html:1924
 msgid "Choose different file"
 msgstr ""
@@ -4808,7 +4843,7 @@ msgstr ""
 msgid "Choose language"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:369
+#: app/templates/admin/assignments/manage_assignment.html:391
 msgid ""
 "Choose one or more admins responsible for reviewing submissions for this "
 "assignment."
@@ -5015,7 +5050,7 @@ msgstr ""
 msgid "Click"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:880
+#: app/templates/forms/form_builder/partials/_sections_container.html:894
 msgid "Click \"Add Section\" to get started."
 msgstr ""
 
@@ -5208,7 +5243,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/sessions.html:182
 #: app/templates/admin/assignments/assignments.html:132
-#: app/templates/admin/assignments/manage_assignment.html:1076
+#: app/templates/admin/assignments/manage_assignment.html:1098
 #: app/templates/admin/communication/center.html:864
 #: app/templates/admin/communication/center.html:1155
 #: app/templates/admin/communication/center.html:1176
@@ -5274,7 +5309,7 @@ msgstr ""
 msgid "Closed"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:118
+#: plugins/fdrs/templates/service_income/tab_panel.html:122
 msgid "Closed rounds"
 msgstr ""
 
@@ -5358,11 +5393,11 @@ msgstr ""
 msgid "Collapse navigation panel"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:105
+#: app/templates/forms/form_builder/partials/_sections_container.html:110
 msgid "Collapse section"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:288
+#: app/templates/forms/form_builder/partials/_sections_container.html:294
 msgid "Collapse subsection"
 msgstr ""
 
@@ -5405,14 +5440,20 @@ msgstr ""
 
 #. Do not place Jinja comments inside the {{ { ... } }} expression below.
 #: app/templates/components/ag_grid_i18n_js.html:4
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:400
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:402
 msgid "Columns"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:402
+msgid "Columns to add"
 msgstr ""
 
 #: app/templates/admin/user_management/access_requests.html:236
 msgid "Combine requests from the same user into one row"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:257
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:262
 msgid "Combined Sex & Age Distribution"
 msgstr ""
 
@@ -5634,7 +5675,7 @@ msgstr ""
 msgid "Completion"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1390
+#: app/templates/admin/assignments/manage_assignment.html:1413
 msgid "Completion Rate"
 msgstr ""
 
@@ -5651,23 +5692,23 @@ msgstr ""
 msgid "Completion:"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:323
+#: plugins/fdrs/templates/compliance/tab_panel.html:336
 msgid "Compliance Status"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:72
+#: plugins/fdrs/templates/compliance/tab_panel.html:85
 msgid ""
 "Compliance requires at least one Annual Report AND one Audited Financial "
 "Statement in the past 3 years. Inactive countries and National Societies "
 "stay in the table but are left out of the counts."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:334
-#: plugins/fdrs/templates/compliance/tab_panel.html:541
+#: plugins/fdrs/templates/compliance/tab_panel.html:347
+#: plugins/fdrs/templates/compliance/tab_panel.html:554
 msgid "Compliant"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:114
+#: plugins/fdrs/templates/compliance/tab_panel.html:127
 msgid "Compliant Countries"
 msgstr ""
 
@@ -5793,7 +5834,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:44
-#: app/templates/forms/form_builder/partials/_sections_container.html:556
+#: app/templates/forms/form_builder/partials/_sections_container.html:565
 msgid "Configured"
 msgstr ""
 
@@ -5801,7 +5842,7 @@ msgstr ""
 msgid "Configured via deployment / Config.FEATURES"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1362
+#: app/templates/admin/assignments/manage_assignment.html:1385
 #: app/templates/admin/assignments/public_submissions.html:382
 msgid "Confirm"
 msgstr ""
@@ -5827,7 +5868,7 @@ msgstr ""
 msgid "Confirm Plugin Uninstallation"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1386
+#: app/templates/admin/assignments/manage_assignment.html:1409
 msgid "Confirm action"
 msgstr ""
 
@@ -5904,11 +5945,16 @@ msgstr ""
 msgid "Content source"
 msgstr ""
 
+#: plugins/fdrs/templates/ecr/tab_panel.html:178
+#: plugins/fdrs/templates/ecr/tab_panel.html:218
+msgid "Contents"
+msgstr ""
+
 #: app/templates/admin/security/event_detail.html:48
 msgid "Context Data"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1367
+#: app/templates/admin/assignments/manage_assignment.html:1390
 #: app/templates/admin/translations/manage_translations.html:708
 #: app/templates/forms/form_builder/form_builder.html:1468
 msgid "Continue"
@@ -5967,8 +6013,17 @@ msgstr ""
 msgid "Conversations"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:125
+#: plugins/fdrs/templates/service_income/tab_panel.html:129
 msgid "Copied"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:1418
+#, python-brace-format
+msgid "Copied from {name}. Review the fields below, then create the assignment."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:1424
+msgid "Copied values stay in the form. Reload the page to clear them."
 msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:321
@@ -5989,7 +6044,7 @@ msgstr ""
 #: app/templates/admin/api_keys/rotate_success.html:57
 #: app/templates/admin/api_keys/rotate_success.html:109
 #: app/templates/admin/api_management.html:711
-#: app/templates/admin/assignments/manage_assignment.html:693
+#: app/templates/admin/assignments/manage_assignment.html:715
 #: app/templates/core/chat_immersive.html:53
 #: app/templates/forms/form_builder/partials/_item_modal.html:225
 msgid "Copy"
@@ -6019,9 +6074,13 @@ msgid ""
 "unique name is assigned automatically."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:49
-#: plugins/fdrs/templates/service_income/tab_panel.html:123
+#: plugins/fdrs/templates/service_income/tab_panel.html:53
+#: plugins/fdrs/templates/service_income/tab_panel.html:127
 msgid "Copy chart as PNG"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:132
+msgid "Copy configuration from"
 msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:329
@@ -6079,8 +6138,8 @@ msgstr ""
 msgid "Copy summary (queries + answers + meta only)"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:61
-#: plugins/fdrs/templates/service_income/tab_panel.html:124
+#: plugins/fdrs/templates/service_income/tab_panel.html:65
+#: plugins/fdrs/templates/service_income/tab_panel.html:128
 msgid "Copy table for Excel"
 msgstr ""
 
@@ -6119,7 +6178,7 @@ msgstr ""
 msgid "Cost:"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:75
+#: plugins/fdrs/templates/ecr/tab_panel.html:204
 msgid "Could not calculate Everyone Counts indicators."
 msgstr ""
 
@@ -6178,7 +6237,7 @@ msgstr ""
 msgid "Could not fetch sync status."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:355
+#: plugins/upr/templates/upr/tab_panel.html:367
 msgid "Could not load data. Refresh the page and try again."
 msgstr ""
 
@@ -6223,6 +6282,10 @@ msgstr ""
 msgid "Could not load session logs."
 msgstr ""
 
+#: app/templates/admin/assignments/manage_assignment.html:1417
+msgid "Could not load that assignment. Try again."
+msgstr ""
+
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:20
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:13
 #: app/templates/admin/indicator_bank/measurement_lookups.html:135
@@ -6233,7 +6296,7 @@ msgstr ""
 msgid "Could not load the validation summary."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:379
+#: plugins/upr/templates/upr/tab_panel.html:391
 msgid "Could not load this preview."
 msgstr ""
 
@@ -6287,7 +6350,7 @@ msgstr ""
 msgid "Could not save unit."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:360
+#: plugins/upr/templates/upr/tab_panel.html:372
 msgid "Could not start export."
 msgstr ""
 
@@ -6332,8 +6395,16 @@ msgstr ""
 msgid "Count"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:84
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:391
+msgid "Count filled cells"
+msgstr ""
+
+#: plugins/fdrs/templates/compliance/tab_panel.html:97
 msgid "Count inactive"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:390
+msgid "Count numbers"
 msgstr ""
 
 #: app/templates/admin/reports/partials/_widget_properties.html:54
@@ -6360,7 +6431,7 @@ msgstr ""
 msgid "Countries & Organization"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:584
+#: plugins/fdrs/templates/compliance/tab_panel.html:597
 msgid "Countries and documents:"
 msgstr ""
 
@@ -6369,7 +6440,7 @@ msgstr ""
 msgid "Countries by status"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:265
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:270
 msgid ""
 "Countries marked \"No data\" have no eligible indicator records for the "
 "selected view."
@@ -6400,8 +6471,8 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
 #: app/templates/admin/analytics/import_change_log.html:90
-#: app/templates/admin/assignments/manage_assignment.html:995
-#: app/templates/admin/assignments/manage_assignment.html:1032
+#: app/templates/admin/assignments/manage_assignment.html:1017
+#: app/templates/admin/assignments/manage_assignment.html:1054
 #: app/templates/admin/assignments/public_submissions.html:216
 #: app/templates/admin/countries/manage_country.html:4
 #: app/templates/admin/countries/manage_country.html:8
@@ -6430,7 +6501,7 @@ msgstr ""
 #: app/templates/components/entity_dropdown.html:27
 #: app/templates/components/entity_dropdown.html:154
 #: app/templates/public_submission_export_pdf.html:17
-#: plugins/fdrs/templates/compliance/tab_panel.html:302
+#: plugins/fdrs/templates/compliance/tab_panel.html:315
 #: plugins/upr/templates/upr/_manage_tools.html:37
 msgid "Country"
 msgstr ""
@@ -6445,8 +6516,8 @@ msgstr ""
 msgid "Country Access Requests"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:80
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:263
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:85
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:268
 msgid "Country Disaggregation Coverage"
 msgstr ""
 
@@ -6689,11 +6760,11 @@ msgid ""
 "ensure consistency in your reporting workflows."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1364
+#: app/templates/admin/assignments/manage_assignment.html:1387
 msgid "Create anyway"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1366
+#: app/templates/admin/assignments/manage_assignment.html:1389
 msgid "Create assignment"
 msgstr ""
 
@@ -6842,7 +6913,7 @@ msgstr ""
 msgid "Current Year View"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:199
+#: app/templates/admin/assignments/manage_assignment.html:221
 msgid "Current name:"
 msgstr ""
 
@@ -6879,7 +6950,7 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:535
 #: app/templates/admin/templates/new_template.html:1226
 #: app/templates/components/_builder_items.html:68
-#: app/templates/forms/form_builder/partials/_sections_container.html:463
+#: app/templates/forms/form_builder/partials/_sections_container.html:472
 msgid "Custom"
 msgstr ""
 
@@ -6891,11 +6962,11 @@ msgstr ""
 msgid "Custom Label (Optional)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:164
+#: app/templates/admin/assignments/manage_assignment.html:186
 msgid "Custom Name"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1084
+#: app/templates/admin/assignments/manage_assignment.html:1106
 msgid "Custom Name Translations"
 msgstr ""
 
@@ -6909,6 +6980,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:88
 msgid "Custom field type from a plugin."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:395
+msgid "Custom formula"
 msgstr ""
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:27
@@ -7099,7 +7174,7 @@ msgstr ""
 msgid "Data Values"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:545
+#: app/templates/forms/entry_form/partials/matrix_table.html:602
 msgid "Data availability options"
 msgstr ""
 
@@ -7137,7 +7212,7 @@ msgstr ""
 msgid "Data governance sections"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:154
+#: app/templates/forms/entry_form/partials/matrix_table.html:220
 msgid "Data matrix for"
 msgstr ""
 
@@ -7258,7 +7333,7 @@ msgid "Day of week"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:130
-#: app/templates/admin/assignments/manage_assignment.html:698
+#: app/templates/admin/assignments/manage_assignment.html:720
 #: app/templates/admin/plugin_management.html:212
 #: app/templates/admin/translations/quality_dashboard.html:230
 #: app/templates/admin/translations/quality_dashboard.html:370
@@ -7289,8 +7364,8 @@ msgstr ""
 msgid "Deadline reminder: %(assignment_title)s"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:260
-#: app/templates/admin/assignments/manage_assignment.html:280
+#: app/templates/admin/assignments/manage_assignment.html:282
+#: app/templates/admin/assignments/manage_assignment.html:302
 #: app/templates/admin/documents/documents.html:299
 #: app/templates/admin/documents/documents.html:325
 #: app/templates/forms/entry_form/entry_form.html:3063
@@ -7302,7 +7377,8 @@ msgstr ""
 msgid "Dec"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:269
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:270
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:420
 msgid "Decimals"
 msgstr ""
 
@@ -7364,7 +7440,7 @@ msgstr ""
 msgid "Default title"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:203
+#: app/templates/admin/assignments/manage_assignment.html:225
 msgid "Default:"
 msgstr ""
 
@@ -7393,7 +7469,7 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:90
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:120
 #: app/templates/forms/form_builder/form_builder.html:809
-#: app/templates/forms/form_builder/partials/_sections_container.html:463
+#: app/templates/forms/form_builder/partials/_sections_container.html:472
 msgid "Definition"
 msgstr ""
 
@@ -7504,7 +7580,7 @@ msgstr ""
 msgid "Delete Notification?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:186
+#: app/templates/forms/form_builder/partials/_sections_container.html:191
 msgid "Delete Section"
 msgstr ""
 
@@ -7516,7 +7592,7 @@ msgstr ""
 msgid "Delete Self-Reported Assignment"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:359
+#: app/templates/forms/form_builder/partials/_sections_container.html:367
 msgid "Delete Sub-section"
 msgstr ""
 
@@ -7540,8 +7616,8 @@ msgstr ""
 msgid "Delete chat"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:57
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:58
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:113
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:115
 #: app/templates/forms/entry_form/partials/discussion_panel.html:41
 #: app/templates/forms/entry_form/partials/discussion_panel_section.html:34
 msgid "Delete comment"
@@ -7594,7 +7670,7 @@ msgid "Delete sector"
 msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:150
-#: app/templates/admin/assignments/manage_assignment.html:753
+#: app/templates/admin/assignments/manage_assignment.html:775
 msgid "Delete selected"
 msgstr ""
 
@@ -7806,7 +7882,7 @@ msgid ""
 "template"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:446
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:532
 msgid "Describe the image for screen readers"
 msgstr ""
 
@@ -7866,12 +7942,12 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal.html:104
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:30
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:19
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:439
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:525
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:50
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:52
-#: app/templates/forms/form_builder/partials/_sections_container.html:484
-#: app/templates/forms/form_builder/partials/_sections_container.html:490
-#: app/templates/forms/form_builder/partials/_sections_container.html:553
+#: app/templates/forms/form_builder/partials/_sections_container.html:493
+#: app/templates/forms/form_builder/partials/_sections_container.html:499
+#: app/templates/forms/form_builder/partials/_sections_container.html:562
 #: app/templates/forms/form_builder/partials/_template_details.html:128
 #: app/templates/plugins/base_plugin_builder.html:22
 msgid "Description"
@@ -7893,11 +7969,11 @@ msgstr ""
 msgid "Deselect All"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:357
+#: app/templates/admin/assignments/manage_assignment.html:379
 msgid "Designated FDS member"
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:279
+#: app/routes/admin/assignment_management.py:385
 msgid "Designated FDS member for the submitting country"
 msgstr ""
 
@@ -7977,7 +8053,11 @@ msgstr ""
 msgid "Diagnostics"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:110
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:392
+msgid "Difference"
+msgstr ""
+
+#: plugins/fdrs/templates/service_income/tab_panel.html:114
 msgid "Difference from the reference"
 msgstr ""
 
@@ -8002,11 +8082,11 @@ msgid "Disability"
 msgstr ""
 
 #: app/templates/components/_builder_items.html:122
-#: app/templates/forms/form_builder/partials/_sections_container.html:567
+#: app/templates/forms/form_builder/partials/_sections_container.html:576
 msgid "Disability questions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:769
+#: app/templates/admin/assignments/manage_assignment.html:791
 msgid "Disable public reporting"
 msgstr ""
 
@@ -8035,7 +8115,7 @@ msgid "Disaggregated disability"
 msgstr ""
 
 #: app/templates/core/dashboard.html:1256
-#: app/templates/forms/form_builder/partials/_sections_container.html:448
+#: app/templates/forms/form_builder/partials/_sections_container.html:457
 msgid "Disaggregation"
 msgstr ""
 
@@ -8056,11 +8136,11 @@ msgstr ""
 msgid "Disaggregation Options"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:115
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:120
 msgid "Disaggregation coverage"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:111
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:116
 msgid ""
 "Disaggregation coverage: percentage of eligible indicators reported with "
 "disaggregation."
@@ -8111,7 +8191,7 @@ msgstr ""
 msgid "Discrepancy"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:123
+#: app/templates/forms/form_builder/partials/_sections_container.html:118
 msgid "Discussion"
 msgstr ""
 
@@ -8286,7 +8366,7 @@ msgstr ""
 
 #: app/templates/admin/organization/_nss_component.html:176
 #: app/templates/admin/organization/index.html:954
-#: plugins/fdrs/templates/compliance/tab_panel.html:190
+#: plugins/fdrs/templates/compliance/tab_panel.html:203
 msgid "Dissolved"
 msgstr ""
 
@@ -8302,12 +8382,16 @@ msgstr ""
 msgid "Distinct users reached"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:252
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:257
 msgid "Distribution by Age Group"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:248
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:253
 msgid "Distribution by Sex"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:410
+msgid "Divide by"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:452
@@ -8331,7 +8415,7 @@ msgstr ""
 msgid "Divisions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:917
+#: app/templates/admin/assignments/manage_assignment.html:939
 #: app/templates/admin/user_management/user_form.html:1000
 msgid "Divisions & Departments"
 msgstr ""
@@ -8436,7 +8520,7 @@ msgstr ""
 msgid "Document Updated"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:481
+#: app/templates/forms/form_builder/partials/_sections_container.html:490
 msgid "Document Upload"
 msgstr ""
 
@@ -8489,7 +8573,7 @@ msgstr ""
 msgid "Document sheets"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:132
+#: plugins/fdrs/templates/compliance/tab_panel.html:145
 msgid "Document status:"
 msgstr ""
 
@@ -8554,6 +8638,10 @@ msgstr ""
 msgid "Domains"
 msgstr ""
 
+#: app/templates/admin/assignments/manage_assignment.html:137
+msgid "Don't copy"
+msgstr ""
+
 #: app/templates/components/_ai_policy_modal.html:8
 msgid "Don't share sensitive information."
 msgstr ""
@@ -8612,7 +8700,7 @@ msgstr ""
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:282
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:314
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1185
-#: plugins/fdrs/templates/compliance/tab_panel.html:90
+#: plugins/fdrs/templates/compliance/tab_panel.html:103
 msgid "Download Excel"
 msgstr ""
 
@@ -8759,11 +8847,16 @@ msgid "Drag to move"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:258
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:471
 msgid "Drag to reorder"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:398
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:484
 msgid "Drag to reorder group"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:476
+msgid "Drag to reorder. New columns are added at the end of this list."
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:701
@@ -8818,9 +8911,9 @@ msgid "Dry run (preview only, no DB write)"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:122
-#: app/templates/admin/assignments/manage_assignment.html:288
-#: app/templates/admin/assignments/manage_assignment.html:314
-#: app/templates/admin/assignments/manage_assignment.html:323
+#: app/templates/admin/assignments/manage_assignment.html:310
+#: app/templates/admin/assignments/manage_assignment.html:336
+#: app/templates/admin/assignments/manage_assignment.html:345
 #: app/templates/core/dashboard/_assignments_tab.html:108
 msgid "Due Date"
 msgstr ""
@@ -8829,13 +8922,13 @@ msgstr ""
 msgid "Due Date:"
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1276
+#: app/routes/admin/assignment_management.py:1400
 msgid ""
 "Due date was not changed because some entities already have their own due"
 " dates."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1288
+#: app/routes/admin/assignment_management.py:1412
 msgid "Due date was not saved because this assignment has no entities yet."
 msgstr ""
 
@@ -8845,53 +8938,53 @@ msgstr ""
 msgid "Duplicate"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:712
+#: app/templates/forms/form_builder/partials/_sections_container.html:724
 msgid "Duplicate Document Field"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:778
+#: app/templates/forms/form_builder/partials/_sections_container.html:790
 msgid "Duplicate Image"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:630
+#: app/templates/forms/form_builder/partials/_sections_container.html:642
 msgid "Duplicate Indicator"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:746
+#: app/templates/forms/form_builder/partials/_sections_container.html:758
 msgid "Duplicate Matrix"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:817
+#: app/templates/forms/form_builder/partials/_sections_container.html:829
 msgid "Duplicate Plugin Item"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:679
+#: app/templates/forms/form_builder/partials/_sections_container.html:691
 msgid "Duplicate Question"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:175
+#: app/templates/forms/form_builder/partials/_sections_container.html:180
 msgid "Duplicate Section"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:351
+#: app/templates/forms/form_builder/partials/_sections_container.html:359
 msgid "Duplicate Sub-section"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1365
+#: app/templates/admin/assignments/manage_assignment.html:1388
 msgid "Duplicate assignment"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:709
+#: app/templates/forms/form_builder/partials/_sections_container.html:721
 msgid ""
 "Duplicate this document field? This will copy its upload configuration "
 "and permissions."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:775
+#: app/templates/forms/form_builder/partials/_sections_container.html:787
 msgid "Duplicate this image item?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:627
+#: app/templates/forms/form_builder/partials/_sections_container.html:639
 msgid ""
 "Duplicate this indicator? This will create a copy with the same "
 "calculations and settings."
@@ -8901,30 +8994,30 @@ msgstr ""
 msgid "Duplicate this item? This will copy the item and all of its configuration."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:743
+#: app/templates/forms/form_builder/partials/_sections_container.html:755
 msgid ""
 "Duplicate this matrix? This will copy all rows, columns, and validation "
 "rules."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:814
+#: app/templates/forms/form_builder/partials/_sections_container.html:826
 msgid "Duplicate this plugin item? This will copy its configuration and logic."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:676
+#: app/templates/forms/form_builder/partials/_sections_container.html:688
 msgid ""
 "Duplicate this question? This will copy its options, logic, and "
 "translations."
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:1437
-#: app/templates/forms/form_builder/partials/_sections_container.html:172
+#: app/templates/forms/form_builder/partials/_sections_container.html:177
 msgid ""
 "Duplicate this section? This will copy the section, all sub-sections, and"
 " their items."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:348
+#: app/templates/forms/form_builder/partials/_sections_container.html:356
 msgid ""
 "Duplicate this sub-section? This will copy the sub-section along with all"
 " of its items."
@@ -8949,7 +9042,7 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:81
 #: app/templates/forms/form_builder/partials/_section_modal.html:83
-#: app/templates/forms/form_builder/partials/_sections_container.html:119
+#: app/templates/forms/form_builder/partials/_sections_container.html:116
 msgid "Dynamic Indicators"
 msgstr ""
 
@@ -9010,7 +9103,7 @@ msgstr ""
 msgid "Earliest due"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:324
+#: app/templates/admin/assignments/manage_assignment.html:346
 msgid "Earliest:"
 msgstr ""
 
@@ -9088,7 +9181,7 @@ msgstr ""
 msgid "Edit Document"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:693
+#: app/templates/forms/form_builder/partials/_sections_container.html:705
 msgid "Edit Document Field"
 msgstr ""
 
@@ -9096,12 +9189,12 @@ msgstr ""
 msgid "Edit Embed Content"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:760
+#: app/templates/forms/form_builder/partials/_sections_container.html:772
 msgid "Edit Image"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:52
-#: app/templates/forms/form_builder/partials/_sections_container.html:598
+#: app/templates/forms/form_builder/partials/_sections_container.html:610
 msgid "Edit Indicator"
 msgstr ""
 
@@ -9113,7 +9206,7 @@ msgstr ""
 msgid "Edit List"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:726
+#: app/templates/forms/form_builder/partials/_sections_container.html:738
 msgid "Edit Matrix"
 msgstr ""
 
@@ -9121,11 +9214,11 @@ msgstr ""
 msgid "Edit National Society"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:792
+#: app/templates/forms/form_builder/partials/_sections_container.html:804
 msgid "Edit Plugin Item"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:644
+#: app/templates/forms/form_builder/partials/_sections_container.html:656
 msgid "Edit Question"
 msgstr ""
 
@@ -9135,7 +9228,7 @@ msgstr ""
 msgid "Edit Resource"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:154
+#: app/templates/forms/form_builder/partials/_sections_container.html:159
 msgid "Edit Section"
 msgstr ""
 
@@ -9144,11 +9237,11 @@ msgstr ""
 msgid "Edit Sector"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1095
+#: app/templates/admin/assignments/manage_assignment.html:1117
 msgid "Edit Status"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1095
+#: app/templates/admin/assignments/manage_assignment.html:1117
 msgid "Edit Status for"
 msgstr ""
 
@@ -9157,7 +9250,7 @@ msgstr ""
 msgid "Edit Sub-Sector"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:329
+#: app/templates/forms/form_builder/partials/_sections_container.html:337
 msgid "Edit Sub-section"
 msgstr ""
 
@@ -9175,8 +9268,8 @@ msgstr ""
 msgid "Edit all translations"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:51
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:52
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:101
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:103
 #: app/templates/forms/entry_form/partials/discussion_panel.html:40
 #: app/templates/forms/entry_form/partials/discussion_panel_section.html:33
 msgid "Edit comment"
@@ -9247,11 +9340,11 @@ msgstr ""
 msgid "Effect"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:128
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:133
 msgid "Eligible indicators"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:124
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:129
 msgid "Eligible indicators: count of indicators included in this analysis."
 msgstr ""
 
@@ -9319,7 +9412,7 @@ msgstr ""
 msgid "Email attempted"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1070
+#: app/templates/admin/assignments/manage_assignment.html:1092
 msgid "Email body preview"
 msgstr ""
 
@@ -9529,7 +9622,7 @@ msgid ""
 "entity assignments."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1440
+#: app/templates/admin/assignments/manage_assignment.html:1472
 msgid ""
 "Enable per-page submit?\n"
 "\n"
@@ -9541,7 +9634,7 @@ msgid ""
 "Save still writes the whole form."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:766
+#: app/templates/admin/assignments/manage_assignment.html:788
 msgid "Enable public reporting"
 msgstr ""
 
@@ -9566,7 +9659,7 @@ msgstr ""
 msgid "End"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:265
+#: app/templates/admin/assignments/manage_assignment.html:287
 #: app/templates/admin/documents/documents.html:304
 #: app/templates/forms/entry_form/entry_form.html:3068
 msgid "End Period"
@@ -9576,7 +9669,7 @@ msgstr ""
 msgid "End Tour"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:239
+#: app/templates/admin/assignments/manage_assignment.html:261
 #: app/templates/admin/documents/documents.html:262
 #: app/templates/forms/entry_form/entry_form.html:3026
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:142
@@ -9631,7 +9724,7 @@ msgid "Engine mix"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:142
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:107
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:120
 msgid "English"
 msgstr ""
 
@@ -9698,7 +9791,7 @@ msgstr ""
 msgid "Enter new value…"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:378
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:452
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:200
 msgid "Enter option text"
 msgstr ""
@@ -9738,7 +9831,7 @@ msgid "Enter your job title or role"
 msgstr ""
 
 #: app/templates/admin/assignments/_assignment_status_overview.html:59
-#: app/templates/admin/assignments/manage_assignment.html:1392
+#: app/templates/admin/assignments/manage_assignment.html:1415
 #: app/templates/admin/user_management/users.html:377
 msgid "Entities"
 msgstr ""
@@ -9746,6 +9839,13 @@ msgstr ""
 #: app/templates/admin/assignments/_assignment_status_overview.html:120
 #: app/templates/admin/assignments/_assignment_status_overview.html:139
 msgid "Entities by status"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:1420
+#, python-brace-format
+msgid ""
+"Entities on the source use different due dates. The earliest ({date}) was"
+" filled in."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:824
@@ -10076,7 +10176,7 @@ msgid ""
 "the register below and are not a failure of this control."
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:35
+#: plugins/fdrs/templates/ecr/tab_panel.html:155
 msgid ""
 "Every figure and table from Everyone Counts 2026, calculated from current"
 " FDRS assignments. Closed years use the published value. A figure that "
@@ -10123,11 +10223,11 @@ msgid ""
 "first if these are different language versions."
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:33
+#: plugins/fdrs/templates/ecr/tab_panel.html:153
 msgid "Everyone Counts"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:58
+#: plugins/fdrs/templates/ecr/tab_panel.html:180
 msgid "Everyone Counts chapters"
 msgstr ""
 
@@ -10323,7 +10423,7 @@ msgstr ""
 msgid "Expand or collapse filters"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:312
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:321
 msgid "Expand selectable header options"
 msgstr ""
 
@@ -10338,7 +10438,7 @@ msgstr ""
 msgid "Expected JSON body"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:149
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:154
 msgid ""
 "Expected indicators with no saved reported value. These appear when non-"
 "reported items are included for a bounded template, period, and country "
@@ -10371,14 +10471,14 @@ msgid "Expires"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:123
-#: app/templates/admin/assignments/manage_assignment.html:296
-#: app/templates/admin/assignments/manage_assignment.html:305
+#: app/templates/admin/assignments/manage_assignment.html:318
+#: app/templates/admin/assignments/manage_assignment.html:327
 msgid "Expiry Date"
 msgstr ""
 
 #: app/routes/admin/data_exploration.py:296
 #: app/routes/admin/data_exploration.py:320
-#: app/templates/admin/_validation_admin_shell.html:55
+#: app/templates/admin/_validation_admin_shell.html:109
 #: app/templates/admin/data_exploration/explore_data.html:4
 #: app/templates/admin/data_exploration/explore_data.html:19
 #: app/templates/components/_sidebar_nav_categories.html:122
@@ -10500,7 +10600,7 @@ msgstr ""
 msgid "Export all languages in a single Excel file. Easy to edit and reimport."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:371
+#: plugins/upr/templates/upr/tab_panel.html:383
 msgid "Export cancelled."
 msgstr ""
 
@@ -10508,7 +10608,7 @@ msgstr ""
 msgid "Export failed"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:370
+#: plugins/upr/templates/upr/tab_panel.html:382
 msgid "Export failed."
 msgstr ""
 
@@ -10524,7 +10624,7 @@ msgstr ""
 msgid "Export or import template structure to/from Excel"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:369
+#: plugins/upr/templates/upr/tab_panel.html:381
 msgid "Export ready. Download the ZIP below."
 msgstr ""
 
@@ -10590,6 +10690,10 @@ msgstr ""
 msgid "External Links"
 msgstr ""
 
+#: plugins/fdrs/templates/ecr/tab_panel.html:219
+msgid "External sources"
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:552
 msgid ""
 "Extract English terms with the model, retrieve matching target-language "
@@ -10638,7 +10742,7 @@ msgstr ""
 msgid "FDRS"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:70
+#: plugins/fdrs/templates/compliance/tab_panel.html:83
 msgid "FDRS Document Compliance"
 msgstr ""
 
@@ -10655,7 +10759,7 @@ msgstr ""
 msgid "FDRS data sync, imputation, and manage publication"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:17
+#: plugins/fdrs/templates/service_income/tab_panel.html:21
 msgid ""
 "FDRS imputes total income for the open collection round, and does not "
 "impute income sources. The average of the two preceding closed rounds is "
@@ -10986,8 +11090,8 @@ msgstr ""
 msgid "Features"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:250
-#: app/templates/admin/assignments/manage_assignment.html:270
+#: app/templates/admin/assignments/manage_assignment.html:272
+#: app/templates/admin/assignments/manage_assignment.html:292
 #: app/templates/admin/documents/documents.html:289
 #: app/templates/admin/documents/documents.html:315
 #: app/templates/forms/entry_form/entry_form.html:3053
@@ -11136,6 +11240,13 @@ msgid ""
 "Fills or overwrites from the current release’s bundled HTML (same as the "
 "flask seed-email-templates command). The page reloads after a successful "
 "run."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:146
+msgid ""
+"Fills this form with that assignment's template, period, options, and "
+"entities. Change anything you need, then create the assignment. Nothing "
+"is saved until you submit."
 msgstr ""
 
 #: app/templates/admin/analytics/login_logs.html:71
@@ -11448,7 +11559,7 @@ msgstr ""
 msgid "Focal points can add indicators from the indicator bank"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:445
+#: app/templates/admin/assignments/manage_assignment.html:467
 msgid ""
 "Focal points will be notified about the new assignment. Uncheck to create"
 " without sending notifications."
@@ -11650,6 +11761,10 @@ msgstr ""
 msgid "Forms"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:414
+msgid "Formula"
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:716
 #: app/templates/components/auto_translate_modal_js.html:32
 msgid "Found"
@@ -11700,7 +11815,7 @@ msgid "Found data · reviewing…"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:143
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:108
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:121
 msgid "French"
 msgstr ""
 
@@ -11741,7 +11856,7 @@ msgstr ""
 msgid "From this entity's document repository"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:37
+#: plugins/fdrs/templates/service_income/tab_panel.html:41
 msgid "Full"
 msgstr ""
 
@@ -11757,7 +11872,7 @@ msgstr ""
 msgid "Full Name"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:37
+#: plugins/fdrs/templates/service_income/tab_panel.html:41
 msgid "Full amount"
 msgstr ""
 
@@ -11769,7 +11884,7 @@ msgstr ""
 msgid "Full quality_debug payload"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:464
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:550
 msgid "Full width"
 msgstr ""
 
@@ -11795,7 +11910,7 @@ msgstr ""
 msgid "Gathering additional sources…"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:217
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:222
 msgid "Gender Distribution by Country"
 msgstr ""
 
@@ -11816,7 +11931,7 @@ msgstr ""
 
 #: plugins/upr/templates/upr/_manage_tools.html:89
 #: plugins/upr/templates/upr/_narrative_modal.html:69
-#: plugins/upr/templates/upr/tab_panel.html:365
+#: plugins/upr/templates/upr/tab_panel.html:377
 msgid "Generate InDesign"
 msgstr ""
 
@@ -11835,17 +11950,17 @@ msgid "Generate PDF Thumbnail"
 msgstr ""
 
 #: plugins/upr/templates/upr/_manage_tools.html:89
-#: plugins/upr/templates/upr/tab_panel.html:364
+#: plugins/upr/templates/upr/tab_panel.html:376
 msgid "Generate PDFs"
 msgstr ""
 
 #: plugins/upr/templates/upr/_manage_tools.html:89
 #: plugins/upr/templates/upr/_manage_tools.html:90
-#: plugins/upr/templates/upr/tab_panel.html:363
+#: plugins/upr/templates/upr/tab_panel.html:375
 msgid "Generate PNGs"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:714
+#: app/templates/admin/assignments/manage_assignment.html:736
 msgid "Generate Public URL"
 msgstr ""
 
@@ -11901,7 +12016,7 @@ msgid "Generated:"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:220
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:157
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:170
 msgid "Generating report..."
 msgstr ""
 
@@ -11926,7 +12041,7 @@ msgid "Generating..."
 msgstr ""
 
 #: plugins/upr/templates/upr/_narrative_modal.html:58
-#: plugins/upr/templates/upr/tab_panel.html:362
+#: plugins/upr/templates/upr/tab_panel.html:374
 msgid "Generating…"
 msgstr ""
 
@@ -12015,7 +12130,7 @@ msgstr ""
 msgid "Governance, finance, and people-reached indicators"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:298
+#: app/templates/forms/entry_form/partials/matrix_table.html:83
 msgid "Grand total for matrix"
 msgstr ""
 
@@ -12104,7 +12219,7 @@ msgstr ""
 msgid "Group into sections"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:402
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:488
 msgid "Group label, e.g. Male"
 msgstr ""
 
@@ -12222,9 +12337,12 @@ msgstr ""
 #: app/routes/help_docs.py:44
 #: app/templates/forms/form_builder/partials/_field_help_tooltip.html:3
 #: app/templates/forms/form_builder/partials/_item_modal.html:215
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:8
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:271
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:292
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:15
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:272
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:293
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:302
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:430
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:438
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:260
 msgid "Help"
 msgstr ""
@@ -12247,7 +12365,7 @@ msgstr ""
 msgid "Hide Details"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:90
+#: app/templates/forms/form_builder/partials/_sections_container.html:95
 msgid "Hide Sections"
 msgstr ""
 
@@ -12279,7 +12397,7 @@ msgid "Hide section header on entry form"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:222
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:159
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:172
 msgid "Hide steps"
 msgstr ""
 
@@ -12326,11 +12444,11 @@ msgstr ""
 msgid "Highlights empty fields in red. Click again to clear."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:6
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:11
 msgid "Hint"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:18
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:35
 msgid "Hint style"
 msgstr ""
 
@@ -12343,7 +12461,7 @@ msgstr ""
 msgid "Historical data"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:42
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:83
 #: app/templates/forms/entry_form/partials/discussion_panel.html:39
 #: app/templates/forms/entry_form/partials/discussion_panel_section.html:32
 msgid "Historical import"
@@ -12413,7 +12531,7 @@ msgstr ""
 msgid "How many volunteers in Bangladesh?"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:63
+#: plugins/fdrs/templates/ecr/tab_panel.html:185
 msgid "How these figures are calculated"
 msgstr ""
 
@@ -12604,7 +12722,7 @@ msgstr ""
 
 #: app/templates/components/_builder_items.html:25
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:84
-#: app/templates/forms/form_builder/partials/_sections_container.html:534
+#: app/templates/forms/form_builder/partials/_sections_container.html:543
 msgid "Image"
 msgstr ""
 
@@ -12612,11 +12730,11 @@ msgstr ""
 msgid "Image Item Translations"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:495
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:581
 msgid "Image URL or site path"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:490
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:576
 msgid "Image file"
 msgstr ""
 
@@ -12630,7 +12748,7 @@ msgstr ""
 msgid "Image files only (PNG, JPG, etc.) up to 10MB"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:472
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:558
 msgid "Image source by language"
 msgstr ""
 
@@ -12893,7 +13011,7 @@ msgid "Import/Export"
 msgstr ""
 
 #: app/templates/admin/api_keys/create.html:79
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:23
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:45
 msgid "Important"
 msgstr ""
 
@@ -12906,8 +13024,8 @@ msgstr ""
 msgid "Imported"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:18
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:34
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:35
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:67
 msgid "Imported from UPR Excel"
 msgstr ""
 
@@ -12947,11 +13065,11 @@ msgstr ""
 #: app/templates/admin/data_exploration/explore_data.html:2568
 #: app/templates/components/_status_label.html:98
 #: app/templates/forms/entry_form/export_pdf.html:188
-#: app/templates/forms/entry_form/export_pdf.html:289
+#: app/templates/forms/entry_form/export_pdf.html:305
 msgid "Imputed"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:76
+#: plugins/fdrs/templates/service_income/tab_panel.html:80
 msgid "Imputed NSs"
 msgstr ""
 
@@ -12998,6 +13116,10 @@ msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:147
 msgid "In review"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:301
+msgid "In row total"
 msgstr ""
 
 #: app/templates/tours/tours.html:501
@@ -13065,7 +13187,7 @@ msgstr ""
 #: app/templates/admin/user_management/users.html:389
 #: app/templates/components/_status_label.html:75
 #: app/templates/components/ag_grid_i18n_js.html:28
-#: plugins/fdrs/templates/compliance/tab_panel.html:189
+#: plugins/fdrs/templates/compliance/tab_panel.html:202
 msgid "Inactive"
 msgstr ""
 
@@ -13073,7 +13195,7 @@ msgstr ""
 msgid "Inactive Public"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:619
+#: plugins/fdrs/templates/compliance/tab_panel.html:632
 msgid "Inactive countries and National Societies are included in these counts."
 msgstr ""
 
@@ -13121,10 +13243,6 @@ msgid ""
 "Include rows where wall-clock session length or active time (start to "
 "last activity) is at least this many minutes, or the session is still "
 "active and has been open at least this long."
-msgstr ""
-
-#: plugins/fdrs/templates/ecr/tab_panel.html:195
-msgid "Income group is the current classification, held fixed across years."
 msgstr ""
 
 #: app/templates/core/dashboard.html:1281
@@ -13309,7 +13427,7 @@ msgstr ""
 msgid "Indicators created:"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:133
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:138
 msgid "Indicators in scope"
 msgstr ""
 
@@ -13323,14 +13441,14 @@ msgstr ""
 msgid "Indicators updated:"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:136
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:141
 msgid ""
 "Indicators with a single reported value but no disaggregation breakdown. "
 "These are reported, but not disaggregated."
 msgstr ""
 
 #: app/templates/components/_builder_items.html:117
-#: app/templates/forms/form_builder/partials/_sections_container.html:562
+#: app/templates/forms/form_builder/partials/_sections_container.html:571
 msgid "Indirect Reach"
 msgstr ""
 
@@ -13360,7 +13478,7 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:443
 #: app/templates/admin/monitoring/system_monitoring.html:212
 #: app/templates/admin/validation_questions.html:141
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:20
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:39
 msgid "Info"
 msgstr ""
 
@@ -13554,7 +13672,7 @@ msgid ""
 "message, user_name, action_url, org_name, copyright_year"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:283
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:284
 msgid "Is Variable"
 msgstr ""
 
@@ -13572,7 +13690,7 @@ msgstr ""
 msgid "Issue register"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:434
+#: app/templates/forms/form_builder/partials/_sections_container.html:443
 msgid "Issue: Missing/invalid indicator reference"
 msgstr ""
 
@@ -13607,7 +13725,7 @@ msgstr ""
 
 #: app/templates/admin/api_management.html:1100
 #: app/templates/admin/api_management.html:1117
-#: app/templates/forms/form_builder/partials/_sections_container.html:408
+#: app/templates/forms/form_builder/partials/_sections_container.html:417
 msgid "Item ID"
 msgstr ""
 
@@ -13709,8 +13827,8 @@ msgstr ""
 msgid "JSON request required"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:249
-#: app/templates/admin/assignments/manage_assignment.html:269
+#: app/templates/admin/assignments/manage_assignment.html:271
+#: app/templates/admin/assignments/manage_assignment.html:291
 #: app/templates/admin/documents/documents.html:288
 #: app/templates/admin/documents/documents.html:314
 #: app/templates/forms/entry_form/entry_form.html:3052
@@ -13747,8 +13865,8 @@ msgstr ""
 msgid "Judged traces"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:255
-#: app/templates/admin/assignments/manage_assignment.html:275
+#: app/templates/admin/assignments/manage_assignment.html:277
+#: app/templates/admin/assignments/manage_assignment.html:297
 #: app/templates/admin/documents/documents.html:294
 #: app/templates/admin/documents/documents.html:320
 #: app/templates/forms/entry_form/entry_form.html:3058
@@ -13760,8 +13878,8 @@ msgstr ""
 msgid "Jul"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:254
-#: app/templates/admin/assignments/manage_assignment.html:274
+#: app/templates/admin/assignments/manage_assignment.html:276
+#: app/templates/admin/assignments/manage_assignment.html:296
 #: app/templates/admin/documents/documents.html:293
 #: app/templates/admin/documents/documents.html:319
 #: app/templates/forms/entry_form/entry_form.html:3057
@@ -13809,7 +13927,7 @@ msgstr ""
 msgid "Keep the data entries but archive the"
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:499
+#: app/templates/forms/entry_form/export_pdf.html:536
 #: plugins/pb_progress/templates/pb_progress/manage.html:194
 msgid "Key"
 msgstr ""
@@ -13909,7 +14027,7 @@ msgstr ""
 #: app/templates/admin/validation_rules.html:221
 #: app/templates/components/_builder_items.html:40
 #: app/templates/components/_builder_items.html:68
-#: app/templates/forms/form_builder/partials/_sections_container.html:463
+#: app/templates/forms/form_builder/partials/_sections_container.html:472
 msgid "Label"
 msgstr ""
 
@@ -13944,7 +14062,7 @@ msgstr ""
 #: app/templates/auth/login.html:680
 #: app/templates/components/_mobile_language_menu.html:18
 #: app/templates/core/layout.html:275
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:104
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:117
 #: plugins/upr/templates/upr/_language_select.html:6
 #: plugins/upr/templates/upr/_language_select.html:12
 #: plugins/upr/templates/upr/_language_select.html:13
@@ -14072,13 +14190,13 @@ msgstr ""
 msgid "Last sent"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:107
-#: plugins/fdrs/templates/service_income/tab_panel.html:120
+#: plugins/fdrs/templates/service_income/tab_panel.html:111
+#: plugins/fdrs/templates/service_income/tab_panel.html:124
 msgid "Last two closed rounds"
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:185
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:155
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:168
 msgid "Last updated:"
 msgstr ""
 
@@ -14092,8 +14210,8 @@ msgstr ""
 msgid "Last year"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:79
-#: plugins/fdrs/templates/compliance/tab_panel.html:509
+#: plugins/fdrs/templates/compliance/tab_panel.html:92
+#: plugins/fdrs/templates/compliance/tab_panel.html:522
 msgid "Latest"
 msgstr ""
 
@@ -14101,7 +14219,7 @@ msgstr ""
 msgid "Latest Submission"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:82
+#: plugins/fdrs/templates/ecr/tab_panel.html:211
 msgid "Latest closed year"
 msgstr ""
 
@@ -14115,8 +14233,8 @@ msgstr ""
 
 #: app/templates/components/_builder_items.html:127
 #: app/templates/components/_builder_items.html:129
-#: app/templates/forms/form_builder/partials/_sections_container.html:572
-#: app/templates/forms/form_builder/partials/_sections_container.html:574
+#: app/templates/forms/form_builder/partials/_sections_container.html:581
+#: app/templates/forms/form_builder/partials/_sections_container.html:583
 msgid "Layout"
 msgstr ""
 
@@ -14132,7 +14250,7 @@ msgstr ""
 msgid "Leave blank for no expiry."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:206
+#: app/templates/admin/assignments/manage_assignment.html:228
 msgid "Leave blank to use \"Template – Period\" everywhere."
 msgstr ""
 
@@ -14180,7 +14298,7 @@ msgid "Leave empty to use the indicator bank name."
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:85
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:456
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:542
 msgid "Left"
 msgstr ""
 
@@ -14225,14 +14343,14 @@ msgstr ""
 msgid "Less than 1 minute"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:609
+#: app/templates/admin/assignments/manage_assignment.html:631
 msgid ""
 "Let focal points submit each page independently instead of the whole form"
 " at once. Save still writes the whole form. Applies to paginated "
 "templates."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:509
+#: app/templates/admin/assignments/manage_assignment.html:531
 msgid ""
 "Let focal points submit each page independently instead of the whole form"
 " at once. Save still writes the whole form. Applies to paginated "
@@ -14316,7 +14434,7 @@ msgstr ""
 msgid "List Config"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:333
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:342
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:173
 msgid "List Library"
 msgstr ""
@@ -14407,11 +14525,11 @@ msgstr ""
 msgid "Load summary first"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:966
+#: app/templates/admin/assignments/manage_assignment.html:988
 msgid "Loading Regions structure..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:948
+#: app/templates/admin/assignments/manage_assignment.html:970
 msgid "Loading Secretariat structure..."
 msgstr ""
 
@@ -14424,7 +14542,7 @@ msgstr ""
 msgid "Loading assignments data..."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:350
+#: plugins/upr/templates/upr/tab_panel.html:362
 msgid "Loading assignments…"
 msgstr ""
 
@@ -14457,9 +14575,13 @@ msgstr ""
 msgid "Loading common words..."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:96
-#: plugins/fdrs/templates/compliance/tab_panel.html:103
+#: plugins/fdrs/templates/compliance/tab_panel.html:109
+#: plugins/fdrs/templates/compliance/tab_panel.html:116
 msgid "Loading compliance data..."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:1416
+msgid "Loading configuration…"
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:1432
@@ -14468,7 +14590,7 @@ msgid "Loading countries..."
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:165
-#: plugins/upr/templates/upr/tab_panel.html:351
+#: plugins/upr/templates/upr/tab_panel.html:363
 msgid "Loading countries…"
 msgstr ""
 
@@ -14516,7 +14638,7 @@ msgstr ""
 msgid "Loading endpoints…"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:776
+#: app/templates/admin/assignments/manage_assignment.html:798
 #: app/templates/admin/communication/center.html:270
 msgid "Loading entities..."
 msgstr ""
@@ -14597,9 +14719,9 @@ msgstr ""
 msgid "Loading preview..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1039
+#: app/templates/admin/assignments/manage_assignment.html:1061
 #: app/templates/admin/communication/registry.html:135
-#: plugins/upr/templates/upr/tab_panel.html:376
+#: plugins/upr/templates/upr/tab_panel.html:388
 msgid "Loading preview…"
 msgstr ""
 
@@ -14615,9 +14737,9 @@ msgstr ""
 msgid "Loading regional offices..."
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:60
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:134
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:156
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:73
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:147
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:169
 msgid "Loading report…"
 msgstr ""
 
@@ -14712,10 +14834,10 @@ msgstr ""
 #: app/templates/components/ag_grid_includes.html:119
 #: app/templates/components/loading_indicator.html:22
 #: app/templates/core/dashboard.html:1294
-#: app/templates/forms/form_builder/partials/_sections_container.html:309
-#: app/templates/forms/form_builder/partials/_sections_container.html:580
-#: app/templates/forms/form_builder/partials/_sections_container.html:584
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:71
+#: app/templates/forms/form_builder/partials/_sections_container.html:315
+#: app/templates/forms/form_builder/partials/_sections_container.html:589
+#: app/templates/forms/form_builder/partials/_sections_container.html:593
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:75
 msgid "Loading..."
 msgstr ""
 
@@ -14750,7 +14872,7 @@ msgstr ""
 msgid "Locale code (en, fr, es, etc.)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:545
+#: app/templates/forms/form_builder/partials/_sections_container.html:554
 msgid "Localized images"
 msgstr ""
 
@@ -14884,7 +15006,7 @@ msgid "Lookup value label"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:230
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:166
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:179
 msgid ""
 "Lost connection to the server while generating. Wait for the server to "
 "come back, then refresh this page."
@@ -14985,7 +15107,7 @@ msgid ""
 "public website"
 msgstr ""
 
-#: app/templates/admin/_validation_admin_shell.html:33
+#: app/templates/admin/_validation_admin_shell.html:65
 msgid "Manage Questions"
 msgstr ""
 
@@ -15057,7 +15179,7 @@ msgstr ""
 msgid "Manage report"
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:70
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:83
 msgid "Manage report data and build"
 msgstr ""
 
@@ -15113,12 +15235,12 @@ msgstr ""
 msgid "Manage your registered mobile devices for push notifications."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:325
+#: app/templates/admin/assignments/manage_assignment.html:347
 msgid "Managed per entity below."
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:48
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:329
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:338
 msgid "Manual"
 msgstr ""
 
@@ -15172,8 +15294,8 @@ msgid ""
 " shown in grids. Matches the NotificationType enum used for stored rows."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:251
-#: app/templates/admin/assignments/manage_assignment.html:271
+#: app/templates/admin/assignments/manage_assignment.html:273
+#: app/templates/admin/assignments/manage_assignment.html:293
 #: app/templates/admin/documents/documents.html:290
 #: app/templates/admin/documents/documents.html:316
 #: app/templates/forms/entry_form/entry_form.html:3054
@@ -15261,7 +15383,7 @@ msgstr ""
 
 #: app/templates/admin/templates/partials/imputation_badges.html:18
 #: app/templates/components/_builder_items.html:100
-#: app/templates/forms/form_builder/partials/_sections_container.html:499
+#: app/templates/forms/form_builder/partials/_sections_container.html:508
 msgid "Matrix"
 msgstr ""
 
@@ -15286,7 +15408,7 @@ msgid "Matrix Row Headers Translations Matrix"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:79
-#: app/templates/forms/form_builder/partials/_sections_container.html:487
+#: app/templates/forms/form_builder/partials/_sections_container.html:496
 msgid "Matrix Table"
 msgstr ""
 
@@ -15295,7 +15417,7 @@ msgstr ""
 msgid "Matrix Title"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:514
+#: app/templates/forms/entry_form/partials/matrix_table.html:571
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr ""
 
@@ -15328,15 +15450,19 @@ msgstr ""
 msgid "Max indicators: %(current)s/%(max)s"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:462
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:548
 msgid "Max width"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:389
+msgid "Maximum"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:46
 msgid "Maximum Documents Allowed"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:273
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:274
 msgid ""
 "Maximum decimal places accepted for this column. Values are rounded on "
 "save; use \".\" for decimals and \",\" for thousands when entering or "
@@ -15373,8 +15499,8 @@ msgid ""
 "reached the limit."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:253
-#: app/templates/admin/assignments/manage_assignment.html:273
+#: app/templates/admin/assignments/manage_assignment.html:275
+#: app/templates/admin/assignments/manage_assignment.html:295
 #: app/templates/admin/documents/documents.html:292
 #: app/templates/admin/documents/documents.html:318
 #: app/templates/forms/entry_form/entry_form.html:3056
@@ -15422,11 +15548,11 @@ msgstr ""
 msgid "Measurement types and units"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:81
+#: plugins/fdrs/templates/ecr/tab_panel.html:210
 msgid "Median share of women volunteers"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:80
+#: plugins/fdrs/templates/ecr/tab_panel.html:209
 msgid "Median volunteers per paid staff"
 msgstr ""
 
@@ -15460,7 +15586,7 @@ msgid "Menu"
 msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:215
-#: app/templates/admin/assignments/manage_assignment.html:1065
+#: app/templates/admin/assignments/manage_assignment.html:1087
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:23
 #: app/templates/admin/communication/center.html:654
 #: app/templates/admin/communication/center.html:1369
@@ -15565,6 +15691,10 @@ msgstr ""
 msgid "Minimize — translation keeps running in background"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:388
+msgid "Minimum"
+msgstr ""
+
 #: app/templates/admin/settings/manage_settings.html:201
 msgid "Minimum mobile app version"
 msgstr ""
@@ -15580,8 +15710,8 @@ msgstr ""
 #: app/templates/admin/validation_dashboard.html:294
 #: app/templates/core/dashboard.html:1289
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:196
-#: plugins/fdrs/templates/compliance/tab_panel.html:136
-#: plugins/fdrs/templates/compliance/tab_panel.html:222
+#: plugins/fdrs/templates/compliance/tab_panel.html:149
+#: plugins/fdrs/templates/compliance/tab_panel.html:235
 msgid "Missing"
 msgstr ""
 
@@ -15672,7 +15802,7 @@ msgstr ""
 msgid "Monitoring Questions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:226
+#: app/templates/admin/assignments/manage_assignment.html:248
 #: app/templates/admin/documents/documents.html:233
 #: app/templates/forms/entry_form/entry_form.html:2997
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:43
@@ -15703,14 +15833,14 @@ msgid "Most Active Users (30 days)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:245
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:382
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:456
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:204
 #: app/templates/forms/form_builder/partials/_template_details.html:358
 msgid "Move Down"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:242
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:379
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:453
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:201
 #: app/templates/forms/form_builder/partials/_template_details.html:357
 msgid "Move Up"
@@ -15739,7 +15869,7 @@ msgstr ""
 msgid "Multiple"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:327
+#: app/templates/admin/assignments/manage_assignment.html:349
 msgid "Multiple different due dates set across entities."
 msgstr ""
 
@@ -15921,7 +16051,7 @@ msgstr ""
 msgid "National Societies"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:114
+#: plugins/fdrs/templates/service_income/tab_panel.html:118
 msgid "National Societies with a total"
 msgstr ""
 
@@ -15967,8 +16097,8 @@ msgstr ""
 msgid "National Society focal points (count)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:495
-#: app/templates/admin/assignments/manage_assignment.html:597
+#: app/templates/admin/assignments/manage_assignment.html:517
+#: app/templates/admin/assignments/manage_assignment.html:619
 msgid ""
 "National Society focal points must send to delegation for review before "
 "final submission; delegation can edit and submit upstream."
@@ -16169,7 +16299,7 @@ msgstr ""
 msgid "New chat"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1154
+#: app/templates/admin/assignments/manage_assignment.html:1176
 msgid "New due date"
 msgstr ""
 
@@ -16203,7 +16333,7 @@ msgstr ""
 msgid "New report"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1135
+#: app/templates/admin/assignments/manage_assignment.html:1157
 msgid "New status"
 msgstr ""
 
@@ -16310,11 +16440,11 @@ msgstr ""
 msgid "No Excel file selected for import."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:126
+#: plugins/fdrs/templates/service_income/tab_panel.html:130
 msgid "No FDRS income figures were found."
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:76
+#: plugins/fdrs/templates/ecr/tab_panel.html:205
 msgid "No FDRS indicator values were found for this analysis."
 msgstr ""
 
@@ -16339,7 +16469,7 @@ msgstr ""
 msgid "No National Societies found."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:193
+#: plugins/fdrs/templates/compliance/tab_panel.html:206
 msgid "No National Society"
 msgstr ""
 
@@ -16375,18 +16505,12 @@ msgstr ""
 msgid "No URL!"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:352
+#: plugins/upr/templates/upr/tab_panel.html:364
 msgid "No Unified Plan or Report assignments found."
 msgstr ""
 
 #: app/services/platform/user_analytics_service.py:267
 msgid "No User-Agent header was sent."
-msgstr ""
-
-#: plugins/fdrs/templates/ecr/tab_panel.html:190
-msgid ""
-"No World Bank snapshot is saved yet. Refresh to download population and "
-"income groups."
 msgstr ""
 
 #: app/templates/admin/api_keys/_access_summary.html:4
@@ -16502,7 +16626,7 @@ msgstr ""
 msgid "No completion data yet"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:597
+#: plugins/fdrs/templates/compliance/tab_panel.html:610
 msgid "No compliance data available."
 msgstr ""
 
@@ -16536,8 +16660,8 @@ msgstr ""
 msgid "No country assignments for this period."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:204
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:268
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:209
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:273
 msgid "No country coverage data found for eligible indicators."
 msgstr ""
 
@@ -16549,7 +16673,7 @@ msgstr ""
 msgid "No country information found."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:354
+#: plugins/upr/templates/upr/tab_panel.html:366
 msgid "No dashboards available for this assignment."
 msgstr ""
 
@@ -16557,7 +16681,7 @@ msgstr ""
 msgid "No data available for this selection."
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:85
+#: plugins/fdrs/templates/ecr/tab_panel.html:214
 msgid "No data for this figure."
 msgstr ""
 
@@ -16570,7 +16694,7 @@ msgid "No data found. Try adjusting your parameters."
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:2652
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:89
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:94
 msgid "No data loaded yet"
 msgstr ""
 
@@ -16578,11 +16702,11 @@ msgstr ""
 msgid "No data owner"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:153
+#: app/templates/admin/assignments/manage_assignment.html:175
 msgid "No data owner set — governance gap."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:772
+#: app/routes/admin/assignment_management.py:880
 msgid ""
 "No data owner was set for this assignment. Consider assigning one for "
 "governance accountability."
@@ -16627,7 +16751,7 @@ msgstr ""
 
 #: app/templates/admin/organization/_nss_component.html:178
 #: app/templates/admin/organization/index.html:956
-#: plugins/fdrs/templates/compliance/tab_panel.html:192
+#: plugins/fdrs/templates/compliance/tab_panel.html:205
 msgid "No direct comms"
 msgstr ""
 
@@ -16670,11 +16794,11 @@ msgstr ""
 msgid "No documents have been uploaded for this entity yet."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:188
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:193
 msgid "No eligible disaggregation indicators found for the current parameters."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:196
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:201
 msgid "No eligible indicators found."
 msgstr ""
 
@@ -16683,7 +16807,7 @@ msgstr ""
 msgid "No email deliveries in this period."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1384
+#: app/templates/admin/assignments/manage_assignment.html:1407
 msgid "No email recipients for this country with the current settings."
 msgstr ""
 
@@ -16741,7 +16865,7 @@ msgstr ""
 msgid "No focal points"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1385
+#: app/templates/admin/assignments/manage_assignment.html:1408
 msgid ""
 "No focal points are configured for the selected countries — no "
 "notifications will be sent."
@@ -16767,7 +16891,7 @@ msgstr ""
 msgid "No form templates found."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:242
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:247
 msgid "No governing board, volunteer, or staff gender-disaggregated data found."
 msgstr ""
 
@@ -16788,7 +16912,7 @@ msgstr ""
 msgid "No indicator suggestion has been pending for more than 30 days."
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:629
+#: app/templates/forms/entry_form/export_pdf.html:666
 #: app/templates/forms/entry_form/validation_summary_pdf.html:165
 msgid "No indicators added."
 msgstr ""
@@ -17023,11 +17147,11 @@ msgstr ""
 msgid "No removed (obsolete) entries found. Try refreshing the page."
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:66
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:79
 msgid "No report is available yet."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:159
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:164
 msgid "No reported value saved"
 msgstr ""
 
@@ -17058,7 +17182,7 @@ msgid ""
 "summary)."
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:400
+#: app/templates/forms/entry_form/export_pdf.html:422
 msgid "No rows added"
 msgstr ""
 
@@ -17088,7 +17212,7 @@ msgid ""
 "open the Campaigns tab to create one."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:879
+#: app/templates/forms/form_builder/partials/_sections_container.html:893
 msgid "No sections added to this template yet."
 msgstr ""
 
@@ -17137,7 +17261,7 @@ msgstr ""
 msgid "No settings were changed."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:260
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:265
 msgid "No sex or age disaggregation found for the current parameters."
 msgstr ""
 
@@ -17278,7 +17402,7 @@ msgstr ""
 msgid "No user found for that email. Showing all users."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1389
+#: app/templates/admin/assignments/manage_assignment.html:1412
 #: app/templates/admin/user_management/users.html:170
 msgid "No users found."
 msgstr ""
@@ -17314,12 +17438,12 @@ msgstr ""
 msgid "Nobody has country access without a role."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:334
-#: plugins/fdrs/templates/compliance/tab_panel.html:541
+#: plugins/fdrs/templates/compliance/tab_panel.html:347
+#: plugins/fdrs/templates/compliance/tab_panel.html:554
 msgid "Non-Compliant"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:123
+#: plugins/fdrs/templates/compliance/tab_panel.html:136
 msgid "Non-Compliant Countries"
 msgstr ""
 
@@ -17342,7 +17466,7 @@ msgstr ""
 #: app/templates/admin/communication/center.html:682
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:149
 #: app/templates/admin/settings/manage_settings.html:1522
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:19
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:37
 msgid "Normal"
 msgstr ""
 
@@ -17364,8 +17488,8 @@ msgid "Not Processed"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:205
-#: app/templates/forms/entry_form/export_pdf.html:514
-#: app/templates/forms/entry_form/export_pdf.html:609
+#: app/templates/forms/entry_form/export_pdf.html:551
+#: app/templates/forms/entry_form/export_pdf.html:646
 #: app/templates/forms/entry_form/validation_summary_pdf.html:119
 #: app/templates/forms/entry_form/validation_summary_pdf.html:126
 msgid "Not Reported"
@@ -17390,7 +17514,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2592
 #: app/templates/forms/entry_form/entry_form.html:2607
 #: app/templates/forms/entry_form/export_pdf.html:201
-#: app/templates/forms/entry_form/partials/matrix_table.html:567
+#: app/templates/forms/entry_form/partials/matrix_table.html:624
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
 msgid "Not applicable"
 msgstr ""
@@ -17435,7 +17559,7 @@ msgstr ""
 msgid "Not filled"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:709
+#: app/templates/admin/assignments/manage_assignment.html:731
 #: app/templates/admin/validation_dashboard.html:274
 msgid "Not generated"
 msgstr ""
@@ -17458,15 +17582,15 @@ msgstr ""
 msgid "Not public"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:87
+#: plugins/fdrs/templates/ecr/tab_panel.html:216
 msgid "Not re-estimated"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:154
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:159
 msgid "Not reported"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:150
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:155
 msgid "Not reported: expected indicators with no saved reported value."
 msgstr ""
 
@@ -17479,6 +17603,10 @@ msgstr ""
 #: app/templates/forms/entry_form/validation_summary_pdf.html:194
 #: app/templates/forms/entry_form/validation_summary_progress.html:299
 msgid "Not run"
+msgstr ""
+
+#: plugins/fdrs/templates/ecr/tab_panel.html:223
+msgid "Not saved"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:275
@@ -17501,7 +17629,7 @@ msgstr ""
 msgid "Not started"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:88
+#: plugins/fdrs/templates/ecr/tab_panel.html:217
 msgid "Not stored"
 msgstr ""
 
@@ -17509,8 +17637,8 @@ msgstr ""
 msgid "Note"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:903
-#: app/templates/admin/assignments/manage_assignment.html:983
+#: app/templates/admin/assignments/manage_assignment.html:925
+#: app/templates/admin/assignments/manage_assignment.html:1005
 msgid "Note:"
 msgstr ""
 
@@ -17577,7 +17705,7 @@ msgstr ""
 msgid "Notification Types"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1027
+#: app/templates/admin/assignments/manage_assignment.html:1049
 #: app/templates/admin/communication/registry.html:147
 msgid "Notification email preview"
 msgstr ""
@@ -17632,12 +17760,12 @@ msgstr ""
 msgid "Notify focal points (assignment editor/submitter)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:358
+#: app/templates/admin/assignments/manage_assignment.html:380
 msgid "Notify the FDS member assigned to the submitting country (default)."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:259
-#: app/templates/admin/assignments/manage_assignment.html:279
+#: app/templates/admin/assignments/manage_assignment.html:281
+#: app/templates/admin/assignments/manage_assignment.html:301
 #: app/templates/admin/documents/documents.html:298
 #: app/templates/admin/documents/documents.html:324
 #: app/templates/forms/entry_form/entry_form.html:3062
@@ -17663,11 +17791,11 @@ msgid "Number (Whole)"
 msgstr ""
 
 #: app/templates/admin/reports/partials/_style_properties.html:14
-#: plugins/fdrs/templates/service_income/tab_panel.html:35
+#: plugins/fdrs/templates/service_income/tab_panel.html:39
 msgid "Number format"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/_entry_form_item_hint.html:48
+#: app/templates/forms/entry_form/partials/_entry_form_item_hint.html:95
 msgid ""
 "Number format: Use \".\" for decimals and \",\" for thousands (e.g. "
 "1,234.56). Values are rounded to each column's allowed decimal places."
@@ -17687,7 +17815,7 @@ msgid ""
 "for this user in the selected period."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:123
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:128
 msgid ""
 "Number of indicators included in this analysis. Eligible indicators have "
 "people-oriented units or configured disaggregation options."
@@ -17697,6 +17825,10 @@ msgstr ""
 msgid ""
 "Number of successful login events recorded for this user in the selected "
 "period."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:401
+msgid "Numerator"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:64
@@ -17722,8 +17854,8 @@ msgstr ""
 msgid "Observation"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:258
-#: app/templates/admin/assignments/manage_assignment.html:278
+#: app/templates/admin/assignments/manage_assignment.html:280
+#: app/templates/admin/assignments/manage_assignment.html:300
 #: app/templates/admin/documents/documents.html:297
 #: app/templates/admin/documents/documents.html:323
 #: app/templates/forms/entry_form/entry_form.html:3061
@@ -17792,7 +17924,7 @@ msgstr ""
 msgid "One database"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:461
+#: app/templates/admin/assignments/manage_assignment.html:483
 msgid "One email per country"
 msgstr ""
 
@@ -17897,7 +18029,7 @@ msgstr ""
 #: app/templates/admin/validation_dashboard.html:270
 #: app/templates/admin/validation_questions.html:130
 #: app/templates/admin/validation_questions.html:270
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:123
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:136
 msgid "Open"
 msgstr ""
 
@@ -17967,7 +18099,7 @@ msgstr ""
 msgid "Open documents library"
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:122
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:135
 msgid "Open in new tab"
 msgstr ""
 
@@ -17987,11 +18119,11 @@ msgstr ""
 msgid "Open questions"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:105
+#: plugins/fdrs/templates/service_income/tab_panel.html:109
 msgid "Open round"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:119
+#: plugins/fdrs/templates/service_income/tab_panel.html:123
 msgid "Open round, reported so far"
 msgstr ""
 
@@ -18015,7 +18147,7 @@ msgstr ""
 msgid "Open work is not more than 30 days overdue"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:83
+#: plugins/fdrs/templates/ecr/tab_panel.html:212
 msgid "Open year"
 msgstr ""
 
@@ -18035,7 +18167,7 @@ msgid ""
 "reporting period."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:112
+#: plugins/fdrs/templates/service_income/tab_panel.html:116
 msgid "Open-round total income minus the closed-round reference"
 msgstr ""
 
@@ -18124,11 +18256,11 @@ msgid ""
 "and/or attach an auto-generated assignment PDF per recipient entity."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:411
+#: app/templates/admin/assignments/manage_assignment.html:433
 #: app/templates/components/_builder_items.html:83
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:338
-#: app/templates/forms/form_builder/partials/_sections_container.html:470
-#: app/templates/forms/form_builder/partials/_sections_container.html:478
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:347
+#: app/templates/forms/form_builder/partials/_sections_container.html:479
+#: app/templates/forms/form_builder/partials/_sections_container.html:487
 msgid "Options"
 msgstr ""
 
@@ -18280,11 +18412,11 @@ msgstr ""
 msgid "Other focal points"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:72
+#: plugins/fdrs/templates/service_income/tab_panel.html:76
 msgid "Other income"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:82
+#: plugins/fdrs/templates/service_income/tab_panel.html:86
 msgid ""
 "Other income is total income minus reported service income. A National "
 "Society with no service-income figure contributes zero. Reported and "
@@ -18346,8 +18478,8 @@ msgstr ""
 
 #: app/services/documentation/service.py:805
 #: app/templates/admin/translations/quality_dashboard.html:57
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:75
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:106
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:80
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:111
 msgid "Overview"
 msgstr ""
 
@@ -18394,11 +18526,11 @@ msgid "P&B report management"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:42
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:27
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:40
 msgid "P&B report versions"
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:137
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:150
 msgid "P&B visuals preview"
 msgstr ""
 
@@ -18492,7 +18624,7 @@ msgstr ""
 msgid "PO write locking is not active"
 msgstr ""
 
-#: app/routes/forms/export.py:1694 app/routes/forms/validation_summary.py:829
+#: app/routes/forms/export.py:1737 app/routes/forms/validation_summary.py:829
 #: app/routes/forms/validation_summary.py:863
 #: app/routes/forms/validation_summary.py:1835
 #: app/services/documentation/pdf_service.py:121
@@ -18510,7 +18642,7 @@ msgstr ""
 #: app/templates/forms/entry_form/validation_summary_progress.html:331
 #: app/templates/forms/form_builder/partials/_section_modal.html:59
 #: app/templates/forms/form_builder/partials/_section_modal.html:60
-#: app/templates/forms/form_builder/partials/_sections_container.html:80
+#: app/templates/forms/form_builder/partials/_sections_container.html:85
 msgid "Page"
 msgstr ""
 
@@ -18651,8 +18783,8 @@ msgstr ""
 msgid "Parent Section"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:741
-#: app/templates/admin/assignments/manage_assignment.html:851
+#: app/templates/admin/assignments/manage_assignment.html:763
+#: app/templates/admin/assignments/manage_assignment.html:873
 msgid "Part of:"
 msgstr ""
 
@@ -18719,11 +18851,11 @@ msgstr ""
 msgid "Past due, not yet submitted"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:488
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:574
 msgid "Paste"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:486
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:572
 msgid "Paste a screenshot from the clipboard (Ctrl+V)"
 msgstr ""
 
@@ -18731,7 +18863,7 @@ msgstr ""
 msgid "Paste an API key created in API Key Management"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:486
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:572
 msgid "Paste image"
 msgstr ""
 
@@ -18818,8 +18950,8 @@ msgstr ""
 msgid "Pending review"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:134
-#: plugins/fdrs/templates/compliance/tab_panel.html:223
+#: plugins/fdrs/templates/compliance/tab_panel.html:147
+#: plugins/fdrs/templates/compliance/tab_panel.html:236
 msgid "Pending validation"
 msgstr ""
 
@@ -18869,18 +19001,19 @@ msgid "Percent"
 msgstr ""
 
 #: app/templates/admin/templates/data_sync_imputation.html:183
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:393
 #: app/utils/form_localization.py:78 app/utils/form_localization.py:79
 msgid "Percentage"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:110
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:115
 msgid ""
 "Percentage of eligible indicators reported with sex, age, sex-and-age, "
 "matrix, or disability disaggregation. Based on all eligible indicators in"
 " the current filters."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:162
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:167
 msgid ""
 "Percentage of eligible indicators that include age information, either "
 "age-only or combined sex-and-age disaggregation. Based on all eligible "
@@ -18903,11 +19036,11 @@ msgstr ""
 msgid "Period"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:218
+#: app/templates/admin/assignments/manage_assignment.html:240
 msgid "Period & deadlines"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:222
+#: app/templates/admin/assignments/manage_assignment.html:244
 msgid "Period Type"
 msgstr ""
 
@@ -19009,7 +19142,7 @@ msgstr ""
 msgid "Place all indicators in one section"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:319
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:328
 msgid "Placeholder text"
 msgstr ""
 
@@ -19134,7 +19267,7 @@ msgstr ""
 msgid "Please select a user first."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:725
+#: app/templates/admin/assignments/manage_assignment.html:747
 msgid "Please select a valid period (year or date range) before submitting."
 msgstr ""
 
@@ -19199,7 +19332,7 @@ msgstr ""
 
 #: app/templates/admin/plugin_management.html:121
 #: app/templates/admin/templates/partials/imputation_badges.html:20
-#: app/templates/forms/form_builder/partials/_sections_container.html:550
+#: app/templates/forms/form_builder/partials/_sections_container.html:559
 msgid "Plugin"
 msgstr ""
 
@@ -19223,7 +19356,7 @@ msgstr ""
 msgid "Plugin \"%(plugin)s\" uninstalled successfully"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:556
+#: app/templates/forms/form_builder/partials/_sections_container.html:565
 msgid "Plugin Config"
 msgstr ""
 
@@ -19366,8 +19499,8 @@ msgstr ""
 msgid "Prefilled Values Notice"
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:296
-#: app/templates/forms/entry_form/partials/matrix_table.html:126
+#: app/templates/forms/entry_form/export_pdf.html:312
+#: app/templates/forms/entry_form/partials/matrix_table.html:181
 msgid "Prefilled value"
 msgstr ""
 
@@ -19418,7 +19551,7 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:49
 #: app/templates/forms/form_builder/form_builder.html:22
 #: app/templates/forms/form_builder/form_builder.html:497
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:498
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:584
 #: app/templates/forms/form_builder/partials/_versions_modal.html:38
 #: plugins/upr/templates/upr/_manage_tools.html:12
 msgid "Preview"
@@ -19445,7 +19578,7 @@ msgstr ""
 msgid "Preview current data and imputed values per country and item."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:468
+#: app/templates/admin/assignments/manage_assignment.html:490
 msgid "Preview email"
 msgstr ""
 
@@ -19468,8 +19601,8 @@ msgid ""
 "to test saving dynamic indicators."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:465
-#: app/templates/admin/assignments/manage_assignment.html:466
+#: app/templates/admin/assignments/manage_assignment.html:487
+#: app/templates/admin/assignments/manage_assignment.html:488
 msgid "Preview notification email"
 msgstr ""
 
@@ -19483,7 +19616,7 @@ msgid ""
 "notification email layout (not the Communication Center email wrapper)."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1028
+#: app/templates/admin/assignments/manage_assignment.html:1050
 msgid ""
 "Preview the grouped email for one assigned country. Recipients reflect "
 "current preferences (instant email enabled)."
@@ -19568,11 +19701,11 @@ msgstr ""
 msgid "Principal"
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:117
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:130
 msgid "Print"
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:116
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:129
 msgid "Print report"
 msgstr ""
 
@@ -19676,6 +19809,10 @@ msgstr ""
 #: app/templates/admin/ai/knowledge_base.html:53
 #: app/templates/admin/ai/knowledge_base.html:766
 msgid "Processing..."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:394
+msgid "Product"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:162
@@ -19806,7 +19943,7 @@ msgid "Public Submissions"
 msgstr ""
 
 #: app/templates/admin/assignments/_assignment_status_overview.html:107
-#: app/templates/admin/assignments/manage_assignment.html:681
+#: app/templates/admin/assignments/manage_assignment.html:703
 #: app/templates/admin/assignments/public_submissions.html:66
 msgid "Public URL"
 msgstr ""
@@ -19822,11 +19959,11 @@ msgstr ""
 msgid "Public URL copied to clipboard!"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:412
+#: app/templates/admin/assignments/manage_assignment.html:434
 msgid "Public access and notifications for this assignment."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1363
+#: app/templates/admin/assignments/manage_assignment.html:1386
 msgid "Public reporting"
 msgstr ""
 
@@ -19871,11 +20008,11 @@ msgid ""
 "archived version."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:34
+#: plugins/fdrs/templates/service_income/tab_panel.html:38
 msgid "Published figures"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:83
+#: plugins/fdrs/templates/service_income/tab_panel.html:87
 msgid ""
 "Published figures keeps a service-income amount only when the FDRS API "
 "state is Published (500). Other states stay in the live columns and are "
@@ -20066,7 +20203,7 @@ msgstr ""
 
 #: app/templates/admin/ai/review_queue.html:60
 #: app/templates/admin/ai/review_queue.html:158
-#: plugins/upr/templates/upr/tab_panel.html:367
+#: plugins/upr/templates/upr/tab_panel.html:379
 msgid "Queued"
 msgstr ""
 
@@ -20161,7 +20298,8 @@ msgid "Read rate"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:290
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:287
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:288
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:429
 msgid "Read-only"
 msgstr ""
 
@@ -20480,7 +20618,8 @@ msgstr ""
 #: app/templates/admin/monitoring/system_monitoring.html:122
 #: app/templates/admin/monitoring/system_monitoring.html:178
 #: app/templates/admin/validation_questions.html:44
-#: plugins/fdrs/templates/compliance/tab_panel.html:86
+#: plugins/fdrs/templates/compliance/tab_panel.html:99
+#: plugins/fdrs/templates/ecr/tab_panel.html:224
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:43
 msgid "Refresh"
 msgstr ""
@@ -20488,10 +20627,6 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:291
 #: app/templates/admin/indicator_bank/indicator_bank.html:1794
 msgid "Refresh Page"
-msgstr ""
-
-#: plugins/fdrs/templates/ecr/tab_panel.html:38
-msgid "Refresh World Bank snapshot"
 msgstr ""
 
 #: app/templates/admin/reports/builder.html:49
@@ -20516,6 +20651,10 @@ msgstr ""
 
 #: app/templates/components/_fb_ai_config.html:29
 msgid "Refreshing the form builder…"
+msgstr ""
+
+#: plugins/fdrs/templates/ecr/tab_panel.html:225
+msgid "Refreshing…"
 msgstr ""
 
 #: app/utils/form_localization.py:151
@@ -20556,7 +20695,7 @@ msgstr ""
 msgid "Regional Offices"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:928
+#: app/templates/admin/assignments/manage_assignment.html:950
 #: app/templates/admin/organization/index.html:148
 #: app/templates/admin/user_management/user_form.html:1005
 msgid "Regions"
@@ -20614,8 +20753,8 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:745
 #: app/templates/components/_status_label.html:43
 #: app/templates/components/ag_grid_i18n_js.html:30
-#: plugins/fdrs/templates/compliance/tab_panel.html:135
-#: plugins/fdrs/templates/compliance/tab_panel.html:225
+#: plugins/fdrs/templates/compliance/tab_panel.html:148
+#: plugins/fdrs/templates/compliance/tab_panel.html:238
 msgid "Rejected"
 msgstr ""
 
@@ -20651,8 +20790,8 @@ msgid "Related tables scope: page (current page) or all (full dataset)"
 msgstr ""
 
 #: app/templates/components/_builder_items.html:135
-#: app/templates/forms/form_builder/partials/_sections_container.html:309
-#: app/templates/forms/form_builder/partials/_sections_container.html:580
+#: app/templates/forms/form_builder/partials/_sections_container.html:315
+#: app/templates/forms/form_builder/partials/_sections_container.html:589
 msgid "Relevance"
 msgstr ""
 
@@ -20709,8 +20848,8 @@ msgid ""
 "message, user_name, dashboard_url, org_name, copyright_year"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1359
-#: app/templates/admin/assignments/manage_assignment.html:1387
+#: app/templates/admin/assignments/manage_assignment.html:1382
+#: app/templates/admin/assignments/manage_assignment.html:1410
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:11
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:21
 #: app/templates/forms/form_builder/form_builder.html:498
@@ -20718,7 +20857,7 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:298
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:307
 msgid "Remove Column"
 msgstr ""
 
@@ -20726,27 +20865,27 @@ msgstr ""
 msgid "Remove Condition"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:721
+#: app/templates/forms/form_builder/partials/_sections_container.html:733
 msgid "Remove Document Field"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:404
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:490
 msgid "Remove Group"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:787
+#: app/templates/forms/form_builder/partials/_sections_container.html:799
 msgid "Remove Image"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:639
+#: app/templates/forms/form_builder/partials/_sections_container.html:651
 msgid "Remove Indicator"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:755
+#: app/templates/forms/form_builder/partials/_sections_container.html:767
 msgid "Remove Matrix"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:385
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:459
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:207
 msgid "Remove Option"
 msgstr ""
@@ -20755,11 +20894,11 @@ msgstr ""
 msgid "Remove Page"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:826
+#: app/templates/forms/form_builder/partials/_sections_container.html:838
 msgid "Remove Plugin Item"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:688
+#: app/templates/forms/form_builder/partials/_sections_container.html:700
 msgid "Remove Question"
 msgstr ""
 
@@ -20776,7 +20915,7 @@ msgstr ""
 msgid "Remove all deleted strings?"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1361
+#: app/templates/admin/assignments/manage_assignment.html:1384
 msgid "Remove entities"
 msgstr ""
 
@@ -20832,7 +20971,7 @@ msgid ""
 "queries that expand each array."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:368
+#: plugins/upr/templates/upr/tab_panel.html:380
 msgid "Rendering…"
 msgstr ""
 
@@ -20903,7 +21042,7 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:88
 #: app/templates/forms/form_builder/partials/_section_modal.html:90
-#: app/templates/forms/form_builder/partials/_sections_container.html:121
+#: app/templates/forms/form_builder/partials/_sections_container.html:117
 msgid "Repeat Group"
 msgstr ""
 
@@ -20950,7 +21089,7 @@ msgstr ""
 msgid "Report editor"
 msgstr ""
 
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:161
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:174
 msgid "Report generated successfully."
 msgstr ""
 
@@ -20959,12 +21098,12 @@ msgid "Report generated. Open Data Explorer to view and download deliverables."
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:224
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:160
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:173
 msgid "Report generation failed."
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:226
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:162
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:175
 msgid "Report generation was cancelled."
 msgstr ""
 
@@ -20984,7 +21123,7 @@ msgstr ""
 msgid "Report years updated."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:75
+#: plugins/fdrs/templates/service_income/tab_panel.html:79
 msgid "Reported NSs"
 msgstr ""
 
@@ -20996,15 +21135,15 @@ msgstr ""
 msgid "Reported income"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:109
+#: plugins/fdrs/templates/service_income/tab_panel.html:113
 msgid "Reported service income"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:120
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:125
 msgid "Reported with disaggregation"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:146
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:151
 msgid "Reported, not disaggregated"
 msgstr ""
 
@@ -21017,7 +21156,7 @@ msgstr ""
 msgid "Reporting NS count"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:184
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:189
 msgid "Reporting Status"
 msgstr ""
 
@@ -21174,7 +21313,7 @@ msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:722
 #: plugins/pb_progress/templates/pb_progress/manage.html:229
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:165
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:178
 msgid "Request failed."
 msgstr ""
 
@@ -21206,11 +21345,11 @@ msgstr ""
 #: app/templates/components/_builder_items.html:87
 #: app/templates/components/_builder_items.html:93
 #: app/templates/components/_builder_items.html:106
-#: app/templates/forms/form_builder/partials/_sections_container.html:446
-#: app/templates/forms/form_builder/partials/_sections_container.html:468
-#: app/templates/forms/form_builder/partials/_sections_container.html:482
-#: app/templates/forms/form_builder/partials/_sections_container.html:488
-#: app/templates/forms/form_builder/partials/_sections_container.html:551
+#: app/templates/forms/form_builder/partials/_sections_container.html:455
+#: app/templates/forms/form_builder/partials/_sections_container.html:477
+#: app/templates/forms/form_builder/partials/_sections_container.html:491
+#: app/templates/forms/form_builder/partials/_sections_container.html:497
+#: app/templates/forms/form_builder/partials/_sections_container.html:560
 msgid "Required"
 msgstr ""
 
@@ -21595,7 +21734,7 @@ msgstr ""
 msgid "Reviewer notes..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:376
+#: app/templates/admin/assignments/manage_assignment.html:398
 msgid "Reviewers"
 msgstr ""
 
@@ -21660,7 +21799,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:121
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:458
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:544
 msgid "Right"
 msgstr ""
 
@@ -21759,7 +21898,7 @@ msgstr ""
 msgid "Round"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:36
+#: plugins/fdrs/templates/service_income/tab_panel.html:40
 msgid "Rounded, such as 31.8 B"
 msgstr ""
 
@@ -21782,8 +21921,12 @@ msgid "Row Headers"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:115
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:358
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:367
 msgid "Row Label Column"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:475
+msgid "Row total"
 msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:61
@@ -21810,7 +21953,7 @@ msgstr ""
 msgid "Rule pack"
 msgstr ""
 
-#: app/templates/admin/_validation_admin_shell.html:42
+#: app/templates/admin/_validation_admin_shell.html:83
 msgid "Rules Registry"
 msgstr ""
 
@@ -22035,7 +22178,8 @@ msgstr ""
 msgid "Save failed."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:291
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:292
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:437
 msgid "Save value"
 msgstr ""
 
@@ -22048,6 +22192,7 @@ msgstr ""
 #: app/templates/admin/validation_rules.html:218
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:87
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:362
+#: plugins/fdrs/templates/ecr/tab_panel.html:222
 msgid "Saved"
 msgstr ""
 
@@ -22185,7 +22330,7 @@ msgstr ""
 msgid "Search Mode"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:988
+#: app/templates/admin/assignments/manage_assignment.html:1010
 msgid "Search NS Structure"
 msgstr ""
 
@@ -22217,11 +22362,11 @@ msgstr ""
 msgid "Search Recipients"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:956
+#: app/templates/admin/assignments/manage_assignment.html:978
 msgid "Search Regions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:938
+#: app/templates/admin/assignments/manage_assignment.html:960
 msgid "Search Secretariat"
 msgstr ""
 
@@ -22243,7 +22388,7 @@ msgstr ""
 msgid "Search and select a row to add..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:992
+#: app/templates/admin/assignments/manage_assignment.html:1014
 msgid "Search branches, sub-branches, or local units..."
 msgstr ""
 
@@ -22272,7 +22417,7 @@ msgstr ""
 msgid "Search by name or email"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:382
+#: app/templates/admin/assignments/manage_assignment.html:404
 #: app/templates/admin/communication/center.html:175
 #: app/templates/admin/communication/center.html:1214
 msgid "Search by name or email..."
@@ -22317,7 +22462,7 @@ msgstr ""
 msgid "Search description (e.g., template name)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:942
+#: app/templates/admin/assignments/manage_assignment.html:964
 msgid "Search divisions or departments..."
 msgstr ""
 
@@ -22368,7 +22513,7 @@ msgstr ""
 msgid "Search notifications..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:960
+#: app/templates/admin/assignments/manage_assignment.html:982
 msgid "Search regional or cluster offices..."
 msgstr ""
 
@@ -22486,7 +22631,7 @@ msgstr ""
 msgid "Secretariat assignment"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:908
+#: app/templates/admin/assignments/manage_assignment.html:930
 #: app/templates/admin/organization/index.html:138
 msgid "Secretariat structure"
 msgstr ""
@@ -22697,7 +22842,7 @@ msgstr ""
 msgid "Security token not found. Please refresh the page and try again."
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:617
+#: app/templates/forms/entry_form/export_pdf.html:654
 msgid "See documents in the web interface"
 msgstr ""
 
@@ -22737,7 +22882,7 @@ msgstr ""
 msgid "Select All"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:848
+#: app/templates/admin/assignments/manage_assignment.html:870
 #: app/templates/components/_form_helpers.html:73
 msgid "Select All Countries"
 msgstr ""
@@ -22747,7 +22892,7 @@ msgid "Select All Visible"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:119
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:360
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:369
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:242
 msgid "Select Column..."
 msgstr ""
@@ -22776,7 +22921,7 @@ msgstr ""
 msgid "Select Item Type"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:346
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:355
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:222
 msgid "Select List"
 msgstr ""
@@ -22786,7 +22931,7 @@ msgid "Select List for Rows"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:104
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:348
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:357
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:226
 msgid "Select List..."
 msgstr ""
@@ -22820,7 +22965,7 @@ msgstr ""
 msgid "Select Traces to Compare"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:277
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:278
 msgid "Select Variable..."
 msgstr ""
 
@@ -22828,13 +22973,13 @@ msgstr ""
 msgid "Select a campaign..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:997
+#: app/templates/admin/assignments/manage_assignment.html:1019
 #: app/templates/admin/documents/documents.html:170
 #: app/templates/admin/organization/_nss_component.html:151
 #: app/templates/admin/user_management/user_form.html:970
 #: app/templates/auth/login.html:1200
 #: plugins/upr/templates/upr/_manage_tools.html:41
-#: plugins/upr/templates/upr/tab_panel.html:373
+#: plugins/upr/templates/upr/tab_panel.html:385
 msgid "Select a country"
 msgstr ""
 
@@ -22843,16 +22988,16 @@ msgstr ""
 msgid "Select a country to compare indicators."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:375
+#: plugins/upr/templates/upr/tab_panel.html:387
 msgid "Select a country to preview."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1012
+#: app/templates/admin/assignments/manage_assignment.html:1034
 #: app/templates/admin/user_management/user_form.html:985
 msgid "Select a country to view NS structure."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1383
+#: app/templates/admin/assignments/manage_assignment.html:1406
 msgid "Select a form template and reporting period before previewing the email."
 msgstr ""
 
@@ -22868,7 +23013,7 @@ msgid "Select a sector..."
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:2653
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:90
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:95
 msgid "Select a template above to analyze eligible disaggregation indicators."
 msgstr ""
 
@@ -22914,7 +23059,7 @@ msgstr ""
 msgid "Select a user…"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:84
+#: app/templates/forms/entry_form/partials/matrix_table.html:139
 msgid "Select a value in the column header to enable this cell"
 msgstr ""
 
@@ -22945,19 +23090,19 @@ msgid "Select all visible"
 msgstr ""
 
 #: plugins/upr/templates/upr/_manage_tools.html:33
-#: plugins/upr/templates/upr/tab_panel.html:348
+#: plugins/upr/templates/upr/tab_panel.html:360
 msgid "Select an assignment"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:349
+#: plugins/upr/templates/upr/tab_panel.html:361
 msgid "Select an assignment to load dashboards and countries."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:374
+#: plugins/upr/templates/upr/tab_panel.html:386
 msgid "Select an assignment to preview a country visual."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:357
+#: plugins/upr/templates/upr/tab_panel.html:369
 msgid "Select an assignment."
 msgstr ""
 
@@ -22966,23 +23111,23 @@ msgstr ""
 msgid "Select an entity"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:366
+#: plugins/upr/templates/upr/tab_panel.html:378
 msgid "Select an export type."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:331
+#: app/routes/admin/assignment_management.py:437
 msgid "Select at least one IFRC admin to notify when submissions arrive."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1382
+#: app/templates/admin/assignments/manage_assignment.html:1405
 msgid "Select at least one country in Entity Assignments to preview the email."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:359
+#: plugins/upr/templates/upr/tab_panel.html:371
 msgid "Select at least one country."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:358
+#: plugins/upr/templates/upr/tab_panel.html:370
 msgid "Select at least one dashboard."
 msgstr ""
 
@@ -23020,13 +23165,13 @@ msgstr ""
 msgid "Select colour"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:830
+#: app/templates/admin/assignments/manage_assignment.html:852
 msgid ""
 "Select countries to add to this assignment. Already assigned countries "
 "are pre-checked."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:832
+#: app/templates/admin/assignments/manage_assignment.html:854
 msgid "Select countries to assign to this assignment."
 msgstr ""
 
@@ -23062,8 +23207,8 @@ msgstr ""
 msgid "Select documents in the grid"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:903
-#: app/templates/admin/assignments/manage_assignment.html:983
+#: app/templates/admin/assignments/manage_assignment.html:925
+#: app/templates/admin/assignments/manage_assignment.html:1005
 msgid ""
 "Select entities by checking the boxes, then click \"Save Changes\" to "
 "apply them."
@@ -23128,7 +23273,7 @@ msgid ""
 "the selected status."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1137
+#: app/templates/admin/assignments/manage_assignment.html:1159
 msgid "Select status"
 msgstr ""
 
@@ -23217,7 +23362,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:39
 #: app/templates/forms/entry_form/partials/matrix_table.html:15
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:320
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:329
 msgid "Select..."
 msgstr ""
 
@@ -23225,7 +23370,7 @@ msgstr ""
 msgid "Select:"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:307
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:316
 msgid "Selectable header (dropdown)"
 msgstr ""
 
@@ -23433,8 +23578,8 @@ msgstr ""
 msgid "Sent for review: %(assignment_title)s — %(country)s"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:257
-#: app/templates/admin/assignments/manage_assignment.html:277
+#: app/templates/admin/assignments/manage_assignment.html:279
+#: app/templates/admin/assignments/manage_assignment.html:299
 #: app/templates/admin/documents/documents.html:296
 #: app/templates/admin/documents/documents.html:322
 #: app/templates/forms/entry_form/entry_form.html:3060
@@ -23450,20 +23595,20 @@ msgstr ""
 msgid "Server error"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:15
-#: plugins/fdrs/templates/service_income/tab_panel.html:71
+#: plugins/fdrs/templates/service_income/tab_panel.html:19
+#: plugins/fdrs/templates/service_income/tab_panel.html:75
 msgid "Service income"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:45
+#: plugins/fdrs/templates/service_income/tab_panel.html:49
 msgid "Service income and the last two closed rounds"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:122
+#: plugins/fdrs/templates/service_income/tab_panel.html:126
 msgid "Service income could not be loaded."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:73
+#: plugins/fdrs/templates/service_income/tab_panel.html:77
 msgid "Service share"
 msgstr ""
 
@@ -23643,7 +23788,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1627
 #: app/templates/forms/entry_form/entry_form.html:2337
 #: app/templates/forms/entry_form/entry_form.html:2465
-#: app/templates/forms/entry_form/export_pdf.html:569
+#: app/templates/forms/entry_form/export_pdf.html:606
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:211
 msgid "Sex"
 msgstr ""
@@ -23656,8 +23801,8 @@ msgstr ""
 msgid "Sex disaggregation"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:79
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:245
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:84
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:250
 msgid "Sex, Age & Sex & Age"
 msgstr ""
 
@@ -23904,7 +24049,7 @@ msgstr ""
 msgid "Show national societies"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:34
+#: plugins/fdrs/templates/service_income/tab_panel.html:38
 msgid "Show only service income that FDRS has published"
 msgstr ""
 
@@ -23932,7 +24077,7 @@ msgid "Show score components"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:221
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:158
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:171
 msgid "Show steps"
 msgstr ""
 
@@ -23940,24 +24085,24 @@ msgstr ""
 msgid "Show sub-sectors for this sector"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:523
-#: app/templates/admin/assignments/manage_assignment.html:622
+#: app/templates/admin/assignments/manage_assignment.html:545
+#: app/templates/admin/assignments/manage_assignment.html:644
 msgid ""
 "Show the Excel export button on the entry form. UPR Country Reporting and"
 " Unified Country Plan assignments use their structured workbooks; other "
 "templates use the generic item-row workbook."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:537
-#: app/templates/admin/assignments/manage_assignment.html:634
+#: app/templates/admin/assignments/manage_assignment.html:559
+#: app/templates/admin/assignments/manage_assignment.html:656
 msgid ""
 "Show the Excel import button on the entry form. UPR Country Reporting and"
 " Unified Country Plan assignments use their structured workbooks; other "
 "templates use the generic item-row workbook."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:551
-#: app/templates/admin/assignments/manage_assignment.html:646
+#: app/templates/admin/assignments/manage_assignment.html:573
+#: app/templates/admin/assignments/manage_assignment.html:668
 msgid "Show the Export PDF button on the entry form."
 msgstr ""
 
@@ -23967,7 +24112,7 @@ msgid ""
 "the tabs in user_form.html and manage_assignment.html)."
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:52
+#: plugins/fdrs/templates/service_income/tab_panel.html:56
 msgid "Show total income"
 msgstr ""
 
@@ -24051,24 +24196,24 @@ msgid ""
 "notes)."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:10
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:19
 msgid "Shows a highlighted note below the field label in the data entry form."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:264
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:269
 msgid ""
 "Shows country-level disaggregation coverage for eligible indicators in "
 "the current filters, including sex, age, and disability breakdowns where "
 "applicable."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:200
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:205
 msgid ""
 "Shows country-level disaggregation coverage for eligible indicators in "
 "the current filters."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:192
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:197
 msgid ""
 "Shows disaggregation coverage by indicator, not summed values across "
 "mixed units."
@@ -24097,7 +24242,7 @@ msgstr ""
 msgid "Single PO"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:224
+#: app/templates/admin/assignments/manage_assignment.html:246
 #: app/templates/admin/documents/documents.html:231
 #: app/templates/forms/entry_form/entry_form.html:2995
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:41
@@ -24153,7 +24298,7 @@ msgid ""
 "spotting clusters"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:79
+#: plugins/fdrs/templates/ecr/tab_panel.html:208
 msgid "Societies reporting volunteers"
 msgstr ""
 
@@ -24244,7 +24389,7 @@ msgstr ""
 msgid "Source Template"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:86
+#: plugins/fdrs/templates/ecr/tab_panel.html:215
 msgid "Source still needed"
 msgstr ""
 
@@ -24257,7 +24402,7 @@ msgstr ""
 msgid "Source unavailable"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:323
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:332
 msgid "Source:"
 msgstr ""
 
@@ -24272,7 +24417,7 @@ msgid "Space to be freed:"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:144
-#: plugins/pb_progress/templates/pb_progress/tab_panel.html:109
+#: plugins/pb_progress/templates/pb_progress/tab_panel.html:122
 msgid "Spanish"
 msgstr ""
 
@@ -24280,8 +24425,8 @@ msgstr ""
 msgid "Specialists"
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:280
-#: app/templates/admin/assignments/manage_assignment.html:368
+#: app/routes/admin/assignment_management.py:386
+#: app/templates/admin/assignments/manage_assignment.html:390
 msgid "Specific IFRC admin(s)"
 msgstr ""
 
@@ -24317,7 +24462,7 @@ msgstr ""
 msgid "Stale Accounts (90+ days)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:125
+#: app/templates/forms/form_builder/partials/_sections_container.html:119
 msgid "Standard"
 msgstr ""
 
@@ -24334,7 +24479,7 @@ msgstr ""
 msgid "Start"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:245
+#: app/templates/admin/assignments/manage_assignment.html:267
 #: app/templates/admin/documents/documents.html:278
 #: app/templates/forms/entry_form/entry_form.html:3042
 msgid "Start Period"
@@ -24348,7 +24493,7 @@ msgstr ""
 msgid "Start Translation"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:236
+#: app/templates/admin/assignments/manage_assignment.html:258
 #: app/templates/admin/documents/documents.html:252
 #: app/templates/forms/entry_form/entry_form.html:3016
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:132
@@ -24530,7 +24675,7 @@ msgstr ""
 msgid "Status overview"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1391
+#: app/templates/admin/assignments/manage_assignment.html:1414
 msgid "Status set by"
 msgstr ""
 
@@ -24637,7 +24782,7 @@ msgid ""
 "under \"What this key can do\""
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:113
+#: plugins/fdrs/templates/service_income/tab_panel.html:117
 msgid "Stored sources only. Income sources are not imputed."
 msgstr ""
 
@@ -24705,7 +24850,7 @@ msgstr ""
 msgid "Subcategories"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1047
+#: app/templates/admin/assignments/manage_assignment.html:1069
 msgid "Subject"
 msgstr ""
 
@@ -24730,7 +24875,7 @@ msgstr ""
 msgid "Submission reminder"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:344
+#: app/templates/admin/assignments/manage_assignment.html:366
 msgid "Submission review notification"
 msgstr ""
 
@@ -24852,6 +24997,10 @@ msgstr ""
 msgid "Subsectors created:"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:406
+msgid "Subtract"
+msgstr ""
+
 #: app/templates/admin/ai/_trace_card.html:429
 #: app/templates/admin/ai/conversation_traces.html:232
 #: app/templates/admin/analytics/_user_detail_partial.html:365
@@ -24940,6 +25089,10 @@ msgstr ""
 msgid "Suggestions"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:386
+msgid "Sum"
+msgstr ""
+
 #: app/templates/admin/analytics/_user_detail_partial.html:105
 msgid ""
 "Sum of session page-view counters for this user in the selected period "
@@ -25008,7 +25161,7 @@ msgstr ""
 
 #: app/templates/admin/organization/_nss_component.html:177
 #: app/templates/admin/organization/index.html:955
-#: plugins/fdrs/templates/compliance/tab_panel.html:191
+#: plugins/fdrs/templates/compliance/tab_panel.html:204
 msgid "Suspended"
 msgstr ""
 
@@ -25037,7 +25190,7 @@ msgstr ""
 msgid "Switch languages, including the 6 UN languages"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1441
+#: app/templates/admin/assignments/manage_assignment.html:1473
 msgid ""
 "Switch this assignment to whole-form submit?\n"
 "\n"
@@ -25327,6 +25480,7 @@ msgstr ""
 msgid "Technical safeguards include:"
 msgstr ""
 
+#: app/routes/admin/assignment_management.py:231
 #: app/services/ai/runtime/step_ux.py:216
 #: app/templates/admin/ai/knowledge_base.html:830
 #: app/templates/admin/assignments/assignments.html:120
@@ -25339,7 +25493,7 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:64
 #: app/templates/admin/validation_questions.html:234
 #: app/templates/forms/form_builder/field_mapping.html:230
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:58
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:62
 msgid "Template"
 msgstr ""
 
@@ -25634,12 +25788,16 @@ msgstr ""
 msgid "That page has not been submitted."
 msgstr ""
 
+#: app/templates/admin/assignments/manage_assignment.html:1421
+msgid "That template cannot be selected. The other settings were still copied."
+msgstr ""
+
 #: app/templates/core/dashboard.html:1295
 #: app/templates/core/dashboard/_admin_panel.html:497
 msgid "That's all"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1370
+#: app/templates/admin/assignments/manage_assignment.html:1393
 msgid ""
 "The \"Notify focal points\" checkbox is ticked, but notifications for "
 "assignment_created are currently disabled in platform settings (Admin → "
@@ -25769,7 +25927,14 @@ msgid ""
 " are marked Not applicable."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:144
+#: app/templates/admin/assignments/manage_assignment.html:1419
+#, python-brace-format
+msgid ""
+"The period \"{period}\" does not match the year or month controls, so it "
+"was kept as entered. Changing those controls replaces it."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:166
 msgid ""
 "The person accountable for data quality in this collection cycle. "
 "Defaults to the template owner."
@@ -25805,7 +25970,7 @@ msgstr ""
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:356
+#: plugins/upr/templates/upr/tab_panel.html:368
 msgid "The server stopped during export. Restart Flask and try again."
 msgstr ""
 
@@ -25813,6 +25978,16 @@ msgstr ""
 msgid ""
 "The sidebar shows your dashboard and available reporting forms. You can "
 "expand or collapse sections, and the state persists across visits."
+msgstr ""
+
+#: plugins/fdrs/templates/ecr/tab_panel.html:226
+msgid "The snapshot could not be refreshed. The saved file is unchanged."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:1422
+msgid ""
+"The source data owner is not in the list, so the current data owner was "
+"left unchanged."
 msgstr ""
 
 #: app/routes/main/helpers.py:1253
@@ -25847,11 +26022,17 @@ msgid ""
 "publish for this template."
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:583
+#: plugins/fdrs/templates/compliance/tab_panel.html:596
 msgid ""
 "These countries have uploaded Annual Reports or Audited Financial "
 "Statements that are still awaiting approval. Pending documents do not "
 "count toward compliance — validate or reject them as a priority."
+msgstr ""
+
+#: plugins/fdrs/templates/ecr/tab_panel.html:220
+msgid ""
+"These files are saved on the server. Figures keep using the saved copy "
+"until you refresh that file."
 msgstr ""
 
 #: app/templates/admin/reports/partials/_filter_panel.html:24
@@ -25898,7 +26079,7 @@ msgstr ""
 msgid "This action cannot be undone."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1268
+#: app/routes/admin/assignment_management.py:1392
 msgid ""
 "This active assignment has no data owner. Consider assigning one for "
 "governance accountability."
@@ -25918,7 +26099,7 @@ msgid ""
 "changes until it is returned for revision."
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:353
+#: plugins/upr/templates/upr/tab_panel.html:365
 msgid "This assignment has no countries."
 msgstr ""
 
@@ -25944,7 +26125,7 @@ msgid ""
 "and try again."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1368
+#: app/templates/admin/assignments/manage_assignment.html:1391
 msgid ""
 "This assignment will be created without sending notifications to assigned"
 " entities. Do you want to continue?"
@@ -25954,6 +26135,12 @@ msgstr ""
 msgid ""
 "This assignment's data collection round is closed. You can view the form,"
 " but only an administrator can make changes or reopen it for this entity."
+msgstr ""
+
+#: app/routes/admin/assignment_management.py:1034
+msgid ""
+"This assignment's template has no published version, so it cannot be "
+"copied."
 msgstr ""
 
 #: app/templates/admin/organization/index.html:1176
@@ -25968,8 +26155,8 @@ msgstr ""
 msgid "This column cannot be unpinned"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:405
-#: app/templates/forms/entry_form/partials/matrix_table.html:435
+#: app/templates/forms/entry_form/partials/matrix_table.html:501
+#: app/templates/forms/entry_form/partials/matrix_table.html:531
 msgid "This column requires a whole number. Please correct the decimal value."
 msgstr ""
 
@@ -26078,7 +26265,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2380
 #: app/templates/forms/entry_form/entry_form.html:2403
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
-#: app/templates/forms/entry_form/partials/matrix_table.html:83
+#: app/templates/forms/entry_form/partials/matrix_table.html:138
 msgid "This is a prefilled value"
 msgstr ""
 
@@ -26125,11 +26312,11 @@ msgstr ""
 msgid "This is where you can access your country data and submit reports."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:636
-#: app/templates/forms/form_builder/partials/_sections_container.html:685
-#: app/templates/forms/form_builder/partials/_sections_container.html:718
-#: app/templates/forms/form_builder/partials/_sections_container.html:752
-#: app/templates/forms/form_builder/partials/_sections_container.html:823
+#: app/templates/forms/form_builder/partials/_sections_container.html:648
+#: app/templates/forms/form_builder/partials/_sections_container.html:697
+#: app/templates/forms/form_builder/partials/_sections_container.html:730
+#: app/templates/forms/form_builder/partials/_sections_container.html:764
+#: app/templates/forms/form_builder/partials/_sections_container.html:835
 #, python-format
 msgid "This item has %(count)s saved data entries."
 msgstr ""
@@ -26171,7 +26358,7 @@ msgid ""
 "pick another language tab."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:136
+#: app/templates/forms/entry_form/partials/matrix_table.html:191
 msgid "This matrix is imputed"
 msgstr ""
 
@@ -26244,7 +26431,7 @@ msgid ""
 "requests per minute)."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:183
+#: app/templates/forms/form_builder/partials/_sections_container.html:188
 #, python-format
 msgid "This section contains %(count)s saved data entries."
 msgstr ""
@@ -26256,7 +26443,7 @@ msgid ""
 "below."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:864
+#: app/templates/forms/form_builder/partials/_sections_container.html:878
 msgid ""
 "This section displays the assignment comment thread. Configure the title "
 "via the section name and sidebar options in template settings."
@@ -26266,7 +26453,7 @@ msgstr ""
 msgid "This section has no fields."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:866
+#: app/templates/forms/form_builder/partials/_sections_container.html:880
 msgid "This section is empty. Add items or document fields."
 msgstr ""
 
@@ -26292,7 +26479,7 @@ msgstr ""
 msgid "This string was removed from source code"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:356
+#: app/templates/forms/form_builder/partials/_sections_container.html:364
 #, python-format
 msgid "This sub-section contains %(count)s saved data entries."
 msgstr ""
@@ -26448,7 +26635,7 @@ msgstr ""
 msgid "Tick (✓)"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:421
+#: app/templates/forms/entry_form/partials/matrix_table.html:517
 msgid "Tick for"
 msgstr ""
 
@@ -26516,7 +26703,7 @@ msgstr ""
 msgid "Timestamp"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:22
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:43
 msgid "Tip"
 msgstr ""
 
@@ -26553,7 +26740,7 @@ msgstr ""
 msgid "Titles"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1052
+#: app/templates/admin/assignments/manage_assignment.html:1074
 #: app/templates/admin/communication/center.html:353
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:61
 msgid "To"
@@ -26599,7 +26786,7 @@ msgstr ""
 msgid "Toggle archived items"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:88
+#: app/templates/forms/form_builder/partials/_sections_container.html:93
 msgid "Toggle sections visibility"
 msgstr ""
 
@@ -26646,7 +26833,7 @@ msgstr ""
 msgid "Tools Used"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:180
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:185
 msgid "Top Countries by Disaggregation Coverage"
 msgstr ""
 
@@ -26665,12 +26852,14 @@ msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:74
 #: app/templates/admin/governance/dashboard.html:568
-#: app/templates/forms/entry_form/export_pdf.html:354
-#: app/templates/forms/entry_form/export_pdf.html:392
-#: app/templates/forms/entry_form/export_pdf.html:481
-#: app/templates/forms/entry_form/partials/matrix_table.html:227
-#: app/templates/forms/entry_form/partials/matrix_table.html:274
-#: app/templates/forms/entry_form/partials/matrix_table.html:284
+#: app/templates/forms/entry_form/export_pdf.html:336
+#: app/templates/forms/entry_form/export_pdf.html:372
+#: app/templates/forms/entry_form/export_pdf.html:396
+#: app/templates/forms/entry_form/export_pdf.html:413
+#: app/templates/forms/entry_form/export_pdf.html:515
+#: app/templates/forms/entry_form/partials/matrix_table.html:77
+#: app/templates/forms/entry_form/partials/matrix_table.html:351
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:474
 #: app/templates/notifications/center.html:61
 msgid "Total"
 msgstr ""
@@ -26733,7 +26922,7 @@ msgstr ""
 msgid "Total Logins"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:452
+#: app/templates/forms/form_builder/partials/_sections_container.html:461
 msgid "Total Only"
 msgstr ""
 
@@ -26781,16 +26970,16 @@ msgstr ""
 msgid "Total cost"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:70
+#: plugins/fdrs/templates/service_income/tab_panel.html:74
 msgid "Total expenditure"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:291
+#: app/templates/forms/entry_form/partials/matrix_table.html:361
 msgid "Total for column"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:468
-#: app/templates/forms/entry_form/partials/matrix_table.html:480
+#: app/templates/forms/entry_form/partials/matrix_table.html:112
+#: app/templates/forms/entry_form/partials/matrix_table.html:124
 msgid "Total for row"
 msgstr ""
 
@@ -26798,12 +26987,12 @@ msgstr ""
 msgid "Total funding"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:69
-#: plugins/fdrs/templates/service_income/tab_panel.html:106
+#: plugins/fdrs/templates/service_income/tab_panel.html:73
+#: plugins/fdrs/templates/service_income/tab_panel.html:110
 msgid "Total income"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:108
+#: plugins/fdrs/templates/service_income/tab_panel.html:112
 msgid "Total income minus reference"
 msgstr ""
 
@@ -26838,11 +27027,11 @@ msgstr ""
 msgid "Total vs breakdown validation"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:141
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:146
 msgid "Total-only reporting"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:137
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:142
 msgid ""
 "Total-only reporting: indicators with a value but without a "
 "disaggregation breakdown."
@@ -26991,7 +27180,7 @@ msgid "Translating the form…"
 msgstr ""
 
 #: plugins/upr/templates/upr/assignment_panel.html:5
-#: plugins/upr/templates/upr/tab_panel.html:377
+#: plugins/upr/templates/upr/tab_panel.html:389
 #, python-brace-format
 msgid "Translating visuals… {done} of {total}"
 msgstr ""
@@ -27240,11 +27429,15 @@ msgstr ""
 msgid "Translations saved."
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:425
+msgid "Treat blanks as zero in + − × ÷"
+msgstr ""
+
 #: app/templates/core/dashboard/_admin_panel.html:120
 msgid "Trend Analysis"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:223
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:228
 msgid "Trends Over Time"
 msgstr ""
 
@@ -27324,17 +27517,17 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:126
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:128
 #: app/templates/forms/entry_form/validation_summary_progress.html:320
-#: app/templates/forms/form_builder/partials/_sections_container.html:444
-#: app/templates/forms/form_builder/partials/_sections_container.html:467
-#: app/templates/forms/form_builder/partials/_sections_container.html:481
-#: app/templates/forms/form_builder/partials/_sections_container.html:487
-#: app/templates/forms/form_builder/partials/_sections_container.html:534
-#: app/templates/forms/form_builder/partials/_sections_container.html:550
+#: app/templates/forms/form_builder/partials/_sections_container.html:453
+#: app/templates/forms/form_builder/partials/_sections_container.html:476
+#: app/templates/forms/form_builder/partials/_sections_container.html:490
+#: app/templates/forms/form_builder/partials/_sections_container.html:496
+#: app/templates/forms/form_builder/partials/_sections_container.html:543
+#: app/templates/forms/form_builder/partials/_sections_container.html:559
 #: app/templates/notifications/center.html:91
 msgid "Type"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1388
+#: app/templates/admin/assignments/manage_assignment.html:1411
 msgid "Type at least 2 characters to search."
 msgstr ""
 
@@ -27351,7 +27544,7 @@ msgstr ""
 msgid "Type not set on this item"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:524
+#: app/templates/forms/entry_form/partials/matrix_table.html:581
 msgid "Type to search for rows to add..."
 msgstr ""
 
@@ -27415,7 +27608,7 @@ msgstr ""
 msgid "UPR tools"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:482
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:568
 msgid "URL / path"
 msgstr ""
 
@@ -27465,15 +27658,15 @@ msgstr ""
 msgid "Unarchive"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:593
+#: app/templates/forms/form_builder/partials/_sections_container.html:605
 msgid "Unarchive Item"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:134
+#: app/templates/forms/form_builder/partials/_sections_container.html:139
 msgid "Unarchive Section"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:319
+#: app/templates/forms/form_builder/partials/_sections_container.html:327
 msgid "Unarchive Sub-section"
 msgstr ""
 
@@ -27491,6 +27684,12 @@ msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:48
 msgid "Unchanged"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:304
+msgid ""
+"Uncheck to leave this column out of the row total and the grand total. "
+"Calculated columns stay out unless you check this."
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:263
@@ -27593,7 +27792,7 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:97
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:130
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:15
-#: app/templates/forms/form_builder/partials/_sections_container.html:445
+#: app/templates/forms/form_builder/partials/_sections_container.html:454
 msgid "Unit"
 msgstr ""
 
@@ -27708,7 +27907,7 @@ msgstr ""
 #: app/templates/admin/ai/_trace_card.html:41
 #: app/templates/admin/analytics/login_logs.html:123
 #: app/templates/admin/analytics/sessions.html:149
-#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:38
+#: app/templates/forms/entry_form/partials/discussion_comment_macros.html:75
 msgid "Unknown user"
 msgstr ""
 
@@ -27757,7 +27956,7 @@ msgstr ""
 msgid "Up to date"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1380
+#: app/templates/admin/assignments/manage_assignment.html:1403
 #, python-brace-format
 msgid "Up to {admin_users} admin(s) can be CC'd on emails."
 msgstr ""
@@ -27839,7 +28038,7 @@ msgstr ""
 #: app/templates/admin/settings/manage_settings.html:524
 #: app/templates/admin/settings/manage_settings.html:569
 #: app/templates/forms/entry_form/entry_form.html:3124
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:478
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:564
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:29
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:33
 #: plugins/upr/templates/macros/unified_country_plan_excel_instructions.html:24
@@ -28519,12 +28718,12 @@ msgid "Validating…"
 msgstr ""
 
 #: app/templates/components/_builder_items.html:139
-#: app/templates/forms/form_builder/partials/_sections_container.html:584
+#: app/templates/forms/form_builder/partials/_sections_container.html:593
 msgid "Validation"
 msgstr ""
 
-#: app/templates/admin/_validation_admin_shell.html:13
-#: app/templates/admin/_validation_admin_shell.html:24
+#: app/templates/admin/_validation_admin_shell.html:25
+#: app/templates/admin/_validation_admin_shell.html:47
 #: app/templates/admin/validation_dashboard.html:6
 #: app/templates/admin/validation_dashboard.html:17
 #: app/templates/components/_sidebar_nav_categories.html:134
@@ -28540,7 +28739,7 @@ msgstr ""
 msgid "Validation Message Translations"
 msgstr ""
 
-#: app/templates/admin/_validation_admin_shell.html:15
+#: app/templates/admin/_validation_admin_shell.html:29
 #: app/templates/admin/validation_questions.html:8
 #: app/templates/admin/validation_questions.html:19
 #: app/templates/components/_sidebar_nav_categories.html:140
@@ -28552,7 +28751,7 @@ msgstr ""
 msgid "Validation Rule"
 msgstr ""
 
-#: app/templates/admin/_validation_admin_shell.html:17
+#: app/templates/admin/_validation_admin_shell.html:33
 #: app/templates/admin/validation_rules.html:6
 #: app/templates/admin/validation_rules.html:17
 msgid "Validation Rules Registry"
@@ -28626,12 +28825,12 @@ msgid "Validation summary"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:239
-#: app/templates/forms/entry_form/export_pdf.html:499
+#: app/templates/forms/entry_form/export_pdf.html:536
 #: app/templates/forms/entry_form/validation_summary_progress.html:321
 msgid "Value"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:434
+#: app/templates/forms/entry_form/partials/matrix_table.html:530
 msgid "Value for"
 msgstr ""
 
@@ -28655,18 +28854,18 @@ msgstr ""
 msgid "Variable column tooltip labels"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:386
+#: app/templates/forms/entry_form/partials/matrix_table.html:482
 msgid "Variable tick for"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:404
+#: app/templates/forms/entry_form/partials/matrix_table.html:500
 msgid "Variable value for"
 msgstr ""
 
 #: app/templates/admin/communication/center.html:1496
 #: app/templates/admin/settings/manage_settings.html:1540
-#: app/templates/forms/form_builder/partials/_sections_container.html:517
-#: app/templates/forms/form_builder/partials/_sections_container.html:530
+#: app/templates/forms/form_builder/partials/_sections_container.html:526
+#: app/templates/forms/form_builder/partials/_sections_container.html:539
 msgid "Variables"
 msgstr ""
 
@@ -29022,6 +29221,14 @@ msgstr ""
 msgid "Volume, types, and delivery for %(start)s to %(end)s."
 msgstr ""
 
+#: plugins/fdrs/templates/ecr/tab_panel.html:221
+msgid ""
+"Volunteer figures, including “Volunteers without the five largest "
+"Societies”, come from FDRS assignments in the databank, not from these "
+"files. That comparison only uses a year when most Societies have a "
+"published value."
+msgstr ""
+
 #: app/utils/form_localization.py:123
 msgid "Volunteers"
 msgstr ""
@@ -29030,7 +29237,7 @@ msgstr ""
 msgid "Volunteers in Syria over time"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:78
+#: plugins/fdrs/templates/ecr/tab_panel.html:207
 msgid "Volunteers, 3-year mean"
 msgstr ""
 
@@ -29057,7 +29264,7 @@ msgstr ""
 
 #: app/templates/admin/monitoring/system_monitoring.html:211
 #: app/templates/admin/validation_questions.html:140
-#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:21
+#: app/templates/forms/form_builder/partials/_item_modal_entry_form_hint_panel.html:41
 msgid "Warning"
 msgstr ""
 
@@ -29224,7 +29431,20 @@ msgid ""
 "system managers and admins — add them explicitly)."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:294
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:432
+msgid ""
+"When checked, people filling the form cannot type over this result. "
+"Uncheck to let them replace the calculated number."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:440
+msgid ""
+"When checked, the calculated value is saved with the form and restored "
+"when the form is reopened. When unchecked, the value is always "
+"recalculated and not stored."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:295
 msgid ""
 "When checked, the variable column value is saved with the form and "
 "restored when the form is reopened. When unchecked, the value is always "
@@ -29311,7 +29531,7 @@ msgid ""
 "including countries that are not in a current cycle."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:345
+#: app/templates/admin/assignments/manage_assignment.html:367
 msgid ""
 "Who receives the review request when a focal point submits this "
 "assignment."
@@ -29350,7 +29570,7 @@ msgstr ""
 msgid "Will be deleted when you save the form."
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:172
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:177
 msgid "With age breakdown"
 msgstr ""
 
@@ -29358,24 +29578,24 @@ msgstr ""
 msgid "Wizard steps"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:78
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:207
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:83
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:212
 msgid "Women Participation"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:213
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:218
 msgid "Women Participation by Category"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:229
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:234
 msgid "Women in Leadership Roles"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:233
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:238
 msgid "Women in Staff"
 msgstr ""
 
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:237
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:242
 msgid "Women in Volunteering"
 msgstr ""
 
@@ -29425,16 +29645,20 @@ msgstr ""
 msgid "Working…"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:194
-msgid "World Bank snapshot"
-msgstr ""
-
 #: app/templates/core/chat_immersive.html:213
 msgid "World heatmap of volunteers by country"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:120
 msgid "World map coloured by FDRS submission status"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:416
+msgid ""
+"Write the column code directly, for example income + grant. Codes cannot "
+"contain spaces. Functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, ABS, "
+"ROUND, IF, BLANK. Operators: + − × ÷ and comparisons. Blank numbers are "
+"skipped by SUM and AVERAGE. Ticks are 0 or 1. Division by zero is blank."
 msgstr ""
 
 #: app/templates/admin/analytics/_user_detail_partial.html:63
@@ -29450,17 +29674,17 @@ msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:402
 #: app/templates/admin/ai/knowledge_base.html:840
-#: app/templates/admin/assignments/manage_assignment.html:231
+#: app/templates/admin/assignments/manage_assignment.html:253
 #: app/templates/admin/settings/manage_settings.html:1012
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:49
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:120
 #: app/templates/macros/year_picker.html:24
-#: plugins/fdrs/templates/disaggregation/tab_panel.html:67
-#: plugins/fdrs/templates/service_income/tab_panel.html:68
+#: plugins/fdrs/templates/disaggregation/tab_panel.html:71
+#: plugins/fdrs/templates/service_income/tab_panel.html:72
 msgid "Year"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:225
+#: app/templates/admin/assignments/manage_assignment.html:247
 #: app/templates/admin/documents/documents.html:232
 #: app/templates/forms/entry_form/entry_form.html:2996
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:42
@@ -29469,7 +29693,7 @@ msgstr ""
 msgid "Year Range"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:60
+#: plugins/fdrs/templates/service_income/tab_panel.html:64
 msgid "Yearly comparison"
 msgstr ""
 
@@ -29509,13 +29733,13 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/disability_questions.html:23
 #: app/templates/forms/entry_form/partials/disability_questions.html:48
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:270
-#: app/templates/forms/form_builder/partials/_sections_container.html:446
-#: app/templates/forms/form_builder/partials/_sections_container.html:468
-#: app/templates/forms/form_builder/partials/_sections_container.html:482
-#: app/templates/forms/form_builder/partials/_sections_container.html:488
-#: app/templates/forms/form_builder/partials/_sections_container.html:551
-#: app/templates/forms/form_builder/partials/_sections_container.html:562
-#: app/templates/forms/form_builder/partials/_sections_container.html:567
+#: app/templates/forms/form_builder/partials/_sections_container.html:455
+#: app/templates/forms/form_builder/partials/_sections_container.html:477
+#: app/templates/forms/form_builder/partials/_sections_container.html:491
+#: app/templates/forms/form_builder/partials/_sections_container.html:497
+#: app/templates/forms/form_builder/partials/_sections_container.html:560
+#: app/templates/forms/form_builder/partials/_sections_container.html:571
+#: app/templates/forms/form_builder/partials/_sections_container.html:576
 #: app/templates/forms/form_builder/partials/_template_details.html:40
 #: app/templates/forms/form_builder/partials/_template_details.html:54
 #: app/templates/forms/form_builder/partials/_template_details.html:68
@@ -29688,7 +29912,7 @@ msgstr ""
 msgid "You do not have permission to return this page for revision."
 msgstr ""
 
-#: app/routes/admin/assignment_management.py:1217
+#: app/routes/admin/assignment_management.py:1341
 msgid "You do not have permission to update assignment details."
 msgstr ""
 
@@ -29886,11 +30110,12 @@ msgstr ""
 
 #: app/templates/admin/api_management.html:625
 #: app/templates/admin/api_management.html:626
-#: app/templates/forms/entry_form/partials/matrix_table.html:386
-#: app/templates/forms/entry_form/partials/matrix_table.html:404
-#: app/templates/forms/entry_form/partials/matrix_table.html:421
-#: app/templates/forms/entry_form/partials/matrix_table.html:434
-#: plugins/fdrs/templates/compliance/tab_panel.html:573
+#: app/templates/forms/entry_form/partials/matrix_table.html:460
+#: app/templates/forms/entry_form/partials/matrix_table.html:482
+#: app/templates/forms/entry_form/partials/matrix_table.html:500
+#: app/templates/forms/entry_form/partials/matrix_table.html:517
+#: app/templates/forms/entry_form/partials/matrix_table.html:530
+#: plugins/fdrs/templates/compliance/tab_panel.html:586
 msgid "and"
 msgstr ""
 
@@ -29959,7 +30184,7 @@ msgstr ""
 msgid "by"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:84
+#: plugins/fdrs/templates/ecr/tab_panel.html:213
 msgid "calculated from current data"
 msgstr ""
 
@@ -29975,6 +30200,10 @@ msgstr ""
 msgid "campaigns"
 msgstr ""
 
+#: app/routes/admin/assignment_management.py:213
+msgid "closed"
+msgstr ""
+
 #: app/templates/admin/organization/index.html:2536
 msgid "cluster offices"
 msgstr ""
@@ -29985,7 +30214,7 @@ msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1161
 #: app/templates/components/_builder_items.html:100
-#: app/templates/forms/form_builder/partials/_sections_container.html:500
+#: app/templates/forms/form_builder/partials/_sections_container.html:509
 msgid "columns"
 msgstr ""
 
@@ -30010,7 +30239,7 @@ msgstr ""
 msgid "countries"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:706
+#: app/templates/admin/assignments/manage_assignment.html:728
 msgid "countries enabled for public submission"
 msgstr ""
 
@@ -30096,7 +30325,7 @@ msgstr ""
 msgid "e.g. <5, 5-17, 18-49, 50+"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:179
+#: app/templates/admin/assignments/manage_assignment.html:201
 msgid "e.g. Annual Country Survey 2025 — leave blank to use \"Template – Period\""
 msgstr ""
 
@@ -30301,7 +30530,7 @@ msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:794
 #: app/templates/admin/data_exploration/explore_data.html:801
-#: plugins/fdrs/templates/service_income/tab_panel.html:116
+#: plugins/fdrs/templates/service_income/tab_panel.html:120
 msgid "imputed"
 msgstr ""
 
@@ -30313,7 +30542,11 @@ msgstr ""
 msgid "in_progress"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:623
+#: app/routes/admin/assignment_management.py:215
+msgid "inactive"
+msgstr ""
+
+#: plugins/fdrs/templates/compliance/tab_panel.html:636
 msgid "inactive countries or National Societies are excluded from these counts."
 msgstr ""
 
@@ -30436,7 +30669,7 @@ msgstr ""
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:876
 #: app/templates/components/ag_grid_i18n_js.html:45
-#: plugins/fdrs/templates/compliance/tab_panel.html:573
+#: plugins/fdrs/templates/compliance/tab_panel.html:586
 msgid "more"
 msgstr ""
 
@@ -30483,7 +30716,7 @@ msgstr ""
 msgid "new"
 msgstr ""
 
-#: plugins/fdrs/templates/compliance/tab_panel.html:579
+#: plugins/fdrs/templates/compliance/tab_panel.html:592
 msgid "non-compliant countries have compliance documents pending validation."
 msgstr ""
 
@@ -30518,7 +30751,8 @@ msgstr ""
 msgid "of %(total)s in knowledge base"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:165
+#: app/templates/admin/assignments/manage_assignment.html:133
+#: app/templates/admin/assignments/manage_assignment.html:187
 #: app/templates/admin/reports/partials/_section_properties.html:43
 #: app/templates/admin/reports/partials/_section_tools.html:10
 #: app/templates/admin/reports/partials/_widget_properties.html:71
@@ -30623,7 +30857,7 @@ msgstr ""
 msgid "proper noun or technical term, no translation available"
 msgstr ""
 
-#: plugins/fdrs/templates/ecr/tab_panel.html:77
+#: plugins/fdrs/templates/ecr/tab_panel.html:206
 msgid "provisional"
 msgstr ""
 
@@ -30668,7 +30902,7 @@ msgstr ""
 msgid "repeat group data entries"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:115
+#: plugins/fdrs/templates/service_income/tab_panel.html:119
 msgid "reported"
 msgstr ""
 
@@ -30698,7 +30932,7 @@ msgstr ""
 #: app/templates/admin/communication/registry.html:44
 #: app/templates/admin/templates/kobo_data_import.html:1160
 #: app/templates/components/_builder_items.html:100
-#: app/templates/forms/form_builder/partials/_sections_container.html:500
+#: app/templates/forms/form_builder/partials/_sections_container.html:509
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:345
 msgid "rows"
 msgstr ""
@@ -30723,7 +30957,7 @@ msgstr ""
 msgid "secretariat entities"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:82
+#: app/templates/forms/form_builder/partials/_sections_container.html:87
 msgid "section"
 msgstr ""
 
@@ -30731,7 +30965,7 @@ msgstr ""
 msgid "section(s)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_sections_container.html:82
+#: app/templates/forms/form_builder/partials/_sections_container.html:87
 msgid "sections"
 msgstr ""
 
@@ -30968,7 +31202,7 @@ msgid "validation questions answered"
 msgstr ""
 
 #: app/templates/components/_builder_items.html:127
-#: app/templates/forms/form_builder/partials/_sections_container.html:572
+#: app/templates/forms/form_builder/partials/_sections_container.html:581
 msgid "width"
 msgstr ""
 
@@ -30984,7 +31218,7 @@ msgstr ""
 msgid "will be unassigned"
 msgstr ""
 
-#: plugins/fdrs/templates/service_income/tab_panel.html:117
+#: plugins/fdrs/templates/service_income/tab_panel.html:121
 msgid "with a service-income figure"
 msgstr ""
 
@@ -30996,6 +31230,11 @@ msgstr ""
 #: app/templates/core/dashboard/_admin_panel.html:690
 #: app/templates/core/dashboard/_assignments_tab.html:666
 msgid "yet."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:1423
+#, python-brace-format
+msgid "{countries} countries and {others} other entities selected."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:756
@@ -31022,12 +31261,12 @@ msgid "{count} selected"
 msgstr ""
 
 #: plugins/upr/templates/upr/assignment_panel.html:6
-#: plugins/upr/templates/upr/tab_panel.html:378
+#: plugins/upr/templates/upr/tab_panel.html:390
 #, python-brace-format
 msgid "{pending} remaining"
 msgstr ""
 
-#: plugins/upr/templates/upr/tab_panel.html:361
+#: plugins/upr/templates/upr/tab_panel.html:373
 #, python-brace-format
 msgid "{selected} of {total} selected"
 msgstr ""
@@ -31037,7 +31276,7 @@ msgstr ""
 msgid "{submitter_name} has submitted {assignment_title}."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1373
+#: app/templates/admin/assignments/manage_assignment.html:1396
 #, python-brace-format
 msgid ""
 "{users} focal points (in-app); {entities} emails to {email_users} with "
@@ -31105,7 +31344,7 @@ msgstr ""
 msgid "— type to filter and dim non-matching indicators"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1371
+#: app/templates/admin/assignments/manage_assignment.html:1394
 msgid ""
 "⚠ Platform settings have disabled notifications for this event — focal "
 "points will NOT receive notifications even though this box is checked."

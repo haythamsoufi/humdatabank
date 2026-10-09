@@ -284,7 +284,7 @@ class SettingsScreen extends StatelessWidget {
           },
         ),
         IOSListSwitchTile(
-          leading: Icons.auto_awesome_outlined,
+          leading: Icons.bubble_chart_outlined,
           title: localizations.chatbot,
           subtitle: localizations.enableChatbotAssistance,
           value: user.chatbotEnabled,

@@ -68,19 +68,23 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final localizations = AppLocalizations.of(context)!;
     final tone = _tone(context, assignment);
+    final overdue = assignment.isOverdue;
+    final cardTone = overdue ? _danger(context) : tone;
     final titleColor = isDark
         ? scheme.onSurface
         : const Color(AppConstants.defaultNavy);
     final metaColor = scheme.onSurface.withValues(alpha: 0.55);
     final cardColor = isDark
         ? Color.alphaBlend(
-            tone.accent.withValues(alpha: 0.22),
+            cardTone.accent.withValues(alpha: 0.22),
             scheme.surfaceContainerHigh,
           )
-        : tone.card;
+        : cardTone.background;
     final borderColor = isDark
-        ? scheme.outlineVariant.withValues(alpha: 0.45)
-        : GroupedDashboardPalette.hairline;
+        ? (overdue
+              ? cardTone.accent.withValues(alpha: 0.7)
+              : scheme.outlineVariant.withValues(alpha: 0.45))
+        : cardTone.border;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -97,7 +101,10 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ColoredBox(color: tone.accent, child: const SizedBox(width: 6)),
+                ColoredBox(
+                  color: cardTone.accent,
+                  child: const SizedBox(width: 6),
+                ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 13, 12, 12),
@@ -118,7 +125,19 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            _StatusChip(label: tone.label, tone: tone),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _StatusChip(label: tone.label, tone: tone),
+                                if (overdue) ...[
+                                  const SizedBox(height: 4),
+                                  _StatusChip(
+                                    label: localizations.overdue,
+                                    tone: _danger(context),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -205,131 +224,87 @@ class DashboardGroupedAssignmentCard extends StatelessWidget {
 class _StatusTone {
   const _StatusTone({
     required this.label,
-    required this.accent,
     required this.foreground,
     required this.background,
-    required this.card,
-    required this.outlined,
+    required this.border,
+    required this.accent,
   });
 
   final String label;
-  final Color accent;
   final Color foreground;
   final Color background;
-  final Color card;
-  final bool outlined;
+  final Color border;
+  final Color accent;
 }
 
-_StatusTone _tone(BuildContext context, Assignment assignment) {
-  final localizations = AppLocalizations.of(context)!;
+_StatusTone _toneFor(
+  BuildContext context,
+  String label,
+  GroupedStatusColors c,
+) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final navy = Color(AppConstants.ifrcNavy);
-  final red = Color(AppConstants.ifrcRed);
-
-  if (assignment.isOverdue) {
+  if (!isDark) {
     return _StatusTone(
-      label: localizations.overdue,
-      accent: red,
-      foreground: red,
-      background: isDark
-          ? red.withValues(alpha: 0.18)
-          : GroupedDashboardPalette.overdueWash,
-      card: isDark
-          ? red.withValues(alpha: 0.18)
-          : GroupedDashboardPalette.overdueCard,
-      outlined: false,
+      label: label,
+      foreground: c.foreground,
+      background: c.background,
+      border: c.border,
+      accent: c.accent,
     );
   }
+  return _StatusTone(
+    label: label,
+    foreground: Color.lerp(c.accent, Colors.white, 0.5)!,
+    background: c.accent.withValues(alpha: 0.18),
+    border: c.accent.withValues(alpha: 0.5),
+    accent: c.accent,
+  );
+}
 
+_StatusTone _danger(BuildContext context) => _toneFor(
+  context,
+  AppLocalizations.of(context)!.overdue,
+  GroupedDashboardPalette.danger,
+);
+
+String _titleCase(String value) => value
+    .split(' ')
+    .where((word) => word.isNotEmpty)
+    .map((word) => word[0].toUpperCase() + word.substring(1))
+    .join(' ');
+
+/// Status to colour mapping matches Backoffice `assignment_status_variant`.
+_StatusTone _tone(BuildContext context, Assignment assignment) {
+  final localizations = AppLocalizations.of(context)!;
   final status = assignment.status.toLowerCase().trim().replaceAll('_', ' ');
+  final label = localizations.localizeStatus(status);
+
   switch (status) {
-    case 'submitted':
-      const green = GroupedDashboardPalette.submitted;
-      return _StatusTone(
-        label: localizations.localizeStatus(status),
-        accent: green,
-        foreground: green,
-        background: isDark
-            ? green.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.submittedWash,
-        card: isDark
-            ? green.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.submittedCard,
-        outlined: false,
-      );
-    case 'approved':
-      final blue = isDark
-          ? GroupedDashboardPalette.approvedDark
-          : GroupedDashboardPalette.approved;
-      return _StatusTone(
-        label: localizations.localizeStatus(status),
-        accent: blue,
-        foreground: blue,
-        background: isDark
-            ? blue.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.approvedWash,
-        card: isDark
-            ? blue.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.approvedCard,
-        outlined: false,
-      );
     case 'in progress':
-      final ink = isDark ? GroupedDashboardPalette.progressOnDark : navy;
-      return _StatusTone(
-        label: localizations.localizeStatus(status),
-        accent: ink,
-        foreground: ink,
-        background: isDark
-            ? navy.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.progressWash,
-        card: isDark
-            ? navy.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.progressWash,
-        outlined: true,
-      );
+      return _toneFor(context, label, GroupedDashboardPalette.pending);
+    case 'submitted':
+      return _toneFor(context, label, GroupedDashboardPalette.info);
+    case 'approved':
+      return _toneFor(context, label, GroupedDashboardPalette.success);
     case 'requires revision':
-      const amber = GroupedDashboardPalette.amber;
-      return _StatusTone(
-        label: localizations.localizeStatus(status),
-        accent: amber,
-        foreground: amber,
-        background: isDark
-            ? amber.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.amberWash,
-        card: isDark
-            ? amber.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.amberCard,
-        outlined: false,
+      return _toneFor(context, label, GroupedDashboardPalette.warning);
+    case 'sent for review':
+      return _toneFor(
+        context,
+        label == status ? _titleCase(status) : label,
+        GroupedDashboardPalette.review,
       );
-    case 'pending':
-      const amber = GroupedDashboardPalette.amber;
-      return _StatusTone(
-        label: localizations.localizeStatus(status),
-        accent: amber,
-        foreground: amber,
-        background: isDark
-            ? amber.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.amberWash,
-        card: isDark
-            ? amber.withValues(alpha: 0.18)
-            : GroupedDashboardPalette.amberCard,
-        outlined: false,
+    case 'cancelled':
+      return _toneFor(
+        context,
+        label == status ? _titleCase(status) : label,
+        GroupedDashboardPalette.danger,
       );
     default:
-      final gray = isDark
-          ? GroupedDashboardPalette.mutedDark
-          : GroupedDashboardPalette.muted;
-      return _StatusTone(
-        label: localizations.localizeStatus(status),
-        accent: gray,
-        foreground: gray,
-        background: isDark
-            ? GroupedDashboardPalette.mutedWashDark
-            : GroupedDashboardPalette.mutedWash,
-        card: isDark
-            ? GroupedDashboardPalette.mutedWashDark
-            : GroupedDashboardPalette.card,
-        outlined: false,
+      return _toneFor(
+        context,
+        label == status ? _titleCase(status) : label,
+        GroupedDashboardPalette.neutral,
       );
   }
 }
@@ -347,9 +322,7 @@ class _StatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: tone.background,
         borderRadius: BorderRadius.circular(8),
-        border: tone.outlined
-            ? Border.all(color: tone.foreground.withValues(alpha: 0.85))
-            : null,
+        border: Border.all(color: tone.border),
       ),
       child: Text(
         label,

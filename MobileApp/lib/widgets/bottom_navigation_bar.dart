@@ -506,20 +506,17 @@ class AppBottomNavigationBar extends StatelessWidget {
     if (useSystemGlass) {
       // No Flutter fill or blur on top — that would hide the system glass.
       // The view ignores hits so the icon buttons keep the gestures.
-      // ClipRRect keeps the platform view's corners round even if the native
-      // side has not laid out its own capsule shape yet.
+      // Do not wrap the platform view in a Flutter clip: ClipRRect masks the
+      // native layer, and a masked ancestor stops UIVisualEffectView from
+      // sampling the content behind it. The native view shapes itself.
       surface = IgnorePointer(
-        child: ClipRRect(
-          borderRadius: radius,
-          child: UiKitView(
-            key: ValueKey<bool>(isDark),
-            viewType: _systemGlassViewType,
-            creationParams: <String, Object>{'dark': isDark},
-            creationParamsCodec: const StandardMessageCodec(),
-            gestureRecognizers:
-                const <Factory<OneSequenceGestureRecognizer>>{},
-            hitTestBehavior: PlatformViewHitTestBehavior.transparent,
-          ),
+        child: UiKitView(
+          key: ValueKey<bool>(isDark),
+          viewType: _systemGlassViewType,
+          creationParams: <String, Object>{'dark': isDark},
+          creationParamsCodec: const StandardMessageCodec(),
+          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+          hitTestBehavior: PlatformViewHitTestBehavior.transparent,
         ),
       );
     } else {

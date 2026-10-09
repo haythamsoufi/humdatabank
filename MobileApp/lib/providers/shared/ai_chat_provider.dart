@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../models/shared/ai_chat.dart';
 import '../../config/app_config.dart';
+import '../../services/ai_chat_exception.dart';
 import '../../services/ai_chat_service.dart';
 import '../../services/ai_chat_persistence_service.dart';
 import '../../services/storage_service.dart';
@@ -1280,6 +1281,8 @@ class AiChatProvider with ChangeNotifier {
 
   /// Retry the last user message without adding a duplicate
   Future<void> retryLastMessage({required bool isAuthenticated}) async {
+    // Ignore repeat taps while an attempt is still running.
+    if (_isStreaming) return;
     // Find the last user message
     final userMessages = _messages.where((m) => m.role == 'user').toList();
     if (userMessages.isEmpty) return;
@@ -1293,11 +1296,9 @@ class AiChatProvider with ChangeNotifier {
     _retryDelay = null;
     _failedMessage = null;
 
-    // Remove any error messages or empty assistant placeholders at the end
-    while (_messages.isNotEmpty &&
-           (_messages.last.role == 'assistant' && _messages.last.content.isEmpty)) {
-      _messages.removeLast();
-    }
+    // Drop the previous failed attempt (error bubbles and empty placeholders) so the
+    // retry replaces it instead of stacking another error bubble.
+    removeTrailingFailedAttempt(_messages);
 
     // Add assistant placeholder for streaming
     _messages.add(AiChatMessage(role: 'assistant', content: ''));
@@ -1681,12 +1682,14 @@ class AiChatProvider with ChangeNotifier {
       _error = errorMessage;
 
       final errorStr = errorMessage.toLowerCase();
-      String? errorType = _inferChatErrorType(e, errorStr);
-      if (errorType == 'quota_exceeded' ||
-          errorStr.contains('quota') ||
-          errorStr.contains('429') ||
-          errorStr.contains('rate limit')) {
-        errorType = 'quota_exceeded';
+      final String? errorType = e is AiChatHttpException
+          ? e.chatErrorType
+          : _inferChatErrorType(e, errorStr);
+      DebugLogger.logWarn(
+        'AI',
+        'Chat HTTP fallback failed (type=$errorType): $errorMessage',
+      );
+      if (errorType == 'quota_exceeded') {
         _errorType = 'quota_exceeded';
         final userMessages = _messages.where((m) => m.role == 'user').toList();
         if (userMessages.isNotEmpty) {

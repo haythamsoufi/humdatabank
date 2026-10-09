@@ -926,6 +926,24 @@ try {
         setTimeout(reapplyNssPersistedColumnState, 80);
     }
 
+    // Logo files on the public CDN are a different origin from this app.
+    // SafeDom rejects that by default and the cell would point at "#".
+    function nsLogoImgSrc(value) {
+        const raw = String(value || '').trim();
+        if (!raw || !window.SafeDom) return '';
+        if (SafeDom.safeUrl(raw)) return SafeDom.safeHrefAttr(raw);
+        const cdn = window.__staticCdnBase || '';
+        if (!cdn) return '';
+        try {
+            const fileOrigin = new URL(raw, window.location.origin).origin;
+            const cdnOrigin = new URL(cdn, window.location.origin).origin;
+            if (fileOrigin !== cdnOrigin) return '';
+        } catch (_) {
+            return '';
+        }
+        return SafeDom.safeHrefAttr(raw, { allowSameOrigin: false });
+    }
+
     // Column definitions for NSs grid
     // Column definitions for NSs table
     // Order: id, all name columns (name + name_*), other columns, actions (pinned last)
@@ -958,10 +976,11 @@ try {
             sortable: false,
             filter: false,
             cellRenderer: function(params) {
-                if (!params.value) {
+                const src = nsLogoImgSrc(params.value);
+                if (!src) {
                     return '<span class="text-gray-400">-</span>';
                 }
-                return '<img src="' + SafeDom.safeHrefAttr(params.value) + '" alt="" class="h-8 w-8 object-contain rounded border border-gray-200 bg-white">';
+                return '<img src="' + src + '" alt="" class="h-8 w-8 object-contain rounded border border-gray-200 bg-white">';
             },
             cellStyle: { 'text-align': 'center' }
         },

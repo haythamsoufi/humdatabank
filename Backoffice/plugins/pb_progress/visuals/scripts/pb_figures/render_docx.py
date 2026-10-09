@@ -13,10 +13,11 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
+from .font_faces import font_file
 from .languages import ARABIC_VISUAL_FONT, LATIN_DOCX_FONT, is_rtl
 from .calculations import not_available
 from .layouts import cumulative_table_rows, mapping_from_model, section_has_indicators
-from .line_chart import CHART_HEIGHT, render_line_chart_svg
+from .line_chart import CHART_HEIGHT, DOCX_LABEL_BAND_EM, render_line_chart_svg
 from .donut_chart import render_donut_svg
 from .svg_raster import write_svg_png
 from .payload import build_payload
@@ -25,28 +26,48 @@ from .report_meta import report_parts, report_titles, section_uses_part_heading_
 CHART_WIDTH_PX = 481
 IFRC_RED = RGBColor(0xC2, 0x25, 0x26)
 _DOCX_STYLES = ("Normal", "Title", "Heading 1", "Heading 2", "List Paragraph")
-_DOCX_PAGE_MARGIN = Inches(0.5)
+_DOCX_PAGE_MARGIN_IN = 0.35
+_DOCX_PAGE_MARGIN = Inches(_DOCX_PAGE_MARGIN_IN)
 _DOCX_PAGE_WIDTH_IN = 8.5
-_DOCX_CONTENT_WIDTH_IN = _DOCX_PAGE_WIDTH_IN - (2 * 0.5)
+_DOCX_CONTENT_WIDTH_IN = _DOCX_PAGE_WIDTH_IN - (2 * _DOCX_PAGE_MARGIN_IN)
 _DOCX_LABEL_COL_IN = 2.85
-_DOCX_DONUT_COL_IN = 0.55
+_DOCX_DONUT_SIZE_IN = 1.25
+_DOCX_DONUT_COL_IN = 1.45
+_DOCX_DONUT_PX = 220
+# viewBox 64, radius 26, stroke 10 → inner hole diameter is 42 user units.
+_DONUT_HOLE_RATIO = 42 / 64
 _DOCX_TABLE_FONT = 9
 _DOCX_CHART_DPI = 175  # PNG resolution for embedded line charts (~481px @ 2.75in)
+# Dashboard charts use 10px type. Embedded at the Word chart width that prints
+# near 7pt — smaller than the 9pt year table. Aim for this point size instead.
+_DOCX_CHART_LABEL_PT = 11
+
+
+def _docx_chart_label_band_px(width_px: int) -> float:
+    """Vertical room, in SVG units, reserved above and below the plot for labels."""
+    return (10 * _docx_chart_font_scale(width_px)) * DOCX_LABEL_BAND_EM
 
 
 def _docx_chart_height_px(width_px: int) -> int:
-    """Match PNG dashboard aspect ratio (110 px tall @ 481 px wide)."""
-    return int(width_px * CHART_HEIGHT / CHART_WIDTH_PX)
+    """Dashboard plot plus a label band above and below."""
+    plot = width_px * CHART_HEIGHT / CHART_WIDTH_PX
+    return int(round(plot + 2 * _docx_chart_label_band_px(width_px)))
 
 
 def _docx_chart_font_scale(width_px: int) -> float:
-    """Scale labels/markers with chart width so physical size matches PNG output."""
-    return width_px / CHART_WIDTH_PX
+    """Scale SVG type so value labels print at ``_DOCX_CHART_LABEL_PT``.
+
+    ``value_font`` is ``10 * font_scale`` user units on a canvas of ``width_px``,
+    and that canvas is ``width_px / _DOCX_CHART_DPI`` inches wide, so
+    ``point_size = 10 * font_scale * 72 / _DOCX_CHART_DPI``.
+    """
+    del width_px
+    return _DOCX_CHART_LABEL_PT * _DOCX_CHART_DPI / (10 * 72)
 
 
 def _docx_chart_display_height_in(width_in: float) -> float:
-    """Embedded height preserving the PNG 110/481 aspect ratio."""
-    return width_in * CHART_HEIGHT / CHART_WIDTH_PX
+    """Embedded height matching ``_docx_chart_height_px`` at ``_DOCX_CHART_DPI``."""
+    return _docx_chart_height_px(int(round(width_in * _DOCX_CHART_DPI))) / _DOCX_CHART_DPI
 
 
 def _set_rfonts(r_pr, font_name: str) -> None:
@@ -120,6 +141,8 @@ def _configure_page_margins(doc: Document) -> None:
         section.bottom_margin = _DOCX_PAGE_MARGIN
         section.left_margin = _DOCX_PAGE_MARGIN
         section.right_margin = _DOCX_PAGE_MARGIN
+        section.header_distance = Inches(0.2)
+        section.footer_distance = Inches(0.2)
 
 
 def _cumulative_table_widths(n_years: int) -> list[float]:
@@ -157,6 +180,21 @@ def _set_cell_vertical_alignment(
     alignment: WD_CELL_VERTICAL_ALIGNMENT = WD_CELL_VERTICAL_ALIGNMENT.CENTER,
 ) -> None:
     cell.vertical_alignment = alignment
+
+
+def _clear_cell_margins(cell) -> None:
+    """Drop Word's default cell padding so an edge-to-edge chart image is not cropped."""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    existing = tc_pr.find(qn("w:tcMar"))
+    if existing is not None:
+        tc_pr.remove(existing)
+    margins = OxmlElement("w:tcMar")
+    for edge in ("top", "left", "bottom", "right"):
+        node = OxmlElement(f"w:{edge}")
+        node.set(qn("w:w"), "0")
+        node.set(qn("w:type"), "dxa")
+        margins.append(node)
+    tc_pr.append(margins)
 
 
 def _center_table_cells(table) -> None:
@@ -211,6 +249,46 @@ def render_line_chart_asset(
     return output_path
 
 
+def _donut_label_font(language: str) -> tuple[str, Path]:
+    """Open Sans (Tajawal for Arabic). SVG rasterizers drop the named face."""
+    family = "Tajawal" if is_rtl(language) else "Open Sans"
+    return family, font_file(family, 700)
+
+
+def _paint_donut_center_label(image_path: Path, label: str, language: str) -> None:
+    from PIL import Image, ImageDraw, ImageFont
+
+    lines = [line for line in str(label).split("\n") if line.strip()]
+    if not lines:
+        return
+    image = Image.open(image_path).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    _family, path = _donut_label_font(language)
+    # Start from the dashboard's 11px-on-64 and shrink until the text sits
+    # inside the hole. "424M" overflows a fixed 11px face.
+    hole = image.width * _DONUT_HOLE_RATIO * 0.78
+    font_px = max(12, int(round(13 / 64 * image.width)))
+    font = ImageFont.truetype(str(path), size=font_px)
+    while font_px > 12:
+        widest = max(font.getlength(line) for line in lines)
+        ascent, descent = font.getmetrics()
+        block = (ascent + descent) * len(lines) + font_px * 0.15 * (len(lines) - 1)
+        if widest <= hole and block <= hole:
+            break
+        font_px -= 1
+        font = ImageFont.truetype(str(path), size=font_px)
+    ascent, descent = font.getmetrics()
+    line_height = ascent + descent
+    spacing = font_px * 0.15
+    total_height = line_height * len(lines) + spacing * (len(lines) - 1)
+    center_y = (image.height - total_height) / 2 + line_height / 2
+    fill = (0x1A, 0x1A, 0x1A, 255)
+    for line in lines:
+        draw.text((image.width / 2, center_y), line, font=font, fill=fill, anchor="mm")
+        center_y += line_height + spacing
+    image.convert("RGB").save(image_path)
+
+
 def render_donut_asset(
     item: dict[str, Any],
     output_path: Path,
@@ -220,8 +298,12 @@ def render_donut_asset(
     session=None,
 ) -> Path:
     del session
-    svg = render_donut_svg(item, show_label=show_label, language=language)
-    write_svg_png(svg, output_path, width=64, height=64)
+    svg = render_donut_svg(item, show_label=False, language=language)
+    write_svg_png(svg, output_path, width=_DOCX_DONUT_PX, height=_DOCX_DONUT_PX)
+    if show_label:
+        label = item.get("unavailable_label") if item.get("unavailable") else item.get("value_label")
+        if label:
+            _paint_donut_center_label(output_path, str(label), language)
     return output_path
 
 
@@ -291,11 +373,32 @@ def _set_table_preferred_width(table, width_in: float) -> None:
 
 
 def _set_column_widths(table, widths: list[float]) -> None:
+    """Fix both the grid and each cell. Word shrinks pictures to the grid, not cell.width."""
     _set_table_preferred_width(table, sum(widths))
+    grid = table._tbl.find(qn("w:tblGrid"))
+    if grid is None:
+        grid = OxmlElement("w:tblGrid")
+        table._tbl.insert(0, grid)
+    for col in list(grid.findall(qn("w:gridCol"))):
+        grid.remove(col)
+    for width in widths:
+        col = OxmlElement("w:gridCol")
+        col.set(qn("w:w"), str(int(round(width * 1440))))
+        grid.append(col)
     for row in table.rows:
         for idx, width in enumerate(widths):
-            if idx < len(row.cells):
-                row.cells[idx].width = Inches(width)
+            if idx >= len(row.cells):
+                continue
+            cell = row.cells[idx]
+            dxa = str(int(round(width * 1440)))
+            cell.width = Inches(width)
+            tc_pr = cell._tc.get_or_add_tcPr()
+            tc_w = tc_pr.find(qn("w:tcW"))
+            if tc_w is None:
+                tc_w = OxmlElement("w:tcW")
+                tc_pr.append(tc_w)
+            tc_w.set(qn("w:w"), dxa)
+            tc_w.set(qn("w:type"), "dxa")
 
 
 def _add_data_row(
@@ -381,6 +484,7 @@ def _add_cumulative_block(
     chart_cell = table.cell(0, 1)
     chart_cell.merge(table.cell(0, n_years))
     chart_cell.text = ""
+    _clear_cell_margins(chart_cell)
     p = chart_cell.paragraphs[0]
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after = Pt(0)
@@ -438,7 +542,12 @@ def _add_donut_image_cell(cell, image_path: Path, *, language: str) -> None:
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after = Pt(0)
     _apply_paragraph_language(p, language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
-    p.add_run().add_picture(str(image_path), width=Inches(0.45))
+    _clear_cell_margins(cell)
+    p.add_run().add_picture(
+        str(image_path),
+        width=Inches(_DOCX_DONUT_SIZE_IN),
+        height=Inches(_DOCX_DONUT_SIZE_IN),
+    )
     _set_cell_vertical_alignment(cell)
 
 
@@ -478,6 +587,7 @@ def _add_donut_block(
 
     _set_cell_text(table.cell(0, 0), item["label"], language=language)
     _add_donut_image_cell(table.cell(0, 1), donut_path, language=language)
+    _set_row_min_height(table.rows[0], _DOCX_DONUT_SIZE_IN)
     if has_target:
         _set_cell_text(
             table.cell(0, 2),
@@ -516,6 +626,7 @@ def _add_donut_pair_block(
     _set_table_fixed_layout(table)
     _set_column_widths(table, _donut_pair_widths())
     _set_row_cant_split(table.rows[0])
+    _set_row_min_height(table.rows[0], _DOCX_DONUT_SIZE_IN)
 
     _set_cell_text(table.cell(0, 0), left["label"], language=language)
     if left.get("unavailable"):

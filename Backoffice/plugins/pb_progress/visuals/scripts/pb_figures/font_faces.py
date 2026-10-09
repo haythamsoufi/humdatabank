@@ -24,6 +24,11 @@ _TAJAWAL_PLACEHOLDER = "__TAJAWAL_FONT_CSS__"
 _OPEN_SANS_PLACEHOLDER = "__OPEN_SANS_FONT_CSS__"
 
 
+def font_file(family: str, weight: int = 700) -> Path:
+    """Path to a bundled face. Used when SVG rasterizers ignore @font-face."""
+    return _FONT_SPECS[family][weight]
+
+
 def _face_css(family: str, *, inline: bool = True) -> str:
     blocks: list[str] = []
     for weight, path in _FONT_SPECS[family].items():

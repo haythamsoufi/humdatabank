@@ -353,9 +353,17 @@ class BasePlugin(ABC):
         """Return plugin settings for the Plugin Management API and settings page."""
         return {}
 
+    def supports_settings_update(self) -> bool:
+        """True when this plugin overrides :meth:`update_settings` and persists what it receives."""
+        return type(self).update_settings is not BasePlugin.update_settings
+
     def update_settings(self, settings: Dict[str, Any]) -> bool:
-        """Persist plugin settings. Default is a no-op success for plugins without writable config."""
-        return True
+        """Persist plugin settings. Plugins without writable settings leave this alone and return False."""
+        return False
+
+    def get_required_plugins(self) -> List[str]:
+        """``plugin_id`` values of other plugins this plugin cannot work without."""
+        return []
 
     def install(self) -> bool:
         """Called when plugin is installed"""
@@ -428,7 +436,11 @@ class BasePlugin(ABC):
             'license': self.license,
             'homepage': self.homepage,
             'field_types_count': len(self.get_field_types()),
-            'has_blueprint': self.get_blueprint() is not None,
+            # Do not build the blueprint here: that is expensive and has import side effects.
+            'has_blueprint': (
+                type(self).get_blueprint is not BasePlugin.get_blueprint
+                or type(self).get_additional_blueprints is not BasePlugin.get_additional_blueprints
+            ),
             'has_admin_menu': len(self.get_admin_menu_items()) > 0,
             'has_models': len(self.get_models()) > 0,
             'has_migrations': len(self.get_migrations()) > 0

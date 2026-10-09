@@ -5,7 +5,10 @@ Utility functions and classes for plugin development.
 This module provides common functionality that plugins can use to reduce code duplication.
 """
 
+import copy
+import hashlib
 import logging
+import threading
 import traceback
 import sys
 import importlib.util
@@ -13,14 +16,43 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from functools import wraps
 from flask import current_app, request
+from markupsafe import escape
 from app.utils.api_responses import json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.utils.request_utils import is_json_request
-from flask_login import login_required
+from flask_login import current_user, login_required
 from app.routes.admin.shared import permission_required
 import json
 
 PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
+
+# Shown instead of stored secrets (API keys). Saving this value back keeps the stored secret.
+REDACTED_SECRET = '********'
+
+
+def redact_secrets(config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
+    """Copy of ``config`` with each non-empty secret (a tuple key path) replaced by ``REDACTED_SECRET``."""
+    redacted = copy.deepcopy(config)
+    for path in secret_paths:
+        node = redacted
+        for key in path[:-1]:
+            node = node.get(key) if isinstance(node, dict) else None
+        if isinstance(node, dict) and node.get(path[-1]):
+            node[path[-1]] = REDACTED_SECRET
+    return redacted
+
+
+def restore_secrets(new_config: Dict[str, Any], current_config: Dict[str, Any], secret_paths) -> Dict[str, Any]:
+    """Replace ``REDACTED_SECRET`` placeholders in ``new_config`` with the stored values."""
+    restored = copy.deepcopy(new_config)
+    for path in secret_paths:
+        node, stored = restored, current_config
+        for key in path[:-1]:
+            node = node.get(key) if isinstance(node, dict) else None
+            stored = stored.get(key) if isinstance(stored, dict) else None
+        if isinstance(node, dict) and node.get(path[-1]) == REDACTED_SECRET:
+            node[path[-1]] = stored.get(path[-1], '') if isinstance(stored, dict) else ''
+    return restored
 
 
 def _plugin_config_payload():
@@ -114,7 +146,7 @@ def plugin_error_handler(plugin_name: str):
                         error_code=e.error_code or 'PLUGIN_ERROR'
                     )
                 else:
-                    return f"<div class='plugin-error'>Error in {plugin_name}: {e.message}</div>", 500
+                    return f"<div class='plugin-error'>Error in {escape(plugin_name)}: {escape(e.message)}</div>", 500
             except Exception as e:
                 error_msg = f"Unexpected error in {plugin_name}.{func.__name__}: {str(e)}"
                 current_app.logger.error(error_msg, exc_info=True)
@@ -127,7 +159,7 @@ def plugin_error_handler(plugin_name: str):
                         error_code='UNEXPECTED_ERROR'
                     )
                 else:
-                    return f"<div class='plugin-error'>Internal error in {plugin_name}</div>", 500
+                    return f"<div class='plugin-error'>Internal error in {escape(plugin_name)}</div>", 500
         return wrapper
     return decorator
 
@@ -175,10 +207,11 @@ def settings_plugin_info(plugin_id: str) -> Dict[str, Any]:
 class BasePluginRoutes:
     """Base class for plugin routes with common functionality."""
 
-    def __init__(self, plugin_id: str, display_name: str = None, plugin_config=None):
+    def __init__(self, plugin_id: str, display_name: str = None, plugin_config=None, secret_paths=()):
         self.plugin_id = plugin_id
         self.display_name = display_name or plugin_id
         self.plugin_config = plugin_config
+        self.secret_paths = tuple(tuple(p) for p in secret_paths)
         self.logger = logging.getLogger(f"plugin.{self.plugin_id}")
 
     def create_standard_routes(self, blueprint, template_renderer=None):
@@ -191,7 +224,7 @@ class BasePluginRoutes:
             if not self.plugin_config:
                 raise PluginConfigError("Plugin configuration not available", self.display_name)
 
-            return json_ok(config=self.plugin_config.get_all_config())
+            return json_ok(config=redact_secrets(self.plugin_config.get_all_config(), self.secret_paths))
 
         @blueprint.route('/api/config', methods=['POST'])
         @plugin_admin_route_wrapper(self.display_name)
@@ -200,7 +233,9 @@ class BasePluginRoutes:
             if not self.plugin_config:
                 raise PluginConfigError("Plugin configuration not available", self.display_name)
 
-            payload = _plugin_config_payload()
+            payload = restore_secrets(
+                _plugin_config_payload(), self.plugin_config.get_all_config(), self.secret_paths
+            )
             success = self.plugin_config.update_config(payload)
 
             if not success:
@@ -215,7 +250,10 @@ class BasePluginRoutes:
             if not self.plugin_config:
                 raise PluginConfigError("Plugin configuration not available", self.display_name)
 
-            payload = _plugin_config_payload()
+            section_secrets = tuple(p[1:] for p in self.secret_paths if p and p[0] == section)
+            payload = restore_secrets(
+                _plugin_config_payload(), self.plugin_config.get_section(section), section_secrets
+            )
             success = self.plugin_config.update_section(section, payload)
 
             if not success:
@@ -362,51 +400,54 @@ class PluginMetrics:
         return processed_metrics
 
 
-# Global plugin cache storage
-_plugin_cache = {}
+# Global plugin cache storage: cache_key -> (result, stored_at)
+_plugin_cache: Dict[str, Any] = {}
+_plugin_cache_lock = threading.Lock()
+_PLUGIN_CACHE_MAX_ENTRIES = 100
+
 
 def clear_plugin_cache(plugin_name: str = None, function_name: str = None):
     """Clear plugin cache entries."""
-    global _plugin_cache
+    with _plugin_cache_lock:
+        if plugin_name is None and function_name is None:
+            _plugin_cache.clear()
+            return True
 
-    if plugin_name is None and function_name is None:
-        # Clear all cache
-        _plugin_cache.clear()
-        return True
+        keys_to_remove = []
+        for cache_key in _plugin_cache:
+            # Cache key format: "plugin_name:function_name:digest"
+            parts = cache_key.split(':', 2)
+            if len(parts) < 2:
+                continue
+            if plugin_name and parts[0] != plugin_name:
+                continue
+            if function_name and parts[1] != function_name:
+                continue
+            keys_to_remove.append(cache_key)
 
-    keys_to_remove = []
-    for cache_key in _plugin_cache.keys():
-        # Cache key format: "plugin_name:function_name:args_hash"
-        parts = cache_key.split(':', 2)
-        if len(parts) >= 2:
-            cached_plugin = parts[0]
-            cached_function = parts[1]
-
-            should_remove = True
-            if plugin_name and cached_plugin != plugin_name:
-                should_remove = False
-            if function_name and cached_function != function_name:
-                should_remove = False
-
-            if should_remove:
-                keys_to_remove.append(cache_key)
-
-    for key in keys_to_remove:
-        del _plugin_cache[key]
+        for key in keys_to_remove:
+            del _plugin_cache[key]
 
     return len(keys_to_remove)
 
+
+def _cache_viewer_scope() -> str:
+    """Identify who the cached response was built for (cached routes may be user-specific)."""
+    try:
+        if current_user and current_user.is_authenticated:
+            return f"user:{current_user.get_id()}"
+    except Exception as e:
+        logging.getLogger(__name__).debug("Could not resolve cache viewer scope: %s", e)
+    return "anonymous"
+
+
 def cache_plugin_result(ttl_seconds: int = 300, plugin_name: str = None):
-    """Simple caching decorator for plugin methods with global cache clearing support."""
+    """Cache a plugin function's result per viewer and, inside a request, per method/path/query."""
     def decorator(func: Callable):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
             import time
-            global _plugin_cache
-            # If we're running inside a Flask request, include request data in cache key.
-            # This prevents cross-request collisions for route handlers that don't take args/kwargs,
-            # but do vary based on query params (e.g., ?iso=XXX).
             try:
                 from flask import has_request_context, request
                 has_req = has_request_context()
@@ -414,46 +455,41 @@ def cache_plugin_result(ttl_seconds: int = 300, plugin_name: str = None):
                 logging.getLogger(__name__).debug("Request context check failed: %s", e)
                 has_req = False
 
-            # Get plugin name from decorator or try to infer
             actual_plugin_name = plugin_name or getattr(func, '__module__', '').split('.')[-1]
 
-            # Create cache key with plugin name
-            # For config dicts, use JSON stringification for stable hashing
-            kwargs_str = json.dumps(kwargs, sort_keys=True, default=str) if kwargs else ''
             req_str = ''
             if has_req:
                 try:
-                    # Normalize args (MultiDict) into stable JSON
                     args_dict = {k: request.args.getlist(k) for k in sorted(request.args.keys())}
                     req_str = json.dumps({
                         'method': request.method,
                         'path': request.path,
                         'args': args_dict,
+                        'viewer': _cache_viewer_scope(),
                     }, sort_keys=True, default=str)
                 except Exception as e:
                     logging.getLogger(__name__).debug("Could not serialize request for cache key: %s", e)
                     req_str = ''
-            args_hash = hash(str(args) + kwargs_str + req_str)
-            cache_key = f"{actual_plugin_name}:{func.__name__}:{args_hash}"
+            kwargs_str = json.dumps(kwargs, sort_keys=True, default=str) if kwargs else ''
+            digest = hashlib.sha256(f"{args!r}|{kwargs_str}|{req_str}".encode('utf-8')).hexdigest()
+            cache_key = f"{actual_plugin_name}:{func.__name__}:{digest}"
             current_time = time.time()
 
-            # Check if we have a valid cached result
-            if cache_key in _plugin_cache:
-                cached_result, cached_time = _plugin_cache[cache_key]
-                if current_time - cached_time < ttl_seconds:
-                    return cached_result
-                else:
-                    # Remove expired entry
+            with _plugin_cache_lock:
+                cached = _plugin_cache.get(cache_key)
+                if cached is not None:
+                    cached_result, cached_time = cached
+                    if current_time - cached_time < ttl_seconds:
+                        return cached_result
                     del _plugin_cache[cache_key]
 
-            # Execute function and cache result
             result = func(*args, **kwargs)
-            _plugin_cache[cache_key] = (result, current_time)
 
-            # Limit cache size
-            if len(_plugin_cache) > 100:
-                oldest_key = min(_plugin_cache.keys(), key=lambda k: _plugin_cache[k][1])
-                del _plugin_cache[oldest_key]
+            with _plugin_cache_lock:
+                _plugin_cache[cache_key] = (result, current_time)
+                while len(_plugin_cache) > _PLUGIN_CACHE_MAX_ENTRIES:
+                    oldest_key = min(_plugin_cache, key=lambda k: _plugin_cache[k][1])
+                    del _plugin_cache[oldest_key]
 
             return result
         return wrapper

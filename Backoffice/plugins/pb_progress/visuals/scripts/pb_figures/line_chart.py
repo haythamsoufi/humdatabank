@@ -27,6 +27,9 @@ LABEL_BELOW_OFFSET = 16
 MIN_LABEL_CLEARANCE_FROM_BOTTOM = 12
 
 LABEL_EDGE_THRESHOLD_PCT = 12.0
+# Word charts are short. This many ems of canvas, above and below the plot,
+# is where value labels sit so they are not drawn on the stroke.
+DOCX_LABEL_BAND_EM = 2.15
 
 LINE_CHART_JS_PATH = Path(__file__).parent / "templates" / "line_chart.js"
 _LINE_CHART_JS_PLACEHOLDER = "__LINE_CHART_JS__"
@@ -282,6 +285,94 @@ def target_label_layout(
     return {"tag_below": tag_below, "value_above": value_above, "value_below": value_below}
 
 
+def _label_advance_px(text: str, font_size: float) -> float:
+    return max(len(text), 1) * font_size * 0.58
+
+
+def _label_anchor(x: float, text: str, font_size: float, width: int) -> str:
+    """Keep a label inside the SVG when centering it would cross the edge."""
+    half = _label_advance_px(text, font_size) / 2
+    if x - half < 4:
+        return "start"
+    if x + half > width - 4:
+        return "end"
+    return "middle"
+
+
+def _label_box(baseline: float, x: float, anchor: str, text: str, font_size: float) -> tuple[float, float, float, float]:
+    advance = _label_advance_px(text, font_size)
+    if anchor == "start":
+        left = x
+    elif anchor == "end":
+        left = x - advance
+    else:
+        left = x - advance / 2
+    top = baseline - font_size * 0.82
+    return left, top, left + advance, top + font_size
+
+
+def _boxes_overlap(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+    gap: float,
+) -> bool:
+    return a[0] < b[2] + gap and b[0] < a[2] + gap and a[1] < b[3] + gap and b[1] < a[3] + gap
+
+
+def _separate_value_labels(
+    labels: list[dict[str, object]],
+    *,
+    height: int,
+    marker_r: float,
+) -> None:
+    """Nudge labels that share the same patch of the chart until their boxes clear."""
+    font_size = float(labels[0]["font_size"]) if labels else 10
+    gap = max(2.0, font_size * 0.12)
+    for _ in range(14):
+        moved = False
+        for i in range(len(labels)):
+            for j in range(i + 1, len(labels)):
+                first = labels[i]
+                second = labels[j]
+                box_a = _label_box(
+                    float(first["baseline"]), float(first["x"]), str(first["anchor"]), str(first["text"]), font_size
+                )
+                box_b = _label_box(
+                    float(second["baseline"]), float(second["x"]), str(second["anchor"]), str(second["text"]), font_size
+                )
+                if not _boxes_overlap(box_a, box_b, gap):
+                    continue
+                upper, lower = (first, second) if float(first["baseline"]) <= float(second["baseline"]) else (second, first)
+                shift = font_size * 0.4
+                if upper["above"]:
+                    upper["baseline"] = float(upper["baseline"]) - shift
+                if not lower["above"]:
+                    lower["baseline"] = float(lower["baseline"]) + shift
+                elif lower["above"]:
+                    ceiling = float(lower["cy"]) - marker_r - font_size * 0.25
+                    lowered = float(lower["baseline"]) + shift
+                    if lowered <= ceiling:
+                        lower["baseline"] = lowered
+                    else:
+                        upper["baseline"] = float(upper["baseline"]) - shift
+                moved = True
+        if not moved:
+            break
+    for label in labels:
+        baseline = float(label["baseline"])
+        top = baseline - font_size * 0.82
+        bottom = baseline + font_size * 0.25
+        if top < 1:
+            baseline += 1 - top
+        if bottom > height - 1:
+            baseline -= bottom - (height - 1)
+        if label["above"]:
+            baseline = min(baseline, float(label["cy"]) - marker_r - font_size * 0.55)
+        else:
+            baseline = max(baseline, float(label["cy"]) + marker_r + font_size * 0.95)
+        label["baseline"] = baseline
+
+
 def _line_segments(coords: list[tuple[float, float] | None]) -> list[list[tuple[float, float]]]:
     segments: list[list[tuple[float, float]]] = []
     current: list[tuple[float, float]] = []
@@ -313,10 +404,28 @@ def render_line_chart_svg(
     """Render line geometry as SVG (labels optional for PNG assets)."""
     values = item["values"]
     v_scale = height / CHART_HEIGHT
+    value_font = max(8, round(10 * font_scale))
+    target_tag_font = max(8, round(9 * font_scale))
+    target_value_font = max(8, round(10 * font_scale))
     pad_l = CHART_PAD_L
     pad_r = CHART_PAD_R
-    pad_t = CHART_PAD_TOP * v_scale
-    pad_b = CHART_PAD_BOTTOM * v_scale
+    word_labels = font_scale > 1.05 and show_value_labels
+    if word_labels:
+        # Bands match render_docx's extra canvas height. The plot stays in
+        # the middle; labels occupy the bands instead of the stroke.
+        pad_t = value_font * DOCX_LABEL_BAND_EM
+        pad_b = value_font * DOCX_LABEL_BAND_EM
+    else:
+        pad_t = CHART_PAD_TOP * v_scale
+        pad_b = CHART_PAD_BOTTOM * v_scale
+    if font_scale > 1.05 and show_target_labels:
+        annual_label = str(item.get("annual_target_label") or "")
+        if annual_label:
+            label_pad = 12 * font_scale + len(annual_label) * target_value_font * 0.62
+            if is_rtl(language):
+                pad_l = max(pad_l, label_pad)
+            else:
+                pad_r = max(pad_r, label_pad)
     plot_w = width - pad_l - pad_r
 
     numeric = [v for v in values if v is not None]
@@ -351,9 +460,6 @@ def render_line_chart_svg(
     marker_ring = fx.get("marker_ring", False)
     stroke_width = style["line_stroke_width"] * font_scale
     marker_r = style.get("marker_radius", 3.5) * font_scale
-    value_font = max(8, round(10 * font_scale))
-    target_tag_font = max(8, round(9 * font_scale))
-    target_value_font = max(8, round(10 * font_scale))
     is_modern = style.get("name") == "modern"
     label_layout = target_label_layout(
         values,
@@ -470,6 +576,7 @@ def render_line_chart_svg(
             f'stroke-linejoin="round" stroke-linecap="round"{shadow_attr}/>'
         )
 
+    placed: list[dict[str, object]] = []
     for i, value in enumerate(values):
         if value is None:
             continue
@@ -492,29 +599,65 @@ def render_line_chart_svg(
         if show_value_labels:
             label = item["value_labels"][i]
             if label:
-                ly, above = _value_label_y_px(
-                    i,
-                    value,
-                    values,
-                    annual_target,
-                    y_max,
-                    height=height,
-                    marker_r=marker_r,
-                    font_size=value_font,
-                )
-                x_pct = x_percent(i, count, width, language=language)
-                parts.append(
-                    _svg_chart_text(
-                        str(label),
-                        x=cx,
-                        y=ly,
-                        language=language,
-                        fill=COLOR_VALUE,
-                        font_size=value_font,
-                        text_anchor=value_label_text_anchor(x_pct),
-                        dominant_baseline="auto" if above else "hanging",
+                text = str(label)
+                if word_labels:
+                    above = value_label_above(i, value, values, annual_target, y_max)
+                    # Alphabetic baseline only. Rasterizers ignore dominant-baseline,
+                    # so a "below" label has to start a full glyph under the marker.
+                    if above:
+                        baseline = cy - marker_r - value_font * 0.55
+                    else:
+                        baseline = cy + marker_r + value_font * 0.95
+                    placed.append(
+                        {
+                            "text": text,
+                            "x": cx,
+                            "baseline": baseline,
+                            "above": above,
+                            "cy": cy,
+                            "anchor": _label_anchor(cx, text, value_font, width),
+                            "font_size": value_font,
+                        }
                     )
+                else:
+                    ly, above = _value_label_y_px(
+                        i,
+                        value,
+                        values,
+                        annual_target,
+                        y_max,
+                        height=height,
+                        marker_r=marker_r,
+                        font_size=value_font,
+                    )
+                    x_pct = x_percent(i, count, width, language=language)
+                    parts.append(
+                        _svg_chart_text(
+                            text,
+                            x=cx,
+                            y=ly,
+                            language=language,
+                            fill=COLOR_VALUE,
+                            font_size=value_font,
+                            text_anchor=value_label_text_anchor(x_pct),
+                            dominant_baseline="auto" if above else "hanging",
+                        )
+                    )
+
+    if word_labels and placed:
+        _separate_value_labels(placed, height=height, marker_r=marker_r)
+        for label in placed:
+            parts.append(
+                _svg_chart_text(
+                    str(label["text"]),
+                    x=float(label["x"]),
+                    y=float(label["baseline"]),
+                    language=language,
+                    fill=COLOR_VALUE,
+                    font_size=value_font,
+                    text_anchor=str(label["anchor"]),
                 )
+            )
 
     parts.append("</svg>")
     return "".join(parts)

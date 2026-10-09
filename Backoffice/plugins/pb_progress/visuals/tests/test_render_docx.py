@@ -15,9 +15,11 @@ from docx.oxml.ns import qn
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from pb_figures.font_faces import font_file  # noqa: E402
 from pb_figures.line_chart import CHART_HEIGHT  # noqa: E402
 from pb_figures.render_docx import (  # noqa: E402
     CHART_WIDTH_PX,
+    _DOCX_CHART_DPI,
     _DOCX_CONTENT_WIDTH_IN,
     _DOCX_LABEL_COL_IN,
     _DOCX_PAGE_MARGIN,
@@ -27,6 +29,7 @@ from pb_figures.render_docx import (  # noqa: E402
     _chart_render_width_px,
     _configure_page_margins,
     _cumulative_table_widths,
+    _DOCX_DONUT_SIZE_IN,
     _docx_chart_display_height_in,
     _docx_chart_font_scale,
     _docx_chart_height_px,
@@ -106,16 +109,29 @@ class TableInnerBorderTests(unittest.TestCase):
         widths = _donut_pair_widths()
         self.assertAlmostEqual(sum(widths), _DOCX_CONTENT_WIDTH_IN, places=5)
 
-    def test_docx_chart_height_matches_png_aspect_ratio(self) -> None:
+    def test_docx_chart_is_taller_than_the_dashboard_plot(self) -> None:
         width_px = _chart_render_width_px(5)
         height_px = _docx_chart_height_px(width_px)
-        png_ratio = CHART_HEIGHT / CHART_WIDTH_PX
-        self.assertAlmostEqual(height_px / width_px, png_ratio, places=2)
+        plot_px = width_px * CHART_HEIGHT / CHART_WIDTH_PX
+        self.assertGreater(height_px, plot_px + 40)
         width_in = _chart_area_width(5)
         height_in = _docx_chart_display_height_in(width_in)
-        self.assertAlmostEqual(height_in / width_in, png_ratio, places=4)
-        self.assertAlmostEqual(_docx_chart_font_scale(width_px), width_px / CHART_WIDTH_PX, places=4)
-        self.assertGreater(_docx_chart_font_scale(width_px), 1.0)
+        self.assertAlmostEqual(height_in * _DOCX_CHART_DPI, height_px, delta=1.5)
+        font_scale = _docx_chart_font_scale(width_px)
+        point_size = (10 * font_scale) / width_px * width_in * 72
+        self.assertAlmostEqual(point_size, 11, delta=0.2)
+        self.assertGreater(font_scale, width_px / CHART_WIDTH_PX)
+
+
+class DonutLabelFontTests(unittest.TestCase):
+    def test_center_label_uses_open_sans_bold(self) -> None:
+        from pb_figures.render_docx import _donut_label_font
+
+        family, path = _donut_label_font("English")
+        self.assertEqual(family, "Open Sans")
+        self.assertEqual(path, font_file("Open Sans", 700))
+        self.assertTrue(path.is_file())
+        self.assertGreater(_DOCX_DONUT_SIZE_IN, 0.9)
 
 
 class DonutPairTableTests(unittest.TestCase):

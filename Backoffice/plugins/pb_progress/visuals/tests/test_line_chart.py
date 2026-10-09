@@ -40,6 +40,42 @@ class LineChartNullValueTests(unittest.TestCase):
         above = value_label_above(2, 63.0, values, None, 80.0)
         self.assertTrue(above)
 
+    def test_word_scale_labels_clear_the_marker(self) -> None:
+        """Value labels on a Word-scaled chart sit off the stroke, including dips and flat series."""
+        import re
+
+        from pb_figures.line_chart import render_line_chart_svg
+        from pb_figures.render_docx import (
+            _chart_render_width_px,
+            _docx_chart_font_scale,
+            _docx_chart_height_px,
+        )
+
+        width = _chart_render_width_px(5)
+        height = _docx_chart_height_px(width)
+        font_scale = _docx_chart_font_scale(width)
+        item = {
+            "values": [32.0, 38.0, 71.0, 36.0, 75.0],
+            "value_labels": ["32", "38", "71", "36", "75"],
+            "annual_target": None,
+            "annual_target_label": None,
+        }
+        svg = render_line_chart_svg(
+            item,
+            width,
+            height=height,
+            show_value_labels=True,
+            show_target_labels=True,
+            font_scale=font_scale,
+        )
+        circles = [float(y) for y in re.findall(r'<circle[^>]*cy="([\d.]+)"', svg)]
+        texts = re.findall(r'<text x="([\d.]+)" y="([\d.]+)"[^>]*>([^<]+)</text>', svg)
+        self.assertEqual(len(circles), 5)
+        self.assertEqual([text for _, _, text in texts], ["32", "38", "71", "36", "75"])
+        font = 10 * font_scale
+        for (_, y_text, _), cy in zip(texts, circles):
+            self.assertGreater(abs(float(y_text) - cy), font * 0.7)
+
     def test_local_minimum_near_bottom_flips_label_above(self) -> None:
         values = [562_000, 12_300_000, 15_200_000, 6_200_000, 87_000_000]
         _, y_max = y_scale(values[0], values, None)

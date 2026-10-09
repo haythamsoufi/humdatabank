@@ -75,6 +75,20 @@ def _file_storage(filename: str, data: bytes) -> FileStorage:
     return FileStorage(stream=BytesIO(data), filename=filename, content_type="image/png")
 
 
+def _stored_logo_exists(filename: str | None) -> bool:
+    """True when the database filename still has a file in upload storage."""
+    name = (filename or "").strip()
+    if not name:
+        return False
+    from app.services.platform import storage_service as storage
+
+    try:
+        return bool(storage.exists(storage.SYSTEM, f"{NS_LOGO_SUBDIR}/{name}"))
+    except Exception:
+        logger.warning("Could not check stored NS logo %s", name)
+        return False
+
+
 def societies_for_iso3(iso3: str) -> list[NationalSociety]:
     code = (iso3 or "").strip().upper()
     if not code:
@@ -119,7 +133,7 @@ def sync_ns_logos_from_github(
             missing_ns += 1
             continue
         matched += 1
-        existing = [row for row in nss if (row.logo_filename or "").strip()]
+        existing = [row for row in nss if _stored_logo_exists(row.logo_filename)]
         if existing and not overwrite:
             skipped += len(nss)
             continue

@@ -30,6 +30,10 @@ from app.services.organization.country_service import (
 from app.services.organization.secretariat_regional_office_service import (
     assign_country_secretariat_regional_office,
 )
+from app.utils.country_utils import (
+    collect_part_of_category_definitions,
+    collect_part_of_category_names,
+)
 from app.routes.admin.shared import (
     admin_permission_required,
     admin_permission_required_any,
@@ -298,15 +302,11 @@ def index():
 
         return json_ok(**response_data)
 
-    # Derive part_of categories from already-loaded NSs so the page does not
-    # need a separate GET /api/part-of-programs round-trip on load.
-    part_of_programs = sorted({
-        item.strip()
-        for ns in nss
-        if ns.part_of and isinstance(ns.part_of, list)
-        for item in ns.part_of
-        if item and isinstance(item, str) and item.strip()
-    })
+    # Derive part_of categories from already-loaded NSs plus the saved catalog
+    # so the page does not need a separate GET /api/part-of-programs on load.
+    # The catalog keeps a category that was added before any society is checked.
+    part_of_programs = collect_part_of_category_names(nss)
+    part_of_category_definitions = collect_part_of_category_definitions(nss)
 
     return render_template('admin/organization/index.html',
                          countries_count=countries_count,
@@ -332,6 +332,7 @@ def index():
                          clusters=clusters,
                          all_countries=all_countries,
                          part_of_programs=part_of_programs,
+                         part_of_category_definitions=part_of_category_definitions,
                          # Filter parameters
                          selected_country_id=selected_country_id,
                          selected_division_id=selected_division_id,

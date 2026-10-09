@@ -25,9 +25,9 @@
                                 <i class="fas fa-file-excel mr-2"></i>
                                 {{ _('Excel') }}
                             </button>
-                            <button type="button" id="add-category-btn" class="btn btn-primary">
-                                <i class="fas fa-plus-circle mr-2"></i>
-                                {{ _('Add Category') }}
+                            <button type="button" id="categories-btn" class="btn btn-primary">
+                                <i class="fas fa-tags mr-2"></i>
+                                {{ _('Categories') }}
                             </button>
                             <a href="{{ url_for('organization.new_national_society') }}"
                                class="btn btn-success">
@@ -95,11 +95,17 @@
 </div>
 {% endif %}
 
-{# Add Category Modal #}
+{# Categories modal: existing columns plus add. #}
 {% from "macros/modal_shell.html" import modal_shell %}
-{% call modal_shell('add-category-modal', _('Add Category'), max_width='max-w-md', close_id='close-add-category-modal-btn',
+{% call modal_shell('add-category-modal', _('Categories'), max_width='max-w-lg', close_id='close-add-category-modal-btn',
     title_class='flex items-center') %}
-<form id="add-category-form">
+<div class="mb-4">
+    <h4 class="text-sm font-medium text-gray-700 mb-2">{{ _('Existing categories') }}</h4>
+    <div id="category-list" class="border border-gray-200 rounded-md divide-y divide-gray-200 max-h-60 overflow-y-auto"></div>
+    <p id="category-list-empty" class="hidden mt-2 text-sm text-gray-500">{{ _('No categories yet.') }}</p>
+</div>
+<form id="add-category-form" class="no-submit-guard border-t border-gray-200 pt-4">
+    <h4 class="text-sm font-medium text-gray-700 mb-3">{{ _('Add a category') }}</h4>
     <div class="mb-4">
         <label for="category-name-input" class="block text-sm font-medium text-gray-700 mb-2">
             {{ _('Category Name') }}
@@ -111,18 +117,30 @@
             class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="{{ _('Enter category name...')|forceescape }}"
             required
-            autofocus
         >
-        <p class="mt-2 text-sm text-gray-500">
-            {{ _('This will create a new column in the table for this category.') }}
+    </div>
+    <div class="mb-4">
+        <label for="category-type-input" class="block text-sm font-medium text-gray-700 mb-2">
+            {{ _('Type') }}
+        </label>
+        <select
+            id="category-type-input"
+            name="category_type"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+        >
+            <option value="checkbox">{{ _('Tick boxes') }}</option>
+            <option value="text">{{ _('Text') }}</option>
+        </select>
+        <p id="category-type-help" class="mt-2 text-sm text-gray-500">
+            {{ _('Each National Society can be ticked for this category.') }}
         </p>
     </div>
     <div class="flex justify-end gap-3">
         <button type="button" id="cancel-add-category-btn" class="btn btn-secondary close-modal">
-            {{ _('Cancel') }}
+            {{ _('Close') }}
         </button>
         <button type="submit" id="submit-add-category-btn" class="btn btn-primary">
-            <i class="fas fa-plus mr-2"></i>{{ _('Add Category') }}
+            <i class="fas fa-plus mr-2"></i>{{ _('Add') }}
         </button>
     </div>
 </form>

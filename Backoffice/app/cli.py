@@ -63,8 +63,10 @@ def register_commands(app):
     @with_appcontext
     def sync_ns_logos(dry_run, overwrite, iso3):
         """Download FDRS ns_logos (ISO3 filenames) onto National Society records."""
+        from app.services.platform.storage_service import adopt_container_storage_settings
         from app.services.organization.ns_logo_service import sync_ns_logos_from_github
 
+        adopt_container_storage_settings(current_app)
         result = sync_ns_logos_from_github(dry_run=dry_run, overwrite=overwrite, iso3=iso3)
         prefix = 'Would update' if dry_run else 'Updated'
         click.echo(

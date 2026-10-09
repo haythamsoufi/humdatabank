@@ -81,6 +81,11 @@ def main() -> int:
     app = create_app()
     with app.app_context():
         from app.services.organization.ns_logo_service import sync_ns_logos_from_github
+        from app.services.platform.storage_service import adopt_container_storage_settings
+
+        # SSH shells omit storage credentials. Copy them from the web process so
+        # logos are written to blob storage, not the container disk.
+        adopt_container_storage_settings(app)
 
         result = sync_ns_logos_from_github(
             dry_run=args.dry_run,

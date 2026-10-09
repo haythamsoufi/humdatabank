@@ -724,6 +724,7 @@ try {
             is_active: {{ ns.is_active|tojson|safe }},
             display_order: {{ ns.display_order or 0 }},
             part_of: {{ (ns.part_of or [])|tojson|safe }},
+            category_text: {{ (ns.category_text if ns.category_text is mapping else {})|tojson|safe }},
             edit_url: "{{ url_for('organization.edit_national_society', ns_id=ns.id) if can_manage_org else '' }}",
             delete_url: "{{ url_for('organization.delete_national_society', ns_id=ns.id) if can_manage_org else '' }}",
             delete_confirm: {{ _('Are you sure you want to delete this National Society?')|tojson|safe }}
@@ -733,7 +734,108 @@ try {
 
     // Available categories (each becomes a column) — injected with the page so we
     // do not need GET /api/part-of-programs on load.
-    let availableCategories = {{ (part_of_programs or [])|tojson }};
+    let availableCategoryDefs = {{ (part_of_category_definitions or [])|tojson }};
+
+    function categoryFieldId(name) {
+        return 'part_of_' + String(name).replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    function escapeCategoryHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function setCategoryDefsFromResponse(data) {
+        if (Array.isArray(data.category_definitions)) {
+            availableCategoryDefs = data.category_definitions.map(function(item) {
+                if (typeof item === 'string') {
+                    return { name: item, type: 'checkbox' };
+                }
+                return {
+                    name: item.name,
+                    type: item.type === 'text' ? 'text' : 'checkbox'
+                };
+            }).filter(function(item) { return item.name; });
+            return;
+        }
+        const names = data.categories || data.programs || [];
+        availableCategoryDefs = names.map(function(name) {
+            return { name: name, type: 'checkbox' };
+        });
+    }
+
+    function buildCategoryColumns() {
+        return availableCategoryDefs.map(function(def) {
+            const category = def.name;
+            const field = categoryFieldId(category);
+            if (def.type === 'text') {
+                return {
+                    field: field,
+                    headerName: category,
+                    width: 220,
+                    minWidth: 160,
+                    maxWidth: 360,
+                    sortable: true,
+                    filter: 'agTextColumnFilter',
+                    valueGetter: function(params) {
+                        const texts = params.data && params.data.category_text || {};
+                        return texts[category] || '';
+                    },
+                    editable: false,
+                    suppressKeyboardEvent: function(params) {
+                        const target = params.event && params.event.target;
+                        return !!(target && target.classList && target.classList.contains('part-of-text-input'));
+                    },
+                    cellRenderer: function(params) {
+                        const texts = (params.data && params.data.category_text) || {};
+                        const value = texts[category] || '';
+                        if (!UI_PERMS.canManageOrg) {
+                            return '<span class="text-sm text-gray-800">' + escapeCategoryHtml(value) + '</span>';
+                        }
+                        return '<input type="text" maxlength="500" class="part-of-text-input w-full px-2 py-1 text-sm border border-gray-300 rounded" data-ns-id="' + params.data.id + '" data-category-name="' + escapeCategoryHtml(category) + '" value="' + escapeCategoryHtml(value) + '">';
+                    },
+                    cellStyle: { 'padding': '4px' }
+                };
+            }
+            return {
+                field: field,
+                headerName: category,
+                width: 150,
+                minWidth: 120,
+                maxWidth: 200,
+                sortable: false,
+                filter: 'customSetFilter',
+                valueGetter: function(params) {
+                    const partOf = params.data && params.data.part_of || [];
+                    return partOf.includes(category) ? 'Yes' : 'No';
+                },
+                editable: false,
+                cellRenderer: function(params) {
+                    const nsId = params.data.id;
+                    const currentPartOf = params.data.part_of || [];
+                    const isChecked = currentPartOf.includes(category);
+                    const checkboxId = categoryFieldId(category) + '_' + nsId;
+                    return `
+                        <div class="flex items-center justify-center p-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox"
+                                       class="part-of-checkbox"
+                                       data-ns-id="${nsId}"
+                                       data-category-name="${escapeCategoryHtml(category)}"
+                                       ${isChecked ? 'checked' : ''}
+                                       id="${checkboxId}">
+                                <span class="text-sm"></span>
+                            </label>
+                        </div>
+                    `;
+                },
+                cellStyle: { 'text-align': 'center', 'padding': '4px' }
+            };
+        });
+    }
 
     /**
      * Re-apply persisted column visibility after dynamic columns are injected.
@@ -744,7 +846,7 @@ try {
      */
     function nssDesiredColumnOrder() {
         const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-        const categoryColIds = availableCategories.map(p => `part_of_${p.replace(/[^a-zA-Z0-9]/g, '_')}`);
+        const categoryColIds = availableCategoryDefs.map(def => categoryFieldId(def.name));
         return ['id', 'logo_url', 'name']
             .concat(nameColumns)
             .concat(['country_name', 'status', 'display_order'])
@@ -803,42 +905,7 @@ try {
         // Get base column definitions (without part_of and actions columns - we'll add actions at the end)
         const baseColumns = nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions');
 
-        // Create category columns
-        const categoryColumns = availableCategories.map(category => ({
-            field: `part_of_${category.replace(/[^a-zA-Z0-9]/g, '_')}`,
-            headerName: category,
-            width: 150,
-            minWidth: 120,
-            maxWidth: 200,
-            sortable: false,
-            filter: 'customSetFilter',
-            valueGetter: function(params) {
-                const partOf = params.data && params.data.part_of || [];
-                return partOf.includes(category) ? 'Yes' : 'No';
-            },
-            editable: false,
-            cellRenderer: function(params) {
-                const nsId = params.data.id;
-                const currentPartOf = params.data.part_of || [];
-                const isChecked = currentPartOf.includes(category);
-                const checkboxId = `part_of_${nsId}_${category.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-                return `
-                    <div class="flex items-center justify-center p-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox"
-                                   class="part-of-checkbox"
-                                   data-ns-id="${nsId}"
-                                   data-category-name="${category.replace(/"/g, '&quot;')}"
-                                   ${isChecked ? 'checked' : ''}
-                                   id="${checkboxId}">
-                            <span class="text-sm"></span>
-                        </label>
-                    </div>
-                `;
-            },
-            cellStyle: { 'text-align': 'center', 'padding': '4px' }
-        }));
+        const categoryColumns = buildCategoryColumns();
 
         // Get actions column (only once)
         const actionsColumn = nssColumnDefs.find(col => col.field === 'actions');
@@ -1033,41 +1100,7 @@ try {
         // Build complete column definitions including category columns
         // Filter out 'part_of' (old single column) and 'actions' (we'll add it at the end)
         const baseColumns = nssColumnDefs.filter(col => col.field !== 'part_of' && col.field !== 'actions');
-        const categoryColumns = availableCategories.map(category => ({
-            field: `part_of_${category.replace(/[^a-zA-Z0-9]/g, '_')}`,
-            headerName: category,
-            width: 150,
-            minWidth: 120,
-            maxWidth: 200,
-            sortable: false,
-            filter: 'customSetFilter',
-            valueGetter: function(params) {
-                const partOf = params.data && params.data.part_of || [];
-                return partOf.includes(category) ? 'Yes' : 'No';
-            },
-            editable: false,
-            cellRenderer: function(params) {
-                const nsId = params.data.id;
-                const currentPartOf = params.data.part_of || [];
-                const isChecked = currentPartOf.includes(category);
-                const checkboxId = `part_of_${nsId}_${category.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-                return `
-                    <div class="flex items-center justify-center p-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox"
-                                   class="part-of-checkbox"
-                                   data-ns-id="${nsId}"
-                                   data-category-name="${category.replace(/"/g, '&quot;')}"
-                                   ${isChecked ? 'checked' : ''}
-                                   id="${checkboxId}">
-                            <span class="text-sm"></span>
-                        </label>
-                    </div>
-                `;
-            },
-            cellStyle: { 'text-align': 'center', 'padding': '4px' }
-        }));
+        const categoryColumns = buildCategoryColumns();
         // Get actions column (only once)
         const actionsColumn = nssColumnDefs.find(col => col.field === 'actions');
         // Combine: base + categories + actions (only once)
@@ -1103,37 +1136,226 @@ try {
         setupAddCategoryButton();
 
         // If categories are already loaded, rebuild columns; otherwise they'll be added when loaded
-        if (availableCategories.length > 0) {
+        if (availableCategoryDefs.length > 0) {
             rebuildGridColumns();
         }
     }
 
-    // Set up add category button and modal
+    const categoryTypeLabels = {
+        checkbox: {{ _('Tick boxes') | tojson }},
+        text: {{ _('Text') | tojson }}
+    };
+
+    function renderCategoryList() {
+        const list = document.getElementById('category-list');
+        const empty = document.getElementById('category-list-empty');
+        if (!list) return;
+        list.replaceChildren();
+        if (!availableCategoryDefs.length) {
+            list.classList.add('hidden');
+            if (empty) empty.classList.remove('hidden');
+            return;
+        }
+        list.classList.remove('hidden');
+        if (empty) empty.classList.add('hidden');
+        availableCategoryDefs.forEach(function(def) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between gap-3 px-3 py-2';
+
+            const meta = document.createElement('div');
+            meta.className = 'flex items-center gap-3 min-w-0';
+            const name = document.createElement('span');
+            name.className = 'text-sm font-medium text-gray-800 truncate';
+            name.textContent = def.name;
+            const typeSelect = document.createElement('select');
+            typeSelect.className = 'text-sm border border-gray-300 rounded-md py-1 pl-2 pr-8 shrink-0';
+            typeSelect.setAttribute('aria-label', {{ _('Type for') | tojson }} + ' ' + def.name);
+            ['checkbox', 'text'].forEach(function(kind) {
+                const option = document.createElement('option');
+                option.value = kind;
+                option.textContent = categoryTypeLabels[kind];
+                typeSelect.appendChild(option);
+            });
+            typeSelect.value = def.type === 'text' ? 'text' : 'checkbox';
+            typeSelect.addEventListener('change', function() {
+                const nextType = typeSelect.value === 'text' ? 'text' : 'checkbox';
+                const previousType = def.type === 'text' ? 'text' : 'checkbox';
+                if (nextType === previousType) return;
+                confirmCategoryTypeChange(def.name, nextType, function() {
+                    typeSelect.value = previousType;
+                });
+            });
+            meta.appendChild(name);
+            meta.appendChild(typeSelect);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'text-red-600 hover:text-red-800 shrink-0';
+            removeBtn.title = {{ _('Remove') | tojson }};
+            removeBtn.setAttribute('aria-label', {{ _('Remove') | tojson }} + ' ' + def.name);
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-trash fa-fw';
+            icon.setAttribute('aria-hidden', 'true');
+            removeBtn.appendChild(icon);
+            removeBtn.addEventListener('click', function() {
+                confirmRemoveCategory(def.name);
+            });
+
+            row.appendChild(meta);
+            row.appendChild(removeBtn);
+            list.appendChild(row);
+        });
+    }
+
+    function confirmCategoryTypeChange(categoryName, nextType, revert) {
+        const message = nextType === 'text'
+            ? {{ _('Change this category to text? Ticked National Societies will show Yes.') | tojson }}
+            : {{ _('Change this category to tick boxes? National Societies with text will be ticked.') | tojson }};
+        const run = function() { updateCategoryType(categoryName, nextType, revert); };
+        if (window.showConfirmation) {
+            window.showConfirmation(
+                message,
+                run,
+                revert,
+                {{ _('Change type') | tojson }},
+                {{ _('Cancel') | tojson }},
+                {{ _('Change category type') | tojson }}
+            );
+            return;
+        }
+        if (window.confirm(message)) run();
+        else revert();
+    }
+
+    function updateCategoryType(categoryName, nextType, revert) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const url = {{ url_for('organization.api_update_part_of_program_type', program_name='__CATEGORY__')|tojson }}.replace('__CATEGORY__', encodeURIComponent(categoryName));
+        fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ category_type: nextType })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                if (revert) revert();
+                var m = {{ _('Error changing category type') | tojson }};
+                if (window.showAlert) window.showAlert(m, 'error');
+                return;
+            }
+            (data.updated_societies || []).forEach(function(row) {
+                const node = findNssRow(row.id);
+                if (!node || !node.data) return;
+                node.data.part_of = row.part_of || [];
+                node.data.category_text = row.category_text || {};
+            });
+            setCategoryDefsFromResponse(data);
+            renderCategoryList();
+            rebuildGridColumns();
+        })
+        .catch(error => {
+            console.error('Error changing category type:', error);
+            if (revert) revert();
+            var m = {{ _('Error changing category type') | tojson }};
+            if (window.showAlert) window.showAlert(m, 'error');
+        });
+    }
+
+    function confirmRemoveCategory(categoryName) {
+        const message = {{ _('Remove this category? Values saved for it will be cleared on every National Society.') | tojson }};
+        const run = function() { removeCategory(categoryName); };
+        if (window.showConfirmation) {
+            window.showConfirmation(
+                message,
+                run,
+                function() {},
+                {{ _('Remove') | tojson }},
+                {{ _('Cancel') | tojson }},
+                {{ _('Remove category') | tojson }}
+            );
+            return;
+        }
+        if (window.confirm(message)) run();
+    }
+
+    function removeCategory(categoryName) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const url = {{ url_for('organization.api_remove_part_of_program', program_name='__CATEGORY__')|tojson }}.replace('__CATEGORY__', encodeURIComponent(categoryName));
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                var m = {{ _('Error removing category') | tojson }};
+                if (window.showAlert) window.showAlert(m, 'error');
+                return;
+            }
+            availableCategoryDefs = availableCategoryDefs.filter(function(def) {
+                return def.name !== categoryName;
+            });
+            renderCategoryList();
+            rebuildGridColumns();
+        })
+        .catch(error => {
+            console.error('Error removing category:', error);
+            var m = {{ _('Error removing category') | tojson }};
+            if (window.showAlert) window.showAlert(m, 'error');
+        });
+    }
+
+    // Set up categories button and modal
     function setupAddCategoryButton() {
-        const addBtn = document.getElementById('add-category-btn');
+        const addBtn = document.getElementById('categories-btn');
         const modal = document.getElementById('add-category-modal');
         const closeBtn = document.getElementById('close-add-category-modal-btn');
         const cancelBtn = document.getElementById('cancel-add-category-btn');
         const form = document.getElementById('add-category-form');
         const input = document.getElementById('category-name-input');
+        const typeSelect = document.getElementById('category-type-input');
+        const typeHelp = document.getElementById('category-type-help');
+        const checkboxHelp = {{ _('Each National Society can be ticked for this category.') | tojson }};
+        const textHelp = {{ _('Each National Society can enter text for this category.') | tojson }};
+
+        function syncTypeHelp() {
+            if (!typeHelp || !typeSelect) return;
+            typeHelp.textContent = typeSelect.value === 'text' ? textHelp : checkboxHelp;
+        }
+
+        function resetCategoryForm() {
+            if (input) input.value = '';
+            if (typeSelect) typeSelect.value = 'checkbox';
+            syncTypeHelp();
+        }
+
+        if (typeSelect) {
+            typeSelect.addEventListener('change', syncTypeHelp);
+        }
 
         if (!addBtn || !modal) return;
 
         // Open modal
         addBtn.addEventListener('click', function() {
+            renderCategoryList();
             modal.classList.remove('hidden');
-            if (input) {
-                input.value = '';
-                input.focus();
-            }
+            resetCategoryForm();
+            if (input) input.focus();
         });
 
         // Close modal handlers
         function closeModal() {
             modal.classList.add('hidden');
-            if (input) {
-                input.value = '';
-            }
+            resetCategoryForm();
         }
 
         if (closeBtn) {
@@ -1172,28 +1394,31 @@ try {
                 const categoryName = input.value.trim();
 
                 // Check if category already exists
-                if (availableCategories.includes(categoryName)) {
+                if (availableCategoryDefs.some(function(def) { return def.name === categoryName; })) {
                     var m = {{ _('This category already exists') | tojson }};
                     if (window.showAlert) window.showAlert(m, 'warning');
                     input.focus();
                     return;
                 }
 
+                const categoryType = typeSelect && typeSelect.value === 'text' ? 'text' : 'checkbox';
+
                 const submitBtn = document.getElementById('submit-add-category-btn');
-                if (submitBtn && submitBtn.disabled) return;
-                if (submitBtn) submitBtn.disabled = true;
+                // Ignore a disabled state applied by the global submit guard in the
+                // capture phase; that runs before this handler and used to abort the add.
+                if (submitBtn && submitBtn.dataset.addingCategory === '1') return;
+                if (submitBtn) {
+                    submitBtn.dataset.addingCategory = '1';
+                    submitBtn.disabled = true;
+                }
 
-                // Add the category
-                addCategory(categoryName, submitBtn);
-
-                // Close modal
-                closeModal();
+                addCategory(categoryName, categoryType, submitBtn);
             });
         }
     }
 
     // Add a new category
-    function addCategory(categoryName, submitBtn) {
+    function addCategory(categoryName, categoryType, submitBtn) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
         fetch("{{ url_for('organization.api_add_part_of_program') }}", {
@@ -1205,22 +1430,38 @@ try {
             credentials: 'same-origin',
             body: JSON.stringify({
                 category_name: categoryName,
-                program_name: categoryName
+                program_name: categoryName,
+                category_type: categoryType
             })
         })
         .then(response => response.json())
         .then(data => {
-            if (submitBtn) submitBtn.disabled = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                delete submitBtn.dataset.addingCategory;
+            }
             if (data.success) {
-                availableCategories = data.categories || data.programs;
+                setCategoryDefsFromResponse(data);
                 rebuildGridColumns();
+                renderCategoryList();
+                const nameInput = document.getElementById('category-name-input');
+                const typeInput = document.getElementById('category-type-input');
+                if (nameInput) nameInput.value = '';
+                if (typeInput) {
+                    typeInput.value = 'checkbox';
+                    typeInput.dispatchEvent(new Event('change'));
+                }
+                if (nameInput) nameInput.focus();
             } else {
                 var m = {{ _('Error adding category:') | tojson }} + ' ' + (data.message || 'Unknown error');
                 if (window.showAlert) window.showAlert(m, 'error');
             }
         })
         .catch(error => {
-            if (submitBtn) submitBtn.disabled = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                delete submitBtn.dataset.addingCategory;
+            }
             console.error('Error adding category:', error);
             var m = {{ _('Error adding category') | tojson }};
             if (window.showAlert) window.showAlert(m, 'error');
@@ -1236,12 +1477,83 @@ try {
         // Remove existing listener if any (using named function for proper removal)
         gridContainer.removeEventListener('change', handlePartOfCheckboxChange);
 
-        // Add event listener for checkbox changes
+        // Add event listener for checkbox and text category changes
         gridContainer.addEventListener('change', handlePartOfCheckboxChange);
+        gridContainer.addEventListener('keydown', function(event) {
+            if (event.target.classList && event.target.classList.contains('part-of-text-input')) {
+                event.stopPropagation();
+            }
+        }, true);
+    }
+
+    function findNssRow(nsId) {
+        let rowNode = null;
+        if (!window.nssGridApi) return null;
+        window.nssGridApi.forEachNode(function(node) {
+            if (node.data && node.data.id === nsId) {
+                rowNode = node;
+            }
+        });
+        return rowNode;
+    }
+
+    function saveCategoryText(input) {
+        const nsId = parseInt(input.getAttribute('data-ns-id'), 10);
+        const categoryName = input.getAttribute('data-category-name');
+        const value = (input.value || '').trim();
+        if (!nsId || !categoryName) return;
+        if (input.dataset.lastSaved === value) return;
+
+        const rowNode = findNssRow(nsId);
+        if (!rowNode || !rowNode.data) return;
+
+        const previous = Object.assign({}, rowNode.data.category_text || {});
+        const next = Object.assign({}, previous);
+        if (value) next[categoryName] = value;
+        else delete next[categoryName];
+        rowNode.data.category_text = next;
+        input.dataset.lastSaved = value;
+
+        const url = `{{ url_for('organization.api_update_ns_part_of', ns_id=0) }}`.replace('/0/', `/${nsId}/`);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                category_text_name: categoryName,
+                category_text_value: value
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                rowNode.data.category_text = previous;
+                input.value = previous[categoryName] || '';
+                delete input.dataset.lastSaved;
+                var m = {{ _('Error saving category text') | tojson }};
+                if (window.showAlert) window.showAlert(m, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving category text:', error);
+            rowNode.data.category_text = previous;
+            input.value = previous[categoryName] || '';
+            delete input.dataset.lastSaved;
+            var m = {{ _('Error saving category text') | tojson }};
+            if (window.showAlert) window.showAlert(m, 'error');
+        });
     }
 
     // Handle checkbox change for part_of field
     function handlePartOfCheckboxChange(event) {
+        if (event.target.classList.contains('part-of-text-input')) {
+            saveCategoryText(event.target);
+            return;
+        }
         if (!event.target.classList.contains('part-of-checkbox')) {
             return;
         }

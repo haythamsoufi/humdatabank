@@ -1593,6 +1593,114 @@ class TestOrganizationAPIEndpoints:
         )
         assert resp.status_code in (200, 201, 400, 422)
 
+    def test_api_part_of_programs_post_persists_unused_category(self, logged_in_client, db_session):
+        category_name = "ZZ Unused Category"
+        resp = logged_in_client.post(
+            "/admin/organization/api/part-of-programs",
+            json={"category_name": category_name},
+            headers=_json_headers(),
+        )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert category_name in payload["categories"]
+        assert any(
+            item.get("name") == category_name and item.get("type") == "checkbox"
+            for item in payload["category_definitions"]
+        )
+
+        listed = logged_in_client.get("/admin/organization/api/part-of-programs")
+        assert listed.status_code == 200
+        assert category_name in listed.get_json()["categories"]
+
+        removed = logged_in_client.delete(
+            "/admin/organization/api/part-of-programs/ZZ%20Unused%20Category",
+            headers=_json_headers(),
+        )
+        assert removed.status_code == 200
+        listed_after = logged_in_client.get("/admin/organization/api/part-of-programs")
+        assert category_name not in listed_after.get_json()["categories"]
+
+    def test_api_part_of_programs_text_category_saves_value(self, logged_in_client, db_session):
+        from app.models.organization import NationalSociety
+
+        category_name = "ZZ Text Category"
+        created = logged_in_client.post(
+            "/admin/organization/api/part-of-programs",
+            json={"category_name": category_name, "category_type": "text"},
+            headers=_json_headers(),
+        )
+        assert created.status_code == 200
+        payload = created.get_json()
+        assert category_name not in payload["categories"]
+        assert any(
+            item.get("name") == category_name and item.get("type") == "text"
+            for item in payload["category_definitions"]
+        )
+
+        country = create_test_country(db_session, name="Text Cat Country", iso3="TXC", iso2="TX")
+        ns = NationalSociety(name="Text Cat NS", country_id=country.id, is_active=True)
+        db_session.add(ns)
+        db_session.commit()
+        saved = logged_in_client.post(
+            f"/admin/organization/api/national-societies/{ns.id}/part-of",
+            json={"category_text_name": category_name, "category_text_value": "Hello note"},
+            headers=_json_headers(),
+        )
+        assert saved.status_code == 200
+        assert saved.get_json()["category_text"][category_name] == "Hello note"
+
+        logged_in_client.delete(
+            "/admin/organization/api/part-of-programs/ZZ%20Text%20Category",
+            headers=_json_headers(),
+        )
+
+    def test_api_part_of_program_type_converts_saved_values(self, logged_in_client, db_session):
+        from app.models.organization import NationalSociety
+
+        category_name = "ZZ Type Switch"
+        created = logged_in_client.post(
+            "/admin/organization/api/part-of-programs",
+            json={"category_name": category_name, "category_type": "checkbox"},
+            headers=_json_headers(),
+        )
+        assert created.status_code == 200
+
+        country = create_test_country(db_session, name="Type Switch Country", iso3="TYC", iso2="TY")
+        ns = NationalSociety(name="Type Switch NS", country_id=country.id, is_active=True, part_of=[category_name])
+        db_session.add(ns)
+        db_session.commit()
+
+        to_text = logged_in_client.put(
+            "/admin/organization/api/part-of-programs/ZZ%20Type%20Switch",
+            json={"category_type": "text"},
+            headers=_json_headers(),
+        )
+        assert to_text.status_code == 200
+        payload = to_text.get_json()
+        assert any(
+            item.get("name") == category_name and item.get("type") == "text"
+            for item in payload["category_definitions"]
+        )
+        updated = next(row for row in payload["updated_societies"] if row["id"] == ns.id)
+        assert category_name not in updated["part_of"]
+        assert updated["category_text"][category_name] == "Yes"
+
+        to_checkbox = logged_in_client.put(
+            "/admin/organization/api/part-of-programs/ZZ%20Type%20Switch",
+            json={"category_type": "checkbox"},
+            headers=_json_headers(),
+        )
+        assert to_checkbox.status_code == 200
+        restored = next(row for row in to_checkbox.get_json()["updated_societies"] if row["id"] == ns.id)
+        assert category_name in restored["part_of"]
+        assert category_name not in restored["category_text"]
+
+        logged_in_client.delete(
+            "/admin/organization/api/part-of-programs/ZZ%20Type%20Switch",
+            headers=_json_headers(),
+        )
+
     def test_api_part_of_programs_delete(self, logged_in_client, db_session):
         # First create a program
         logged_in_client.post(
@@ -1665,10 +1773,59 @@ class TestNSSExportImport:
         )
         assert resp.status_code == 302
 
+    def test_ns_excel_text_category_is_its_own_column(self, logged_in_client, db_session, app):
+        import openpyxl
+        from app.models.organization import NationalSociety
+        from app.utils.country_utils import forget_part_of_category, remember_part_of_category
 
-# ---------------------------------------------------------------------------
-# Helper functions (internal) — covered via route execution
-# ---------------------------------------------------------------------------
+        category_name = "Roster note"
+        remember_part_of_category(category_name, "text")
+        try:
+            country = create_test_country(db_session, name="Text Excel Country", iso3="NTX", iso2="NX")
+            ns = NationalSociety(
+                name="Text Excel NS",
+                country_id=country.id,
+                is_active=True,
+                part_of=["UP", category_name],
+                category_text={category_name: "kept note"},
+            )
+            db_session.add(ns)
+            db_session.commit()
+
+            exported = logged_in_client.get("/admin/organization/national-societies/export")
+            assert exported.status_code == 200
+            book = openpyxl.load_workbook(io.BytesIO(exported.data))
+            sheet = book.active
+            headers = [cell.value for cell in next(sheet.iter_rows(max_row=1))]
+            assert "Part Of (Categories)" in headers
+            assert category_name in headers
+            name_idx = headers.index("Name")
+            part_idx = headers.index("Part Of (Categories)")
+            text_idx = headers.index(category_name)
+            match = next(row for row in sheet.iter_rows(min_row=2, values_only=True) if row[name_idx] == "Text Excel NS")
+            assert "UP" in str(match[part_idx])
+            assert category_name not in str(match[part_idx] or "")
+            assert match[text_idx] == "kept note"
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.append(["Name", "Country ISO3", "Part Of (Categories)", category_name])
+            ws.append(["Imported Note NS", "NTX", "UP", "from excel"])
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            imported = logged_in_client.post(
+                "/admin/organization/national-societies/import",
+                data={"excel_file": (buf, "ns.xlsx")},
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+            assert imported.status_code == 302
+            created = NationalSociety.query.filter_by(name="Imported Note NS").one()
+            assert created.part_of == ["UP"]
+            assert created.category_text[category_name] == "from excel"
+        finally:
+            forget_part_of_category(category_name)
 
 class TestInternalHelpers:
     def test_get_translation_languages_no_app_context(self, app):

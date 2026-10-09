@@ -158,6 +158,29 @@ class TestGetCountriesByRegionWithPartOf:
             found = any(country in countries for countries in regions.values())
             assert found
 
+    def test_catalog_category_is_listed_before_any_society_is_checked(self, db_session, app):
+        with app.app_context():
+            from app.utils.country_utils import (
+                collect_part_of_category_definitions,
+                collect_part_of_category_names,
+                forget_part_of_category,
+                remember_part_of_category,
+            )
+
+            remember_part_of_category("Catalog Only")
+            remember_part_of_category("Catalog Note", "text")
+            try:
+                assert "Catalog Only" in collect_part_of_category_names([])
+                assert "Catalog Note" not in collect_part_of_category_names([])
+                definitions = collect_part_of_category_definitions([])
+                assert {"name": "Catalog Note", "type": "text"} in definitions
+                _, programs, _mapping = get_countries_by_region_with_part_of()
+                assert "Catalog Only" in programs
+                assert "Catalog Note" not in programs
+            finally:
+                forget_part_of_category("Catalog Only")
+                forget_part_of_category("Catalog Note")
+
 
 def test_is_sandbox_country_matches_testland_only():
     assert is_sandbox_country(name="Testland", iso3="TST")

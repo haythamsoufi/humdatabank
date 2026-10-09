@@ -362,6 +362,80 @@ def import_countries():
 
 # ==================== National Societies Excel Export/Import ====================
 
+_NS_RESERVED_COLUMNS = {
+    'ID',
+    'Name',
+    'Code',
+    'Description',
+    'Country ISO3',
+    'Country Name',
+    'Status',
+    'Is Active',
+    'Active',
+    'Display Order',
+    'Part Of (Categories)',
+    'Part Of (Programs)',
+}
+_TEXT_CATEGORY_COLUMN_PREFIX = 'Text: '
+
+
+def _ns_text_category_columns(reserved):
+    """Header for each text category, after the tick-box Part Of column.
+
+    The header is the category name. Names that match a fixed column use a Text: prefix.
+    """
+    from app.utils.country_utils import PART_OF_CATEGORY_TEXT, collect_part_of_category_definitions
+
+    columns = []
+    used = set(reserved)
+    for item in collect_part_of_category_definitions():
+        if item.get('type') != PART_OF_CATEGORY_TEXT:
+            continue
+        name = item['name']
+        header = name if name not in used else f'{_TEXT_CATEGORY_COLUMN_PREFIX}{name}'
+        used.add(header)
+        columns.append((name, header))
+    return columns
+
+
+def _checkbox_part_of_labels(part_of, text_names):
+    if not isinstance(part_of, list):
+        return []
+    return [str(item).strip() for item in part_of if str(item).strip() and str(item).strip() not in text_names]
+
+
+def _text_values_from_excel_row(row, columns, text_names):
+    """Map present text-category columns to values. None when the file has none of those columns."""
+    present = {}
+    for col in columns:
+        name = None
+        if col in text_names:
+            name = col
+        elif isinstance(col, str) and col.startswith(_TEXT_CATEGORY_COLUMN_PREFIX):
+            candidate = col[len(_TEXT_CATEGORY_COLUMN_PREFIX):].strip()
+            if candidate in text_names:
+                name = candidate
+        if not name:
+            continue
+        raw = row.get(col)
+        present[name] = '' if pd.isna(raw) else str(raw).strip()
+    return present or None
+
+
+def _apply_category_text(ns, updates):
+    if updates is None:
+        return
+    from sqlalchemy.orm.attributes import flag_modified
+
+    current = dict(ns.category_text) if isinstance(ns.category_text, dict) else {}
+    for name, value in updates.items():
+        if value:
+            current[name] = value[:500]
+        else:
+            current.pop(name, None)
+    ns.category_text = current or None
+    flag_modified(ns, 'category_text')
+
 @bp.route('/national-societies/export', methods=['GET'])
 @permission_required_any('admin.organization.manage', 'admin.countries.view')
 def export_national_societies():
@@ -369,6 +443,10 @@ def export_national_societies():
     try:
         translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
+        reserved = set(_NS_RESERVED_COLUMNS)
+        reserved.update(display_names.get(code, code.upper()) for code in translatable)
+        text_columns = _ns_text_category_columns(reserved)
+        text_names = {name for name, _header in text_columns}
         nss = NationalSociety.query.join(Country).order_by(Country.name, NationalSociety.display_order, NationalSociety.name).all()
         data = []
         for ns in nss:
@@ -385,10 +463,11 @@ def export_national_societies():
             for code in translatable:
                 header = display_names.get(code, code.upper())
                 row[header] = (ns.name_translations or {}).get(code, '') or ''
-            if ns.part_of and isinstance(ns.part_of, list):
-                row['Part Of (Categories)'] = ', '.join(str(p) for p in ns.part_of)
-            else:
-                row['Part Of (Categories)'] = ''
+            ticks = _checkbox_part_of_labels(ns.part_of, text_names)
+            row['Part Of (Categories)'] = ', '.join(ticks)
+            texts = ns.category_text if isinstance(ns.category_text, dict) else {}
+            for name, header in text_columns:
+                row[header] = texts.get(name) or ''
             data.append(row)
         df = pd.DataFrame(data)
         output = io.BytesIO()
@@ -422,6 +501,9 @@ def national_societies_template():
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
         base_cols = ['Name', 'Code', 'Description', 'Country ISO3', 'Status', 'Display Order', 'Part Of (Categories)']
         name_cols = [display_names.get(code, code.upper()) for code in translatable]
+        reserved = set(_NS_RESERVED_COLUMNS)
+        reserved.update(name_cols)
+        text_columns = _ns_text_category_columns(reserved)
         sample = [{
             'Name': 'Sample National Society',
             'Code': 'SNS',
@@ -433,6 +515,8 @@ def national_societies_template():
         }]
         df = pd.DataFrame(sample, columns=base_cols)
         for header in name_cols:
+            df[header] = ''
+        for _name, header in text_columns:
             df[header] = ''
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -478,6 +562,9 @@ def import_national_societies():
             return redirect(url_for('organization.index', tab='nss'))
         translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
+        reserved = set(_NS_RESERVED_COLUMNS)
+        reserved.update(display_names.get(code, code.upper()) for code in translatable)
+        text_names = {name for name, _header in _ns_text_category_columns(reserved)}
         overwrite = request.form.get('overwrite_existing') == 'on'
         imported = 0
         updated = 0
@@ -550,7 +637,11 @@ def import_national_societies():
                 if part_of_col in df.columns and pd.notna(row.get(part_of_col)):
                     raw = str(row[part_of_col]).strip()
                     if raw:
-                        part_of = [p.strip() for p in raw.split(',') if p.strip()]
+                        part_of = [
+                            label for label in (p.strip() for p in raw.split(','))
+                            if label and label not in text_names
+                        ]
+                text_updates = _text_values_from_excel_row(row, df.columns, text_names)
                 if existing:
                     existing.name = name
                     existing.code = code_val
@@ -561,6 +652,7 @@ def import_national_societies():
                     existing.name_translations = trans
                     if part_of is not None:
                         existing.part_of = part_of
+                    _apply_category_text(existing, text_updates)
                     updated += 1
                 else:
                     create_kwargs = dict(
@@ -576,6 +668,7 @@ def import_national_societies():
                     if row_id:
                         create_kwargs['id'] = row_id
                     ns = NationalSociety(**create_kwargs)
+                    _apply_category_text(ns, text_updates)
                     db.session.add(ns)
                     imported += 1
             except Exception as e:

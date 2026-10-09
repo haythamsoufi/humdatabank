@@ -87,11 +87,44 @@ def test_sync_skips_existing_unless_overwrite(app, db_session, monkeypatch):
         return "QSK.png"
 
     monkeypatch.setattr("app.services.organization.ns_logo_service.save_system_logo", _save)
+    monkeypatch.setattr(
+        "app.services.platform.storage_service.exists",
+        lambda *_args, **_kwargs: True,
+    )
     fetch = _fetch_factory(_github_listing("QSK.png"), {"QSK.png": b"png-bytes"})
     result = sync_ns_logos_from_github(fetch=fetch)
     assert result["skipped"] == 1
     assert result["updated"] == 0
     assert not called
+
+
+def test_sync_restores_logo_when_file_is_missing(app, db_session, monkeypatch):
+    country = create_test_country(
+        db_session, name="Zedland Logo Missing", iso3="QMS", iso2="QM"
+    )
+    ns = NationalSociety(
+        name="Missing Logo Red Cross",
+        country_id=country.id,
+        is_active=True,
+        logo_filename="QMS.png",
+    )
+    db_session.add(ns)
+    db_session.commit()
+
+    monkeypatch.setattr(
+        "app.services.platform.storage_service.exists",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        "app.services.organization.ns_logo_service.save_system_logo",
+        lambda *_args, **_kwargs: "QMS.png",
+    )
+    fetch = _fetch_factory(_github_listing("QMS.png"), {"QMS.png": b"png-bytes"})
+    result = sync_ns_logos_from_github(fetch=fetch)
+    db_session.refresh(ns)
+    assert result["skipped"] == 0
+    assert result["updated"] == 1
+    assert ns.logo_filename == "QMS.png"
 
 
 def test_sync_dry_run_does_not_write(app, db_session, monkeypatch):

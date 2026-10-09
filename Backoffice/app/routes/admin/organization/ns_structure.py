@@ -725,26 +725,46 @@ def api_update_ns_part_of(ns_id):
         if err:
             return err
 
-        part_of = data.get('part_of')
+        has_part_of = 'part_of' in data
+        has_text = 'category_text_name' in data
+        if not has_part_of and not has_text:
+            return json_bad_request('part_of or category_text_name is required')
 
-        # Validate that part_of is either None or a list/array
-        if part_of is not None and not isinstance(part_of, list):
-            return json_bad_request('part_of must be a list or null')
-
-        # Update the field
-        ns.part_of = part_of if part_of else None
-
-        # Mark the JSONB field as modified
         from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(ns, 'part_of')
+
+        if has_part_of:
+            part_of = data.get('part_of')
+            if part_of is not None and not isinstance(part_of, list):
+                return json_bad_request('part_of must be a list or null')
+            ns.part_of = part_of if part_of else None
+            flag_modified(ns, 'part_of')
+
+        if has_text:
+            category_name = (data.get('category_text_name') or '').strip()
+            if not category_name:
+                return json_bad_request('category_text_name is required')
+            raw_value = data.get('category_text_value')
+            if raw_value is not None and not isinstance(raw_value, str):
+                return json_bad_request('category_text_value must be a string')
+            value = (raw_value or '').strip()
+            if len(value) > 500:
+                return json_bad_request('category_text_value must be 500 characters or fewer')
+            current = dict(ns.category_text) if isinstance(ns.category_text, dict) else {}
+            if value:
+                current[category_name] = value
+            else:
+                current.pop(category_name, None)
+            ns.category_text = current or None
+            flag_modified(ns, 'category_text')
 
         db.session.add(ns)
         db.session.flush()
 
         return json_ok(
             success=True,
-            message='National Society part_of field updated successfully',
-            part_of=ns.part_of
+            message='National Society category updated successfully',
+            part_of=ns.part_of if isinstance(ns.part_of, list) else [],
+            category_text=ns.category_text if isinstance(ns.category_text, dict) else {}
         )
 
     except Exception as e:
@@ -753,25 +773,26 @@ def api_update_ns_part_of(ns_id):
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
 
+def _part_of_category_payload():
+    from app.utils.country_utils import collect_part_of_category_definitions
+
+    nss = NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all()
+    definitions = collect_part_of_category_definitions(nss)
+    checkbox_names = [item["name"] for item in definitions if item["type"] == "checkbox"]
+    return definitions, checkbox_names
+
+
 @bp.route('/api/part-of-programs', methods=['GET'])
 @admin_permission_required_any('admin.organization.manage', 'admin.countries.view', 'admin.countries.edit')
 def api_get_part_of_programs():
     """API endpoint to get the list of available categories for part_of columns."""
     try:
-        # Get all distinct categories from all NSs' part_of fields
-        all_categories = set()
-        nss = NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all()
-        for ns in nss:
-            if ns.part_of and isinstance(ns.part_of, list):
-                for item in ns.part_of:
-                    if item and isinstance(item, str):
-                        all_categories.add(item.strip())
-
-        categories_list = sorted(list(all_categories))
+        definitions, categories_list = _part_of_category_payload()
         return json_ok(
             success=True,
             categories=categories_list,
-            programs=categories_list
+            programs=categories_list,
+            category_definitions=definitions
         )
 
     except Exception as e:
@@ -784,33 +805,121 @@ def api_get_part_of_programs():
 def api_add_part_of_program():
     """API endpoint to add a new category to the available list."""
     try:
+        from app.utils.country_utils import PART_OF_CATEGORY_TYPES, remember_part_of_category
+
         data = get_json_safe()
         category_name = (data.get('category_name') or data.get('program_name') or '').strip()
         if not category_name:
             return json_bad_request('category_name is required')
+        category_type = (data.get('category_type') or 'checkbox').strip().lower()
+        if category_type not in PART_OF_CATEGORY_TYPES:
+            return json_bad_request('category_type must be checkbox or text')
 
-        # Get current list of categories
-        all_categories = set()
-        nss = NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all()
-        for ns in nss:
-            if ns.part_of and isinstance(ns.part_of, list):
-                for item in ns.part_of:
-                    if item and isinstance(item, str):
-                        all_categories.add(item.strip())
-
-        # Add the new category
-        all_categories.add(category_name)
-        categories_list = sorted(list(all_categories))
+        remember_part_of_category(category_name, category_type)
+        definitions, categories_list = _part_of_category_payload()
 
         return json_ok(
             success=True,
             message=f'Category "{category_name}" added successfully',
             categories=categories_list,
-            programs=categories_list
+            programs=categories_list,
+            category_definitions=definitions
         )
 
     except Exception as e:
         current_app.logger.error(f"Error adding part_of category: {e}")
+        return json_server_error(GENERIC_ERROR_MESSAGE)
+
+
+def _migrate_part_of_category_values(category_name, new_type):
+    """Move saved values when a category switches between tick boxes and text.
+
+    A tick becomes the text Yes. Non-empty text becomes a tick.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    changed = []
+    if new_type == 'text':
+        nss = NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all()
+        for ns in nss:
+            if not isinstance(ns.part_of, list) or category_name not in ns.part_of:
+                continue
+            ns.part_of = [item for item in ns.part_of if item != category_name] or None
+            flag_modified(ns, 'part_of')
+            texts = dict(ns.category_text) if isinstance(ns.category_text, dict) else {}
+            if not str(texts.get(category_name) or '').strip():
+                texts[category_name] = 'Yes'
+            ns.category_text = texts
+            flag_modified(ns, 'category_text')
+            db.session.add(ns)
+            changed.append(ns)
+    else:
+        text_rows = NationalSociety.query.filter(NationalSociety.category_text.isnot(None)).all()
+        for ns in text_rows:
+            if not isinstance(ns.category_text, dict):
+                continue
+            if not str(ns.category_text.get(category_name) or '').strip():
+                continue
+            part_of = list(ns.part_of) if isinstance(ns.part_of, list) else []
+            if category_name not in part_of:
+                part_of.append(category_name)
+            ns.part_of = part_of
+            flag_modified(ns, 'part_of')
+            remaining = {key: value for key, value in ns.category_text.items() if key != category_name}
+            ns.category_text = remaining or None
+            flag_modified(ns, 'category_text')
+            db.session.add(ns)
+            changed.append(ns)
+    if changed:
+        db.session.flush()
+    return changed
+
+
+@bp.route('/api/part-of-programs/<program_name>', methods=['PUT'])
+@admin_permission_required('admin.organization.manage')
+def api_update_part_of_program_type(program_name):
+    """Change a category between tick boxes and text."""
+    try:
+        from urllib.parse import unquote
+        from app.utils.country_utils import (
+            PART_OF_CATEGORY_TYPES,
+            load_part_of_category_catalog,
+            update_part_of_category_type,
+        )
+
+        category_name = unquote(program_name).strip()
+        if not category_name:
+            return json_bad_request('category_name is required')
+        data = get_json_safe()
+        category_type = (data.get('category_type') or '').strip().lower()
+        if category_type not in PART_OF_CATEGORY_TYPES:
+            return json_bad_request('category_type must be checkbox or text')
+
+        previous = load_part_of_category_catalog().get(category_name, 'checkbox')
+        changed = []
+        if previous != category_type:
+            changed = _migrate_part_of_category_values(category_name, category_type)
+            update_part_of_category_type(category_name, category_type)
+
+        definitions, categories_list = _part_of_category_payload()
+        return json_ok(
+            success=True,
+            message=f'Category "{category_name}" is now {category_type}',
+            categories=categories_list,
+            programs=categories_list,
+            category_definitions=definitions,
+            updated_societies=[
+                {
+                    'id': ns.id,
+                    'part_of': ns.part_of if isinstance(ns.part_of, list) else [],
+                    'category_text': ns.category_text if isinstance(ns.category_text, dict) else {},
+                }
+                for ns in changed
+            ],
+        )
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error(f"Error updating part_of category type: {e}")
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
 
@@ -820,23 +929,37 @@ def api_remove_part_of_program(program_name):
     """API endpoint to remove a category from all NSs and the available list."""
     try:
         from urllib.parse import unquote
+        from app.utils.country_utils import forget_part_of_category
+
         category_name = unquote(program_name).strip()
 
         # Remove this category from all NSs' part_of fields
         nss = NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all()
-        updated_count = 0
+        updated_ids = set()
+        from sqlalchemy.orm.attributes import flag_modified
         for ns in nss:
             if ns.part_of and isinstance(ns.part_of, list):
                 original_length = len(ns.part_of)
                 ns.part_of = [p for p in ns.part_of if p != category_name]
                 if len(ns.part_of) != original_length:
-                    from sqlalchemy.orm.attributes import flag_modified
                     flag_modified(ns, 'part_of')
                     db.session.add(ns)
-                    updated_count += 1
+                    updated_ids.add(ns.id)
 
+        text_rows = NationalSociety.query.filter(NationalSociety.category_text.isnot(None)).all()
+        for ns in text_rows:
+            if isinstance(ns.category_text, dict) and category_name in ns.category_text:
+                remaining = {key: value for key, value in ns.category_text.items() if key != category_name}
+                ns.category_text = remaining or None
+                flag_modified(ns, 'category_text')
+                db.session.add(ns)
+                updated_ids.add(ns.id)
+
+        updated_count = len(updated_ids)
         if updated_count > 0:
             db.session.flush()
+
+        forget_part_of_category(category_name)
 
         return json_ok(
             success=True,

@@ -74,8 +74,10 @@ class NationalSociety(db.Model):
     # Multilingual NS Name fields
     name_translations = db.Column(JSONB, nullable=True)
 
-    # Projects/Emergencies/Programs this NS is part of
+    # Projects/Emergencies/Programs this NS is part of (tick-box categories).
     part_of = db.Column(JSONB, nullable=True)
+    # Free-text values for text categories, keyed by category name.
+    category_text = db.Column(JSONB, nullable=True)
 
     # Status and metadata. is_active is kept in sync with status (Active vs not).
     # No Python-side default: before_insert derives status from is_active when blank.

@@ -4,6 +4,21 @@
 import { FALSY_CONFIG_STRINGS, TRUTHY_CONFIG_STRINGS } from '../../../lib/matrix-boolean.js';
 import { checkFormulaSyntax, compileCalculation } from '../../../forms/modules/matrix/calculation.js';
 
+/** Same grey as a normal matrix column header (Tailwind bg-gray-100). */
+const DEFAULT_MATRIX_GROUP_HEADER_COLOR = '#f3f4f6';
+const GROUP_HEADER_COLOR_KEY = 'header_color';
+
+function normalizeMatrixGroupHeaderColor(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(raw) ? raw : '';
+}
+
+/** Colour to persist. The default grey is omitted so existing groups stay unchanged. */
+function customMatrixGroupHeaderColor(value) {
+    const normalized = normalizeMatrixGroupHeaderColor(value);
+    return normalized && normalized !== DEFAULT_MATRIX_GROUP_HEADER_COLOR ? normalized : '';
+}
+
 const truthyMatrixValues = TRUTHY_CONFIG_STRINGS;
 const falsyMatrixValues = FALSY_CONFIG_STRINGS;
 
@@ -225,6 +240,7 @@ export const MatrixItem = {
                 e.target.classList.contains('row-text') ||
                 e.target.classList.contains('column-text') ||
                 e.target.classList.contains('group-label-text') ||
+                e.target.classList.contains('group-header-color') ||
                 e.target.classList.contains('column-type') ||
                 e.target.classList.contains('column-decimals') ||
                 e.target.classList.contains('column-variable-select') ||
@@ -351,6 +367,9 @@ export const MatrixItem = {
                         this.handleColumnHeaderListSelection(modalElement, columnDiv, e.target.value);
                     }
                 }
+                if (e.target.classList.contains('group-header-color')) {
+                    this._paintGroupHeader(e.target.closest('.matrix-group'));
+                }
                 this.updateConfig(modalElement);
             }
         };
@@ -437,7 +456,13 @@ export const MatrixItem = {
 
         document.addEventListener('change', modalElement._matrixChangeHandler);
         modalElement._matrixColumnCodeHandler = (e) => {
-            if (!modalElement.contains(e.target) || !e.target.classList?.contains('column-text')) return;
+            if (!modalElement.contains(e.target)) return;
+            if (e.target.classList?.contains('group-header-color')) {
+                this._paintGroupHeader(e.target.closest('.matrix-group'));
+                this.updateConfig(modalElement);
+                return;
+            }
+            if (!e.target.classList?.contains('column-text')) return;
             const cleaned = e.target.value.replace(/\s+/g, '');
             if (cleaned === e.target.value) return;
             const pos = e.target.selectionStart;
@@ -962,7 +987,7 @@ export const MatrixItem = {
         this.updateAutoLoadVisibility(modalElement);
     },
 
-    addGroup(modalElement, label = '', labelTranslations = {}) {
+    addGroup(modalElement, label = '', labelTranslations = {}, headerColor = '') {
         const columnsContainer = Utils.getElementById('matrix-columns-container');
         const template = Utils.getElementById('matrix-group-template');
         if (!columnsContainer || !template) {
@@ -970,18 +995,39 @@ export const MatrixItem = {
             return;
         }
         const clone = template.content.cloneNode(true);
+        const groupEl = clone.querySelector('.matrix-group');
         const labelInput = clone.querySelector('.group-label-text');
         const labelTranslationsInput = clone.querySelector('.group-label-translations');
+        const colorInput = clone.querySelector('.group-header-color');
+        const translations = (labelTranslations && typeof labelTranslations === 'object' && !Array.isArray(labelTranslations))
+            ? { ...labelTranslations }
+            : {};
+        const storedColor = headerColor || translations[GROUP_HEADER_COLOR_KEY] || '';
+        delete translations[GROUP_HEADER_COLOR_KEY];
         if (labelInput) labelInput.value = label || '';
         if (labelTranslationsInput) {
             try {
-                const normalized = (labelTranslations && typeof labelTranslations === 'object') ? labelTranslations : {};
-                labelTranslationsInput.value = JSON.stringify(normalized);
+                labelTranslationsInput.value = JSON.stringify(translations);
             } catch (_) {
                 labelTranslationsInput.value = '{}';
             }
         }
+        if (colorInput) {
+            colorInput.value = normalizeMatrixGroupHeaderColor(storedColor) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
+        }
+        this._paintGroupHeader(groupEl);
         columnsContainer.appendChild(clone);
+    },
+
+    /**
+     * Preview the saved group-header colour on the builder group bar.
+     * Default grey matches a normal matrix column header.
+     */
+    _paintGroupHeader(groupEl) {
+        const header = groupEl?.querySelector('.matrix-group-header');
+        const input = groupEl?.querySelector('.group-header-color');
+        if (!header || !input) return;
+        header.style.backgroundColor = normalizeMatrixGroupHeaderColor(input.value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
     },
 
     moveGroup(button, direction) {
@@ -2331,12 +2377,19 @@ export const MatrixItem = {
                 const groupLabel = labelInput?.value?.trim() || '';
                 if (!groupLabel) return; // skip unnamed groups
 
-                // Persist group label translations
+                // Persist group label translations and an optional header colour.
+                // The default grey is not stored, so groups look like other columns.
                 const labelTranslationsInput = child.querySelector('.group-label-translations');
                 let labelTranslations = {};
                 if (labelTranslationsInput?.value) {
                     try { labelTranslations = JSON.parse(labelTranslationsInput.value) || {}; } catch (_) {}
                 }
+                if (!labelTranslations || typeof labelTranslations !== 'object' || Array.isArray(labelTranslations)) {
+                    labelTranslations = {};
+                }
+                delete labelTranslations[GROUP_HEADER_COLOR_KEY];
+                const headerColor = customMatrixGroupHeaderColor(child.querySelector('.group-header-color')?.value);
+                if (headerColor) labelTranslations[GROUP_HEADER_COLOR_KEY] = headerColor;
                 column_groups[groupLabel] = labelTranslations;
 
                 // Extract all columns inside this group
@@ -2699,7 +2752,13 @@ export const MatrixItem = {
 
                     orderedItems.forEach(item => {
                         if (item.type === 'group') {
-                            this.addGroup(modalElement, item.label, item.translations);
+                            const groupMeta = (item.translations && typeof item.translations === 'object' && !Array.isArray(item.translations))
+                                ? item.translations
+                                : {};
+                            const headerColor = groupMeta[GROUP_HEADER_COLOR_KEY] || '';
+                            const translations = { ...groupMeta };
+                            delete translations[GROUP_HEADER_COLOR_KEY];
+                            this.addGroup(modalElement, item.label, translations, headerColor);
                             const groupContainer = columnsContainer.lastElementChild;
                             const groupColumnsContainer = groupContainer?.querySelector('.matrix-group-columns');
                             item.columns.forEach(colData => {

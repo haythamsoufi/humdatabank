@@ -708,6 +708,7 @@ function attachMatrixColumnHeadersModal() {
           if (labelTranslationsInput && labelTranslationsInput.value) {
             try { translations = JSON.parse(labelTranslationsInput.value) || {}; } catch (_) {}
           }
+          if (translations && typeof translations === 'object') delete translations.header_color;
 
           const row = document.createElement('tr');
           row.className = 'border-b border-indigo-200 bg-indigo-50';

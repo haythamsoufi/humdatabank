@@ -604,6 +604,8 @@ def _recover_stuck_job_items(job, *, stale_seconds: int) -> bool:
     Document ``processing_heartbeat_at`` counts as progress when the current
     run is still pending/processing.
     """
+    from app.extensions import db
+
     thread_alive = is_job_thread_alive(str(job.id))
     # Hung-but-alive workers: use the same hard window as job abandon.
     effective_seconds = max(int(stale_seconds) * 10, 1800) if thread_alive else int(stale_seconds)

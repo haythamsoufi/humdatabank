@@ -1,7 +1,6 @@
 import json
-import threading
 
-from app.utils.transactions import request_transaction_rollback, register_post_commit, safe_remove
+from app.utils.transactions import request_transaction_rollback, register_post_commit
 from contextlib import suppress
 from config.config import Config
 # File: Backoffice/app/routes/admin/assignment_management.py
@@ -490,83 +489,40 @@ def _admin_capable_user_search_query():
     return User.query.filter(User.active.is_(True), User.id.in_(admin_user_ids))
 
 
-# --- Assignment-created notification dispatch (async) ---
+# --- Assignment-created notification dispatch (async, tracked) ---
 #
 # See docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md.
 # A synchronous per-country notify loop here previously held the request open for
 # ~3s per country (sequential Email API calls), causing Application Gateway 504s on
-# assignments covering dozens of countries. The loop itself is unchanged (still
-# sequential, still capped by the same Email API rate) — it just no longer runs on
-# the request thread.
-def _dispatch_assignment_created_notifications(app, aes_ids, notify_admins, actor_user_id):
+# assignments covering dozens of countries, so the loop runs on a background worker.
+#
+# The work is tracked as a job (see app/services/notification/assignment_notification_jobs.py):
+# the job rows are written in the request transaction, the worker starts only after commit,
+# and per-entity progress/failures are shown in Communication Center -> Background jobs.
+def _queue_assignment_notification_job(aes_ids, notify_admins, source):
     """
-    Background-thread body: send assignment-created notifications/emails for AES rows.
+    Queue a tracked background job that notifies the given AssignmentEntityStatus rows.
 
-    Opens its own app context (own DB session/transaction) — Flask's current_app and
-    db.session are context-local, so the request thread's context cannot be reused here
-    (same pattern as the email-retry pool in app/services/email/delivery.py and the UPR
-    Excel import worker in plugins/upr/excel/import_routes.py). Must only be started
-    *after* the request's transaction has committed (see _start_assignment_notification_dispatch
-    below), otherwise this fresh session would not see the newly created rows yet.
+    Call after the rows were flushed, inside the request. Returns the job id, or None when
+    nothing was queued (callers should warn the user: the assignment itself is unaffected).
+    The worker is started via register_post_commit so it only runs once the request's
+    transaction (including the job rows) has committed.
     """
-    from app.services.notification.core import notify_assignment_created
+    from app.services.notification.assignment_notification_jobs import (
+        create_assignment_notification_job,
+        start_assignment_notification_job,
+    )
 
-    with app.app_context():
-        notif_ok = 0
-        notif_err = 0
-        try:
-            for aes_id in aes_ids:
-                aes = AssignmentEntityStatus.query.get(aes_id)
-                if not aes:
-                    continue
-                try:
-                    results = notify_assignment_created(
-                        aes, notify_admins=notify_admins, actor_user_id=actor_user_id
-                    ) or []
-                    notif_ok += len(results)
-                except Exception as e:
-                    notif_err += 1
-                    current_app.logger.error(
-                        f"Error sending assignment created notification for AES {aes_id}: {e}",
-                        exc_info=True,
-                    )
-            current_app.logger.info(
-                "Assignment notifications dispatched (background): "
-                f"{notif_ok} sent, {notif_err} errors, {len(aes_ids)} entities"
-            )
-        except Exception as e:
-            current_app.logger.error(f"Assignment notification dispatch failed: {e}", exc_info=True)
-        finally:
-            safe_remove(reason="assignment_notification_dispatch")
-
-
-def _start_assignment_notification_dispatch(aes_ids, notify_admins):
-    """
-    Kick off assignment-created notification dispatch without blocking the request.
-
-    Register this via register_post_commit (not called directly) so it only runs once the
-    AssignmentEntityStatus rows are committed and visible outside the request's own session.
-    Captures actor_user_id from current_user here, while still inside the original request —
-    the background thread has no request context, so current_user there is always anonymous.
-    Runs synchronously under TESTING (mirrors upr_excel_import.py) so tests can assert on the
-    outcome without racing a real thread.
-    """
     aes_ids = [aid for aid in (aes_ids or []) if aid]
     if not aes_ids:
-        return
-
-    worker_app = current_app._get_current_object()
+        return None
     actor_user_id = current_user.id if current_user and current_user.is_authenticated else None
-
-    if current_app.config.get("TESTING"):
-        _dispatch_assignment_created_notifications(worker_app, aes_ids, notify_admins, actor_user_id)
-    else:
-        threading.Thread(
-            target=_dispatch_assignment_created_notifications,
-            args=(worker_app, aes_ids, notify_admins, actor_user_id),
-            daemon=False,
-            name="assignment-notify-dispatch",
-        ).start()
+    job_id = create_assignment_notification_job(
+        aes_ids, notify_admins, actor_user_id, source=source
+    )
+    if job_id:
+        register_post_commit(start_assignment_notification_job, job_id)
+    return job_id
 
 
 # Define the form for editing overall assignment details
@@ -973,13 +929,23 @@ def new_assignment():
                 # request open — see docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md.
                 send_notifications = getattr(form.send_notifications, 'data', False)
                 notify_admins = getattr(form.notify_admins, 'data', False) if send_notifications else False
+                notification_job_id = None
                 if send_notifications:
                     aes_ids_for_notify = [aes.id for aes in created_aes_list]
-                    register_post_commit(_start_assignment_notification_dispatch, aes_ids_for_notify, notify_admins)
-                    current_app.logger.info(
-                        f"Creating assignment: queued background notification dispatch for "
-                        f"{len(aes_ids_for_notify)} entities"
+                    notification_job_id = _queue_assignment_notification_job(
+                        aes_ids_for_notify, notify_admins, "create"
                     )
+                    if notification_job_id:
+                        current_app.logger.info(
+                            f"Creating assignment: queued notification job {notification_job_id} for "
+                            f"{len(aes_ids_for_notify)} entities"
+                        )
+                    else:
+                        flash(
+                            "The assignment was created, but its notifications could not be queued. "
+                            "No notifications were sent.",
+                            "warning",
+                        )
                 else:
                     current_app.logger.info(
                         "Creating assignment: notifications skipped (send_notifications=False)"
@@ -996,7 +962,11 @@ def new_assignment():
                     public_status = "active" if new_assignment.is_public_active else "inactive"
                     success_msg += f" Public URL generated and is {public_status}."
                 if send_notifications:
-                    success_msg += " Notifications are being sent in the background."
+                    if notification_job_id:
+                        success_msg += (
+                            " Notifications are being sent in the background; follow progress and "
+                            "any failures in Communication Center > Background jobs."
+                        )
                 else:
                     success_msg += " No notifications were sent."
                 flash(success_msg, "success")
@@ -1572,7 +1542,12 @@ def add_countries_to_assignment(assignment_id):
         # request open — see docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md.
         if created_aes_list:
             aes_ids_for_notify = [aes.id for aes in created_aes_list]
-            register_post_commit(_start_assignment_notification_dispatch, aes_ids_for_notify, False)
+            if not _queue_assignment_notification_job(aes_ids_for_notify, False, "add_countries"):
+                flash(
+                    "The countries were added, but their notifications could not be queued. "
+                    "No notifications were sent.",
+                    "warning",
+                )
 
         flash(f"Added {added_count} countries to assignment.", "success")
     except Exception as e:
@@ -1723,9 +1698,13 @@ def add_entity_to_assignment(assignment_id):
     # Send notification to focal points for all entity types, dispatched asynchronously
     # (after commit) for consistency with the other assignment-entity routes — see
     # docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md.
-    register_post_commit(_start_assignment_notification_dispatch, [new_aes.id], False)
+    notifications_queued = bool(_queue_assignment_notification_job([new_aes.id], False, "add_entity"))
 
-    return json_ok(status_id=new_aes.id, entity_name=EntityService.get_entity_name(entity_type, entity_id, include_hierarchy=True))
+    return json_ok(
+        status_id=new_aes.id,
+        entity_name=EntityService.get_entity_name(entity_type, entity_id, include_hierarchy=True),
+        notifications_queued=notifications_queued,
+    )
 
 @bp.route("/assignments/<int:assignment_id>/entities/remove/<int:status_id>", methods=["DELETE"])
 @permission_required('admin.assignments.entities.manage')

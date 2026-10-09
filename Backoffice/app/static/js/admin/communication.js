@@ -599,7 +599,7 @@ class AdminNotifications {
             });
         });
         const hash = (window.location.hash || '').replace('#', '');
-        if (hash && ['view-all', 'insights', 'send', 'campaigns'].includes(hash) && document.getElementById(`panel-${hash}`)) {
+        if (hash && ['view-all', 'insights', 'send', 'campaigns', 'jobs'].includes(hash) && document.getElementById(`panel-${hash}`)) {
             this.switchTab(hash);
         }
         document.querySelectorAll('.communication-tab-link').forEach((link) => {
@@ -2810,7 +2810,7 @@ class AdminNotifications {
      * Tab UI: AdminUnderlineTabs.activateStripTab (shared with manage_settings.html).
      */
     switchTab(tab) {
-        const validTabs = ['view-all', 'insights', 'send', 'campaigns'];
+        const validTabs = ['view-all', 'insights', 'send', 'campaigns', 'jobs'];
         if (!validTabs.includes(tab)) return;
 
         const A = window.AdminUnderlineTabs;
@@ -2833,6 +2833,10 @@ class AdminNotifications {
         } else if (tab === 'insights') {
             if (window.CommunicationInsights && typeof window.CommunicationInsights.onTabActivated === 'function') {
                 setTimeout(() => window.CommunicationInsights.onTabActivated(), 50);
+            }
+        } else if (tab === 'jobs') {
+            if (window.CommunicationJobs && typeof window.CommunicationJobs.onTabActivated === 'function') {
+                window.CommunicationJobs.onTabActivated();
             }
         } else if (tab === 'campaigns') {
             this.loadCampaigns();

@@ -1441,9 +1441,15 @@ def send_grouped_entity_email(
     sample_notification,
     entity_name: str,
     notification_by_user_id=None,
+    outcome: Optional[dict] = None,
 ) -> bool:
     """
     Send one notification email per entity: focal points in To, admins in CC.
+
+    *outcome*, when given, is filled with ``status`` (``sent`` / ``skipped`` /
+    ``failed``) and a human-readable ``detail``. The boolean return value alone cannot
+    tell "nothing to send" apart from "the send failed", which background jobs need to
+    report honestly.
 
     Uses *sample_notification* for subject/body content. Assignment-created emails
     always use the team greeting ("Dear colleagues,"), including a single To
@@ -1457,13 +1463,20 @@ def send_grouped_entity_email(
     from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
     from app.services.notification.creation import get_user_preferences_batch
 
+    def _set_outcome(status: str, detail: str = '') -> None:
+        if outcome is not None:
+            outcome['status'] = status
+            outcome['detail'] = detail
+
     if sample_notification.notification_type in IN_APP_ONLY_NOTIFICATION_TYPES:
+        _set_outcome('skipped', 'This notification type is in-app only.')
         return False
 
     preview = build_grouped_entity_email_preview(
         to_user_ids, cc_user_ids, sample_notification, entity_name
     )
     if preview.get('empty_reason') or not preview.get('html_body'):
+        _set_outcome('skipped', preview.get('empty_reason') or 'No email content to send.')
         return False
 
     subject = preview['subject']
@@ -1490,6 +1503,7 @@ def send_grouped_entity_email(
     primary_user_id = to_eligible[0] if to_eligible else (cc_eligible[0] if cc_eligible else None)
     primary_email = to_emails[0] if to_emails else None
     if not primary_user_id or not primary_email:
+        _set_outcome('skipped', 'No recipient is eligible for email (preferences or missing address).')
         return False
 
     notification_by_user_id = notification_by_user_id or {}
@@ -1543,8 +1557,21 @@ def send_grouped_entity_email(
                     _failure_info[-1] if _failure_info else None,
                 )
 
+        if success:
+            _set_outcome('sent')
+        elif filtered_out:
+            _set_outcome('skipped', 'All recipients were filtered out by the email safety filter.')
+        else:
+            last_failure = _failure_info[-1] if _failure_info else None
+            _set_outcome(
+                'failed',
+                f"The email service did not accept the message. {last_failure}".strip()
+                if last_failure
+                else 'The email service did not accept the message.',
+            )
         return success or bool(filtered_out)
     except Exception as e:
+        _set_outcome('failed', str(e))
         for user in users:
             if not user.email:
                 continue

@@ -7,9 +7,9 @@ import json
 import re
 import pytest
 from unittest.mock import patch, MagicMock
-from app.routes.admin.assignment_management import (
-    _start_assignment_notification_dispatch,
-    _dispatch_assignment_created_notifications,
+from app.services.notification.assignment_notification_jobs import (
+    JOB_TYPE as NOTIFY_JOB_TYPE,
+    start_assignment_notification_job,
 )
 from tests.factories import (
     create_test_admin,
@@ -35,6 +35,19 @@ def _json_post(client, url, data, **kwargs):
 
 def _assert_ok(resp, status_code=200):
     assert resp.status_code == status_code, f"Expected {status_code}, got {resp.status_code}: {resp.data[:300]}"
+
+
+def _assert_job_queued(app, job_id, *, expected_items, notify_admins):
+    """The request must have written a tracked job (and one item per entity)."""
+    from app.models import AIJob
+
+    with app.app_context():
+        job = AIJob.query.get(job_id)
+        assert job is not None
+        assert job.job_type == NOTIFY_JOB_TYPE
+        assert job.total_items == expected_items
+        assert len(job.items) == expected_items
+        assert bool((job.meta or {}).get("notify_admins")) is notify_admins
 
 
 def _assert_redirect(resp, location_contains=None):
@@ -290,10 +303,9 @@ class TestNewAssignmentNotificationDispatch:
 
         assert resp.status_code in (200, 302)
         mock_register.assert_called_once()
-        callback, aes_ids, notify_admins = mock_register.call_args[0]
-        assert callback is _start_assignment_notification_dispatch
-        assert len(aes_ids) == 1
-        assert notify_admins is True
+        callback, job_id = mock_register.call_args[0]
+        assert callback is start_assignment_notification_job
+        _assert_job_queued(app, job_id, expected_items=1, notify_admins=True)
 
     def test_send_notifications_unchecked_skips_dispatch(self, logged_in_client, db_session, app):
         """Unchecked 'send notifications' checkbox (omitted from POST, like a real
@@ -324,7 +336,7 @@ class TestNewAssignmentNotificationDispatch:
     ):
         """End-to-end (no mocking of register_post_commit): the real post-commit
         callback must fire within the same request (TESTING short-circuits the
-        background thread to a synchronous call — see _start_assignment_notification_dispatch)
+        background thread to a synchronous call — see start_assignment_notification_job)
         and call notify_assignment_created with the committed AES row and the
         creating admin as actor_user_id."""
         with app.app_context():
@@ -334,8 +346,15 @@ class TestNewAssignmentNotificationDispatch:
             country_id = country.id
             admin_id = admin_user.id
 
+        seen = {}
+
+        def _capture(aes_row, **kwargs):
+            # The worker owns this row's session; read it while that session is alive.
+            seen["entity_id"] = aes_row.entity_id
+            return []
+
         with patch(
-            "app.services.notification.core.notify_assignment_created", return_value=[]
+            "app.services.notification.core.notify_assignment_created", side_effect=_capture
         ) as mock_notify:
             resp = logged_in_client.post(
                 "/admin/assignments/new",
@@ -351,8 +370,7 @@ class TestNewAssignmentNotificationDispatch:
 
         assert resp.status_code in (200, 302)
         mock_notify.assert_called_once()
-        aes_arg = mock_notify.call_args[0][0]
-        assert aes_arg.entity_id == country_id
+        assert seen["entity_id"] == country_id
         assert mock_notify.call_args.kwargs["actor_user_id"] == admin_id
         assert mock_notify.call_args.kwargs["notify_admins"] is False
 
@@ -821,10 +839,9 @@ class TestAddCountriesToAssignmentNotificationDispatch:
 
         assert resp.status_code in (302, 200)
         mock_register.assert_called_once()
-        callback, aes_ids, notify_admins = mock_register.call_args[0]
-        assert callback is _start_assignment_notification_dispatch
-        assert len(aes_ids) == 1
-        assert notify_admins is False
+        callback, job_id = mock_register.call_args[0]
+        assert callback is start_assignment_notification_job
+        _assert_job_queued(app, job_id, expected_items=1, notify_admins=False)
 
     def test_no_new_country_skips_dispatch(self, logged_in_client, db_session, app):
         """Re-adding an already-assigned country creates no new AES rows, so no
@@ -988,96 +1005,9 @@ class TestAddEntityToAssignmentNotificationDispatch:
 
         assert resp.status_code in (200, 302)
         mock_register.assert_called_once()
-        callback, aes_ids, notify_admins = mock_register.call_args[0]
-        assert callback is _start_assignment_notification_dispatch
-        assert len(aes_ids) == 1
-        assert notify_admins is False
-
-
-# ---------------------------------------------------------------------------
-# _start_assignment_notification_dispatch / _dispatch_assignment_created_notifications
-# (docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md)
-# ---------------------------------------------------------------------------
-
-class TestAssignmentNotificationDispatchHelpers:
-    def test_spawns_non_daemon_thread_outside_testing_mode(self, app):
-        """Outside TESTING, the request thread must only *start* a background
-        thread (fast) rather than run the notify loop inline — this is the actual
-        fix for the 504: the slow work must never block the response."""
-        mock_user = MagicMock()
-        mock_user.is_authenticated = True
-        mock_user.id = 4242
-
-        with app.app_context():
-            with patch("app.routes.admin.assignment_management.current_user", mock_user), \
-                 patch.dict(app.config, {"TESTING": False}), \
-                 patch("app.routes.admin.assignment_management.threading.Thread") as mock_thread_cls, \
-                 patch(
-                     "app.routes.admin.assignment_management._dispatch_assignment_created_notifications"
-                 ) as mock_dispatch:
-                _start_assignment_notification_dispatch([101, 102], True)
-
-        mock_dispatch.assert_not_called()  # must not run inline on the request thread
-        mock_thread_cls.assert_called_once()
-        _, kwargs = mock_thread_cls.call_args
-        assert kwargs["daemon"] is False
-        assert kwargs["target"] is mock_dispatch
-        assert kwargs["args"][1:] == ([101, 102], True, 4242)
-        mock_thread_cls.return_value.start.assert_called_once()
-
-    def test_runs_synchronously_under_testing_mode(self, app):
-        """Under TESTING, dispatch runs on the caller's thread (no real Thread spawned)
-        so assertions on notify_assignment_created don't race a background thread."""
-        with app.app_context():
-            with patch("app.routes.admin.assignment_management.current_user", None), \
-                 patch("app.routes.admin.assignment_management.threading.Thread") as mock_thread_cls, \
-                 patch(
-                     "app.routes.admin.assignment_management._dispatch_assignment_created_notifications"
-                 ) as mock_dispatch:
-                _start_assignment_notification_dispatch([101], False)
-
-        mock_thread_cls.assert_not_called()
-        mock_dispatch.assert_called_once()
-        args = mock_dispatch.call_args[0]
-        assert args[1:] == ([101], False, None)
-
-    def test_empty_aes_ids_is_noop(self, app):
-        with app.app_context():
-            with patch("app.routes.admin.assignment_management.threading.Thread") as mock_thread_cls, \
-                 patch(
-                     "app.routes.admin.assignment_management._dispatch_assignment_created_notifications"
-                 ) as mock_dispatch:
-                _start_assignment_notification_dispatch([], False)
-
-        mock_thread_cls.assert_not_called()
-        mock_dispatch.assert_not_called()
-
-    def test_dispatch_skips_missing_aes_and_isolates_per_entity_errors(self, db_session, app):
-        """Mirrors the original synchronous loop's error handling: one entity's
-        notify failure must not stop the rest, and a stale/missing id (e.g. the
-        row was deleted between commit and dispatch) is skipped, not fatal."""
-        with app.app_context():
-            country1 = create_test_country(db_session)
-            country2 = create_test_country(db_session)
-            aes1 = create_test_assignment_entity_status(db_session, country=country1)
-            aes2 = create_test_assignment_entity_status(db_session, country=country2)
-            aes1_id, aes2_id = aes1.id, aes2.id
-            missing_id = max(aes1_id, aes2_id) + 999999
-
-        with patch(
-            "app.services.notification.core.notify_assignment_created",
-            side_effect=[["n1"], RuntimeError("boom")],
-        ) as mock_notify, patch(
-            "app.routes.admin.assignment_management.safe_remove"
-        ) as mock_safe_remove:
-            _dispatch_assignment_created_notifications(
-                app, [aes1_id, missing_id, aes2_id], True, 777
-            )
-
-        assert mock_notify.call_count == 2
-        first_kwargs = mock_notify.call_args_list[0].kwargs
-        assert first_kwargs == {"notify_admins": True, "actor_user_id": 777}
-        mock_safe_remove.assert_called_once()
+        callback, job_id = mock_register.call_args[0]
+        assert callback is start_assignment_notification_job
+        _assert_job_queued(app, job_id, expected_items=1, notify_admins=False)
 
 
 # ---------------------------------------------------------------------------

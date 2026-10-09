@@ -46,7 +46,7 @@ from app.services.communication.campaign_email_templates_service import (
 from app.utils.organization_helpers import get_org_name
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_server_error
 from flask_babel import gettext as _
 from datetime import datetime, timedelta
 from sqlalchemy import cast, String
@@ -203,8 +203,19 @@ def communication_center():
         current_app.logger.exception('Failed to build Communication Center insights')
         communications_insights = empty_communications_insights(insights_days)
 
+    try:
+        from app.services.notification import assignment_notification_jobs as notification_jobs
+
+        notification_jobs.resume_orphaned_jobs(current_app._get_current_object())
+        background_jobs_summary = notification_jobs.get_banner_summary()
+    except Exception:
+        current_app.logger.exception('Failed to load background job summary')
+        db.session.rollback()
+        background_jobs_summary = {"active": 0, "failed": 0}
+
     return render_template(
         "admin/communication/center.html",
+        background_jobs_summary=background_jobs_summary,
         notification_types=notification_types,
         notifications=notifications_data,
         total_count=total_count,
@@ -740,6 +751,76 @@ def api_communications_insights():
         insights_days = clamp_insights_days(request.args.get('days', type=int))
         payload = build_communications_insights(insights_days)
         return json_ok(**payload)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/background-jobs", methods=["GET"])
+@permission_required("admin.communication.manage")
+def api_background_jobs():
+    """Recent background notification jobs (progress + failures) for the Communication Center."""
+    try:
+        from app.services.notification import assignment_notification_jobs as jobs
+
+        jobs.resume_orphaned_jobs(current_app._get_current_object())
+        job_list = jobs.list_jobs(limit=request.args.get('limit', default=20, type=int))
+        return json_ok(
+            jobs=job_list,
+            active_count=sum(1 for j in job_list if j['is_active']),
+            failed_count=sum(
+                1 for j in job_list
+                if j['status'] == 'failed' and not j['dismissed']
+            ),
+        )
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/background-jobs/<job_id>", methods=["GET"])
+@permission_required("admin.communication.manage")
+def api_background_job_detail(job_id):
+    """One background job with its per-entity results."""
+    try:
+        from app.services.notification import assignment_notification_jobs as jobs
+
+        job = jobs.get_job(job_id)
+        if job is None:
+            return json_not_found('Background job not found')
+        return json_ok(job=jobs.serialize_job(job, include_items=True))
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/background-jobs/<job_id>/cancel", methods=["POST"])
+@permission_required("admin.communication.manage")
+def api_cancel_background_job(job_id):
+    """Stop a running notification job; entities not yet processed will not be notified."""
+    enforce_api_or_csrf_protection()
+    try:
+        from app.services.notification import assignment_notification_jobs as jobs
+
+        if jobs.get_job(job_id) is None:
+            return json_not_found('Background job not found')
+        if not jobs.request_cancel(job_id):
+            return json_bad_request('This job is no longer running.', success=False)
+        return json_ok(success=True, message=_('Cancelling. Entities already processed keep their notifications.'))
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/background-jobs/<job_id>/dismiss", methods=["POST"])
+@permission_required("admin.communication.manage")
+def api_dismiss_background_job(job_id):
+    """Hide a finished job's failure notice (the job stays listed)."""
+    enforce_api_or_csrf_protection()
+    try:
+        from app.services.notification import assignment_notification_jobs as jobs
+
+        if jobs.get_job(job_id) is None:
+            return json_not_found('Background job not found')
+        if not jobs.dismiss_job(job_id):
+            return json_bad_request('Only finished jobs can be dismissed.', success=False)
+        return json_ok(success=True)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 

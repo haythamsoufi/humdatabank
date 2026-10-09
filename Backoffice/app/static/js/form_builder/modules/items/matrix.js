@@ -19,6 +19,16 @@ function customMatrixGroupHeaderColor(value) {
     return normalized && normalized !== DEFAULT_MATRIX_GROUP_HEADER_COLOR ? normalized : '';
 }
 
+/** Dark header fills use white text; light fills use the same grey as other columns. */
+function matrixGroupHeaderTextColor(value) {
+    const raw = normalizeMatrixGroupHeaderColor(value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
+    const r = parseInt(raw.slice(1, 3), 16);
+    const g = parseInt(raw.slice(3, 5), 16);
+    const b = parseInt(raw.slice(5, 7), 16);
+    const luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
+    return luminance >= 160 ? '#4b5563' : '#ffffff';
+}
+
 const truthyMatrixValues = TRUTHY_CONFIG_STRINGS;
 const falsyMatrixValues = FALSY_CONFIG_STRINGS;
 
@@ -1021,13 +1031,27 @@ export const MatrixItem = {
 
     /**
      * Preview the saved group-header colour on the builder group bar.
-     * Default grey matches a normal matrix column header.
+     * Default grey matches a normal matrix column header. Dark fills use white text.
      */
     _paintGroupHeader(groupEl) {
         const header = groupEl?.querySelector('.matrix-group-header');
         const input = groupEl?.querySelector('.group-header-color');
         if (!header || !input) return;
-        header.style.backgroundColor = normalizeMatrixGroupHeaderColor(input.value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
+        const background = normalizeMatrixGroupHeaderColor(input.value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
+        const text = matrixGroupHeaderTextColor(background);
+        const dark = text === '#ffffff';
+        header.style.backgroundColor = background;
+        header.style.color = text;
+        const labelInput = header.querySelector('.group-label-text');
+        if (labelInput) {
+            labelInput.style.color = text;
+            labelInput.style.backgroundColor = dark ? 'transparent' : '';
+            labelInput.style.borderColor = dark ? 'rgba(255,255,255,0.45)' : '';
+        }
+        const caption = header.querySelector('label');
+        if (caption) caption.style.color = text;
+        const handle = header.querySelector('.matrix-drag-handle');
+        if (handle) handle.style.color = dark ? text : '';
     },
 
     moveGroup(button, direction) {

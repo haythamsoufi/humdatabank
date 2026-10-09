@@ -330,7 +330,11 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               loc,
               theme,
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 24 + MediaQuery.paddingOf(context).bottom,
+              ),
+            ),
           ],
         ),
       );
@@ -384,7 +388,11 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                 ),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 24 + MediaQuery.paddingOf(context).bottom,
+            ),
+          ),
         ],
       ),
     );

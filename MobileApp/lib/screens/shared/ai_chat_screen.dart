@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -924,13 +925,6 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       localizations.aiQuickPrompt5,
     ];
 
-    // Capture the outer body height BEFORE the inner Scaffold/AppBar consumes any
-    // vertical space. This lets the composer compute exactly how much of the
-    // keyboard overlaps the inner body — without needing to know kToolbarHeight or
-    // whether an ancestor primary Scaffold already consumed the status-bar inset.
-    return LayoutBuilder(
-      builder: (_, outerConstraints) {
-        final outerBodyH = outerConstraints.maxHeight;
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(
         textScaler: TextScaler.linear(MediaQuery.textScalerOf(context).scale(1) * _kUiScale),
@@ -1080,19 +1074,33 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      Container(
-                                        width: 72,
-                                        height: 72,
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary
-                                              .withValues(alpha: 0.08),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Icon(
-                                          Icons.assistant_rounded,
-                                          size: 36,
-                                          color: theme.colorScheme.primary,
+                                      Center(
+                                        child: Container(
+                                          width: 76,
+                                          height: 76,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                _chatLink(theme)
+                                                    .withValues(alpha: 0.18),
+                                                _chatLink(theme)
+                                                    .withValues(alpha: 0.05),
+                                              ],
+                                            ),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: _chatLink(theme)
+                                                  .withValues(alpha: 0.14),
+                                            ),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Icon(
+                                            Icons.assistant_rounded,
+                                            size: 38,
+                                            color: _chatLink(theme),
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 20),
@@ -1100,8 +1108,8 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                         _welcomeAssistantName(context),
                                         style: TextStyle(
                                           fontSize: 28,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: -0.5,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.6,
                                           height: 1.2,
                                           color: _chatBody(theme),
                                         ),
@@ -1223,31 +1231,30 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                       ] else
                                         const SizedBox(height: 8),
                                       if (!policyBlocksInput) ...[
-                                        Text(
-                                          localizations.aiTryAsking,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            color: _chatMuted(theme),
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 4, bottom: 10, top: 12),
+                                          child: Text(
+                                            localizations.aiTryAsking,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.2,
+                                              color: _chatMuted(theme),
+                                            ),
                                           ),
-                                          textAlign: TextAlign.center,
                                         ),
-                                        const SizedBox(height: 14),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          alignment: WrapAlignment.center,
-                                          children: quickPrompts.map((prompt) {
-                                            return _buildPromptChip(
-                                              theme: theme,
-                                              prompt: prompt,
-                                              onTap: () {
-                                                _controller.text = prompt;
-                                                _send(context, isAuthed);
-                                              },
-                                            );
-                                          }).toList(),
-                                        ),
+                                        for (var p = 0; p < quickPrompts.length; p++) ...[
+                                          if (p > 0) const SizedBox(height: 8),
+                                          _buildPromptChip(
+                                            theme: theme,
+                                            prompt: quickPrompts[p],
+                                            onTap: () {
+                                              _controller.text = quickPrompts[p];
+                                              _send(context, isAuthed);
+                                            },
+                                          ),
+                                        ],
                                       ],
                                     ],
                                   ),
@@ -1537,27 +1544,15 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                 Builder(
                     builder: (context) {
                       final mq = MediaQuery.of(context);
-                      // AiChatScreen is hosted inside an outer Scaffold that has a
-                      // bottomNavigationBar (AiChatScreenWithBottomNav / MainNavigationScreen).
-                      // viewInsets.bottom measures keyboard height from the SCREEN bottom, but
-                      // the inner body's bottom sits ABOVE the outer nav bar.
-                      //
-                      // outerBottomNavH = screenH − viewPadding.top − outerBodyH
-                      //
-                      // outerBodyH is captured by the top-level LayoutBuilder in build()
-                      // BEFORE the inner Scaffold/AppBar consumes any space, so we do not
-                      // need to know kToolbarHeight or whether a parent Scaffold already
-                      // consumed the status-bar inset.
-                      //
-                      // When there is no outer nav bar, outerBottomNavH ≤ 0 → clamped to 0
-                      // → composerBottom = viewInsets.bottom (full keyboard height).
-                      final outerBottomNavH = (mq.size.height
-                              - mq.viewPadding.top
-                              - outerBodyH)
-                          .clamp(0.0, double.infinity);
-                      final composerBottom =
-                          (mq.viewInsets.bottom - outerBottomNavH)
-                              .clamp(0.0, mq.viewInsets.bottom);
+                      // Both hosts (MainNavigationScreen and
+                      // AiChatScreenWithBottomNav) set Scaffold.extendBody, so the
+                      // page runs under the floating tab bar and padding.bottom is
+                      // the bar's height. The composer must clear the bar, or sit on
+                      // the keyboard when that covers it (the bar does not move).
+                      final composerBottom = math.max(
+                        mq.viewInsets.bottom,
+                        mq.padding.bottom,
+                      );
                     return Padding(
                       padding: EdgeInsets.fromLTRB(_chatPagePaddingH, 6, _chatPagePaddingH, 8 + composerBottom),
                       child: Column(
@@ -1579,12 +1574,24 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                           Container(
                             padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
                             decoration: BoxDecoration(
-                              color: _chatComposer(theme),
-                              borderRadius: BorderRadius.circular(26),
+                              color: theme.isDarkTheme
+                                  ? _chatComposer(theme)
+                                  : theme.cardColor,
+                              borderRadius: BorderRadius.circular(28),
                               border: Border.all(
-                                color: _chatOutline(theme),
+                                color: _chatOutline(theme).withValues(alpha: 0.6),
                                 width: 1,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: theme.ambientShadow(
+                                    lightOpacity: 0.10,
+                                    darkOpacity: 0.35,
+                                  ),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
@@ -1639,8 +1646,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                         color: _chatMuted(theme),
                                         fontSize: 16,
                                       ),
-                                      filled: true,
-                                      fillColor: _chatComposer(theme),
+                                      filled: false,
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,
@@ -1726,7 +1732,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                         height: 40,
                                         child: Material(
                                           color: canSend
-                                              ? ChatImmersivePalette.sendButtonWhite
+                                              ? (_chatGptDark(theme)
+                                                  ? ChatImmersivePalette.sendButtonWhite
+                                                  : theme.colorScheme.primary)
                                               : _chatSendDisabled(theme),
                                           shape: const CircleBorder(),
                                           clipBehavior: Clip.antiAlias,
@@ -1738,7 +1746,9 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                                 Icons.arrow_upward_rounded,
                                                 size: 20,
                                                 color: canSend
-                                                    ? ChatImmersivePalette.sendArrowBlack
+                                                    ? (_chatGptDark(theme)
+                                                        ? ChatImmersivePalette.sendArrowBlack
+                                                        : theme.colorScheme.onPrimary)
                                                     : _chatMuted(theme),
                                               ),
                                             ),
@@ -1762,8 +1772,6 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       ),
     ),
     );
-      }, // LayoutBuilder builder
-    ); // LayoutBuilder
   }
 
   Future<void> _send(BuildContext context, bool isAuthenticated) async {
@@ -2699,39 +2707,58 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
     required String prompt,
     required VoidCallback onTap,
   }) {
+    final accent = _chatLink(theme);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
           decoration: BoxDecoration(
-            color: theme.isDarkTheme
-                ? _chatBubble(theme)
-                : _chatSurface(theme),
-            borderRadius: BorderRadius.circular(20),
+            color: theme.isDarkTheme ? _chatBubble(theme) : theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: _chatOutline(theme),
+              color: _chatOutline(theme).withValues(alpha: 0.55),
               width: 1,
             ),
             boxShadow: theme.isDarkTheme
                 ? null
                 : [
                     BoxShadow(
-                      color: theme.ambientShadow(lightOpacity: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: theme.ambientShadow(lightOpacity: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
                   ],
           ),
-          child: Text(
-            prompt,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.3,
-              color: _chatBody(theme),
-            ),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.north_east_rounded, size: 16, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  prompt,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.3,
+                    fontWeight: FontWeight.w500,
+                    color: _chatBody(theme),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2754,6 +2781,9 @@ class AiChatScreenWithBottomNav extends StatelessWidget {
         final chatbot = auth.user?.chatbotEnabled ?? false;
         return Scaffold(
           resizeToAvoidBottomInset: false,
+          // Same as MainNavigationScreen: the composer reads the bar height from
+          // padding.bottom instead of inferring it from the body size.
+          extendBody: true,
           body: const AiChatScreen(),
           // When AiChatScreenWithBottomNav is shown as a standalone route
           // (deep link, notification tap, etc.), tapping any tab navigates to

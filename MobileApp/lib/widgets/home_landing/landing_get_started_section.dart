@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -83,7 +82,8 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
     }
     setState(() {
       _periodOptions = periods;
-      if (_selectedPeriod == null || !_periodOptions.contains(_selectedPeriod)) {
+      if (_selectedPeriod == null ||
+          !_periodOptions.contains(_selectedPeriod)) {
         _selectedPeriod = periods.isNotEmpty ? periods.first : null;
       }
     });
@@ -252,11 +252,11 @@ class _LandingGetStartedSectionState extends State<LandingGetStartedSection> {
                         _datasetFuture = _loadDataOnly();
                       });
                     },
-                    reloadDataset: ({
-                      required int indicatorBankId,
-                      required String? periodName,
-                    }) =>
-                        _service.loadOverview(
+                    reloadDataset:
+                        ({
+                          required int indicatorBankId,
+                          required String? periodName,
+                        }) => _service.loadOverview(
                           indicatorBankId: indicatorBankId,
                           locale: widget.locale,
                           periodName: periodName,
@@ -317,15 +317,15 @@ class _ShortcutStripTile extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final accent = cs.secondary;
     final iconBg = accent.withValues(alpha: isDark ? 0.18 : 0.1);
-    final borderColor = cs.outlineVariant.withValues(alpha: isDark ? 0.5 : 0.32);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.5 : 0.32,
+    );
 
     return Material(
       color: cs.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: borderColor),
-      ),
+      shape: RoundedRectangleBorder(side: BorderSide(color: borderColor)),
       clipBehavior: Clip.hardEdge,
       child: InkWell(
         onTap: () {
@@ -429,7 +429,7 @@ class _ErrorBlock extends StatelessWidget {
   }
 }
 
-/// Top countries for the selected indicator (complements the map).
+/// Top countries for the selected indicator (complements the map): ranked bars.
 class _OverviewTopCountriesBar extends StatelessWidget {
   const _OverviewTopCountriesBar({
     required this.theme,
@@ -445,149 +445,121 @@ class _OverviewTopCountriesBar extends StatelessWidget {
   final GlobalOverviewDataset data;
   final String indicatorLabel;
 
+  String _countryLabel(int countryId) {
+    final name = data.countryNames[countryId];
+    if (name != null && name.isNotEmpty) return name;
+    final iso = data.countryIso2[countryId];
+    if (iso != null && iso.isNotEmpty) return iso.toUpperCase();
+    return '#$countryId';
+  }
+
   @override
   Widget build(BuildContext context) {
     final top = data.topByValue(8);
     if (top.isEmpty) {
       return const SizedBox.shrink();
     }
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final maxY = top.map((e) => e.value).reduce(math.max);
-    final rodColor = Color(AppConstants.ifrcRed);
-    final gridColor = theme.colorScheme.outlineVariant
-        .withValues(alpha: theme.brightness == Brightness.dark ? 0.35 : 0.45);
+    final accent = Color(AppConstants.ifrcRed);
+    final track = cs.onSurface.withValues(alpha: isDark ? 0.1 : 0.06);
 
-    String shortLabel(int countryId) {
-      final name = data.countryNames[countryId];
-      if (name != null && name.isNotEmpty) {
-        const maxChars = 18;
-        return name.length <= maxChars
-            ? name
-            : '${name.substring(0, maxChars - 1)}…';
-      }
-      final iso = data.countryIso2[countryId];
-      if (iso != null && iso.isNotEmpty) {
-        return iso.toUpperCase();
-      }
-      return '#$countryId';
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.homeLandingGlobalTopCountries,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerHigh : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.45 : 0.6),
         ),
-        const SizedBox(height: 4),
-        Text(
-          indicatorLabel,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 232,
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              maxY: maxY > 0 ? maxY * 1.12 : 1,
-              barTouchData: const BarTouchData(enabled: false),
-              titlesData: FlTitlesData(
-                show: true,
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 44,
-                    interval: maxY > 0 ? (maxY / 3).clamp(1, double.infinity) : 1,
-                    getTitlesWidget: (value, meta) {
-                      if (value < 0 || value > meta.max) {
-                        return const SizedBox.shrink();
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Text(
-                          formatFdrsOverviewValue(value, locale),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          textAlign: TextAlign.end,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 68,
-                    getTitlesWidget: (value, meta) {
-                      final i = value.toInt();
-                      if (i < 0 || i >= top.length) {
-                        return const SizedBox.shrink();
-                      }
-                      final labelStyle = theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      );
-                      return SideTitleWidget(
-                        meta: meta,
-                        space: 2,
-                        angle: -math.pi / 4,
-                        fitInside: SideTitleFitInsideData.fromTitleMeta(
-                          meta,
-                          distanceFromEdge: 4,
-                        ),
-                        child: Text(
-                          shortLabel(top[i].key),
-                          style: labelStyle,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.homeLandingGlobalTopCountries,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: maxY > 0 ? maxY / 4 : 1,
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: gridColor,
-                  strokeWidth: 1,
-                ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              indicatorLabel,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: cs.onSurfaceVariant,
               ),
-              borderData: FlBorderData(show: false),
-              barGroups: [
-                for (var i = 0; i < top.length; i++)
-                  BarChartGroupData(
-                    x: i,
-                    barsSpace: 6,
-                    barRods: [
-                      BarChartRodData(
-                        toY: top[i].value,
-                        width: 14,
-                        color: rodColor.withValues(alpha: 0.85),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(4),
+            ),
+            const SizedBox(height: 12),
+            for (var i = 0; i < top.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      child: Text(
+                        '${i + 1}',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _countryLabel(top[i].key),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurface,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                formatFdrsOverviewValue(top[i].value, locale),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: maxY > 0
+                                  ? (top[i].value / maxY).clamp(0.0, 1.0)
+                                  : 0,
+                              minHeight: 6,
+                              backgroundColor: track,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                accent.withValues(
+                                  alpha: (1 - i * 0.07).clamp(0.5, 1.0),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -620,7 +592,8 @@ class _OverviewBody extends StatelessWidget {
   final Future<GlobalOverviewDataset> Function({
     required int indicatorBankId,
     required String? periodName,
-  }) reloadDataset;
+  })
+  reloadDataset;
 
   @override
   Widget build(BuildContext context) {
@@ -651,9 +624,7 @@ class _OverviewBody extends StatelessWidget {
 
     final circles = <CircleMarker<String>>[];
     for (final p in points) {
-      final r = maxVal > 0
-          ? 6 + math.sqrt(p.value / maxVal) * 24
-          : 8.0;
+      final r = maxVal > 0 ? 6 + math.sqrt(p.value / maxVal) * 24 : 8.0;
       circles.add(
         CircleMarker<String>(
           point: p.point,
@@ -675,10 +646,12 @@ class _OverviewBody extends StatelessWidget {
     }
 
     final isDark = theme.brightness == Brightness.dark;
-    final border = theme.colorScheme.outlineVariant
-        .withValues(alpha: isDark ? 0.45 : 0.35);
-    final noData = theme.colorScheme.surfaceContainerHighest
-        .withValues(alpha: isDark ? 0.35 : 0.5);
+    final border = theme.colorScheme.outlineVariant.withValues(
+      alpha: isDark ? 0.45 : 0.35,
+    );
+    final noData = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: isDark ? 0.35 : 0.5,
+    );
     final low = Color(AppConstants.ifrcRed).withValues(alpha: 0.12);
     final high = Color(AppConstants.ifrcRed).withValues(alpha: 0.78);
 
@@ -693,8 +666,9 @@ class _OverviewBody extends StatelessWidget {
     );
 
     final indicatorLabel = fdrsIndicatorTitle(l10n, indicatorBankId);
-    final frame = theme.colorScheme.outlineVariant
-        .withValues(alpha: isDark ? 0.55 : 0.4);
+    final frame = theme.colorScheme.outlineVariant.withValues(
+      alpha: isDark ? 0.55 : 0.4,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -707,11 +681,13 @@ class _OverviewBody extends StatelessWidget {
         const SizedBox(height: 10),
         DecoratedBox(
           decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: frame, width: 1),
           ),
-          child: ClipRect(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
             child: SizedBox(
-              height: 240,
+              height: 260,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -738,34 +714,36 @@ class _OverviewBody extends StatelessWidget {
                     },
                   ),
                   PositionedDirectional(
-                    top: 0,
-                    end: 0,
+                    top: 8,
+                    end: 8,
                     child: Material(
                       color: theme.colorScheme.surface.withValues(alpha: 0.94),
                       surfaceTintColor: Colors.transparent,
-                      elevation: 0,
-                      shape: const RoundedRectangleBorder(),
+                      elevation: 1,
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap: () async {
-                          final snap =
-                              await Navigator.of(context)
-                                  .push<FdrsMapSessionSnapshot?>(
-                            MaterialPageRoute<FdrsMapSessionSnapshot?>(
-                              settings: const RouteSettings(name: '/world-map-fullscreen'),
-                              fullscreenDialog: true,
-                              builder: (ctx) => FdrsWorldMapFullscreenPage(
-                                l10n: l10n,
-                                theme: theme,
-                                locale: locale,
-                                initialDataset: data,
-                                indicatorBankId: indicatorBankId,
-                                selectedPeriod: selectedPeriod,
-                                periodOptions: periodOptions,
-                                visualMode: mapVisualMode,
-                                reloadDataset: reloadDataset,
-                              ),
-                            ),
-                          );
+                          final snap = await Navigator.of(context)
+                              .push<FdrsMapSessionSnapshot?>(
+                                MaterialPageRoute<FdrsMapSessionSnapshot?>(
+                                  settings: const RouteSettings(
+                                    name: '/world-map-fullscreen',
+                                  ),
+                                  fullscreenDialog: true,
+                                  builder: (ctx) => FdrsWorldMapFullscreenPage(
+                                    l10n: l10n,
+                                    theme: theme,
+                                    locale: locale,
+                                    initialDataset: data,
+                                    indicatorBankId: indicatorBankId,
+                                    selectedPeriod: selectedPeriod,
+                                    periodOptions: periodOptions,
+                                    visualMode: mapVisualMode,
+                                    reloadDataset: reloadDataset,
+                                  ),
+                                ),
+                              );
                           if (snap != null && context.mounted) {
                             onApplyFullscreenSnapshot(snap);
                           }
@@ -791,13 +769,9 @@ class _OverviewBody extends StatelessWidget {
         ),
         if (mapVisualMode == FdrsMapVisualMode.choropleth) ...[
           const SizedBox(height: 8),
-          FdrsChoroplethLegend(
-            l10n: l10n,
-            lowColor: low,
-            highColor: high,
-          ),
+          FdrsChoroplethLegend(l10n: l10n, lowColor: low, highColor: high),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         _OverviewTopCountriesBar(
           theme: theme,
           l10n: l10n,
@@ -805,7 +779,7 @@ class _OverviewBody extends StatelessWidget {
           data: data,
           indicatorLabel: indicatorLabel,
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         Text(
           l10n.homeLandingGlobalMapHint,
           style: theme.textTheme.labelSmall?.copyWith(

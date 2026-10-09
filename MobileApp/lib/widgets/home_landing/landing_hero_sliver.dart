@@ -37,7 +37,7 @@ class LandingHeroSliver extends StatefulWidget {
     super.key,
     required this.title,
     required this.description,
-    this.expandedHeight = 188,
+    this.expandedHeight = 160,
     this.footer,
     this.quickPrompts,
     this.chatExpanded = false,
@@ -45,7 +45,7 @@ class LandingHeroSliver extends StatefulWidget {
   });
 
   /// Reserved height for [footer] (card + overlap into the hero).
-  static const double footerPreferredHeight = 212;
+  static const double footerPreferredHeight = 166;
 
   /// Extra flex height when [quickPrompts] is non-null (list + padding).
   static const double quickPromptsSlotHeight = 58;
@@ -59,7 +59,7 @@ class LandingHeroSliver extends StatefulWidget {
   /// sliver itself adds that same 0-value to its own height, so the two are consistent
   /// only when the status-bar height is excluded here.
   static double bodyHeroExtent({
-    double expandedHeight = 188,
+    double expandedHeight = 160,
     bool hasFooter = true,
   }) {
     final footerExtra = hasFooter ? footerPreferredHeight : 0.0;
@@ -165,8 +165,9 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
 
   @override
   Widget build(BuildContext context) {
-    final footerExtra =
-        widget.footer != null ? LandingHeroSliver.footerPreferredHeight : 0.0;
+    final footerExtra = widget.footer != null
+        ? LandingHeroSliver.footerPreferredHeight
+        : 0.0;
     // Quick-prompt space is NOT added to the expanded height; prompts appear
     // in the space freed by the collapsing title area (expandedHeight - 12 px).
     //
@@ -280,15 +281,14 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
                                             Text(
                                               widget.description,
                                               textAlign: TextAlign.center,
-                                              maxLines: 4,
+                                              maxLines: 3,
                                               overflow: TextOverflow.ellipsis,
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodyMedium
                                                   ?.copyWith(
                                                     color: Colors.white
-                                                        .withValues(
-                                                            alpha: 0.9),
+                                                        .withValues(alpha: 0.9),
                                                     height: 1.35,
                                                   ),
                                             ),
@@ -322,8 +322,12 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
                                 child: FadeTransition(
                                   opacity: _promptsFade,
                                   child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(0, 6, 0, 8),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      0,
+                                      6,
+                                      0,
+                                      8,
+                                    ),
                                     child: widget.quickPrompts!,
                                   ),
                                 ),
@@ -371,13 +375,13 @@ class _MeshGradient extends StatelessWidget {
           right: -80,
           top: -40,
           child: _Blob(
-              color: Color(AppConstants.ifrcRed).withValues(alpha: 0.35)),
+            color: Color(AppConstants.ifrcRed).withValues(alpha: 0.35),
+          ),
         ),
         Positioned(
           left: -60,
           bottom: 20,
-          child: _Blob(
-              color: Colors.blue.shade900.withValues(alpha: 0.4)),
+          child: _Blob(color: Colors.blue.shade900.withValues(alpha: 0.4)),
         ),
       ],
     );
@@ -397,10 +401,7 @@ class _Blob extends StatelessWidget {
         child: Container(
           width: 200,
           height: 200,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
       ),
     );

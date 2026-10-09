@@ -48,13 +48,16 @@ def visual_export_filename(meta: dict[str, Any], dashboard_id: str, ext: str) ->
 
 class UprVisualsService:
     @classmethod
-    def png_bytes(cls, aes_id: int, dashboard_id: str, *, lang: str = "en") -> tuple[bytes, str]:
+    def png_bytes(
+        cls, aes_id: int, dashboard_id: str, *, lang: str = "en", bundle: str = ""
+    ) -> tuple[bytes, str]:
         from plugins.upr.assignment_job import take_matching_pdf_bytes
 
         reused = take_matching_pdf_bytes(
             aes_id=aes_id,
             dashboard_id=dashboard_id,
             lang=lang,
+            bundle=bundle,
             timeout=RENDER_TIMEOUT_SECONDS,
         )
         with export_locale(lang):
@@ -80,7 +83,7 @@ class UprVisualsService:
                         timeout=RENDER_TIMEOUT_SECONDS,
                     )
                     return png_path.read_bytes(), filename
-                payload, html = cls._dashboard_html(aes_id, dashboard_id)
+                payload, html = cls._dashboard_html(aes_id, dashboard_id, bundle=bundle)
                 filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "png")
                 dest = work_dir / f"{stamp}_{filename}"
                 render_png_isolated(
@@ -95,9 +98,11 @@ class UprVisualsService:
                         pass
 
     @classmethod
-    def pdf_bytes(cls, aes_id: int, dashboard_id: str, *, lang: str = "en") -> tuple[bytes, str]:
+    def pdf_bytes(
+        cls, aes_id: int, dashboard_id: str, *, lang: str = "en", bundle: str = ""
+    ) -> tuple[bytes, str]:
         with export_locale(lang):
-            payload, html = cls._dashboard_html(aes_id, dashboard_id)
+            payload, html = cls._dashboard_html(aes_id, dashboard_id, bundle=bundle)
             meta = payload.get("meta") or {}
             filename = visual_export_filename(meta, dashboard_id, "pdf")
             tmp = Path(current_app.instance_path) / "upr_tmp" / f"{uuid.uuid4().hex}_{filename}"
@@ -133,6 +138,7 @@ class UprVisualsService:
         lang: str = "en",
         audience: str | None = None,
         word_filename: str = "",
+        bundle: str = "",
     ) -> tuple[bytes, str]:
         from plugins.upr.audience import resolve_narrative_audience
         from plugins.upr.data import filename_from_visual_title
@@ -149,6 +155,7 @@ class UprVisualsService:
                 aes_id,
                 "combined",
                 narrative_audience=resolved or None,
+                bundle="" if word_bytes else bundle,
             )
             title = title_for_export_filename(payload.get("meta") or {}) or "UPR"
             filename = f"{filename_from_visual_title(title, 'zip')[:-4]} - InDesign.zip"
@@ -303,11 +310,17 @@ class UprVisualsService:
         *,
         on_progress: Callable[..., Any] | None = None,
         narrative_audience: str | None = None,
+        bundle: str = "",
     ) -> tuple[dict[str, Any], str]:
         from plugins.upr.audience import apply_narrative_audience
+        from plugins.upr.bundle import build_bundle_payload
 
         def build() -> tuple[dict[str, Any], str]:
-            payload = build_payload(aes_id, inline_icons=True)
+            label = str(bundle or "").strip()
+            if label:
+                payload = build_bundle_payload(aes_id, label, inline_icons=True)
+            else:
+                payload = build_payload(aes_id, inline_icons=True)
             if narrative_audience in {"internal", "public"}:
                 payload = apply_narrative_audience(payload, narrative_audience)
             if dashboard_id not in DASHBOARD_BY_ID:

@@ -11,6 +11,9 @@
   const downloadWrap = downloadBtn && downloadBtn.closest(".upr-download");
   const formArea = document.getElementById("sections-container");
   const toggleBtn = document.getElementById("upr-toggle");
+  const scopeRoot = document.getElementById("upr-scope");
+  const scopeToggle = document.getElementById("upr-scope-toggle");
+  const scopeMenu = document.getElementById("upr-scope-menu");
   const shared = window.UprVisualsShared || {};
   const i18n = {
     loading: panel.dataset.loading || "Loading visuals…",
@@ -21,6 +24,16 @@
   let activeDashboard = "combined";
   let loaded = false;
   let htmlCache = Object.create(null);
+  let bundleValue = "";
+
+  window.UprVisualsScope = {
+    query() {
+      return bundleValue ? "bundle=" + encodeURIComponent(bundleValue) : "";
+    },
+    value() {
+      return bundleValue;
+    },
+  };
 
   function csrfHeaders() {
     if (shared.csrfHeaders) return shared.csrfHeaders();
@@ -175,7 +188,7 @@
         : null;
     try {
       const url = `/assignment/${aesId}/visuals?dashboard=${encodeURIComponent(requested)}`;
-      const langUrl = shared.withLang ? shared.withLang(url) : url;
+      const langUrl = withScope(shared.withLang ? shared.withLang(url) : url);
       const progressUrl = progressId
         ? langUrl + (langUrl.indexOf("?") >= 0 ? "&" : "?") + "progress_id=" + encodeURIComponent(progressId)
         : langUrl;
@@ -210,6 +223,107 @@
   function loadReport(opts) {
     return loadDashboard(activeDashboard, opts);
   }
+
+  function withScope(url) {
+    const extra = window.UprVisualsScope ? window.UprVisualsScope.query() : "";
+    if (!extra) return url;
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + extra;
+  }
+
+  function scopeLabel(bundle) {
+    const pattern = (scopeRoot && scopeRoot.dataset.countriesLabel) || "{count} countries";
+    return pattern.replace("{count}", String(bundle.country_count || (bundle.countries || []).length));
+  }
+
+  function markScopeChecks() {
+    if (!scopeMenu) return;
+    scopeMenu.querySelectorAll("[data-bundle]").forEach((btn) => {
+      const selected = (btn.dataset.bundle || "") === bundleValue;
+      btn.setAttribute("aria-checked", selected ? "true" : "false");
+      btn.classList.toggle("is-selected", selected);
+    });
+  }
+
+  function setScopeOpen(open) {
+    if (!scopeMenu || !scopeToggle || scopeToggle.hidden) return;
+    scopeMenu.hidden = !open;
+    scopeToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    scopeRoot?.classList.toggle("is-open", open);
+  }
+
+  function chooseScope(value) {
+    const next = value || "";
+    setScopeOpen(false);
+    if (next === bundleValue) return;
+    bundleValue = next;
+    markScopeChecks();
+    htmlCache = Object.create(null);
+    loaded = false;
+    activeDashboard = "combined";
+    if (panel.classList.contains("is-visible")) loadReport({ force: true });
+  }
+
+  function renderScopeMenu(bundles) {
+    if (!scopeMenu || !scopeToggle) return;
+    scopeMenu.replaceChildren();
+    const add = (value, title, detail, hint) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.setAttribute("role", "menuitemradio");
+      btn.dataset.bundle = value;
+      btn.className = "upr-scope__option";
+      if (hint) btn.title = hint;
+      const label = document.createElement("span");
+      label.textContent = title;
+      btn.appendChild(label);
+      if (detail) {
+        const note = document.createElement("span");
+        note.className = "upr-scope__detail";
+        note.textContent = detail;
+        btn.appendChild(note);
+      }
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        chooseScope(value);
+      });
+      scopeMenu.appendChild(btn);
+    };
+    add("", (scopeRoot && scopeRoot.dataset.thisCountry) || "This country", "", "");
+    (bundles || []).forEach((bundle) => {
+      if (!bundle || !bundle.value) return;
+      const names = (bundle.countries || []).join(", ");
+      add(String(bundle.value), String(bundle.value), scopeLabel(bundle), names);
+    });
+    const hasBundles = (bundles || []).some((bundle) => bundle && bundle.value);
+    scopeToggle.hidden = !hasBundles;
+    if (!hasBundles) setScopeOpen(false);
+    markScopeChecks();
+  }
+
+  function loadScopeOptions() {
+    if (!scopeToggle) return;
+    fetchJson(`/assignment/${aesId}/visuals/bundles`, {
+      headers: csrfHeaders(),
+      credentials: "same-origin",
+    })
+      .then((data) => renderScopeMenu((data && data.bundles) || []))
+      .catch(() => {
+        if (scopeToggle) scopeToggle.hidden = true;
+      });
+  }
+
+  scopeToggle?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setScopeOpen(scopeMenu ? scopeMenu.hidden : false);
+  });
+  document.addEventListener("click", (event) => {
+    if (!scopeRoot || scopeRoot.contains(event.target)) return;
+    setScopeOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setScopeOpen(false);
+  });
+  loadScopeOptions();
 
   toggleBtn?.addEventListener("click", () => {
     if (panel.classList.contains("is-visible")) showForm();

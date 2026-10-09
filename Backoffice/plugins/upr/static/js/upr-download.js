@@ -514,11 +514,18 @@
     status.classList.toggle("is-error", !!isError);
   }
 
+  function withScope(url) {
+    const extra =
+      global.UprVisualsScope && global.UprVisualsScope.query ? global.UprVisualsScope.query() : "";
+    if (!extra) return url;
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + extra;
+  }
+
   async function startInPagePngDownload(aesId, dashboardId, ui) {
     const box = ui && ui.box;
     const button = ui && ui.button;
     if (box && box.classList.contains("is-busy") && button && button.disabled) return;
-    const url = withLang(`/assignment/${encodeURIComponent(aesId)}/png/${encodeURIComponent(dashboardId)}`);
+    const url = withScope(withLang(`/assignment/${encodeURIComponent(aesId)}/png/${encodeURIComponent(dashboardId)}`));
     setDownloadBusy(box, button, true, "Preparing PNG…");
     try {
       const response = await fetch(url, {
@@ -562,14 +569,16 @@
       return;
     }
     if (format === "idml") {
-      window.location.href = withLang(`/assignment/${encodeURIComponent(aesId)}/idml`);
+      window.location.href = withScope(withLang(`/assignment/${encodeURIComponent(aesId)}/idml`));
       return;
     }
     const kind = format === "pdf" ? "pdf" : "png";
     const path =
       kind === "pdf" && dashboardId === "combined"
-        ? withLang(`/assignment/${encodeURIComponent(aesId)}/pdf`)
-        : withLang(`/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(dashboardId)}`);
+        ? withScope(withLang(`/assignment/${encodeURIComponent(aesId)}/pdf`))
+        : withScope(
+            withLang(`/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(dashboardId)}`)
+          );
     if (kind === "pdf" && dashboardId === "combined") {
       window.open(path, "_blank", "noopener");
     } else {

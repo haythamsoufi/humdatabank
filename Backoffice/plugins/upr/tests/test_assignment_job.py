@@ -55,6 +55,19 @@ def test_visual_job_matches_same_assignment_format_lang():
     assert not _visual_job_matches(
         job, aes_id=1641, export_format="pdf", dashboard_id="combined", lang="ar"
     )
+    job.meta["style_rev"] = export_style_token()
+    job.meta["bundle"] = "Pacific Islands"
+    assert not _visual_job_matches(
+        job, aes_id=1641, export_format="pdf", dashboard_id="combined", lang="ar"
+    )
+    assert _visual_job_matches(
+        job,
+        aes_id=1641,
+        export_format="pdf",
+        dashboard_id="combined",
+        lang="ar",
+        bundle="Pacific Islands",
+    )
 
 
 @pytest.mark.unit

@@ -313,8 +313,6 @@ def create_blueprint():
         """Get plugin usage statistics."""
         try:
             from app.models import FormItem, FormTemplate
-            from sqlalchemy import func
-            from datetime import datetime, timedelta
 
             # Count total EO fields (form items with item_type 'emergency_operations' or 'plugin_emergency_operations*')
             total_eo_fields = FormItem.query.filter(
@@ -329,35 +327,16 @@ def create_blueprint():
                 FormTemplate.published_version_id.isnot(None)
             ).distinct().count()
 
-            # Count total appeals fetched (this would need to be tracked separately)
-            # For now, return 0 or a placeholder
-            total_appeals = 0
-
-            # Count API calls today (this would need to be tracked separately)
-            # For now, return 0 or a placeholder
-            api_calls = 0
-
             stats = {
                 'total_eo_fields': total_eo_fields,
                 'active_forms': active_forms,
-                'total_appeals': total_appeals,
-                'api_calls': api_calls
             }
 
             return json_ok(success=True, stats=stats)
 
         except Exception as e:
             current_app.logger.error(f"Error getting emergency operations stats: {e}", exc_info=True)
-            # Return mock data on error to prevent frontend issues
-            return json_ok(
-                success=True,
-                stats={
-                    'total_eo_fields': 0,
-                    'active_forms': 0,
-                    'total_appeals': 0,
-                    'api_calls': 0
-                }
-            )
+            return json_server_error('Failed to load statistics', success=False)
 
     @bp.route('/api/list-data', methods=['GET'])
     @plugin_route_wrapper('Emergency Operations Plugin')

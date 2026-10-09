@@ -61,35 +61,6 @@ class TestFormIntegrationInit:
         fi = _make_fi(pm)
         assert fi.plugin_manager is pm
 
-    def test_get_template_cache_key_is_deterministic(self, fi):
-        k1 = fi._get_template_cache_key("ft", "tmpl.html", "abc")
-        k2 = fi._get_template_cache_key("ft", "tmpl.html", "abc")
-        assert k1 == k2
-
-    def test_get_template_cache_key_differs_for_different_inputs(self, fi):
-        k1 = fi._get_template_cache_key("ft_a", "tmpl.html", "abc")
-        k2 = fi._get_template_cache_key("ft_b", "tmpl.html", "abc")
-        assert k1 != k2
-
-
-@pytest.mark.unit
-class TestGetTemplateFileHash:
-    def test_existing_file_returns_mtime_size(self, fi, tmp_path):
-        f = tmp_path / "tmpl.html"
-        f.write_text("hello")
-        h = fi._get_template_file_hash(str(f))
-        assert ":" in h  # format: "mtime:size"
-
-    def test_missing_file_returns_missing(self, fi, tmp_path):
-        h = fi._get_template_file_hash(str(tmp_path / "no_file.html"))
-        assert h == "missing"
-
-    def test_exception_returns_error(self, fi):
-        with patch("app.plugins.form_integration.os.path.exists", return_value=True):
-            with patch("app.plugins.form_integration.os.stat", side_effect=OSError("perm")):
-                h = fi._get_template_file_hash("/some/path.html")
-        assert h == "error"
-
 
 @pytest.mark.unit
 class TestGetPluginIdForFieldType:
@@ -232,8 +203,7 @@ class TestGetCustomFieldTypesForBuilder:
             field_type_config=field_config,
         )
         fi = _make_fi(pm)
-        # Clear lru_cache before test
-        fi._get_cached_field_config.cache_clear()
+        fi.clear_caches()
         fi.plugin_manager.get_field_type_config.return_value = field_config
 
         result = fi.get_custom_field_types_for_builder()
@@ -247,7 +217,7 @@ class TestGetCustomFieldTypesForBuilder:
             field_type_config=None,
         )
         fi = _make_fi(pm)
-        fi._get_cached_field_config.cache_clear()
+        fi.clear_caches()
         fi.plugin_manager.get_field_type_config.return_value = None
 
         result = fi.get_custom_field_types_for_builder()
@@ -904,3 +874,68 @@ class TestFormIntegrationEscaping:
         with app.app_context():
             html = fi.render_custom_field_builder_ui("<script>x</script>", {})
         assert "<script>" not in html
+
+    def test_unknown_field_type_in_entry_form_is_escaped(self, app):
+        pm = _mock_plugin_manager(field_type_config=None)
+        fi = _make_fi(pm)
+        with app.app_context():
+            html = fi.render_custom_field_entry_form("<script>alert(1)</script>", {}, None)
+        assert "<script>" not in str(html)
+        assert "&lt;script&gt;" in str(html)
+
+
+@pytest.mark.unit
+class TestConfigCache:
+    def test_config_is_cached_until_cleared(self):
+        pm = _mock_plugin_manager()
+        pm.get_field_type_config.return_value = {"display_name": "A"}
+        fi = _make_fi(pm)
+        fi._get_cached_field_config("a")
+        fi._get_cached_field_config("a")
+        assert pm.get_field_type_config.call_count == 1
+        fi.clear_caches()
+        fi._get_cached_field_config("a")
+        assert pm.get_field_type_config.call_count == 2
+
+    def test_missing_config_is_cached_as_none(self):
+        pm = _mock_plugin_manager()
+        pm.get_field_type_config.return_value = None
+        fi = _make_fi(pm)
+        assert fi._get_cached_field_config("gone") is None
+        assert fi._get_cached_field_config("gone") is None
+        assert pm.get_field_type_config.call_count == 1
+
+
+@pytest.mark.unit
+class TestParseEntryRenderArgs:
+    def test_forces_field_name_to_field_id(self):
+        from app.plugins.form_integration import parse_entry_render_args
+
+        config, value = parse_entry_render_args(
+            {"field_id": "f1", "field_config": json.dumps({"field_name": "evil", "x": 1})}
+        )
+        assert config == {"field_name": "f1", "x": 1}
+        assert value is None
+
+    def test_existing_data_passes_through(self):
+        from app.plugins.form_integration import parse_entry_render_args
+
+        _, value = parse_entry_render_args({"existing_data": json.dumps({"a": 1})})
+        assert value == {"a": 1}
+
+    def test_invalid_json_and_non_dict_config_are_ignored(self):
+        from app.plugins.form_integration import parse_entry_render_args
+
+        config, value = parse_entry_render_args({"field_config": "[1,2]", "existing_data": "{nope"})
+        assert config == {}
+        assert value is None
+
+    def test_oversized_payload_rejected(self):
+        from app.plugins.form_integration import (
+            EntryRenderRequestError,
+            MAX_ENTRY_RENDER_PARAM_BYTES,
+            parse_entry_render_args,
+        )
+
+        with pytest.raises(EntryRenderRequestError):
+            parse_entry_render_args({"field_config": "x" * (MAX_ENTRY_RENDER_PARAM_BYTES + 1)})

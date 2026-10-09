@@ -1,5 +1,6 @@
 {
-  "name": "sample-package",
+  "plugin_id": "sample_plugin",
+  "name": "sample_plugin",
   "display_name": "Sample Plugin",
   "version": "1.0.0",
   "description": "Starter plugin package for the Humanitarian Databank plugin system.",

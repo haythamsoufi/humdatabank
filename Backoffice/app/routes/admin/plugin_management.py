@@ -4,7 +4,8 @@ from flask import Blueprint, request, current_app, render_template, redirect, se
 from flask_login import current_user
 from app.routes.admin.shared import permission_required, system_manager_required, rbac_guard_audit_exempt
 from app.plugins import PluginManager
-from app.plugins.form_integration import FormIntegration
+from app.plugins.form_integration import EntryRenderRequestError, FormIntegration, parse_entry_render_args
+from app.plugins.manager import PluginLifecycleError
 # Do not import csrf_exempt; these API routes are protected by auth/permissions
 from app.utils.rate_limiting import plugin_management_rate_limit, plugin_install_rate_limit
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
@@ -12,14 +13,17 @@ from app.utils.request_utils import get_request_data
 from app.utils.constants import CACHE_MAX_AGE_ONE_HOUR
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error, require_json_data
 from app.utils.error_handling import handle_json_view_exception
-from typing import Optional
+from typing import Optional, Tuple
 import json
 import io
 import os
 import re
+import shutil
 import stat
 import zipfile
 from pathlib import Path
+
+from markupsafe import escape
 
 from werkzeug.security import safe_join
 
@@ -190,27 +194,12 @@ def render_plugin_field_entry(field_type_id):
 
         form_integration: FormIntegration = current_app.form_integration
 
-        # Field configuration and existing data are passed as JSON strings in query params
-        # IMPORTANT: ensure per-field DOM ids match the initializer's `fieldId`.
-        field_id = request.args.get('field_id')
-        field_config_raw = request.args.get('field_config')
-        existing_data_raw = request.args.get('existing_data')
-
+        # Field configuration and existing data are passed as JSON strings in query params.
+        # The parser sets `field_name = field_id` so per-field DOM ids match the initializer's `fieldId`.
         try:
-            field_config = json.loads(field_config_raw) if field_config_raw else {}
-        except (TypeError, json.JSONDecodeError):
-            field_config = {}
-
-        if field_id:
-            field_config = dict(field_config or {})
-            field_config['field_name'] = str(field_id)
-
-        try:
-            existing_data = json.loads(existing_data_raw) if existing_data_raw else {}
-        except (TypeError, json.JSONDecodeError):
-            existing_data = {}
-
-        field_value = existing_data.get('value')
+            field_config, field_value = parse_entry_render_args(request.args)
+        except EntryRenderRequestError as exc:
+            return f"<p class='text-red-500'>{escape(str(exc))}</p>", 413, {'Content-Type': 'text/html'}
 
         html = form_integration.render_custom_field_entry_form(
             field_type=field_type_id,
@@ -244,20 +233,31 @@ def get_plugin_info(plugin_name):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+def _run_lifecycle(action: str, plugin_name: str, past_tense: str):
+    """Run a manager lifecycle action, turning refusals into 400s with a readable reason."""
+    plugin_manager = current_app.plugin_manager
+    if action in ('activate', 'deactivate', 'uninstall'):
+        reason = plugin_manager.lifecycle_block_reason(action, plugin_name)
+        if reason:
+            return json_bad_request(reason)
+    try:
+        success = getattr(plugin_manager, f'{action}_plugin')(plugin_name)
+    except PluginLifecycleError:
+        return json_bad_request(f'Plugin {plugin_name} cannot be {action}d right now')
+
+    if success:
+        return json_ok(success=True, message=f'Plugin {plugin_name} {past_tense} successfully')
+    return json_bad_request(f'Failed to {action} plugin {plugin_name}')
+
+
 @plugin_bp.route('/<plugin_name>/install', methods=['POST'])
 @permission_required('admin.plugins.manage')
 @system_manager_required
 @plugin_install_rate_limit()
 def install_plugin(plugin_name):
-    """Install a specific plugin."""
+    """Run the install hook of an already-loaded plugin."""
     try:
-        plugin_manager = current_app.plugin_manager
-        success = plugin_manager.install_plugin(plugin_name)
-
-        if success:
-            return json_ok(success=True, message=f'Plugin {plugin_name} installed successfully')
-        else:
-            return json_bad_request(f'Failed to install plugin {plugin_name}')
+        return _run_lifecycle('install', plugin_name, 'installed')
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -267,15 +267,9 @@ def install_plugin(plugin_name):
 @system_manager_required
 @plugin_management_rate_limit()
 def uninstall_plugin(plugin_name):
-    """Uninstall a specific plugin."""
+    """Uninstall a specific plugin (not allowed for bundled plugins)."""
     try:
-        plugin_manager = current_app.plugin_manager
-        success = plugin_manager.uninstall_plugin(plugin_name)
-
-        if success:
-            return json_ok(success=True, message=f'Plugin {plugin_name} uninstalled successfully')
-        else:
-            return json_bad_request(f'Failed to uninstall plugin {plugin_name}')
+        return _run_lifecycle('uninstall', plugin_name, 'uninstalled')
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -286,13 +280,7 @@ def uninstall_plugin(plugin_name):
 def activate_plugin(plugin_name):
     """Activate a specific plugin."""
     try:
-        plugin_manager = current_app.plugin_manager
-        success = plugin_manager.activate_plugin(plugin_name)
-
-        if success:
-            return json_ok(success=True, message=f'Plugin {plugin_name} activated successfully')
-        else:
-            return json_bad_request(f'Failed to activate plugin {plugin_name}')
+        return _run_lifecycle('activate', plugin_name, 'activated')
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -301,15 +289,97 @@ def activate_plugin(plugin_name):
 @permission_required('admin.plugins.manage')
 @plugin_management_rate_limit()
 def deactivate_plugin(plugin_name):
-    """Deactivate a specific plugin."""
+    """Deactivate a specific plugin (not allowed for always-on admin features)."""
+    try:
+        return _run_lifecycle('deactivate', plugin_name, 'deactivated')
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@plugin_bp.route('/reload', methods=['POST'])
+@permission_required('admin.plugins.manage')
+@system_manager_required
+@plugin_management_rate_limit()
+def reload_all_plugins():
+    """Reload every plugin from disk, keeping activation state."""
+    try:
+        if current_app.plugin_manager.reload_plugins():
+            return json_ok(success=True, message='All plugins reloaded successfully')
+        return json_server_error('Failed to reload plugins')
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@plugin_bp.route('/<plugin_name>/reload', methods=['POST'])
+@permission_required('admin.plugins.manage')
+@system_manager_required
+@plugin_management_rate_limit()
+def reload_plugin(plugin_name):
+    """Reload one plugin from disk. A failed reload leaves the running plugin untouched."""
     try:
         plugin_manager = current_app.plugin_manager
-        success = plugin_manager.deactivate_plugin(plugin_name)
+        if plugin_manager.get_plugin(plugin_name) is None:
+            return json_not_found(f'Plugin {plugin_name} not found')
+        if plugin_manager.reload_plugin(plugin_name):
+            return json_ok(success=True, message=f'Plugin {plugin_name} reloaded successfully')
+        return json_bad_request(f'Failed to reload plugin {plugin_name}')
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
-        if success:
-            return json_ok(success=True, message=f'Plugin {plugin_name} deactivated successfully')
-        else:
-            return json_bad_request(f'Failed to deactivate plugin {plugin_name}')
+
+@plugin_bp.route('/scan', methods=['POST'])
+@permission_required('admin.plugins.manage')
+@system_manager_required
+@plugin_management_rate_limit()
+def scan_for_new_plugins():
+    """Register plugins that appeared on disk since startup (inactive until activated)."""
+    try:
+        new_ids = current_app.plugin_manager.scan_for_new_plugins()
+        return json_ok(success=True, new_plugins=new_ids, count=len(new_ids))
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@plugin_bp.route('/<plugin_name>/cleanup-info', methods=['GET'])
+@permission_required('admin.plugins.manage')
+def get_plugin_cleanup_info(plugin_name):
+    """Describe what uninstalling a plugin would remove."""
+    try:
+        plugin_manager = current_app.plugin_manager
+        cleanup_info = plugin_manager.get_plugin_cleanup_info(plugin_name)
+        if cleanup_info is None:
+            return json_not_found(f'Plugin {plugin_name} not found')
+        return json_ok(
+            success=True,
+            cleanup_info=cleanup_info,
+            first_party=plugin_manager.is_first_party(plugin_name),
+            dependents=plugin_manager.get_dependents(plugin_name),
+        )
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@plugin_bp.route('/starter/download', methods=['GET'])
+@permission_required('admin.plugins.manage')
+def download_starter_plugin():
+    """Download the starter plugin package as a ZIP archive."""
+    try:
+        sample_dir = Path(current_app.root_path) / 'sample_plugin_package'
+        if not sample_dir.is_dir():
+            return json_not_found('Starter plugin package is not available')
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(sample_dir.rglob('*')):
+                if path.is_file() and '__pycache__' not in path.parts:
+                    archive.write(path, path.relative_to(sample_dir).as_posix())
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='sample_plugin.zip',
+        )
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -328,17 +398,189 @@ def plugin_settings(plugin_name):
         if request.method == 'GET':
             settings = plugin.get_settings()
             return json_ok(success=True, settings=settings)
-        else:  # POST
-            data = get_json_safe()
-            err = require_json_data(data, 'No settings data provided')
-            if err:
-                return err
 
-            success = plugin.update_settings(data)
-            if success:
-                return json_ok(success=True, message=f'Settings for plugin {plugin_name} updated successfully')
-            else:
-                return json_bad_request(f'Failed to update settings for plugin {plugin_name}')
+        if not plugin.supports_settings_update():
+            return json_bad_request(f'Plugin {plugin_name} does not have editable settings')
+
+        data = get_json_safe()
+        err = require_json_data(data, 'No settings data provided')
+        if err:
+            return err
+
+        if plugin.update_settings(data):
+            return json_ok(success=True, message=f'Settings for plugin {plugin_name} updated successfully')
+        return json_bad_request(f'Failed to update settings for plugin {plugin_name}')
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+def _archive_prefix(names: list) -> str:
+    """Leading folder shared by every file in the archive (``''`` when plugin.py is at the root)."""
+    files = [n for n in names if not n.endswith('/') and not n.startswith('__MACOSX/')]
+    if any(n == 'plugin.py' for n in files):
+        return ''
+    tops = {n.split('/', 1)[0] for n in files if '/' in n}
+    if len(tops) == 1 and all('/' in n for n in files):
+        return next(iter(tops)) + '/'
+    return ''
+
+
+def _install_plugin_archive(zip_data: bytes, expected_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """Validate a plugin ZIP, extract it into the plugins directory and register it.
+
+    Returns ``(plugin_id, None)`` or ``(None, reason)`` when the archive is rejected. The archive is imported
+    as Python code, so callers must already have checked ``plugin_upload_enabled()`` and the
+    System Manager role.
+    """
+    if not (zip_data.startswith(b'PK\x03\x04') or zip_data.startswith(b'PK\x05\x06')):
+        return None, 'Invalid ZIP file format'
+
+    archive = zipfile.ZipFile(io.BytesIO(zip_data))
+    infos = [i for i in archive.infolist() if not i.filename.startswith('__MACOSX/')]
+    prefix = _archive_prefix([i.filename for i in infos])
+
+    def relative(info) -> str:
+        return info.filename[len(prefix):] if prefix and info.filename.startswith(prefix) else info.filename
+
+    members = [(info, relative(info)) for info in infos if relative(info)]
+    rel_names = {rel for _, rel in members}
+    if 'plugin.py' not in rel_names or 'plugin.json' not in rel_names:
+        return None, 'Invalid plugin structure. Plugin must contain plugin.py and plugin.json'
+
+    try:
+        manifest = json.loads(archive.read(f'{prefix}plugin.json').decode('utf-8'))
+    except (ValueError, KeyError, UnicodeDecodeError):
+        return None, 'plugin.json is not valid JSON'
+    if not isinstance(manifest, dict):
+        return None, 'plugin.json must contain a JSON object'
+
+    plugin_id = str(manifest.get('plugin_id') or manifest.get('name') or '')
+    if not _PLUGIN_NAME_RE.match(plugin_id):
+        return None, 'plugin.json needs a plugin_id of lowercase letters, digits and underscores'
+    if expected_name is not None and expected_name != plugin_id:
+        return None, f'Plugin name mismatch. Expected {expected_name}, got {plugin_id}'
+
+    plugin_manager = current_app.plugin_manager
+    if plugin_id in plugin_manager.plugins or plugin_manager.is_first_party(plugin_id):
+        return None, f'Plugin {plugin_id} is already installed. Uninstall it before uploading a new version.'
+
+    plugins_root = Path(plugin_manager.plugin_directories[-1]).resolve()
+    target = plugins_root / plugin_id
+    if target.exists():
+        return None, f'A directory for plugin {plugin_id} already exists on disk'
+
+    total_uncompressed = 0
+    for info, rel in members:
+        member_path = Path(rel)
+        if member_path.is_absolute() or '..' in member_path.parts:
+            return None, f'Invalid ZIP entry: path traversal attempt detected ({info.filename})'
+        if stat.S_ISLNK(info.external_attr >> 16):
+            return None, f'Invalid ZIP entry: symbolic links are not allowed ({info.filename})'
+        if rel.lower().endswith(('.exe', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.ps1')):
+            return None, f'Invalid ZIP entry: dangerous file type not allowed ({info.filename})'
+        total_uncompressed += info.file_size
+    if total_uncompressed > _MAX_PLUGIN_UNCOMPRESSED_BYTES:
+        return None, 'Plugin archive expands to too much data'
+
+    staging = plugins_root / f'.{plugin_id}.upload'
+    if staging.exists():
+        shutil.rmtree(staging)
+    try:
+        for info, rel in members:
+            staging_root = os.path.realpath(staging)
+            destination = os.path.realpath(os.path.join(staging_root, rel))
+            if not destination.startswith(staging_root + os.sep):
+                return None, f'Invalid ZIP entry: path traversal attempt detected ({info.filename})'
+            if info.is_dir():
+                os.makedirs(destination, exist_ok=True)
+                continue
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            with open(destination, 'wb') as out_file:
+                out_file.write(archive.read(info))
+        init_file = staging / '__init__.py'
+        if not init_file.exists():
+            init_file.write_text('')
+        os.replace(staging, target)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+
+    new_ids = plugin_manager.scan_for_new_plugins()
+    if plugin_id not in new_ids:
+        shutil.rmtree(target, ignore_errors=True)
+        plugin_manager._discovery_cache.clear()
+        return None, (
+            'The archive was extracted but did not load as a plugin. Check that plugin.py defines a '
+            'BasePlugin subclass whose plugin_id matches plugin.json.'
+        )
+
+    try:
+        installed = plugin_manager.install_plugin(plugin_id)
+    except Exception:
+        installed = False
+    if not installed:
+        try:
+            plugin_manager.uninstall_plugin(plugin_id)
+        except Exception:
+            current_app.logger.exception('Rollback of plugin %s after failed install failed', plugin_id)
+        return None, f'Failed to install plugin {plugin_id} after upload'
+
+    return plugin_id, None
+
+
+def _handle_plugin_upload(expected_name: Optional[str], field_name: str):
+    """Shared body of the two upload endpoints."""
+    if not plugin_upload_enabled():
+        return json_forbidden('Plugin upload is disabled on this deployment.')
+
+    if expected_name is not None and not _PLUGIN_NAME_RE.match(expected_name or ''):
+        return json_bad_request('Invalid plugin name')
+
+    if field_name not in request.files:
+        return json_bad_request('No plugin file provided')
+
+    plugin_file = request.files[field_name]
+    if plugin_file.filename == '':
+        return json_bad_request('No file selected')
+    if not plugin_file.filename.lower().endswith('.zip'):
+        return json_bad_request('Plugin file must be a ZIP archive')
+
+    max_plugin_size = 100 * 1024 * 1024
+    plugin_file.seek(0, 2)
+    file_size = plugin_file.tell()
+    plugin_file.seek(0)
+    if file_size > max_plugin_size:
+        return json_bad_request(f'Plugin file too large. Maximum size is {max_plugin_size // (1024 * 1024)}MB')
+
+    try:
+        plugin_id, rejection = _install_plugin_archive(plugin_file.read(), expected_name)
+    except zipfile.BadZipFile:
+        return json_bad_request('Invalid ZIP file')
+    if rejection:
+        return json_bad_request(rejection)
+
+    return json_ok(
+        success=True,
+        plugin_id=plugin_id,
+        message=(
+            f'Plugin {plugin_id} uploaded and installed. It is inactive until you activate it; '
+            'restart the application to enable its routes.'
+        ),
+    )
+
+
+@plugin_bp.route('/install', methods=['POST'])
+@permission_required('admin.plugins.manage')
+@system_manager_required
+@plugin_install_rate_limit()
+def install_plugin_package():
+    """Install a plugin from an uploaded ZIP (field ``plugin_package``).
+
+    Archives are imported as Python, so this is remote code execution by design:
+    System Manager only, and off unless PLUGIN_UPLOAD_ENABLED is set.
+    """
+    try:
+        return _handle_plugin_upload(None, 'plugin_package')
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -348,123 +590,12 @@ def plugin_settings(plugin_name):
 @system_manager_required
 @plugin_install_rate_limit()
 def upload_plugin(plugin_name):
-    """Upload and install a plugin from a ZIP file.
+    """Upload and install a plugin ZIP (field ``plugin_file``) that must declare ``plugin_name``.
 
-    Uploaded archives are extracted into the plugins directory and imported as Python, so this is
-    remote code execution by design: System Manager only, and off unless PLUGIN_UPLOAD_ENABLED is set.
+    Same safeguards as ``/install``: System Manager only, off unless PLUGIN_UPLOAD_ENABLED is set.
     """
     try:
-        if not plugin_upload_enabled():
-            return json_forbidden('Plugin upload is disabled on this deployment.')
-
-        if not _PLUGIN_NAME_RE.match(plugin_name or ''):
-            return json_bad_request('Invalid plugin name')
-
-        if 'plugin_file' not in request.files:
-            return json_bad_request('No plugin file provided')
-
-        plugin_file = request.files['plugin_file']
-        if plugin_file.filename == '':
-            return json_bad_request('No file selected')
-
-        # Validate file extension
-        if not plugin_file.filename.endswith('.zip'):
-            return json_bad_request('Plugin file must be a ZIP archive')
-
-        plugin_manager = current_app.plugin_manager
-
-        # SECURITY: Validate file size (max 100MB for plugins)
-        MAX_PLUGIN_SIZE = 100 * 1024 * 1024  # 100MB
-        plugin_file.seek(0, 2)  # Seek to end
-        file_size = plugin_file.tell()
-        plugin_file.seek(0)  # Reset to beginning
-
-        if file_size > MAX_PLUGIN_SIZE:
-            return json_bad_request(f'Plugin file too large. Maximum size is {MAX_PLUGIN_SIZE // (1024*1024)}MB')
-
-        # Read the ZIP file
-        zip_data = plugin_file.read()
-
-        # SECURITY: Validate ZIP magic bytes to prevent MIME spoofing
-        if not zip_data.startswith(b'PK\x03\x04') and not zip_data.startswith(b'PK\x05\x06'):
-            return json_bad_request('Invalid ZIP file format')
-
-        zip_file = zipfile.ZipFile(io.BytesIO(zip_data))
-
-        # Validate ZIP structure
-        required_files = ['plugin.py', 'plugin.json']
-        zip_files = zip_file.namelist()
-
-        if not all(any(f.endswith(req) for f in zip_files) for req in required_files):
-            return json_bad_request('Invalid plugin structure. Plugin must contain plugin.py and plugin.json')
-
-        # Extract plugin info from plugin.json
-        try:
-            plugin_json_str = None
-            for file_name in zip_files:
-                if file_name.endswith('plugin.json'):
-                    plugin_json_str = zip_file.read(file_name).decode('utf-8')
-                    break
-
-            if not plugin_json_str:
-                return json_bad_request('plugin.json not found in ZIP archive')
-
-            plugin_info = json.loads(plugin_json_str)
-            extracted_plugin_name = plugin_info.get('name')
-
-            if extracted_plugin_name != plugin_name:
-                return json_bad_request(f'Plugin name mismatch. Expected {plugin_name}, got {extracted_plugin_name}')
-        except (json.JSONDecodeError, KeyError) as e:
-            return json_bad_request(GENERIC_ERROR_MESSAGE)
-
-        # Save plugin to plugins directory
-        plugins_dir = Path(current_app.config.get('PLUGINS_DIR', 'plugins'))
-        plugin_dir = plugins_dir / plugin_name
-        plugin_dir.mkdir(parents=True, exist_ok=True)
-
-        # SECURITY: Safe ZIP extraction with path traversal protection
-        # Validate all ZIP entries before extraction
-        for member in zip_file.namelist():
-            # Normalize the path and check for path traversal attempts
-            member_path = Path(member)
-
-            # Check for absolute paths
-            if member_path.is_absolute():
-                return json_bad_request(f'Invalid ZIP entry: absolute path detected ({member})')
-
-            # Check for path traversal attempts (../)
-            try:
-                # Resolve the full target path
-                target_path = (plugin_dir / member).resolve()
-                # Ensure it's within the plugin directory
-                target_path.relative_to(plugin_dir.resolve())
-            except ValueError:
-                return json_bad_request(f'Invalid ZIP entry: path traversal attempt detected ({member})')
-
-            # Check for dangerous file types within the ZIP
-            if member.lower().endswith(('.exe', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.ps1')):
-                return json_bad_request(f'Invalid ZIP entry: dangerous file type not allowed ({member})')
-
-        total_uncompressed = 0
-        for info in zip_file.infolist():
-            if stat.S_ISLNK(info.external_attr >> 16):
-                return json_bad_request(f'Invalid ZIP entry: symbolic links are not allowed ({info.filename})')
-            total_uncompressed += info.file_size
-        if total_uncompressed > _MAX_PLUGIN_UNCOMPRESSED_BYTES:
-            return json_bad_request('Plugin archive expands to too much data')
-
-        # Safe to extract after validation
-        zip_file.extractall(plugin_dir)
-
-        # Install the plugin
-        success = plugin_manager.install_plugin(plugin_name)
-
-        if success:
-            return json_ok(success=True, message=f'Plugin {plugin_name} uploaded and installed successfully')
-        else:
-            return json_bad_request(f'Failed to install plugin {plugin_name} after upload')
-    except zipfile.BadZipFile:
-        return json_bad_request('Invalid ZIP file')
+        return _handle_plugin_upload(plugin_name, 'plugin_file')
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 

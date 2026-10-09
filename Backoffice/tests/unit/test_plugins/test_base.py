@@ -235,8 +235,12 @@ class TestBasePluginDefaults:
     def test_get_settings_empty(self):
         assert self.plugin.get_settings() == {}
 
-    def test_update_settings_returns_true(self):
-        assert self.plugin.update_settings({"any": "value"}) is True
+    def test_update_settings_rejected_by_default(self):
+        assert self.plugin.update_settings({"any": "value"}) is False
+        assert self.plugin.supports_settings_update() is False
+
+    def test_no_required_plugins_by_default(self):
+        assert self.plugin.get_required_plugins() == []
 
     def test_install_returns_true(self):
         assert self.plugin.install() is True

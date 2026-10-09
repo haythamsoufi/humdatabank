@@ -2,21 +2,58 @@
 
 import logging
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from contextlib import suppress
 from flask import render_template, current_app
 from jinja2.utils import htmlsafe_json_dumps
 from markupsafe import Markup, escape
 from .manager import PluginManager
 import threading
-from functools import lru_cache
-import hashlib
-import os
-import time
 import json
 
 
 logger = logging.getLogger(__name__)
+
+MAX_ENTRY_RENDER_PARAM_BYTES = 64 * 1024
+
+
+class EntryRenderRequestError(ValueError):
+    """The render-entry query parameters were unusable."""
+
+
+def parse_entry_render_args(args) -> Tuple[Dict[str, Any], Any]:
+    """Read ``field_id``, ``field_config`` and ``existing_data`` from a render-entry query string.
+
+    Returns ``(field_config, field_value)``. ``field_config['field_name']`` is forced to
+    ``field_id`` so DOM ids match the JS initializer. Dict and list payloads are passed
+    through unchanged as the value; an absent or empty payload gives None.
+    """
+    field_id = args.get("field_id")
+    field_config_raw = args.get("field_config")
+    existing_data_raw = args.get("existing_data")
+
+    for raw in (field_config_raw, existing_data_raw):
+        if raw and len(raw.encode("utf-8", errors="ignore")) > MAX_ENTRY_RENDER_PARAM_BYTES:
+            raise EntryRenderRequestError("Render parameters are too large.")
+
+    try:
+        field_config = json.loads(field_config_raw) if field_config_raw else {}
+    except (TypeError, ValueError):
+        field_config = {}
+    if not isinstance(field_config, dict):
+        field_config = {}
+
+    if field_id:
+        field_config = dict(field_config)
+        field_config["field_name"] = str(field_id)
+
+    try:
+        existing_data = json.loads(existing_data_raw) if existing_data_raw else {}
+    except (TypeError, ValueError):
+        existing_data = {}
+
+    field_value = existing_data if existing_data != {} else None
+    return field_config, field_value
 
 
 class FormIntegration:
@@ -24,25 +61,13 @@ class FormIntegration:
 
     def __init__(self, plugin_manager: PluginManager):
         self.plugin_manager = plugin_manager
-        self._template_cache = {}
-        self._template_cache_lock = threading.Lock()
-        self._config_cache = {}
+        self._config_cache: Dict[str, Optional[Dict[str, Any]]] = {}
         self._config_cache_lock = threading.Lock()
 
-    def _get_template_cache_key(self, field_type: str, template_path: str, config_hash: str) -> str:
-        """Generate cache key for templates."""
-        return hashlib.md5(f"{field_type}:{template_path}:{config_hash}".encode()).hexdigest()
-
-    def _get_template_file_hash(self, template_path: str) -> str:
-        """Generate hash for template file based on modification time."""
-        try:
-            if os.path.exists(template_path):
-                stat = os.stat(template_path)
-                return f"{stat.st_mtime}:{stat.st_size}"
-            return "missing"
-        except Exception as e:
-            logger.debug("_get_template_file_hash failed for %s: %s", template_path, e)
-            return "error"
+    def clear_caches(self) -> None:
+        """Drop cached field-type configs (call after activate, deactivate, reload or uninstall)."""
+        with self._config_cache_lock:
+            self._config_cache.clear()
 
     def _get_plugin_id_for_field_type(self, field_type: str) -> Optional[str]:
         """Return plugin_id that owns a given field_type."""
@@ -90,10 +115,15 @@ class FormIntegration:
         resolved = f"plugins/{plugin_id}/{template_name.lstrip('/')}"
         return resolved
 
-    @lru_cache(maxsize=128)
     def _get_cached_field_config(self, field_type_name: str) -> Optional[Dict[str, Any]]:
         """Get cached field configuration."""
-        return self.plugin_manager.get_field_type_config(field_type_name)
+        with self._config_cache_lock:
+            if field_type_name in self._config_cache:
+                return self._config_cache[field_type_name]
+        config = self.plugin_manager.get_field_type_config(field_type_name)
+        with self._config_cache_lock:
+            self._config_cache[field_type_name] = config
+        return config
 
     def get_plugin_lookup_lists(self) -> List[Dict[str, Any]]:
         """Get lookup lists from all active plugins for form builder integration."""
@@ -418,7 +448,7 @@ class FormIntegration:
         """Render a custom field type in the entry form."""
         field_type_config = self.plugin_manager.get_field_type_config(field_type)
         if not field_type_config:
-            return f"<p class='text-red-500'>Unknown field type: {field_type}</p>"
+            return f"<p class='text-red-500'>Unknown field type: {escape(field_type)}</p>"
 
         # Get the entry form configuration
         entry_config = field_type_config['entry_form_config']

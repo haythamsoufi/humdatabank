@@ -147,10 +147,16 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
             for _tab_id, label, permission, role_code, _priority, _icon in _SPLIT_ANALYSIS_TABS
         ]
 
-    def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
-        from plugins.pb_progress.plugin import PBProgressPlugin
+    def get_required_plugins(self) -> list[str]:
+        return ["pb_progress"]
 
-        return PBProgressPlugin().get_panel_render_context(flags, first_tab)
+    def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
+        from flask import current_app
+
+        pb_progress = current_app.plugin_manager.get_plugin("pb_progress")
+        if pb_progress is None:
+            return {"explore_first_tab": first_tab}
+        return pb_progress.get_panel_render_context(flags, first_tab)
 
     def is_admin_feature(self) -> bool:
         return True

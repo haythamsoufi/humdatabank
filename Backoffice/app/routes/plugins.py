@@ -1,9 +1,10 @@
 from flask import Blueprint, current_app, request
 from flask_login import login_required, current_user
-import json
+from markupsafe import escape
 
 from app.models.assignments import AssignmentEntityStatus
 from app.services.organization.authorization_service import AuthorizationService
+from app.plugins.form_integration import EntryRenderRequestError, parse_entry_render_args
 from app.utils.form_authorization import redirect_if_assignment_entry_blocked
 
 
@@ -82,31 +83,13 @@ def render_plugin_field_entry_public(field_type_id):
                 {"Content-Type": "text/html"},
             )
 
-        # Field configuration and existing data are passed as JSON strings in query params
-        # IMPORTANT: plugins typically key DOM ids off `field_name`. Entry forms use numeric ids
-        # (e.g. 153), so we inject `field_name = field_id` to keep DOM ids consistent with the
-        # JS initializer (which is constructed with `fieldId`).
-        field_id = request.args.get("field_id")
-        field_config_raw = request.args.get("field_config")
-        existing_data_raw = request.args.get("existing_data")
-
+        # Field configuration and existing data are passed as JSON strings in query params.
+        # Plugins key DOM ids off `field_name`; entry forms use numeric ids (e.g. 153), so the
+        # parser sets `field_name = field_id` to match the JS initializer's `fieldId`.
         try:
-            field_config = json.loads(field_config_raw) if field_config_raw else {}
-        except (TypeError, json.JSONDecodeError):
-            field_config = {}
-
-        if field_id:
-            # Force a deterministic per-field name for DOM ids.
-            field_config = dict(field_config or {})
-            field_config["field_name"] = str(field_id)
-
-        try:
-            existing_data = json.loads(existing_data_raw) if existing_data_raw else {}
-        except (TypeError, json.JSONDecodeError):
-            existing_data = {}
-
-        # NOTE: form_integration will pass through dict/list values as-is.
-        field_value = existing_data if isinstance(existing_data, (dict, list)) else existing_data.get("value")
+            field_config, field_value = parse_entry_render_args(request.args)
+        except EntryRenderRequestError as exc:
+            return (f"<p class='text-red-500'>{escape(str(exc))}</p>", 413, {"Content-Type": "text/html"})
 
         html = current_app.form_integration.render_custom_field_entry_form(
             field_type=field_type_id,

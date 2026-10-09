@@ -264,7 +264,7 @@
                                 class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_settings}">
                             <i class="fas fa-cog text-base align-middle leading-none"></i>
                         </button>
-                        ${plugin.is_active ?
+                        ${plugin.always_on ? '' : (plugin.is_active ?
                             `<button data-action="deactivate"
                                      class="text-orange-600 hover:text-orange-900 inline-flex items-center justify-center" title="${i18n.title_deactivate}">
                                 <i class="fas fa-pause text-base align-middle leading-none"></i>
@@ -272,16 +272,16 @@
                             `<button data-action="activate"
                                      class="text-green-600 hover:text-green-900 inline-flex items-center justify-center" title="${i18n.title_activate}">
                                 <i class="fas fa-play text-base align-middle leading-none"></i>
-                            </button>`
+                            </button>`)
                         }
                         <button data-action="reload"
                                 class="text-yellow-600 hover:text-yellow-900 inline-flex items-center justify-center" title="${i18n.title_reload}">
                             <i class="fas fa-sync-alt text-base align-middle leading-none"></i>
                         </button>
-                        <button data-action="uninstall"
+                        ${plugin.first_party ? '' : `<button data-action="uninstall"
                                 class="text-red-600 hover:text-red-900 inline-flex items-center justify-center" title="${i18n.title_uninstall}">
                             <i class="fas fa-trash text-base align-middle leading-none"></i>
-                        </button>
+                        </button>`}
                     </div>
                 </td>
             `;
@@ -323,6 +323,8 @@
                     showSuccess(i18n.success_all_reloaded);
                     await loadPlugins();
                 }
+            } else {
+                showError(await serverMessage(response, i18n.error_failed_reload_plugins));
             }
         } catch (error) {
             console.error('Error reloading plugins:', error);
@@ -343,7 +345,16 @@
     async function scanForNewPlugins() {
         try {
             showLoading(true);
-            // This would trigger a scan of plugin directories
+            const response = await ((window.getFetch && window.getFetch()) || fetch)('/admin/api/plugins/scan', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
+            if (!response.ok) {
+                showError(await serverMessage(response, i18n.error_failed_scan_plugins));
+                return;
+            }
             showSuccess(i18n.success_scan_completed);
             await loadPlugins();
         } catch (error) {
@@ -358,7 +369,7 @@
         try {
             showLoading(true);
             // Directly navigate to the download endpoint to prompt browser download
-            window.location.href = '/admin/api/plugins/sample-package/download';
+            window.location.href = '/admin/api/plugins/starter/download';
         } catch (error) {
             console.error('Error starting download:', error);
             showError(i18n.error_failed_start_download);
@@ -393,10 +404,12 @@
             if (response.ok) {
                 const data = await response.json();
                 if (data.success) {
-                    showSuccess(i18n.success_installed);
+                    showSuccess(data.message || i18n.success_installed);
                     fileInput.value = '';
                     await loadPlugins();
                 }
+            } else {
+                showError(await serverMessage(response, i18n.error_failed_install));
             }
         } catch (error) {
             console.error('Error installing plugin:', error);
@@ -497,7 +510,7 @@
                     showError(data.message || i18n.error_failed_reload_plugins);
                 }
             } else {
-                showError(i18n.error_failed_reload_plugins);
+                showError(await serverMessage(response, i18n.error_failed_reload_plugins));
             }
         } catch (error) {
             console.error('Error reloading plugin:', error);
@@ -539,7 +552,7 @@
                     showError(data.message || i18n.error_failed_install);
                 }
             } else {
-                showError(i18n.error_failed_install);
+                showError(await serverMessage(response, i18n.error_failed_install));
             }
         } catch (error) {
             console.error('Error activating plugin:', error);
@@ -581,7 +594,7 @@
                     showError(data.message || i18n.error_failed_install);
                 }
             } else {
-                showError(i18n.error_failed_install);
+                showError(await serverMessage(response, i18n.error_failed_install));
             }
         } catch (error) {
             console.error('Error deactivating plugin:', error);
@@ -788,6 +801,16 @@
     function closeCleanupModal() {
         document.getElementById('plugin-cleanup-modal').classList.add('hidden');
         currentPluginForUninstall = null;
+    }
+
+    async function serverMessage(response, fallback) {
+        try {
+            const err = window.parseHttpError ? await window.parseHttpError(response) : null;
+            if (err && err.message) return err.message;
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not parse error response', e);
+        }
+        return fallback;
     }
 
     function showLoading(show) {

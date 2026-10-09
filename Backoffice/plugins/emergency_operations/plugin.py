@@ -122,22 +122,10 @@ class EmergencyOperationsPlugin(FirstPartyPluginMetadata, BasePlugin):
         return [EmergencyOperationsFieldType()]
 
     def get_blueprint(self):
-        """Return blueprint for plugin-specific routes with unique import path."""
-        try:
-            import importlib
-            module = importlib.import_module('plugins.emergency_operations.routes')
-            return module.create_blueprint()
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).debug("Plugin routes import failed, using local fallback: %s", e)
-            # Fallback: local import using plugin directory on sys.path
-            import sys
-            import os
-            plugin_dir = os.path.dirname(__file__)
-            if plugin_dir not in sys.path:
-                sys.path.insert(0, plugin_dir)
-            from routes import create_blueprint
-            return create_blueprint()
+        """Return blueprint for plugin-specific routes."""
+        import importlib
+
+        return importlib.import_module('plugins.emergency_operations.routes').create_blueprint()
 
     def register_section_binding(self) -> None:
         from app.services.forms.section_binding import register_section_binding_provider
@@ -165,11 +153,6 @@ class EmergencyOperationsPlugin(FirstPartyPluginMetadata, BasePlugin):
         Returns:
             List of lookup list configurations
         """
-        try:
-            # Try relative import first
-            from .routes import get_emergency_operations_lookup_list
-            return [get_emergency_operations_lookup_list()]
-        except ImportError:
-            # Fallback to absolute import
-            from plugins.emergency_operations.routes import get_emergency_operations_lookup_list
-            return [get_emergency_operations_lookup_list()]
+        from plugins.emergency_operations.routes import get_emergency_operations_lookup_list
+
+        return [get_emergency_operations_lookup_list()]

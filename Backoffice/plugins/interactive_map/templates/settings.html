@@ -34,20 +34,6 @@
                     <i class="fas fa-sync-alt mr-2"></i>
                     Reload Plugin
                 </button>
-
-                <button type="button"
-                        id="im-check-updates-btn"
-                        class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-600">
-                    <i class="fas fa-download mr-2"></i>
-                    Check for Updates
-                </button>
-
-                <button type="button"
-                        id="im-uninstall-plugin-btn"
-                        class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-600">
-                    <i class="fas fa-trash mr-2"></i>
-                    Uninstall Plugin
-                </button>
             </div>
         </div>
     </div>
@@ -212,7 +198,7 @@
             Usage Statistics
         </h3>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="text-center p-4 bg-blue-50 rounded-lg">
                 <div class="text-2xl font-bold text-blue-600" id="total_map_fields">0</div>
                 <div class="text-sm text-gray-600">Total Map Fields</div>
@@ -222,16 +208,6 @@
                 <div class="text-2xl font-bold text-green-600" id="active_forms">0</div>
                 <div class="text-sm text-gray-600">Forms Using Maps</div>
             </div>
-
-            <div class="text-center p-4 bg-yellow-50 rounded-lg">
-                <div class="text-2xl font-bold text-yellow-600" id="total_markers">0</div>
-                <div class="text-sm text-gray-600">Total Markers</div>
-            </div>
-
-            <div class="text-center p-4 bg-purple-50 rounded-lg">
-                <div class="text-2xl font-bold text-purple-600" id="api_calls">0</div>
-                <div class="text-sm text-gray-600">API Calls Today</div>
-            </div>
         </div>
     </div>
 </div>
@@ -240,7 +216,7 @@
 // Plugin management functions
 function reloadPlugin() {
     const msg = 'Are you sure you want to reload the Interactive Map plugin? This will restart the plugin service.';
-    const doReload = () => fetch('/admin/api/plugins/reload', {
+    const doReload = () => fetch('/admin/api/plugins/interactive_map/reload', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -266,51 +242,6 @@ function reloadPlugin() {
         window.showConfirmation(msg, doReload, null, 'Reload', 'Cancel', 'Reload Plugin?');
     } else {
         doReload();
-    }
-}
-
-function checkForUpdates() {
-    const msg = 'Checking for updates...\n\nThis feature would typically check for plugin updates from a repository.';
-    if (window.showAlert) window.showAlert(msg, 'info');
-    else console.log(msg);
-}
-
-function uninstallPlugin() {
-    const msg1 = 'Are you sure you want to uninstall the Interactive Map plugin? This action cannot be undone and will remove all map fields from forms.';
-    const msg2 = 'WARNING: This will permanently remove the plugin and all associated data. Are you absolutely sure?';
-    const doUninstall = () => fetch('/admin/api/plugins/Interactive Map Plugin/uninstall', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    if (window.showAlert) window.showAlert('Plugin uninstalled successfully!', 'success');
-                    else console.log('Plugin uninstalled');
-                    window.location.href = '/admin/dashboard';
-                } else {
-                    if (window.showAlert) window.showAlert('Failed to uninstall plugin: ' + data.error, 'error');
-                    else console.error('Failed:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                if (window.showAlert) window.showAlert('Error uninstalling plugin', 'error');
-            });
-    const step2 = () => {
-        if (window.showDangerConfirmation) {
-            window.showDangerConfirmation(msg2, doUninstall, null, 'Uninstall', 'Cancel', 'Confirm Uninstall');
-        } else {
-            doUninstall();
-        }
-    };
-    if (window.showDangerConfirmation) {
-        window.showDangerConfirmation(msg1, step2, null, 'Uninstall', 'Cancel', 'Uninstall Plugin?');
-    } else {
-        step2();
     }
 }
 
@@ -357,15 +288,11 @@ function loadUsageStats() {
             if (data.success && data.stats) {
                 document.getElementById('total_map_fields').textContent = data.stats.total_map_fields;
                 document.getElementById('active_forms').textContent = data.stats.active_forms;
-                document.getElementById('total_markers').textContent = data.stats.total_markers;
-                document.getElementById('api_calls').textContent = data.stats.api_calls;
             } else {
                 console.error('Failed to load usage statistics');
                 // Fallback to zeros
                 document.getElementById('total_map_fields').textContent = '0';
                 document.getElementById('active_forms').textContent = '0';
-                document.getElementById('total_markers').textContent = '0';
-                document.getElementById('api_calls').textContent = '0';
             }
         })
         .catch(error => {
@@ -373,8 +300,6 @@ function loadUsageStats() {
             // Fallback to zeros
             document.getElementById('total_map_fields').textContent = '0';
             document.getElementById('active_forms').textContent = '0';
-            document.getElementById('total_markers').textContent = '0';
-            document.getElementById('api_calls').textContent = '0';
         });
 }
 
@@ -428,15 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
         reloadBtn.addEventListener('click', reloadPlugin);
     }
 
-    const checkUpdatesBtn = document.getElementById('im-check-updates-btn');
-    if (checkUpdatesBtn) {
-        checkUpdatesBtn.addEventListener('click', checkForUpdates);
-    }
 
-    const uninstallBtn = document.getElementById('im-uninstall-plugin-btn');
-    if (uninstallBtn) {
-        uninstallBtn.addEventListener('click', uninstallPlugin);
-    }
 });
 </script>
 {% endblock %}

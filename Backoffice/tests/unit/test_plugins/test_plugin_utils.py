@@ -8,6 +8,7 @@ import pytest
 import logging
 from unittest.mock import MagicMock, patch, call
 from flask import Flask, Blueprint
+from app.plugins import plugin_utils
 
 
 # ---------------------------------------------------------------------------
@@ -1046,3 +1047,76 @@ class TestCreateStandardRoutesSuccessPaths:
                 mca.logger = MagicMock()
                 response = app.test_client().post("/pnc2/api/config/some_section", json={})
         assert response.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# secret redaction
+# ---------------------------------------------------------------------------
+
+class TestSecretRedaction:
+    PATHS = (("api_keys", "mapbox"), ("global_settings", "geocoding_api_key"))
+
+    def test_redact_replaces_non_empty_secrets_only(self):
+        config = {
+            "api_keys": {"mapbox": "pk.secret", "google_maps": "public"},
+            "global_settings": {"geocoding_api_key": ""},
+        }
+        redacted = plugin_utils.redact_secrets(config, self.PATHS)
+        assert redacted["api_keys"]["mapbox"] == plugin_utils.REDACTED_SECRET
+        assert redacted["api_keys"]["google_maps"] == "public"
+        assert redacted["global_settings"]["geocoding_api_key"] == ""
+        assert config["api_keys"]["mapbox"] == "pk.secret"
+
+    def test_redact_tolerates_missing_sections(self):
+        assert plugin_utils.redact_secrets({}, self.PATHS) == {}
+
+    def test_restore_keeps_stored_secret_for_placeholder_and_accepts_new_values(self):
+        stored = {"api_keys": {"mapbox": "pk.old"}, "global_settings": {"geocoding_api_key": "g.old"}}
+        incoming = {
+            "api_keys": {"mapbox": plugin_utils.REDACTED_SECRET},
+            "global_settings": {"geocoding_api_key": "g.new"},
+        }
+        restored = plugin_utils.restore_secrets(incoming, stored, self.PATHS)
+        assert restored["api_keys"]["mapbox"] == "pk.old"
+        assert restored["global_settings"]["geocoding_api_key"] == "g.new"
+
+    def test_restore_placeholder_without_stored_value_becomes_empty(self):
+        incoming = {"api_keys": {"mapbox": plugin_utils.REDACTED_SECRET}}
+        restored = plugin_utils.restore_secrets(incoming, {}, self.PATHS)
+        assert restored["api_keys"]["mapbox"] == ""
+
+
+# ---------------------------------------------------------------------------
+# cache_plugin_result: viewer scope and size bound
+# ---------------------------------------------------------------------------
+
+class TestCacheViewerScope:
+    def setup_method(self):
+        plugin_utils._plugin_cache.clear()
+
+    def test_cached_results_are_not_shared_between_viewers(self):
+        app = _make_flask_app()
+        calls = []
+
+        @plugin_utils.cache_plugin_result(ttl_seconds=60, plugin_name="scoped")
+        def compute():
+            calls.append(1)
+            return len(calls)
+
+        with app.test_request_context("/x"):
+            with patch.object(plugin_utils, "_cache_viewer_scope", return_value="user:1"):
+                first = compute()
+                assert compute() == first
+            with patch.object(plugin_utils, "_cache_viewer_scope", return_value="user:2"):
+                assert compute() != first
+
+    def test_cache_is_bounded(self):
+        app = _make_flask_app()
+        @plugin_utils.cache_plugin_result(ttl_seconds=60, plugin_name="bounded")
+        def compute(n):
+            return n
+
+        with app.test_request_context("/x"):
+            for n in range(plugin_utils._PLUGIN_CACHE_MAX_ENTRIES + 20):
+                compute(n)
+        assert len(plugin_utils._plugin_cache) <= plugin_utils._PLUGIN_CACHE_MAX_ENTRIES

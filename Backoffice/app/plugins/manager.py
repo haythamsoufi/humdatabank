@@ -1,26 +1,32 @@
 # Backoffice/app/plugins/manager.py
 from app.utils.datetime_helpers import utcnow
 
-import os
+import re
 import sys
 import importlib.util
+import inspect
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
-from flask import Flask, current_app
+from flask import Flask
 from .base import BasePlugin, BaseFieldType, CspOverride, DataExplorerTabConfig, PluginDocsSource
 import shutil
 import json
-from datetime import datetime
 import hashlib
 import time
-from functools import lru_cache
 import threading
 
 from jinja2 import ChoiceLoader
 
 from .jinja_plugin_loader import PluginTemplateLoader
 from .data_explorer import CORE_DATA_EXPLORER_PERMISSIONS
+
+_PLUGIN_ID_RE = re.compile(r'^[a-z0-9][a-z0-9_]{0,63}$')
+
+
+class PluginLifecycleError(Exception):
+    """A plugin lifecycle action was refused; the message is safe to show to admins."""
+
 
 class PluginManager:
     """Manages plugin discovery, loading, and lifecycle."""
@@ -43,11 +49,15 @@ class PluginManager:
         self.plugin_dirs: Dict[str, Path] = {}
         self.template_dirs: Dict[str, Path] = {}
         self.static_dirs: Dict[str, Path] = {}
+        # Blueprint name -> owning plugin_id, used to gate routes of inactive plugins.
+        self.blueprint_plugin_ids: Dict[str, str] = {}
 
-        # Plugin directories to scan
+        # Plugin directories to scan. ``app/plugins`` is the framework package
+        # itself and normally holds no plugins; Backoffice/plugins is where
+        # bundled and uploaded plugins live.
         self.plugin_directories = [
-            Path(app.root_path) / 'plugins',  # Core plugins
-            Path(app.root_path).parent / 'plugins'  # External plugins
+            Path(app.root_path) / 'plugins',
+            Path(app.root_path).parent / 'plugins',
         ]
 
         # Plugin state file path
@@ -56,8 +66,8 @@ class PluginManager:
         # Caching and optimization
         self._discovery_cache = {}
         self._discovery_cache_file = Path(app.instance_path) / 'plugin_discovery_cache.json'
-        self._state_update_lock = threading.Lock()
-        self._pending_state_updates = []
+        self._state_update_lock = threading.RLock()
+        self._state_mtime_ns: Optional[int] = None
         self._loaded_plugin_modules = {}  # Cache for loaded modules
 
         # Load plugin states on initialization
@@ -80,6 +90,7 @@ class PluginManager:
                     # - Legacy: active_plugins (could be plugin_id or display_name)
                     self._raw_active_tokens = list(state_data.get('active_plugin_ids') or state_data.get('active_plugins') or [])
                     self.active_plugins = set()  # resolved after plugins are loaded
+                    self._state_mtime_ns = self._state_file_mtime_ns()
                     self.logger.info(f"Loaded plugin states: {len(self._raw_active_tokens)} tokens")
             else:
                 self.logger.info("No plugin state file found, all plugins will be active by default")
@@ -144,16 +155,16 @@ class PluginManager:
             self.logger.warning(f"Error generating directory hash for {directory}: {e}")
             return str(time.time())  # Fallback to timestamp
 
+    def _state_file_mtime_ns(self) -> Optional[int]:
+        try:
+            return self.state_file_path.stat().st_mtime_ns
+        except OSError:
+            return None
+
     def _save_plugin_states(self):
-        """Save plugin activation states to persistent storage with batching."""
+        """Persist plugin activation states."""
         with self._state_update_lock:
             try:
-                if self._pending_state_updates:
-                    for update in self._pending_state_updates:
-                        plugin_name, action = update
-                        # Process update logic here if needed
-                    self._pending_state_updates.clear()
-
                 from app.utils.file_lock import atomic_json_write
 
                 state_data = {
@@ -161,10 +172,40 @@ class PluginManager:
                     'last_updated': utcnow().isoformat()
                 }
                 atomic_json_write(self.state_file_path, state_data)
+                self._state_mtime_ns = self._state_file_mtime_ns()
 
                 self.logger.info(f"Saved plugin states: {len(self.active_plugins)} active plugins")
             except Exception as e:
-                self.logger.error(f"Error saving plugin states: {e}")
+                self.logger.error(f"Error saving plugin states: {e}", exc_info=True)
+
+    def sync_state_from_disk(self) -> bool:
+        """Adopt activation changes written by another worker process.
+
+        Activation state is persisted to ``plugin_states.json`` but each worker
+        keeps its own in-memory copy. This is a cheap ``stat`` per call; the file
+        is re-read only when its modification time changed. Returns True when the
+        active set was refreshed.
+        """
+        current = self._state_file_mtime_ns()
+        if current is None or current == self._state_mtime_ns:
+            return False
+        with self._state_update_lock:
+            if current == self._state_mtime_ns:
+                return False
+            previous = set(self.active_plugins)
+            self._load_plugin_states()
+            self._resolve_active_plugins()
+            if self.active_plugins != previous:
+                self._extract_field_types()
+                self._invalidate_form_integration_cache()
+                return True
+        return False
+
+    def _invalidate_form_integration_cache(self) -> None:
+        form_integration = getattr(self.app, 'form_integration', None)
+        clear = getattr(form_integration, 'clear_caches', None)
+        if callable(clear):
+            clear()
 
     def register_template_loader(self) -> None:
         """
@@ -188,11 +229,6 @@ class PluginManager:
             self.app._plugin_template_loader_registered = True
         except Exception as e:
             self.logger.error(f"Failed to register plugin template loader: {e}", exc_info=True)
-
-    def _queue_state_update(self, plugin_name: str, action: str):
-        """Queue a state update for batching."""
-        with self._state_update_lock:
-            self._pending_state_updates.append((plugin_name, action))
 
     def discover_plugins(self) -> List[str]:
         """Discover available plugins in configured directories with caching."""
@@ -237,7 +273,7 @@ class PluginManager:
         plugins = []
 
         for item in directory.iterdir():
-            if item.is_dir() and not item.name.startswith('.'):
+            if item.is_dir() and not item.name.startswith(('.', '_')):
                 # Check if it's a plugin directory
                 if self._is_plugin_directory(item):
                     plugins.append(str(item))
@@ -273,36 +309,9 @@ class PluginManager:
         loaded_plugins: List[str] = []
 
         for plugin_path in discovered_plugins:
-            try:
-                plugin = self._load_plugin(plugin_path)
-                if plugin:
-                    plugin_id = plugin.plugin_id
-
-                    # Skip if plugin is already loaded
-                    if plugin_id in self.plugins:
-                        continue
-
-                    plugin_dir = Path(plugin_path)
-                    # Attach directory metadata for deterministic template/static resolution
-                    self.plugin_dirs[plugin_id] = plugin_dir
-                    self.template_dirs[plugin_id] = plugin_dir / 'templates'
-                    self.static_dirs[plugin_id] = plugin_dir / 'static'
-
-                    # Sanity check: plugin folder name must match plugin_id
-                    if plugin_dir.name != plugin_id:
-                        self.logger.error(
-                            f"Plugin folder mismatch: folder='{plugin_dir.name}' plugin_id='{plugin_id}'. "
-                            f"Please rename folder to match plugin_id."
-                        )
-
-                    self.plugins[plugin_id] = plugin
-                    loaded_plugins.append(plugin_id)
-
-                    # Track plugin installation
-                    self._track_plugin_installation(plugin, 'installed')
-
-            except Exception as e:
-                self.logger.error(f"Failed to load plugin from {plugin_path}: {e}")
+            plugin_id = self._load_and_register(plugin_path)
+            if plugin_id:
+                loaded_plugins.append(plugin_id)
 
         # Resolve which plugins are active using stored tokens (plugin_id or legacy display_name)
         self._resolve_active_plugins()
@@ -310,6 +319,7 @@ class PluginManager:
         # Extract field types from all plugins
         self._extract_field_types()
 
+        self._check_plugin_dependencies()
         self._sync_validation_packs()
         self._register_section_binding_providers()
 
@@ -320,6 +330,81 @@ class PluginManager:
             self.logger.info(f"Plugin system: Loaded {len(loaded_plugins)} plugins [{', '.join(loaded_plugins)}]")
 
         return self.plugins
+
+    def _load_and_register(self, plugin_path: str) -> Optional[str]:
+        """Load one plugin directory and add it to the registry. Returns its id when newly registered."""
+        try:
+            plugin = self._load_plugin(plugin_path)
+            if not plugin:
+                return None
+            plugin_id = plugin.plugin_id
+
+            if plugin_id in self.plugins:
+                return None
+
+            plugin_dir = Path(plugin_path)
+            self.plugin_dirs[plugin_id] = plugin_dir
+            self.template_dirs[plugin_id] = plugin_dir / 'templates'
+            self.static_dirs[plugin_id] = plugin_dir / 'static'
+
+            if plugin_dir.name != plugin_id:
+                self.logger.error(
+                    f"Plugin folder mismatch: folder='{plugin_dir.name}' plugin_id='{plugin_id}'. "
+                    f"Please rename folder to match plugin_id."
+                )
+
+            self.plugins[plugin_id] = plugin
+            self._track_plugin_installation(plugin, 'installed')
+            return plugin_id
+        except Exception as e:
+            self.logger.error(f"Failed to load plugin from {plugin_path}: {e}", exc_info=True)
+            return None
+
+    def scan_for_new_plugins(self) -> List[str]:
+        """Discover and register plugins that appeared on disk since startup.
+
+        New plugins are registered but not activated. Their blueprints cannot be
+        added to a running Flask app, so routes appear after the next restart.
+        """
+        self._discovery_cache.clear()
+        new_ids: List[str] = []
+        for plugin_path in self.discover_plugins():
+            plugin_id = self._load_and_register(plugin_path)
+            if plugin_id:
+                new_ids.append(plugin_id)
+        if new_ids:
+            self._check_plugin_dependencies()
+        return new_ids
+
+    def get_required_plugins(self, plugin_id: str) -> List[str]:
+        plugin = self.plugins.get(plugin_id)
+        if plugin is None:
+            return []
+        try:
+            return [str(pid) for pid in (plugin.get_required_plugins() or [])]
+        except Exception as exc:
+            self.logger.warning("get_required_plugins failed for plugin %s: %s", plugin_id, exc)
+            return []
+
+    def get_missing_dependencies(self, plugin_id: str) -> List[str]:
+        return [pid for pid in self.get_required_plugins(plugin_id) if pid not in self.plugins]
+
+    def get_dependents(self, plugin_id: str) -> List[str]:
+        """Loaded plugins that declare ``plugin_id`` as a requirement."""
+        return sorted(
+            other for other in self.plugins
+            if other != plugin_id and plugin_id in self.get_required_plugins(other)
+        )
+
+    def _check_plugin_dependencies(self) -> None:
+        for plugin_id in self.plugins:
+            missing = self.get_missing_dependencies(plugin_id)
+            if missing:
+                self.logger.error(
+                    "Plugin %s requires plugin(s) that are not installed: %s",
+                    plugin_id,
+                    ", ".join(missing),
+                )
 
     def _sync_validation_packs(self) -> None:
         """Register the core pack and packs from plugins that integrate with core."""
@@ -385,22 +470,28 @@ class PluginManager:
                 resolved.add(plugin_id)
                 continue
 
-        # If nothing matched but there were tokens, keep resolved empty (all inactive).
+        # If nothing matched but there were tokens, keep resolved empty (all inactive),
+        # except admin features, which are always on.
+        resolved.update(self._always_on_plugin_ids())
         self.active_plugins = resolved
 
-    def _is_existing_plugin(self, plugin_name: str) -> bool:
-        """Check if a plugin was previously known to the system."""
+    def _always_on_plugin_ids(self) -> Set[str]:
+        return {pid for pid in self.plugins if self.is_always_on(pid)}
+
+    def is_always_on(self, plugin_id: str) -> bool:
+        """Admin-feature plugins register routes and RBAC regardless of activation."""
+        plugin = self.plugins.get(plugin_id)
+        if plugin is None:
+            return False
         try:
-            if self.state_file_path.exists():
-                with open(self.state_file_path, 'r') as f:
-                    state_data = json.load(f)
-                    # Check if this plugin was mentioned in any previous state
-                    # We can track this by looking at installation history or previous states
-                    return True  # For now, assume all plugins are existing
+            return bool(plugin.is_admin_feature())
+        except Exception:
             return False
-        except Exception as e:
-            self.logger.debug("_is_existing_plugin state read failed: %s", e)
-            return False
+
+    def is_first_party(self, plugin_id: str) -> bool:
+        from plugins.metadata import FIRST_PARTY_PLUGIN_IDS
+
+        return plugin_id in FIRST_PARTY_PLUGIN_IDS
 
     def _load_plugin(self, plugin_path: str) -> Optional[BasePlugin]:
         """Load a single plugin from a directory."""
@@ -457,23 +548,36 @@ class PluginManager:
                 sys.path[:] = original_path
 
         except Exception as e:
-            self.logger.error(f"Error loading Python plugin {plugin_file}: {e}")
+            self.logger.error(f"Error loading Python plugin {plugin_file}: {e}", exc_info=True)
             return None
 
     def _extract_plugin_class(self, plugin_module) -> Optional[BasePlugin]:
-        """Extract plugin class from loaded module."""
+        """Instantiate the concrete ``BasePlugin`` subclass a plugin module defines.
+
+        Classes defined in the module itself win over ones it merely imported
+        (for example another plugin's class or an abstract base).
+        """
         try:
-            for attr_name in dir(plugin_module):
+            candidates = []
+            for attr_name in sorted(dir(plugin_module)):
                 attr = getattr(plugin_module, attr_name)
-                if (isinstance(attr, type) and
-                    issubclass(attr, BasePlugin) and
-                    attr != BasePlugin):
-                    return attr()
+                if (
+                    isinstance(attr, type)
+                    and issubclass(attr, BasePlugin)
+                    and attr is not BasePlugin
+                    and not inspect.isabstract(attr)
+                ):
+                    candidates.append(attr)
+
+            own = [c for c in candidates if c.__module__ == getattr(plugin_module, '__name__', None)]
+            chosen = own or candidates
+            if chosen:
+                return chosen[0]()
 
             self.logger.warning(f"No plugin class found in module {plugin_module}")
             return None
         except Exception as e:
-            self.logger.error(f"Error extracting plugin class: {e}")
+            self.logger.error(f"Error extracting plugin class: {e}", exc_info=True)
             return None
 
     def _load_json_plugin(self, plugin_json: Path) -> Optional[BasePlugin]:
@@ -487,7 +591,7 @@ class PluginManager:
             return plugin_class()
 
         except Exception as e:
-            self.logger.error(f"Error loading JSON plugin {plugin_json}: {e}")
+            self.logger.error(f"Error loading JSON plugin {plugin_json}: {e}", exc_info=True)
             return None
 
     def _create_plugin_class_from_json(self, config: Dict[str, Any]) -> type:
@@ -578,49 +682,85 @@ class PluginManager:
             self.logger.warning(f"Could not track plugin installation for {getattr(plugin, 'plugin_id', 'unknown')}: {e}")
 
     def _extract_field_types(self):
-        """Extract field types from all active plugins."""
+        """Extract field types from all active plugins (deterministic order, first plugin wins)."""
         self.field_types.clear()
         self.field_type_to_plugin_id.clear()
 
-        for plugin_id in self.active_plugins:
-            if plugin_id in self.plugins:
-                plugin = self.plugins[plugin_id]
-                for field_type in plugin.get_field_types():
-                    self.field_types[field_type.type_name] = field_type
-                    self.field_type_to_plugin_id[field_type.type_name] = plugin_id
+        for plugin_id in sorted(self.active_plugins):
+            plugin = self.plugins.get(plugin_id)
+            if plugin is None:
+                continue
+            for field_type in plugin.get_field_types():
+                existing = self.field_type_to_plugin_id.get(field_type.type_name)
+                if existing is not None:
+                    self.logger.error(
+                        "Field type '%s' from plugin %s ignored: already provided by plugin %s",
+                        field_type.type_name,
+                        plugin_id,
+                        existing,
+                    )
+                    continue
+                self.field_types[field_type.type_name] = field_type
+                self.field_type_to_plugin_id[field_type.type_name] = plugin_id
 
     def register_blueprints(self):
-        """Register blueprints from active form-field plugins (not admin-feature plugins)."""
+        """Register blueprints of form-field plugins (not admin-feature plugins).
+
+        Every loaded plugin's blueprint is registered, active or not, because Flask
+        cannot add routes to a running app. Requests to the blueprint of an inactive
+        plugin are rejected by :meth:`register_activation_guard`, so activating or
+        deactivating takes effect without a restart.
+        """
         registered_blueprints = []
         skipped_blueprints = []
 
-        for plugin_id in self.active_plugins:
-            if plugin_id in self.plugins:
-                plugin = self.plugins[plugin_id]
-                if plugin.is_admin_feature():
-                    continue
-                blueprint = plugin.get_blueprint()
-                if blueprint:
-                    # Check if blueprint is already registered
-                    blueprint_name = blueprint.name
-                    if blueprint_name in self.app.blueprints:
-                        skipped_blueprints.append(plugin_id)
-                        continue
+        for plugin_id, plugin in self.plugins.items():
+            if plugin.is_admin_feature():
+                continue
+            blueprint = plugin.get_blueprint()
+            if not blueprint:
+                continue
 
-                    try:
-                        self.app.register_blueprint(blueprint)
-                        registered_blueprints.append(plugin_id)
-                    except Exception as e:
-                        if "has already been registered" in str(e):
-                            skipped_blueprints.append(plugin_id)
-                        else:
-                            self.logger.error(f"Failed to register blueprint for plugin {plugin_id}: {e}")
+            self.blueprint_plugin_ids[blueprint.name] = plugin_id
+            if blueprint.name in self.app.blueprints:
+                skipped_blueprints.append(plugin_id)
+                continue
 
-        # Summary logging
+            try:
+                self.app.register_blueprint(blueprint)
+                registered_blueprints.append(plugin_id)
+            except Exception as e:
+                if "has already been registered" in str(e):
+                    skipped_blueprints.append(plugin_id)
+                else:
+                    self.logger.error(f"Failed to register blueprint for plugin {plugin_id}: {e}", exc_info=True)
+
         if registered_blueprints:
             self.logger.info(f"Plugin routes: Registered {len(registered_blueprints)} blueprints [{', '.join(registered_blueprints)}]")
         if skipped_blueprints:
             self.logger.info(f"Skipped {len(skipped_blueprints)} already registered blueprints")
+
+    def register_activation_guard(self) -> None:
+        """Return 404 for routes owned by inactive, activation-gated plugins.
+
+        Also picks up activation changes made by other worker processes.
+        """
+        if getattr(self.app, "_plugin_activation_guard_registered", False):
+            return
+
+        @self.app.before_request
+        def _reject_inactive_plugin_routes():
+            from flask import abort, request
+
+            self.sync_state_from_disk()
+            blueprint = request.blueprint
+            if not blueprint or blueprint not in self.blueprint_plugin_ids:
+                return None
+            if self.blueprint_plugin_ids[blueprint] not in self.active_plugins:
+                abort(404)
+            return None
+
+        self.app._plugin_activation_guard_registered = True
 
     def get_plugin(self, plugin_name: str) -> Optional[BasePlugin]:
         """Get plugin instance by plugin_id."""
@@ -667,6 +807,11 @@ class PluginManager:
         # Add status information
         info['is_active'] = plugin_name in self.active_plugins
         info['status'] = self.get_plugin_status(plugin_name)
+        info['always_on'] = self.is_always_on(plugin_name)
+        info['first_party'] = self.is_first_party(plugin_name)
+        info['requires'] = self.get_required_plugins(plugin_name)
+        info['missing_dependencies'] = self.get_missing_dependencies(plugin_name)
+        info['dependents'] = self.get_dependents(plugin_name)
 
         # Add field type information
         field_types = []
@@ -707,7 +852,7 @@ class PluginManager:
         return self.get_field_types()
 
     def install_plugin(self, plugin_name: str) -> bool:
-        """Install a specific plugin."""
+        """Run a loaded plugin's install hook."""
         if plugin_name not in self.plugins:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
@@ -722,230 +867,243 @@ class PluginManager:
                 self.logger.error(f"Plugin {plugin_name} installation failed")
             return success
         except Exception as e:
-            self.logger.error(f"Error installing plugin {plugin_name}: {e}")
+            self.logger.error(f"Error installing plugin {plugin_name}: {e}", exc_info=True)
             return False
 
+    def lifecycle_block_reason(self, action: str, plugin_name: str) -> Optional[str]:
+        """Why ``action`` (activate, deactivate or uninstall) is refused for a plugin, or None if allowed."""
+        if plugin_name not in self.plugins:
+            return None
+
+        if action == 'deactivate':
+            if self.is_always_on(plugin_name):
+                return f"{plugin_name} is an admin feature and is always on; it cannot be deactivated."
+            active_dependents = [d for d in self.get_dependents(plugin_name) if d in self.active_plugins]
+            if active_dependents:
+                return f"{plugin_name} is required by active plugin(s): {', '.join(active_dependents)}."
+        elif action == 'activate':
+            missing = self.get_missing_dependencies(plugin_name)
+            if missing:
+                return f"{plugin_name} requires plugin(s) that are not installed: {', '.join(missing)}."
+            inactive = [pid for pid in self.get_required_plugins(plugin_name) if pid not in self.active_plugins]
+            if inactive:
+                return f"{plugin_name} requires plugin(s) that are not active: {', '.join(inactive)}."
+        elif action == 'uninstall':
+            if self.is_first_party(plugin_name):
+                return (
+                    f"{plugin_name} is bundled with the application and cannot be uninstalled; "
+                    "deactivate it instead."
+                )
+            dependents = self.get_dependents(plugin_name)
+            if dependents:
+                return f"{plugin_name} is required by plugin(s): {', '.join(dependents)}."
+        return None
+
     def deactivate_plugin(self, plugin_name: str) -> bool:
-        """Deactivate a specific plugin (safe, reversible)."""
+        """Deactivate a specific plugin (safe, reversible).
+
+        Raises PluginLifecycleError for admin-feature plugins, which are always on, and for
+        plugins that other active plugins depend on.
+        """
         if plugin_name not in self.plugins:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
+        reason = self.lifecycle_block_reason('deactivate', plugin_name)
+        if reason:
+            raise PluginLifecycleError(reason)
+
         try:
             plugin = self.plugins[plugin_name]
 
-            # Call plugin's deactivate method if it exists
             if hasattr(plugin, 'deactivate') and callable(getattr(plugin, 'deactivate')):
                 success = plugin.deactivate()
                 if not success:
                     self.logger.error(f"Plugin {plugin_name} deactivation failed")
                     return False
 
-            # Mark plugin as inactive
             self.active_plugins.discard(plugin_name)
-
-            # Re-extract field types to exclude this plugin's field types
             self._extract_field_types()
-
-            # Track the deactivation
+            self._invalidate_form_integration_cache()
             self._track_plugin_installation(plugin, 'deactivated')
-
-            # Save the updated state
             self._save_plugin_states()
 
             self.logger.info(f"Plugin {plugin_name} deactivated successfully")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error deactivating plugin {plugin_name}: {e}")
+            self.logger.error(f"Error deactivating plugin {plugin_name}: {e}", exc_info=True)
             return False
 
     def activate_plugin(self, plugin_name: str) -> bool:
-        """Activate a specific plugin."""
+        """Activate a specific plugin.
+
+        Raises PluginLifecycleError when a required plugin is not installed or not active.
+        """
         if plugin_name not in self.plugins:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
+        reason = self.lifecycle_block_reason('activate', plugin_name)
+        if reason:
+            raise PluginLifecycleError(reason)
+
         try:
             plugin = self.plugins[plugin_name]
 
-            # Call plugin's activate method if it exists
             if hasattr(plugin, 'activate') and callable(getattr(plugin, 'activate')):
                 success = plugin.activate()
                 if not success:
                     self.logger.error(f"Plugin {plugin_name} activation failed")
                     return False
 
-            # Mark plugin as active
             self.active_plugins.add(plugin_name)
-
-            # Re-extract field types to include this plugin's field types
             self._extract_field_types()
-
-            # Track the activation
+            self._invalidate_form_integration_cache()
             self._track_plugin_installation(plugin, 'activated')
-
-            # Save the updated state
             self._save_plugin_states()
 
             self.logger.info(f"Plugin {plugin_name} activated successfully")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error activating plugin {plugin_name}: {e}")
+            self.logger.error(f"Error activating plugin {plugin_name}: {e}", exc_info=True)
             return False
 
     def uninstall_plugin(self, plugin_name: str) -> bool:
-        """Uninstall a specific plugin (complete removal)."""
+        """Uninstall a specific plugin (complete removal, including its files).
+
+        Raises PluginLifecycleError for bundled plugins (their source ships with the app) and
+        for plugins other loaded plugins depend on.
+        """
         if plugin_name not in self.plugins:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
+        reason = self.lifecycle_block_reason('uninstall', plugin_name)
+        if reason:
+            raise PluginLifecycleError(reason)
+
         try:
             plugin = self.plugins[plugin_name]
 
-            # Get cleanup information before uninstalling
-            cleanup_info = {}
-            if hasattr(plugin, 'get_cleanup_info'):
-                cleanup_info = plugin.get_cleanup_info()
-
-            # Call plugin's cleanup method
             if hasattr(plugin, 'cleanup') and callable(getattr(plugin, 'cleanup')):
                 success = plugin.cleanup()
                 if not success:
                     self.logger.error(f"Plugin {plugin_name} cleanup failed")
                     return False
 
-            # Remove plugin files from disk
             self._remove_plugin_files(plugin_name)
 
-            # Remove from active plugins
             self.active_plugins.discard(plugin_name)
-
-            # Remove from plugins dictionary
             del self.plugins[plugin_name]
-
-            # Re-extract field types
+            for registry in (self.plugin_dirs, self.template_dirs, self.static_dirs):
+                registry.pop(plugin_name, None)
+            self._discovery_cache.clear()
             self._extract_field_types()
-
-            # Track the uninstallation
+            self._invalidate_form_integration_cache()
             self._track_plugin_installation(plugin, 'uninstalled')
-
-            # Save the updated state
             self._save_plugin_states()
 
             self.logger.info(f"Plugin {plugin_name} uninstalled successfully")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error uninstalling plugin {plugin_name}: {e}")
+            self.logger.error(f"Error uninstalling plugin {plugin_name}: {e}", exc_info=True)
             return False
 
     def _remove_plugin_files(self, plugin_name: str):
-        """Remove plugin files from disk."""
+        """Remove a plugin's directory from disk (only directories the manager registered)."""
         try:
-            # Find the plugin directory
-            plugin_dir = None
-            for base_dir in self.plugin_directories:
-                potential_dir = base_dir / plugin_name
-                if potential_dir.exists():
-                    plugin_dir = potential_dir
-                    break
+            plugin_dir = self.plugin_dirs.get(plugin_name)
+            if plugin_dir is None:
+                plugin_path = self._find_plugin_path(plugin_name)
+                plugin_dir = Path(plugin_path) if plugin_path else None
 
             if plugin_dir and plugin_dir.exists():
-                # Remove the entire plugin directory
                 shutil.rmtree(plugin_dir)
                 self.logger.info(f"Removed plugin directory: {plugin_dir}")
             else:
                 self.logger.warning(f"Could not find plugin directory for {plugin_name}")
 
         except Exception as e:
-            self.logger.error(f"Error removing plugin files for {plugin_name}: {e}")
+            self.logger.error(f"Error removing plugin files for {plugin_name}: {e}", exc_info=True)
 
     def reload_plugin(self, plugin_name: str) -> bool:
-        """Reload a specific plugin."""
+        """Reload a plugin's code from disk.
+
+        The new version is loaded first; if that fails the running plugin is left untouched.
+        Already-registered blueprints keep their old view functions until the next restart.
+        """
         if plugin_name not in self.plugins:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
         try:
-            # Store current activation state
-            was_active = plugin_name in self.active_plugins
-
-            # Deactivate first
-            self.deactivate_plugin(plugin_name)
-
-            # Remove from plugins dictionary
-            plugin = self.plugins.pop(plugin_name)
-
-            # Reload the plugin
             plugin_path = self._find_plugin_path(plugin_name)
-            if plugin_path:
-                new_plugin = self._load_plugin(plugin_path)
-                if new_plugin:
-                    # Ensure the reloaded plugin id is consistent
-                    if new_plugin.plugin_id != plugin_name:
-                        self.logger.error(
-                            f"Reloaded plugin_id mismatch: expected '{plugin_name}', got '{new_plugin.plugin_id}'. "
-                            "Refusing to overwrite plugin registry entry."
-                        )
-                        return False
+            if not plugin_path:
+                self.logger.error(f"Failed to reload plugin {plugin_name}: directory not found")
+                return False
 
-                    self.plugins[plugin_name] = new_plugin
+            for key in [k for k in self._loaded_plugin_modules if k.startswith(f"{plugin_name}_")]:
+                del self._loaded_plugin_modules[key]
 
-                    # Restore activation state
-                    if was_active:
-                        self.active_plugins.add(plugin_name)
+            new_plugin = self._load_plugin(plugin_path)
+            if not new_plugin:
+                self.logger.error(f"Failed to reload plugin {plugin_name}")
+                return False
 
-                    self._extract_field_types()
-                    self.logger.info(f"Plugin {plugin_name} reloaded successfully")
-                    return True
+            if new_plugin.plugin_id != plugin_name:
+                self.logger.error(
+                    f"Reloaded plugin_id mismatch: expected '{plugin_name}', got '{new_plugin.plugin_id}'. "
+                    "Refusing to overwrite plugin registry entry."
+                )
+                return False
 
-            self.logger.error(f"Failed to reload plugin {plugin_name}")
-            return False
+            self.plugins[plugin_name] = new_plugin
+            self._extract_field_types()
+            self._invalidate_form_integration_cache()
+            self._track_plugin_installation(new_plugin, 'reloaded')
+            self.logger.info(f"Plugin {plugin_name} reloaded successfully")
+            return True
 
         except Exception as e:
-            self.logger.error(f"Error reloading plugin {plugin_name}: {e}")
+            self.logger.error(f"Error reloading plugin {plugin_name}: {e}", exc_info=True)
             return False
 
     def _find_plugin_path(self, plugin_name: str) -> Optional[str]:
         """Find the path to a plugin directory."""
+        registered = self.plugin_dirs.get(plugin_name)
+        if registered is not None and registered.exists():
+            return str(registered)
         for base_dir in self.plugin_directories:
             potential_dir = base_dir / plugin_name
             if potential_dir.exists():
                 return str(potential_dir)
         return None
 
-    def reload_plugins(self):
-        """Reload all plugins (useful for development)."""
+    def reload_plugins(self) -> bool:
+        """Reload every plugin from disk, keeping the current activation state."""
         try:
-            # Store current plugin state
-            current_plugins = self.plugins.copy()
-            current_active = self.active_plugins.copy()
+            current_active = set(self.active_plugins)
 
-            # Clear current state
             self.plugins.clear()
             self.active_plugins.clear()
             self.field_types.clear()
+            self.field_type_to_plugin_id.clear()
+            self._loaded_plugin_modules.clear()
+            self._discovery_cache.clear()
+            self._raw_active_tokens = sorted(current_active)
 
-            # Reload all plugins
             self.load_plugins()
-
-            # Restore active state for existing plugins
-            for plugin_name in current_active:
-                if plugin_name in self.plugins:
-                    self.active_plugins.add(plugin_name)
-
-            # Re-extract field types
-            self._extract_field_types()
-
-            # Save the updated state
-            self._save_plugin_states()
+            self._invalidate_form_integration_cache()
 
             self.logger.info("All plugins reloaded successfully")
+            return True
 
         except Exception as e:
-            self.logger.error(f"Error reloading plugins: {e}")
+            self.logger.error(f"Error reloading plugins: {e}", exc_info=True)
+            return False
 
     def is_plugin_active(self, plugin_name: str) -> bool:
         """Check if a plugin is currently active."""

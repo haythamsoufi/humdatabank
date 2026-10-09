@@ -536,16 +536,23 @@ class AppBottomNavigationBar extends StatelessWidget {
       );
     }
 
+    // System glass draws its own edge and depth; a Flutter shadow under it
+    // shows as a dark halo around the material.
     Widget pill = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: theme.ambientShadow(lightOpacity: 0.16, darkOpacity: 0.45),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: useSystemGlass
+            ? null
+            : [
+                BoxShadow(
+                  color: theme.ambientShadow(
+                    lightOpacity: 0.16,
+                    darkOpacity: 0.45,
+                  ),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: SizedBox(
         key: floatingPillKey,

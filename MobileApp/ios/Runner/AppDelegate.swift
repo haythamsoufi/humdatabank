@@ -65,8 +65,11 @@ private final class GlassCapsuleView: UIView {
 
   init(frame: CGRect, dark: Bool) {
     if #available(iOS 26.0, *) {
-      // Default UIGlassEffect shape is a capsule, which matches the pill.
-      effectView = UIVisualEffectView(effect: UIGlassEffect())
+      // Glass views get a small fixed corner radius unless the shape is set;
+      // layer.cornerRadius is ignored for UIGlassEffect.
+      let glass = UIVisualEffectView(effect: UIGlassEffect())
+      glass.cornerConfiguration = .capsule()
+      effectView = glass
       usesLiquidGlass = true
     } else {
       let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))

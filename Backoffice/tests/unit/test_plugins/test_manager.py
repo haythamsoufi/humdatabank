@@ -233,17 +233,6 @@ class TestSavePluginStates:
         data = json.loads((tmp_path / "instance" / "plugin_states.json").read_text())
         assert set(data["active_plugin_ids"]) == {"plugin_a", "plugin_b"}
 
-    def test_processes_pending_state_updates(self, tmp_path):
-        pm, _ = _make_manager(tmp_path)
-        pm._pending_state_updates = [("plugin_a", "activated"), ("plugin_b", "deactivated")]
-
-        with patch("app.plugins.manager.utcnow") as m:
-            m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
-            pm._save_plugin_states()
-
-        # Pending updates should be cleared after processing
-        assert pm._pending_state_updates == []
-
     def test_handles_write_error_gracefully(self, tmp_path):
         pm, _ = _make_manager(tmp_path)
         with patch("builtins.open", side_effect=OSError("no perm")):
@@ -670,32 +659,6 @@ class TestResolveActivePlugins:
 
 
 # ---------------------------------------------------------------------------
-# _is_existing_plugin
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestIsExistingPlugin:
-    def test_returns_true_when_state_file_exists(self, tmp_path):
-        pm, _ = _make_manager(tmp_path)
-        pm.state_file_path.parent.mkdir(parents=True, exist_ok=True)
-        pm.state_file_path.write_text('{"active_plugin_ids": []}')
-        assert pm._is_existing_plugin("anything") is True
-
-    def test_returns_false_when_state_file_missing(self, tmp_path):
-        pm, _ = _make_manager(tmp_path)
-        assert pm._is_existing_plugin("anything") is False
-
-    def test_returns_false_on_exception(self, tmp_path):
-        pm, _ = _make_manager(tmp_path)
-        # Create the state file so exists() returns True, then make open() fail
-        pm.state_file_path.parent.mkdir(parents=True, exist_ok=True)
-        pm.state_file_path.write_text("{}")
-        with patch("builtins.open", side_effect=OSError("fail")):
-            result = pm._is_existing_plugin("anything")
-        assert result is False
-
-
-# ---------------------------------------------------------------------------
 # register_template_loader
 # ---------------------------------------------------------------------------
 
@@ -735,18 +698,6 @@ class TestRegisterTemplateLoader:
         pm, _ = _make_manager(tmp_path)
         with patch("app.plugins.manager.PluginTemplateLoader", side_effect=RuntimeError("err")):
             pm.register_template_loader()  # Should not raise
-
-
-# ---------------------------------------------------------------------------
-# _queue_state_update
-# ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-class TestQueueStateUpdate:
-    def test_appends_to_pending_updates(self, tmp_path):
-        pm, _ = _make_manager(tmp_path)
-        pm._queue_state_update("my_plugin", "activated")
-        assert ("my_plugin", "activated") in pm._pending_state_updates
 
 
 # ---------------------------------------------------------------------------
@@ -984,11 +935,20 @@ class TestReloadPlugin:
 
     def test_reload_exception(self, tmp_path):
         pm, _ = self._loaded_pm(tmp_path)
-        with patch.object(pm, "deactivate_plugin", side_effect=RuntimeError("err")):
-            with patch("app.plugins.manager.utcnow") as m:
-                m.return_value.isoformat.return_value = "2026-01-01T00:00:00"
-                result = pm.reload_plugin("plugin_a")
-        assert result is False
+        with patch.object(pm, "_load_plugin", side_effect=RuntimeError("err")):
+            assert pm.reload_plugin("plugin_a") is False
+
+    def test_failed_reload_keeps_running_plugin_and_field_types(self, tmp_path):
+        pm, plugins_dir = self._loaded_pm(tmp_path)
+        pm.active_plugins.add("plugin_a")
+        original = pm.plugins["plugin_a"]
+        (plugins_dir / "plugin_a" / "plugin.py").write_text("raise RuntimeError('broken')\n")
+
+        assert pm.reload_plugin("plugin_a") is False
+
+        assert pm.plugins["plugin_a"] is original
+        assert "plugin_a" in pm.active_plugins
+        assert "plugin_a_type" in pm.field_types
 
 
 # ---------------------------------------------------------------------------

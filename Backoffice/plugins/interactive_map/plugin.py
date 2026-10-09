@@ -2,7 +2,7 @@
 
 from app.plugins.base import BasePlugin, BaseFieldType
 from flask import Blueprint, current_app
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 import shutil
 from pathlib import Path
@@ -23,6 +23,9 @@ from plugins.interactive_map.data_utils import (
 from plugins.interactive_map.config import plugin_config
 from plugins.metadata import FirstPartyPluginMetadata
 from app.utils.schema_validation import validate_plugin_config, validate_plugin_data, sanitize_plugin_data
+
+
+_APP_CONFIG_KEYS = ('INTERACTIVE_MAP_DEFAULT_CENTER', 'INTERACTIVE_MAP_TILE_PROVIDER')
 
 
 class InteractiveMapFieldType(BaseFieldType):
@@ -275,21 +278,16 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
 
     def get_blueprint(self):
         """Return blueprint for plugin-specific routes."""
-        # Use absolute import path since this plugin is loaded from a directory
-        import sys
-        import os
-        plugin_dir = os.path.dirname(__file__)
-        if plugin_dir not in sys.path:
-            sys.path.insert(0, plugin_dir)
-        from routes import create_blueprint
-        return create_blueprint()
+        import importlib
+
+        return importlib.import_module('plugins.interactive_map.routes').create_blueprint()
 
     def get_admin_menu_items(self) -> List[Dict[str, Any]]:
         """Return admin menu items for the plugin."""
         return [
             {
                 'name': 'Map Settings',
-                'url': 'plugin_management.map_settings',
+                'url': 'interactive_map_plugin.settings_page',
                 'icon': 'fas fa-map-marked-alt',
                 'category': 'plugins'
             }
@@ -349,21 +347,14 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     def cleanup(self) -> bool:
         """Called when plugin is uninstalled - comprehensive cleanup"""
         try:
-            current_app.logger.info(f"Starting cleanup for Interactive Map Plugin")
+            current_app.logger.info("Starting cleanup for Interactive Map Plugin")
 
-            # 1. Remove uploaded map files
             self._cleanup_uploaded_files()
-
-            # 2. Remove database tables (if any)
             self._cleanup_database()
-
-            # 3. Remove configuration
             self._cleanup_configuration()
-
-            # 4. Remove temporary files
             self._cleanup_temp_files()
 
-            current_app.logger.info(f"Interactive Map Plugin cleanup completed successfully")
+            current_app.logger.info("Interactive Map Plugin cleanup completed successfully")
             return True
         except Exception as e:
             current_app.logger.error(f"Error during Interactive Map Plugin cleanup: {e}")
@@ -372,26 +363,15 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     def get_cleanup_info(self) -> Dict[str, Any]:
         """Return information about what will be cleaned up when uninstalling"""
         return {
-            'database_tables': [
-                'interactive_map_data',
-                'interactive_map_markers',
-                'interactive_map_config'
-            ],
-            'uploaded_files': [
-                '/uploads/interactive_map/',
-                '/uploads/map_tiles/',
-                '/uploads/map_exports/'
-            ],
-            'configuration_keys': [
-                'INTERACTIVE_MAP_API_KEY',
-                'INTERACTIVE_MAP_DEFAULT_CENTER',
-                'INTERACTIVE_MAP_TILE_PROVIDER'
-            ],
-            'estimated_space_freed': '2.5 MB',
+            'database_tables': [],
+            'database_rows': [f'plugin_data row "{self.plugin_id}" (settings and API keys)'],
+            'uploaded_files': [str(path) for path in self._upload_and_temp_dirs()],
+            'configuration_keys': list(_APP_CONFIG_KEYS),
+            'estimated_space_freed': f"{self._calculate_disk_space():.1f} MB",
             'warnings': [
-                'This will permanently delete all map data and configurations',
-                'Uploaded map files will be removed',
-                'Custom map settings will be lost'
+                'Plugin settings and the stored map API keys will be deleted',
+                'Files uploaded by this plugin will be removed',
+                'Existing map field values stored in form submissions are not deleted',
             ],
             'backup_recommendation': True
         }
@@ -399,22 +379,13 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     def get_resource_usage(self) -> Dict[str, Any]:
         """Return current resource usage information"""
         try:
-            # Calculate disk space usage
-            disk_space = self._calculate_disk_space()
-
-            # Count uploaded files
-            uploaded_files = self._count_uploaded_files()
-
-            # Get configuration count
-            config_keys = self._count_configuration_keys()
-
             return {
-                'disk_space': f"{disk_space:.1f} MB",
-                'database_tables': 3,  # Fixed for this plugin
-                'uploaded_files': uploaded_files,
-                'configuration_keys': config_keys,
+                'disk_space': f"{self._calculate_disk_space():.1f} MB",
+                'database_tables': 0,
+                'uploaded_files': self._count_uploaded_files(),
+                'configuration_keys': self._count_configuration_keys(),
                 'last_activity': self._get_last_activity(),
-                'memory_usage': '1.2 MB'  # Estimated
+                'memory_usage': None,
             }
         except Exception as e:
             current_app.logger.error(f"Error getting resource usage: {e}")
@@ -424,19 +395,21 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
                 'uploaded_files': 0,
                 'configuration_keys': 0,
                 'last_activity': None,
-                'memory_usage': '0 MB'
+                'memory_usage': None,
             }
+
+    def _upload_and_temp_dirs(self) -> List[Path]:
+        return [
+            Path(get_plugin_upload_path('interactive_map')),
+            Path(current_app.config.get('TEMP_FOLDER', 'temp')) / 'interactive_map',
+        ]
 
     def _create_directories(self):
         """Create necessary directories for the plugin"""
         try:
-            upload_dir = Path(get_plugin_upload_path('interactive_map'))
-            upload_dir.mkdir(parents=True, exist_ok=True)
-
-            temp_dir = Path(current_app.config.get('TEMP_FOLDER', 'temp')) / 'interactive_map'
-            temp_dir.mkdir(parents=True, exist_ok=True)
-
-            current_app.logger.info(f"Created directories for Interactive Map Plugin")
+            for directory in self._upload_and_temp_dirs():
+                directory.mkdir(parents=True, exist_ok=True)
+            current_app.logger.info("Created directories for Interactive Map Plugin")
         except Exception as e:
             current_app.logger.error(f"Error creating directories: {e}")
             raise
@@ -444,14 +417,13 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     def _initialize_config(self):
         """Initialize plugin configuration"""
         try:
-            # Set default configuration values
             if 'INTERACTIVE_MAP_DEFAULT_CENTER' not in current_app.config:
                 current_app.config['INTERACTIVE_MAP_DEFAULT_CENTER'] = {'lat': 0, 'lng': 0}
 
             if 'INTERACTIVE_MAP_TILE_PROVIDER' not in current_app.config:
                 current_app.config['INTERACTIVE_MAP_TILE_PROVIDER'] = 'openstreetmap'
 
-            current_app.logger.info(f"Initialized configuration for Interactive Map Plugin")
+            current_app.logger.info("Initialized configuration for Interactive Map Plugin")
         except Exception as e:
             current_app.logger.error(f"Error initializing configuration: {e}")
             raise
@@ -464,11 +436,10 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
                 shutil.rmtree(upload_dir)
                 current_app.logger.info(f"Removed uploaded files directory: {upload_dir}")
 
-            # Also check for map-specific directories (legacy locations)
-            map_dirs = ['map_tiles', 'map_exports']
+            # Legacy locations used by earlier versions
             from app.utils.file_paths import get_upload_base_path
             upload_base = Path(get_upload_base_path())
-            for map_dir in map_dirs:
+            for map_dir in ('map_tiles', 'map_exports'):
                 map_path = upload_base / map_dir
                 if map_path.exists():
                     shutil.rmtree(map_path)
@@ -477,29 +448,23 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
             current_app.logger.warning(f"Could not remove uploaded files: {e}")
 
     def _cleanup_database(self):
-        """Remove database tables and data"""
+        """Delete this plugin's settings document."""
+        from app.extensions import db
+        from app.models.plugin_data import PluginData
+
         try:
-            # Example: Remove plugin-specific tables
-            tables = ['interactive_map_data', 'interactive_map_markers', 'interactive_map_config']
-            for table in tables:
-                try:
-                    # Note: In a real implementation, you would use proper database models
-                    # db.session.execute(f"DROP TABLE IF EXISTS {table}")
-                    current_app.logger.info(f"Would drop table: {table}")
-                except Exception as e:
-                    current_app.logger.warning(f"Could not drop table {table}: {e}")
+            PluginData.query.filter_by(plugin_id=self.plugin_id).delete()
+            db.session.commit()
         except Exception as e:
-            current_app.logger.warning(f"Error during database cleanup: {e}")
+            db.session.rollback()
+            current_app.logger.warning(f"Could not remove plugin data row: {e}")
 
     def _cleanup_configuration(self):
         """Remove plugin configuration"""
         try:
-            # Remove from app config
-            config_keys = ['INTERACTIVE_MAP_API_KEY', 'INTERACTIVE_MAP_DEFAULT_CENTER', 'INTERACTIVE_MAP_TILE_PROVIDER']
-            for key in config_keys:
+            for key in _APP_CONFIG_KEYS:
                 current_app.config.pop(key, None)
-
-            current_app.logger.info(f"Removed configuration keys: {config_keys}")
+            current_app.logger.info(f"Removed configuration keys: {list(_APP_CONFIG_KEYS)}")
         except Exception as e:
             current_app.logger.warning(f"Error during configuration cleanup: {e}")
 
@@ -514,24 +479,17 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
             current_app.logger.warning(f"Could not remove temporary files: {e}")
 
     def _calculate_disk_space(self) -> float:
-        """Calculate disk space used by plugin files"""
+        """Disk space (MB) used by the plugin's code and uploads."""
         try:
             total_size = 0
-
-            # Check plugin directory size
-            plugin_dir = Path(__file__).parent
-            for file_path in plugin_dir.rglob('*'):
-                if file_path.is_file():
-                    total_size += file_path.stat().st_size
-
-            # Check uploaded files size
-            upload_dir = Path(get_plugin_upload_path('interactive_map'))
-            if upload_dir.exists():
-                for file_path in upload_dir.rglob('*'):
-                    if file_path.is_file():
+            roots = [Path(__file__).parent, Path(get_plugin_upload_path('interactive_map'))]
+            for root in roots:
+                if not root.exists():
+                    continue
+                for file_path in root.rglob('*'):
+                    if file_path.is_file() and '__pycache__' not in file_path.parts:
                         total_size += file_path.stat().st_size
-
-            return total_size / (1024 * 1024)  # Convert to MB
+            return total_size / (1024 * 1024)
         except Exception as e:
             current_app.logger.warning(f"Error calculating disk space: {e}")
             return 0.0
@@ -539,34 +497,25 @@ class InteractiveMapPlugin(FirstPartyPluginMetadata, BasePlugin):
     def _count_uploaded_files(self) -> int:
         """Count uploaded files for this plugin"""
         try:
-            count = 0
             upload_dir = Path(get_plugin_upload_path('interactive_map'))
-            if upload_dir.exists():
-                count += len(list(upload_dir.rglob('*')))
-            return count
+            if not upload_dir.exists():
+                return 0
+            return sum(1 for path in upload_dir.rglob('*') if path.is_file())
         except Exception as e:
             current_app.logger.warning(f"Error counting uploaded files: {e}")
             return 0
 
     def _count_configuration_keys(self) -> int:
-        """Count configuration keys for this plugin"""
-        try:
-            count = 0
-            config_keys = ['INTERACTIVE_MAP_API_KEY', 'INTERACTIVE_MAP_DEFAULT_CENTER', 'INTERACTIVE_MAP_TILE_PROVIDER']
-            for key in config_keys:
-                if key in current_app.config:
-                    count += 1
-            return count
-        except Exception as e:
-            current_app.logger.warning(f"Error counting configuration keys: {e}")
-            return 0
+        """Count app config keys this plugin has set"""
+        return sum(1 for key in _APP_CONFIG_KEYS if key in current_app.config)
 
-    def _get_last_activity(self) -> str:
-        """Get last activity timestamp for the plugin"""
+    def _get_last_activity(self) -> Optional[str]:
+        """When the plugin's settings were last saved (ISO timestamp), if ever."""
         try:
-            # In a real implementation, this would query the database
-            # For now, return a placeholder
-            return "2024-01-15 14:30:00"
+            from app.models.plugin_data import PluginData
+
+            row = PluginData.query.filter_by(plugin_id=self.plugin_id).first()
+            return row.updated_at.isoformat() if row and row.updated_at else None
         except Exception as e:
             current_app.logger.warning(f"Error getting last activity: {e}")
             return None

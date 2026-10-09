@@ -1,7 +1,7 @@
 # Backoffice/plugins/interactive_map/routes.py
 
 from flask import Blueprint, render_template, request, current_app, Response
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 try:
     import requests
@@ -15,7 +15,10 @@ from app.plugins.plugin_utils import (
     plugin_admin_route_wrapper,
     measure_performance,
     clear_plugin_cache,
+    redact_secrets,
+    REDACTED_SECRET,
 )
+from app.utils.rate_limiting import hit_rate_limit
 from app.utils.api_helpers import get_json_safe
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
@@ -26,6 +29,27 @@ from pathlib import Path
 
 plugin_config = load_plugin_config(Path(__file__).parent, "interactive_map")
 
+# Stored secrets: never sent to the browser; the placeholder keeps the stored value on save.
+SECRET_PATHS = (
+    ("api_keys", "mapbox"),
+    ("api_keys", "google_maps"),
+    ("global_settings", "geocoding_api_key"),
+)
+
+MAP_PROVIDERS = ('openstreetmap', 'google_maps', 'mapbox', 'leaflet', 'custom_tiles')
+
+MAPBOX_STYLE_ID = 'go-ifrc/ckrfe16ru4c8718phmckdfjh0'
+
+# Per-user and global per-minute budgets for paid or policy-limited upstream services.
+TILE_REQUESTS_PER_USER_PER_MINUTE = 600
+GEOCODE_REQUESTS_PER_USER_PER_MINUTE = 10
+# Nominatim's usage policy allows an absolute maximum of 1 request per second for the whole app.
+NOMINATIM_REQUESTS_PER_MINUTE = 60
+
+
+def _viewer_key(prefix: str) -> str:
+    return f"{prefix}:{current_user.get_id()}"
+
 
 def create_blueprint():
     """Create blueprint for the interactive map plugin."""
@@ -34,7 +58,7 @@ def create_blueprint():
     bp = Blueprint('interactive_map_plugin', __name__, url_prefix='/admin/plugins/interactive_map', template_folder=template_folder)
 
     # Use the base plugin routes utility
-    plugin_routes = BasePluginRoutes('interactive_map', 'Interactive Map Plugin', plugin_config)
+    plugin_routes = BasePluginRoutes('interactive_map', 'Interactive Map Plugin', plugin_config, secret_paths=SECRET_PATHS)
     plugin_routes.create_standard_routes(bp, render_plugin_template)
 
     @bp.route('/api/tiles/<map_type>')
@@ -47,9 +71,9 @@ def create_blueprint():
             return json_bad_request('Invalid map type parameter', error='Invalid map type parameter')
 
         # Sanitize map_type to prevent injection
-        allowed_map_types = ['openstreetmap', 'google_maps', 'mapbox', 'leaflet', 'custom_tiles']
-        if map_type not in allowed_map_types:
-            return json_bad_request(f'Map type must be one of: {", ".join(allowed_map_types)}', error=f'Map type must be one of: {", ".join(allowed_map_types)}')
+        if map_type not in MAP_PROVIDERS:
+            message = f'Map type must be one of: {", ".join(MAP_PROVIDERS)}'
+            return json_bad_request(message, error=message)
 
         # Get base configurations from plugin config
         provider_config = plugin_config.get_provider_config(map_type)
@@ -84,19 +108,20 @@ def create_blueprint():
 
         if z < 0 or z > 22:
             return json_bad_request('Invalid zoom level', error='Invalid zoom level')
+        if x >= 2 ** z or y >= 2 ** z:
+            return json_bad_request('Invalid tile coordinates', error='Invalid tile coordinates')
+
+        if hit_rate_limit(_viewer_key('interactive_map:tiles'), TILE_REQUESTS_PER_USER_PER_MINUTE):
+            return json_error('Too many tile requests', 429, success=False, error='Too many tile requests')
 
         mapbox_token = plugin_config.get_api_key('mapbox')
         if not mapbox_token:
             return json_bad_request('Mapbox is not configured', error='Mapbox is not configured')
 
-        style_id = 'go-ifrc/ckrfe16ru4c8718phmckdfjh0'
-        tile_url = (
-            f'https://api.mapbox.com/styles/v1/{style_id}/tiles/{z}/{x}/{y}'
-            f'?access_token={mapbox_token}'
-        )
+        tile_url = f'https://api.mapbox.com/styles/v1/{MAPBOX_STYLE_ID}/tiles/{z}/{x}/{y}'
 
         try:
-            upstream = requests.get(tile_url, timeout=10)
+            upstream = requests.get(tile_url, params={'access_token': mapbox_token}, timeout=10)
             if upstream.status_code != 200:
                 current_app.logger.warning(
                     'Mapbox tile proxy upstream status %s for z=%s x=%s y=%s',
@@ -109,20 +134,17 @@ def create_blueprint():
 
             upstream_type = (upstream.headers.get('Content-Type') or '').split(';')[0].strip().lower()
             headers = {
-                'Cache-Control': 'public, max-age=86400',
+                'Cache-Control': 'private, max-age=86400',
                 'X-Content-Type-Options': 'nosniff',
                 'Content-Security-Policy': "default-src 'none'; sandbox",
             }
-            if upstream_type == 'image/png':
-                return Response(upstream.content, status=200, headers=headers, mimetype='image/png')
-            if upstream_type == 'image/jpeg':
-                return Response(upstream.content, status=200, headers=headers, mimetype='image/jpeg')
-            if upstream_type == 'image/webp':
-                return Response(upstream.content, status=200, headers=headers, mimetype='image/webp')
+            if upstream_type in ('image/png', 'image/jpeg', 'image/webp'):
+                return Response(upstream.content, status=200, headers=headers, mimetype=upstream_type)
             current_app.logger.warning('Mapbox tile proxy rejected upstream content type %r', upstream_type)
             return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
         except requests.exceptions.RequestException as exc:
-            current_app.logger.error('Mapbox tile proxy request failed: %s', exc)
+            # The exception text can embed the request URL, which carries the access token.
+            current_app.logger.error('Mapbox tile proxy request failed: %s', type(exc).__name__)
             return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
 
     @bp.route('/api/config/field', methods=['GET'])
@@ -176,6 +198,14 @@ def create_blueprint():
         if not address:
             return json_bad_request('Address cannot be empty', success=False, error='Address cannot be empty')
 
+        if hit_rate_limit(_viewer_key('interactive_map:geocode'), GEOCODE_REQUESTS_PER_USER_PER_MINUTE):
+            return json_error(
+                'Rate limit exceeded. Please wait before making another request.',
+                429,
+                success=False,
+                error='Rate limit exceeded. Please wait before making another request.'
+            )
+
         # Get geocoding service from config
         geocoding_service = plugin_config.get_global_setting('geocoding_service') or 'nominatim'
 
@@ -187,34 +217,14 @@ def create_blueprint():
         try:
             if geocoding_service == 'nominatim':
                 # Use Nominatim for free geocoding
-                import requests
-                from flask import g
 
-                # Rate limiting: Check if we've made too many requests recently
-                # Use Flask's g object to track requests per session
-                if not hasattr(g, 'nominatim_request_count'):
-                    g.nominatim_request_count = 0
-                if not hasattr(g, 'nominatim_request_time'):
-                    g.nominatim_request_time = 0
-
-                import time as time_module
-                current_time = time_module.time()
-
-                # Reset counter if more than 1 second has passed
-                if current_time - g.nominatim_request_time > 1.0:
-                    g.nominatim_request_count = 0
-                    g.nominatim_request_time = current_time
-
-                # Enforce rate limit: max 1 request per second (Nominatim's usage policy)
-                if g.nominatim_request_count >= 1:
+                if hit_rate_limit('interactive_map:nominatim', NOMINATIM_REQUESTS_PER_MINUTE, shared=True):
                     return json_error(
                         'Rate limit exceeded. Please wait before making another request.',
                         429,
                         success=False,
                         error='Rate limit exceeded. Please wait before making another request.'
                     )
-
-                g.nominatim_request_count += 1
 
                 # Make geocoding request
                 response = requests.get(
@@ -326,7 +336,7 @@ def create_blueprint():
     def get_settings():
         """Get plugin settings."""
         try:
-            config = plugin_config.get_all_config()
+            config = redact_secrets(plugin_config.get_all_config(), SECRET_PATHS)
             return json_ok(success=True, settings=config)
         except Exception as e:
             current_app.logger.error(f"Error getting settings: {e}")
@@ -346,8 +356,7 @@ def create_blueprint():
 
             # Validate and sanitize input values
             default_map_provider = data.get('default_map_provider', 'mapbox')
-            allowed_providers = ['openstreetmap', 'google_maps', 'mapbox', 'leaflet']
-            if default_map_provider not in allowed_providers:
+            if default_map_provider not in MAP_PROVIDERS:
                 default_map_provider = 'mapbox'
 
             # Validate zoom level
@@ -372,11 +381,13 @@ def create_blueprint():
             if geocoding_service not in allowed_services:
                 geocoding_service = 'nominatim'
 
-            # Sanitize API keys (limit length, remove whitespace)
+            # Sanitize API keys (limit length, remove whitespace). The redaction placeholder means "unchanged".
             geocoding_api_key = str(data.get('geocoding_api_key', '')).strip()[:500]
             mapbox_api_key = str(data.get('mapbox_api_key', '')).strip()[:500]
-
-            current_app.logger.info(f"Interactive Map Plugin: Saving settings - mapbox_api_key length: {len(mapbox_api_key)}, value present: {bool(mapbox_api_key)}")
+            if geocoding_api_key == REDACTED_SECRET:
+                geocoding_api_key = plugin_config.get_global_setting('geocoding_api_key') or ''
+            if mapbox_api_key == REDACTED_SECRET:
+                mapbox_api_key = plugin_config.get_api_key('mapbox') or ''
 
             # Map form fields to config structure
             settings = {
@@ -398,15 +409,8 @@ def create_blueprint():
                 if section == 'api_keys':
                     # Handle API keys separately
                     for key, value in section_data.items():
-                        current_app.logger.info(f"Interactive Map Plugin: Setting API key '{key}' (length: {len(value) if value else 0})")
-                        success = plugin_config.set_api_key(key, value)
-                        if not success:
+                        if not plugin_config.set_api_key(key, value):
                             current_app.logger.error(f"Failed to set API key: {key}")
-                        else:
-                            current_app.logger.info(f"Successfully set API key: {key}")
-                            # Verify it was saved
-                            saved_value = plugin_config.get_api_key(key)
-                            current_app.logger.info(f"Verified saved API key '{key}' length: {len(saved_value) if saved_value else 0}")
                 else:
                     for key, value in section_data.items():
                         if not plugin_config.set_global_setting(key, value):
@@ -440,7 +444,6 @@ def create_blueprint():
         """Get plugin usage statistics."""
         try:
             from app.models import FormItem
-            from sqlalchemy import func
 
             # Query actual database for statistics using correct item_type
             # Plugin items use item_type='plugin_interactive_map', not field_type
@@ -455,18 +458,11 @@ def create_blueprint():
                 FormItem.template_id
             ).distinct().count()
 
-            # For now, use estimated values for markers and API calls
-            # These would need proper tracking implementation
-            total_markers = total_map_fields * 3  # Estimated average markers per field
-            api_calls_today = 42  # Would need proper API call tracking
-
             return json_ok(
                 success=True,
                 stats={
                     'total_map_fields': total_map_fields,
                     'active_forms': active_forms,
-                    'total_markers': total_markers,
-                    'api_calls': api_calls_today
                 }
             )
 
@@ -476,12 +472,6 @@ def create_blueprint():
                 'Failed to retrieve usage statistics',
                 success=False,
                 error='Failed to retrieve usage statistics',
-                stats={
-                    'total_map_fields': 0,
-                    'active_forms': 0,
-                    'total_markers': 0,
-                    'api_calls': 0
-                }
             )
 
     return bp

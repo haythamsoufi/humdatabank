@@ -195,6 +195,7 @@ def create_app(config_name=None):
         not app.debug or serves_http or app.config.get('TESTING')
     ):
         app.plugin_manager.register_blueprints()
+        app.plugin_manager.register_activation_guard()
 
     from app.error_handlers import register_error_handlers
     register_error_handlers(app)

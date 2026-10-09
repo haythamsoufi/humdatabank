@@ -1441,7 +1441,9 @@ def chat():
     except Exception as e:
         error_type = type(e).__name__
         error_message = GENERIC_ERROR_MESSAGE
-        current_app.logger.exception("AI v2 chat failed: %s", error_message)
+        # Classify on the real exception text; it is never returned to the client.
+        classify_text = f"{error_type} {e}"
+        current_app.logger.exception("AI v2 chat failed: %s", error_type)
 
         # Track error in telemetry
         try:
@@ -1483,17 +1485,18 @@ def chat():
         }
 
         # Add additional context for common error types
-        if "quota" in error_message.lower() or "rate limit" in error_message.lower() or "429" in error_message:
+        classify_lower = classify_text.lower()
+        if "quota" in classify_lower or "rate limit" in classify_lower or "ratelimit" in classify_lower or re.search(r"\b429\b", classify_text):
             error_response["error_type"] = "quota_exceeded"
             error_response["error"] = "API rate limit exceeded"
             error_response["message"] = "The AI service has reached its request limit. Please try again later."
-        elif "timeout" in error_message.lower() or "TimeoutError" in error_type:
+        elif "timeout" in classify_lower or "timed out" in classify_lower:
             error_response["error"] = "Request timeout"
             error_response["message"] = "The request took too long to process. Please try again."
-        elif "connection" in error_message.lower() or "ConnectionError" in error_type:
+        elif "connection" in classify_lower:
             error_response["error"] = "Connection error"
             error_response["message"] = "Unable to connect to the AI service. Please check your connection and try again."
-        elif "authentication" in error_message.lower() or "401" in error_message or "403" in error_message:
+        elif "authentication" in classify_lower or re.search(r"\b401\b", classify_text):
             error_response["error"] = "Authentication error"
             error_response["message"] = "Authentication failed. Please log in and try again."
 

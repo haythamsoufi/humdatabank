@@ -6,6 +6,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
+import 'ai_chat_exception.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 import '../di/service_locator.dart';
@@ -33,14 +34,18 @@ class AiChatService {
   Future<String?> fetchAndCacheToken() async {
     try {
       final resp = await _api.get(AppConfig.aiV2TokenEndpoint, includeAuth: true, useCache: false);
-      if (resp.statusCode != 200) return null;
+      if (resp.statusCode != 200) {
+        DebugLogger.logWarn('AI', 'AI token request failed: HTTP ${resp.statusCode}');
+        return null;
+      }
       final data = jsonDecode(resp.body);
       final token = data['token']?.toString();
       if (token != null && token.isNotEmpty) {
         await _storage.setSecure(_aiTokenKey, token);
       }
       return token;
-    } catch (_) {
+    } catch (e) {
+      DebugLogger.logWarn('AI', 'AI token request error: $e');
       return null;
     }
   }
@@ -105,10 +110,12 @@ class AiChatService {
         additionalHeaders: headers.isEmpty ? null : headers,
       );
 
-      final data = jsonDecode(resp.body);
-
       // Token might be expired/invalid: refresh once then retry the request.
       if (isAuthenticated && (resp.statusCode == 401 || resp.statusCode == 403)) {
+        DebugLogger.logWarn(
+          'AI',
+          'Chat HTTP ${resp.statusCode}; refreshing token and retrying once',
+        );
         try {
           await clearToken();
           final refreshed = await fetchAndCacheToken();
@@ -119,25 +126,29 @@ class AiChatService {
               body: body,
               additionalHeaders: {'Authorization': 'Bearer $refreshed'},
             );
-            final retryData = jsonDecode(retryResp.body);
             if (retryResp.statusCode == 200) {
-              return Map<String, dynamic>.from(retryData);
+              return _decodeChatSuccess(retryResp.body);
             }
-            final retryMsg = _extractErrorMessage(Map<String, dynamic>.from(retryData), retryResp.statusCode);
-            throw Exception(retryMsg);
+            throw AiChatHttpException.fromResponse(retryResp.statusCode, retryResp.body);
           }
-        } catch (_) {
-          // Fall through: we'll surface the original auth error.
+        } on AiChatHttpException {
+          rethrow;
+        } catch (e) {
+          DebugLogger.logWarn('AI', 'Chat token refresh retry failed: $e');
         }
       }
 
       if (resp.statusCode != 200) {
-        final errorMessage =
-            _extractErrorMessage(Map<String, dynamic>.from(data), resp.statusCode);
-        throw Exception(errorMessage);
+        final error = AiChatHttpException.fromResponse(resp.statusCode, resp.body);
+        DebugLogger.logWarn(
+          'AI',
+          'Chat HTTP ${resp.statusCode} '
+          'type=${error.backendErrorType ?? '-'} message=${error.message}',
+        );
+        throw error;
       }
 
-      return Map<String, dynamic>.from(data);
+      return _decodeChatSuccess(resp.body);
     }
 
     Exception? lastError;
@@ -157,6 +168,14 @@ class AiChatService {
     }
 
     throw lastError ?? Exception('Chat failed after retries');
+  }
+
+  Map<String, dynamic> _decodeChatSuccess(String body) {
+    final decoded = jsonDecode(body);
+    if (decoded is! Map) {
+      throw const FormatException('Unexpected chat response format');
+    }
+    return Map<String, dynamic>.from(decoded);
   }
 
   /// Streaming via WebSocket (mobile-first)
@@ -359,47 +378,6 @@ class AiChatService {
     if (resp.statusCode != 200) {
       throw Exception(data['error']?.toString() ?? 'Failed to import conversation messages');
     }
-  }
-
-  /// Extract detailed error message from API response
-  String _extractErrorMessage(Map<String, dynamic> data, int statusCode) {
-    // Try multiple fields that might contain error information
-    final String? error = data['error']?.toString();
-    final String? message = data['message']?.toString();
-    final String? detail = data['detail']?.toString();
-    final String? details = data['details']?.toString();
-
-    // Build error message with available information
-    final List<String> parts = [];
-
-    if (error != null && error.isNotEmpty && error != 'Chat failed') {
-      parts.add(error);
-    }
-
-    if (message != null && message.isNotEmpty && message != error) {
-      parts.add(message);
-    }
-
-    if (detail != null && detail.isNotEmpty) {
-      parts.add(detail);
-    }
-
-    if (details != null && details.isNotEmpty) {
-      parts.add(details);
-    }
-
-    // If we have detailed info, use it (avoid surfacing HTTP codes to end users).
-    if (parts.isNotEmpty) {
-      return parts.join(' — ');
-    }
-
-    if (statusCode >= 500) {
-      return 'The assistant is temporarily unavailable. Please try again later.';
-    } else if (statusCode >= 400) {
-      return 'Could not complete the request. Please try again.';
-    }
-
-    return 'Chat failed';
   }
 
   /// Like/dislike for a trace (same as web immersive chat).

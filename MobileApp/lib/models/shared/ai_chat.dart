@@ -125,3 +125,14 @@ class AiConversationSummary {
     );
   }
 }
+
+/// Removes the previous failed attempt from the end of [messages]: error bubbles and
+/// empty assistant placeholders. Used by retry so a new attempt replaces the old
+/// error bubble instead of stacking another one.
+void removeTrailingFailedAttempt(List<AiChatMessage> messages) {
+  while (messages.isNotEmpty &&
+      (messages.last.role == 'error' ||
+          (messages.last.role == 'assistant' && messages.last.content.isEmpty))) {
+    messages.removeLast();
+  }
+}

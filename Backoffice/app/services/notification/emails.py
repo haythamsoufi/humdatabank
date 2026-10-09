@@ -1349,22 +1349,38 @@ def build_grouped_entity_email_preview(
         )
         return empty
 
-    use_team_greeting = len(to_emails) > 1 or bool(cc_emails)
+    nt_val = getattr(
+        getattr(sample_notification, 'notification_type', None),
+        'value',
+        str(getattr(sample_notification, 'notification_type', '') or ''),
+    )
+    # Assignment-created mail is one message per country. Always greet the
+    # group ("Dear colleagues"), including a single focal point and the
+    # no-recipient preview. Never substitute the country name for a person.
+    always_team_greeting = nt_val == 'assignment_created'
+    use_team_greeting = always_team_greeting or len(to_emails) > 1 or bool(cc_emails)
+    locale_user = None
+    if to_eligible:
+        locale_user = user_map.get(to_eligible[0])
+    elif cc_eligible:
+        locale_user = user_map.get(cc_eligible[0])
     if use_team_greeting:
-        proxy_user = SimpleNamespace(
-            name=entity_name,
-            email=to_emails[0] if to_emails else 'preview@example.com',
-            preferred_language='en',
-        )
+        if locale_user is not None:
+            proxy_user = locale_user
+        else:
+            proxy_user = SimpleNamespace(
+                name='',
+                email=to_emails[0] if to_emails else 'preview@example.com',
+                preferred_language='en',
+            )
         email_audience = 'grouped'
     else:
-        sole_uid = to_eligible[0] if to_eligible else None
-        sole_user = user_map.get(sole_uid) if sole_uid else None
+        sole_user = locale_user
         if sole_user:
             proxy_user = sole_user
         else:
             proxy_user = SimpleNamespace(
-                name=to_emails[0] if to_emails else entity_name,
+                name=to_emails[0] if to_emails else '',
                 email=to_emails[0] if to_emails else 'preview@example.com',
                 preferred_language='en',
             )
@@ -1429,9 +1445,10 @@ def send_grouped_entity_email(
     """
     Send one notification email per entity: focal points in To, admins in CC.
 
-    Uses *sample_notification* for subject/body content. Multiple To/CC recipients use
-    a team greeting ("Dear colleagues,"); a sole To recipient with no CC gets a
-    personal "Hello {name}," greeting.
+    Uses *sample_notification* for subject/body content. Assignment-created emails
+    always use the team greeting ("Dear colleagues,"), including a single To
+    recipient and a preview with no recipients. The country name is never used
+    as the greeting.
 
     When *notification_by_user_id* is provided, one EmailDeliveryLog row is written per
     email-eligible recipient, each linked via notification_id so Communication Center

@@ -971,7 +971,7 @@ def new_assignment():
                 # Send notifications to focal points only if requested. Dispatched
                 # asynchronously (after commit) so a large country set can't hold this
                 # request open — see docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md.
-                send_notifications = getattr(form.send_notifications, 'data', True)
+                send_notifications = getattr(form.send_notifications, 'data', False)
                 notify_admins = getattr(form.notify_admins, 'data', False) if send_notifications else False
                 if send_notifications:
                     aes_ids_for_notify = [aes.id for aes in created_aes_list]
@@ -997,6 +997,8 @@ def new_assignment():
                     success_msg += f" Public URL generated and is {public_status}."
                 if send_notifications:
                     success_msg += " Notifications are being sent in the background."
+                else:
+                    success_msg += " No notifications were sent."
                 flash(success_msg, "success")
             else:
                 success_msg = f"Assignment '{new_assignment.period_name}' created successfully. No entities assigned yet."

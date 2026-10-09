@@ -464,7 +464,7 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             {{ form.send_notifications.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Focal points will be notified about the new assignment. Uncheck to create without sending notifications.') }}</p>
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Leave this unticked to create the assignment without emailing or notifying anyone. Tick it only if focal points should be notified as soon as the assignment is created. You will confirm this before the assignment is created.') }}</p>
                         </div>
                     </div>
 
@@ -1388,9 +1388,20 @@ window.manageAssignmentConfig = {
         duplicateAssignment: {{ _('Duplicate assignment')|tojson }},
         createAssignment: {{ _('Create assignment')|tojson }},
         continueBtn: {{ _('Continue')|tojson }},
-        noNotifyMsg: {{ _('This assignment will be created without sending notifications to assigned entities. Do you want to continue?')|tojson }},
-        notifyMsg: {{ _('Assigned entities (focal points) will be notified about this new assignment. Do you want to continue?')|tojson }},
-        notifyMsgDisabled: {{ _('The "Notify focal points" checkbox is ticked, but notifications for assignment_created are currently disabled in platform settings (Admin → Settings → Notifications). No one will be notified. Do you want to continue anyway?')|tojson }},
+        confirmNoNotifyTitle: {{ _('Create without notifications?')|tojson }},
+        confirmNotifyTitle: {{ _('Send notifications now?')|tojson }},
+        confirmNotifyBlockedTitle: {{ _('Notifications will not be sent')|tojson }},
+        confirmNotifyNoneTitle: {{ _('No one will be notified')|tojson }},
+        confirmNoNotifyBtn: {{ _('Create without notifying')|tojson }},
+        confirmNotifyBtn: {{ _('Create and notify')|tojson }},
+        noNotifyLead: {{ _('The "Notify assigned entities" option is unticked.')|tojson }},
+        noNotifyBody: {{ _('No email and no in-app notification will be sent to focal points or admins.')|tojson }},
+        noNotifyAsk: {{ _('Create this assignment without contacting anyone?')|tojson }},
+        notifyLead: {{ _('The "Notify assigned entities" option is ticked.')|tojson }},
+        notifyBody: {{ _('Emails and in-app notifications will be sent as soon as this assignment is created.')|tojson }},
+        notifyWho: {{ _('Who will be notified:')|tojson }},
+        notifyBlockedBody: {{ _('Platform settings have notifications for new assignments turned off (Admin → Settings → Notifications). No email or in-app notification will be sent.')|tojson }},
+        notifyNoneBody: {{ _('No focal points are configured for the selected countries. No email or in-app notification will be sent.')|tojson }},
         notifyAudienceDisabled: {{ _('⚠ Platform settings have disabled notifications for this event — focal points will NOT receive notifications even though this box is checked.')|tojson }},
         notifyPreviewLoading: {{ _('Checking notification recipients…')|tojson }},
         notifyRecipientsSummary: {{ _('{users} focal points (in-app); {entities} emails to {email_users} with email enabled{no_focal_suffix}{admin_suffix}{admin_cc_suffix}')|tojson }},

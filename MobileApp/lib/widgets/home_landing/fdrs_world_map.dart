@@ -675,10 +675,10 @@ class FdrsMapModeToggle extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: selected
                     ? [
-                        BoxShadow(
+                        const BoxShadow(
                           color: GroupedDashboardPalette.softShadow,
                           blurRadius: 6,
-                          offset: const Offset(0, 1),
+                          offset: Offset(0, 1),
                         ),
                       ]
                     : null,

@@ -1,11 +1,6 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/shared/notification_provider.dart';
 import '../providers/shared/auth_provider.dart';
@@ -16,15 +11,6 @@ import '../utils/navigation_helper.dart';
 import '../l10n/app_localizations.dart';
 import 'tab_customization_dialog.dart';
 
-/// Floating glass tab bar.
-///
-/// The capsule is inset from the screen edges and sits above the iPhone home
-/// indicator (or the Android system inset), in the style of Instagram and the
-/// iOS 26 tab bar. The selected tab is a rounded capsule behind the glyph.
-///
-/// On iOS the capsule is a system material ([UiKitView]): Liquid Glass on
-/// iOS 26, and the ultra-thin system blur on earlier versions. Other
-/// platforms keep a Flutter [BackdropFilter] approximation.
 class AppBottomNavigationBar extends StatelessWidget {
   /// Pass as [currentIndex] when no tab should appear selected.
   static const int noTabSelected = -1;
@@ -64,40 +50,31 @@ class AppBottomNavigationBar extends StatelessWidget {
   /// Light icon colours for dark translucent bars ([backgroundColor] with low opacity).
   final bool lightForegroundOnBar;
 
+  /// Selection stripe at the top of each tab slot.
+  static const double _stripeHeight = 3;
+
   /// Tab glyph size.
   static const double _iconExtent = 24;
 
-  /// Floating capsule height (icons are centered inside).
-  @visibleForTesting
-  static const double floatingPillHeight = 56;
+  /// Gap under the stripe on iOS. Clears the notification badge, which is
+  /// drawn 6px above the glyph.
+  static const double _iosStripeToIconGap = 8;
 
-  /// Clearance above the capsule so its shadow is not clipped by the scaffold.
-  @visibleForTesting
-  static const double floatingTopGap = 10;
+  /// iOS icon row: stripe + gap + glyph. Home-indicator space sits below this.
+  static const double _iosIconRowHeight =
+      _stripeHeight + _iosStripeToIconGap + _iconExtent;
 
-  /// Horizontal inset of the capsule from the screen (plus the safe inset).
-  @visibleForTesting
-  static const double floatingSideMargin = 12;
-
-  /// Finder for the rounded capsule (tests and semantics).
-  @visibleForTesting
-  static const Key floatingPillKey = Key('appBottomNavFloatingPill');
-
-  /// iOS platform view registered in `AppDelegate`.
-  static const String _systemGlassViewType = 'hum_databank/glass_capsule';
-
-  /// Space under the floating capsule on iOS.
+  /// Space under the glyphs on iOS.
   ///
-  /// The home-indicator graphic occupies about the bottom 13pt. A 21pt gap
-  /// leaves that graphic visible beneath the pill, the way Instagram and the
-  /// iOS 26 tab bar float. Taller insets (some iPads, split view) stay intact
-  /// so the capsule does not cover them. Phones with a home button get a
-  /// short float margin.
+  /// The home-indicator inset is about 34pt, but the indicator graphic only
+  /// occupies the bottom ~13pt. Using the full inset leaves a tall empty band.
+  /// Shaving it down to 18pt put the glyphs on top of that graphic, so phone
+  /// insets keep a clearer gap (34pt → 28pt). Taller insets stay intact.
   @visibleForTesting
   static double iosBottomPaddingForInset(double inset) {
-    if (inset <= 0) return 12;
+    if (inset <= 0) return 8;
     if (inset > 40) return inset;
-    return math.max(20, math.min(21, inset));
+    return math.max(20, inset - 6);
   }
 
   const AppBottomNavigationBar({
@@ -176,7 +153,7 @@ class AppBottomNavigationBar extends StatelessWidget {
       context: context,
       enableCustomization: enableCustomization,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           for (int i = 0; i < tabs.length; i++)
             Flexible(
@@ -245,7 +222,7 @@ class AppBottomNavigationBar extends StatelessWidget {
       context: context,
       enableCustomization: enableCustomization,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (isAdmin) ...[
             // Notifications (index 0) — admin only
@@ -462,7 +439,7 @@ class AppBottomNavigationBar extends StatelessWidget {
   }
 
   // =========================================================================
-  // Shared shell — floating glass capsule (Instagram / iOS 26 tab bar)
+  // Shared shell (border, safe area, optional long-press)
   // =========================================================================
 
   Widget _barShell({
@@ -470,115 +447,52 @@ class AppBottomNavigationBar extends StatelessWidget {
     required bool enableCustomization,
     required Widget child,
   }) {
-    final theme = Theme.of(context);
-    final platform = theme.platform;
-    final apple = platform == TargetPlatform.iOS ||
-        platform == TargetPlatform.macOS;
+    final barBg = backgroundColor ?? context.surfaceColor;
+    final topBorderColor = backgroundColor != null
+        ? Colors.white.withValues(alpha: 0.14)
+        : context.borderColor;
+
     final safe = MediaQuery.paddingOf(context);
-    final bottomGap = apple
-        ? iosBottomPaddingForInset(safe.bottom)
-        : (safe.bottom > 0 ? safe.bottom : 12.0);
-
-    final cs = theme.colorScheme;
-    final isDark = context.isDarkTheme;
-    final Color fill;
-    final Color hairline;
-    if (backgroundColor != null) {
-      fill = backgroundColor!;
-      // Caller-supplied bars (PDF) are dark; onPrimary is the light stroke.
-      hairline = cs.onPrimary.withValues(alpha: 0.18);
-    } else if (isDark) {
-      fill = context.surfaceColor.withValues(alpha: 0.78);
-      hairline = cs.outlineVariant;
-    } else {
-      fill = context.cardColor.withValues(alpha: 0.82);
-      hairline = context.borderColor.withValues(alpha: 0.85);
-    }
-
-    final radius = BorderRadius.circular(floatingPillHeight / 2);
-    // Theme.platform is not enough: widget tests set it to iOS on a host that
-    // cannot build a UiKitView. Real iOS (and not web) gets the system material.
-    final useSystemGlass = backgroundColor == null &&
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.iOS;
-
-    final Widget surface;
-    if (useSystemGlass) {
-      // No Flutter fill or blur on top — that would hide the system glass.
-      // The view ignores hits so the icon buttons keep the gestures.
-      surface = IgnorePointer(
-        child: UiKitView(
-          key: ValueKey<bool>(isDark),
-          viewType: _systemGlassViewType,
-          creationParams: <String, Object>{'dark': isDark},
-          creationParamsCodec: const StandardMessageCodec(),
-          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
-          hitTestBehavior: PlatformViewHitTestBehavior.transparent,
-        ),
-      );
-    } else {
-      surface = ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: radius,
-              border: Border.all(
-                color: hairline,
-                width: 0.6,
-                strokeAlign: BorderSide.strokeAlignInside,
+    final ios = Theme.of(context).platform == TargetPlatform.iOS;
+    // iOS: shorten the home-indicator gap. Other platforms keep the previous
+    // shell (52px icon slot plus the full system inset).
+    final Widget barBody = ios
+        ? Padding(
+            padding: EdgeInsets.fromLTRB(
+              6 + safe.left,
+              0,
+              6 + safe.right,
+              iosBottomPaddingForInset(safe.bottom),
+            ),
+            child: SizedBox(height: _iosIconRowHeight, child: child),
+          )
+        : SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 52,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
+                child: child,
               ),
             ),
-          ),
-        ),
-      );
-    }
+          );
 
-    Widget pill = DecoratedBox(
+    Widget bar = Container(
       decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: theme.ambientShadow(lightOpacity: 0.16, darkOpacity: 0.45),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: barBg,
+        border: Border(top: BorderSide(color: topBorderColor, width: 0.5)),
       ),
-      child: SizedBox(
-        key: floatingPillKey,
-        height: floatingPillHeight,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            surface,
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: child,
-            ),
-          ],
-        ),
-      ),
+      child: barBody,
     );
 
     if (enableCustomization) {
-      pill = GestureDetector(
+      bar = GestureDetector(
         onLongPress: () => TabCustomizationDialog.show(context),
-        child: pill,
+        child: bar,
       );
     }
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        floatingSideMargin + safe.left,
-        floatingTopGap,
-        floatingSideMargin + safe.right,
-        bottomGap,
-      ),
-      child: pill,
-    );
+    return bar;
   }
 
   // =========================================================================
@@ -602,23 +516,22 @@ class AppBottomNavigationBar extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final primary = cs.primary;
+    final ifrcRed = Color(AppConstants.ifrcRed);
 
     final Color iconFg;
-    final Color capsuleColor;
+    final Color stripeColor;
     if (lightForegroundOnBar) {
-      capsuleColor = cs.onPrimary.withValues(alpha: 0.16);
+      stripeColor = ifrcRed;
       iconFg = isSelected
-          ? cs.onPrimary
-          : cs.onPrimary.withValues(alpha: 0.62);
+          ? Colors.white
+          : Colors.white.withValues(alpha: 0.62);
     } else if (isSelected) {
-      capsuleColor = cs.onSurface.withValues(
-        alpha: context.isDarkTheme ? 0.16 : 0.08,
-      );
+      stripeColor = ifrcRed;
       iconFg = context.isDarkTheme
           ? Color.alphaBlend(Colors.white.withValues(alpha: 0.22), primary)
           : primary;
     } else {
-      capsuleColor = Colors.transparent;
+      stripeColor = Colors.transparent;
       iconFg = context.iconColor.withValues(
         alpha: context.isDarkTheme ? 0.72 : 0.55,
       );
@@ -686,6 +599,7 @@ class AppBottomNavigationBar extends StatelessWidget {
       curve: Curves.easeOutCubic,
       child: iconChild,
     );
+    final pinIconUnderStripe = Theme.of(context).platform == TargetPlatform.iOS;
 
     return Semantics(
       label: label,
@@ -695,36 +609,35 @@ class AppBottomNavigationBar extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          customBorder: const StadiumBorder(),
+          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
           splashColor: context.isDarkTheme && isSelected
               ? Colors.white.withValues(alpha: 0.18)
               : primary.withValues(alpha: 0.12),
           highlightColor: context.isDarkTheme && isSelected
               ? Colors.white.withValues(alpha: 0.1)
               : primary.withValues(alpha: 0.06),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // Bubble hugs the glyph. Wide slots (tablet, few tabs) stay a
-              // compact capsule instead of a full-width segment.
-              final bubbleWidth = math.min(
-                72.0,
-                math.max(0.0, constraints.maxWidth - 6),
-              );
-              return Center(
-                child: AnimatedContainer(
+          child: SizedBox.expand(
+            child: Column(
+              children: [
+                AnimatedContainer(
                   duration: AppConstants.animationFast,
                   curve: Curves.easeOutCubic,
-                  width: bubbleWidth,
-                  height: 40,
-                  alignment: Alignment.center,
+                  height: _stripeHeight,
+                  margin: EdgeInsets.symmetric(horizontal: isSelected ? 10 : 0),
                   decoration: BoxDecoration(
-                    color: isSelected ? capsuleColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
+                    color: isSelected ? stripeColor : Colors.transparent,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(1.5),
+                    ),
                   ),
-                  child: scaledIcon,
                 ),
-              );
-            },
+                if (pinIconUnderStripe) ...[
+                  const SizedBox(height: _iosStripeToIconGap),
+                  scaledIcon,
+                ] else
+                  Expanded(child: Center(child: scaledIcon)),
+              ],
+            ),
           ),
         ),
       ),

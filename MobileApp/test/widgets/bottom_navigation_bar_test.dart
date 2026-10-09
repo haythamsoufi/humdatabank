@@ -65,89 +65,53 @@ Future<void> _pumpBar(
 }
 
 void main() {
-  test('iPhone home-indicator inset leaves the indicator under the pill', () {
-    // 34pt inset → 21pt under the capsule (indicator graphic is ~13pt).
-    expect(AppBottomNavigationBar.iosBottomPaddingForInset(34), 21);
-    expect(AppBottomNavigationBar.iosBottomPaddingForInset(0), 12);
-    expect(AppBottomNavigationBar.iosBottomPaddingForInset(21), 21);
+  test('iPhone home-indicator inset keeps a short clearance', () {
+    // 34pt inset → 28pt under the glyphs (indicator graphic is ~13pt).
+    expect(AppBottomNavigationBar.iosBottomPaddingForInset(34), 28);
+    expect(AppBottomNavigationBar.iosBottomPaddingForInset(0), 8);
+    expect(AppBottomNavigationBar.iosBottomPaddingForInset(21), 20);
     expect(AppBottomNavigationBar.iosBottomPaddingForInset(48), 48);
   });
 
-  testWidgets('iPhone bar floats a capsule above the home indicator', (
+  testWidgets('iPhone bar does not stack the full safe inset under the icons', (
     tester,
   ) async {
     await _pumpBar(tester, platform: TargetPlatform.iOS, bottomInset: 34);
 
-    final barRect = tester.getRect(find.byType(AppBottomNavigationBar));
-    final pillRect = tester.getRect(
-      find.byKey(AppBottomNavigationBar.floatingPillKey),
+    final bar = tester.renderObject<RenderBox>(
+      find.byType(AppBottomNavigationBar),
     );
     final icon = tester.renderObject<RenderBox>(find.byIcon(Icons.grid_view));
     final gap =
-        barRect.bottom - icon.localToGlobal(Offset(0, icon.size.height)).dy;
+        bar.localToGlobal(Offset(0, bar.size.height)).dy -
+        icon.localToGlobal(Offset(0, icon.size.height)).dy;
 
-    expect(
-      barRect.height,
-      closeTo(
-        AppBottomNavigationBar.floatingTopGap +
-            AppBottomNavigationBar.floatingPillHeight +
-            21,
-        0.5,
-      ),
-    );
-    expect(pillRect.height, AppBottomNavigationBar.floatingPillHeight);
-    // Host tests are not iOS, so the bar keeps the Flutter blur instead of
-    // embedding a UiKitView.
-    expect(find.byType(BackdropFilter), findsOneWidget);
-    expect(find.byType(UiKitView), findsNothing);
-    expect(pillRect.left - barRect.left, greaterThan(10));
-    expect(barRect.right - pillRect.right, greaterThan(10));
-    expect(barRect.bottom - pillRect.bottom, closeTo(21, 0.5));
-    // Glyph stays clear of the ~13pt home-indicator graphic.
+    expect(bar.size.height, closeTo(35 + 28, 0.5));
+    // Old shell was 52 + 34, with the glyph centered, ~48pt under the icon.
+    expect(gap, closeTo(28, 0.5));
     expect(gap, greaterThan(13));
   });
 
-  testWidgets('iPhone without a home indicator still floats off the edge', (
+  testWidgets('iPhone without a home indicator uses a short bottom pad', (
     tester,
   ) async {
     await _pumpBar(tester, platform: TargetPlatform.iOS, bottomInset: 0);
 
-    final barRect = tester.getRect(find.byType(AppBottomNavigationBar));
-    final pillRect = tester.getRect(
-      find.byKey(AppBottomNavigationBar.floatingPillKey),
+    final bar = tester.renderObject<RenderBox>(
+      find.byType(AppBottomNavigationBar),
     );
-    expect(
-      barRect.height,
-      closeTo(
-        AppBottomNavigationBar.floatingTopGap +
-            AppBottomNavigationBar.floatingPillHeight +
-            12,
-        0.5,
-      ),
-    );
-    expect(barRect.bottom - pillRect.bottom, closeTo(12, 0.5));
+    expect(bar.size.height, closeTo(35 + 8, 0.5));
   });
 
-  testWidgets('Android floats the capsule above the system inset', (
+  testWidgets('Android keeps the full system inset under the icon slot', (
     tester,
   ) async {
     await _pumpBar(tester, platform: TargetPlatform.android, bottomInset: 48);
 
-    final barRect = tester.getRect(find.byType(AppBottomNavigationBar));
-    final pillRect = tester.getRect(
-      find.byKey(AppBottomNavigationBar.floatingPillKey),
+    final bar = tester.renderObject<RenderBox>(
+      find.byType(AppBottomNavigationBar),
     );
-    expect(
-      barRect.height,
-      closeTo(
-        AppBottomNavigationBar.floatingTopGap +
-            AppBottomNavigationBar.floatingPillHeight +
-            48,
-        0.5,
-      ),
-    );
-    expect(barRect.bottom - pillRect.bottom, closeTo(48, 0.5));
-    expect(pillRect.left, greaterThan(10));
+    expect(bar.size.height, closeTo(52 + 48, 0.5));
   });
 
   testWidgets('iPhone landscape keeps the side safe inset', (tester) async {
@@ -161,10 +125,6 @@ void main() {
     final icon = tester.renderObject<RenderBox>(
       find.byIcon(Icons.home_outlined),
     );
-    final pillRect = tester.getRect(
-      find.byKey(AppBottomNavigationBar.floatingPillKey),
-    );
     expect(icon.localToGlobal(Offset.zero).dx, greaterThan(47));
-    expect(pillRect.left, greaterThan(47));
   });
 }

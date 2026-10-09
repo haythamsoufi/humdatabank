@@ -395,6 +395,11 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
                           _buildGridView(provider)
                         else
                           _buildTableView(provider),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height: 24 + MediaQuery.paddingOf(context).bottom,
+                          ),
+                        ),
                       ],
                     ),
                   ),

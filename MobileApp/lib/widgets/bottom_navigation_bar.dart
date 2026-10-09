@@ -459,7 +459,8 @@ class AppBottomNavigationBar extends StatelessWidget {
     required bool enableCustomization,
     required Widget child,
   }) {
-    final platform = Theme.of(context).platform;
+    final theme = Theme.of(context);
+    final platform = theme.platform;
     final apple = platform == TargetPlatform.iOS ||
         platform == TargetPlatform.macOS;
     final safe = MediaQuery.paddingOf(context);
@@ -467,18 +468,20 @@ class AppBottomNavigationBar extends StatelessWidget {
         ? iosBottomPaddingForInset(safe.bottom)
         : (safe.bottom > 0 ? safe.bottom : 12.0);
 
+    final cs = theme.colorScheme;
     final isDark = context.isDarkTheme;
     final Color fill;
     final Color hairline;
     if (backgroundColor != null) {
       fill = backgroundColor!;
-      hairline = Colors.white.withValues(alpha: 0.18);
+      // Caller-supplied bars (PDF) are dark; onPrimary is the light stroke.
+      hairline = cs.onPrimary.withValues(alpha: 0.18);
     } else if (isDark) {
       fill = context.surfaceColor.withValues(alpha: 0.78);
-      hairline = Colors.white.withValues(alpha: 0.14);
+      hairline = cs.outlineVariant;
     } else {
-      fill = Colors.white.withValues(alpha: 0.82);
-      hairline = Colors.black.withValues(alpha: 0.08);
+      fill = context.cardColor.withValues(alpha: 0.82);
+      hairline = context.borderColor.withValues(alpha: 0.85);
     }
 
     final radius = BorderRadius.circular(floatingPillHeight / 2);
@@ -488,7 +491,7 @@ class AppBottomNavigationBar extends StatelessWidget {
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+            color: theme.ambientShadow(lightOpacity: 0.16, darkOpacity: 0.45),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -564,14 +567,14 @@ class AppBottomNavigationBar extends StatelessWidget {
     final Color iconFg;
     final Color capsuleColor;
     if (lightForegroundOnBar) {
-      capsuleColor = Colors.white.withValues(alpha: 0.16);
+      capsuleColor = cs.onPrimary.withValues(alpha: 0.16);
       iconFg = isSelected
-          ? Colors.white
-          : Colors.white.withValues(alpha: 0.62);
+          ? cs.onPrimary
+          : cs.onPrimary.withValues(alpha: 0.62);
     } else if (isSelected) {
-      capsuleColor = context.isDarkTheme
-          ? Colors.white.withValues(alpha: 0.16)
-          : Colors.black.withValues(alpha: 0.08);
+      capsuleColor = cs.onSurface.withValues(
+        alpha: context.isDarkTheme ? 0.16 : 0.08,
+      );
       iconFg = context.isDarkTheme
           ? Color.alphaBlend(Colors.white.withValues(alpha: 0.22), primary)
           : primary;

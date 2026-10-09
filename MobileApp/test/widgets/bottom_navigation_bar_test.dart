@@ -96,6 +96,10 @@ void main() {
       ),
     );
     expect(pillRect.height, AppBottomNavigationBar.floatingPillHeight);
+    // Host tests are not iOS, so the bar keeps the Flutter blur instead of
+    // embedding a UiKitView.
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(UiKitView), findsNothing);
     expect(pillRect.left - barRect.left, greaterThan(10));
     expect(barRect.right - pillRect.right, greaterThan(10));
     expect(barRect.bottom - pillRect.bottom, closeTo(21, 0.5));

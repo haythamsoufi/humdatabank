@@ -1,7 +1,11 @@
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/shared/notification_provider.dart';
 import '../providers/shared/auth_provider.dart';
@@ -17,6 +21,10 @@ import 'tab_customization_dialog.dart';
 /// The capsule is inset from the screen edges and sits above the iPhone home
 /// indicator (or the Android system inset), in the style of Instagram and the
 /// iOS 26 tab bar. The selected tab is a rounded capsule behind the glyph.
+///
+/// On iOS the capsule is a system material ([UiKitView]): Liquid Glass on
+/// iOS 26, and the ultra-thin system blur on earlier versions. Other
+/// platforms keep a Flutter [BackdropFilter] approximation.
 class AppBottomNavigationBar extends StatelessWidget {
   /// Pass as [currentIndex] when no tab should appear selected.
   static const int noTabSelected = -1;
@@ -74,6 +82,9 @@ class AppBottomNavigationBar extends StatelessWidget {
   /// Finder for the rounded capsule (tests and semantics).
   @visibleForTesting
   static const Key floatingPillKey = Key('appBottomNavFloatingPill');
+
+  /// iOS platform view registered in `AppDelegate`.
+  static const String _systemGlassViewType = 'hum_databank/glass_capsule';
 
   /// Space under the floating capsule on iOS.
   ///
@@ -485,20 +496,28 @@ class AppBottomNavigationBar extends StatelessWidget {
     }
 
     final radius = BorderRadius.circular(floatingPillHeight / 2);
+    // Theme.platform is not enough: widget tests set it to iOS on a host that
+    // cannot build a UiKitView. Real iOS (and not web) gets the system material.
+    final useSystemGlass = backgroundColor == null &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS;
 
-    Widget pill = DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: theme.ambientShadow(lightOpacity: 0.16, darkOpacity: 0.45),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        key: floatingPillKey,
+    final Widget surface;
+    if (useSystemGlass) {
+      // No Flutter fill or blur on top — that would hide the system glass.
+      // The view ignores hits so the icon buttons keep the gestures.
+      surface = IgnorePointer(
+        child: UiKitView(
+          key: ValueKey<bool>(isDark),
+          viewType: _systemGlassViewType,
+          creationParams: <String, Object>{'dark': isDark},
+          creationParamsCodec: const StandardMessageCodec(),
+          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+          hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+        ),
+      );
+    } else {
+      surface = ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
@@ -512,14 +531,34 @@ class AppBottomNavigationBar extends StatelessWidget {
                 strokeAlign: BorderSide.strokeAlignInside,
               ),
             ),
-            child: SizedBox(
-              height: floatingPillHeight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: child,
-              ),
-            ),
           ),
+        ),
+      );
+    }
+
+    Widget pill = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: theme.ambientShadow(lightOpacity: 0.16, darkOpacity: 0.45),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        key: floatingPillKey,
+        height: floatingPillHeight,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            surface,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: child,
+            ),
+          ],
         ),
       ),
     );

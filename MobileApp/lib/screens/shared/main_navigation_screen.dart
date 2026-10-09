@@ -332,9 +332,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         // primary app bar and actions (e.g. propose icon) render correctly.
         return Scaffold(
           primary: false,
+          // Draw tab pages behind the floating capsule so the iOS system
+          // glass (and the fallback blur) sample real content. Bottom padding
+          // inside the body becomes the bar height, which also lifts
+          // [OfflineBanner] via its SafeArea.
+          extendBody: true,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           resizeToAvoidBottomInset: !onAiChatPage,
-          // [OfflineBanner] sits above [bottomNavigationBar] (anchored to body bottom).
           body: Stack(
             fit: StackFit.expand,
             clipBehavior: Clip.none,

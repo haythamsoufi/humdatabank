@@ -2219,14 +2219,30 @@ class VariableResolutionService:
             groups_changed = False
             for group_key, group_translations in column_groups.items():
                 if isinstance(group_translations, dict) and group_translations:
-                    resolved_map = cls.resolve_translation_map(
-                        group_translations,
-                        resolved_variables,
-                        variable_configs,
-                        replace_fn=replace_fn,
-                    )
-                    new_groups[group_key] = resolved_map
-                    if resolved_map is not group_translations:
+                    # header_color is presentation metadata, not a language.
+                    # Keep the original dict when only translations are unchanged
+                    # so a custom colour still reaches the matrix header.
+                    header_color = group_translations.get('header_color')
+                    translations = group_translations
+                    if 'header_color' in group_translations:
+                        translations = {
+                            k: v for k, v in group_translations.items() if k != 'header_color'
+                        }
+                    resolved_map = translations
+                    if translations:
+                        resolved_map = cls.resolve_translation_map(
+                            translations,
+                            resolved_variables,
+                            variable_configs,
+                            replace_fn=replace_fn,
+                        )
+                    if resolved_map is translations:
+                        new_groups[group_key] = group_translations
+                    else:
+                        merged = dict(resolved_map or {})
+                        if header_color not in (None, ''):
+                            merged['header_color'] = header_color
+                        new_groups[group_key] = merged
                         groups_changed = True
                 else:
                     new_groups[group_key] = group_translations

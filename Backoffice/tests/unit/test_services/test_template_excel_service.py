@@ -1995,6 +1995,16 @@ class TestNormalizeMatrixItemConfig:
         assert repaired['columns'][1]['group'] == 'Funding'
         assert repaired['column_groups']['Funding'] == {}
 
+    def test_repair_preserves_group_header_color(self):
+        mc = {
+            'type': 'matrix',
+            'columns': [{'name': 'A', 'type': 'number', 'group': 'Funding'}],
+            'column_groups': {'Funding': {'fr': 'Financement', 'header_color': '#dbeafe'}},
+        }
+        repaired = TemplateExcelService._repair_matrix_column_groups(mc)
+        assert repaired['column_groups']['Funding']['fr'] == 'Financement'
+        assert repaired['column_groups']['Funding']['header_color'] == '#dbeafe'
+
     def test_repair_column_groups_from_name_prefix(self):
         mc = {
             'type': 'matrix',

@@ -1,4 +1,5 @@
 {% from "components/_status_label.html" import status_label_for_data_flag %}
+{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style %}
 {# ── Macro: renders the content of a column <th> ──────────────────────────────
    For columns with header_type="selectable" it renders a custom header picker
    (multiline label + dropdown menu) and an optional Other text-input; for all
@@ -279,10 +280,11 @@
                                     {# Resolve translated group label from column_groups config #}
                                     {% set _grp_translations = matrix_column_groups.get(_col_group, {}) %}
                                     {% set _grp_display = _grp_translations.get(translation_key) or _grp_translations.get('en') or _col_group %}
-                                    <th class="border border-gray-300 px-2 py-1 bg-indigo-50 text-center font-semibold text-indigo-700"
+                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
                                         role="columnheader"
                                         scope="colgroup"
-                                        colspan="{{ _span.value }}">
+                                        colspan="{{ _span.value }}"
+                                        {{- matrix_group_header_style(_grp_translations) }}>
                                         {{ _grp_display }}
                                     </th>
                                 {% endif %}

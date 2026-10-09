@@ -1501,8 +1501,8 @@ def build_assignment_pdf_bytes(assignment_entity_status):
             max-width: none;
         }
         .matrix-group-header {
-            background: #eef2ff;
-            color: #3730a3;
+            background: #f3f4f6;
+            color: #4b5563;
             font-weight: 600;
             text-align: center;
         }

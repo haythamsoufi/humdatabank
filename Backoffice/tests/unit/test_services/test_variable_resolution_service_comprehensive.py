@@ -688,6 +688,31 @@ class TestResolveMatrixDisplayHeaders:
         assert resolved_columns[0]['name_translations']['en'] == 'Planned 2026'
         assert resolved_groups['Funding']['en'] == 'Funding 2026'
 
+    def test_resolve_matrix_display_headers_keeps_group_header_color(self):
+        matrix_config = {
+            'column_groups': {
+                'Funding': {
+                    'en': 'Funding [assignment_period]',
+                    'header_color': '#dbeafe',
+                },
+            },
+        }
+        _, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+            matrix_config,
+            {'assignment_period': '2026'},
+        )
+        assert resolved_groups['Funding']['en'] == 'Funding 2026'
+        assert resolved_groups['Funding']['header_color'] == '#dbeafe'
+
+    def test_resolve_matrix_display_headers_leaves_color_only_groups_unchanged(self):
+        original = {'Funding': {'fr': 'Financement', 'header_color': '#dbeafe'}}
+        matrix_config = {'column_groups': original}
+        _, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+            matrix_config,
+            {'assignment_period': '2026'},
+        )
+        assert resolved_groups is None
+
     def test_resolve_matrix_display_rows_for_text_and_translations(self):
         matrix_config = {
             'rows': [

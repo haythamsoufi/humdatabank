@@ -482,13 +482,17 @@
                         {# Hidden template for column group #}
                         <template id="matrix-group-template">
                             <div class="matrix-group border border-indigo-200 rounded-md">
-                                <div class="matrix-group-header flex items-center gap-2 px-2 py-1.5 bg-indigo-50 rounded-t-md">
+                                <div class="matrix-group-header flex items-center gap-2 px-2 py-1.5 bg-gray-100 rounded-t-md">
                                     <span class="matrix-drag-handle inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-600 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder group')|forceescape }}" draggable="false">
                                         <i class="fas fa-grip-vertical text-xs"></i>
                                         <i class="fas fa-layer-group text-xs"></i>
                                     </span>
                                     <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}">
                                     <input type="hidden" class="group-label-translations" value="{}">
+                                    <label class="inline-flex items-center gap-1 shrink-0 text-xs text-gray-600" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
+                                        <span>{{ _('Header') }}</span>
+                                        <input type="color" class="group-header-color cursor-pointer rounded border border-gray-300 bg-white" style="width:2rem;height:1.5rem;padding:0;" value="#f3f4f6" aria-label="{{ _('Group header colour')|forceescape }}">
+                                    </label>
                                     <button type="button" class="remove-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Group')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>

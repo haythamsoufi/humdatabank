@@ -239,7 +239,9 @@ def handle_assignment_form(aes_id):
                                             if isinstance(column_groups, dict):
                                                 for group_translations in column_groups.values():
                                                     if isinstance(group_translations, dict):
-                                                        for v in group_translations.values():
+                                                        for key, v in group_translations.items():
+                                                            if key == 'header_color':
+                                                                continue
                                                             if v and '[' in str(v):
                                                                 names.update(placeholder_pattern.findall(str(v)))
                                 except Exception as e:

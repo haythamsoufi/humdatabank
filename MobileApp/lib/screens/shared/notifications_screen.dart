@@ -380,7 +380,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   },
                   color: context.navyIconColor,
                   child: ListView.builder(
-                    padding: EdgeInsets.zero,
+                    // The load-more footer already pads for the floating tab bar.
+                    padding: EdgeInsets.only(
+                      bottom: showLoadMoreFooter
+                          ? 0
+                          : MediaQuery.paddingOf(context).bottom + 12,
+                    ),
                     itemCount: displayed.length +
                         (showLoadMoreFooter ? 1 : 0),
                     itemBuilder: (context, index) {

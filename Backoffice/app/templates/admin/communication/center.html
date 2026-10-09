@@ -51,9 +51,30 @@
                 class="{{ admin_underline_tab_btn_classes(false) }}">
             <i class="fas fa-calendar-alt mr-1.5"></i>{{ _('Campaigns') }}
         </button>
+        <button type="button" role="tab" id="tab-jobs" data-tab="jobs" aria-selected="false"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+            <i class="fas fa-tasks mr-1.5"></i>{{ _('Background jobs') }}
+            <span id="background-jobs-tab-badge"
+                  class="ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 text-xs font-semibold leading-5{% if background_jobs_summary and background_jobs_summary.failed %} bg-red-100 text-red-800{% elif background_jobs_summary and background_jobs_summary.active %} bg-blue-100 text-blue-800{% else %} hidden{% endif %}">{% if background_jobs_summary and background_jobs_summary.failed %}{{ background_jobs_summary.failed }}{% elif background_jobs_summary and background_jobs_summary.active %}{{ background_jobs_summary.active }}{% endif %}</span>
+        </button>
     {% endcall %}
 
     <div class="p-6">
+        <div id="background-jobs-notice"
+             class="hidden mb-4 p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+             role="status"
+             aria-live="polite">
+            <div class="text-sm">
+                <i id="background-jobs-notice-icon" class="fas fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+                <span id="background-jobs-notice-message"></span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" id="background-jobs-notice-view" class="btn btn-secondary btn-sm whitespace-nowrap">
+                    <i class="fas fa-tasks mr-2"></i>{{ _('View details') }}
+                </button>
+            </div>
+        </div>
+
         <div id="failed-email-notice"
              class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3{% if not (failed_email_delivery_count and failed_email_delivery_count > 0) %} hidden{% endif %}"
              role="alert"
@@ -850,6 +871,24 @@
                 <p class="text-sm text-gray-700">{{ _('No campaigns found.') }}</p>
             {% endif %}
         </div>
+
+        <!-- Tab Content: Background jobs -->
+        <div id="panel-jobs" class="communication-center-panel hidden">
+            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h3 class="text-sm font-medium text-gray-900 m-0">{{ _('Background jobs') }}</h3>
+                    <p class="text-xs text-gray-500 mt-1 mb-0">
+                        {{ _('Notifications for new assignments are sent in the background. Follow progress here and see which entities could not be notified, and why. Jobs are kept for 30 days.') }}
+                    </p>
+                </div>
+                <button type="button" id="background-jobs-refresh" class="btn btn-secondary btn-sm whitespace-nowrap">
+                    <i class="fas fa-sync-alt mr-2"></i>{{ _('Refresh') }}
+                </button>
+            </div>
+            <div id="background-jobs-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900"></div>
+            <div id="background-jobs-list" class="space-y-4"></div>
+            <p id="background-jobs-empty" class="hidden text-sm text-gray-700">{{ _('No background jobs yet. Jobs appear here when you create an assignment with notifications on.') }}</p>
+        </div>
     </div>
 </div>
 
@@ -1479,6 +1518,7 @@
     window.communicationPageConfig = {
         notificationsPushEnabled: {{ notifications_push_enabled|tojson }},
         failedEmailDeliveryCount: {{ (failed_email_delivery_count or 0)|tojson }},
+        backgroundJobs: {{ (background_jobs_summary or {'active': 0, 'failed': 0})|tojson }},
         pagination: {
             page: {{ (page or 1)|tojson }},
             perPage: {{ (per_page or 50)|tojson }},
@@ -1489,6 +1529,10 @@
         urls: {
             campaignEmailComposePreview: {{ url_for('admin_communication.api_campaign_email_compose_preview')|tojson }},
             communicationsInsights: {{ url_for('admin_communication.api_communications_insights')|tojson }},
+            backgroundJobs: {{ url_for('admin_communication.api_background_jobs')|tojson }},
+            backgroundJobDetail: {{ url_for('admin_communication.api_background_job_detail', job_id='__JOB__')|tojson }},
+            backgroundJobCancel: {{ url_for('admin_communication.api_cancel_background_job', job_id='__JOB__')|tojson }},
+            backgroundJobDismiss: {{ url_for('admin_communication.api_dismiss_background_job', job_id='__JOB__')|tojson }},
             tinymceBase: {{ url_for('static', filename='libs/tinymce')|tojson }},
         },
         t: {
@@ -1496,6 +1540,46 @@
             variables: {{ _('Variables')|tojson }},
             couldNotLoadSampleValues: {{ _('Could not load sample values for this template.')|tojson }},
             addContentFirst: {{ _('Add some template content first, then show sample values.')|tojson }},
+            jobsLoadError: {{ _('Could not load background jobs. Please try again.')|tojson }},
+            jobsRunningNotice: {{ _('Sending assignment notifications in the background: __DONE__ of __TOTAL__ entities done.')|tojson }},
+            jobsFailedNotice: {{ _('Some assignment notifications could not be sent (__COUNT__ job(s) with failures).')|tojson }},
+            jobStatusQueued: {{ _('Queued')|tojson }},
+            jobStatusRunning: {{ _('Running')|tojson }},
+            jobStatusCancelRequested: {{ _('Cancelling')|tojson }},
+            jobStatusCompleted: {{ _('Completed')|tojson }},
+            jobStatusFailed: {{ _('Completed with failures')|tojson }},
+            jobStatusCancelled: {{ _('Cancelled')|tojson }},
+            jobProgressLine: {{ _('__DONE__ of __TOTAL__ entities processed')|tojson }},
+            jobNotified: {{ _('__COUNT__ notified')|tojson }},
+            jobNoRecipients: {{ _('__COUNT__ without recipients')|tojson }},
+            jobFailedCount: {{ _('__COUNT__ failed')|tojson }},
+            jobEmailsSent: {{ _('__COUNT__ email(s) sent')|tojson }},
+            jobStartedBy: {{ _('Started by __NAME__')|tojson }},
+            jobCreated: {{ _('Created')|tojson }},
+            jobFinished: {{ _('Finished')|tojson }},
+            jobShowDetails: {{ _('Show all entities')|tojson }},
+            jobHideDetails: {{ _('Hide entities')|tojson }},
+            jobCancel: {{ _('Stop sending')|tojson }},
+            jobConfirmCancel: {{ _('Stop this job? Entities not yet processed will not be notified.')|tojson }},
+            jobDismiss: {{ _('Dismiss')|tojson }},
+            jobFailuresHeading: {{ _('Entities that could not be notified')|tojson }},
+            jobFailuresTruncated: {{ _('Only the first failures are listed here. Show all entities for the full list.')|tojson }},
+            jobColEntity: {{ _('Entity')|tojson }},
+            jobColStatus: {{ _('Status')|tojson }},
+            jobColResult: {{ _('Result')|tojson }},
+            jobItemQueued: {{ _('Waiting')|tojson }},
+            jobItemProcessing: {{ _('Sending…')|tojson }},
+            jobItemCompleted: {{ _('Done')|tojson }},
+            jobItemFailed: {{ _('Failed')|tojson }},
+            jobItemCancelled: {{ _('Not sent (cancelled)')|tojson }},
+            jobResultNotifications: {{ _('__COUNT__ in-app notification(s)')|tojson }},
+            jobResultEmailSent: {{ _('email sent')|tojson }},
+            jobResultNoRecipients: {{ _('no recipients to notify')|tojson }},
+            jobActionFailed: {{ _('That action could not be completed.')|tojson }},
+            jobSourceCreate: {{ _('New assignment')|tojson }},
+            jobSourceAddCountries: {{ _('Countries added')|tojson }},
+            jobSourceAddEntity: {{ _('Entity added')|tojson }},
+            jobUnnamed: {{ _('Assignment')|tojson }},
         },
     };
 
@@ -1555,5 +1639,6 @@
     <script src="{{ static_url('js/admin/communication-campaign-email.js') }}"></script>
     <script src="{{ static_url('js/admin/campaign-audience-common.js') }}"></script>
     <script src="{{ static_url('js/admin/communication-insights.js') }}"></script>
+    <script src="{{ static_url('js/admin/communication-jobs.js') }}"></script>
     <script src="{{ static_url('js/admin/communication.js') }}"></script>
 {% endblock %}

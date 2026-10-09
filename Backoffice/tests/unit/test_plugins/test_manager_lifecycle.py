@@ -111,6 +111,24 @@ class TestDependencies:
 
 
 @pytest.mark.unit
+class TestLifecycleBlockReason:
+    def test_reasons_match_actions(self, manager):
+        pm, d = manager
+        _write_plugin(d, "base_p")
+        _write_plugin(d, "child_p", requires=["base_p"])
+        _write_plugin(d, "admin_tool", admin=True)
+        _load(pm)
+        pm.active_plugins.update({"base_p", "child_p"})
+        assert "required by active" in pm.lifecycle_block_reason("deactivate", "base_p")
+        assert "always on" in pm.lifecycle_block_reason("deactivate", "admin_tool")
+        assert "required by" in pm.lifecycle_block_reason("uninstall", "base_p")
+        pm.active_plugins.discard("base_p")
+        assert "not active" in pm.lifecycle_block_reason("activate", "child_p")
+        assert pm.lifecycle_block_reason("activate", "base_p") is None
+        assert pm.lifecycle_block_reason("deactivate", "unknown") is None
+
+
+@pytest.mark.unit
 class TestAlwaysOnAndFirstParty:
     def test_admin_feature_plugin_cannot_be_deactivated(self, manager):
         from app.plugins.manager import PluginLifecycleError

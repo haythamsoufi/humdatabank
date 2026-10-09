@@ -44,6 +44,7 @@ def _make_plugin_manager(**kwargs):
     pm.plugin_directories = kwargs.get("plugin_directories", [])
     pm.is_first_party.return_value = kwargs.get("first_party", False)
     pm.get_dependents.return_value = kwargs.get("dependents", [])
+    pm.lifecycle_block_reason.return_value = kwargs.get("block_reason", None)
     return pm
 
 
@@ -400,6 +401,7 @@ class TestUninstallPlugin:
 
     def test_uninstall_exception(self, logged_in_sm_client, db_session, app):
         pm = MagicMock()
+        pm.lifecycle_block_reason.return_value = None
         pm.uninstall_plugin.side_effect = Exception("uninstall error")
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_sm_client.post("/admin/api/plugins/my_plugin/uninstall")
@@ -428,6 +430,7 @@ class TestActivatePlugin:
 
     def test_activate_exception(self, logged_in_client, db_session, app):
         pm = MagicMock()
+        pm.lifecycle_block_reason.return_value = None
         pm.activate_plugin.side_effect = Exception("activate error")
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_client.post("/admin/api/plugins/my_plugin/activate")
@@ -456,6 +459,7 @@ class TestDeactivatePlugin:
 
     def test_deactivate_exception(self, logged_in_client, db_session, app):
         pm = MagicMock()
+        pm.lifecycle_block_reason.return_value = None
         pm.deactivate_plugin.side_effect = Exception("deactivate error")
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_client.post("/admin/api/plugins/my_plugin/deactivate")
@@ -971,23 +975,28 @@ class TestPluginStaticAuthentication:
 
 
 class TestLifecycleRefusals:
-    def test_lifecycle_error_is_returned_as_readable_400(self, logged_in_client, db_session, app):
-        from app.plugins.manager import PluginLifecycleError
-
-        pm = _make_plugin_manager()
-        pm.deactivate_plugin.side_effect = PluginLifecycleError("fdrs is an admin feature and is always on")
+    def test_blocked_action_returns_readable_400_without_running(self, logged_in_client, db_session, app):
+        pm = _make_plugin_manager(block_reason="fdrs is an admin feature and is always on; it cannot be deactivated.")
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_client.post("/admin/api/plugins/fdrs/deactivate")
         assert resp.status_code == 400
         assert "always on" in resp.get_data(as_text=True)
+        pm.deactivate_plugin.assert_not_called()
 
     def test_first_party_uninstall_refusal_is_400(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager(block_reason="interactive_map is bundled with the application")
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/interactive_map/uninstall")
+        assert resp.status_code == 400
+        pm.uninstall_plugin.assert_not_called()
+
+    def test_lifecycle_error_raised_by_manager_is_still_a_400(self, logged_in_client, db_session, app):
         from app.plugins.manager import PluginLifecycleError
 
         pm = _make_plugin_manager()
-        pm.uninstall_plugin.side_effect = PluginLifecycleError("bundled with the application")
+        pm.activate_plugin.side_effect = PluginLifecycleError("raced")
         with patch.object(app, "plugin_manager", pm):
-            resp = logged_in_sm_client.post("/admin/api/plugins/interactive_map/uninstall")
+            resp = logged_in_client.post("/admin/api/plugins/x/activate")
         assert resp.status_code == 400
 
 

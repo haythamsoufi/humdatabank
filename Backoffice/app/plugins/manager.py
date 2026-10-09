@@ -870,6 +870,35 @@ class PluginManager:
             self.logger.error(f"Error installing plugin {plugin_name}: {e}", exc_info=True)
             return False
 
+    def lifecycle_block_reason(self, action: str, plugin_name: str) -> Optional[str]:
+        """Why ``action`` (activate, deactivate or uninstall) is refused for a plugin, or None if allowed."""
+        if plugin_name not in self.plugins:
+            return None
+
+        if action == 'deactivate':
+            if self.is_always_on(plugin_name):
+                return f"{plugin_name} is an admin feature and is always on; it cannot be deactivated."
+            active_dependents = [d for d in self.get_dependents(plugin_name) if d in self.active_plugins]
+            if active_dependents:
+                return f"{plugin_name} is required by active plugin(s): {', '.join(active_dependents)}."
+        elif action == 'activate':
+            missing = self.get_missing_dependencies(plugin_name)
+            if missing:
+                return f"{plugin_name} requires plugin(s) that are not installed: {', '.join(missing)}."
+            inactive = [pid for pid in self.get_required_plugins(plugin_name) if pid not in self.active_plugins]
+            if inactive:
+                return f"{plugin_name} requires plugin(s) that are not active: {', '.join(inactive)}."
+        elif action == 'uninstall':
+            if self.is_first_party(plugin_name):
+                return (
+                    f"{plugin_name} is bundled with the application and cannot be uninstalled; "
+                    "deactivate it instead."
+                )
+            dependents = self.get_dependents(plugin_name)
+            if dependents:
+                return f"{plugin_name} is required by plugin(s): {', '.join(dependents)}."
+        return None
+
     def deactivate_plugin(self, plugin_name: str) -> bool:
         """Deactivate a specific plugin (safe, reversible).
 
@@ -880,15 +909,9 @@ class PluginManager:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
-        if self.is_always_on(plugin_name):
-            raise PluginLifecycleError(
-                f"{plugin_name} is an admin feature and is always on; it cannot be deactivated."
-            )
-        active_dependents = [d for d in self.get_dependents(plugin_name) if d in self.active_plugins]
-        if active_dependents:
-            raise PluginLifecycleError(
-                f"{plugin_name} is required by active plugin(s): {', '.join(active_dependents)}."
-            )
+        reason = self.lifecycle_block_reason('deactivate', plugin_name)
+        if reason:
+            raise PluginLifecycleError(reason)
 
         try:
             plugin = self.plugins[plugin_name]
@@ -921,16 +944,9 @@ class PluginManager:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
-        missing = self.get_missing_dependencies(plugin_name)
-        if missing:
-            raise PluginLifecycleError(
-                f"{plugin_name} requires plugin(s) that are not installed: {', '.join(missing)}."
-            )
-        inactive = [pid for pid in self.get_required_plugins(plugin_name) if pid not in self.active_plugins]
-        if inactive:
-            raise PluginLifecycleError(
-                f"{plugin_name} requires plugin(s) that are not active: {', '.join(inactive)}."
-            )
+        reason = self.lifecycle_block_reason('activate', plugin_name)
+        if reason:
+            raise PluginLifecycleError(reason)
 
         try:
             plugin = self.plugins[plugin_name]
@@ -964,15 +980,9 @@ class PluginManager:
             self.logger.error(f"Plugin {plugin_name} not found")
             return False
 
-        if self.is_first_party(plugin_name):
-            raise PluginLifecycleError(
-                f"{plugin_name} is bundled with the application and cannot be uninstalled; deactivate it instead."
-            )
-        dependents = self.get_dependents(plugin_name)
-        if dependents:
-            raise PluginLifecycleError(
-                f"{plugin_name} is required by plugin(s): {', '.join(dependents)}."
-            )
+        reason = self.lifecycle_block_reason('uninstall', plugin_name)
+        if reason:
+            raise PluginLifecycleError(reason)
 
         try:
             plugin = self.plugins[plugin_name]

@@ -402,7 +402,7 @@ class _OfflineActions extends StatelessWidget {
             height: 16,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        else if (onDownload != null)
+        else if (onDownload != null && (!hasSnapshot || outdated))
           IconButton(
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,

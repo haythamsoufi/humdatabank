@@ -107,6 +107,38 @@ void main() {
     expect(find.text('In Progress'), findsOneWidget);
   });
 
+  testWidgets('downloaded assignment shows only the saved cloud icon', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardGroupedAssignmentCard(
+        assignment: _assignment('pending'),
+        onDownloadForOffline: () {},
+        onOfflineBundleDetails: () {},
+        hasOfflineFormSnapshot: true,
+      ),
+    );
+
+    expect(find.byIcon(Icons.download_rounded), findsNothing);
+    expect(find.byIcon(Icons.cloud_done_rounded), findsOneWidget);
+  });
+
+  testWidgets('not yet downloaded assignment shows only the download icon', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardGroupedAssignmentCard(
+        assignment: _assignment('pending'),
+        onDownloadForOffline: () {},
+      ),
+    );
+
+    expect(find.byIcon(Icons.download_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_done_rounded), findsNothing);
+  });
+
   testWidgets('focal points use envelope and Teams action marks', (
     tester,
   ) async {

@@ -40,6 +40,10 @@ def _make_plugin_manager(**kwargs):
     pm.deactivate_plugin.return_value = kwargs.get("deactivate_result", True)
     pm.field_types = kwargs.get("field_types", {})
     pm.static_dirs = kwargs.get("static_dirs", {})
+    pm.plugins = kwargs.get("plugins_by_id", {})
+    pm.plugin_directories = kwargs.get("plugin_directories", [])
+    pm.is_first_party.return_value = kwargs.get("first_party", False)
+    pm.get_dependents.return_value = kwargs.get("dependents", [])
     return pm
 
 
@@ -591,15 +595,65 @@ class TestUploadPlugin:
 
     def test_valid_zip_name_match_install_success(self, logged_in_sm_client, db_session, app, tmp_path):
         zip_data = _make_valid_zip("test_plugin")
-        pm = _make_plugin_manager(install_result=True)
-        app.config["PLUGINS_DIR"] = str(tmp_path)
+        pm = _make_plugin_manager(install_result=True, plugin_directories=[tmp_path])
+        pm.scan_for_new_plugins.return_value = ["test_plugin"]
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
                 data={"plugin_file": (io.BytesIO(zip_data), "test_plugin.zip")},
                 content_type="multipart/form-data",
             )
-        _assert_status(resp, 200, 302)
+        assert resp.status_code == 200, resp.data
+        assert _get_json(resp)["plugin_id"] == "test_plugin"
+        assert (tmp_path / "test_plugin" / "plugin.py").exists()
+        assert (tmp_path / "test_plugin" / "__init__.py").exists()
+        pm.install_plugin.assert_called_once_with("test_plugin")
+
+    def test_archive_that_does_not_load_is_removed(self, logged_in_sm_client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(plugin_directories=[tmp_path])
+        pm.scan_for_new_plugins.return_value = []
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post(
+                "/admin/api/plugins/test_plugin/upload",
+                data={"plugin_file": (io.BytesIO(_make_valid_zip("test_plugin")), "p.zip")},
+                content_type="multipart/form-data",
+            )
+        assert resp.status_code == 400
+        assert not (tmp_path / "test_plugin").exists()
+        pm.install_plugin.assert_not_called()
+
+    def test_already_installed_plugin_is_rejected(self, logged_in_sm_client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(plugins_by_id={"test_plugin": object()}, plugin_directories=[tmp_path])
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post(
+                "/admin/api/plugins/test_plugin/upload",
+                data={"plugin_file": (io.BytesIO(_make_valid_zip("test_plugin")), "p.zip")},
+                content_type="multipart/form-data",
+            )
+        assert resp.status_code == 400
+        assert not (tmp_path / "test_plugin").exists()
+
+    def test_generic_install_endpoint_uses_manifest_plugin_id(self, logged_in_sm_client, db_session, app, tmp_path):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("bundle/plugin.py", "# plugin")
+            zf.writestr("bundle/plugin.json", json.dumps({"plugin_id": "from_manifest"}))
+        pm = _make_plugin_manager(plugin_directories=[tmp_path])
+        pm.scan_for_new_plugins.return_value = ["from_manifest"]
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post(
+                "/admin/api/plugins/install",
+                data={"plugin_package": (io.BytesIO(buf.getvalue()), "bundle.zip")},
+                content_type="multipart/form-data",
+            )
+        assert resp.status_code == 200, resp.data
+        assert (tmp_path / "from_manifest" / "plugin.py").exists()
+
+    def test_install_endpoint_requires_package_field(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager()
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/install")
+        assert resp.status_code == 400
 
     def test_file_too_large(self, logged_in_sm_client, db_session, app):
         pm = _make_plugin_manager()
@@ -650,22 +704,17 @@ class TestUploadPlugin:
             )
         _assert_status(resp, 200, 302, 400)
 
-    def test_valid_zip_install_failure(self, logged_in_sm_client, db_session, app, tmp_path):
-        zip_data = _make_valid_zip("test_plugin")
-        pm = _make_plugin_manager(install_result=False)
-        with patch.object(app, "plugin_manager", pm), \
-             patch("app.routes.admin.plugin_management.Path") as mock_path_cls:
-            mock_path_inst = MagicMock()
-            mock_path_inst.__truediv__ = MagicMock(return_value=mock_path_inst)
-            mock_path_inst.mkdir = MagicMock()
-            mock_path_inst.resolve.return_value = mock_path_inst
-            mock_path_cls.return_value = mock_path_inst
+    def test_valid_zip_install_failure_rolls_back(self, logged_in_sm_client, db_session, app, tmp_path):
+        pm = _make_plugin_manager(install_result=False, plugin_directories=[tmp_path])
+        pm.scan_for_new_plugins.return_value = ["test_plugin"]
+        with patch.object(app, "plugin_manager", pm):
             resp = logged_in_sm_client.post(
                 "/admin/api/plugins/test_plugin/upload",
-                data={"plugin_file": (io.BytesIO(zip_data), "test_plugin.zip")},
+                data={"plugin_file": (io.BytesIO(_make_valid_zip("test_plugin")), "test_plugin.zip")},
                 content_type="multipart/form-data",
             )
-        _assert_status(resp, 200, 302, 400)
+        assert resp.status_code == 400
+        pm.uninstall_plugin.assert_called_once_with("test_plugin")
 
 
 # ---------------------------------------------------------------------------
@@ -860,7 +909,7 @@ class TestPluginCodeChangesAreSystemManagerOnly:
             link = zipfile.ZipInfo("static/link")
             link.external_attr = 0o120777 << 16
             zf.writestr(link, "/etc/passwd")
-        pm = _make_plugin_manager()
+        pm = _make_plugin_manager(plugin_directories=[tmp_path])
         app.config["PLUGIN_UPLOAD_ENABLED"] = True
         app.config["PLUGINS_DIR"] = str(tmp_path)
         try:
@@ -919,3 +968,111 @@ class TestPluginStaticAuthentication:
         with patch.object(app, "plugin_manager", pm):
             resp = logged_in_client.get("/plugins/static/my_plugin/..%2f..%2fetc%2fpasswd")
         assert resp.status_code in (403, 404)
+
+
+class TestLifecycleRefusals:
+    def test_lifecycle_error_is_returned_as_readable_400(self, logged_in_client, db_session, app):
+        from app.plugins.manager import PluginLifecycleError
+
+        pm = _make_plugin_manager()
+        pm.deactivate_plugin.side_effect = PluginLifecycleError("fdrs is an admin feature and is always on")
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.post("/admin/api/plugins/fdrs/deactivate")
+        assert resp.status_code == 400
+        assert "always on" in resp.get_data(as_text=True)
+
+    def test_first_party_uninstall_refusal_is_400(self, logged_in_sm_client, db_session, app):
+        from app.plugins.manager import PluginLifecycleError
+
+        pm = _make_plugin_manager()
+        pm.uninstall_plugin.side_effect = PluginLifecycleError("bundled with the application")
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/interactive_map/uninstall")
+        assert resp.status_code == 400
+
+
+class TestReloadScanAndInfoRoutes:
+    def test_reload_requires_system_manager(self, logged_in_client, db_session, app):
+        pm = _make_plugin_manager()
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.post("/admin/api/plugins/reload")
+        assert resp.status_code == 403
+        pm.reload_plugins.assert_not_called()
+
+    def test_reload_all(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager()
+        pm.reload_plugins.return_value = True
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/reload")
+        assert resp.status_code == 200
+        pm.reload_plugins.assert_called_once()
+
+    def test_reload_all_failure_is_500(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager()
+        pm.reload_plugins.return_value = False
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/reload")
+        assert resp.status_code == 500
+
+    def test_reload_single_unknown_plugin_is_404(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager(plugin=None)
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/nope/reload")
+        assert resp.status_code == 404
+        pm.reload_plugin.assert_not_called()
+
+    def test_reload_single(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager(plugin=MagicMock())
+        pm.reload_plugin.return_value = True
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/interactive_map/reload")
+        assert resp.status_code == 200
+        pm.reload_plugin.assert_called_once_with("interactive_map")
+
+    def test_scan_reports_new_plugins(self, logged_in_sm_client, db_session, app):
+        pm = _make_plugin_manager()
+        pm.scan_for_new_plugins.return_value = ["fresh"]
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_sm_client.post("/admin/api/plugins/scan")
+        data = _get_json(resp)
+        assert resp.status_code == 200
+        assert data["new_plugins"] == ["fresh"]
+        assert data["count"] == 1
+
+    def test_cleanup_info(self, logged_in_client, db_session, app):
+        pm = _make_plugin_manager(first_party=True, dependents=["fdrs"])
+        pm.get_plugin_cleanup_info.return_value = {"data_to_cleanup": []}
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/admin/api/plugins/pb_progress/cleanup-info")
+        data = _get_json(resp)
+        assert resp.status_code == 200
+        assert data["first_party"] is True
+        assert data["dependents"] == ["fdrs"]
+
+    def test_cleanup_info_unknown_plugin(self, logged_in_client, db_session, app):
+        pm = _make_plugin_manager()
+        pm.get_plugin_cleanup_info.return_value = None
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.get("/admin/api/plugins/nope/cleanup-info")
+        assert resp.status_code == 404
+
+    def test_starter_package_is_a_loadable_plugin_zip(self, logged_in_client, db_session, app):
+        resp = logged_in_client.get("/admin/api/plugins/starter/download")
+        assert resp.status_code == 200
+        archive = zipfile.ZipFile(io.BytesIO(resp.data))
+        names = set(archive.namelist())
+        assert {"plugin.py", "plugin.json", "__init__.py"} <= names
+        manifest = json.loads(archive.read("plugin.json"))
+        assert manifest["plugin_id"] == "sample_plugin"
+        assert 'return "sample_plugin"' in archive.read("plugin.py").decode()
+
+
+class TestSettingsRequireSupport:
+    def test_plugin_without_settings_support_is_rejected(self, logged_in_client, db_session, app):
+        plugin = MagicMock()
+        plugin.supports_settings_update.return_value = False
+        pm = _make_plugin_manager(plugin=plugin)
+        with patch.object(app, "plugin_manager", pm):
+            resp = logged_in_client.post("/admin/api/plugins/x/settings", json={"a": 1})
+        assert resp.status_code == 400
+        plugin.update_settings.assert_not_called()

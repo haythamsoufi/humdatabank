@@ -9,6 +9,7 @@ abstract final class GroupedDashboardPalette {
   static const card = Color(0xFFFFFFFF);
   static const onFill = Color(0xFFFFFFFF);
   static const hairline = Color(0xFFE5E5EA);
+  static const softShadow = Color(0x1A000000);
 
   /// Status variants mirror Backoffice `.status-label--*` (components.css) and
   /// `assignment_status_variant` so mobile and web show the same colour per status.

@@ -254,7 +254,7 @@ _StatusTone _toneFor(
   }
   return _StatusTone(
     label: label,
-    foreground: Color.lerp(c.accent, Colors.white, 0.5)!,
+    foreground: Color.lerp(c.accent, GroupedDashboardPalette.onFill, 0.5)!,
     background: c.accent.withValues(alpha: 0.18),
     border: c.accent.withValues(alpha: 0.5),
     accent: c.accent,

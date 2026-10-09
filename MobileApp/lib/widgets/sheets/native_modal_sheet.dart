@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/ios_constants.dart';
 import '../ios_button.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 
 /// Drag handle matching [HomeScreen] / resources / disaggregation bottom sheets.
 class NativeModalSheetDragHandle extends StatelessWidget {
@@ -223,7 +224,7 @@ class ReportingPeriodPickerField extends StatelessWidget {
       label: l10n.homeLandingGlobalPeriodFilterLabel,
       value: effective,
       child: Material(
-        color: isDark ? theme.colorScheme.surfaceContainerHigh : Colors.white,
+        color: isDark ? theme.colorScheme.surfaceContainerHigh : GroupedDashboardPalette.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: line),

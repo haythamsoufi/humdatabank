@@ -13,6 +13,7 @@ import 'country_centroids_cache.dart';
 import 'fdrs_world_map.dart';
 import 'world_geojson_cache.dart';
 import '../sheets/native_modal_sheet.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 
 class LandingShortcutItem {
   final IconData icon;
@@ -467,7 +468,7 @@ class _OverviewTopCountriesBar extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : Colors.white,
+        color: isDark ? cs.surfaceContainerHigh : GroupedDashboardPalette.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.45 : 0.6),

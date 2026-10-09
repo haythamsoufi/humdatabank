@@ -16,6 +16,7 @@ import '../../utils/constants.dart';
 import '../sheets/native_modal_sheet.dart';
 import 'country_centroids_cache.dart';
 import 'world_geojson_cache.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 
 /// Bubble markers vs filled country polygons (choropleth).
 enum FdrsMapVisualMode { bubble, choropleth }
@@ -667,13 +668,15 @@ class FdrsMapModeToggle extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
               decoration: BoxDecoration(
                 color: selected
-                    ? (isDark ? cs.surfaceContainerHigh : Colors.white)
+                    ? (isDark
+                          ? cs.surfaceContainerHigh
+                          : GroupedDashboardPalette.card)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: selected
                     ? [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
+                          color: GroupedDashboardPalette.softShadow,
                           blurRadius: 6,
                           offset: const Offset(0, 1),
                         ),
@@ -827,7 +830,9 @@ class _IndicatorChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? accent
-                : (isDark ? cs.surfaceContainerHigh : Colors.white),
+                : (isDark
+                      ? cs.surfaceContainerHigh
+                      : GroupedDashboardPalette.card),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: selected ? accent : borderColor),
           ),
@@ -840,7 +845,7 @@ class _IndicatorChip extends StatelessWidget {
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               fontSize: compact ? 12 : 13,
               height: 1.2,
-              color: selected ? Colors.white : cs.onSurface,
+              color: selected ? GroupedDashboardPalette.onFill : cs.onSurface,
             ),
           ),
         ),

@@ -198,14 +198,29 @@
                             {% set _use_export_excel = _aes_id and _excel_mode == 'generic' and _show_export %}
                             {% set _use_import_excel = _aes_id and _excel_mode == 'generic' and _show_import %}
                             {% if tmpl and tmpl.id in [24, 33] and _aes_id and can_use_upr %}
-                            <button type="button"
-                                    id="upr-toggle"
-                                    class="professional-action-btn"
-                                    aria-pressed="false"
-                                    aria-controls="upr-panel">
-                                <i class="fas fa-chart-pie" aria-hidden="true"></i>
-                                <span>{{ _('Visuals') }}</span>
-                            </button>
+                            <div class="upr-scope" id="upr-scope"
+                                 data-this-country="{{ _('This country')|e }}"
+                                 data-countries-label="{{ _('{count} countries')|e }}">
+                                <button type="button"
+                                        id="upr-toggle"
+                                        class="professional-action-btn"
+                                        aria-pressed="false"
+                                        aria-controls="upr-panel">
+                                    <i class="fas fa-chart-pie" aria-hidden="true"></i>
+                                    <span>{{ _('Visuals') }}</span>
+                                </button>
+                                <button type="button"
+                                        id="upr-scope-toggle"
+                                        class="upr-scope__chevron"
+                                        hidden
+                                        aria-expanded="false"
+                                        aria-haspopup="menu"
+                                        aria-controls="upr-scope-menu"
+                                        aria-label="{{ _('Choose country or bundle') }}">
+                                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                </button>
+                                <div id="upr-scope-menu" class="upr-scope__menu" hidden role="menu"></div>
+                            </div>
                             {% endif %}
                             {% if _aes_id and (_show_export or _show_import) %}
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">

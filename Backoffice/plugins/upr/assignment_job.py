@@ -130,6 +130,7 @@ def create_assignment_export_job(
     dashboard_id: str = "combined",
     word_filename: str = "",
     audience: str | None = None,
+    bundle: str = "",
 ) -> str:
     from plugins.upr.catalog import DASHBOARD_BY_ID
     from plugins.upr.errors import UprError
@@ -141,6 +142,7 @@ def create_assignment_export_job(
     if dash not in DASHBOARD_BY_ID:
         raise UprError(f"Unknown dashboard: {dash}")
     lang = parse_export_language(lang)
+    bundle = str(bundle or "").strip()
     job_id = str(uuid.uuid4())
     job_dir = _job_dir(job_id)
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -166,6 +168,7 @@ def create_assignment_export_job(
         "has_word": bool(word_bytes),
         "style_rev": export_style_token(),
         "audience": (audience or "auto").strip().lower() or "auto",
+        "bundle": bundle,
     }
     payload = {
         "aes_id": int(aes_id),
@@ -175,6 +178,7 @@ def create_assignment_export_job(
         "word_path": word_path,
         "word_filename": Path(word_filename or "").name[:200],
         "audience": (audience or "auto").strip().lower() or "auto",
+        "bundle": bundle,
     }
     job = AIJob(
         id=job_id,
@@ -206,6 +210,7 @@ def _visual_job_matches(
     export_format: str,
     dashboard_id: str,
     lang: str,
+    bundle: str = "",
 ) -> bool:
     if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
         return False
@@ -218,6 +223,7 @@ def _visual_job_matches(
         and str(meta.get("dashboard_id") or "combined") == dashboard_id
         and str(meta.get("lang") or "en") == lang
         and str(meta.get("style_rev") or "") == export_style_token()
+        and str(meta.get("bundle") or "") == str(bundle or "")
     )
 
 
@@ -228,15 +234,22 @@ def _reusable_job_id(
     export_format: str,
     dashboard_id: str,
     lang: str,
+    bundle: str = "",
     now: datetime | None = None,
 ) -> str | None:
     fmt = str(export_format or "pdf").strip().lower()
     dash = str(dashboard_id or "combined").strip() or "combined"
     lang = parse_export_language(lang)
+    bundle = str(bundle or "").strip()
     clock = now or utcnow()
     for job in jobs:
         if not _visual_job_matches(
-            job, aes_id=aes_id, export_format=fmt, dashboard_id=dash, lang=lang
+            job,
+            aes_id=aes_id,
+            export_format=fmt,
+            dashboard_id=dash,
+            lang=lang,
+            bundle=bundle,
         ):
             continue
         status = _status_str(job.status)
@@ -268,6 +281,7 @@ def find_reusable_assignment_export_job(
     export_format: str,
     dashboard_id: str = "combined",
     lang: str = "en",
+    bundle: str = "",
 ) -> str | None:
     """Return a matching in-flight or freshly completed visual export, if any."""
     jobs = (
@@ -282,6 +296,7 @@ def find_reusable_assignment_export_job(
         export_format=export_format,
         dashboard_id=dashboard_id,
         lang=lang,
+        bundle=bundle,
     )
 
 
@@ -290,6 +305,7 @@ def take_matching_pdf_bytes(
     aes_id: int,
     dashboard_id: str = "combined",
     lang: str = "en",
+    bundle: str = "",
     timeout: float = 120.0,
 ) -> tuple[bytes, str] | None:
     """Return a fresh matching PDF so PNG can skip a second WeasyPrint pass.
@@ -301,6 +317,7 @@ def take_matching_pdf_bytes(
         export_format="pdf",
         dashboard_id=dashboard_id,
         lang=lang,
+        bundle=bundle,
     )
     if not job_id:
         return None
@@ -614,6 +631,7 @@ def _run_assignment_export_job_body(_app, job_id: str, pulse: threading.Thread) 
     word_path = payload.get("word_path") or ""
     word_filename = str(payload.get("word_filename") or "")
     audience = payload.get("audience")
+    bundle = str(payload.get("bundle") or (job.meta or {}).get("bundle") or "").strip()
     started = utcnow()
     logger.info(
         "UPR assignment export start job=%s aes=%s fmt=%s dash=%s lang=%s",
@@ -684,6 +702,7 @@ def _run_assignment_export_job_body(_app, job_id: str, pulse: threading.Thread) 
                 export_format="pdf",
                 dashboard_id=dashboard_id,
                 lang=lang,
+                bundle=bundle,
             )
             waiting_for_pdf = False
             if pdf_job_id:
@@ -697,15 +716,19 @@ def _run_assignment_export_job_body(_app, job_id: str, pulse: threading.Thread) 
                 step=1,
                 total=2,
             )
-            data, filename = UprVisualsService.png_bytes(aes_id, dashboard_id, lang=lang)
+            data, filename = UprVisualsService.png_bytes(
+                aes_id, dashboard_id, lang=lang, bundle=bundle
+            )
             mimetype = "image/png"
         elif fmt == "idml":
             _report(job, "Generating InDesign package…", step=1, total=2)
-            data, filename = UprVisualsService.idml_zip_bytes(aes_id, lang=lang)
+            data, filename = UprVisualsService.idml_zip_bytes(aes_id, lang=lang, bundle=bundle)
             mimetype = "application/zip"
         else:
             _report(job, "Generating PDF…", step=1, total=2)
-            data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id, lang=lang)
+            data, filename = UprVisualsService.pdf_bytes(
+                aes_id, dashboard_id, lang=lang, bundle=bundle
+            )
             mimetype = "application/pdf"
         output = job_dir / filename
         output.write_bytes(data)

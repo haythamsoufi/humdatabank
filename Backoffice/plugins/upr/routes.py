@@ -97,6 +97,22 @@ def _apply_plugin_static_cache(response: Response) -> Response:
     return response
 
 
+def _requested_bundle() -> str:
+    """Bundle name from the query string. Empty means this assignment's country only."""
+    if not has_request_context():
+        return ""
+    return (request.args.get("bundle") or "").strip()
+
+
+def _visual_payload(aes_id: int, *, inline_icons: bool = False):
+    bundle = _requested_bundle()
+    if not bundle:
+        return build_payload(aes_id, inline_icons=inline_icons)
+    from plugins.upr.bundle import build_bundle_payload
+
+    return build_bundle_payload(aes_id, bundle, inline_icons=inline_icons)
+
+
 def _requested_language(*, strict: bool = False) -> str:
     raw = (request.args.get("lang") or request.form.get("lang") or "").strip()
     if not raw:
@@ -314,7 +330,7 @@ def assignment_payload(aes_id: int):
         progress_id = parse_progress_id(request.args.get("progress_id"))
 
         def build() -> tuple[dict, str, dict[str, str]]:
-            payload = build_payload(aes_id)
+            payload = _visual_payload(aes_id)
             html_by_dashboard = render_dashboards_html(payload)
             html = html_by_dashboard.get(dashboard_id) or render_dashboard_html(payload, dashboard_id)
             return payload, html, html_by_dashboard
@@ -340,6 +356,26 @@ def assignment_payload(aes_id: int):
 
 
 
+@bp.route("/assignment/<int:aes_id>/visuals/bundles", methods=["GET"])
+@login_required
+@permission_required("admin.data_explore.upr")
+def assignment_bundles(aes_id: int):
+    """Bundles this assignment can switch to, when another country on the same form shares one."""
+    try:
+        aes = _aes_or_404(aes_id)
+        from plugins.upr.bundle import bundle_options_for_aes
+
+        return json_ok(bundles=bundle_options_for_aes(aes))
+    except UprError as exc:
+        return json_bad_request(str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return handle_json_view_exception(
+            exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR bundles failed for aes {aes_id}"
+        )
+
+
 @bp.route("/assignment/<int:aes_id>/visuals/report", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr")
@@ -349,7 +385,7 @@ def assignment_report(aes_id: int):
         lang = _requested_language(strict=False)
         _aes_or_404(aes_id)
         with force_locale(lang):
-            payload = build_payload(aes_id)
+            payload = _visual_payload(aes_id)
             html = render_report_html(payload)
         return json_ok(payload=payload, html=html)
     except UprError as exc:
@@ -484,11 +520,13 @@ def _pdf_viewer_response(
 
 def _queue_visual_export(aes_id: int, export_format: str, *, dashboard_id: str = "combined") -> str:
     lang = _requested_language(strict=True)
+    bundle = _requested_bundle()
     existing = find_reusable_assignment_export_job(
         aes_id=aes_id,
         export_format=export_format,
         dashboard_id=dashboard_id,
         lang=lang,
+        bundle=bundle,
     )
     app = current_app._get_current_object()
     if existing:
@@ -500,6 +538,7 @@ def _queue_visual_export(aes_id: int, export_format: str, *, dashboard_id: str =
         export_format=export_format,
         lang=lang,
         dashboard_id=dashboard_id,
+        bundle=bundle,
     )
     start_assignment_export_job(app, job_id)
     _log_upr_generation(
@@ -651,6 +690,9 @@ def assignment_pdf(aes_id: int):
             file_params: dict[str, str | int] = {"aes_id": aes_id, "job_id": job_id, "lang": lang}
             if dashboard_id != "combined":
                 file_params["dashboard"] = dashboard_id
+            bundle = _requested_bundle()
+            if bundle:
+                file_params["bundle"] = bundle
             if _wants_download():
                 file_params["download"] = 1
             else:
@@ -666,8 +708,12 @@ def assignment_pdf(aes_id: int):
         if dashboard_id != "combined":
             raw_params["dashboard"] = dashboard_id
             download_params["dashboard"] = dashboard_id
+        bundle = _requested_bundle()
+        if bundle:
+            raw_params["bundle"] = bundle
+            download_params["bundle"] = bundle
         with force_locale(lang):
-            title = visuals_browser_title(aes)
+            title = bundle or visuals_browser_title(aes)
             return _pdf_viewer_response(
                 title=title,
                 pdf_url=url_for("upr.assignment_pdf", **raw_params),

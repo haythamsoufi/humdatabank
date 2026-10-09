@@ -104,7 +104,9 @@ class _AdminScreenState extends State<AdminScreen>
             color: groupedBg,
             child: SingleChildScrollView(
               physics: IOSSettingsStyle.pageScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: IOSSpacing.lg),
+              padding: EdgeInsets.only(
+                bottom: IOSSpacing.lg + MediaQuery.paddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: hubChildren,

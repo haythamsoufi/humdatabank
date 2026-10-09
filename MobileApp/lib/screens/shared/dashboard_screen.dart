@@ -1554,7 +1554,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                                 ),
 
-                              const SizedBox(height: 80), // Space for FAB
+                              // Clears the floating tab bar (padding.bottom is its
+                              // height inside the tab shell).
+                              SizedBox(
+                                height:
+                                    80 + MediaQuery.paddingOf(context).bottom,
+                              ),
                             ],
                           ),
                         ),

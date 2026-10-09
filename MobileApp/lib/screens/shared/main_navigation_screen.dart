@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/debug_logger.dart';
@@ -344,16 +346,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             clipBehavior: Clip.none,
             children: [
               Positioned.fill(
-                child: HorizontalSwipePageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    DebugLogger.logNav(
-                        'onPageChanged $_currentIndex → $index');
-                    _navVersion++;
-                    setState(() => _currentIndex = index);
-                    _trackTabScreenView(index, visibleTabs);
+                // [Scaffold.extendBody] only raises padding.bottom to the bar
+                // height. Pages that size their trailing space from
+                // viewPadding.bottom would still end under the capsule.
+                child: Builder(
+                  builder: (context) {
+                    final mq = MediaQuery.of(context);
+                    return MediaQuery(
+                      data: mq.copyWith(
+                        viewPadding: mq.viewPadding.copyWith(
+                          bottom: math.max(
+                            mq.viewPadding.bottom,
+                            mq.padding.bottom,
+                          ),
+                        ),
+                      ),
+                      child: HorizontalSwipePageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          DebugLogger.logNav(
+                              'onPageChanged $_currentIndex → $index');
+                          _navVersion++;
+                          setState(() => _currentIndex = index);
+                          _trackTabScreenView(index, visibleTabs);
+                        },
+                        children: screens,
+                      ),
+                    );
                   },
-                  children: screens,
                 ),
               ),
               const Positioned(

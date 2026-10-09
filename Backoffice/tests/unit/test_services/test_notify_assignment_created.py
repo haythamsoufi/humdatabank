@@ -339,3 +339,50 @@ class TestPreviewAssignmentCreatedGroupedEmail:
         html = preview.get("html_body") or ""
         assert 'href="' in html
         assert "/forms/" in html or 'href="/"' in html or "Open Assignment" in html
+
+class TestNotifyAssignmentCreatedOutcome:
+    """The ``outcome`` dict lets background jobs tell a failed email from 'nothing to send'."""
+
+    def _run(self, app, pending_aes, *, focal_ids, send_side_effect=None):
+        outcome = {}
+        with app.app_context():
+            with patch(
+                "app.services.notification.notifiers.assignment.get_assignment_editor_submitter_user_ids_for_entity",
+                return_value=focal_ids,
+            ), patch(
+                "app.services.notification.notifiers.assignment.notify_entity_focal_points",
+                return_value=["n"],
+            ), patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment._send_grouped_assignment_created_email",
+                side_effect=send_side_effect,
+            ), patch(
+                "app.services.notification.notifiers.assignment.log_entity_activity",
+            ), patch(
+                "app.services.notification.notifiers.assignment.url_for",
+                return_value="/assignment/1",
+            ):
+                notify_assignment_created(pending_aes, outcome=outcome)
+        return outcome
+
+    def test_no_recipients_reports_skipped(self, app, pending_aes):
+        outcome = self._run(app, pending_aes, focal_ids=[])
+        assert outcome["email_status"] == "skipped"
+        assert outcome["email_detail"]
+
+    def test_send_exception_reports_failed(self, app, pending_aes):
+        outcome = self._run(
+            app, pending_aes, focal_ids=[101], send_side_effect=RuntimeError("mail service down")
+        )
+        assert outcome["email_status"] == "failed"
+        assert "mail service down" in outcome["email_detail"]
+
+    def test_send_status_is_passed_through(self, app, pending_aes):
+        def _send(**kwargs):
+            kwargs["outcome"].update({"status": "sent", "detail": ""})
+            return True
+
+        outcome = self._run(app, pending_aes, focal_ids=[101], send_side_effect=_send)
+        assert outcome["email_status"] == "sent"

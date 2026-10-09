@@ -184,11 +184,15 @@ def _send_grouped_assignment_created_email(
     sample_notification,
     entity_name,
     notification_by_user_id=None,
+    outcome=None,
 ):
     """One email per entity: focal points in To, admins in CC."""
     from app.services.notification.emails import send_grouped_entity_email
 
     if not focal_user_ids and not admin_user_ids:
+        if outcome is not None:
+            outcome['status'] = 'skipped'
+            outcome['detail'] = 'No recipients for this entity.'
         return False
     return send_grouped_entity_email(
         to_user_ids=focal_user_ids,
@@ -196,6 +200,7 @@ def _send_grouped_assignment_created_email(
         sample_notification=sample_notification,
         entity_name=entity_name,
         notification_by_user_id=notification_by_user_id,
+        outcome=outcome,
     )
 
 
@@ -338,9 +343,16 @@ def preview_assignment_created_grouped_email(
     return preview
 
 
-def notify_assignment_created(assignment_entity_status, notify_admins=False, actor_user_id=None):
+def notify_assignment_created(
+    assignment_entity_status, notify_admins=False, actor_user_id=None, outcome=None
+):
     """
     Notify focal points (and optionally entity-scoped admins) when a new assignment is created.
+
+    outcome: optional dict the caller can pass to learn what happened to the grouped email
+    (``email_status`` = ``sent`` / ``skipped`` / ``failed`` / ``not_requested``, plus
+    ``email_detail``). Email failures are logged and never raised, so without this a caller
+    (e.g. the background job runner) cannot tell a failed send from "no recipients".
 
     actor_user_id: explicit id of the admin who created the assignment, used to exclude them
     from their own notification. Pass this when calling from outside the original request
@@ -365,6 +377,9 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False, act
             "[NOTIFY] Suppressing notify_assignment_created for [LOADTEST] assignment "
             "(period=%r, aes_id=%s)", assigned_form.period_name, aes.id
         )
+        if outcome is not None:
+            outcome['email_status'] = 'skipped'
+            outcome['email_detail'] = 'Load-test assignment: notifications suppressed.'
         return []
 
     # Debug: Log template lookup to help diagnose any issues
@@ -486,6 +501,7 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False, act
             entity_id=entity_id,
             assigned_form_id=aes.assigned_form_id,
         )
+        email_outcome: dict = {}
         try:
             _send_grouped_assignment_created_email(
                 focal_user_ids=focal_user_ids,
@@ -493,12 +509,20 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False, act
                 sample_notification=sample,
                 entity_name=message_params['country'],
                 notification_by_user_id=notification_by_user_id,
+                outcome=email_outcome,
             )
         except Exception as e:
+            email_outcome = {'status': 'failed', 'detail': str(e)}
             current_app.logger.error(
                 "[NOTIFY] Failed grouped assignment_created email for %s:%s: %s",
                 entity_type, entity_id, e, exc_info=True,
             )
+        if outcome is not None:
+            outcome['email_status'] = email_outcome.get('status') or 'skipped'
+            outcome['email_detail'] = email_outcome.get('detail') or ''
+    elif outcome is not None:
+        outcome['email_status'] = 'skipped'
+        outcome['email_detail'] = 'No recipients for this entity.'
 
     return list(notifications) + list(admin_notifications)
 

@@ -388,6 +388,9 @@ Use this as a step-by-step when moving an existing feature to this stack.
 | `ifrc_api_bulk` | `ifrc_api_bulk` |
 | `fdrs.data_sync` | *(inline modal poll — `data_sync_imputation.html`)* |
 | `upr.bulk_export` | *(bespoke `#upr-vis-progress` poll — `upr-admin.js`)* |
+| `assignments.notify_created` | *(Communication Center → Background jobs tab + banner — `communication-jobs.js`)* |
+
+**`assignments.notify_created`** (`app/services/notification/assignment_notification_jobs.py`): one `AIJob` per assignment/country/entity add with notifications on, one `AIJobItem` per `AssignmentEntityStatus`. Job rows are written inside the request transaction (`_queue_assignment_notification_job` in `assignment_management.py`) and the worker starts via `register_post_commit`. Items end `failed` when the entity's email was rejected (`notify_assignment_created(..., outcome=...)`), an exception occurred, or the worker died; entities with nobody to notify finish `completed` and are reported as "without recipients". Jobs are kept 30 days (not the 6h AI-docs TTL) and can be stopped or dismissed from `/admin/api/communications/background-jobs`. Worker threads must run inside `app.test_request_context(base_url=BASE_URL)` because `url_for` is used and `SERVER_NAME` is unset.
 
 ---
 

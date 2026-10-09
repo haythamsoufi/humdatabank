@@ -506,14 +506,20 @@ class AppBottomNavigationBar extends StatelessWidget {
     if (useSystemGlass) {
       // No Flutter fill or blur on top — that would hide the system glass.
       // The view ignores hits so the icon buttons keep the gestures.
+      // ClipRRect keeps the platform view's corners round even if the native
+      // side has not laid out its own capsule shape yet.
       surface = IgnorePointer(
-        child: UiKitView(
-          key: ValueKey<bool>(isDark),
-          viewType: _systemGlassViewType,
-          creationParams: <String, Object>{'dark': isDark},
-          creationParamsCodec: const StandardMessageCodec(),
-          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
-          hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: UiKitView(
+            key: ValueKey<bool>(isDark),
+            viewType: _systemGlassViewType,
+            creationParams: <String, Object>{'dark': isDark},
+            creationParamsCodec: const StandardMessageCodec(),
+            gestureRecognizers:
+                const <Factory<OneSequenceGestureRecognizer>>{},
+            hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+          ),
         ),
       );
     } else {
@@ -539,13 +545,20 @@ class AppBottomNavigationBar extends StatelessWidget {
     Widget pill = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: theme.ambientShadow(lightOpacity: 0.16, darkOpacity: 0.45),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        // System glass draws its own lensing and shadow. A Flutter shadow
+        // underneath would show through the glass as a gray cast.
+        boxShadow: useSystemGlass
+            ? null
+            : [
+                BoxShadow(
+                  color: theme.ambientShadow(
+                    lightOpacity: 0.16,
+                    darkOpacity: 0.45,
+                  ),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: SizedBox(
         key: floatingPillKey,

@@ -59,19 +59,22 @@ private final class GlassCapsulePlatformView: NSObject, FlutterPlatformView {
 }
 
 /// Capsule of system glass. Touches pass through so the Flutter icons stay tappable.
+///
+/// iOS 26 uses `UIGlassEffect` in a `UIVisualEffectView` with an explicit
+/// capsule corner configuration (the documented way to shape glass). Earlier
+/// versions use a system material clipped to a continuous-corner capsule.
 private final class GlassCapsuleView: UIView {
   private let effectView: UIVisualEffectView
   private let usesLiquidGlass: Bool
 
   init(frame: CGRect, dark: Bool) {
     if #available(iOS 26.0, *) {
-      // Default UIGlassEffect shape is a capsule, which matches the pill.
-      effectView = UIVisualEffectView(effect: UIGlassEffect())
+      let glass = UIVisualEffectView(effect: UIGlassEffect())
+      glass.cornerConfiguration = .capsule()
+      effectView = glass
       usesLiquidGlass = true
     } else {
-      let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
-      blur.clipsToBounds = true
-      effectView = blur
+      effectView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
       usesLiquidGlass = false
     }
     super.init(frame: frame)
@@ -85,6 +88,16 @@ private final class GlassCapsuleView: UIView {
     effectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     effectView.frame = bounds
     addSubview(effectView)
+
+    if !usesLiquidGlass {
+      // Round the host itself so the blur never shows square corners.
+      clipsToBounds = true
+      layer.masksToBounds = true
+      layer.cornerCurve = .continuous
+      effectView.layer.cornerCurve = .continuous
+      layer.borderWidth = 0.5
+      layer.borderColor = UIColor.separator.withAlphaComponent(0.35).cgColor
+    }
   }
 
   required init?(coder: NSCoder) {
@@ -95,7 +108,9 @@ private final class GlassCapsuleView: UIView {
     super.layoutSubviews()
     effectView.frame = bounds
     if !usesLiquidGlass {
-      effectView.layer.cornerRadius = min(bounds.width, bounds.height) / 2
+      let radius = min(bounds.width, bounds.height) / 2
+      layer.cornerRadius = radius
+      effectView.layer.cornerRadius = radius
     }
   }
 }

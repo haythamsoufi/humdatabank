@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,11 @@ import '../utils/navigation_helper.dart';
 import '../l10n/app_localizations.dart';
 import 'tab_customization_dialog.dart';
 
+/// Floating glass tab bar.
+///
+/// The capsule is inset from the screen edges and sits above the iPhone home
+/// indicator (or the Android system inset), in the style of Instagram and the
+/// iOS 26 tab bar. The selected tab is a rounded capsule behind the glyph.
 class AppBottomNavigationBar extends StatelessWidget {
   /// Pass as [currentIndex] when no tab should appear selected.
   static const int noTabSelected = -1;
@@ -50,31 +56,37 @@ class AppBottomNavigationBar extends StatelessWidget {
   /// Light icon colours for dark translucent bars ([backgroundColor] with low opacity).
   final bool lightForegroundOnBar;
 
-  /// Selection stripe at the top of each tab slot.
-  static const double _stripeHeight = 3;
-
   /// Tab glyph size.
   static const double _iconExtent = 24;
 
-  /// Gap under the stripe on iOS. Clears the notification badge, which is
-  /// drawn 6px above the glyph.
-  static const double _iosStripeToIconGap = 8;
+  /// Floating capsule height (icons are centered inside).
+  @visibleForTesting
+  static const double floatingPillHeight = 56;
 
-  /// iOS icon row: stripe + gap + glyph. Home-indicator space sits below this.
-  static const double _iosIconRowHeight =
-      _stripeHeight + _iosStripeToIconGap + _iconExtent;
+  /// Clearance above the capsule so its shadow is not clipped by the scaffold.
+  @visibleForTesting
+  static const double floatingTopGap = 10;
 
-  /// Space under the glyphs on iOS.
+  /// Horizontal inset of the capsule from the screen (plus the safe inset).
+  @visibleForTesting
+  static const double floatingSideMargin = 12;
+
+  /// Finder for the rounded capsule (tests and semantics).
+  @visibleForTesting
+  static const Key floatingPillKey = Key('appBottomNavFloatingPill');
+
+  /// Space under the floating capsule on iOS.
   ///
-  /// The home-indicator inset is about 34pt, but the indicator graphic only
-  /// occupies the bottom ~13pt. Using the full inset leaves a tall empty band.
-  /// Shaving it down to 18pt put the glyphs on top of that graphic, so phone
-  /// insets keep a clearer gap (34pt → 28pt). Taller insets stay intact.
+  /// The home-indicator graphic occupies about the bottom 13pt. A 21pt gap
+  /// leaves that graphic visible beneath the pill, the way Instagram and the
+  /// iOS 26 tab bar float. Taller insets (some iPads, split view) stay intact
+  /// so the capsule does not cover them. Phones with a home button get a
+  /// short float margin.
   @visibleForTesting
   static double iosBottomPaddingForInset(double inset) {
-    if (inset <= 0) return 8;
+    if (inset <= 0) return 12;
     if (inset > 40) return inset;
-    return math.max(20, inset - 6);
+    return math.max(20, math.min(21, inset));
   }
 
   const AppBottomNavigationBar({
@@ -153,7 +165,7 @@ class AppBottomNavigationBar extends StatelessWidget {
       context: context,
       enableCustomization: enableCustomization,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (int i = 0; i < tabs.length; i++)
             Flexible(
@@ -222,7 +234,7 @@ class AppBottomNavigationBar extends StatelessWidget {
       context: context,
       enableCustomization: enableCustomization,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (isAdmin) ...[
             // Notifications (index 0) — admin only
@@ -439,7 +451,7 @@ class AppBottomNavigationBar extends StatelessWidget {
   }
 
   // =========================================================================
-  // Shared shell (border, safe area, optional long-press)
+  // Shared shell — floating glass capsule (Instagram / iOS 26 tab bar)
   // =========================================================================
 
   Widget _barShell({
@@ -447,52 +459,84 @@ class AppBottomNavigationBar extends StatelessWidget {
     required bool enableCustomization,
     required Widget child,
   }) {
-    final barBg = backgroundColor ?? context.surfaceColor;
-    final topBorderColor = backgroundColor != null
-        ? Colors.white.withValues(alpha: 0.14)
-        : context.borderColor;
-
+    final platform = Theme.of(context).platform;
+    final apple = platform == TargetPlatform.iOS ||
+        platform == TargetPlatform.macOS;
     final safe = MediaQuery.paddingOf(context);
-    final ios = Theme.of(context).platform == TargetPlatform.iOS;
-    // iOS: shorten the home-indicator gap. Other platforms keep the previous
-    // shell (52px icon slot plus the full system inset).
-    final Widget barBody = ios
-        ? Padding(
-            padding: EdgeInsets.fromLTRB(
-              6 + safe.left,
-              0,
-              6 + safe.right,
-              iosBottomPaddingForInset(safe.bottom),
+    final bottomGap = apple
+        ? iosBottomPaddingForInset(safe.bottom)
+        : (safe.bottom > 0 ? safe.bottom : 12.0);
+
+    final isDark = context.isDarkTheme;
+    final Color fill;
+    final Color hairline;
+    if (backgroundColor != null) {
+      fill = backgroundColor!;
+      hairline = Colors.white.withValues(alpha: 0.18);
+    } else if (isDark) {
+      fill = context.surfaceColor.withValues(alpha: 0.78);
+      hairline = Colors.white.withValues(alpha: 0.14);
+    } else {
+      fill = Colors.white.withValues(alpha: 0.82);
+      hairline = Colors.black.withValues(alpha: 0.08);
+    }
+
+    final radius = BorderRadius.circular(floatingPillHeight / 2);
+
+    Widget pill = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        key: floatingPillKey,
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: radius,
+              border: Border.all(
+                color: hairline,
+                width: 0.6,
+                strokeAlign: BorderSide.strokeAlignInside,
+              ),
             ),
-            child: SizedBox(height: _iosIconRowHeight, child: child),
-          )
-        : SafeArea(
-            top: false,
             child: SizedBox(
-              height: 52,
+              height: floatingPillHeight,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: child,
               ),
             ),
-          );
-
-    Widget bar = Container(
-      decoration: BoxDecoration(
-        color: barBg,
-        border: Border(top: BorderSide(color: topBorderColor, width: 0.5)),
+          ),
+        ),
       ),
-      child: barBody,
     );
 
     if (enableCustomization) {
-      bar = GestureDetector(
+      pill = GestureDetector(
         onLongPress: () => TabCustomizationDialog.show(context),
-        child: bar,
+        child: pill,
       );
     }
 
-    return bar;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        floatingSideMargin + safe.left,
+        floatingTopGap,
+        floatingSideMargin + safe.right,
+        bottomGap,
+      ),
+      child: pill,
+    );
   }
 
   // =========================================================================
@@ -516,22 +560,23 @@ class AppBottomNavigationBar extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final primary = cs.primary;
-    final ifrcRed = Color(AppConstants.ifrcRed);
 
     final Color iconFg;
-    final Color stripeColor;
+    final Color capsuleColor;
     if (lightForegroundOnBar) {
-      stripeColor = ifrcRed;
+      capsuleColor = Colors.white.withValues(alpha: 0.16);
       iconFg = isSelected
           ? Colors.white
           : Colors.white.withValues(alpha: 0.62);
     } else if (isSelected) {
-      stripeColor = ifrcRed;
+      capsuleColor = context.isDarkTheme
+          ? Colors.white.withValues(alpha: 0.16)
+          : Colors.black.withValues(alpha: 0.08);
       iconFg = context.isDarkTheme
           ? Color.alphaBlend(Colors.white.withValues(alpha: 0.22), primary)
           : primary;
     } else {
-      stripeColor = Colors.transparent;
+      capsuleColor = Colors.transparent;
       iconFg = context.iconColor.withValues(
         alpha: context.isDarkTheme ? 0.72 : 0.55,
       );
@@ -599,7 +644,6 @@ class AppBottomNavigationBar extends StatelessWidget {
       curve: Curves.easeOutCubic,
       child: iconChild,
     );
-    final pinIconUnderStripe = Theme.of(context).platform == TargetPlatform.iOS;
 
     return Semantics(
       label: label,
@@ -609,35 +653,36 @@ class AppBottomNavigationBar extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+          customBorder: const StadiumBorder(),
           splashColor: context.isDarkTheme && isSelected
               ? Colors.white.withValues(alpha: 0.18)
               : primary.withValues(alpha: 0.12),
           highlightColor: context.isDarkTheme && isSelected
               ? Colors.white.withValues(alpha: 0.1)
               : primary.withValues(alpha: 0.06),
-          child: SizedBox.expand(
-            child: Column(
-              children: [
-                AnimatedContainer(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Bubble hugs the glyph. Wide slots (tablet, few tabs) stay a
+              // compact capsule instead of a full-width segment.
+              final bubbleWidth = math.min(
+                72.0,
+                math.max(0.0, constraints.maxWidth - 6),
+              );
+              return Center(
+                child: AnimatedContainer(
                   duration: AppConstants.animationFast,
                   curve: Curves.easeOutCubic,
-                  height: _stripeHeight,
-                  margin: EdgeInsets.symmetric(horizontal: isSelected ? 10 : 0),
+                  width: bubbleWidth,
+                  height: 40,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isSelected ? stripeColor : Colors.transparent,
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(1.5),
-                    ),
+                    color: isSelected ? capsuleColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: scaledIcon,
                 ),
-                if (pinIconUnderStripe) ...[
-                  const SizedBox(height: _iosStripeToIconGap),
-                  scaledIcon,
-                ] else
-                  Expanded(child: Center(child: scaledIcon)),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),

@@ -857,3 +857,41 @@ class TestAiAidocStoragePathForSubmitted:
             with patch.object(svc, "category_rel_for_submitted_storage_path", return_value=None):
                 result = svc.ai_aidoc_storage_path_for_submitted(fake)
             assert "/" in result
+
+
+class TestAdoptContainerStorageSettings:
+    def test_copies_blob_settings_from_the_web_process(self, app, monkeypatch):
+        monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+        monkeypatch.setattr(
+            svc,
+            "iter_container_storage_environs",
+            lambda: iter([{
+                "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=https;AccountName=test;",
+                "AZURE_STORAGE_CONTAINER": "uploads",
+                "STATIC_CDN_URL": "https://cdn.example/static/",
+            }]),
+        )
+        app.config["UPLOAD_STORAGE_PROVIDER"] = "filesystem"
+        app.config["AZURE_STORAGE_CONNECTION_STRING"] = ""
+        try:
+            assert svc.adopt_container_storage_settings(app) is True
+            assert app.config["UPLOAD_STORAGE_PROVIDER"] == "azure_blob"
+            assert app.config["AZURE_STORAGE_CONTAINER"] == "uploads"
+            assert app.config["STATIC_CDN_URL"] == "https://cdn.example/static"
+        finally:
+            for key in (
+                "AZURE_STORAGE_CONNECTION_STRING",
+                "UPLOAD_STORAGE_PROVIDER",
+                "AZURE_STORAGE_CONTAINER",
+                "STATIC_CDN_URL",
+            ):
+                os.environ.pop(key, None)
+
+    def test_skips_when_this_process_already_has_blob_storage(self, app, monkeypatch):
+        monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "already-set")
+
+        def _unexpected():
+            raise AssertionError("should not read the web process")
+
+        monkeypatch.setattr(svc, "iter_container_storage_environs", _unexpected)
+        assert svc.adopt_container_storage_settings(app) is False

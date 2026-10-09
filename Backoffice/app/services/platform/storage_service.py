@@ -51,6 +51,105 @@ def _provider() -> str:
     return current_app.config.get("UPLOAD_STORAGE_PROVIDER") or "filesystem"
 
 
+# App Service SSH shells do not receive storage credentials. Maintenance commands
+# (logo sync, and anything else that writes uploads) must copy them from the
+# web process or the files land on the container disk and vanish on redeploy.
+_CONTAINER_STORAGE_ENV_KEYS = (
+    "AZURE_STORAGE_CONNECTION_STRING",
+    "AZURE_STORAGE_CONTAINER",
+    "UPLOAD_STORAGE_PROVIDER",
+    "UPLOAD_FOLDER",
+    "STATIC_CDN_URL",
+    "STATIC_BLOB_CONTAINER",
+)
+
+
+def _parse_environ_bytes(raw: bytes) -> dict:
+    parsed = {}
+    for item in raw.split(b"\0"):
+        if b"=" not in item:
+            continue
+        key, value = item.split(b"=", 1)
+        try:
+            name = key.decode("utf-8")
+            text = value.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if name in _CONTAINER_STORAGE_ENV_KEYS and text.strip():
+            parsed[name] = text.strip()
+    return parsed
+
+
+def _read_environ_file(path: str) -> dict:
+    try:
+        with open(path, "rb") as handle:
+            return _parse_environ_bytes(handle.read())
+    except OSError:
+        return {}
+
+
+def iter_container_storage_environs():
+    """Yield storage settings from the container's main process, then Gunicorn."""
+    if not os.path.isdir("/proc"):
+        return
+    yield _read_environ_file("/proc/1/environ")
+    proc_root = "/proc"
+    try:
+        entries = os.listdir(proc_root)
+    except OSError:
+        return
+    for entry in entries:
+        if not entry.isdigit():
+            continue
+        cmdline_path = os.path.join(proc_root, entry, "cmdline")
+        try:
+            with open(cmdline_path, "rb") as handle:
+                cmdline = handle.read().replace(b"\0", b" ").decode("utf-8", "replace")
+        except OSError:
+            continue
+        if "gunicorn" in cmdline and "run:app" in cmdline:
+            yield _read_environ_file(os.path.join(proc_root, entry, "environ"))
+
+
+def adopt_container_storage_settings(app=None) -> bool:
+    """Point this process at Azure Blob when the web process is already using it.
+
+    Returns True when settings were copied. Values are never logged.
+    """
+    if (os.environ.get("AZURE_STORAGE_CONNECTION_STRING") or "").strip():
+        return False
+    parent = {}
+    for found in iter_container_storage_environs():
+        for key, value in found.items():
+            parent.setdefault(key, value)
+        if parent.get("AZURE_STORAGE_CONNECTION_STRING"):
+            break
+    connection = parent.get("AZURE_STORAGE_CONNECTION_STRING")
+    if not connection:
+        return False
+    provider = (parent.get("UPLOAD_STORAGE_PROVIDER") or "azure_blob").strip().lower()
+    if provider not in ("filesystem", "azure_blob"):
+        provider = "azure_blob"
+    os.environ["AZURE_STORAGE_CONNECTION_STRING"] = connection
+    os.environ["UPLOAD_STORAGE_PROVIDER"] = provider
+    for key in ("AZURE_STORAGE_CONTAINER", "UPLOAD_FOLDER", "STATIC_CDN_URL", "STATIC_BLOB_CONTAINER"):
+        if parent.get(key):
+            os.environ[key] = parent[key]
+    if app is not None:
+        app.config["AZURE_STORAGE_CONNECTION_STRING"] = connection
+        app.config["UPLOAD_STORAGE_PROVIDER"] = provider
+        if parent.get("AZURE_STORAGE_CONTAINER"):
+            app.config["AZURE_STORAGE_CONTAINER"] = parent["AZURE_STORAGE_CONTAINER"]
+        if parent.get("UPLOAD_FOLDER"):
+            app.config["UPLOAD_FOLDER"] = parent["UPLOAD_FOLDER"]
+        if parent.get("STATIC_CDN_URL"):
+            app.config["STATIC_CDN_URL"] = parent["STATIC_CDN_URL"].rstrip("/")
+        if parent.get("STATIC_BLOB_CONTAINER"):
+            app.config["STATIC_BLOB_CONTAINER"] = parent["STATIC_BLOB_CONTAINER"]
+    logger.info("Adopted upload storage settings from the web process (provider=%s).", provider)
+    return True
+
+
 def _upload_base() -> str:
     return os.path.abspath(current_app.config.get("UPLOAD_FOLDER", "uploads"))
 

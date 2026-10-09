@@ -8,6 +8,139 @@ from app import db
 
 SANDBOX_COUNTRY_ISO3 = "TST"
 SANDBOX_COUNTRY_NAME = "testland"
+PART_OF_CATEGORY_CATALOG_KEY = "ns_part_of_category_catalog"
+PART_OF_CATEGORY_CHECKBOX = "checkbox"
+PART_OF_CATEGORY_TEXT = "text"
+PART_OF_CATEGORY_TYPES = (PART_OF_CATEGORY_CHECKBOX, PART_OF_CATEGORY_TEXT)
+
+
+def _normalize_part_of_category_name(name) -> str:
+    if not isinstance(name, str):
+        return ""
+    return name.strip()
+
+
+def _normalize_part_of_category_type(category_type) -> str:
+    kind = (category_type or PART_OF_CATEGORY_CHECKBOX).strip().lower()
+    if kind not in PART_OF_CATEGORY_TYPES:
+        return PART_OF_CATEGORY_CHECKBOX
+    return kind
+
+
+def _catalog_item(item) -> Optional[Tuple[str, str]]:
+    if isinstance(item, str):
+        label = _normalize_part_of_category_name(item)
+        if not label:
+            return None
+        return label, PART_OF_CATEGORY_CHECKBOX
+    if isinstance(item, dict):
+        label = _normalize_part_of_category_name(item.get("name") or item.get("category_name") or "")
+        if not label:
+            return None
+        return label, _normalize_part_of_category_type(item.get("type") or item.get("category_type"))
+    return None
+
+
+def load_part_of_category_catalog() -> Dict[str, str]:
+    """Category name to type. Types are 'checkbox' or 'text'.
+
+    Older catalogs stored plain names; those stay tick-box categories.
+    """
+    from app.models.system import SystemSettings
+
+    raw = SystemSettings.get_value(PART_OF_CATEGORY_CATALOG_KEY, default=[])
+    if not isinstance(raw, list):
+        return {}
+    catalog: Dict[str, str] = {}
+    for item in raw:
+        parsed = _catalog_item(item)
+        if parsed:
+            catalog[parsed[0]] = parsed[1]
+    return catalog
+
+
+def _save_part_of_category_catalog(catalog: Dict[str, str]) -> None:
+    from app.models.system import SystemSettings
+
+    payload = [
+        {"name": name, "type": _normalize_part_of_category_type(kind)}
+        for name, kind in sorted(catalog.items())
+    ]
+    SystemSettings.set_value(
+        PART_OF_CATEGORY_CATALOG_KEY,
+        payload,
+        description="National Society categories (tick box or text) that stay available before any value is saved.",
+    )
+
+
+def remember_part_of_category(name: str, category_type: str = PART_OF_CATEGORY_CHECKBOX) -> None:
+    """Persist a category so Add Category survives a reload before any value is saved."""
+    label = _normalize_part_of_category_name(name)
+    if not label:
+        return
+    catalog = load_part_of_category_catalog()
+    if label in catalog:
+        return
+    catalog[label] = _normalize_part_of_category_type(category_type)
+    _save_part_of_category_catalog(catalog)
+
+
+def update_part_of_category_type(name: str, category_type: str) -> str:
+    """Set an existing category's type. Returns the stored type."""
+    label = _normalize_part_of_category_name(name)
+    if not label:
+        return ""
+    kind = _normalize_part_of_category_type(category_type)
+    catalog = load_part_of_category_catalog()
+    if catalog.get(label) == kind:
+        return kind
+    catalog[label] = kind
+    _save_part_of_category_catalog(catalog)
+    return kind
+
+
+def forget_part_of_category(name: str) -> None:
+    label = _normalize_part_of_category_name(name)
+    if not label:
+        return
+    catalog = load_part_of_category_catalog()
+    if label not in catalog:
+        return
+    catalog.pop(label, None)
+    _save_part_of_category_catalog(catalog)
+
+
+def part_of_category_names_from_societies(societies) -> set:
+    names = set()
+    for ns in societies or []:
+        part_of = getattr(ns, "part_of", None)
+        if not part_of or not isinstance(part_of, list):
+            continue
+        for item in part_of:
+            label = _normalize_part_of_category_name(item)
+            if label:
+                names.add(label)
+    return names
+
+
+def collect_part_of_category_definitions(societies=None) -> List[dict]:
+    """Sorted categories with type. Tick-box names on societies stay checkbox if uncatalogued."""
+    catalog = load_part_of_category_catalog()
+    for name in part_of_category_names_from_societies(societies):
+        catalog.setdefault(name, PART_OF_CATEGORY_CHECKBOX)
+    return [
+        {"name": name, "type": catalog[name]}
+        for name in sorted(catalog)
+    ]
+
+
+def collect_part_of_category_names(societies=None) -> List[str]:
+    """Sorted tick-box category names. Text categories are excluded from membership filters."""
+    return [
+        item["name"]
+        for item in collect_part_of_category_definitions(societies)
+        if item["type"] == PART_OF_CATEGORY_CHECKBOX
+    ]
 
 
 def is_sandbox_country(country=None, *, name=None, iso3=None) -> bool:
@@ -89,6 +222,11 @@ def get_countries_by_region_with_part_of() -> Tuple[dict, List[str], Dict[str, L
         for category, country_ids in ns_mapping.items():
             category_to_countries[category].update(country_ids)
 
+    all_categories.update(
+        name
+        for name, kind in load_part_of_category_catalog().items()
+        if kind == PART_OF_CATEGORY_CHECKBOX
+    )
     programs = sorted(all_categories)
     mapping = {category: sorted(ids) for category, ids in category_to_countries.items()}
     return countries_by_region, programs, mapping

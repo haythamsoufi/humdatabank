@@ -31,6 +31,7 @@ from app.utils.entity_groups import get_enabled_entity_groups
 from app.utils.profile_utils import PROFILE_COLORS
 from app.models.system import UserDevice
 from app.utils.azure_b2c_config import is_azure_b2c_configured
+from app.utils.country_utils import get_countries_by_region_with_part_of
 
 from . import bp
 from .helpers import (
@@ -935,12 +936,17 @@ def new_user():
                     return redirect(url_for("user_management.manage_users"))
 
     # Fetch countries and group by region for the template
-    countries_by_region = _get_countries_by_region()
+    countries_by_region, part_of_programs, part_of_category_to_countries, part_of_text_groups = (
+        get_countries_by_region_with_part_of()
+    )
 
     return render_template("admin/user_management/user_form.html",
                            form=form,
                            title="Add New User",
                            countries_by_region=countries_by_region,
+                           part_of_programs=part_of_programs,
+                           part_of_category_to_countries=part_of_category_to_countries,
+                           part_of_text_groups=part_of_text_groups,
                            get_localized_country_name=get_localized_country_name,
                            enabled_entity_types=enabled_entity_groups,
                            azure_sso_enabled=azure_sso_enabled,
@@ -1311,7 +1317,9 @@ def edit_user(user_id):
             form.rbac_roles.data = []
 
     # Fetch countries and group by region for the template
-    countries_by_region = _get_countries_by_region()
+    countries_by_region, part_of_programs, part_of_category_to_countries, part_of_text_groups = (
+        get_countries_by_region_with_part_of()
+    )
 
     # Load notification preferences for the user
     from app.services.notification.service import NotificationService
@@ -1350,6 +1358,9 @@ def edit_user(user_id):
                            user=user,
                            title=f"Edit User: {user.email}",
                            countries_by_region=countries_by_region,
+                           part_of_programs=part_of_programs,
+                           part_of_category_to_countries=part_of_category_to_countries,
+                           part_of_text_groups=part_of_text_groups,
                            get_localized_country_name=get_localized_country_name,
                            enabled_entity_types=enabled_entity_groups,
                            azure_sso_enabled=azure_sso_enabled,

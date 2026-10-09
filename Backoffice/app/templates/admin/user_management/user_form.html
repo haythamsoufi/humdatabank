@@ -5,6 +5,7 @@
 
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
+{% from "macros/part_of_filter_checkboxes.html" import part_of_filter_checkboxes %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_subtab_btn_classes %}
 {% from "components/_status_label.html" import status_label, status_label_for_active %}
 {% set azure_sso_enabled = azure_sso_enabled | default(false) %}
@@ -919,11 +920,18 @@ window.userFormConfig = {
                 <div class="{% if default_entity_tab != 'countries' %}hidden{% endif %} entity-form-panel" id="panel-countries" role="tabpanel" aria-labelledby="countries-tab">
                     <label class="block text-gray-700 text-sm font-semibold mb-2">{{ form.countries.label.text }}</label>
                     <div class="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
-                        {# Global Select All Checkbox #}
-                        <div class="flex items-center mb-4 pb-4 border-b border-gray-200">
-                            <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" {% if read_only %}disabled{% endif %}>
-                            <label for="select-all-countries" class="ml-2 block text-sm font-semibold text-gray-800">{{ _('Select all countries') }}</label>
+                        {# Global Select All Checkbox and Part of filter #}
+                        <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200 flex-wrap gap-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" {% if read_only %}disabled{% endif %}>
+                                <label for="select-all-countries" class="ml-2 block text-sm font-semibold text-gray-800">{{ _('Select all countries') }}</label>
+                            </div>
+                            <div id="category-filters-user" class="flex items-center gap-3 flex-wrap">
+                                <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
+                                {{ part_of_filter_checkboxes(part_of_programs or [], text_groups=part_of_text_groups or [], disabled=read_only) }}
+                            </div>
                         </div>
+                        <script type="application/json" id="user-part-of-map">{{ (part_of_category_to_countries or {})|tojson }}</script>
 
                         {# Iterate through regions and their countries #}
                         {% for region, countries in countries_by_region.items() %}

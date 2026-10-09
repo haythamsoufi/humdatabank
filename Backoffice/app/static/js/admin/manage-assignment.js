@@ -2088,7 +2088,49 @@
             });
         }
 
+        function updatePartOfDropdownSummary(root) {
+            const label = root.querySelector('[data-part-of-label]');
+            if (!label) return;
+            const count = root.querySelectorAll('.category-filter-checkbox:checked').length;
+            label.textContent = count
+                ? (count === 1 ? '1 selected' : count + ' selected')
+                : (label.dataset.emptyLabel || 'Any');
+        }
+
+        function setupPartOfDropdowns() {
+            if (document.body.dataset.partOfDropdownBound === 'true') return;
+            document.body.dataset.partOfDropdownBound = 'true';
+
+            document.addEventListener('click', function (event) {
+                const toggle = event.target.closest('[data-part-of-toggle]');
+                const dropdown = event.target.closest('[data-part-of-dropdown]');
+                document.querySelectorAll('[data-part-of-dropdown]').forEach(function (root) {
+                    const panel = root.querySelector('[data-part-of-panel]');
+                    const button = root.querySelector('[data-part-of-toggle]');
+                    if (!panel || !button) return;
+                    if (toggle && root === toggle.closest('[data-part-of-dropdown]')) {
+                        const willOpen = panel.classList.contains('hidden');
+                        panel.classList.toggle('hidden', !willOpen);
+                        button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                        return;
+                    }
+                    if (root !== dropdown) {
+                        panel.classList.add('hidden');
+                        button.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            }, true);
+
+            document.addEventListener('change', function (event) {
+                const box = event.target;
+                if (!box.classList || !box.classList.contains('category-filter-checkbox')) return;
+                const root = box.closest('[data-part-of-dropdown]');
+                if (root) updatePartOfDropdownSummary(root);
+            });
+        }
+
         function bindCategoryFilterDelegation() {
+            setupPartOfDropdowns();
             const entityContainer = document.getElementById('category-filters-entity');
             if (entityContainer && entityContainer.dataset.filterDelegationBound !== 'true') {
                 entityContainer.dataset.filterDelegationBound = 'true';
@@ -2148,6 +2190,7 @@
 
             renderCategoryFilters();
             bindCategoryFilterDelegation();
+            setupPartOfDropdowns();
             return true;
         }
 

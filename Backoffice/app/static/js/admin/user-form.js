@@ -1067,6 +1067,28 @@
             });
         });
 
+        const userPartOfMapEl = document.getElementById('user-part-of-map');
+        const userPartOfRoot = document.getElementById('category-filters-user');
+        if (userPartOfMapEl && userPartOfRoot) {
+            let userPartOfMap = {};
+            try {
+                userPartOfMap = JSON.parse(userPartOfMapEl.textContent || '{}');
+            } catch (e) {
+                userPartOfMap = {};
+            }
+            userPartOfRoot.addEventListener('change', function (event) {
+                const box = event.target;
+                if (!box.classList || !box.classList.contains('category-filter-checkbox')) return;
+                const ids = userPartOfMap[box.dataset.category || box.value] || [];
+                ids.forEach(function (id) {
+                    const country = document.getElementById('country-' + id);
+                    if (!country || country.disabled) return;
+                    country.checked = box.checked;
+                    country.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            });
+        }
+
         if (cfg.userId) {
         // --- Initial state setup for edit mode ---
         // For edit mode, we need to set up the initial state based on existing user assignments

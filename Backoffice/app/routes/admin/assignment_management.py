@@ -192,11 +192,14 @@ def _status_changed_by_user_payload(user) -> dict:
 
 
 def _manage_assignment_country_context():
-    countries_by_region, part_of_programs, part_of_category_to_countries = get_countries_by_region_with_part_of()
+    countries_by_region, part_of_programs, part_of_category_to_countries, part_of_text_groups = (
+        get_countries_by_region_with_part_of()
+    )
     return {
         'countries_by_region': countries_by_region,
         'part_of_programs': part_of_programs,
         'part_of_category_to_countries': part_of_category_to_countries,
+        'part_of_text_groups': part_of_text_groups,
     }
 
 

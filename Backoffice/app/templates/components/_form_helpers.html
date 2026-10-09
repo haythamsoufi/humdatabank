@@ -61,17 +61,25 @@
     {{ field(class=class) }}
 {% endmacro %}
 
-{% macro render_countries_by_region(field, countries_by_region, legend_text="") %}
+{% from "macros/part_of_filter_checkboxes.html" import part_of_filter_checkboxes %}
+{% macro render_countries_by_region(field, countries_by_region, legend_text="", part_of_categories=none, part_of_text_groups=none, part_of_category_to_countries=none) %}
   <div class="mb-4">
     {% if legend_text or field.label %}
       <legend class="block text-gray-700 text-sm font-semibold mb-2">{{ legend_text or field.label.text }}</legend>
     {% endif %}
     <div class="p-4 border border-gray-200 rounded-md" data-country-region-select="true">
-      {# Global Select All Checkbox #}
-      <div class="flex items-center mb-4 pb-4 border-b border-gray-200">
-        <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-        <label for="select-all-countries" class="ml-2 block text-sm font-bold text-gray-800">{{ _('Select All Countries') }}</label>
+      {# Global Select All Checkbox and Part of filter #}
+      <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200 flex-wrap gap-4">
+        <div class="flex items-center">
+          <input type="checkbox" id="select-all-countries" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <label for="select-all-countries" class="ml-2 block text-sm font-bold text-gray-800">{{ _('Select All Countries') }}</label>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
+          {{ part_of_filter_checkboxes(part_of_categories or [], text_groups=part_of_text_groups or []) }}
+        </div>
       </div>
+      <script type="application/json" data-part-of-map>{{ (part_of_category_to_countries or {})|tojson }}</script>
 
       <div class="mt-1 space-y-4">
         {% for region, countries in countries_by_region.items() %}

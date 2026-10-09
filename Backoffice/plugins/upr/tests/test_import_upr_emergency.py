@@ -203,3 +203,153 @@ class TestFundingEaColHeaderGoUnmatched:
         assert ok is True
         assert cells["col_header|EA2"] == "MDRAF070 Afghanistan: Population Movement"
         assert cells[f"{COL_HEADER_GO_UNMATCHED_PREFIX}EA2"] == 1
+
+
+class TestGroupedAppealResolution:
+    def _ctx(self):
+        ctx = UprImportContext(template_ids=[33])
+        ctx.iso2_by_iso3["TCD"] = "TD"
+        ctx.country_name_by_iso3["TCD"] = "Chad"
+        ctx.assignment_by_template[33] = {("2025", "TCD"): 42}
+        ctx.appeal_catalogue_rows = []
+        return ctx
+
+    def test_group_code_resolves_to_the_country_child(self):
+        ctx = self._ctx()
+        child = {
+            "name": "Chad - Pop. Movement 2023",
+            "code": "MDRTD022",
+            "part_of": "MDRS1001",
+            "country": {"iso": "TD"},
+        }
+        ctx.emergency_ops_by_iso["TCD"] = {"MDRTD022": child, "MDRS1001": {"name": "Sudan Crisis", "code": "MDRS1001"}}
+        ctx.emergency_ops_ordered_by_iso["TCD"] = [child, ctx.emergency_ops_by_iso["TCD"]["MDRS1001"]]
+        name, code, display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3="TCD",
+            excel_name="Sudan Crisis",
+            excel_code="MDRS1001",
+            aes_id=42,
+        )
+        assert code == "MDRTD022"
+        assert name == "Chad - Pop. Movement 2023"
+        assert "part of MDRS1001" in display
+        from upr_import_warnings import warning_text
+
+        assert any("was matched to" in warning_text(w) and "Chad (TCD)" in warning_text(w) for w in ctx.warnings)
+        assert not any("is not listed for this country in GO" in warning_text(w) for w in ctx.warnings)
+
+    def test_child_code_resolves_to_the_listed_group(self):
+        ctx = self._ctx()
+        group = {"name": "Sudan Crisis Regional Population Movement", "code": "MDRS1001", "country": {"iso": "AFR"}}
+        ctx.emergency_ops_by_iso["TCD"] = {"MDRS1001": group}
+        ctx.emergency_ops_ordered_by_iso["TCD"] = [group]
+        ctx.appeal_catalogue_rows = [
+            {
+                "code": "MDRTD099",
+                "name": "Chad - old child",
+                "part_of": "MDRS1001",
+                "country": {"iso": "TD"},
+            },
+            group,
+        ]
+        name, code, _display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3="TCD",
+            excel_name="old",
+            excel_code="MDRTD099",
+            aes_id=42,
+        )
+        assert code == "MDRS1001"
+        assert name == "Sudan Crisis Regional Population Movement"
+
+    def test_child_code_resolves_to_the_country_sibling(self):
+        ctx = self._ctx()
+        child = {
+            "name": "Chad - Pop. Movement 2023",
+            "code": "MDRTD022",
+            "part_of": "MDRS1001",
+            "country": {"iso": "TD"},
+        }
+        ctx.emergency_ops_by_iso["TCD"] = {"MDRTD022": child}
+        ctx.emergency_ops_ordered_by_iso["TCD"] = [child]
+        ctx.appeal_catalogue_rows = [
+            child,
+            {
+                "code": "MDRTD099",
+                "name": "Chad - old code",
+                "part_of": "MDRS1001",
+                "country": {"iso": "TD"},
+            },
+            {
+                "code": "MDRET030",
+                "name": "Ethiopia - Population Movement",
+                "part_of": "MDRS1001",
+                "country": {"iso": "ET"},
+            },
+        ]
+        _name, code, _display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3="TCD",
+            excel_name="old",
+            excel_code="MDRTD099",
+        )
+        assert code == "MDRTD022"
+
+    def test_unmatched_warning_names_country_and_assignment(self):
+        ctx = self._ctx()
+        ctx.emergency_ops_by_iso["TCD"] = {}
+        ctx.emergency_ops_ordered_by_iso["TCD"] = []
+        _resolve_emergency_operation_labels(
+            ctx,
+            iso3="TCD",
+            excel_name="Missing",
+            excel_code="MDRTD999",
+            aes_id=42,
+        )
+        from upr_import_warnings import warning_text
+
+        text = warning_text(ctx.warnings[0])
+        assert "MDRTD999" in text
+        assert "Chad (TCD)" in text
+        assert "Reporting - Country" in text
+        assert "assignment 42" in text
+        assert ctx.warnings[0]["place"].startswith("Chad (TCD)")
+
+    def test_ambiguous_children_are_listed_instead_of_guessed(self):
+        ctx = self._ctx()
+        first = {"name": "Chad floods", "code": "MDRTD024", "part_of": "MDRGRP01", "country": {"iso": "TD"}}
+        second = {"name": "Chad cholera", "code": "MDRTD030", "part_of": "MDRGRP01", "country": {"iso": "TD"}}
+        ctx.emergency_ops_by_iso["TCD"] = {"MDRTD024": first, "MDRTD030": second}
+        ctx.emergency_ops_ordered_by_iso["TCD"] = [first, second]
+        _name, code, _display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3="TCD",
+            excel_name="Group",
+            excel_code="MDRGRP01",
+        )
+        assert code == "MDRGRP01"
+        from upr_import_warnings import warning_text
+
+        text = warning_text(ctx.warnings[0])
+        assert "MDRTD024" in text
+        assert "MDRTD030" in text
+
+    def test_ensure_emergency_ops_queries_iso2_before_iso3(self, monkeypatch):
+        import import_upr_excel_data as mod
+
+        ctx = UprImportContext(template_ids=[24])
+        ctx.iso2_by_iso3["TCD"] = "TD"
+        seen = []
+
+        def fake(iso, _cfg):
+            seen.append(iso)
+            if iso == "TD":
+                op = {"code": "MDRTD022", "name": "Chad - Pop. Movement 2023", "part_of": "MDRS1001"}
+                return [op], {"MDRTD022": op}
+            return [], {}
+
+        monkeypatch.setattr(mod, "_fetch_emergency_ops_for_country", fake)
+        _ordered, by_code = mod._ensure_emergency_ops(ctx, "tcd")
+        assert seen == ["TD", "TCD"]
+        assert by_code["MDRTD022"]["name"] == "Chad - Pop. Movement 2023"

@@ -49,6 +49,8 @@ def make_import_warning(
     item_id: Optional[int] = None,
     code: Optional[str] = None,
     iso3: Optional[str] = None,
+    place: Optional[str] = None,
+    detail: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build a structured import warning the entry form can turn into a jump-link."""
     out: Dict[str, Any] = {"message": str(message or "").strip()}
@@ -58,6 +60,10 @@ def make_import_warning(
         out["code"] = str(code).strip().upper()
     if iso3:
         out["iso3"] = str(iso3).strip().upper()
+    if place:
+        out["place"] = str(place).strip()
+    if detail:
+        out["detail"] = str(detail).strip()
     return out
 
 
@@ -209,6 +215,22 @@ class _WarningClassification:
     iso3: Optional[str] = None
     rnd: Optional[str] = None
     bank_id: Optional[str] = None
+    place: Optional[str] = None
+    detail: Optional[str] = None
+
+
+def _ea_place_from_raw(raw: Any, iso3: Optional[str] = None) -> Optional[str]:
+    """Country / assignment text to keep on a grouped emergency-appeal warning."""
+    if isinstance(raw, dict):
+        place = str(raw.get("place") or "").strip()
+        if place:
+            return place
+        raw_iso = str(raw.get("iso3") or "").strip().upper()
+        if raw_iso:
+            return raw_iso
+    if iso3:
+        return str(iso3).strip().upper() or None
+    return None
 
 
 def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _WarningClassification:
@@ -221,7 +243,8 @@ def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _Warning
                 f"Emergency appeal {code} is not listed in GO — "
                 "imported using the Excel name and code; please review it on the form"
             ),
-            iso3=raw.get("iso3"),
+            place=_ea_place_from_raw(raw),
+            detail=str(raw.get("detail") or "").strip() or None,
         )
     patterns: Tuple[
         Tuple[re.Pattern[str], Callable[[re.Match[str]], _WarningClassification]],
@@ -259,7 +282,7 @@ def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _Warning
                     f"Emergency code '{m.group(1).upper()}' not found in GO API — "
                     "imported using Excel labels; review in form"
                 ),
-                iso3=m.group(2),
+                place=m.group(2),
             ),
         ),
         (
@@ -270,6 +293,7 @@ def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _Warning
                     f"Emergency appeal {m.group(1).upper()} is not listed in GO — "
                     "imported using the Excel name and code; please review it on the form"
                 ),
+                place=_ea_place_from_raw(raw),
             ),
         ),
         (
@@ -277,7 +301,7 @@ def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _Warning
             lambda m: _WarningClassification(
                 group_key=f"ea_code_not_found|{m.group(1)}",
                 display_base=f"Emergency appeal code {m.group(1)} not found in GO API",
-                iso3=m.group(2),
+                place=m.group(2),
             ),
         ),
         (
@@ -385,6 +409,19 @@ def _format_warning_group_suffix(
     return f" ({', '.join(parts)})"
 
 
+def _insert_ea_places(label: str, places: Set[str]) -> str:
+    """Put country and assignment names into an emergency-appeal warning."""
+    where = "; ".join(sorted(place for place in places if place))
+    if not where:
+        return label
+    for needle in ("is not listed in GO —", "not found in GO API —"):
+        if needle in label:
+            return label.replace(needle, needle.replace(" —", f" for {where} —"), 1)
+    if label.startswith("Emergency appeal code "):
+        return f"{label} for {where}"
+    return f"{label} ({where})"
+
+
 def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
     """Deduplicate warnings for display, grouping country/round variants of the same issue."""
     @dataclass
@@ -394,6 +431,8 @@ def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
         countries: Set[str] = field(default_factory=set)
         rounds: Set[str] = field(default_factory=set)
         bank_ids: Set[str] = field(default_factory=set)
+        places: Set[str] = field(default_factory=set)
+        details: Set[str] = field(default_factory=set)
 
     groups: Dict[str, _Group] = {}
     order: List[str] = []
@@ -412,16 +451,27 @@ def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
             group.rounds.add(parts.rnd)
         if parts.bank_id:
             group.bank_ids.add(parts.bank_id)
+        if parts.place:
+            group.places.add(parts.place)
+        if parts.detail:
+            group.details.add(parts.detail)
 
-    summarized = [
-        groups[key].label + _format_warning_group_suffix(
-            groups[key].count,
-            groups[key].countries,
-            groups[key].rounds,
-            bank_ids=groups[key].bank_ids or None,
+    summarized = []
+    for key in order:
+        group = groups[key]
+        label = group.label
+        if key.startswith("ea_code_not_found|") and group.places:
+            label = _insert_ea_places(label, group.places)
+        if group.details:
+            label = f"{label} {' '.join(sorted(group.details))}"
+        summarized.append(
+            label + _format_warning_group_suffix(
+                group.count,
+                group.countries,
+                group.rounds,
+                bank_ids=group.bank_ids or None,
+            )
         )
-        for key in order
-    ]
     return {
         "warnings": summarized,
         "warning_count": len(warnings),

@@ -2102,7 +2102,12 @@ def parse_emergency_slot_metadata(wb) -> Dict[int, Dict[str, str]]:
 
 
 def _resolve_workbook_emergency_slot_metadata(
-    ctx: UprImportContext, wb, iso3: str
+    ctx: UprImportContext,
+    wb,
+    iso3: str,
+    *,
+    aes_id: int | None = None,
+    period: str | None = None,
 ) -> Dict[int, Dict[str, str]]:
     """Cross-check each emergency slot's MDR/appeal code from the Start sheet against the
     GO API before it's used for anything (repeat-slot title, dynamic indicator attribution).
@@ -2123,6 +2128,9 @@ def _resolve_workbook_emergency_slot_metadata(
             iso3=iso3,
             excel_name=meta.get("appeal_name") or "",
             excel_code=meta.get("mdr_code") or "",
+            aes_id=aes_id,
+            period=period,
+            template_id=REPORTING_COUNTRY_TEMPLATE_ID,
         )
         resolved[slot_num] = {"mdr_code": code, "appeal_name": name, "display_value": display}
     return resolved
@@ -2847,7 +2855,7 @@ def _collect_workbook_repeat_slot_entries(
         return []
 
     choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
-    slot_meta = _resolve_workbook_emergency_slot_metadata(ctx, wb, iso3)
+    slot_meta = _resolve_workbook_emergency_slot_metadata(ctx, wb, iso3, aes_id=aes_id)
     required_slots: Set[int] = set(slot_meta.keys())
     for entry in dynamic_entries:
         repeat_num = entry.get("repeat_instance_number")
@@ -2957,7 +2965,7 @@ def _import_dynamic_indicators_from_workbook(
     if dry_run:
         return stats
 
-    slot_meta = _resolve_workbook_emergency_slot_metadata(ctx, wb, iso3)
+    slot_meta = _resolve_workbook_emergency_slot_metadata(ctx, wb, iso3, aes_id=aes_id)
     choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
     for slot_num, meta in slot_meta.items():
         if ea_repeat:
@@ -2974,6 +2982,7 @@ def _import_dynamic_indicators_from_workbook(
                     choice_item_id=choice_item_id,
                     appeal_name=meta.get("appeal_name") or "",
                     mdr_code=meta.get("mdr_code") or "",
+                    display_value=meta.get("display_value") or None,
                 )
 
     for entry in _collect_workbook_dynamic_indicator_entries(

@@ -851,6 +851,9 @@ def _import_reach_matrices(
             ea_code=ea_code,
             excel_name=excel_name,
             amount=amount,
+            aes_id=aes_id,
+            period=period,
+            template_id=24,
         )
         if not ea_cells:
             warnings.append(f"Could not resolve emergency appeal row for {area} on Reach sheet.")

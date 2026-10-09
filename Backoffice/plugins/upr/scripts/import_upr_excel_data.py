@@ -73,7 +73,7 @@ from upr_import_warnings import make_import_warning, summarize_warnings  # noqa:
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 12
+TRANSFORM_CACHE_VERSION = 13
 _ROWS_CACHE_LOCKS: Dict[str, threading.Lock] = {}
 _ROWS_CACHE_LOCKS_GUARD = threading.Lock()
 
@@ -320,7 +320,13 @@ class UprImportContext:
     iso3_to_hns_id: Dict[str, int] = field(default_factory=dict)
     emergency_ops_by_iso: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     emergency_ops_ordered_by_iso: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
-    emergency_unmatched_codes_warned: Set[Tuple[str, str]] = field(default_factory=set)
+    emergency_unmatched_codes_warned: Set[Tuple[str, str, int]] = field(default_factory=set)
+    emergency_group_matches_warned: Set[Tuple[str, str, str, int]] = field(default_factory=set)
+    # ISO3 → ISO2 / display name. Appealgroupchild stores Geographical_Code as ISO2.
+    iso2_by_iso3: Dict[str, str] = field(default_factory=dict)
+    country_name_by_iso3: Dict[str, str] = field(default_factory=dict)
+    # None loads the shared appealgroupchild catalogue. A list (including empty) is used as-is.
+    appeal_catalogue_rows: Optional[List[Dict[str, Any]]] = None
     emergency_matrix_plugin_config: Dict[str, Any] = field(default_factory=dict)
     emergency_go_plugin_config: Dict[str, Any] = field(default_factory=dict)
     yes_no_bank_ids: Set[int] = field(default_factory=set)
@@ -1682,6 +1688,25 @@ def _build_ns_home_country_index() -> Tuple[Dict[str, str], Dict[str, int], Dict
     return ns_home, cid, iso3_ns
 
 
+def _load_country_labels() -> Tuple[Dict[str, str], Dict[str, str]]:
+    """ISO3 → ISO2 and ISO3 → country name, for GO appeal matching and warnings."""
+    from app.models.core import Country
+
+    iso2_by_iso3: Dict[str, str] = {}
+    name_by_iso3: Dict[str, str] = {}
+    for country in Country.query.filter(Country.iso3.isnot(None)).all():
+        iso3 = (country.iso3 or "").strip().upper()
+        if not iso3:
+            continue
+        iso2 = (getattr(country, "iso2", None) or "").strip().upper()
+        if iso2:
+            iso2_by_iso3[iso3] = iso2
+        name = (country.name or "").strip()
+        if name:
+            name_by_iso3[iso3] = name
+    return iso2_by_iso3, name_by_iso3
+
+
 def _load_emergency_choice_plugin_config(choice_item_id: int) -> Dict[str, Any]:
     """GO filter config from the T33 emergency_operations single-choice field."""
     from app.models.form_items import FormItem
@@ -1774,11 +1799,36 @@ def _fetch_emergency_ops_for_country(iso3: str, plugin_cfg: Dict[str, Any]) -> T
     return ops, by_code
 
 
+def _go_country_isos(ctx: UprImportContext, iso3: str) -> List[str]:
+    """ISO codes to query GO with. The appeal catalogue stores ISO2, Excel rows store ISO3."""
+    key = (iso3 or "").strip().upper()
+    isos: List[str] = []
+    iso2 = (ctx.iso2_by_iso3.get(key) or "").strip().upper()
+    if iso2:
+        isos.append(iso2)
+    if key and key not in isos:
+        isos.append(key)
+    return isos
+
+
 def _ensure_emergency_ops(ctx: UprImportContext, iso3: str) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
-    key = iso3.upper()
+    key = (iso3 or "").strip().upper()
     if key not in ctx.emergency_ops_ordered_by_iso:
         plugin_cfg = _active_emergency_go_config(ctx)
-        ordered, by_code = _fetch_emergency_ops_for_country(key, plugin_cfg)
+        ordered: List[Dict[str, Any]] = []
+        by_code: Dict[str, Dict[str, Any]] = {}
+        for iso in _go_country_isos(ctx, key):
+            part_ordered, part_by_code = _fetch_emergency_ops_for_country(iso, plugin_cfg)
+            for op in part_ordered:
+                code = (op.get("code") or "").strip().upper()
+                if code and code in by_code:
+                    continue
+                if code:
+                    by_code[code] = op
+                ordered.append(op)
+            for code, op in part_by_code.items():
+                if code not in by_code:
+                    by_code[code] = op
         ctx.emergency_ops_ordered_by_iso[key] = ordered
         ctx.emergency_ops_by_iso[key] = by_code
     return ctx.emergency_ops_ordered_by_iso[key], ctx.emergency_ops_by_iso[key]
@@ -1798,36 +1848,396 @@ def _format_emergency_operation_display(name: str, code: str, part_of: str = "")
     return format_operation_label(name, code, part_of)
 
 
+_APPEAL_CATALOGUE_ROWS: Optional[List[Dict[str, Any]]] = None
+_APPEAL_CATALOGUE_INDEX: Optional[Tuple[Dict[str, Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]] = None
+
+
+def _appeal_code(row: Dict[str, Any]) -> str:
+    return str(row.get("code") or row.get("Appeal_Id") or "").strip().upper()
+
+
+def _appeal_parent(row: Dict[str, Any]) -> str:
+    parent = str(row.get("part_of") or row.get("Part_of") or "").strip().upper()
+    code = _appeal_code(row)
+    if parent and code and parent == code:
+        return ""
+    return parent
+
+
+def _appeal_iso2(row: Dict[str, Any]) -> str:
+    country = row.get("country")
+    if isinstance(country, dict):
+        iso = str(country.get("iso") or country.get("iso2") or "").strip().upper()
+        if iso:
+            return iso
+    return str(row.get("Geographical_Code") or "").strip().upper()
+
+
+def _index_appeal_rows(
+    rows: List[Dict[str, Any]],
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+    by_code: Dict[str, Dict[str, Any]] = {}
+    children: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        code = _appeal_code(row)
+        if not code:
+            continue
+        by_code[code] = row
+        parent = _appeal_parent(row)
+        if parent:
+            children[parent].append(row)
+    return by_code, children
+
+
+def _load_shared_appeal_catalogue() -> List[Dict[str, Any]]:
+    global _APPEAL_CATALOGUE_ROWS, _APPEAL_CATALOGUE_INDEX
+    if _APPEAL_CATALOGUE_ROWS is not None:
+        return _APPEAL_CATALOGUE_ROWS
+    rows: List[Dict[str, Any]] = []
+    try:
+        from plugins.upr.maa_codes import load_appeal_catalogue
+
+        loaded = load_appeal_catalogue()
+        if isinstance(loaded, list):
+            rows = [row for row in loaded if isinstance(row, dict)]
+    except Exception:
+        logger.debug("UPR import: appeal group catalogue unavailable", exc_info=True)
+    _APPEAL_CATALOGUE_ROWS = rows
+    _APPEAL_CATALOGUE_INDEX = _index_appeal_rows(rows)
+    return rows
+
+
+def _catalogue_indexes(
+    ctx: UprImportContext,
+) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+    """Appeal code index. Tests inject rows; imports use the shared GO catalogue."""
+    if ctx.appeal_catalogue_rows is not None:
+        return _index_appeal_rows(ctx.appeal_catalogue_rows)
+    if not ctx.iso2_by_iso3:
+        return {}, {}
+    global _APPEAL_CATALOGUE_INDEX
+    if _APPEAL_CATALOGUE_INDEX is None:
+        _load_shared_appeal_catalogue()
+    return _APPEAL_CATALOGUE_INDEX or ({}, {})
+
+
+def _prefer_country_ops(ops: List[Dict[str, Any]], iso2: str) -> List[Dict[str, Any]]:
+    """Keep operations for this country's ISO2. Rows with no country code stay eligible."""
+    if not iso2:
+        return list(ops)
+    matched = [op for op in ops if _appeal_iso2(op) == iso2]
+    if matched:
+        return matched
+    return [op for op in ops if not _appeal_iso2(op)]
+
+
+def _unique_ops(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    unique: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for op in ops:
+        code = _appeal_code(op)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        unique.append(op)
+    return unique
+
+
+def _assignment_for_aes(ctx: UprImportContext, aes_id: int) -> Optional[Tuple[int, str, str]]:
+    """Return (template_id, period, iso3) for an assignment id."""
+    target = int(aes_id)
+    for tid, mapping in ctx.assignment_by_template.items():
+        for (period, iso), aid in mapping.items():
+            if int(aid) == target:
+                return int(tid), str(period), str(iso).upper()
+    return None
+
+
+def _emergency_place_label(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
+) -> str:
+    """Country and assignment text for an emergency-appeal warning."""
+    iso = (iso3 or "").strip().upper()
+    found = _assignment_for_aes(ctx, int(aes_id)) if aes_id else None
+    if found:
+        template_id, found_period, found_iso = found
+        period = found_period or period
+        iso = iso or found_iso
+    name = (ctx.country_name_by_iso3.get(iso) or "").strip() if iso else ""
+    country = f"{name} ({iso})" if name and iso else (name or iso)
+
+    assignment = ""
+    if template_id:
+        template_name = UPR_TEMPLATE_PROFILES.get(int(template_id), {}).get("name") or f"template {int(template_id)}"
+        period_text = (period or "").strip()
+        assignment = f"{template_name} {period_text}".strip()
+    elif (period or "").strip():
+        assignment = str(period).strip()
+    if aes_id:
+        suffix = f"assignment {int(aes_id)}"
+        assignment = f"{assignment} ({suffix})" if assignment else suffix
+    if country and assignment:
+        return f"{country} — {assignment}"
+    return country or assignment
+
+
+def _official_ops_for_codes(
+    codes: List[str],
+    by_code: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    return _unique_ops([by_code[code] for code in codes if code in by_code])
+
+
+def _match_group_to_country_child(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    excel_code: str,
+    ordered: List[Dict[str, Any]],
+    by_code: Dict[str, Dict[str, Any]],
+) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """If *excel_code* is a group, return this country's child appeal on the GO list."""
+    iso2 = (ctx.iso2_by_iso3.get(iso3) or "").strip().upper()
+    listed_children = _unique_ops(
+        _prefer_country_ops(
+            [op for op in ordered if _appeal_parent(op) == excel_code],
+            iso2,
+        )
+    )
+    if len(listed_children) == 1:
+        return listed_children[0], []
+    if len(listed_children) > 1:
+        return None, [_appeal_code(op) for op in listed_children]
+
+    _cat_by_code, cat_children = _catalogue_indexes(ctx)
+    group_children = list(cat_children.get(excel_code) or [])
+    if iso2:
+        group_children = [row for row in group_children if _appeal_iso2(row) == iso2]
+    official_children = _official_ops_for_codes(
+        [_appeal_code(row) for row in group_children],
+        by_code,
+    )
+    if len(official_children) == 1:
+        return official_children[0], []
+    if len(official_children) > 1:
+        return None, [_appeal_code(op) for op in official_children]
+    return None, []
+
+
+def _match_child_code_to_official(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    excel_code: str,
+    by_code: Dict[str, Dict[str, Any]],
+) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """If *excel_code* is a child that is not listed, use its country sibling or its group."""
+    iso2 = (ctx.iso2_by_iso3.get(iso3) or "").strip().upper()
+    cat_by_code, cat_children = _catalogue_indexes(ctx)
+    row = cat_by_code.get(excel_code)
+    if not row:
+        return None, []
+    parent = _appeal_parent(row)
+    if not parent:
+        return None, []
+    siblings = list(cat_children.get(parent) or [])
+    if iso2:
+        siblings = [item for item in siblings if _appeal_iso2(item) == iso2]
+    official_siblings = _official_ops_for_codes(
+        [_appeal_code(item) for item in siblings if _appeal_code(item) != excel_code],
+        by_code,
+    )
+    if len(official_siblings) == 1:
+        return official_siblings[0], []
+    if len(official_siblings) > 1:
+        return None, [_appeal_code(op) for op in official_siblings]
+    if parent in by_code:
+        return by_code[parent], []
+    return None, []
+
+
+def _note_grouped_appeal_match(
+    ctx: UprImportContext,
+    *,
+    excel_code: str,
+    op: Dict[str, Any],
+    iso3: str,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
+) -> None:
+    resolved = _appeal_code(op)
+    if not resolved or resolved == excel_code:
+        return
+    key = ((iso3 or "").upper(), excel_code, resolved, int(aes_id or 0))
+    if key in ctx.emergency_group_matches_warned:
+        return
+    ctx.emergency_group_matches_warned.add(key)
+    place = _emergency_place_label(
+        ctx, iso3=iso3, aes_id=aes_id, period=period, template_id=template_id
+    )
+    where = f" for {place}" if place else ""
+    parent = _appeal_parent(op)
+    if parent and parent == excel_code:
+        how = "the country appeal under that group"
+    elif parent:
+        how = f"the same group ({parent})"
+    else:
+        how = "the group appeal on the GO list"
+    ctx.warnings.append(
+        f"Emergency appeal {excel_code}{where} was matched to {_emergency_op_row_id(op)} ({how})."
+    )
+
+
+def _warn_unmatched_emergency_code(
+    ctx: UprImportContext,
+    *,
+    code: str,
+    iso3: str,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
+    candidates: Optional[List[str]] = None,
+) -> None:
+    warn_key = ((iso3 or "").upper(), code, int(aes_id or 0))
+    if warn_key in ctx.emergency_unmatched_codes_warned:
+        return
+    ctx.emergency_unmatched_codes_warned.add(warn_key)
+    place = _emergency_place_label(
+        ctx, iso3=iso3, aes_id=aes_id, period=period, template_id=template_id
+    )
+    scope = f" ({place})" if place else ""
+    detail = ""
+    if candidates:
+        detail = "Possible GO matches for this country: " + ", ".join(candidates) + "."
+    ctx.warnings.append(
+        make_import_warning(
+            f"Emergency appeal {code} is not listed for this country in GO{scope}. "
+            "The Excel name and code were imported — please review it on the form."
+            + (f" {detail}" if detail else ""),
+            item_id=ctx.emergency_choice_item_id,
+            code=code,
+            iso3=(iso3 or "").upper() or None,
+            place=place or None,
+            detail=detail or None,
+        )
+    )
+
+
+def _lookup_emergency_operation(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    excel_code: str,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
+    """Official GO operation for an Excel code, including group ↔ child appeals."""
+    code = (excel_code or "").strip().upper()
+    country = (iso3 or "").strip().upper()
+    if not code or not country:
+        return None
+    ordered, by_code = _ensure_emergency_ops(ctx, country)
+    child, ambiguous = _match_group_to_country_child(
+        ctx,
+        iso3=country,
+        excel_code=code,
+        ordered=ordered,
+        by_code=by_code,
+    )
+    if child and _appeal_code(child) != code:
+        _note_grouped_appeal_match(
+            ctx,
+            excel_code=code,
+            op=child,
+            iso3=country,
+            aes_id=aes_id,
+            period=period,
+            template_id=template_id,
+        )
+        return child
+    exact = by_code.get(code)
+    if exact and not ambiguous:
+        return exact
+    if ambiguous:
+        _warn_unmatched_emergency_code(
+            ctx,
+            code=code,
+            iso3=country,
+            aes_id=aes_id,
+            period=period,
+            template_id=template_id,
+            candidates=ambiguous,
+        )
+        return None
+    matched, ambiguous = _match_child_code_to_official(
+        ctx,
+        iso3=country,
+        excel_code=code,
+        by_code=by_code,
+    )
+    if matched:
+        _note_grouped_appeal_match(
+            ctx,
+            excel_code=code,
+            op=matched,
+            iso3=country,
+            aes_id=aes_id,
+            period=period,
+            template_id=template_id,
+        )
+        return matched
+    _warn_unmatched_emergency_code(
+        ctx,
+        code=code,
+        iso3=country,
+        aes_id=aes_id,
+        period=period,
+        template_id=template_id,
+        candidates=ambiguous,
+    )
+    return None
+
+
+def _labels_from_emergency_op(op: Dict[str, Any], excel_name: str, excel_code: str) -> Tuple[str, str, str]:
+    api_name = (op.get("name") or "").strip()
+    api_code = (op.get("code") or "").strip()
+    return api_name or excel_name, api_code or excel_code, _emergency_op_row_id(op)
+
+
 def _resolve_emergency_operation_labels(
     ctx: UprImportContext,
     *,
     iso3: str,
     excel_name: str,
     excel_code: str,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
 ) -> Tuple[str, str, str]:
     """Return (name, code, display_value). Prefer GO API labels when MDR code matches."""
     name = (excel_name or "").strip()
     code = (excel_code or "").strip()
     code_upper = code.upper()
     if code_upper and iso3:
-        _, by_code = _ensure_emergency_ops(ctx, iso3.upper())
-        op = by_code.get(code_upper)
+        op = _lookup_emergency_operation(
+            ctx,
+            iso3=iso3,
+            excel_code=code_upper,
+            aes_id=aes_id,
+            period=period,
+            template_id=template_id,
+        )
         if op:
-            api_name = (op.get("name") or "").strip()
-            api_code = (op.get("code") or "").strip()
-            return api_name or name, api_code or code, _emergency_op_row_id(op)
-        warn_key = (iso3.upper(), code_upper)
-        if warn_key not in ctx.emergency_unmatched_codes_warned:
-            ctx.emergency_unmatched_codes_warned.add(warn_key)
-            ctx.warnings.append(
-                make_import_warning(
-                    f"Emergency appeal {code_upper} is not listed for this country in GO. "
-                    "The Excel name and code were imported — please review it on the form.",
-                    item_id=ctx.emergency_choice_item_id,
-                    code=code_upper,
-                    iso3=iso3.upper(),
-                )
-            )
+            return _labels_from_emergency_op(op, name, code)
     return name, code, _format_emergency_operation_display(name, code)
 
 
@@ -1873,25 +2283,30 @@ def _resolve_ea_operation(
     ea_code: Any,
     excel_name: Any = None,
     context: str = "Reach",
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Resolve a GO emergency operation for Excel EA1/EA2/EA3 slot or EA Code."""
-    ordered, by_code = _ensure_emergency_ops(ctx, iso3)
+    ordered, _by_code = _ensure_emergency_ops(ctx, iso3)
     code_raw = str(ea_code).strip() if ea_code not in (None, "") else ""
     code_upper = code_raw.upper()
     name = str(excel_name or "").strip() if excel_name not in (None, "") else ""
 
     if code_upper:
-        op = by_code.get(code_upper)
-        if op:
-            return op
-        resolved_name, resolved_code, display = _resolve_emergency_operation_labels(
+        op = _lookup_emergency_operation(
             ctx,
             iso3=iso3,
-            excel_name=name,
-            excel_code=code_raw,
+            excel_code=code_upper,
+            aes_id=aes_id,
+            period=period,
+            template_id=template_id,
         )
+        if op:
+            return op
+        display = _format_emergency_operation_display(name, code_raw)
         if display:
-            return _synthetic_emergency_op(resolved_name, resolved_code, display)
+            return _synthetic_emergency_op(name, code_raw, display)
         return None
 
     slot = _parse_ea_slot(area)
@@ -1908,6 +2323,9 @@ def _resolve_ea_operation(
             iso3=iso3,
             excel_name=name,
             excel_code=code_raw,
+            aes_id=aes_id,
+            period=period,
+            template_id=template_id,
         )
         if display:
             return _synthetic_emergency_op(resolved_name, resolved_code, display)
@@ -1923,6 +2341,9 @@ def _resolve_ea_operation_display(
     ea_code: Any,
     excel_name: Any = None,
     context: str = "Reach",
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
 ) -> Optional[str]:
     """Display label for a selectable emergency-appeal column header (name_with_code)."""
     op = _resolve_ea_operation(
@@ -1932,6 +2353,9 @@ def _resolve_ea_operation_display(
         ea_code=ea_code,
         excel_name=excel_name,
         context=context,
+        aes_id=aes_id,
+        period=period,
+        template_id=template_id,
     )
     if not op:
         return None
@@ -1970,6 +2394,9 @@ def _ensure_funding_ea_col_header(
         ea_code=ea_code,
         excel_name=excel_name,
         context="Funding",
+        aes_id=aes_id,
+        period=round_to_period(rnd) or rnd,
+        template_id=24,
     )
     if not op:
         return False
@@ -1989,6 +2416,9 @@ def _resolve_emergency_row_key(
     area: str,
     ea_code: Any,
     excel_name: Any = None,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
 ) -> Optional[str]:
     """Resolve Emergency Appeals matrix row key from Excel EA slot and/or EA Code."""
     op = _resolve_ea_operation(
@@ -1998,6 +2428,9 @@ def _resolve_emergency_row_key(
         ea_code=ea_code,
         excel_name=excel_name,
         context="Reach",
+        aes_id=aes_id,
+        period=period,
+        template_id=template_id,
     )
     if not op:
         return None
@@ -2015,6 +2448,9 @@ def _resolve_emergency_matrix_cells(
     ea_code: Any,
     excel_name: Any = None,
     amount: Any,
+    aes_id: Optional[int] = None,
+    period: Optional[str] = None,
+    template_id: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Build Reach emergency-appeals matrix cells including GO-unmatched metadata."""
     op = _resolve_ea_operation(
@@ -2024,6 +2460,9 @@ def _resolve_emergency_matrix_cells(
         ea_code=ea_code,
         excel_name=excel_name,
         context="Reach",
+        aes_id=aes_id,
+        period=period,
+        template_id=template_id,
     )
     if not op:
         return None
@@ -2684,6 +3123,34 @@ def _stage_emergency_slot_meta(
     meta[field] = value.strip()
 
 
+def _refresh_resolved_emergency_slots(ctx: UprImportContext) -> None:
+    """Resolve staged emergency codes against GO before preview warnings are shown.
+
+    Group codes are rewritten to the country child (and the reverse) when that
+    appeal is on the official list. Import then stores the matched code.
+    """
+    for (aes_id, _slot), meta in ctx.emergency_slot_meta.items():
+        excel_name = (meta.get("name") or "").strip()
+        excel_code = (meta.get("code") or "").strip()
+        if not excel_name and not excel_code:
+            continue
+        iso3 = _aes_id_to_iso3(ctx, int(aes_id))
+        name, code, display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3=iso3,
+            excel_name=excel_name,
+            excel_code=excel_code,
+            aes_id=int(aes_id),
+            template_id=REPORTING_COUNTRY_TEMPLATE_ID,
+        )
+        if name:
+            meta["name"] = name
+        if code:
+            meta["code"] = code
+        if display:
+            meta["display"] = display
+
+
 def _ensure_repeat_instance(
     aes_id: int,
     repeat_section_id: int,
@@ -2788,6 +3255,8 @@ def upsert_emergency_repeat_slots(
             iso3=iso3,
             excel_name=excel_name,
             excel_code=excel_code,
+            aes_id=aes_id,
+            template_id=REPORTING_COUNTRY_TEMPLATE_ID,
         )
         label = name or code or display
         inst = _ensure_repeat_instance(
@@ -3178,6 +3647,7 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
         )
     ctx.ns_name_to_id = _build_ns_name_index()
     ctx.ns_home_country_iso3, ctx.country_id_by_iso3, ctx.iso3_to_hns_id = _build_ns_home_country_index()
+    ctx.iso2_by_iso3, ctx.country_name_by_iso3 = _load_country_labels()
     return ctx
 
 
@@ -3756,6 +4226,9 @@ def transform_to_import_rows(
                     area=area,
                     ea_code=row.get("EA Code"),
                     amount=value_num,
+                    aes_id=aes_id,
+                    period=period,
+                    template_id=24,
                 )
                 if not ea_cells:
                     continue
@@ -4225,6 +4698,7 @@ def transform_to_import_rows(
 
     ctx.pns_t22_reported_aes = {int(aes) for aes, _ in pns_t22_reported_yes}
     ctx.pns_t23_reported_aes = {int(aes) for aes, _ in pns_t23_reported_yes}
+    _refresh_resolved_emergency_slots(ctx)
 
     return import_rows
 

@@ -1308,7 +1308,7 @@ class TestBuildGroupedEntityEmailPreview:
         assert not preview['empty_reason']
         assert [r['email'] for r in preview['to']] == ['instant_focal@example.com']
 
-    def test_single_to_recipient_uses_personal_greeting(self, app, db_session):
+    def test_single_to_recipient_uses_team_greeting(self, app, db_session):
         from app.models import User, NotificationPreferences
         from app import db
 
@@ -1329,8 +1329,9 @@ class TestBuildGroupedEntityEmailPreview:
                 [user.id], [], self._sample_notification(), 'Kenya'
             )
 
-        assert 'Dear colleagues' not in preview['html_body']
-        assert 'Hello Solo Focal,' in preview['html_body']
+        assert 'Dear colleagues,' in preview['html_body']
+        assert 'Hello Solo Focal,' not in preview['html_body']
+        assert 'Hello Kenya' not in preview['html_body']
 
     def test_multiple_to_recipients_use_team_greeting(self, app, db_session):
         from app.models import User, NotificationPreferences
@@ -1426,6 +1427,8 @@ class TestBuildGroupedEntityEmailPreview:
         assert preview['html_body']
         assert preview['subject']
         assert not preview['empty_reason']
+        assert 'Dear colleagues,' in preview['html_body']
+        assert 'Hello Kenya' not in preview['html_body']
 
     def test_related_url_renders_open_assignment_button(self, app, db_session):
         from app.models import User, NotificationPreferences

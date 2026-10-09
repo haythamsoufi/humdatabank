@@ -4,6 +4,7 @@ Comprehensive pytest tests for app/routes/admin/assignment_management.py
 Covers assignment CRUD, entity management, public submissions, and all edge cases.
 """
 import json
+import re
 import pytest
 from unittest.mock import patch, MagicMock
 from app.routes.admin.assignment_management import (
@@ -101,6 +102,16 @@ class TestNewAssignment:
     def test_get_renders_form(self, logged_in_client, db_session):
         resp = logged_in_client.get("/admin/assignments/new")
         assert resp.status_code in (200, 302)
+
+    def test_notify_checkbox_unticked_by_default(self, logged_in_client, db_session):
+        resp = logged_in_client.get("/admin/assignments/new")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        match = re.search(r'<input[^>]*\bname="send_notifications"[^>]*>', html)
+        assert match, "send_notifications checkbox missing"
+        assert "checked" not in match.group(0)
+        assert "Create without notifications?" in html
+        assert "Create without notifying" in html
 
     def test_post_no_published_template(self, logged_in_client, db_session, app):
         with app.app_context():

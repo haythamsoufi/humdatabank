@@ -3690,7 +3690,7 @@
 
                 // Notification confirmation: fetch recipient preview, then ask for confirm
                 const sendNotifCheckbox = mainForm.querySelector('input[name="send_notifications"]');
-                const sendNotifications = sendNotifCheckbox ? sendNotifCheckbox.checked : true;
+                const sendNotifications = sendNotifCheckbox ? sendNotifCheckbox.checked : false;
 
                 function doSubmit() {
                     // Re-sync country checkboxes → hidden inputs right before submission
@@ -3723,22 +3723,51 @@
                     return formatNotifRecipientsSummary(preview, includeAdminCc, localCountryIds);
                 }
 
-                function buildConfirmMsg(sendNotifications, preview, localCountryIds) {
-                    if (!sendNotifications) return cfg.t.noNotifyMsg;
-                    if (!preview) return cfg.t.notifyMsg;
+                function confirmLines() {
+                    return Array.prototype.slice.call(arguments).filter(Boolean).join('\n\n');
+                }
+
+                function buildConfirmDialog(sendNotifications, preview, localCountryIds) {
+                    if (!sendNotifications) {
+                        return {
+                            title: cfg.t.confirmNoNotifyTitle,
+                            message: confirmLines(cfg.t.noNotifyLead, cfg.t.noNotifyBody, cfg.t.noNotifyAsk),
+                            confirmText: cfg.t.confirmNoNotifyBtn,
+                        };
+                    }
+                    const notifyLead = cfg.t.notifyLead;
+                    if (!preview) {
+                        return {
+                            title: cfg.t.confirmNotifyTitle,
+                            message: confirmLines(notifyLead, cfg.t.notifyBody, cfg.t.notifyWho),
+                            confirmText: cfg.t.confirmNotifyBtn,
+                        };
+                    }
                     // Admins are a separate audience bucket from focal points, so
                     // focal_points_enabled=false doesn't necessarily mean no one is notified.
                     const hasAdminRecipients = !!(preview.admins_enabled && preview.admin_users);
                     if (!preview.focal_points_enabled && !hasAdminRecipients) {
-                        return cfg.t.notifyMsgDisabled;
+                        return {
+                            title: cfg.t.confirmNotifyBlockedTitle,
+                            message: confirmLines(notifyLead, cfg.t.notifyBlockedBody),
+                            confirmText: cfg.t.createAnyway,
+                        };
                     }
                     if (!preview.total_focal_users && !hasAdminRecipients) {
-                        return cfg.t.notifyMsg + '\n\n⚠ ' + cfg.t.notifyNoRecipients;
+                        return {
+                            title: cfg.t.confirmNotifyNoneTitle,
+                            message: confirmLines(notifyLead, cfg.t.notifyNoneBody || cfg.t.notifyNoRecipients),
+                            confirmText: cfg.t.createAnyway,
+                        };
                     }
                     const notifyAdminsCheckbox = document.getElementById('notify_admins');
                     const includeAdminCc = notifyAdminsCheckbox ? notifyAdminsCheckbox.checked : false;
                     const summary = _formatNotifSummary(preview, includeAdminCc, localCountryIds);
-                    return cfg.t.notifyMsg + '\n\n' + summary;
+                    return {
+                        title: cfg.t.confirmNotifyTitle,
+                        message: confirmLines(notifyLead, cfg.t.notifyBody, cfg.t.notifyWho, summary),
+                        confirmText: cfg.t.confirmNotifyBtn,
+                    };
                 }
 
                 // Sync countries into the form first so we can read them
@@ -3746,19 +3775,17 @@
                 const selectedCountryIds = getSelectedCountryIds();
 
                 const preview = sendNotifications ? await fetchNotifPreview(selectedCountryIds) : null;
-                const confirmMsg = buildConfirmMsg(sendNotifications, preview, selectedCountryIds);
-                const confirmTitle = cfg.t.createAssignment;
-                const confirmContinue = cfg.t.continueBtn;
+                const confirmDialog = buildConfirmDialog(sendNotifications, preview, selectedCountryIds);
                 const confirmCancel = cfg.t.cancel;
 
                 if (window.showConfirmation) {
                     window.showConfirmation(
-                        confirmMsg,
+                        confirmDialog.message,
                         doSubmit,
                         resetSubmitGuard,
-                        confirmContinue,
+                        confirmDialog.confirmText,
                         confirmCancel,
-                        confirmTitle
+                        confirmDialog.title
                     );
                 } else {
                     doSubmit();

@@ -40,8 +40,9 @@ class AssignedFormForm(BaseForm):
     generate_public_url = BooleanField("Generate public URL for this assignment", default=False)
     public_url_active = BooleanField("Public URL active by default", default=True)
 
-    # Notify assigned entities when assignment is created
-    send_notifications = BooleanField("Notify assigned entities when assignment is created", default=True)
+    # Notify assigned entities when assignment is created.
+    # Off by default so creating an assignment does not email anyone unless chosen.
+    send_notifications = BooleanField("Notify assigned entities when assignment is created", default=False)
 
     notify_admins = BooleanField(
         "CC admins on notification emails",

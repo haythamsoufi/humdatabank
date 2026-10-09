@@ -66,7 +66,8 @@ class TestSummarizeWarnings:
         assert "MDRTD022" in result["warnings"][0]
         assert "imported using Excel labels" in result["warnings"][0]
         assert "×2" in result["warnings"][0]
-        assert "2 countries" in result["warnings"][0]
+        assert "TCD" in result["warnings"][0]
+        assert "ETH" in result["warnings"][0]
 
     def test_groups_new_emergency_appeal_wording(self):
         warnings = [
@@ -91,8 +92,29 @@ class TestSummarizeWarnings:
         ]
         result = summarize_warnings(warnings)
         assert result["warning_unique_count"] == 1
-        assert "MDRBD018" in result["warnings"][0]
-        assert "2 countries" in result["warnings"][0]
+        line = result["warnings"][0]
+        assert "MDRBD018" in line
+        assert "BEN" in line
+        assert "BGD" in line
+        assert "is not listed in GO for " in line
+
+    def test_emergency_appeal_warning_names_the_assignment(self):
+        warnings = [
+            {
+                "message": (
+                    "Emergency appeal MDRTD022 is not listed for this country in GO. "
+                    "The Excel name and code were imported — please review it on the form."
+                ),
+                "code": "MDRTD022",
+                "iso3": "TCD",
+                "place": "Chad (TCD) — Reporting - Country 2025 (assignment 42)",
+            }
+        ]
+        result = summarize_warnings(warnings)
+        line = result["warnings"][0]
+        assert "Chad (TCD)" in line
+        assert "Reporting - Country 2025" in line
+        assert "assignment 42" in line
 
     def test_dedupe_collapses_matrix_row_warnings_per_field(self):
         from upr_import_warnings import dedupe_upr_import_warnings, warning_text

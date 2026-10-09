@@ -2,6 +2,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes %}
 {% from "components/ag_grid_includes.html" import ag_grid_container, ag_grid_js %}
+{% from "macros/part_of_filter_checkboxes.html" import part_of_filter_checkboxes %}
 
 {% block title %}{{ _('Data governance') }}{% endblock %}
 
@@ -315,9 +316,16 @@ details.gov-decide > summary:hover { text-decoration:underline; }
                 </div>
             </div>
             <div class="space-y-3">
-                <p class="text-sm text-gray-500">
-                    {{ _('Coverage is split between %(org)s focal points and National Society focal points. Use Columns to show names, the FDS member, and programme membership. Excel export includes Country ID and ISO3.', org=ORG_SHORT_NAME | default('organization')) }}
-                </p>
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <p class="text-sm text-gray-500">
+                        {{ _('Coverage is split between %(org)s focal points and National Society focal points. Use Columns to show names, the FDS member, and programme membership. Excel export includes Country ID and ISO3.', org=ORG_SHORT_NAME | default('organization')) }}
+                    </p>
+                    <div id="category-filters-governance" class="flex items-center gap-3 flex-wrap">
+                        <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
+                        {{ part_of_filter_checkboxes(part_of_programs or [], text_groups=part_of_text_groups or []) }}
+                    </div>
+                </div>
+                <script type="application/json" id="gov-part-of-map">{{ (part_of_category_to_countries or {})|tojson }}</script>
                 {{ ag_grid_container('countriesFocalGrid', loading_text=_('Loading country coverage…'), include_card=false, grid_height='440px') }}
             </div>
         </div>
@@ -373,6 +381,29 @@ details.gov-decide > summary:hover { text-decoration:underline; }
 
     var orgName = cfg.orgShortName || 'Organization';
     var nsCategories = cfg.nsPartOfCategories || [];
+    var partOfMap = {};
+    try {
+        partOfMap = JSON.parse((document.getElementById('gov-part-of-map') || {}).textContent || '{}');
+    } catch (e) {
+        partOfMap = {};
+    }
+    var sourceRows = rowData.slice();
+
+    function rowsForPartOf() {
+        var root = document.getElementById('category-filters-governance');
+        if (!root) return sourceRows;
+        var ids = {};
+        var any = false;
+        root.querySelectorAll('.category-filter-checkbox:checked').forEach(function (box) {
+            var key = box.getAttribute('data-category') || box.value;
+            (partOfMap[key] || []).forEach(function (id) {
+                ids[Number(id)] = true;
+                any = true;
+            });
+        });
+        if (!any) return sourceRows;
+        return sourceRows.filter(function (row) { return ids[Number(row.id)]; });
+    }
 
     rowData.forEach(function (row) {
         var total  = row.total_focal_points    || 0;
@@ -633,7 +664,7 @@ details.gov-decide > summary:hover { text-decoration:underline; }
         var panel = document.getElementById('panel-focal-points');
         if (!panel || panel.classList.contains('hidden') || typeof AgGridHelper === 'undefined') return;
         if (!focalApi) {
-            var created = AgGridHelper.create('countriesFocalGrid', 'gov-countries-focal-v2', columnDefs, rowData, {
+            var created = AgGridHelper.create('countriesFocalGrid', 'gov-countries-focal-v2', columnDefs, rowsForPartOf(), {
                 gridOptions: {
                     getRowStyle: function (p) {
                         if (p.data && p.data.total_focal_points === 0) {
@@ -651,6 +682,17 @@ details.gov-decide > summary:hover { text-decoration:underline; }
     }
     document.addEventListener('gov-tab', ensureFocalGrid);
     ensureFocalGrid();
+
+    var partOfRoot = document.getElementById('category-filters-governance');
+    if (partOfRoot) {
+        partOfRoot.addEventListener('change', function (event) {
+            var box = event.target;
+            if (!box.classList || !box.classList.contains('category-filter-checkbox')) return;
+            if (focalApi && focalApi.setGridOption) {
+                focalApi.setGridOption('rowData', rowsForPartOf());
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

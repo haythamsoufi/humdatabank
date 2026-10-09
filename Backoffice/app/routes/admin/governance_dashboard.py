@@ -22,6 +22,7 @@ from app.services.platform.governance_program import (
 )
 from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.api_responses import json_ok_result
+from app.utils.country_utils import get_countries_by_region_with_part_of
 from app.utils.request_utils import get_request_data
 
 bp = Blueprint("governance_dashboard", __name__, url_prefix="/admin")
@@ -33,10 +34,16 @@ def governance_dashboard():
     """Control register, open issues, and the focal-point stewardship list."""
     report = build_governance_report()
     can_manage = AuthorizationService.has_rbac_permission(current_user, "admin.governance.manage")
+    _countries, part_of_programs, part_of_category_to_countries, part_of_text_groups = (
+        get_countries_by_region_with_part_of()
+    )
     return render_template(
         "admin/governance/dashboard.html",
         report=report,
         can_manage=can_manage,
+        part_of_programs=part_of_programs,
+        part_of_category_to_countries=part_of_category_to_countries,
+        part_of_text_groups=part_of_text_groups,
         title=_("Data governance"),
     )
 

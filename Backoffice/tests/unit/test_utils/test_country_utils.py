@@ -149,7 +149,7 @@ class TestGetCountriesByRegionWithPartOf:
             db_session.add(ns)
             db_session.commit()
 
-            regions, programs, mapping = get_countries_by_region_with_part_of()
+            regions, programs, mapping, _groups = get_countries_by_region_with_part_of()
 
             assert 'FDRS' in programs
             assert 'PERC' in programs
@@ -174,12 +174,52 @@ class TestGetCountriesByRegionWithPartOf:
                 assert "Catalog Note" not in collect_part_of_category_names([])
                 definitions = collect_part_of_category_definitions([])
                 assert {"name": "Catalog Note", "type": "text"} in definitions
-                _, programs, _mapping = get_countries_by_region_with_part_of()
+                _, programs, _mapping, groups = get_countries_by_region_with_part_of()
                 assert "Catalog Only" in programs
                 assert "Catalog Note" not in programs
+                assert groups == []
             finally:
                 forget_part_of_category("Catalog Only")
                 forget_part_of_category("Catalog Note")
+
+
+def test_text_category_values_group_under_their_title(db_session, app):
+    with app.app_context():
+        from tests.factories import create_test_country
+        from app.models import NationalSociety
+        from app.utils.country_utils import (
+            forget_part_of_category,
+            part_of_text_filter_key,
+            remember_part_of_category,
+        )
+
+        remember_part_of_category("Bundle", "text")
+        remember_part_of_category("Tick Only")
+        try:
+            country = create_test_country(db_session, name="Bundle Land", iso3="BND", iso2="BN")
+            ns = NationalSociety(
+                name="Bundle NS",
+                country_id=country.id,
+                is_active=True,
+                part_of=["Tick Only"],
+                category_text={"Bundle": "Pacific Islands"},
+            )
+            db_session.add(ns)
+            db_session.commit()
+
+            _regions, programs, mapping, groups = get_countries_by_region_with_part_of()
+            assert "Tick Only" in programs
+            assert "Bundle" not in programs
+            bundle = next(group for group in groups if group["name"] == "Bundle")
+            option = {
+                "label": "Pacific Islands",
+                "key": part_of_text_filter_key("Bundle", "Pacific Islands"),
+            }
+            assert option in bundle["options"]
+            assert country.id in mapping[option["key"]]
+        finally:
+            forget_part_of_category("Bundle")
+            forget_part_of_category("Tick Only")
 
 
 def test_is_sandbox_country_matches_testland_only():

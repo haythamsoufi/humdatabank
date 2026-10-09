@@ -134,6 +134,11 @@ def collect_part_of_category_definitions(societies=None) -> List[dict]:
     ]
 
 
+def part_of_text_filter_key(category: str, value: str) -> str:
+    """Stable map key for one text-category value in the assignment Part of filter."""
+    return f"text:{category}\x1f{value}"
+
+
 def collect_part_of_category_names(societies=None) -> List[str]:
     """Sorted tick-box category names. Text categories are excluded from membership filters."""
     return [
@@ -175,12 +180,13 @@ def get_country_region_name(country) -> str:
 
 def get_part_of_category_data() -> Tuple[List[str], Dict[str, List[int]]]:
     """Return sorted Part of category names and category -> country_id mapping from NS records."""
-    _, programs, mapping = get_countries_by_region_with_part_of()
+    _, programs, mapping, _text_groups = get_countries_by_region_with_part_of()
     return programs, mapping
 
 
-def _part_of_from_national_societies(country_id: int, national_societies) -> Tuple[set, Dict[str, set]]:
-    """Extract Part of categories and mapping entries from a country's NS records."""
+def _part_of_from_national_societies(country_id: int, national_societies, text_names=None) -> Tuple[set, Dict[str, set]]:
+    """Extract tick-box Part of categories and mapping entries from a country's NS records."""
+    skip = text_names or set()
     categories: set = set()
     category_to_countries: Dict[str, set] = defaultdict(set)
     for ns in national_societies or []:
@@ -190,21 +196,45 @@ def _part_of_from_national_societies(country_id: int, national_societies) -> Tup
         for item in part_of:
             if item and isinstance(item, str):
                 category = item.strip()
-                if category:
+                if category and category not in skip:
                     categories.add(category)
                     category_to_countries[category].add(country_id)
     return categories, category_to_countries
 
 
-def get_countries_by_region_with_part_of() -> Tuple[dict, List[str], Dict[str, List[int]]]:
+def _text_category_filter_entries(country_id: int, national_societies, text_names):
+    """Map each non-empty text-category value to the countries that use it."""
+    values_by_name = defaultdict(set)
+    category_to_countries = defaultdict(set)
+    if not text_names:
+        return values_by_name, category_to_countries
+    for ns in national_societies or []:
+        texts = ns.category_text if isinstance(ns.category_text, dict) else {}
+        for raw_name, raw_value in texts.items():
+            name = _normalize_part_of_category_name(raw_name)
+            if name not in text_names:
+                continue
+            value = str(raw_value).strip() if raw_value is not None else ""
+            if not value:
+                continue
+            values_by_name[name].add(value)
+            category_to_countries[part_of_text_filter_key(name, value)].add(country_id)
+    return values_by_name, category_to_countries
+
+
+def get_countries_by_region_with_part_of():
     """Load countries grouped by region and Part of filter data in one query batch.
 
     Returns:
-        countries_by_region, sorted part_of category names, category -> country_ids mapping
+        countries_by_region, tick-box category names, filter key -> country_ids,
+        text groups ``[{name, options: [{label, key}]}]``.
     """
     countries_by_region = defaultdict(list)
     all_categories: set = set()
     category_to_countries: Dict[str, set] = defaultdict(set)
+    text_values = defaultdict(set)
+    catalog = load_part_of_category_catalog()
+    text_names = {name for name, kind in catalog.items() if kind == PART_OF_CATEGORY_TEXT}
 
     all_countries = (
         Country.query.options(
@@ -217,19 +247,35 @@ def get_countries_by_region_with_part_of() -> Tuple[dict, List[str], Dict[str, L
     for country in all_countries:
         region_name = get_country_region_name(country)
         countries_by_region[region_name].append(country)
-        ns_categories, ns_mapping = _part_of_from_national_societies(country.id, country.national_societies)
+        ns_categories, ns_mapping = _part_of_from_national_societies(
+            country.id, country.national_societies, text_names
+        )
         all_categories.update(ns_categories)
         for category, country_ids in ns_mapping.items():
             category_to_countries[category].update(country_ids)
+        country_text_values, text_mapping = _text_category_filter_entries(
+            country.id, country.national_societies, text_names
+        )
+        for name, values in country_text_values.items():
+            text_values[name].update(values)
+        for key, country_ids in text_mapping.items():
+            category_to_countries[key].update(country_ids)
 
     all_categories.update(
-        name
-        for name, kind in load_part_of_category_catalog().items()
-        if kind == PART_OF_CATEGORY_CHECKBOX
+        name for name, kind in catalog.items() if kind == PART_OF_CATEGORY_CHECKBOX
     )
+    all_categories -= text_names
     programs = sorted(all_categories)
     mapping = {category: sorted(ids) for category, ids in category_to_countries.items()}
-    return countries_by_region, programs, mapping
+    text_groups = []
+    for name in sorted(text_names):
+        options = [
+            {"label": value, "key": part_of_text_filter_key(name, value)}
+            for value in sorted(text_values.get(name, ()))
+        ]
+        if options:
+            text_groups.append({"name": name, "options": options})
+    return countries_by_region, programs, mapping, text_groups
 
 
 def get_countries_by_region():

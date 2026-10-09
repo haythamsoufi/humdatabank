@@ -779,10 +779,10 @@ try {
                     minWidth: 160,
                     maxWidth: 360,
                     sortable: true,
-                    filter: 'agTextColumnFilter',
+                    filter: 'customSetFilter',
                     valueGetter: function(params) {
                         const texts = params.data && params.data.category_text || {};
-                        return texts[category] || '';
+                        return String(texts[category] || '').trim();
                     },
                     editable: false,
                     suppressKeyboardEvent: function(params) {

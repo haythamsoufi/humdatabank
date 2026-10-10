@@ -19,7 +19,6 @@ import '../../widgets/disaggregation/disagg_chart_panel.dart';
 import '../../widgets/disaggregation/disagg_filter_sheet.dart';
 import '../../widgets/disaggregation/disagg_summary_cards.dart';
 import '../../widgets/error_state.dart';
-import '../../widgets/ios_button.dart';
 import '../../widgets/loading_indicator.dart';
 
 class DisaggregationAnalysisScreen extends StatefulWidget {
@@ -258,12 +257,10 @@ class _DisaggregationAnalysisScreenState
         title: loc.disaggregationAnalysis,
         leading: Builder(
           builder: (BuildContext scaffoldContext) {
-            return IOSIconButton(
-              icon: Icons.menu,
+            return IconButton(
+              icon: const Icon(Icons.menu_rounded),
               onPressed: () => Scaffold.of(scaffoldContext).openDrawer(),
               tooltip: loc.navigation,
-              semanticLabel: loc.navigation,
-              semanticHint: loc.navigation,
             );
           },
         ),

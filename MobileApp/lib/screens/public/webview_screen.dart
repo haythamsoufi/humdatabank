@@ -1022,7 +1022,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     height:
                         MediaQuery.of(context).size.height -
                         MediaQuery.of(context).padding.top -
-                        kToolbarHeight -
+                        AppAppBar.toolbarHeight -
                         50 - // Bottom navigation bar height
                         MediaQuery.of(
                           context,

@@ -44,7 +44,7 @@ See `lib/utils/app_spacing.dart` for standard spacing tokens.
 - `AppErrorState` — Error display with retry action
 
 ### Navigation
-- `AppAppBar` — Themed app bar with optional large title
+- `AppAppBar` — Shared screen header: large left-aligned title (same as the Dashboard heading), no divider, back/menu/action icons in glass circle bubbles (`GlassCircleBubble`)
 - `AppBottomNavigationBar` — Bottom tab bar
 - `AppNavigationDrawer` — Side navigation drawer
 

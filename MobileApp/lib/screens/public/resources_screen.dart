@@ -16,7 +16,6 @@ import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
-import '../../widgets/ios_button.dart';
 import '../../widgets/error_state.dart';
 
 class ResourcesScreen extends StatefulWidget {
@@ -126,12 +125,10 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
             title: _resourcesAppBarTitle(loc, provider),
             leading: Builder(
               builder: (BuildContext scaffoldContext) {
-                return IOSIconButton(
-                  icon: Icons.menu,
+                return IconButton(
+                  icon: const Icon(Icons.menu_rounded),
                   onPressed: () => Scaffold.of(scaffoldContext).openDrawer(),
                   tooltip: loc.navigation,
-                  semanticLabel: loc.navigation,
-                  semanticHint: loc.navigation,
                 );
               },
             ),

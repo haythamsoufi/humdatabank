@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hum_databank_app/widgets/app_bar.dart';
-import 'package:hum_databank_app/widgets/glass_circle_button.dart';
 
 void main() {
   group('AppAppBar', () {
@@ -46,7 +45,7 @@ void main() {
       expect(left, AppAppBar.horizontalPadding);
     });
 
-    testWidgets('actions are displayed in glass circle bubbles',
+    testWidgets('actions are displayed as plain icon buttons',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -70,14 +69,10 @@ void main() {
 
       expect(find.byIcon(Icons.search), findsOneWidget);
       expect(find.byIcon(Icons.notifications), findsOneWidget);
-      expect(find.byType(GlassCircleBubble), findsNWidgets(2));
-      expect(
-        tester.getSize(find.byType(GlassCircleBubble).first),
-        const Size.square(GlassCircleBubble.defaultSize),
-      );
+      expect(find.byType(IconButton), findsNWidgets(2));
     });
 
-    testWidgets('displays custom leading widget in a bubble',
+    testWidgets('displays custom leading widget',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -95,10 +90,9 @@ void main() {
       );
 
       expect(find.byIcon(Icons.menu), findsOneWidget);
-      expect(find.byType(GlassCircleBubble), findsOneWidget);
     });
 
-    testWidgets('shows a back bubble that pops when the route can pop',
+    testWidgets('shows a back button that pops when the route can pop',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -123,7 +117,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Detail'), findsOneWidget);
-      expect(find.byType(GlassCircleBubble), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
@@ -131,7 +124,7 @@ void main() {
       expect(find.text('Detail'), findsNothing);
     });
 
-    testWidgets('has no bubble when there is nothing to show',
+    testWidgets('has no icons when there is nothing to show',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -141,7 +134,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(GlassCircleBubble), findsNothing);
+      expect(find.byType(IconButton), findsNothing);
     });
 
     testWidgets('long titles scale down instead of overflowing',

@@ -3,16 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../utils/constants.dart';
 import '../utils/ios_constants.dart';
-import 'glass_circle_button.dart';
 
 /// Screen header shared by every page.
 ///
 /// Matches the Dashboard heading: a large, left-aligned bold title on the
-/// page background with no divider line. Back, menu and action icons sit in
-/// glass circle bubbles (see [GlassCircleBubble]) like the iOS 26 toolbar.
-///
-/// Pass `IconButton`s (or `PopupMenuButton`s) as [actions] and [leading]; they
-/// are sized to the bubble automatically.
+/// page background with no divider line. Back, menu and action icons are plain
+/// `IconButton`s beside the title.
 class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Height of the header below the status bar.
   static const double toolbarHeight = 64;
@@ -20,7 +16,7 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Horizontal inset, same as the Dashboard heading.
   static const double horizontalPadding = 20;
 
-  /// Large heading text. An empty title leaves only the leading and action bubbles.
+  /// Large heading text. An empty title leaves only the leading and action icons.
   final String title;
   final List<Widget>? actions;
   final Widget? leading;
@@ -39,24 +35,20 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   Widget? _resolveLeading(BuildContext context) {
-    if (leading != null) return GlassCircleBubble(child: leading!);
+    if (leading != null) return leading;
     if (!automaticallyImplyLeading) return null;
 
     final scaffold = Scaffold.maybeOf(context);
-    final colorScheme = Theme.of(context).colorScheme;
     if (Navigator.canPop(context)) {
-      return GlassCircleButton(
-        icon: Icons.arrow_back_ios_new_rounded,
-        iconSize: 18,
-        color: colorScheme.onSurface,
+      return IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
         tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         onPressed: () => Navigator.maybePop(context),
       );
     }
     if (scaffold != null && scaffold.hasDrawer) {
-      return GlassCircleButton(
-        icon: Icons.menu_rounded,
-        color: colorScheme.onSurface,
+      return IconButton(
+        icon: const Icon(Icons.menu_rounded),
         tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
         onPressed: scaffold.openDrawer,
       );
@@ -88,14 +80,15 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: SizedBox(
             height: toolbarHeight,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
+              padding: EdgeInsetsDirectional.only(
+                start: leadingWidget != null ? 8 : horizontalPadding,
+                end: 8,
               ),
               child: Row(
                 children: [
                   if (leadingWidget != null) ...[
                     leadingWidget,
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 4),
                   ],
                   Expanded(
                     child: title.isEmpty
@@ -117,10 +110,7 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
                             ),
                           ),
                   ),
-                  for (final action in actions ?? const <Widget>[]) ...[
-                    const SizedBox(width: 8),
-                    GlassCircleBubble(child: action),
-                  ],
+                  ...?actions,
                 ],
               ),
             ),

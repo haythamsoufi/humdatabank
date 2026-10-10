@@ -10,7 +10,6 @@ import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/countries_widget.dart';
-import '../../widgets/app_bar.dart';
 import '../../widgets/home_landing/landing_ai_entry_card.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/home_landing/landing_get_started_section.dart';
@@ -193,12 +192,11 @@ class _HomeScreenState extends State<HomeScreen>
           onPromptSelected: (p) => _onPromptSelected(p, context),
         );
 
-        final mq = MediaQuery.of(context);
-        // bodyHeroExtent no longer accepts a context: the Scaffold removes the
-        // status-bar inset from the body's MediaQuery (padding.top == 0 there),
-        // so the hero's SliverAppBar.expandedHeight never includes it.
-        final heroBodyExtent = LandingHeroSliver.bodyHeroExtent();
-        const appBarH = AppAppBar.toolbarHeight;
+        // The Home body has no app bar, so the hero starts at the top of the
+        // screen and its sliver height includes the status-bar inset.
+        final statusBarInset = MediaQuery.paddingOf(context).top;
+        final heroBodyExtent =
+            LandingHeroSliver.bodyHeroExtent() + statusBarInset;
 
         return CallbackShortcuts(
           bindings: <ShortcutActivator, VoidCallback>{
@@ -214,20 +212,6 @@ class _HomeScreenState extends State<HomeScreen>
                 // Prevent the swipe-to-open gesture from revealing the drawer
                 // while the chat is in focus mode.
                 drawerEnableOpenDragGesture: !_chatExpanded,
-                appBar: AppAppBar(
-                  title: localizations.home,
-                  leading: Builder(
-                    builder: (BuildContext scaffoldContext) {
-                      return IconButton(
-                        icon: const Icon(Icons.menu_rounded),
-                        onPressed: _chatExpanded
-                            ? null
-                            : () => Scaffold.of(scaffoldContext).openDrawer(),
-                        tooltip: localizations.navigation,
-                      );
-                    },
-                  ),
-                ),
                 drawer: AppNavigationDrawer(
                   activeScreen: ActiveDrawerScreen.home,
                   onHomeSelected: reload,
@@ -279,6 +263,21 @@ class _HomeScreenState extends State<HomeScreen>
                               onNavigated: _onChatNavigated,
                             ),
                             quickPrompts: quickPrompts,
+                            topLeading: Builder(
+                              builder: (BuildContext scaffoldContext) {
+                                return IconButton(
+                                  icon: const Icon(Icons.menu_rounded),
+                                  // Icon sits on the dark hero photo.
+                                  color: Colors.white, // theme-drift-ok
+                                  disabledColor: Colors.white38, // theme-drift-ok
+                                  onPressed: _chatExpanded
+                                      ? null
+                                      : () => Scaffold.of(scaffoldContext)
+                                          .openDrawer(),
+                                  tooltip: localizations.navigation,
+                                );
+                              },
+                            ),
                           ),
                           SliverToBoxAdapter(
                             child: Column(
@@ -305,25 +304,37 @@ class _HomeScreenState extends State<HomeScreen>
                       visible: _chatExpanded,
                       top: heroBodyExtent,
                       onDismiss: () => setState(() => _chatExpanded = false),
-                      // Distinct label from the app-bar scrim above so that
-                      // assistive technology doesn't announce two identical
-                      // "Close" buttons at the same time.
                       label: localizations.close,
-                      excludeSemantics: false,
                     ),
                   ],
                 ),
               ),
-              // Dim status bar + app bar so the hero/chat area reads as the only active surface.
-              // Semantics are excluded here: the body scrim below already provides
-              // the actionable "Close" affordance for accessibility.
-              _FocusModeDimLayer(
-                visible: _chatExpanded,
+              // The hero photo is dark, so keep status-bar icons light while it
+              // is under the status bar and switch to dark once it scrolls away.
+              Positioned(
                 top: 0,
-                height: mq.padding.top + appBarH,
-                onDismiss: () => setState(() => _chatExpanded = false),
-                label: localizations.close,
-                excludeSemantics: true,
+                left: 0,
+                right: 0,
+                height: statusBarInset,
+                child: ListenableBuilder(
+                  listenable: _scrollController,
+                  builder: (context, _) {
+                    final position = _scrollController.positions.length == 1
+                        ? _scrollController.position
+                        : null;
+                    final overHero =
+                        position == null ||
+                        position.pixels < heroBodyExtent - 48;
+                    return IgnorePointer(
+                      child: AnnotatedRegion<SystemUiOverlayStyle>(
+                        value: overHero || theme.brightness == Brightness.dark
+                            ? SystemUiOverlayStyle.light
+                            : SystemUiOverlayStyle.dark,
+                        child: const SizedBox.expand(),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -360,22 +371,14 @@ class _HomeScreenState extends State<HomeScreen>
 class _FocusModeDimLayer extends StatelessWidget {
   final bool visible;
   final double top;
-  final double? height;
   final VoidCallback onDismiss;
   final String label;
-
-  /// When `true` the [Semantics] node is excluded from the accessibility tree.
-  /// Use this on supplementary scrims (e.g. the app-bar overlay) so that
-  /// assistive technology only announces one "Close" affordance.
-  final bool excludeSemantics;
 
   const _FocusModeDimLayer({
     required this.visible,
     required this.top,
-    this.height,
     required this.onDismiss,
     required this.label,
-    this.excludeSemantics = false,
   });
 
   @override
@@ -384,8 +387,7 @@ class _FocusModeDimLayer extends StatelessWidget {
       top: top,
       left: 0,
       right: 0,
-      height: height,
-      bottom: height != null ? null : 0,
+      bottom: 0,
       child: IgnorePointer(
         ignoring: !visible,
         child: AnimatedOpacity(
@@ -393,10 +395,9 @@ class _FocusModeDimLayer extends StatelessWidget {
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
           child: Semantics(
-            button: !excludeSemantics,
-            label: excludeSemantics ? null : label,
-            onTap: excludeSemantics ? null : onDismiss,
-            excludeSemantics: excludeSemantics,
+            button: true,
+            label: label,
+            onTap: onDismiss,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onDismiss,

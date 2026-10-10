@@ -21,14 +21,23 @@ from app.utils.mobile_responses import mobile_auth_error, mobile_forbidden
 from app.utils.request_validation import enforce_api_or_csrf_protection
 
 
+# Exact paths (not prefixes) where a mobile access token is accepted outside the mobile
+# API prefix. The mobile app trades its JWT here for the short-lived AI chat token; it has
+# no Flask session cookie to present (Bearer and PKCE logins never mint one).
+MOBILE_JWT_BEARER_EXACT_PATHS = frozenset({"/api/ai/v2/token"})
+
+
 def bearer_jwt_allowed_for_path(path: str) -> bool:
     """True when a Bearer mobile JWT may establish ``current_user`` for ``path``.
 
     Only mobile/JWT API prefixes qualify (``MOBILE_JWT_BEARER_PATH_PREFIXES`` plus the
-    deprecated ``MOBILE_JWT_LEGACY_BEARER_PATH_PREFIXES``). Server-rendered admin pages
-    and every other cookie/CSRF-protected route ignore Bearer credentials entirely.
+    deprecated ``MOBILE_JWT_LEGACY_BEARER_PATH_PREFIXES``), and the exact paths in
+    ``MOBILE_JWT_BEARER_EXACT_PATHS``. Server-rendered admin pages and every other
+    cookie/CSRF-protected route ignore Bearer credentials entirely.
     """
     path = path or ""
+    if path.rstrip("/") in MOBILE_JWT_BEARER_EXACT_PATHS:
+        return True
     for prefix in current_app.config.get("MOBILE_JWT_BEARER_PATH_PREFIXES") or ():
         if prefix and path.startswith(prefix):
             return True

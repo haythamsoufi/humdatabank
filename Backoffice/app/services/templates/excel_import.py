@@ -775,7 +775,14 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
         sheet_name: str,
         errors: List[str],
         published_fallback: Optional[str] = None,
+        claimed_keys: Optional[set] = None,
     ) -> Optional[str]:
+        """Pick the identity key for an imported row.
+
+        ``claimed_keys`` holds every key already taken in this sheet (explicit keys are seeded up
+        front). A published key reused by position is only given to one row; any further row
+        that would resolve to it gets a fresh key, so one version never holds a key twice.
+        """
         raw = row_data.get('stable_key')
         if raw is not None and str(raw).strip() != '':
             key = normalize_stable_key(raw)
@@ -783,9 +790,26 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
                 errors.append(f"{sheet_name} row {row_idx}: Invalid stable_key '{raw}'")
                 return None
             return key
-        if published_fallback:
+        if published_fallback and (claimed_keys is None or published_fallback not in claimed_keys):
+            if claimed_keys is not None:
+                claimed_keys.add(published_fallback)
             return published_fallback
-        return generate_stable_key()
+        fresh = generate_stable_key()
+        if claimed_keys is not None:
+            claimed_keys.add(fresh)
+        return fresh
+
+    @classmethod
+    def _explicit_stable_keys(cls, rows: List[Tuple[int, Dict[str, Any]]]) -> set:
+        keys = set()
+        for _row_idx, row_data in rows:
+            raw = row_data.get('stable_key')
+            if raw is None or str(raw).strip() == '':
+                continue
+            key = normalize_stable_key(raw)
+            if key:
+                keys.add(key)
+        return keys
 
     @classmethod
     def _validate_stable_key_duplicates_in_sheet(
@@ -886,6 +910,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
         cls._validate_stable_key_duplicates_in_sheet(sections_data, 'Sections', errors)
         if errors:
             return errors
+        claimed_section_keys = cls._explicit_stable_keys(sections_data)
 
         # Get existing sections for this version (for matching)
         existing_sections = FormSection.query.filter_by(
@@ -932,6 +957,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
                     published_fallback=published_stable_key_context.get('sections', {}).get(
                         (section_order, section_name)
                     ),
+                    claimed_keys=claimed_section_keys,
                 )
                 if section_stable_key is None:
                     continue
@@ -1147,6 +1173,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
         cls._validate_stable_key_duplicates_in_sheet(rows_buffer, 'Items', errors)
         if errors:
             return errors
+        claimed_item_keys = cls._explicit_stable_keys(rows_buffer)
 
         existing_indicator_bank_ids: set[int] = set()
         if candidate_indicator_bank_ids:
@@ -1208,6 +1235,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
                         item_order=item_order,
                         indicator_bank_id=parsed_ib_for_mismatch,
                     ),
+                    claimed_keys=claimed_item_keys,
                 )
                 if item_stable_key is None:
                     continue

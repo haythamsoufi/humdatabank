@@ -46,21 +46,24 @@ Exit code `1` means a blocking finding.
 | `N field(s) in the live version hold submitted data but have no match …` | Not an error: the admin must acknowledge it on the deploy dialog or the field mapping page |
 | `The selected version was not found for this template.` | A stale tab; reload |
 
-## Database constraints: decision for the team
+## Database constraints: plan (decided: audit first, then enforce)
 
-The checks above run in the application. The database does **not** yet enforce them, so a script, a manual SQL change or a bug can still create a state the app then refuses at deploy time. `uq_template_version_number` (unique `template_id`, `version_number`) already exists. Candidate constraints:
+The checks above run in the application. The database does **not** yet enforce them, so a script, a manual SQL change or a bug can still create a state the app then refuses at deploy time. `uq_template_version_number` (unique `template_id`, `version_number`) already exists. The constraints still to add:
 
 1. `form_template_version (template_id) WHERE status = 'draft'` unique: one draft per template
 2. `form_item (version_id, stable_key) WHERE stable_key IS NOT NULL` unique
 3. `form_section (version_id, stable_key) WHERE stable_key IS NOT NULL` unique
 
-| Option | Behaviour | Risk |
-|---|---|---|
-| **A. Enforce now** | Migration adds the three partial unique indexes; fails if the audit finds violations | A deploy of the migration is blocked until production data is cleaned. Excel import reuses published keys by position; confirm it can never give one key to two rows, otherwise such an import would fail with an integrity error |
-| **B. Audit, then enforce (recommended)** | Run the audit in each environment, fix findings, then ship the migration (option A) in a later release | Needs one extra release; no surprise at deploy time |
-| **C. Keep application checks only** | No migration | A bypass of the app can still create ambiguous states; deploy will refuse them, but only at deploy time |
+Decision: **audit every environment and fix findings first, then ship the migration in a later release.** Excel import now never assigns one key to two rows (`claimed_keys` in `_resolve_import_stable_key`), so enforcing them will not break imports.
 
-Until a decision is made, the application behaves as option C.
+Checklist before the enforcing migration is released:
+
+- [ ] `python scripts/ops/audit_template_versions.py` exits `0` in every environment (dev, staging, production)
+- [ ] Any `multiple_drafts`, `published_inconsistencies` and duplicate-key findings were fixed and the audit re-run
+- [ ] The enforcing migration is reviewed. It checks for violations itself and aborts with the offending rows listed instead of failing half-way
+- [ ] Released at a quiet time, with a database backup taken first ([Backup & restore](../data/backup-and-restore.md))
+
+Until the migration ships, the application checks above are the only protection.
 
 ## Related
 

@@ -34,6 +34,7 @@ from app.routes.admin.form_builder.helpers.template_mgmt import (
 )
 from app.routes.forms.helpers import entry_form_is_stale
 from app.services.platform.template_version_audit import audit_template_versions
+from app.services.templates.excel_service import TemplateExcelService as TemplateExcelImportService
 from app.routes.admin.form_builder.helpers.cloning import (
     _clone_template_structure,
     _clone_template_structure_between_templates,
@@ -1601,3 +1602,40 @@ class TestTemplateVersionAudit:
         report = audit_template_versions(template.id)
         assert report['sections_without_key']
         assert report['has_blocking_issues'] is False
+
+
+# ---------------------------------------------------------------------------
+# Excel import never hands one identity key to two rows
+# ---------------------------------------------------------------------------
+
+class TestImportKeyClaims:
+    def _resolve(self, row, fallback, claimed):
+        errors = []
+        key = TemplateExcelImportService._resolve_import_stable_key(
+            row, 2, 'Items', errors, published_fallback=fallback, claimed_keys=claimed
+        )
+        assert errors == []
+        return key
+
+    def test_published_key_goes_to_one_row_only(self):
+        published_key = generate_stable_key()
+        claimed = set()
+        first = self._resolve({}, published_key, claimed)
+        second = self._resolve({}, published_key, claimed)
+        assert first == published_key
+        assert second != published_key
+        assert len({first, second}) == 2
+
+    def test_explicit_key_in_the_sheet_beats_a_positional_fallback(self):
+        published_key = generate_stable_key()
+        rows = [(3, {'stable_key': published_key}), (4, {})]
+        claimed = TemplateExcelImportService._explicit_stable_keys(rows)
+        positional = self._resolve({}, published_key, claimed)
+        explicit = self._resolve({'stable_key': published_key}, None, claimed)
+        assert explicit == published_key
+        assert positional != published_key
+
+    def test_without_claims_behaviour_is_unchanged(self):
+        published_key = generate_stable_key()
+        assert self._resolve({}, published_key, None) == published_key
+        assert self._resolve({}, published_key, None) == published_key

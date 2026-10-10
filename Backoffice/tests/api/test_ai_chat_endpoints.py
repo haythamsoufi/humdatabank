@@ -372,3 +372,65 @@ def test_ai_table_export_validation_and_headers(client, app, db_session):
     assert resp.status_code == 200
     assert resp.headers.get("X-hum-databank-Export-Completed") == "1"
     assert resp.headers.get("X-hum-databank-Export-Filename") == "table-data.xlsx"
+
+
+def _csrf_rejected(resp) -> bool:
+    body = resp.get_json(silent=True) or {}
+    return resp.status_code == 400 and body.get("csrf_refresh_required") is True
+
+
+@pytest.mark.api
+@pytest.mark.db
+def test_ai_identity_prefers_bearer_over_cookie(app, client, db_session):
+    """Mobile sends its stored session cookie *and* the AI token; the token must win."""
+    from app.utils.ai_request_user import resolve_ai_identity
+
+    cookie_user = create_test_user(db_session, email="cookie-id@test.local", name="Cookie", role="user")
+    bearer_user = create_test_user(db_session, email="bearer-id@test.local", name="Bearer", role="user")
+    with app.app_context():
+        cookie_id, bearer_id = int(cookie_user.id), int(bearer_user.id)
+        token = issue_ai_token(user_id=bearer_id, role="user")
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(cookie_id)
+        sess["_fresh"] = True
+
+    with client.application.test_request_context(
+        "/api/ai/v2/chat", method="POST", headers={"Authorization": f"Bearer {token}"}
+    ):
+        from flask import session as flask_session
+
+        flask_session["_user_id"] = str(cookie_id)
+        identity = resolve_ai_identity()
+        assert identity.auth_source == "bearer"
+        assert int(identity.user.id) == bearer_id
+
+    with client.application.test_request_context("/api/ai/v2/chat", method="POST"):
+        from flask import session as flask_session
+
+        flask_session["_user_id"] = str(cookie_id)
+        identity = resolve_ai_identity()
+        assert identity.auth_source == "cookie"
+        assert int(identity.user.id) == cookie_id
+
+
+@pytest.mark.api
+@pytest.mark.db
+def test_ai_post_with_cookie_and_bearer_skips_csrf_but_cookie_only_does_not(app, client, db_session, monkeypatch):
+    user = create_test_user(db_session, email="csrf-mobile@test.local", name="Mobile", role="user")
+    with app.app_context():
+        uid = int(user.id)
+        token = issue_ai_token(user_id=uid, role="user")
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", True)
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(uid)
+        sess["_fresh"] = True
+
+    cookie_only = client.post("/api/ai/v2/feedback", json={"trace_id": 1, "rating": "like"})
+    assert _csrf_rejected(cookie_only)
+
+    both = client.post(
+        "/api/ai/v2/feedback",
+        json={"trace_id": 1, "rating": "like"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert not _csrf_rejected(both), both.get_data(as_text=True)

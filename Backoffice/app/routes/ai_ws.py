@@ -21,7 +21,7 @@ from flask import session
 
 from app.extensions import db
 from app.models.ai_chat import AIConversation, AIMessage
-from app.utils.ai_request_user import resolve_ai_identity
+from app.utils.ai_request_user import bearer_identity_needs_login, resolve_ai_identity
 from app.utils.ai_utils import is_form_builder_assistant_context, openai_model_supports_sampling_params
 from app.utils.constants import (
     DAILY_RATE_LIMIT_WINDOW_SECONDS,
@@ -579,7 +579,7 @@ def register_ai_ws(app) -> None:
         # Ensure RBAC helpers (which use current_user) work for Bearer auth
         did_login = False
         try:
-            if identity.user and getattr(identity, "auth_source", "") == "bearer" and not current_user.is_authenticated:
+            if bearer_identity_needs_login(identity):
                 login_user(identity.user, remember=False)
                 did_login = True
                 # Avoid emitting a session cookie for bearer-token clients.

@@ -1077,7 +1077,7 @@ Deploy semantics worth knowing:
 - Data-entry saves post `form_version_id`; `entry_form_is_stale()` takes a share lock on the template row and refuses the save (HTTP 409 for AJAX) when the form belongs to an older published version. Same lock order as deploy: template, then assignment row.
 - Field linking: different item kinds / section types are rejected; a differing data type or indicator needs `confirm_type_mismatch`.
 - A page with workflow progress cannot be removed from a version (`PageInUseError`); `duplicate_template` remaps `variables[*].source_form_item_id` to the cloned items.
-- Operations: `python scripts/ops/audit_template_versions.py` (read-only) and the runbook `Backoffice/docs/runbooks/operations/template-version-integrity.md`, which also lists the open decision on database constraints. Admin guide: `Backoffice/docs/user-guides/admin/template-versions.md`.
+- Operations: `python scripts/ops/audit_template_versions.py` (read-only) and the runbook `Backoffice/docs/runbooks/operations/template-version-integrity.md`, which also holds the plan and checklist for the database constraints (partial unique indexes: one draft per template, unique `stable_key` per version; migration `add_template_version_integrity_constraints`). Tests that need an invalid state use the `without_version_integrity_indexes` fixture. Admin guide: `Backoffice/docs/user-guides/admin/template-versions.md`.
 
 Query all version rows for one logical field:
 

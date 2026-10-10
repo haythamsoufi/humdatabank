@@ -13,6 +13,7 @@
 | Acknowledgement | Deploy refuses until the admin acknowledges live fields with data that have no match in the new version | `deploy_template_version` (`acknowledge_orphaned_data`) |
 | Entry-form guard | A data-entry save takes a share lock on the template and is refused if the form was rendered for an older published version | `entry_form_is_stale` (`routes/forms/helpers.py`) |
 | Link rules | Linking draft to live fields is blocked for different kinds, and needs confirmation for data-type / indicator differences | `helpers/field_mapping.py` |
+| Database indexes (once the migration ships) | Partial unique indexes make a second draft or a repeated key impossible to write | `add_template_version_integrity_constraints.py` |
 | Delete guard | A version with data (submissions, repeats, documents, AI validations, page statuses) cannot be deleted; the check fails closed | `delete_template_version` |
 | Page guard | A page with workflow progress cannot be removed from the live version | `_handle_template_pages` |
 
@@ -62,6 +63,8 @@ Checklist before the enforcing migration is released:
 - [ ] Any `multiple_drafts`, `published_inconsistencies` and duplicate-key findings were fixed and the audit re-run
 - [ ] The enforcing migration is reviewed. It checks for violations itself and aborts with the offending rows listed instead of failing half-way
 - [ ] Released at a quiet time, with a database backup taken first ([Backup & restore](../data/backup-and-restore.md))
+
+The migration is `migrations/versions/add_template_version_integrity_constraints.py` (revision `add_template_version_integrity`). It re-runs the same checks in SQL before creating the indexes and, on violations, aborts with a list like `form_item [uq_form_item_version_stable_key] scope=<version_id>:<key> rows=2 ids=[…]`; fix those rows and run `flask db upgrade` again. Downgrade drops the three indexes.
 
 Until the migration ships, the application checks above are the only protection.
 

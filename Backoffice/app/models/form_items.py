@@ -111,6 +111,10 @@ class FormItem(db.Model):
         db.Index('ix_form_item_version_order', 'version_id', 'order'),
         db.Index('ix_form_item_section_order', 'section_id', 'order'),
         db.Index('ix_form_item_stable_key', 'template_id', 'stable_key'),
+        db.Index(
+            'uq_form_item_version_stable_key', 'version_id', 'stable_key',
+            unique=True, postgresql_where=db.text('stable_key IS NOT NULL'),
+        ),
         db.Index('ix_form_item_item_type', 'item_type'),
         db.Index('ix_form_item_indicator_bank', 'indicator_bank_id'),
         db.Index('ix_form_item_lookup_list', 'lookup_list_id'),

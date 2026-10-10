@@ -84,6 +84,17 @@ No se borra nada. Los datos permanecen en la versión archivada, pero dejan de a
 - Un punto focal que abrió el formulario **antes** del despliegue y pulsa **Guardar** **después** ve: *«This form was updated while you were working on it. Reload the page…»*. Su guardado se rechaza en lugar de perderse en silencio; tras recargar, vuelve a introducir los cambios no guardados.
 - Programe los despliegues grandes fuera de las horas de mayor actividad e indique a los puntos focales que guarden antes de desplegar.
 
+### Otros lugares donde se guardan datos
+
+La misma protección se aplica dondequiera que se escriban datos, no solo en el formulario de entrada principal:
+
+- Los **enlaces de formulario público** y la **página de edición de envíos públicos** rechazan un guardado desde un formulario abierto antes de un despliegue. Recargue la página y vuelva a introducir los cambios.
+- La **aplicación móvil** usa el mismo formulario de entrada, por lo que está protegida de la misma manera.
+- **Explorador de datos**: no se puede crear un valor imputado para un campo que pertenece a una versión anterior (*«Este campo pertenece a una versión anterior de la plantilla. Recargue la página e inténtelo de nuevo.»*). Los valores existentes se pueden seguir editando.
+- No se pueden añadir **indicadores dinámicos** a una sección de una versión anterior.
+- La **importación de datos de KoBo** en una plantilla existente solo acepta campos de la versión en vivo. Si la plantilla cambió después de asignar las columnas, la importación se detiene con *«… no pertenece a la versión en vivo …»*; rehaga la asignación y vuelva a ejecutarla.
+- Las **ejecuciones de imputación** siempre trabajan sobre la versión en vivo.
+
 ## Revertir
 
 Abra **Versions** y despliegue una versión **archivada**. Las respuestas introducidas desde entonces se trasladan de vuelta y se restauran los campos que un despliegue anterior archivó. La misma confirmación se aplica si campos añadidos después de esa versión contienen datos.

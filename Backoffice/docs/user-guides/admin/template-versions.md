@@ -84,6 +84,17 @@ Nothing is deleted. The data stays on the archived version, but it no longer app
 - A focal point who opened the form **before** the deploy and clicks **Save** **after** it sees: *"This form was updated while you were working on it. Reload the page…"*. Their save is refused rather than silently lost; after reloading they re-enter the unsaved changes.
 - Schedule large deploys outside peak reporting hours and tell focal points to save before you deploy.
 
+### Other places data is saved
+
+The same protection applies wherever data is written, not only on the main entry form:
+
+- **Public form links** and the **public submission edit page** refuse a save from a form that was opened before a deploy. Reload the page and re-enter the changes.
+- The **mobile app** uses the same entry form, so it is protected in the same way.
+- **Data Explorer**: an imputed value cannot be created for a field that belongs to an older version (*"This field belongs to an older version of the template. Reload the page and try again."*). Existing values can still be edited.
+- **Dynamic indicators** cannot be added to a section of an older version.
+- **KoBo data import** into an existing template only accepts fields of the live version. If the template changed after you mapped the columns, the import stops with *"…does not belong to the live version…"*; redo the mapping and run it again.
+- **Imputation runs** always work on the live version.
+
 ## Roll back
 
 Open **Versions** and deploy an **archived** version. Answers entered since are carried back, and fields that an earlier deploy archived are restored. The same acknowledgement applies if fields added after that version hold data.

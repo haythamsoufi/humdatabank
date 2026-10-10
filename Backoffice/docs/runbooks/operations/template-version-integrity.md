@@ -12,6 +12,7 @@
 | Unmapped guard | Deploy refuses if submission rows exist on the old version but nothing could be matched | `migrate_submission_fks` |
 | Acknowledgement | Deploy refuses until the admin acknowledges live fields with data that have no match in the new version | `deploy_template_version` (`acknowledge_orphaned_data`) |
 | Entry-form guard | A data-entry save takes a share lock on the template and is refused if the form was rendered for an older published version | `entry_form_is_stale` (`routes/forms/helpers.py`) |
+| Other write paths | Public form links and the public submission editor use the same stale check; Data Explorer imputation, dynamic indicator add and the KoBo import mapping refuse fields of a non-live version | `routes/forms/submission.py`, `routes/admin/data_exploration.py`, `routes/forms_api.py`, `services/imports/kobo_data_import_service.py` |
 | Link rules | Linking draft to live fields is blocked for different kinds, and needs confirmation for data-type / indicator differences | `helpers/field_mapping.py` |
 | Delete guard | A version with data (submissions, repeats, documents, AI validations, page statuses) cannot be deleted; the check fails closed | `delete_template_version` |
 | Page guard | A page with workflow progress cannot be removed from the live version | `_handle_template_pages` |

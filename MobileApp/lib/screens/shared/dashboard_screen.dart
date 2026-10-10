@@ -1330,81 +1330,100 @@ class _DashboardScreenState extends State<DashboardScreen>
         (provider.entities.isNotEmpty ? provider.entities.first : null);
     final hasMultipleEntities = provider.entities.length > 1;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            localizations.dashboard,
-            style: IOSTextStyle.largeTitle(context).copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.6,
-              color: titleColor,
+    final titleStyle = IOSTextStyle.largeTitle(context).copyWith(
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.6,
+      color: titleColor,
+    );
+
+    Widget? entityChip;
+    if (entity != null) {
+      entityChip = Material(
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHigh
+            : GroupedDashboardPalette.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDark
+                ? theme.colorScheme.outlineVariant.withValues(alpha: 0.45)
+                : GroupedDashboardPalette.hairline,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: hasMultipleEntities
+              ? () {
+                  HapticFeedback.lightImpact();
+                  _showEntitySelector(context, provider);
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.location_on_rounded,
+                  size: 16,
+                  color: titleColor.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    entity.displayLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: IOSTextStyle.footnote(context).copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: titleColor,
+                    ),
+                  ),
+                ),
+                if (hasMultipleEntities) ...[
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.expand_more_rounded,
+                    size: 18,
+                    color: titleColor.withValues(alpha: 0.55),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (entity != null) ...[
-            const SizedBox(height: 12),
-            Material(
-              color: isDark
-                  ? theme.colorScheme.surfaceContainerHigh
-                  : GroupedDashboardPalette.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isDark
-                      ? theme.colorScheme.outlineVariant.withValues(alpha: 0.45)
-                      : GroupedDashboardPalette.hairline,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Row(
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * 0.6,
+                ),
+                child: Text(
+                  localizations.dashboard,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: titleStyle,
                 ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: hasMultipleEntities
-                    ? () {
-                        HapticFeedback.lightImpact();
-                        _showEntitySelector(context, provider);
-                      }
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.location_on_rounded,
-                        size: 16,
-                        color: titleColor.withValues(alpha: 0.7),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          entity.displayLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: IOSTextStyle.footnote(context).copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: titleColor,
-                          ),
-                        ),
-                      ),
-                      if (hasMultipleEntities) ...[
-                        const SizedBox(width: 2),
-                        Icon(
-                          Icons.expand_more_rounded,
-                          size: 18,
-                          color: titleColor.withValues(alpha: 0.55),
-                        ),
-                      ],
-                    ],
+              if (entityChip != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: entityChip,
                   ),
                 ),
-              ),
-            ),
-          ],
-        ],
+              ],
+            ],
+          );
+        },
       ),
     );
   }

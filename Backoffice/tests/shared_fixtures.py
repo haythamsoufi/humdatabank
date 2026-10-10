@@ -631,6 +631,23 @@ def db_session(app):
 
 
 @pytest.fixture(scope='function')
+def without_version_integrity_indexes(db_session):
+    """Drop the template-version unique indexes for a test that needs an invalid state.
+
+    Deploy and the audit must still handle data written before the indexes existed (or by
+    SQL that bypasses the app). The schema is rebuilt for every test, so nothing to restore.
+    """
+    for index_name in (
+        'uq_form_template_version_single_draft',
+        'uq_form_item_version_stable_key',
+        'uq_form_section_version_stable_key',
+    ):
+        db_session.execute(db.text(f'DROP INDEX IF EXISTS {index_name}'))
+    db_session.commit()
+    yield
+
+
+@pytest.fixture(scope='function')
 def api_key(db_session, app):
     """Create a real API key for testing."""
     with app.app_context():

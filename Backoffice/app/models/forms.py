@@ -286,6 +286,10 @@ class FormTemplateVersion(db.Model):
     __table_args__ = (
         db.Index('ix_form_template_version_template_status', 'template_id', 'status'),
         db.UniqueConstraint('template_id', 'version_number', name='uq_template_version_number'),
+        db.Index(
+            'uq_form_template_version_single_draft', 'template_id',
+            unique=True, postgresql_where=db.text("status = 'draft'"),
+        ),
     )
 
     def get_effective_name(self):
@@ -500,6 +504,10 @@ class FormSection(db.Model):
         db.Index('ix_form_section_type', 'section_type'),
         db.Index('ix_form_section_template', 'template_id'),
         db.Index('ix_form_section_stable_key', 'template_id', 'stable_key'),
+        db.Index(
+            'uq_form_section_version_stable_key', 'version_id', 'stable_key',
+            unique=True, postgresql_where=db.text('stable_key IS NOT NULL'),
+        ),
     )
 
     @property

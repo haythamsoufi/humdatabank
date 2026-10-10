@@ -313,7 +313,9 @@ class TestLegacyKeyBackfillByPosition:
 # ---------------------------------------------------------------------------
 
 class TestDeploySafetyGuards:
-    def test_duplicate_item_keys_in_new_version_abort_deploy(self, db_session, admin_user):
+    def test_duplicate_item_keys_in_new_version_abort_deploy(
+        self, db_session, admin_user, without_version_integrity_indexes
+    ):
         template, published, draft = _versions(db_session, admin_user)
         pub_section, drf_section, pub_item, drf_item = _pair(db_session, template, published, draft)
         twin = create_test_item(
@@ -331,7 +333,9 @@ class TestDeploySafetyGuards:
         db_session.refresh(row)
         assert row.form_item_id == pub_item.id
 
-    def test_duplicate_section_keys_in_new_version_abort_deploy(self, db_session, admin_user):
+    def test_duplicate_section_keys_in_new_version_abort_deploy(
+        self, db_session, admin_user, without_version_integrity_indexes
+    ):
         template, published, draft = _versions(db_session, admin_user)
         pub_section, drf_section, _pi, _di = _pair(db_session, template, published, draft)
         twin = create_test_section(db_session, template, version=draft, name='twin', order=5)

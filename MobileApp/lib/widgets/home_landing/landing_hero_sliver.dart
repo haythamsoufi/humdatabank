@@ -33,6 +33,10 @@ class LandingHeroSliver extends StatefulWidget {
   /// hero surface acts as a dismiss target — not just the scrims outside it.
   final VoidCallback? onBackgroundTap;
 
+  /// Shown at the top-left of the hero, below the status bar (e.g. the
+  /// drawer menu button). It scrolls away with the hero.
+  final Widget? topLeading;
+
   const LandingHeroSliver({
     super.key,
     required this.title,
@@ -42,6 +46,7 @@ class LandingHeroSliver extends StatefulWidget {
     this.quickPrompts,
     this.chatExpanded = false,
     this.onBackgroundTap,
+    this.topLeading,
   });
 
   /// Reserved height for [footer] (card + overlap into the hero).
@@ -53,11 +58,9 @@ class LandingHeroSliver extends StatefulWidget {
   /// Pixel height of the hero region in the scroll body (matches [SliverAppBar.expandedHeight]
   /// when a footer is present). Use to align focus-mode scrims above/below the hero.
   ///
-  /// Important: this must NOT include `MediaQuery.padding.top`. Flutter's [Scaffold]
-  /// strips the top safe-area inset from the body's [MediaQuery], so inside the body
-  /// Stack the coordinate system starts at y = 0 directly below the [AppBar]. The
-  /// sliver itself adds that same 0-value to its own height, so the two are consistent
-  /// only when the status-bar height is excluded here.
+  /// Does not include `MediaQuery.padding.top`. The hero sliver adds the
+  /// status-bar inset to its own height when the body has no app bar above it
+  /// (the Home screen), so callers add the inset themselves.
   static double bodyHeroExtent({
     double expandedHeight = 160,
     bool hasFooter = true,
@@ -171,11 +174,10 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
     // Quick-prompt space is NOT added to the expanded height; prompts appear
     // in the space freed by the collapsing title area (expandedHeight - 12 px).
     //
-    // Note: MediaQuery.padding.top is intentionally excluded. The Scaffold
-    // removes the status-bar inset from the body's MediaQuery, so it is
-    // always 0 here. bodyHeroExtent() follows the same convention so that
-    // focus-mode scrim positioning stays consistent.
+    // [h] excludes the status-bar inset: the SliverAppBar adds it to its own
+    // height, and the content column below adds a matching spacer.
     final h = widget.expandedHeight + footerExtra;
+    final topInset = MediaQuery.paddingOf(context).top;
 
     // Title region height (see comment below: chat card is bottom-weighted via Spacer).
     final titleAreaHeight = widget.expandedHeight - 12.0;
@@ -234,7 +236,7 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
               child: Builder(
                 builder: (context) {
                   final children = <Widget>[
-                    const SizedBox(height: 12),
+                    SizedBox(height: topInset + 12),
 
                     // Title + description — collapses when chatExpanded.
                     AnimatedBuilder(
@@ -345,6 +347,13 @@ class _LandingHeroSliverState extends State<LandingHeroSliver>
                 },
               ),
             ),
+
+            if (widget.topLeading != null)
+              PositionedDirectional(
+                top: topInset + 4,
+                start: 8,
+                child: widget.topLeading!,
+              ),
           ],
         ),
       ),

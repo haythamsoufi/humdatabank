@@ -1614,6 +1614,15 @@ class KoboDataImportService:
                 fi = import_items_by_id.get(spec['item_id'])
                 if not fi:
                     return {'success': False, 'message': f'Mapped item {spec["item_id"]} not found'}
+                if fi.template_id != template.id or fi.version_id != version.id:
+                    return {
+                        'success': False,
+                        'message': (
+                            f'Mapped item {spec["item_id"]} does not belong to the live version of the '
+                            'selected template. The template may have been updated since the mapping was '
+                            'made; reload the mapping and try again.'
+                        ),
+                    }
                 v_err = _validate_disagg_for_item(fi, spec.get('disagg'))
                 if v_err:
                     return {'success': False, 'message': f'Column mapping (column index {ci}): {v_err}'}

@@ -84,6 +84,17 @@ Rien n'est supprimé. Les données restent sur la version archivée, mais n'appa
 - Un point focal qui a ouvert le formulaire **avant** le déploiement et clique sur **Enregistrer** **après** voit : *« This form was updated while you were working on it. Reload the page… »*. Son enregistrement est refusé au lieu d'être perdu en silence ; après rechargement, il ressaisit les modifications non enregistrées.
 - Planifiez les gros déploiements en dehors des heures de forte activité et demandez aux points focaux d'enregistrer avant de déployer.
 
+### Autres endroits où des données sont enregistrées
+
+La même protection s'applique partout où des données sont écrites, pas seulement dans le formulaire de saisie principal :
+
+- Les **liens de formulaire public** et la **page de modification d'une soumission publique** refusent un enregistrement depuis un formulaire ouvert avant un déploiement. Rechargez la page et saisissez à nouveau les modifications.
+- L'**application mobile** utilise le même formulaire de saisie ; elle est donc protégée de la même façon.
+- **Explorateur de données** : une valeur imputée ne peut pas être créée pour un champ d'une version plus ancienne (*« Ce champ appartient à une version plus ancienne du modèle. Rechargez la page et réessayez. »*). Les valeurs existantes restent modifiables.
+- Les **indicateurs dynamiques** ne peuvent pas être ajoutés à une section d'une version plus ancienne.
+- L'**import de données KoBo** dans un modèle existant n'accepte que les champs de la version en ligne. Si le modèle a changé après le mappage des colonnes, l'import s'arrête avec *« … n'appartient pas à la version en ligne … »* ; refaites le mappage et relancez l'import.
+- Les **exécutions d'imputation** travaillent toujours sur la version en ligne.
+
 ## Revenir en arrière
 
 Ouvrez **Versions** et déployez une version **archivée**. Les réponses saisies depuis sont reportées en arrière, et les champs archivés par un déploiement précédent sont restaurés. La même confirmation s'applique si des champs ajoutés après cette version contiennent des données.

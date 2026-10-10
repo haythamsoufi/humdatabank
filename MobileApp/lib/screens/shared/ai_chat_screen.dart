@@ -1097,7 +1097,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                           ),
                                           alignment: Alignment.center,
                                           child: Icon(
-                                            Icons.assistant_rounded,
+                                            Icons.bubble_chart_rounded,
                                             size: 38,
                                             color: _chatLink(theme),
                                           ),
@@ -2012,7 +2012,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.assistant_outlined,
+                                  Icons.bubble_chart_outlined,
                                   size: 48,
                                   color: _chatMuted(theme),
                                 ),

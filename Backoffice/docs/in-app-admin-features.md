@@ -144,7 +144,7 @@ Guides: [Manage users](user-guides/admin/manage-users.md), [Add a user](user-gui
 
 **Who:** `admin.templates.view` (create/edit/publish map to `admin.templates.create`, `admin.templates.edit`, …).
 
-**What you get:** Full lifecycle for **form templates** — versions, sections and pages, **FormItem** definitions (indicators, questions, documents), relevance rules, calculated lists, repeat sections, preview, import/export helpers, and links to assignment usage. Guides: [Create a form template](user-guides/admin/create-template.md), [Edit a template](user-guides/admin/edit-template.md), [Form Builder (advanced)](user-guides/admin/form-builder-advanced.md).
+**What you get:** Full lifecycle for **form templates** — versions, sections and pages, **FormItem** definitions (indicators, questions, documents), relevance rules, calculated lists, repeat sections, preview, import/export helpers, and links to assignment usage. Guides: [Create a form template](user-guides/admin/create-template.md), [Edit a template](user-guides/admin/edit-template.md), [Form Builder (advanced)](user-guides/admin/form-builder-advanced.md), [Template versions](user-guides/admin/template-versions.md) (draft, field mapping, deploy, rollback; operations: [Template version integrity](runbooks/operations/template-version-integrity.md)).
 
 ---
 

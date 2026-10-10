@@ -246,6 +246,11 @@ def api_add_dynamic_indicator():
         assigned_form = assignment_entity_status.assigned_form
         if not assigned_form or section.template_id != assigned_form.template_id:
             return json_bad_request('Section does not belong to this assignment')
+        live_version_id = getattr(assigned_form.template, 'published_version_id', None)
+        if live_version_id and section.version_id != live_version_id:
+            return json_bad_request(
+                'This section belongs to an older version of the form. Reload the page and try again.'
+            )
 
         # Verify the indicator exists
         indicator = IndicatorBank.query.get_or_404(indicator_bank_id)

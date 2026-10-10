@@ -120,6 +120,12 @@
             </table>
         </div>
 
+        <p class="text-xs text-gray-600 mb-4">
+            <i class="fas fa-info-circle text-blue-500 mr-1" aria-hidden="true"></i>
+            {{ _('Deploying a version publishes it and carries submitted data over to it. Data of removed fields is kept on the archived version, and you can roll back by deploying an archived version.') }}
+            <a href="{{ url_for('admin_docs.view_doc', doc_path='user-guides/admin/template-versions') }}" target="_blank" rel="noopener" class="text-blue-600 underline hover:text-blue-800">{{ _('How template versions work') }}</a>
+        </p>
+
         <div class="flex justify-end space-x-3">
             <form id="create-version-form" method="POST" action="{{ url_for('form_builder.create_draft_version', template_id=template.id) }}" class="inline-block">
                 <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">

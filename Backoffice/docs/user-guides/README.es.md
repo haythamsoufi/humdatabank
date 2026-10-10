@@ -12,6 +12,7 @@ Flujos de trabajo paso a paso y tutoriales para usar el sistema de Backoffice de
 - [Role recipes](admin/role-recipes.md)
 - [Create a form template](admin/create-template.md)
 - [Edit a template (Form Builder)](admin/edit-template.md)
+- [Template versions: draft, deploy and roll back](admin/template-versions.md)
 - [Form Builder (advanced)](admin/form-builder-advanced.md)
 - [Create and manage assignments](admin/manage-assignments.md)
 - [Create assignment](admin/create-assignment.md)

@@ -95,6 +95,8 @@ Always add help text on the “parent” question so users understand why follow
 
 ## Template versioning and “safe vs risky” changes
 
+For how deploy, rollback and field mapping work, see [Template versions](template-versions.md).
+
 ### Safe changes (usually OK during a live collection)
 
 - Fix typos and wording in labels/help text
@@ -139,6 +141,7 @@ Before publishing/using a template:
 
 ## Related
 
+- [Template versions: draft, deploy and roll back](template-versions.md)
 - [Edit a template (Form Builder)](edit-template.md)
 - [Create a form template](create-template.md)
 - [Assignment lifecycle](assignment-lifecycle.md)

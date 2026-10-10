@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 00:53+0000\n"
+"POT-Creation-Date: 2026-10-10 22:53+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: en <LL@li.org>\n"
@@ -116,12 +116,24 @@ msgstr ""
 "%(count)s in-progress entit(ies) had every page submitted and were marked "
 "submitted (or sent for review)."
 
+#: app/templates/forms/form_builder/field_mapping.html:194
+#: app/templates/forms/form_builder/field_mapping.html:380
+#, python-format
+msgid ""
+"%(count)s live field(s) with submitted data have no match in this draft. "
+"Their data stays on the archived version but will no longer appear in the "
+"live form or exports. I understand."
+msgstr ""
+"%(count)s live field(s) with submitted data have no match in this draft. "
+"Their data stays on the archived version but will no longer appear in the "
+"live form or exports. I understand."
+
 #: app/templates/admin/translations/quality_dashboard.html:296
 #, python-format
 msgid "%(count)s pending"
 msgstr "%(count)s pending"
 
-#: app/templates/forms/form_builder/form_builder.html:1357
+#: app/templates/forms/form_builder/form_builder.html:1359
 #, python-format
 msgid "%(count)s shared"
 msgstr "%(count)s shared"
@@ -146,7 +158,7 @@ msgstr ""
 msgid "%(count)s string was skipped because it is already human-approved."
 msgstr "%(count)s string was skipped because it is already human-approved."
 
-#: app/templates/forms/form_builder/field_mapping.html:356
+#: app/templates/forms/form_builder/field_mapping.html:366
 #, python-format
 msgid "%(count)s suggested field(s) may need confirmation before deploy."
 msgstr "%(count)s suggested field(s) may need confirmation before deploy."
@@ -397,11 +409,11 @@ msgstr "(None — unassigned)"
 msgid "(Offline)"
 msgstr "(Offline)"
 
-#: app/templates/forms/form_builder/form_builder.html:1465
+#: app/templates/forms/form_builder/form_builder.html:1467
 msgid "(The item will be archived and hidden from the template)"
 msgstr "(The item will be archived and hidden from the template)"
 
-#: app/templates/forms/form_builder/form_builder.html:1466
+#: app/templates/forms/form_builder/form_builder.html:1468
 msgid ""
 "(The section and its items will be archived and hidden from the template)"
 msgstr ""
@@ -572,7 +584,7 @@ msgstr ""
 msgid "A descriptive name for this campaign"
 msgstr "A descriptive name for this campaign"
 
-#: app/templates/forms/form_builder/partials/_versions_modal.html:129
+#: app/templates/forms/form_builder/partials/_versions_modal.html:135
 msgid ""
 "A draft version already exists. Open or discard it before creating a new "
 "version."
@@ -1046,7 +1058,7 @@ msgstr "Access approved"
 msgid "Access auto-resolved"
 msgstr "Access auto-resolved"
 
-#: app/routes/forms/entry.py:1315 app/routes/forms/entry.py:1318
+#: app/routes/forms/entry.py:1328 app/routes/forms/entry.py:1331
 #: app/routes/main/documents.py:45
 msgid "Access denied."
 msgstr "Access denied."
@@ -1226,8 +1238,8 @@ msgstr "Action Type"
 #: app/templates/components/_builder_items.html:42
 #: app/templates/components/ag_grid_i18n_js.html:25
 #: app/templates/core/dashboard/_assignments_tab.html:508
-#: app/templates/forms/form_builder/field_mapping.html:320
-#: app/templates/forms/form_builder/field_mapping.html:341
+#: app/templates/forms/form_builder/field_mapping.html:330
+#: app/templates/forms/form_builder/field_mapping.html:351
 #: app/templates/forms/form_builder/partials/_sections_container.html:4
 #: app/templates/forms/form_builder/partials/_variables_modal.html:17
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:57
@@ -1411,7 +1423,7 @@ msgstr "Activity type"
 
 #: app/templates/admin/organization/_nss_component.html:143
 #: app/templates/core/chat_immersive.html:221
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/form_builder.html:500
 msgid "Add"
 msgstr "Add"
 
@@ -1450,8 +1462,8 @@ msgstr "Add Embed Content"
 msgid "Add Entities"
 msgstr "Add Entities"
 
-#: app/templates/forms/entry_form/entry_form.html:1924
-#: app/templates/forms/entry_form/entry_form.html:2664
+#: app/templates/forms/entry_form/entry_form.html:1927
+#: app/templates/forms/entry_form/entry_form.html:2667
 msgid "Add Entry"
 msgstr "Add Entry"
 
@@ -1466,7 +1478,7 @@ msgid "Add Group"
 msgstr "Add Group"
 
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:73
-#: app/templates/forms/entry_form/entry_form.html:4043
+#: app/templates/forms/entry_form/entry_form.html:4046
 #: app/templates/forms/entry_form/partials/dynamic_indicators_interface.html:31
 msgid "Add Indicator"
 msgstr "Add Indicator"
@@ -1509,7 +1521,7 @@ msgid "Add New Division"
 msgstr "Add New Division"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:331
-#: app/templates/forms/entry_form/entry_form.html:4057
+#: app/templates/forms/entry_form/entry_form.html:4060
 msgid "Add New Indicator"
 msgstr "Add New Indicator"
 
@@ -1545,7 +1557,7 @@ msgstr "Add New Sub-Sector"
 msgid "Add New User"
 msgstr "Add New User"
 
-#: app/templates/forms/form_builder/partials/_versions_modal.html:130
+#: app/templates/forms/form_builder/partials/_versions_modal.html:136
 msgid "Add New Version"
 msgstr "Add New Version"
 
@@ -1572,7 +1584,7 @@ msgstr "Add Row"
 msgid "Add SP/EF"
 msgstr "Add SP/EF"
 
-#: app/templates/forms/form_builder/form_builder.html:666
+#: app/templates/forms/form_builder/form_builder.html:668
 #: app/templates/forms/form_builder/partials/_section_modal.html:161
 msgid "Add Section"
 msgstr "Add Section"
@@ -1770,7 +1782,7 @@ msgstr ""
 msgid "Add translations for this indicator name in different languages."
 msgstr "Add translations for this indicator name in different languages."
 
-#: app/templates/forms/form_builder/form_builder.html:731
+#: app/templates/forms/form_builder/form_builder.html:733
 msgid ""
 "Add translations for this section name in different languages. You can also "
 "override the English text here if needed."
@@ -1778,7 +1790,7 @@ msgstr ""
 "Add translations for this section name in different languages. You can also "
 "override the English text here if needed."
 
-#: app/templates/forms/form_builder/form_builder.html:743
+#: app/templates/forms/form_builder/form_builder.html:745
 msgid ""
 "Add translations for this template name in different languages. You can also"
 " override the English text here if needed."
@@ -1786,7 +1798,7 @@ msgstr ""
 "Add translations for this template name in different languages. You can also"
 " override the English text here if needed."
 
-#: app/templates/forms/form_builder/form_builder.html:932
+#: app/templates/forms/form_builder/form_builder.html:934
 msgid ""
 "Add translations for this validation message in different languages. You can"
 " also override the English text here if needed."
@@ -1950,7 +1962,7 @@ msgstr "Add…"
 #: app/templates/admin/validation_rules.html:6
 #: app/templates/admin/view_indicator_suggestion.html:13
 #: app/templates/auth/login.html:749
-#: app/templates/forms/form_builder/field_mapping.html:203
+#: app/templates/forms/form_builder/field_mapping.html:209
 #: app/templates/forms/form_builder/form_builder.html:77
 #: app/templates/forms/public/public_submission_success.html:11
 #: app/templates/tours/tours.html:474
@@ -2149,8 +2161,8 @@ msgstr "Alignment"
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
 #: app/templates/admin/validation_dashboard.html:254
 #: app/templates/components/auto_translate_modal_js.html:30
-#: app/templates/forms/entry_form/entry_form.html:4061
-#: app/templates/forms/form_builder/field_mapping.html:303
+#: app/templates/forms/entry_form/entry_form.html:4064
+#: app/templates/forms/form_builder/field_mapping.html:313
 #: app/templates/notifications/center.html:70
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:40
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:202
@@ -2322,7 +2334,7 @@ msgstr "All countries"
 msgid "All disaggregation options"
 msgstr "All disaggregation options"
 
-#: app/templates/forms/form_builder/field_mapping.html:359
+#: app/templates/forms/form_builder/field_mapping.html:369
 msgid "All draft fields are linked or marked as new."
 msgstr "All draft fields are linked or marked as new."
 
@@ -2526,7 +2538,7 @@ msgstr "Allowed disaggregation options"
 msgid "Allowed period types:"
 msgstr "Allowed period types:"
 
-#: app/templates/forms/entry_form/entry_form.html:2950
+#: app/templates/forms/entry_form/entry_form.html:2953
 msgid "Allowed types: PDF, Word, Excel, PowerPoint, Text"
 msgstr "Allowed types: PDF, Word, Excel, PowerPoint, Text"
 
@@ -2538,7 +2550,7 @@ msgstr "Already have an account?"
 msgid "Also:"
 msgstr "Also:"
 
-#: app/templates/forms/form_builder/form_builder.html:872
+#: app/templates/forms/form_builder/form_builder.html:874
 #: app/templates/forms/form_builder/partials/_sections_container.html:548
 msgid "Alt text"
 msgstr "Alt text"
@@ -2798,11 +2810,11 @@ msgstr "App Screen"
 msgid "Append dynamic suffix (percentage, population, etc.)"
 msgstr "Append dynamic suffix (percentage, population, etc.)"
 
-#: app/templates/forms/entry_form/entry_form.html:1566
-#: app/templates/forms/entry_form/entry_form.html:1743
-#: app/templates/forms/entry_form/entry_form.html:1884
-#: app/templates/forms/entry_form/entry_form.html:2601
-#: app/templates/forms/entry_form/entry_form.html:2616
+#: app/templates/forms/entry_form/entry_form.html:1569
+#: app/templates/forms/entry_form/entry_form.html:1746
+#: app/templates/forms/entry_form/entry_form.html:1887
+#: app/templates/forms/entry_form/entry_form.html:2604
+#: app/templates/forms/entry_form/entry_form.html:2619
 #: app/templates/forms/entry_form/partials/matrix_table.html:616
 msgid "Applicable but data not available"
 msgstr "Applicable but data not available"
@@ -2961,8 +2973,8 @@ msgstr "Approving…"
 #: app/templates/admin/assignments/manage_assignment.html:294
 #: app/templates/admin/documents/documents.html:291
 #: app/templates/admin/documents/documents.html:317
-#: app/templates/forms/entry_form/entry_form.html:3070
-#: app/templates/forms/entry_form/entry_form.html:3096
+#: app/templates/forms/entry_form/entry_form.html:3073
+#: app/templates/forms/entry_form/entry_form.html:3099
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:169
@@ -2995,11 +3007,11 @@ msgstr "Archive"
 msgid "Archived"
 msgstr "Archived"
 
-#: app/templates/forms/form_builder/form_builder.html:680
+#: app/templates/forms/form_builder/form_builder.html:682
 msgid "Archived Hidden"
 msgstr "Archived Hidden"
 
-#: app/templates/forms/form_builder/form_builder.html:423
+#: app/templates/forms/form_builder/form_builder.html:424
 msgid "Archived version: all edits and additions are disabled"
 msgstr "Archived version: all edits and additions are disabled"
 
@@ -3059,7 +3071,7 @@ msgstr ""
 msgid "Are you sure you want to delete"
 msgstr "Are you sure you want to delete"
 
-#: app/templates/forms/entry_form/entry_form.html:2898
+#: app/templates/forms/entry_form/entry_form.html:2901
 #, python-format
 msgid ""
 "Are you sure you want to delete \"%(filename)s\"? The document will be "
@@ -3148,7 +3160,7 @@ msgid ""
 msgstr ""
 "Are you sure you want to delete this document? This action cannot be undone."
 
-#: app/templates/forms/entry_form/entry_form.html:4027
+#: app/templates/forms/entry_form/entry_form.html:4030
 msgid "Are you sure you want to delete this entry?"
 msgstr "Are you sure you want to delete this entry?"
 
@@ -3230,7 +3242,7 @@ msgstr "Are you sure you want to delete this sub-sector?"
 msgid "Are you sure you want to delete this submission?"
 msgstr "Are you sure you want to delete this submission?"
 
-#: app/routes/admin/form_builder/templates.py:291
+#: app/routes/admin/form_builder/templates.py:292
 #: app/templates/admin/templates/templates.html:136
 msgid "Are you sure you want to delete this template?"
 msgstr "Are you sure you want to delete this template?"
@@ -3281,8 +3293,8 @@ msgstr "Are you sure you want to reopen this assignment?"
 msgid "Are you sure you want to stop the translation?"
 msgstr "Are you sure you want to stop the translation?"
 
-#: app/templates/forms/entry_form/entry_form.html:658
-#: app/templates/forms/entry_form/entry_form.html:2713
+#: app/templates/forms/entry_form/entry_form.html:661
+#: app/templates/forms/entry_form/entry_form.html:2716
 msgid ""
 "Are you sure you want to submit this form? You will not be able to edit it "
 "after submission."
@@ -3314,7 +3326,7 @@ msgstr "Are you sure you want to validate this assignment?"
 
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:750
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:767
-#: app/templates/forms/form_builder/form_builder.html:1540
+#: app/templates/forms/form_builder/form_builder.html:1542
 msgid "Are you sure?"
 msgstr "Are you sure?"
 
@@ -3443,7 +3455,7 @@ msgstr "Assignment Management"
 
 #: app/templates/admin/data_exploration/explore_data.html:87
 #: app/templates/admin/data_exploration/explore_data.html:1249
-#: app/templates/forms/form_builder/form_builder.html:1085
+#: app/templates/forms/form_builder/form_builder.html:1087
 #: app/templates/forms/form_builder/partials/_variables_modal.html:15
 msgid "Assignment Period"
 msgstr "Assignment Period"
@@ -3486,7 +3498,7 @@ msgstr ""
 "admins receive a separate individual review email when that audience is "
 "enabled."
 
-#: app/templates/forms/form_builder/form_builder.html:1086
+#: app/templates/forms/form_builder/form_builder.html:1088
 msgid "Assignment Year"
 msgstr "Assignment Year"
 
@@ -3531,7 +3543,7 @@ msgstr "Assignment not found."
 msgid "Assignment period"
 msgstr "Assignment period"
 
-#: app/templates/forms/entry_form/entry_form.html:2902
+#: app/templates/forms/entry_form/entry_form.html:2905
 msgid ""
 "Assignment period is not available. Set a period for this assignment or "
 "choose a fixed period in the form template."
@@ -3539,7 +3551,7 @@ msgstr ""
 "Assignment period is not available. Set a period for this assignment or "
 "choose a fixed period in the form template."
 
-#: app/templates/forms/entry_form/entry_form.html:2903
+#: app/templates/forms/entry_form/entry_form.html:2906
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:180
 msgid ""
 "Assignment period is not set yet. Set the assignment period in the header, "
@@ -3575,7 +3587,7 @@ msgstr "Assignment review"
 msgid "Assignment sections"
 msgstr "Assignment sections"
 
-#: app/routes/forms/entry.py:999 app/routes/forms/entry.py:1003
+#: app/routes/forms/entry.py:1011 app/routes/forms/entry.py:1015
 msgid "Assignment sent for review successfully."
 msgstr "Assignment sent for review successfully."
 
@@ -3592,7 +3604,7 @@ msgstr "Assignment status"
 msgid "Assignment status ID:"
 msgstr "Assignment status ID:"
 
-#: app/routes/forms/entry.py:128
+#: app/routes/forms/entry.py:129
 #, python-format
 msgid ""
 "Assignment status for this country not found (ID: %(id)d). Please check the "
@@ -3601,7 +3613,7 @@ msgstr ""
 "Assignment status for this country not found (ID: %(id)d). Please check the "
 "URL or contact support."
 
-#: app/templates/forms/entry_form/entry_form.html:2700
+#: app/templates/forms/entry_form/entry_form.html:2703
 msgid "Assignment status for this country not found."
 msgstr "Assignment status for this country not found."
 
@@ -3613,7 +3625,7 @@ msgstr "Assignment status workflow"
 msgid "Assignment submission"
 msgstr "Assignment submission"
 
-#: app/routes/forms/entry.py:1010 app/routes/forms/entry.py:1015
+#: app/routes/forms/entry.py:1022 app/routes/forms/entry.py:1027
 msgid "Assignment submitted successfully!"
 msgstr "Assignment submitted successfully!"
 
@@ -3746,7 +3758,7 @@ msgstr "Attached questionnaire:"
 #: app/templates/components/_sidebar_nav_categories.html:217
 #: app/templates/components/_sidebar_nav_categories.html:219
 #: app/templates/forms/form_builder/form_builder.html:30
-#: app/templates/forms/form_builder/form_builder.html:497
+#: app/templates/forms/form_builder/form_builder.html:499
 msgid "Audit Trail"
 msgstr "Audit Trail"
 
@@ -3773,8 +3785,8 @@ msgstr "Audited Financial Statement"
 #: app/templates/admin/assignments/manage_assignment.html:298
 #: app/templates/admin/documents/documents.html:295
 #: app/templates/admin/documents/documents.html:321
-#: app/templates/forms/entry_form/entry_form.html:3074
-#: app/templates/forms/entry_form/entry_form.html:3100
+#: app/templates/forms/entry_form/entry_form.html:3077
+#: app/templates/forms/entry_form/entry_form.html:3103
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:173
@@ -3876,7 +3888,7 @@ msgstr "Auto-Translate All Organization Entities"
 msgid "Auto-Translate All Sector & Sub-Sector Names"
 msgstr "Auto-Translate All Sector & Sub-Sector Names"
 
-#: app/templates/forms/form_builder/form_builder.html:1002
+#: app/templates/forms/form_builder/form_builder.html:1004
 msgid "Auto-Translate All Template Items"
 msgstr "Auto-Translate All Template Items"
 
@@ -4106,7 +4118,7 @@ msgstr ""
 
 #: app/templates/admin/assignments/gantt_chart.html:70
 #: app/templates/admin/templates/new_template.html:555
-#: app/templates/forms/entry_form/entry_form.html:599
+#: app/templates/forms/entry_form/entry_form.html:602
 #: app/templates/tours/tours.html:13
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:118
 msgid "Back"
@@ -4152,8 +4164,8 @@ msgstr "Back to Traces"
 msgid "Back to app"
 msgstr "Back to app"
 
-#: app/templates/forms/form_builder/field_mapping.html:211
-#: app/templates/forms/form_builder/field_mapping.html:363
+#: app/templates/forms/form_builder/field_mapping.html:217
+#: app/templates/forms/form_builder/field_mapping.html:373
 msgid "Back to builder"
 msgstr "Back to builder"
 
@@ -4161,7 +4173,7 @@ msgstr "Back to builder"
 msgid "Back to login"
 msgstr "Back to login"
 
-#: app/templates/forms/entry_form/entry_form.html:597
+#: app/templates/forms/entry_form/entry_form.html:600
 msgid "Back to navigation"
 msgstr "Back to navigation"
 
@@ -4266,7 +4278,7 @@ msgstr "Blocked by WAF for translation"
 msgid "Blue"
 msgstr "Blue"
 
-#: app/templates/forms/form_builder/form_builder.html:810
+#: app/templates/forms/form_builder/form_builder.html:812
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:51
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:146
 msgid "Body text"
@@ -4425,11 +4437,11 @@ msgstr ""
 msgid "Busiest day:"
 msgstr "Busiest day:"
 
-#: app/templates/forms/entry_form/entry_form.html:1343
-#: app/templates/forms/entry_form/entry_form.html:1484
-#: app/templates/forms/entry_form/entry_form.html:1637
-#: app/templates/forms/entry_form/entry_form.html:2325
-#: app/templates/forms/entry_form/entry_form.html:2475
+#: app/templates/forms/entry_form/entry_form.html:1346
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:1640
+#: app/templates/forms/entry_form/entry_form.html:2328
+#: app/templates/forms/entry_form/entry_form.html:2478
 #: app/templates/forms/entry_form/export_pdf.html:584
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:206
 msgid "By Age:"
@@ -4445,21 +4457,21 @@ msgstr "By Country"
 msgid "By Indicator"
 msgstr "By Indicator"
 
-#: app/templates/forms/entry_form/entry_form.html:1347
-#: app/templates/forms/entry_form/entry_form.html:1488
-#: app/templates/forms/entry_form/entry_form.html:1641
-#: app/templates/forms/entry_form/entry_form.html:2348
-#: app/templates/forms/entry_form/entry_form.html:2479
+#: app/templates/forms/entry_form/entry_form.html:1350
+#: app/templates/forms/entry_form/entry_form.html:1491
+#: app/templates/forms/entry_form/entry_form.html:1644
+#: app/templates/forms/entry_form/entry_form.html:2351
+#: app/templates/forms/entry_form/entry_form.html:2482
 #: app/templates/forms/entry_form/export_pdf.html:603
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:210
 msgid "By Sex and Age:"
 msgstr "By Sex and Age:"
 
-#: app/templates/forms/entry_form/entry_form.html:1339
-#: app/templates/forms/entry_form/entry_form.html:1480
-#: app/templates/forms/entry_form/entry_form.html:1633
-#: app/templates/forms/entry_form/entry_form.html:2303
-#: app/templates/forms/entry_form/entry_form.html:2471
+#: app/templates/forms/entry_form/entry_form.html:1342
+#: app/templates/forms/entry_form/entry_form.html:1483
+#: app/templates/forms/entry_form/entry_form.html:1636
+#: app/templates/forms/entry_form/entry_form.html:2306
+#: app/templates/forms/entry_form/entry_form.html:2474
 #: app/templates/forms/entry_form/export_pdf.html:565
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:202
 msgid "By Sex:"
@@ -4602,7 +4614,7 @@ msgstr "Campaigns"
 msgid "Can be limited to templates / countries"
 msgstr "Can be limited to templates / countries"
 
-#: app/templates/forms/entry_form/entry_form.html:4048
+#: app/templates/forms/entry_form/entry_form.html:4051
 msgid "Can't find an indicator? Propose a new one here"
 msgstr "Can't find an indicator? Propose a new one here"
 
@@ -4681,16 +4693,16 @@ msgstr "Can't find an indicator? Propose a new one here"
 #: app/templates/components/auto_translate_modal_js.html:55
 #: app/templates/core/chat_immersive.html:50
 #: app/templates/core/dashboard/_access_request_modal.html:105
-#: app/templates/forms/entry_form/entry_form.html:3133
+#: app/templates/forms/entry_form/entry_form.html:3136
 #: app/templates/forms/entry_form/partials/discussion_panel.html:43
 #: app/templates/forms/entry_form/partials/discussion_panel_section.html:36
 #: app/templates/forms/entry_form/validation_summary_progress.html:288
-#: app/templates/forms/form_builder/form_builder.html:360
-#: app/templates/forms/form_builder/form_builder.html:394
-#: app/templates/forms/form_builder/form_builder.html:403
-#: app/templates/forms/form_builder/form_builder.html:471
-#: app/templates/forms/form_builder/form_builder.html:1173
-#: app/templates/forms/form_builder/form_builder.html:1467
+#: app/templates/forms/form_builder/form_builder.html:361
+#: app/templates/forms/form_builder/form_builder.html:395
+#: app/templates/forms/form_builder/form_builder.html:404
+#: app/templates/forms/form_builder/form_builder.html:473
+#: app/templates/forms/form_builder/form_builder.html:1175
+#: app/templates/forms/form_builder/form_builder.html:1469
 #: app/templates/forms/form_builder/partials/_item_modal.html:401
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:137
 #: app/templates/forms/form_builder/partials/_question_modal.html:182
@@ -4710,7 +4722,7 @@ msgstr "Can't find an indicator? Propose a new one here"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: app/templates/forms/entry_form/entry_form.html:2900
+#: app/templates/forms/entry_form/entry_form.html:2903
 msgid "Cancel deletion"
 msgstr "Cancel deletion"
 
@@ -4761,7 +4773,7 @@ msgstr "Cancelling…"
 msgid "Candidate not found or already reviewed"
 msgstr "Candidate not found or already reviewed"
 
-#: app/templates/forms/entry_form/entry_form.html:2896
+#: app/templates/forms/entry_form/entry_form.html:2899
 #, python-format
 msgid ""
 "Cannot cancel deletion. This field allows a maximum of %(max)s document(s). "
@@ -4790,7 +4802,7 @@ msgstr "Caption (optional)"
 msgid "Caption shown below the image"
 msgstr "Caption shown below the image"
 
-#: app/templates/forms/form_builder/form_builder.html:871
+#: app/templates/forms/form_builder/form_builder.html:873
 msgid "Captions"
 msgstr "Captions"
 
@@ -4942,7 +4954,7 @@ msgstr "Changes applied"
 msgid "Changes made and approved"
 msgstr "Changes made and approved"
 
-#: app/templates/forms/form_builder/form_builder.html:427
+#: app/templates/forms/form_builder/form_builder.html:428
 msgid ""
 "Changes made here will immediately affect the live template. Consider "
 "creating a draft version instead for safer editing."
@@ -4975,7 +4987,7 @@ msgstr ""
 msgid "Channel"
 msgstr "Channel"
 
-#: app/templates/forms/entry_form/entry_form.html:3174
+#: app/templates/forms/entry_form/entry_form.html:3177
 msgid "Chat"
 msgstr "Chat"
 
@@ -5056,7 +5068,7 @@ msgid "Checking notification recipients…"
 msgstr "Checking notification recipients…"
 
 #: app/routes/forms/validation_summary.py:2032
-#: app/templates/forms/entry_form/entry_form.html:735
+#: app/templates/forms/entry_form/entry_form.html:738
 msgid "Checking the figures, funding & emergencies…"
 msgstr "Checking the figures, funding & emergencies…"
 
@@ -5069,7 +5081,7 @@ msgid "Checking your assignments…"
 msgstr "Checking your assignments…"
 
 #: app/templates/admin/settings/manage_settings.html:1516
-#: app/templates/forms/form_builder/form_builder.html:1168
+#: app/templates/forms/form_builder/form_builder.html:1170
 msgid "Checking…"
 msgstr "Checking…"
 
@@ -5094,7 +5106,7 @@ msgstr "Choose a review date."
 msgid "Choose a target language."
 msgstr "Choose a target language."
 
-#: app/templates/forms/form_builder/form_builder.html:1459
+#: app/templates/forms/form_builder/form_builder.html:1461
 msgid "Choose an option:"
 msgstr "Choose an option:"
 
@@ -5427,7 +5439,7 @@ msgstr "Click or drag Excel file here"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:264
 #: app/templates/admin/indicator_bank/indicator_bank.html:467
-#: app/templates/forms/entry_form/entry_form.html:2867
+#: app/templates/forms/entry_form/entry_form.html:2870
 #: app/templates/forms/form_builder/partials/_excel_modal.html:71
 msgid "Click or drag Excel file here to import"
 msgstr "Click or drag Excel file here to import"
@@ -5448,7 +5460,7 @@ msgstr "Click or drag ZIP file here"
 msgid "Click or drag an Excel file here"
 msgstr "Click or drag an Excel file here"
 
-#: app/templates/forms/entry_form/entry_form.html:2934
+#: app/templates/forms/entry_form/entry_form.html:2937
 msgid "Click or drag document here to upload"
 msgstr "Click or drag document here to upload"
 
@@ -5492,8 +5504,8 @@ msgstr "Click to make not public"
 msgid "Click to make public"
 msgstr "Click to make public"
 
-#: app/templates/forms/entry_form/entry_form.html:1926
-#: app/templates/forms/entry_form/entry_form.html:2666
+#: app/templates/forms/entry_form/entry_form.html:1929
+#: app/templates/forms/entry_form/entry_form.html:2669
 msgid "Click to repeat this group of fields multiple times"
 msgstr "Click to repeat this group of fields multiple times"
 
@@ -5528,7 +5540,7 @@ msgstr "Client:"
 msgid "Clinics"
 msgstr "Clinics"
 
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/form_builder.html:500
 msgid "Clone"
 msgstr "Clone"
 
@@ -5574,7 +5586,7 @@ msgstr "Clone template"
 #: app/templates/forms/entry_form/validation_summary_progress.html:289
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:44
 #: app/templates/forms/form_builder/partials/_variables_modal.html:31
-#: app/templates/forms/form_builder/partials/_versions_modal.html:133
+#: app/templates/forms/form_builder/partials/_versions_modal.html:139
 #: app/templates/macros/modal_shell.html:35 app/templates/tours/tours.html:486
 msgid "Close"
 msgstr "Close"
@@ -5597,7 +5609,7 @@ msgstr "Close menu"
 msgid "Close modal"
 msgstr "Close modal"
 
-#: app/templates/forms/entry_form/entry_form.html:582
+#: app/templates/forms/entry_form/entry_form.html:585
 msgid "Close navigation"
 msgstr "Close navigation"
 
@@ -5664,7 +5676,7 @@ msgstr "Code cannot be changed while indicators reference this type."
 msgid "Code cannot be changed while indicators reference this unit."
 msgstr "Code cannot be changed while indicators reference this unit."
 
-#: app/templates/forms/entry_form/entry_form.html:3199
+#: app/templates/forms/entry_form/entry_form.html:3202
 msgid "Collapse"
 msgstr "Collapse"
 
@@ -5679,21 +5691,21 @@ msgstr "Collapse all"
 msgid "Collapse all observations"
 msgstr "Collapse all observations"
 
-#: app/templates/forms/form_builder/form_builder.html:695
-#: app/templates/forms/form_builder/form_builder.html:699
+#: app/templates/forms/form_builder/form_builder.html:697
+#: app/templates/forms/form_builder/form_builder.html:701
 msgid "Collapse all pages"
 msgstr "Collapse all pages"
 
-#: app/templates/forms/form_builder/form_builder.html:704
-#: app/templates/forms/form_builder/form_builder.html:708
+#: app/templates/forms/form_builder/form_builder.html:706
+#: app/templates/forms/form_builder/form_builder.html:710
 msgid "Collapse all sections"
 msgstr "Collapse all sections"
 
-#: app/templates/forms/entry_form/entry_form.html:3200
+#: app/templates/forms/entry_form/entry_form.html:3203
 msgid "Collapse editors list"
 msgstr "Collapse editors list"
 
-#: app/templates/forms/entry_form/entry_form.html:588
+#: app/templates/forms/entry_form/entry_form.html:591
 msgid "Collapse navigation panel"
 msgstr "Collapse navigation panel"
 
@@ -5705,16 +5717,16 @@ msgstr "Collapse section"
 msgid "Collapse subsection"
 msgstr "Collapse subsection"
 
-#: app/templates/forms/entry_form/entry_form.html:925
-#: app/templates/forms/entry_form/entry_form.html:1949
+#: app/templates/forms/entry_form/entry_form.html:928
+#: app/templates/forms/entry_form/entry_form.html:1952
 msgid "Collapse/Expand"
 msgstr "Collapse/Expand"
 
-#: app/templates/forms/form_builder/form_builder.html:697
+#: app/templates/forms/form_builder/form_builder.html:699
 msgid "Collapse/expand all pages"
 msgstr "Collapse/expand all pages"
 
-#: app/templates/forms/form_builder/form_builder.html:706
+#: app/templates/forms/form_builder/form_builder.html:708
 msgid "Collapse/expand all sections and sub-sections"
 msgstr "Collapse/expand all sections and sub-sections"
 
@@ -5804,7 +5816,7 @@ msgid "Comments"
 msgstr "Comments"
 
 #: app/routes/admin/form_builder/sections.py:163
-#: app/templates/forms/entry_form/entry_form.html:601
+#: app/templates/forms/entry_form/entry_form.html:604
 #: app/templates/forms/entry_form/partials/discussion_panel.html:7
 #: app/templates/forms/entry_form/partials/discussion_panel_section.html:9
 #: app/templates/forms/form_builder/partials/_template_details.html:292
@@ -5909,7 +5921,7 @@ msgstr "Compare with workbook"
 msgid "Compared %(count)d countries · reviewing…"
 msgstr "Compared %(count)d countries · reviewing…"
 
-#: app/templates/forms/form_builder/field_mapping.html:239
+#: app/templates/forms/form_builder/field_mapping.html:245
 msgid "Compared to published"
 msgstr "Compared to published"
 
@@ -6217,7 +6229,7 @@ msgstr "Confirm action"
 msgid "Confirm suggested link"
 msgstr "Confirm suggested link"
 
-#: app/templates/forms/form_builder/field_mapping.html:200
+#: app/templates/forms/form_builder/field_mapping.html:206
 msgid ""
 "Confirm which draft fields correspond to the live published form before you "
 "deploy."
@@ -6298,7 +6310,7 @@ msgstr "Context Data"
 
 #: app/templates/admin/assignments/manage_assignment.html:1390
 #: app/templates/admin/translations/manage_translations.html:708
-#: app/templates/forms/form_builder/form_builder.html:1468
+#: app/templates/forms/form_builder/form_builder.html:1470
 msgid "Continue"
 msgstr "Continue"
 
@@ -6537,7 +6549,7 @@ msgstr "Cost:"
 msgid "Could not calculate Everyone Counts indicators."
 msgstr "Could not calculate Everyone Counts indicators."
 
-#: app/templates/forms/form_builder/form_builder.html:1169
+#: app/templates/forms/form_builder/form_builder.html:1171
 msgid "Could not check for existing data. Please try again."
 msgstr "Could not check for existing data. Please try again."
 
@@ -6651,7 +6663,7 @@ msgstr "Could not load that assignment. Try again."
 msgid "Could not load the form. Try again or refresh the page."
 msgstr "Could not load the form. Try again or refresh the page."
 
-#: app/templates/forms/entry_form/entry_form.html:738
+#: app/templates/forms/entry_form/entry_form.html:741
 msgid "Could not load the validation summary."
 msgstr "Could not load the validation summary."
 
@@ -6736,7 +6748,7 @@ msgstr "Could not update translation files."
 
 #: app/templates/admin/templates/kobo_data_import.html:1155
 #: app/templates/admin/templates/new_template.html:1131
-#: app/templates/forms/form_builder/form_builder.html:1158
+#: app/templates/forms/form_builder/form_builder.html:1160
 msgid "Could not validate the file. Please try again."
 msgstr "Could not validate the file. Please try again."
 
@@ -6995,7 +7007,7 @@ msgid ""
 msgstr ""
 "Coverage, approved glossary, candidates, and unreviewed machine translations"
 
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/form_builder.html:500
 msgid "Create"
 msgstr "Create"
 
@@ -7083,7 +7095,7 @@ msgstr "Create a blank template manually"
 msgid "Create a new assignment"
 msgstr "Create a new assignment"
 
-#: app/templates/forms/form_builder/form_builder.html:1174
+#: app/templates/forms/form_builder/form_builder.html:1176
 #: app/templates/forms/form_builder/partials/_excel_modal.html:22
 msgid "Create a new draft version"
 msgstr "Create a new draft version"
@@ -7299,7 +7311,7 @@ msgstr "Currency Code"
 msgid "Current"
 msgstr "Current"
 
-#: app/templates/forms/entry_form/entry_form.html:2941
+#: app/templates/forms/entry_form/entry_form.html:2944
 msgid "Current Document:"
 msgstr "Current Document:"
 
@@ -7350,7 +7362,7 @@ msgstr "Currently signed in"
 msgid "Currently viewing/editing this version"
 msgstr "Currently viewing/editing this version"
 
-#: app/templates/forms/entry_form/entry_form.html:3195
+#: app/templates/forms/entry_form/entry_form.html:3198
 msgid "Currently with you editing this form:"
 msgstr "Currently with you editing this form:"
 
@@ -7471,8 +7483,8 @@ msgid "Dashboards"
 msgstr "Dashboards"
 
 #: app/templates/admin/settings/manage_settings.html:78
-#: app/templates/forms/form_builder/field_mapping.html:319
-#: app/templates/forms/form_builder/field_mapping.html:340
+#: app/templates/forms/form_builder/field_mapping.html:329
+#: app/templates/forms/form_builder/field_mapping.html:350
 #: app/templates/forms/form_builder/partials/_item_modal.html:243
 msgid "Data"
 msgstr "Data"
@@ -7790,8 +7802,8 @@ msgstr "Deadline reminder: %(assignment_title)s"
 #: app/templates/admin/assignments/manage_assignment.html:302
 #: app/templates/admin/documents/documents.html:299
 #: app/templates/admin/documents/documents.html:325
-#: app/templates/forms/entry_form/entry_form.html:3078
-#: app/templates/forms/entry_form/entry_form.html:3104
+#: app/templates/forms/entry_form/entry_form.html:3081
+#: app/templates/forms/entry_form/entry_form.html:3107
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:177
@@ -7885,13 +7897,13 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:185
 #: app/templates/admin/validation_questions.html:248
 #: app/templates/components/_builder_items.html:68
-#: app/templates/forms/entry_form/entry_form.html:1220
-#: app/templates/forms/entry_form/entry_form.html:1251
-#: app/templates/forms/entry_form/entry_form.html:2173
-#: app/templates/forms/entry_form/entry_form.html:2203
+#: app/templates/forms/entry_form/entry_form.html:1223
+#: app/templates/forms/entry_form/entry_form.html:1254
+#: app/templates/forms/entry_form/entry_form.html:2176
+#: app/templates/forms/entry_form/entry_form.html:2206
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:90
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:120
-#: app/templates/forms/form_builder/form_builder.html:809
+#: app/templates/forms/form_builder/form_builder.html:811
 #: app/templates/forms/form_builder/partials/_sections_container.html:472
 msgid "Definition"
 msgstr "Definition"
@@ -7904,8 +7916,8 @@ msgstr "Definition (excerpt)"
 msgid "Definition translations cleared:"
 msgstr "Definition translations cleared:"
 
-#: app/templates/forms/form_builder/form_builder.html:807
-#: app/templates/forms/form_builder/form_builder.html:808
+#: app/templates/forms/form_builder/form_builder.html:809
+#: app/templates/forms/form_builder/form_builder.html:810
 msgid "Definitions"
 msgstr "Definitions"
 
@@ -7965,8 +7977,8 @@ msgstr "Delegation focal point"
 #: app/templates/components/thumbnail_upload.html:54
 #: app/templates/core/chat_immersive.html:49
 #: app/templates/core/dashboard/_assignments_tab.html:34
-#: app/templates/forms/form_builder/form_builder.html:498
-#: app/templates/forms/form_builder/form_builder.html:1454
+#: app/templates/forms/form_builder/form_builder.html:500
+#: app/templates/forms/form_builder/form_builder.html:1456
 #: app/templates/macros/delete_confirm_modal.html:32
 #: app/templates/notifications/center.html:178
 #: app/templates/notifications/center.html:207
@@ -7981,11 +7993,11 @@ msgstr "Delete"
 msgid "Delete Common Word?"
 msgstr "Delete Common Word?"
 
-#: app/templates/forms/form_builder/form_builder.html:1460
+#: app/templates/forms/form_builder/form_builder.html:1462
 msgid "Delete Data and Remove"
 msgstr "Delete Data and Remove"
 
-#: app/templates/forms/entry_form/entry_form.html:2893
+#: app/templates/forms/entry_form/entry_form.html:2896
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:100
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:101
 msgid "Delete Document"
@@ -8055,7 +8067,7 @@ msgstr "Delete comment?"
 msgid "Delete conversation?"
 msgstr "Delete conversation?"
 
-#: app/templates/forms/form_builder/form_builder.html:1172
+#: app/templates/forms/form_builder/form_builder.html:1174
 msgid "Delete data & import"
 msgstr "Delete data & import"
 
@@ -8124,7 +8136,7 @@ msgstr "Delete this comment? This cannot be undone."
 msgid "Delete this conversation? This cannot be undone."
 msgstr "Delete this conversation? This cannot be undone."
 
-#: app/templates/forms/entry_form/entry_form.html:4026
+#: app/templates/forms/entry_form/entry_form.html:4029
 msgid "Delete this entry"
 msgstr "Delete this entry"
 
@@ -8151,7 +8163,7 @@ msgstr "Delete this row?"
 msgid "Delete this unit? This cannot be undone."
 msgstr "Delete this unit? This cannot be undone."
 
-#: app/templates/forms/form_builder/form_builder.html:1153
+#: app/templates/forms/form_builder/form_builder.html:1155
 msgid "Delete this version? This cannot be undone."
 msgstr "Delete this version? This cannot be undone."
 
@@ -8190,11 +8202,11 @@ msgid ""
 msgstr ""
 "Deleting a guidance document also removes any linked Knowledge Base copy."
 
-#: app/templates/forms/form_builder/form_builder.html:1444
+#: app/templates/forms/form_builder/form_builder.html:1446
 msgid "Deleting item…"
 msgstr "Deleting item…"
 
-#: app/templates/forms/form_builder/form_builder.html:1443
+#: app/templates/forms/form_builder/form_builder.html:1445
 msgid "Deleting section…"
 msgstr "Deleting section…"
 
@@ -8241,16 +8253,16 @@ msgstr "Department Name"
 msgid "Departments"
 msgstr "Departments"
 
-#: app/templates/forms/form_builder/form_builder.html:359
-#: app/templates/forms/form_builder/form_builder.html:470
+#: app/templates/forms/form_builder/form_builder.html:360
+#: app/templates/forms/form_builder/form_builder.html:472
 msgid "Deploy"
 msgstr "Deploy"
 
-#: app/templates/forms/form_builder/form_builder.html:472
+#: app/templates/forms/form_builder/form_builder.html:474
 msgid "Deploy Archived Version?"
 msgstr "Deploy Archived Version?"
 
-#: app/templates/forms/form_builder/form_builder.html:437
+#: app/templates/forms/form_builder/form_builder.html:438
 msgid "Deploy This Version"
 msgstr "Deploy This Version"
 
@@ -8259,11 +8271,11 @@ msgstr "Deploy This Version"
 msgid "Deploy Version"
 msgstr "Deploy Version"
 
-#: app/templates/forms/form_builder/form_builder.html:361
+#: app/templates/forms/form_builder/form_builder.html:362
 msgid "Deploy Version?"
 msgstr "Deploy Version?"
 
-#: app/templates/forms/form_builder/field_mapping.html:193
+#: app/templates/forms/form_builder/field_mapping.html:199
 msgid "Deploy draft"
 msgstr "Deploy draft"
 
@@ -8271,30 +8283,40 @@ msgstr "Deploy draft"
 msgid "Deploy migration"
 msgstr "Deploy migration"
 
-#: app/templates/forms/form_builder/form_builder.html:453
+#: app/templates/forms/form_builder/form_builder.html:454
 msgid ""
 "Deploy this archived version? This will publish it as the live version."
 msgstr ""
 "Deploy this archived version? This will publish it as the live version."
 
-#: app/templates/forms/form_builder/field_mapping.html:368
+#: app/templates/forms/form_builder/field_mapping.html:384
 msgid "Deploy this version"
 msgstr "Deploy this version"
 
 #: app/templates/forms/form_builder/form_builder.html:332
-#: app/templates/forms/form_builder/form_builder.html:1152
+#: app/templates/forms/form_builder/form_builder.html:1154
 msgid "Deploy this version? This will publish it as the live version."
 msgstr "Deploy this version? This will publish it as the live version."
 
-#: app/routes/admin/form_builder/templates.py:313
+#: app/routes/admin/form_builder/templates.py:314
 #: app/templates/admin/templates/new_template.html:283
 #: app/templates/admin/templates/templates.html:107
 #: app/templates/components/ag_grid_i18n_js.html:33
 msgid "Deployed"
 msgstr "Deployed"
 
-#: app/templates/forms/form_builder/form_builder.html:335
-#: app/templates/forms/form_builder/form_builder.html:456
+#: app/templates/forms/form_builder/partials/_versions_modal.html:125
+msgid ""
+"Deploying a version publishes it and carries submitted data over to it. Data"
+" of removed fields is kept on the archived version, and you can roll back by"
+" deploying an archived version."
+msgstr ""
+"Deploying a version publishes it and carries submitted data over to it. Data"
+" of removed fields is kept on the archived version, and you can roll back by"
+" deploying an archived version."
+
+#: app/templates/forms/form_builder/form_builder.html:336
+#: app/templates/forms/form_builder/form_builder.html:458
 msgid "Deploying version…"
 msgstr "Deploying version…"
 
@@ -8365,13 +8387,13 @@ msgstr ""
 #: app/templates/components/_builder_items.html:89
 #: app/templates/components/_builder_items.html:95
 #: app/templates/components/_builder_items.html:108
-#: app/templates/forms/entry_form/entry_form.html:1044
-#: app/templates/forms/entry_form/entry_form.html:1270
-#: app/templates/forms/entry_form/entry_form.html:2010
-#: app/templates/forms/entry_form/entry_form.html:2222
+#: app/templates/forms/entry_form/entry_form.html:1047
+#: app/templates/forms/entry_form/entry_form.html:1273
+#: app/templates/forms/entry_form/entry_form.html:2013
+#: app/templates/forms/entry_form/entry_form.html:2225
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:169
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:139
-#: app/templates/forms/form_builder/form_builder.html:841
+#: app/templates/forms/form_builder/form_builder.html:843
 #: app/templates/forms/form_builder/partials/_item_modal.html:104
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:30
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:19
@@ -8425,7 +8447,7 @@ msgstr "Detailed definition/description of this question"
 
 #: app/templates/admin/ai/_trace_card.html:92
 #: app/templates/admin/ai/conversation_traces.html:103
-#: app/templates/forms/entry_form/entry_form.html:2762
+#: app/templates/forms/entry_form/entry_form.html:2765
 msgid "Details"
 msgstr "Details"
 
@@ -8595,8 +8617,8 @@ msgstr "Disaggregation preset"
 msgid "Disaggregation views"
 msgstr "Disaggregation views"
 
-#: app/templates/forms/form_builder/form_builder.html:393
-#: app/templates/forms/form_builder/form_builder.html:402
+#: app/templates/forms/form_builder/form_builder.html:394
+#: app/templates/forms/form_builder/form_builder.html:403
 msgid "Discard"
 msgstr "Discard"
 
@@ -8604,17 +8626,17 @@ msgstr "Discard"
 msgid "Discard Draft"
 msgstr "Discard Draft"
 
-#: app/templates/forms/form_builder/form_builder.html:395
-#: app/templates/forms/form_builder/form_builder.html:404
+#: app/templates/forms/form_builder/form_builder.html:396
+#: app/templates/forms/form_builder/form_builder.html:405
 msgid "Discard Draft?"
 msgstr "Discard Draft?"
 
-#: app/templates/forms/form_builder/form_builder.html:376
-#: app/templates/forms/form_builder/form_builder.html:1154
+#: app/templates/forms/form_builder/form_builder.html:377
+#: app/templates/forms/form_builder/form_builder.html:1156
 msgid "Discard this draft? All changes will be lost and cannot be undone."
 msgstr "Discard this draft? All changes will be lost and cannot be undone."
 
-#: app/templates/forms/form_builder/form_builder.html:379
+#: app/templates/forms/form_builder/form_builder.html:380
 msgid "Discarding draft…"
 msgstr "Discarding draft…"
 
@@ -8622,7 +8644,7 @@ msgstr "Discarding draft…"
 msgid "Discarding the draft…"
 msgstr "Discarding the draft…"
 
-#: app/templates/forms/entry_form/entry_form.html:742
+#: app/templates/forms/entry_form/entry_form.html:745
 #: app/templates/forms/entry_form/validation_summary_pdf.html:182
 #: app/templates/forms/entry_form/validation_summary_progress.html:296
 msgid "Discrepancy"
@@ -8636,7 +8658,7 @@ msgstr "Discussion"
 msgid "Discussion & Comments"
 msgstr "Discussion & Comments"
 
-#: app/templates/forms/form_builder/form_builder.html:883
+#: app/templates/forms/form_builder/form_builder.html:885
 msgid "Discussion Item Translations"
 msgstr "Discussion Item Translations"
 
@@ -8707,8 +8729,8 @@ msgstr "Dislike"
 #: app/templates/admin/communication/center.html:1564
 #: app/templates/core/chat_immersive.html:90
 #: app/templates/forms/entry_form/entry_form.html:397
-#: app/templates/forms/entry_form/entry_form.html:740
-#: app/templates/forms/entry_form/entry_form.html:766
+#: app/templates/forms/entry_form/entry_form.html:743
+#: app/templates/forms/entry_form/entry_form.html:769
 #: app/templates/forms/form_builder/form_builder.html:269
 #: app/templates/forms/form_builder/form_builder.html:270
 msgid "Dismiss"
@@ -8740,7 +8762,7 @@ msgstr "Dismiss selected"
 msgid "Dismiss selected email failure(s) without retrying?"
 msgstr "Dismiss selected email failure(s) without retrying?"
 
-#: app/templates/forms/entry_form/entry_form.html:3163
+#: app/templates/forms/entry_form/entry_form.html:3166
 msgid "Dismiss warning"
 msgstr "Dismiss warning"
 
@@ -8903,7 +8925,7 @@ msgstr "Doc Date"
 msgid "Document"
 msgstr "Document"
 
-#: app/templates/forms/form_builder/form_builder.html:826
+#: app/templates/forms/form_builder/form_builder.html:828
 msgid "Document Descriptions"
 msgstr "Document Descriptions"
 
@@ -8911,7 +8933,7 @@ msgstr "Document Descriptions"
 msgid "Document Field"
 msgstr "Document Field"
 
-#: app/templates/forms/form_builder/form_builder.html:822
+#: app/templates/forms/form_builder/form_builder.html:824
 msgid "Document Field Translations"
 msgstr "Document Field Translations"
 
@@ -8928,7 +8950,7 @@ msgstr "Document ID"
 msgid "Document Label"
 msgstr "Document Label"
 
-#: app/templates/forms/form_builder/form_builder.html:825
+#: app/templates/forms/form_builder/form_builder.html:827
 msgid "Document Labels"
 msgstr "Document Labels"
 
@@ -8939,7 +8961,7 @@ msgstr "Document Labels"
 msgid "Document Management"
 msgstr "Document Management"
 
-#: app/templates/forms/entry_form/entry_form.html:2905
+#: app/templates/forms/entry_form/entry_form.html:2908
 msgid "Document Selected"
 msgstr "Document Selected"
 
@@ -8958,7 +8980,7 @@ msgstr "Document Type"
 msgid "Document Type (Optional)"
 msgstr "Document Type (Optional)"
 
-#: app/templates/forms/entry_form/entry_form.html:2992
+#: app/templates/forms/entry_form/entry_form.html:2995
 msgid "Document Type:"
 msgstr "Document Type:"
 
@@ -8966,7 +8988,7 @@ msgstr "Document Type:"
 msgid "Document Types"
 msgstr "Document Types"
 
-#: app/templates/forms/entry_form/entry_form.html:2904
+#: app/templates/forms/entry_form/entry_form.html:2907
 msgid "Document Updated"
 msgstr "Document Updated"
 
@@ -8974,7 +8996,7 @@ msgstr "Document Updated"
 msgid "Document Upload"
 msgstr "Document Upload"
 
-#: app/templates/forms/entry_form/entry_form.html:3145
+#: app/templates/forms/entry_form/entry_form.html:3148
 msgid "Document Upload Not Available"
 msgstr "Document Upload Not Available"
 
@@ -9041,7 +9063,7 @@ msgstr "Document type"
 msgid "Document types"
 msgstr "Document types"
 
-#: app/templates/forms/entry_form/entry_form.html:3146
+#: app/templates/forms/entry_form/entry_form.html:3149
 msgid "Document upload is disabled when the form is read-only."
 msgstr "Document upload is disabled when the form is read-only."
 
@@ -9261,19 +9283,19 @@ msgstr "Download workbook"
 msgid "Downloadable"
 msgstr "Downloadable"
 
-#: app/routes/admin/form_builder/templates.py:313
+#: app/routes/admin/form_builder/templates.py:314
 #: app/services/communication/insights_service.py:101
 #: app/templates/admin/templates/templates.html:107
 #: app/templates/components/ag_grid_i18n_js.html:34
-#: app/templates/forms/form_builder/field_mapping.html:234
+#: app/templates/forms/form_builder/field_mapping.html:240
 msgid "Draft"
 msgstr "Draft"
 
-#: app/templates/forms/form_builder/field_mapping.html:316
+#: app/templates/forms/form_builder/field_mapping.html:326
 msgid "Draft field"
 msgstr "Draft field"
 
-#: app/templates/forms/form_builder/field_mapping.html:282
+#: app/templates/forms/form_builder/field_mapping.html:288
 msgid ""
 "Draft field uses the same identity as the published field — submission data "
 "will follow on deploy."
@@ -9286,7 +9308,7 @@ msgstr ""
 msgid "Draft save"
 msgstr "Draft save"
 
-#: app/templates/forms/form_builder/field_mapping.html:337
+#: app/templates/forms/form_builder/field_mapping.html:347
 msgid "Draft section"
 msgstr "Draft section"
 
@@ -9329,7 +9351,7 @@ msgstr "Drag to reorder group"
 msgid "Drag to reorder. New columns are added at the end of this list."
 msgstr "Drag to reorder. New columns are added at the end of this list."
 
-#: app/templates/forms/entry_form/entry_form.html:716
+#: app/templates/forms/entry_form/entry_form.html:719
 msgid "Drag to resize. Double-click to reset."
 msgstr "Drag to resize. Double-click to reset."
 
@@ -9406,7 +9428,7 @@ msgstr "Due date was not saved because this assignment has no entities yet."
 
 #: app/templates/admin/templates/templates.html:271
 #: app/templates/components/ag_grid_i18n_js.html:50
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/form_builder.html:500
 msgid "Duplicate"
 msgstr "Duplicate"
 
@@ -9466,7 +9488,7 @@ msgstr ""
 "Duplicate this indicator? This will create a copy with the same calculations"
 " and settings."
 
-#: app/templates/forms/form_builder/form_builder.html:1438
+#: app/templates/forms/form_builder/form_builder.html:1440
 msgid ""
 "Duplicate this item? This will copy the item and all of its configuration."
 msgstr ""
@@ -9494,7 +9516,7 @@ msgstr ""
 "Duplicate this question? This will copy its options, logic, and "
 "translations."
 
-#: app/templates/forms/form_builder/form_builder.html:1437
+#: app/templates/forms/form_builder/form_builder.html:1439
 #: app/templates/forms/form_builder/partials/_sections_container.html:177
 msgid ""
 "Duplicate this section? This will copy the section, all sub-sections, and "
@@ -9511,16 +9533,16 @@ msgstr ""
 "Duplicate this sub-section? This will copy the sub-section along with all of"
 " its items."
 
-#: app/routes/admin/form_builder/templates.py:325
+#: app/routes/admin/form_builder/templates.py:326
 #: app/templates/admin/templates/templates.html:137
 msgid "Duplicate this template?"
 msgstr "Duplicate this template?"
 
-#: app/templates/forms/form_builder/form_builder.html:1442
+#: app/templates/forms/form_builder/form_builder.html:1444
 msgid "Duplicating item…"
 msgstr "Duplicating item…"
 
-#: app/templates/forms/form_builder/form_builder.html:1441
+#: app/templates/forms/form_builder/form_builder.html:1443
 msgid "Duplicating section…"
 msgstr "Duplicating section…"
 
@@ -9663,7 +9685,7 @@ msgstr "Earliest:"
 #: app/templates/admin/validation_rules.html:213
 #: app/templates/components/ag_grid_i18n_js.html:46
 #: app/templates/core/chat_immersive.html:61
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/form_builder.html:500
 msgid "Edit"
 msgstr "Edit"
 
@@ -9691,7 +9713,7 @@ msgid "Edit Details"
 msgstr "Edit Details"
 
 #: app/templates/admin/documents/documents.html:115
-#: app/templates/forms/entry_form/entry_form.html:2892
+#: app/templates/forms/entry_form/entry_form.html:2895
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:93
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:94
 msgid "Edit Document"
@@ -10223,7 +10245,7 @@ msgstr "End"
 
 #: app/templates/admin/assignments/manage_assignment.html:287
 #: app/templates/admin/documents/documents.html:304
-#: app/templates/forms/entry_form/entry_form.html:3083
+#: app/templates/forms/entry_form/entry_form.html:3086
 msgid "End Period"
 msgstr "End Period"
 
@@ -10233,7 +10255,7 @@ msgstr "End Tour"
 
 #: app/templates/admin/assignments/manage_assignment.html:261
 #: app/templates/admin/documents/documents.html:262
-#: app/templates/forms/entry_form/entry_form.html:3041
+#: app/templates/forms/entry_form/entry_form.html:3044
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:142
 msgid "End Year"
 msgstr "End Year"
@@ -10439,15 +10461,15 @@ msgstr "Entity"
 msgid "Entity Access"
 msgstr "Entity Access"
 
-#: app/templates/forms/form_builder/form_builder.html:1081
+#: app/templates/forms/form_builder/form_builder.html:1083
 msgid "Entity ID"
 msgstr "Entity ID"
 
-#: app/templates/forms/form_builder/form_builder.html:1079
+#: app/templates/forms/form_builder/form_builder.html:1081
 msgid "Entity Name"
 msgstr "Entity Name"
 
-#: app/templates/forms/form_builder/form_builder.html:1080
+#: app/templates/forms/form_builder/form_builder.html:1082
 msgid "Entity Name (with hierarchy)"
 msgstr "Entity Name (with hierarchy)"
 
@@ -10460,7 +10482,7 @@ msgid "Entity Scope"
 msgstr "Entity Scope"
 
 #: app/templates/admin/communication/center.html:1111
-#: app/templates/forms/form_builder/form_builder.html:1082
+#: app/templates/forms/form_builder/form_builder.html:1084
 msgid "Entity Type"
 msgstr "Entity Type"
 
@@ -10492,11 +10514,11 @@ msgstr "Entity-based"
 msgid "Entity:"
 msgstr "Entity:"
 
-#: app/templates/forms/entry_form/entry_form.html:4025
+#: app/templates/forms/entry_form/entry_form.html:4028
 msgid "Entry"
 msgstr "Entry"
 
-#: app/templates/forms/form_builder/form_builder.html:943
+#: app/templates/forms/form_builder/form_builder.html:945
 msgid "Entry Form Hint Translations"
 msgstr "Entry Form Hint Translations"
 
@@ -10902,7 +10924,7 @@ msgstr "Excel Import"
 msgid "Excel Import/Export"
 msgstr "Excel Import/Export"
 
-#: app/templates/forms/entry_form/entry_form.html:2880
+#: app/templates/forms/entry_form/entry_form.html:2883
 msgid "Excel Import/Export Not Available"
 msgstr "Excel Import/Export Not Available"
 
@@ -10910,10 +10932,10 @@ msgstr "Excel Import/Export Not Available"
 msgid "Excel Imported"
 msgstr "Excel Imported"
 
-#: app/templates/forms/entry_form/entry_form.html:2842
-#: app/templates/forms/entry_form/entry_form.html:2853
-#: app/templates/forms/entry_form/entry_form.html:2876
-#: app/templates/forms/entry_form/entry_form.html:2877
+#: app/templates/forms/entry_form/entry_form.html:2845
+#: app/templates/forms/entry_form/entry_form.html:2856
+#: app/templates/forms/entry_form/entry_form.html:2879
+#: app/templates/forms/entry_form/entry_form.html:2880
 #: app/templates/forms/form_builder/partials/_excel_modal.html:4
 #: app/templates/forms/form_builder/partials/_excel_modal.html:56
 #: app/templates/macros/excel_io_modal.html:58
@@ -10960,7 +10982,7 @@ msgstr "Excel imported"
 msgid "Excel imported: %(count)s values loaded"
 msgstr "Excel imported: %(count)s values loaded"
 
-#: app/templates/forms/entry_form/entry_form.html:2881
+#: app/templates/forms/entry_form/entry_form.html:2884
 msgid "Excel operations are not available for public submissions."
 msgstr "Excel operations are not available for public submissions."
 
@@ -11013,7 +11035,7 @@ msgstr "Existing categories"
 msgid "Exit fill content area"
 msgstr "Exit fill content area"
 
-#: app/templates/forms/entry_form/entry_form.html:2779
+#: app/templates/forms/entry_form/entry_form.html:2782
 msgid "Expand Sections Menu"
 msgstr "Expand Sections Menu"
 
@@ -11028,11 +11050,11 @@ msgstr "Expand all"
 msgid "Expand all observations"
 msgstr "Expand all observations"
 
-#: app/templates/forms/form_builder/form_builder.html:696
+#: app/templates/forms/form_builder/form_builder.html:698
 msgid "Expand all pages"
 msgstr "Expand all pages"
 
-#: app/templates/forms/form_builder/form_builder.html:705
+#: app/templates/forms/form_builder/form_builder.html:707
 msgid "Expand all sections"
 msgstr "Expand all sections"
 
@@ -11040,7 +11062,7 @@ msgstr "Expand all sections"
 msgid "Expand by default"
 msgstr "Expand by default"
 
-#: app/templates/forms/entry_form/entry_form.html:3185
+#: app/templates/forms/entry_form/entry_form.html:3188
 msgid "Expand editors list"
 msgstr "Expand editors list"
 
@@ -11149,7 +11171,7 @@ msgstr "Export CSV"
 msgid "Export Data"
 msgstr "Export Data"
 
-#: app/templates/forms/entry_form/entry_form.html:2860
+#: app/templates/forms/entry_form/entry_form.html:2863
 msgid "Export Data Template (.xlsx)"
 msgstr "Export Data Template (.xlsx)"
 
@@ -11361,7 +11383,7 @@ msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1156
 #: app/templates/admin/templates/new_template.html:1132
-#: app/templates/forms/form_builder/form_builder.html:1159
+#: app/templates/forms/form_builder/form_builder.html:1161
 msgid "Extracted details"
 msgstr "Extracted details"
 
@@ -11463,7 +11485,7 @@ msgstr "Facilities"
 #: app/templates/admin/analytics/login_logs.html:139
 #: app/templates/admin/communication/center.html:1573
 #: app/templates/admin/settings/manage_settings.html:1520
-#: app/templates/forms/entry_form/entry_form.html:744
+#: app/templates/forms/entry_form/entry_form.html:747
 #: app/templates/forms/entry_form/validation_summary_pdf.html:190
 #: app/templates/forms/entry_form/validation_summary_progress.html:298
 msgid "Failed"
@@ -11483,11 +11505,11 @@ msgstr "Failed login"
 msgid "Failed logins"
 msgstr "Failed logins"
 
-#: app/templates/forms/entry_form/entry_form.html:3763
+#: app/templates/forms/entry_form/entry_form.html:3766
 msgid "Failed modules"
 msgstr "Failed modules"
 
-#: app/templates/forms/entry_form/entry_form.html:4050
+#: app/templates/forms/entry_form/entry_form.html:4053
 msgid "Failed to add indicator"
 msgstr "Failed to add indicator"
 
@@ -11514,7 +11536,7 @@ msgstr "Failed to create follow-up question"
 msgid "Failed to delete document."
 msgstr "Failed to delete document."
 
-#: app/templates/forms/entry_form/entry_form.html:4055
+#: app/templates/forms/entry_form/entry_form.html:4058
 msgid "Failed to delete indicator"
 msgstr "Failed to delete indicator"
 
@@ -11749,8 +11771,8 @@ msgstr "Features"
 #: app/templates/admin/assignments/manage_assignment.html:292
 #: app/templates/admin/documents/documents.html:289
 #: app/templates/admin/documents/documents.html:315
-#: app/templates/forms/entry_form/entry_form.html:3068
-#: app/templates/forms/entry_form/entry_form.html:3094
+#: app/templates/forms/entry_form/entry_form.html:3071
+#: app/templates/forms/entry_form/entry_form.html:3097
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:167
@@ -11776,12 +11798,12 @@ msgstr "Field"
 msgid "Field ID"
 msgstr "Field ID"
 
-#: app/templates/forms/form_builder/form_builder.html:840
+#: app/templates/forms/form_builder/form_builder.html:842
 msgid "Field Label"
 msgstr "Field Label"
 
-#: app/templates/forms/entry_form/entry_form.html:1116
-#: app/templates/forms/entry_form/entry_form.html:2081
+#: app/templates/forms/entry_form/entry_form.html:1119
+#: app/templates/forms/entry_form/entry_form.html:2084
 msgid "Field Type No Longer Supported"
 msgstr "Field Type No Longer Supported"
 
@@ -11791,12 +11813,12 @@ msgstr "Field Type No Longer Supported"
 msgid "Field Types"
 msgstr "Field Types"
 
-#: app/templates/forms/form_builder/field_mapping.html:206
+#: app/templates/forms/form_builder/field_mapping.html:212
 msgid "Field mapping"
 msgstr "Field mapping"
 
-#: app/routes/admin/form_builder/versions.py:306
-#: app/templates/forms/form_builder/field_mapping.html:199
+#: app/routes/admin/form_builder/versions.py:368
+#: app/templates/forms/form_builder/field_mapping.html:205
 msgid "Field mapping review"
 msgstr "Field mapping review"
 
@@ -11804,7 +11826,7 @@ msgstr "Field mapping review"
 msgid "Field to sort by (submitted_at, template_id, country_id, period_name)"
 msgstr "Field to sort by (submitted_at, template_id, country_id, period_name)"
 
-#: app/templates/forms/entry_form/entry_form.html:2914
+#: app/templates/forms/entry_form/entry_form.html:2917
 msgid "Field:"
 msgstr "Field:"
 
@@ -11849,11 +11871,11 @@ msgstr "File is too large (max 50 MB)"
 msgid "File is too large (max 80 MB)"
 msgstr "File is too large (max 80 MB)"
 
-#: app/templates/forms/entry_form/entry_form.html:2894
+#: app/templates/forms/entry_form/entry_form.html:2897
 msgid "File size exceeds 25MB limit. Please select a smaller file."
 msgstr "File size exceeds 25MB limit. Please select a smaller file."
 
-#: app/templates/forms/form_builder/form_builder.html:1166
+#: app/templates/forms/form_builder/form_builder.html:1168
 msgid "File size must be less than 10MB."
 msgstr "File size must be less than 10MB."
 
@@ -12025,7 +12047,7 @@ msgstr "Filter by public status"
 msgid "Filter by sector"
 msgstr "Filter by sector"
 
-#: app/templates/forms/form_builder/field_mapping.html:302
+#: app/templates/forms/form_builder/field_mapping.html:312
 msgid "Filter by status"
 msgstr "Filter by status"
 
@@ -12310,7 +12332,7 @@ msgstr "Form Submit"
 msgid "Form Submitted"
 msgstr "Form Submitted"
 
-#: app/routes/forms/submission.py:576
+#: app/routes/forms/submission.py:592
 msgid "Form Unavailable"
 msgstr "Form Unavailable"
 
@@ -12338,7 +12360,7 @@ msgstr "Form created and appended, submitting..."
 msgid "Form data has been updated."
 msgstr "Form data has been updated."
 
-#: app/templates/forms/form_builder/field_mapping.html:292
+#: app/templates/forms/form_builder/field_mapping.html:302
 msgid "Form fields"
 msgstr "Form fields"
 
@@ -12352,11 +12374,11 @@ msgstr ""
 "uploads. Some fields show tooltips (ℹ) with additional information. Yellow-"
 "highlighted fields contain prefilled values you can review and modify."
 
-#: app/templates/forms/entry_form/entry_form.html:3742
+#: app/templates/forms/entry_form/entry_form.html:3745
 msgid "Form initialization failed"
 msgstr "Form initialization failed"
 
-#: app/templates/forms/entry_form/entry_form.html:3642
+#: app/templates/forms/entry_form/entry_form.html:3645
 msgid "Form initialization timeout - some modules may have failed to load"
 msgstr "Form initialization timeout - some modules may have failed to load"
 
@@ -12705,7 +12727,7 @@ msgstr "Generating report..."
 msgid "Generating thumbnail..."
 msgstr "Generating thumbnail..."
 
-#: app/templates/forms/entry_form/entry_form.html:726
+#: app/templates/forms/entry_form/entry_form.html:729
 msgid "Generating validation summary…"
 msgstr "Generating validation summary…"
 
@@ -12780,7 +12802,7 @@ msgstr "Glossary terms"
 msgid "Go back to assignments list"
 msgstr "Go back to assignments list"
 
-#: app/templates/forms/entry_form/entry_form.html:741
+#: app/templates/forms/entry_form/entry_form.html:744
 #: app/templates/forms/entry_form/validation_summary_pdf.html:178
 #: app/templates/forms/entry_form/validation_summary_progress.html:295
 msgid "Good"
@@ -13023,7 +13045,7 @@ msgstr "Has usage"
 msgid "Header"
 msgstr "Header"
 
-#: app/templates/forms/form_builder/form_builder.html:803
+#: app/templates/forms/form_builder/form_builder.html:805
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:26
 msgid "Heading"
 msgstr "Heading"
@@ -13056,7 +13078,7 @@ msgstr "Help your colleagues know who you are."
 msgid "Hide"
 msgstr "Hide"
 
-#: app/templates/forms/form_builder/form_builder.html:675
+#: app/templates/forms/form_builder/form_builder.html:677
 msgid "Hide Archived Items/Sections"
 msgstr "Hide Archived Items/Sections"
 
@@ -13226,7 +13248,7 @@ msgstr ""
 "How each KPI baseline is computed for variation checks (prior year vs three-"
 "year average)."
 
-#: app/templates/forms/form_builder/field_mapping.html:280
+#: app/templates/forms/form_builder/field_mapping.html:286
 msgid "How field identity works"
 msgstr "How field identity works"
 
@@ -13243,6 +13265,10 @@ msgstr "How it works"
 #: app/templates/core/chat_immersive.html:211
 msgid "How many volunteers in Bangladesh?"
 msgstr "How many volunteers in Bangladesh?"
+
+#: app/templates/forms/form_builder/partials/_versions_modal.html:126
+msgid "How template versions work"
+msgstr "How template versions work"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:185
 msgid "How these figures are calculated"
@@ -13404,7 +13430,7 @@ msgstr "Icon"
 msgid "Icon Class"
 msgstr "Icon Class"
 
-#: app/templates/forms/form_builder/field_mapping.html:259
+#: app/templates/forms/form_builder/field_mapping.html:265
 msgid "Identity confirmed"
 msgstr "Identity confirmed"
 
@@ -13435,7 +13461,7 @@ msgstr ""
 "If the narrative is not already in {language}, it will be translated into "
 "{language} after upload, before the report is generated."
 
-#: app/templates/forms/entry_form/entry_form.html:3161
+#: app/templates/forms/entry_form/entry_form.html:3164
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to avoid"
 " conflicts."
@@ -13449,7 +13475,7 @@ msgstr ""
 msgid "Image"
 msgstr "Image"
 
-#: app/templates/forms/form_builder/form_builder.html:868
+#: app/templates/forms/form_builder/form_builder.html:870
 msgid "Image Item Translations"
 msgstr "Image Item Translations"
 
@@ -13514,7 +13540,7 @@ msgstr "Import Common Words from Excel"
 
 #: app/templates/admin/lists/list_detail.html:47
 #: app/templates/admin/lists/list_detail.html:191
-#: app/templates/forms/entry_form/entry_form.html:2868
+#: app/templates/forms/entry_form/entry_form.html:2871
 #: app/templates/macros/excel_io_modal.html:62
 msgid "Import Data"
 msgstr "Import Data"
@@ -13651,13 +13677,13 @@ msgstr "Import from System"
 msgid "Import from external API"
 msgstr "Import from external API"
 
-#: app/templates/forms/form_builder/form_builder.html:1176
+#: app/templates/forms/form_builder/form_builder.html:1178
 #: app/templates/forms/form_builder/partials/_excel_modal.html:38
 #, python-format
 msgid "Import into current version (Version %(num)s)"
 msgstr "Import into current version (Version %(num)s)"
 
-#: app/templates/forms/form_builder/form_builder.html:1175
+#: app/templates/forms/form_builder/form_builder.html:1177
 #: app/templates/forms/form_builder/partials/_excel_modal.html:20
 #, python-format
 msgid "Import into existing draft (Version %(num)s)"
@@ -13776,7 +13802,7 @@ msgstr "Importing"
 msgid "Importing documents"
 msgstr "Importing documents"
 
-#: app/templates/forms/form_builder/form_builder.html:1167
+#: app/templates/forms/form_builder/form_builder.html:1169
 msgid "Importing template…"
 msgstr "Importing template…"
 
@@ -13833,7 +13859,7 @@ msgstr "In Progress"
 msgid "In Review"
 msgstr "In Review"
 
-#: app/templates/forms/entry_form/entry_form.html:748
+#: app/templates/forms/entry_form/entry_form.html:751
 msgid "In good shape"
 msgstr "In good shape"
 
@@ -14083,7 +14109,7 @@ msgstr "Indicator Name"
 msgid "Indicator Name Translations"
 msgstr "Indicator Name Translations"
 
-#: app/templates/forms/form_builder/form_builder.html:898
+#: app/templates/forms/form_builder/form_builder.html:900
 msgid "Indicator Note Translations"
 msgstr "Indicator Note Translations"
 
@@ -14206,24 +14232,24 @@ msgstr ""
 msgid "Indirect Reach"
 msgstr "Indirect Reach"
 
-#: app/templates/forms/entry_form/entry_form.html:1724
-#: app/templates/forms/entry_form/entry_form.html:1866
-#: app/templates/forms/entry_form/entry_form.html:2579
+#: app/templates/forms/entry_form/entry_form.html:1727
+#: app/templates/forms/entry_form/entry_form.html:1869
+#: app/templates/forms/entry_form/entry_form.html:2582
 #: app/templates/forms/form_builder/partials/_item_modal.html:291
 msgid "Indirect reach"
 msgstr "Indirect reach"
 
-#: app/templates/forms/entry_form/entry_form.html:1356
-#: app/templates/forms/entry_form/entry_form.html:1385
-#: app/templates/forms/entry_form/entry_form.html:1497
-#: app/templates/forms/entry_form/entry_form.html:1526
-#: app/templates/forms/entry_form/entry_form.html:1650
-#: app/templates/forms/entry_form/entry_form.html:1679
-#: app/templates/forms/entry_form/entry_form.html:2381
-#: app/templates/forms/entry_form/entry_form.html:2402
-#: app/templates/forms/entry_form/entry_form.html:2429
-#: app/templates/forms/entry_form/entry_form.html:2488
-#: app/templates/forms/entry_form/entry_form.html:2515
+#: app/templates/forms/entry_form/entry_form.html:1359
+#: app/templates/forms/entry_form/entry_form.html:1388
+#: app/templates/forms/entry_form/entry_form.html:1500
+#: app/templates/forms/entry_form/entry_form.html:1529
+#: app/templates/forms/entry_form/entry_form.html:1653
+#: app/templates/forms/entry_form/entry_form.html:1682
+#: app/templates/forms/entry_form/entry_form.html:2384
+#: app/templates/forms/entry_form/entry_form.html:2405
+#: app/templates/forms/entry_form/entry_form.html:2432
+#: app/templates/forms/entry_form/entry_form.html:2491
+#: app/templates/forms/entry_form/entry_form.html:2518
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:219
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:247
 msgid "Indirect reach:"
@@ -14323,7 +14349,7 @@ msgstr ""
 msgid "Internal only (not for public use)"
 msgstr "Internal only (not for public use)"
 
-#: app/templates/forms/form_builder/form_builder.html:887
+#: app/templates/forms/form_builder/form_builder.html:889
 msgid "Introductions"
 msgstr "Introductions"
 
@@ -14363,12 +14389,12 @@ msgstr "Invalid entity selection."
 msgid "Invalid file type dropped"
 msgstr "Invalid file type dropped"
 
-#: app/routes/admin/form_builder/templates.py:367
-#: app/routes/admin/form_builder/templates.py:395
+#: app/routes/admin/form_builder/templates.py:368
+#: app/routes/admin/form_builder/templates.py:396
 msgid "Invalid file type."
 msgstr "Invalid file type."
 
-#: app/templates/forms/entry_form/entry_form.html:2895
+#: app/templates/forms/entry_form/entry_form.html:2898
 msgid ""
 "Invalid file type. Please select a PDF, Word, Excel, PowerPoint, or Text "
 "file."
@@ -14376,8 +14402,8 @@ msgstr ""
 "Invalid file type. Please select a PDF, Word, Excel, PowerPoint, or Text "
 "file."
 
-#: app/routes/admin/form_builder/templates.py:394
-#: app/routes/admin/form_builder/templates.py:424
+#: app/routes/admin/form_builder/templates.py:395
+#: app/routes/admin/form_builder/templates.py:425
 msgid ""
 "Invalid file type. Please upload an Excel file (.xlsx or .xls) in Kobo "
 "XLSForm format."
@@ -14385,12 +14411,12 @@ msgstr ""
 "Invalid file type. Please upload an Excel file (.xlsx or .xls) in Kobo "
 "XLSForm format."
 
-#: app/routes/admin/form_builder/templates.py:365
-#: app/routes/admin/form_builder/templates.py:683
+#: app/routes/admin/form_builder/templates.py:366
+#: app/routes/admin/form_builder/templates.py:684
 msgid "Invalid file type. Please upload an Excel file (.xlsx)."
 msgstr "Invalid file type. Please upload an Excel file (.xlsx)."
 
-#: app/routes/forms/entry.py:86
+#: app/routes/forms/entry.py:87
 msgid "Invalid form type."
 msgstr "Invalid form type."
 
@@ -14503,7 +14529,7 @@ msgstr "Item Modified"
 msgid "Item Restored"
 msgstr "Item Restored"
 
-#: app/templates/forms/form_builder/form_builder.html:795
+#: app/templates/forms/form_builder/form_builder.html:797
 msgid "Item Translations"
 msgstr "Item Translations"
 
@@ -14529,7 +14555,7 @@ msgstr "Item restored"
 
 #: app/templates/admin/templates/new_template.html:1137
 #: app/templates/forms/entry_form/validation_summary_pdf.html:201
-#: app/templates/forms/form_builder/form_builder.html:1163
+#: app/templates/forms/form_builder/form_builder.html:1165
 #: app/utils/form_localization.py:129
 msgid "Items"
 msgstr "Items"
@@ -14597,8 +14623,8 @@ msgstr "JSON request required"
 #: app/templates/admin/assignments/manage_assignment.html:291
 #: app/templates/admin/documents/documents.html:288
 #: app/templates/admin/documents/documents.html:314
-#: app/templates/forms/entry_form/entry_form.html:3067
-#: app/templates/forms/entry_form/entry_form.html:3093
+#: app/templates/forms/entry_form/entry_form.html:3070
+#: app/templates/forms/entry_form/entry_form.html:3096
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:166
@@ -14635,8 +14661,8 @@ msgstr "Judged traces"
 #: app/templates/admin/assignments/manage_assignment.html:297
 #: app/templates/admin/documents/documents.html:294
 #: app/templates/admin/documents/documents.html:320
-#: app/templates/forms/entry_form/entry_form.html:3073
-#: app/templates/forms/entry_form/entry_form.html:3099
+#: app/templates/forms/entry_form/entry_form.html:3076
+#: app/templates/forms/entry_form/entry_form.html:3102
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:172
@@ -14648,8 +14674,8 @@ msgstr "Jul"
 #: app/templates/admin/assignments/manage_assignment.html:296
 #: app/templates/admin/documents/documents.html:293
 #: app/templates/admin/documents/documents.html:319
-#: app/templates/forms/entry_form/entry_form.html:3072
-#: app/templates/forms/entry_form/entry_form.html:3098
+#: app/templates/forms/entry_form/entry_form.html:3075
+#: app/templates/forms/entry_form/entry_form.html:3101
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:171
@@ -14675,7 +14701,7 @@ msgstr "KPI code"
 msgid "KPI coverage"
 msgstr "KPI coverage"
 
-#: app/templates/forms/form_builder/form_builder.html:1463
+#: app/templates/forms/form_builder/form_builder.html:1465
 msgid "Keep Data and Archive Item"
 msgstr "Keep Data and Archive Item"
 
@@ -14691,7 +14717,7 @@ msgstr ""
 "Keep national-level assignment, country permissions, and Select All by "
 "region controls visible (recommended)."
 
-#: app/templates/forms/form_builder/form_builder.html:1464
+#: app/templates/forms/form_builder/form_builder.html:1466
 msgid "Keep the data entries but archive the"
 msgstr "Keep the data entries but archive the"
 
@@ -14740,11 +14766,11 @@ msgstr "Knowledge Base"
 msgid "Known issues"
 msgstr "Known issues"
 
-#: app/routes/admin/form_builder/templates.py:440
+#: app/routes/admin/form_builder/templates.py:441
 msgid "Kobo import failed."
 msgstr "Kobo import failed."
 
-#: app/routes/admin/form_builder/templates.py:444
+#: app/routes/admin/form_builder/templates.py:445
 #, python-format
 msgid "Kobo import failed: %(message)s"
 msgstr "Kobo import failed: %(message)s"
@@ -14810,8 +14836,8 @@ msgid "Label (English)"
 msgstr "Label (English)"
 
 #: app/templates/admin/indicator_bank/measurement_lookup_spef_form_partial.html:151
-#: app/templates/forms/form_builder/form_builder.html:800
-#: app/templates/forms/form_builder/form_builder.html:801
+#: app/templates/forms/form_builder/form_builder.html:802
+#: app/templates/forms/form_builder/form_builder.html:803
 msgid "Labels"
 msgstr "Labels"
 
@@ -14849,7 +14875,7 @@ msgstr "Language Code"
 msgid "Language columns"
 msgstr "Language columns"
 
-#: app/templates/forms/entry_form/entry_form.html:2958
+#: app/templates/forms/entry_form/entry_form.html:2961
 msgid "Language:"
 msgstr "Language:"
 
@@ -15115,7 +15141,7 @@ msgstr "Legend"
 msgid "Legend Text"
 msgstr "Legend Text"
 
-#: app/templates/forms/form_builder/form_builder.html:909
+#: app/templates/forms/form_builder/form_builder.html:911
 msgid "Legend Text Translations"
 msgstr "Legend Text Translations"
 
@@ -15216,9 +15242,9 @@ msgid "Link to published section"
 msgstr "Link to published section"
 
 #: app/templates/forms/form_builder/field_mapping.html:13
-#: app/templates/forms/form_builder/field_mapping.html:257
-#: app/templates/forms/form_builder/field_mapping.html:282
-#: app/templates/forms/form_builder/field_mapping.html:305
+#: app/templates/forms/form_builder/field_mapping.html:263
+#: app/templates/forms/form_builder/field_mapping.html:288
+#: app/templates/forms/form_builder/field_mapping.html:315
 msgid "Linked"
 msgstr "Linked"
 
@@ -15457,7 +15483,7 @@ msgstr "Loading form builder…"
 msgid "Loading form items..."
 msgstr "Loading form items..."
 
-#: app/templates/forms/entry_form/entry_form.html:456
+#: app/templates/forms/entry_form/entry_form.html:459
 msgid "Loading form…"
 msgstr "Loading form…"
 
@@ -15803,7 +15829,7 @@ msgstr "Looking up country information…"
 msgid "Looking up information for %(country)s…"
 msgstr "Looking up information for %(country)s…"
 
-#: app/templates/forms/form_builder/form_builder.html:954
+#: app/templates/forms/form_builder/form_builder.html:956
 msgid "Lookup Value Label Translations"
 msgstr "Lookup Value Label Translations"
 
@@ -15882,7 +15908,7 @@ msgstr "Maintenance"
 msgid "Maintenance in progress"
 msgstr "Maintenance in progress"
 
-#: app/templates/forms/entry_form/entry_form.html:3124
+#: app/templates/forms/entry_form/entry_form.html:3127
 msgid "Make this document publicly accessible"
 msgstr "Make this document publicly accessible"
 
@@ -16018,7 +16044,7 @@ msgstr "Manage roles, permissions, and access rules."
 msgid "Manage row header translations"
 msgstr "Manage row header translations"
 
-#: app/templates/forms/form_builder/form_builder.html:1346
+#: app/templates/forms/form_builder/form_builder.html:1348
 #: app/templates/forms/form_builder/partials/_template_details.html:170
 msgid "Manage template access..."
 msgstr "Manage template access..."
@@ -16042,7 +16068,7 @@ msgstr "Manage the central repository of indicators used throughout the"
 msgid "Manage the list used in the document upload type dropdown."
 msgstr "Manage the list used in the document upload type dropdown."
 
-#: app/templates/forms/form_builder/form_builder.html:755
+#: app/templates/forms/form_builder/form_builder.html:757
 msgid ""
 "Manage translations for all page names. Original English strings are shown "
 "in row headers, and you can add translations for each language."
@@ -16077,8 +16103,8 @@ msgid "Manual list"
 msgstr "Manual list"
 
 #: app/templates/forms/entry_form/entry_form.html:75
-#: app/templates/forms/entry_form/entry_form.html:3537
-#: app/templates/forms/entry_form/entry_form.html:3556
+#: app/templates/forms/entry_form/entry_form.html:3540
+#: app/templates/forms/entry_form/entry_form.html:3559
 msgid "Manual save required"
 msgstr "Manual save required"
 
@@ -16134,8 +16160,8 @@ msgstr ""
 #: app/templates/admin/assignments/manage_assignment.html:293
 #: app/templates/admin/documents/documents.html:290
 #: app/templates/admin/documents/documents.html:316
-#: app/templates/forms/entry_form/entry_form.html:3069
-#: app/templates/forms/entry_form/entry_form.html:3095
+#: app/templates/forms/entry_form/entry_form.html:3072
+#: app/templates/forms/entry_form/entry_form.html:3098
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:168
@@ -16228,23 +16254,23 @@ msgstr "Matching source"
 msgid "Matrix"
 msgstr "Matrix"
 
-#: app/templates/forms/form_builder/form_builder.html:976
+#: app/templates/forms/form_builder/form_builder.html:978
 msgid "Matrix Column Headers Translations Matrix"
 msgstr "Matrix Column Headers Translations Matrix"
 
-#: app/templates/forms/form_builder/form_builder.html:856
+#: app/templates/forms/form_builder/form_builder.html:858
 msgid "Matrix Descriptions"
 msgstr "Matrix Descriptions"
 
-#: app/templates/forms/form_builder/form_builder.html:852
+#: app/templates/forms/form_builder/form_builder.html:854
 msgid "Matrix Item Translations"
 msgstr "Matrix Item Translations"
 
-#: app/templates/forms/form_builder/form_builder.html:855
+#: app/templates/forms/form_builder/form_builder.html:857
 msgid "Matrix Labels"
 msgstr "Matrix Labels"
 
-#: app/templates/forms/form_builder/form_builder.html:989
+#: app/templates/forms/form_builder/form_builder.html:991
 msgid "Matrix Row Headers Translations Matrix"
 msgstr "Matrix Row Headers Translations Matrix"
 
@@ -16262,12 +16288,12 @@ msgstr "Matrix Title"
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr "Matrix configuration not available. Please contact the administrator."
 
-#: app/templates/forms/entry_form/entry_form.html:3770
+#: app/templates/forms/entry_form/entry_form.html:3773
 msgid "Matrix functionality unavailable"
 msgstr "Matrix functionality unavailable"
 
-#: app/templates/forms/entry_form/entry_form.html:3750
-#: app/templates/forms/entry_form/entry_form.html:3754
+#: app/templates/forms/entry_form/entry_form.html:3753
+#: app/templates/forms/entry_form/entry_form.html:3757
 msgid "Matrix handler not initialized"
 msgstr "Matrix handler not initialized"
 
@@ -16280,8 +16306,8 @@ msgstr "Max Iterations"
 msgid "Max Number of Entries"
 msgstr "Max Number of Entries"
 
-#: app/templates/forms/entry_form/entry_form.html:1928
-#: app/templates/forms/entry_form/entry_form.html:2668
+#: app/templates/forms/entry_form/entry_form.html:1931
+#: app/templates/forms/entry_form/entry_form.html:2671
 #, python-format
 msgid "Max entries: %(max)s"
 msgstr "Max entries: %(max)s"
@@ -16311,11 +16337,11 @@ msgstr ""
 "Maximum decimal places accepted for this column. Values are rounded on save;"
 " use \".\" for decimals and \",\" for thousands when entering or pasting."
 
-#: app/templates/forms/entry_form/entry_form.html:2906
+#: app/templates/forms/entry_form/entry_form.html:2909
 msgid "Maximum documents allowed"
 msgstr "Maximum documents allowed"
 
-#: app/templates/forms/entry_form/entry_form.html:2871
+#: app/templates/forms/entry_form/entry_form.html:2874
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Maximum file size: 10MB"
 msgstr "Maximum file size: 10MB"
@@ -16324,7 +16350,7 @@ msgstr "Maximum file size: 10MB"
 msgid "Maximum file size: 20 MB"
 msgstr "Maximum file size: 20 MB"
 
-#: app/templates/forms/entry_form/entry_form.html:2950
+#: app/templates/forms/entry_form/entry_form.html:2953
 msgid "Maximum file size: 25MB"
 msgstr "Maximum file size: 25MB"
 
@@ -16336,7 +16362,7 @@ msgstr ""
 "Maximum number of repeat entries that can be added. Leave empty for no "
 "limit."
 
-#: app/templates/forms/entry_form/entry_form.html:2897
+#: app/templates/forms/entry_form/entry_form.html:2900
 #, python-format
 msgid ""
 "Maximum of %(max)s document(s) allowed for this field. You have already "
@@ -16349,8 +16375,8 @@ msgstr ""
 #: app/templates/admin/assignments/manage_assignment.html:295
 #: app/templates/admin/documents/documents.html:292
 #: app/templates/admin/documents/documents.html:318
-#: app/templates/forms/entry_form/entry_form.html:3071
-#: app/templates/forms/entry_form/entry_form.html:3097
+#: app/templates/forms/entry_form/entry_form.html:3074
+#: app/templates/forms/entry_form/entry_form.html:3100
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:170
@@ -16660,7 +16686,7 @@ msgstr "Monitoring Questions"
 
 #: app/templates/admin/assignments/manage_assignment.html:248
 #: app/templates/admin/documents/documents.html:233
-#: app/templates/forms/entry_form/entry_form.html:3012
+#: app/templates/forms/entry_form/entry_form.html:3015
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:43
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:89
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:116
@@ -16938,7 +16964,7 @@ msgstr "National Society Leader"
 #: app/templates/admin/organization/_nss_component.html:159
 #: app/templates/admin/organization/_nss_component.html:208
 #: app/templates/admin/organization/index.html:990
-#: app/templates/forms/form_builder/form_builder.html:1083
+#: app/templates/forms/form_builder/form_builder.html:1085
 msgid "National Society Name"
 msgstr "National Society Name"
 
@@ -16989,7 +17015,7 @@ msgid "Navigate your dashboard and access reporting tools"
 msgstr "Navigate your dashboard and access reporting tools"
 
 #: app/templates/admin/docs/documentation.html:1117
-#: app/templates/forms/entry_form/entry_form.html:579
+#: app/templates/forms/entry_form/entry_form.html:582
 msgid "Navigation"
 msgstr "Navigation"
 
@@ -17015,13 +17041,13 @@ msgstr "Needs Improvement"
 msgid "Needs Review"
 msgstr "Needs Review"
 
-#: app/templates/forms/entry_form/entry_form.html:749
+#: app/templates/forms/entry_form/entry_form.html:752
 #: app/templates/forms/entry_form/validation_summary_progress.html:307
 msgid "Needs attention"
 msgstr "Needs attention"
 
 #: app/templates/admin/ai/dashboard.html:212
-#: app/templates/forms/form_builder/field_mapping.html:304
+#: app/templates/forms/form_builder/field_mapping.html:314
 msgid "Needs review"
 msgstr "Needs review"
 
@@ -17104,8 +17130,8 @@ msgstr "Never Logged In"
 #: app/templates/admin/reports/builder.html:23
 #: app/templates/admin/resources/edit_resource_subgroup.html:17
 #: app/templates/components/_status_label.html:105
-#: app/templates/forms/form_builder/field_mapping.html:306
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/field_mapping.html:316
+#: app/templates/forms/form_builder/form_builder.html:500
 msgid "New"
 msgstr "New"
 
@@ -17181,11 +17207,11 @@ msgid "New due date"
 msgstr "New due date"
 
 #: app/templates/forms/form_builder/field_mapping.html:17
-#: app/templates/forms/form_builder/field_mapping.html:284
+#: app/templates/forms/form_builder/field_mapping.html:290
 msgid "New field"
 msgstr "New field"
 
-#: app/templates/forms/form_builder/field_mapping.html:267
+#: app/templates/forms/form_builder/field_mapping.html:273
 msgid "New fields"
 msgstr "New fields"
 
@@ -17241,7 +17267,7 @@ msgid "Next"
 msgstr "Next"
 
 #: app/templates/components/ag_grid_i18n_js.html:64
-#: app/templates/forms/entry_form/entry_form.html:4020
+#: app/templates/forms/entry_form/entry_form.html:4023
 msgid "Next Page"
 msgstr "Next Page"
 
@@ -17260,11 +17286,11 @@ msgstr "Next year"
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:85
 #: app/templates/components/ag_grid_i18n_js.html:36
-#: app/templates/forms/entry_form/entry_form.html:1413
-#: app/templates/forms/entry_form/entry_form.html:1548
-#: app/templates/forms/entry_form/entry_form.html:1701
-#: app/templates/forms/entry_form/entry_form.html:1826
-#: app/templates/forms/entry_form/entry_form.html:2542
+#: app/templates/forms/entry_form/entry_form.html:1416
+#: app/templates/forms/entry_form/entry_form.html:1551
+#: app/templates/forms/entry_form/entry_form.html:1704
+#: app/templates/forms/entry_form/entry_form.html:1829
+#: app/templates/forms/entry_form/entry_form.html:2545
 #: app/templates/forms/entry_form/partials/disability_questions.html:32
 #: app/templates/forms/entry_form/partials/disability_questions.html:57
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:274
@@ -17311,11 +17337,11 @@ msgstr "No Category"
 msgid "No Documents Found"
 msgstr "No Documents Found"
 
-#: app/routes/admin/form_builder/templates.py:671
+#: app/routes/admin/form_builder/templates.py:672
 msgid "No Excel file provided for import."
 msgstr "No Excel file provided for import."
 
-#: app/routes/admin/form_builder/templates.py:677
+#: app/routes/admin/form_builder/templates.py:678
 msgid "No Excel file selected for import."
 msgstr "No Excel file selected for import."
 
@@ -17740,11 +17766,11 @@ msgstr "No events"
 msgid "No field types"
 msgstr "No field types"
 
-#: app/routes/admin/form_builder/templates.py:414
+#: app/routes/admin/form_builder/templates.py:415
 msgid "No file provided for Kobo import."
 msgstr "No file provided for Kobo import."
 
-#: app/routes/admin/form_builder/templates.py:356
+#: app/routes/admin/form_builder/templates.py:357
 msgid "No file provided."
 msgstr "No file provided."
 
@@ -17752,12 +17778,12 @@ msgstr "No file provided."
 msgid "No file selected"
 msgstr "No file selected"
 
-#: app/routes/admin/form_builder/templates.py:419
+#: app/routes/admin/form_builder/templates.py:420
 msgid "No file selected for Kobo import."
 msgstr "No file selected for Kobo import."
 
-#: app/routes/admin/form_builder/templates.py:360
-#: app/routes/admin/form_builder/templates.py:388
+#: app/routes/admin/form_builder/templates.py:361
+#: app/routes/admin/form_builder/templates.py:389
 #: app/routes/admin/utilities/translations.py:742
 msgid "No file selected."
 msgstr "No file selected."
@@ -17855,7 +17881,7 @@ msgstr "No indicators match your filters."
 msgid "No indicators matched these filters."
 msgstr "No indicators matched these filters."
 
-#: app/templates/forms/entry_form/entry_form.html:746
+#: app/templates/forms/entry_form/entry_form.html:749
 msgid "No issues to highlight. Open details for the full field list."
 msgstr "No issues to highlight. Open details for the full field list."
 
@@ -17926,7 +17952,7 @@ msgstr "No measurement unit"
 msgid "No metrics available"
 msgstr "No metrics available"
 
-#: app/templates/forms/entry_form/entry_form.html:4056
+#: app/templates/forms/entry_form/entry_form.html:4059
 msgid "No more indicators available for this section."
 msgstr "No more indicators available for this section."
 
@@ -18009,11 +18035,11 @@ msgstr "No processed requests yet."
 msgid "No public submissions found"
 msgstr "No public submissions found"
 
-#: app/templates/forms/form_builder/field_mapping.html:284
+#: app/templates/forms/form_builder/field_mapping.html:290
 msgid "No published counterpart — starts fresh with no inherited data."
 msgstr "No published counterpart — starts fresh with no inherited data."
 
-#: app/templates/forms/form_builder/field_mapping.html:269
+#: app/templates/forms/form_builder/field_mapping.html:275
 msgid "No published match"
 msgstr "No published match"
 
@@ -18153,7 +18179,7 @@ msgstr "No sections defined."
 msgid "No sections in this draft."
 msgstr "No sections in this draft."
 
-#: app/templates/forms/entry_form/entry_form.html:2685
+#: app/templates/forms/entry_form/entry_form.html:2688
 msgid "No sections or items found for this template."
 msgstr "No sections or items found for this template."
 
@@ -18443,11 +18469,11 @@ msgstr "Not Started"
 #: app/templates/admin/analytics/import_change_log.html:110
 #: app/templates/admin/governance/dashboard.html:257
 #: app/templates/components/_form_item_renderer.html:271
-#: app/templates/forms/entry_form/entry_form.html:1572
-#: app/templates/forms/entry_form/entry_form.html:1749
-#: app/templates/forms/entry_form/entry_form.html:1890
-#: app/templates/forms/entry_form/entry_form.html:2607
-#: app/templates/forms/entry_form/entry_form.html:2622
+#: app/templates/forms/entry_form/entry_form.html:1575
+#: app/templates/forms/entry_form/entry_form.html:1752
+#: app/templates/forms/entry_form/entry_form.html:1893
+#: app/templates/forms/entry_form/entry_form.html:2610
+#: app/templates/forms/entry_form/entry_form.html:2625
 #: app/templates/forms/entry_form/export_pdf.html:202
 #: app/templates/forms/entry_form/partials/matrix_table.html:628
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
@@ -18536,7 +18562,7 @@ msgstr "Not reported: expected indicators with no saved reported value."
 msgid "Not reviewed"
 msgstr "Not reviewed"
 
-#: app/templates/forms/entry_form/entry_form.html:745
+#: app/templates/forms/entry_form/entry_form.html:748
 #: app/templates/forms/entry_form/validation_summary_pdf.html:194
 #: app/templates/forms/entry_form/validation_summary_progress.html:299
 msgid "Not run"
@@ -18608,7 +18634,7 @@ msgstr "Notes (optional)"
 msgid "Notes visible to all users with access to this assignment."
 msgstr "Notes visible to all users with access to this assignment."
 
-#: app/templates/forms/form_builder/field_mapping.html:248
+#: app/templates/forms/form_builder/field_mapping.html:254
 msgid "Nothing to compare yet"
 msgstr "Nothing to compare yet"
 
@@ -18731,8 +18757,8 @@ msgstr "Notify the FDS member assigned to the submitting country (default)."
 #: app/templates/admin/assignments/manage_assignment.html:301
 #: app/templates/admin/documents/documents.html:298
 #: app/templates/admin/documents/documents.html:324
-#: app/templates/forms/entry_form/entry_form.html:3077
-#: app/templates/forms/entry_form/entry_form.html:3103
+#: app/templates/forms/entry_form/entry_form.html:3080
+#: app/templates/forms/entry_form/entry_form.html:3106
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:176
@@ -18829,8 +18855,8 @@ msgstr "Observation"
 #: app/templates/admin/assignments/manage_assignment.html:300
 #: app/templates/admin/documents/documents.html:297
 #: app/templates/admin/documents/documents.html:323
-#: app/templates/forms/entry_form/entry_form.html:3076
-#: app/templates/forms/entry_form/entry_form.html:3102
+#: app/templates/forms/entry_form/entry_form.html:3079
+#: app/templates/forms/entry_form/entry_form.html:3105
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:175
@@ -18974,6 +19000,16 @@ msgstr "Only an open issue can be accepted."
 msgid "Only apply non-empty translations (recommended)"
 msgstr "Only apply non-empty translations (recommended)"
 
+#: app/templates/forms/form_builder/field_mapping.html:294
+msgid ""
+"Only fields of the same kind can be linked. If the data type or indicator "
+"differs you will be asked to confirm, because existing answers are carried "
+"over as they are."
+msgstr ""
+"Only fields of the same kind can be linked. If the data type or indicator "
+"differs you will be asked to confirm, because existing answers are carried "
+"over as they are."
+
 #: app/routes/admin/form_builder/sections.py:154
 msgid "Only one discussion section is allowed per template version."
 msgstr "Only one discussion section is allowed per template version."
@@ -19056,12 +19092,12 @@ msgstr "Open List Library"
 msgid "Open P&B report management (system managers only)"
 msgstr "Open P&B report management (system managers only)"
 
-#: app/templates/forms/entry_form/entry_form.html:2705
+#: app/templates/forms/entry_form/entry_form.html:2708
 msgid "Open Sections Menu"
 msgstr "Open Sections Menu"
 
-#: app/templates/forms/form_builder/form_builder.html:442
-#: app/templates/forms/form_builder/form_builder.html:497
+#: app/templates/forms/form_builder/form_builder.html:443
+#: app/templates/forms/form_builder/form_builder.html:499
 msgid "Open Versions"
 msgstr "Open Versions"
 
@@ -19101,7 +19137,7 @@ msgstr "Open documents library"
 msgid "Open in new tab"
 msgstr "Open in new tab"
 
-#: app/templates/forms/entry_form/entry_form.html:4046
+#: app/templates/forms/entry_form/entry_form.html:4049
 msgid "Open indicator bank to propose new indicators or review existing ones"
 msgstr "Open indicator bank to propose new indicators or review existing ones"
 
@@ -19387,9 +19423,9 @@ msgid "Original query"
 msgstr "Original query"
 
 #: app/templates/forms/form_builder/field_mapping.html:19
-#: app/templates/forms/form_builder/field_mapping.html:272
-#: app/templates/forms/form_builder/field_mapping.html:285
-#: app/templates/forms/form_builder/field_mapping.html:307
+#: app/templates/forms/form_builder/field_mapping.html:278
+#: app/templates/forms/form_builder/field_mapping.html:291
+#: app/templates/forms/form_builder/field_mapping.html:317
 msgid "Orphaned"
 msgstr "Orphaned"
 
@@ -19447,7 +19483,7 @@ msgstr "Other paths (aggregated)"
 msgid "Other programs"
 msgstr "Other programs"
 
-#: app/templates/forms/entry_form/entry_form.html:3160
+#: app/templates/forms/entry_form/entry_form.html:3163
 msgid "Others are editing this form"
 msgstr "Others are editing this form"
 
@@ -19499,7 +19535,7 @@ msgstr "Override label (leave empty to use indicator bank name)"
 msgid "Overview"
 msgstr "Overview"
 
-#: app/templates/forms/entry_form/entry_form.html:747
+#: app/templates/forms/entry_form/entry_form.html:750
 msgid "Overview figures"
 msgstr "Overview figures"
 
@@ -19522,7 +19558,7 @@ msgstr "Overwrite existing translations"
 msgid "Owner"
 msgstr "Owner"
 
-#: app/templates/forms/form_builder/form_builder.html:1354
+#: app/templates/forms/form_builder/form_builder.html:1356
 #, python-format
 msgid "Owner: %(name)s"
 msgstr "Owner: %(name)s"
@@ -19668,12 +19704,12 @@ msgstr "PO write locking is not active"
 msgid "Page"
 msgstr "Page"
 
-#: app/templates/forms/entry_form/entry_form.html:878
+#: app/templates/forms/entry_form/entry_form.html:881
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:51
 msgid "Page "
 msgstr "Page "
 
-#: app/templates/forms/form_builder/form_builder.html:754
+#: app/templates/forms/form_builder/form_builder.html:756
 msgid "Page Name Translations Matrix"
 msgstr "Page Name Translations Matrix"
 
@@ -19737,7 +19773,7 @@ msgstr "Page reopened. Other submitted pages remain locked."
 msgid "Page returned for revision. Other submitted pages remain locked."
 msgstr "Page returned for revision. Other submitted pages remain locked."
 
-#: app/routes/forms/entry.py:1021 app/routes/forms/entry.py:1030
+#: app/routes/forms/entry.py:1033 app/routes/forms/entry.py:1042
 msgid "Page submitted successfully."
 msgstr "Page submitted successfully."
 
@@ -19772,7 +19808,7 @@ msgstr "Page-specific translation function not found"
 
 #: app/templates/admin/templates/new_template.html:1135
 #: app/templates/core/dashboard/_assignments_tab.html:137
-#: app/templates/forms/form_builder/form_builder.html:1161
+#: app/templates/forms/form_builder/form_builder.html:1163
 msgid "Pages"
 msgstr "Pages"
 
@@ -20094,7 +20130,7 @@ msgid "Period type"
 msgstr "Period type"
 
 #: app/templates/admin/documents/documents.html:226
-#: app/templates/forms/entry_form/entry_form.html:3006
+#: app/templates/forms/entry_form/entry_form.html:3009
 msgid "Period/Year Covered"
 msgstr "Period/Year Covered"
 
@@ -20105,7 +20141,7 @@ msgstr "Period/Year Covered"
 msgid "Period:"
 msgstr "Period:"
 
-#: app/templates/forms/form_builder/form_builder.html:1461
+#: app/templates/forms/form_builder/form_builder.html:1463
 msgid "Permanently delete all associated data entries and remove the"
 msgstr "Permanently delete all associated data entries and remove the"
 
@@ -20180,8 +20216,8 @@ msgstr "Pick one or more options from a list."
 msgid "Pie"
 msgstr "Pie"
 
-#: app/templates/forms/entry_form/entry_form.html:2716
-#: app/templates/forms/entry_form/entry_form.html:2718
+#: app/templates/forms/entry_form/entry_form.html:2719
+#: app/templates/forms/entry_form/entry_form.html:2721
 msgid "Pin Sections Pane"
 msgstr "Pin Sections Pane"
 
@@ -20294,11 +20330,11 @@ msgstr ""
 "Please review and validate this submission for %(country)s in the "
 "Backoffice."
 
-#: app/templates/forms/entry_form/entry_form.html:2907
+#: app/templates/forms/entry_form/entry_form.html:2910
 msgid "Please save the form first before editing this document."
 msgstr "Please save the form first before editing this document."
 
-#: app/templates/forms/entry_form/entry_form.html:2901
+#: app/templates/forms/entry_form/entry_form.html:2904
 msgid "Please select a Year/Period for the document."
 msgstr "Please select a Year/Period for the document."
 
@@ -20385,7 +20421,7 @@ msgstr "Please upload a supported guidance file"
 msgid "Please upload a valid Excel file (.xlsx or .xls)"
 msgstr "Please upload a valid Excel file (.xlsx or .xls)"
 
-#: app/templates/forms/form_builder/form_builder.html:1165
+#: app/templates/forms/form_builder/form_builder.html:1167
 msgid "Please upload a valid Excel file (.xlsx or .xls)."
 msgstr "Please upload a valid Excel file (.xlsx or .xls)."
 
@@ -20431,7 +20467,7 @@ msgstr "Plugin Config"
 msgid "Plugin Details"
 msgstr "Plugin Details"
 
-#: app/templates/forms/form_builder/form_builder.html:837
+#: app/templates/forms/form_builder/form_builder.html:839
 msgid "Plugin Field Translations"
 msgstr "Plugin Field Translations"
 
@@ -20581,7 +20617,7 @@ msgstr "Prefilled Values Notice"
 msgid "Prefilled value"
 msgstr "Prefilled value"
 
-#: app/templates/forms/entry_form/entry_form.html:556
+#: app/templates/forms/entry_form/entry_form.html:559
 #: app/templates/forms/form_builder/form_builder.html:237
 msgid "Preparing components. Please wait."
 msgstr "Preparing components. Please wait."
@@ -20598,7 +20634,7 @@ msgstr "Preparing launch"
 msgid "Preparing query…"
 msgstr "Preparing query…"
 
-#: app/templates/forms/entry_form/entry_form.html:4108
+#: app/templates/forms/entry_form/entry_form.html:4111
 msgid "Preparing request..."
 msgstr "Preparing request..."
 
@@ -20627,7 +20663,7 @@ msgstr "Presets only tick the boxes for you; you can adjust them afterwards."
 #: app/templates/admin/embed_content/manage_embed_content.html:413
 #: app/templates/components/ag_grid_i18n_js.html:49
 #: app/templates/forms/form_builder/form_builder.html:22
-#: app/templates/forms/form_builder/form_builder.html:497
+#: app/templates/forms/form_builder/form_builder.html:499
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:590
 #: app/templates/forms/form_builder/partials/_versions_modal.html:38
 #: plugins/upr/templates/upr/_manage_tools.html:12
@@ -20672,7 +20708,7 @@ msgstr "Preview failed."
 msgid "Preview import"
 msgstr "Preview import"
 
-#: app/templates/forms/entry_form/entry_form.html:4049
+#: app/templates/forms/entry_form/entry_form.html:4052
 msgid ""
 "Preview mode: this will not be saved. Assign this template to a country to "
 "test saving dynamic indicators."
@@ -20722,7 +20758,7 @@ msgstr "Preview version"
 msgid "Preview:"
 msgstr "Preview:"
 
-#: app/routes/forms/entry.py:1668
+#: app/routes/forms/entry.py:1681
 #, python-format
 msgid "Preview: %(name)s"
 msgstr "Preview: %(name)s"
@@ -20742,7 +20778,7 @@ msgid "Previous"
 msgstr "Previous"
 
 #: app/templates/components/ag_grid_i18n_js.html:63
-#: app/templates/forms/entry_form/entry_form.html:4019
+#: app/templates/forms/entry_form/entry_form.html:4022
 msgid "Previous Page"
 msgstr "Previous Page"
 
@@ -20959,11 +20995,11 @@ msgstr "Projection"
 msgid "Properties"
 msgstr "Properties"
 
-#: app/templates/forms/entry_form/entry_form.html:4045
+#: app/templates/forms/entry_form/entry_form.html:4048
 msgid "Propose Changes"
 msgstr "Propose Changes"
 
-#: app/templates/forms/entry_form/entry_form.html:4044
+#: app/templates/forms/entry_form/entry_form.html:4047
 msgid "Propose Indicator"
 msgstr "Propose Indicator"
 
@@ -20971,9 +21007,9 @@ msgstr "Propose Indicator"
 msgid "Propose New Indicator URL"
 msgstr "Propose New Indicator URL"
 
-#: app/templates/forms/entry_form/entry_form.html:1292
-#: app/templates/forms/entry_form/entry_form.html:2239
-#: app/templates/forms/entry_form/entry_form.html:4047
+#: app/templates/forms/entry_form/entry_form.html:1295
+#: app/templates/forms/entry_form/entry_form.html:2242
+#: app/templates/forms/entry_form/entry_form.html:4050
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:157
 msgid "Propose changes to this indicator"
 msgstr "Propose changes to this indicator"
@@ -21010,7 +21046,7 @@ msgid "Public 403s"
 msgstr "Public 403s"
 
 #: app/templates/admin/documents/documents.html:350
-#: app/templates/forms/entry_form/entry_form.html:3123
+#: app/templates/forms/entry_form/entry_form.html:3126
 msgid "Public Document"
 msgstr "Public Document"
 
@@ -21086,7 +21122,7 @@ msgstr "Public — no auth"
 msgid "Publish"
 msgstr "Publish"
 
-#: app/templates/forms/form_builder/field_mapping.html:191
+#: app/templates/forms/form_builder/field_mapping.html:197
 msgid "Publish this draft and remap submission data"
 msgstr "Publish this draft and remap submission data"
 
@@ -21095,7 +21131,7 @@ msgstr "Publish this draft and remap submission data"
 msgid "Published"
 msgstr "Published"
 
-#: app/templates/forms/form_builder/field_mapping.html:285
+#: app/templates/forms/form_builder/field_mapping.html:291
 msgid ""
 "Published field removed from draft — historical data stays on the archived "
 "version."
@@ -21117,8 +21153,8 @@ msgstr ""
 " is Published (500). Other states stay in the live columns and are left out "
 "of this view. The snapshot is filled on the next FDRS sync."
 
-#: app/templates/forms/form_builder/field_mapping.html:317
-#: app/templates/forms/form_builder/field_mapping.html:338
+#: app/templates/forms/form_builder/field_mapping.html:327
+#: app/templates/forms/form_builder/field_mapping.html:348
 msgid "Published match"
 msgstr "Published match"
 
@@ -21172,7 +21208,7 @@ msgid "Push title"
 msgstr "Push title"
 
 #: app/routes/forms/validation_summary.py:2052
-#: app/templates/forms/entry_form/entry_form.html:736
+#: app/templates/forms/entry_form/entry_form.html:739
 msgid "Putting the summary together…"
 msgstr "Putting the summary together…"
 
@@ -21242,11 +21278,11 @@ msgstr "Question"
 msgid "Question Options"
 msgstr "Question Options"
 
-#: app/templates/forms/form_builder/form_builder.html:767
+#: app/templates/forms/form_builder/form_builder.html:769
 msgid "Question Options Translations Matrix"
 msgstr "Question Options Translations Matrix"
 
-#: app/templates/forms/form_builder/form_builder.html:802
+#: app/templates/forms/form_builder/form_builder.html:804
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:25
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:27
 msgid "Question Text"
@@ -21404,6 +21440,10 @@ msgstr "Read"
 msgid "Read rate"
 msgstr "Read rate"
 
+#: app/templates/forms/form_builder/field_mapping.html:295
+msgid "Read the guide"
+msgstr "Read the guide"
+
 #: app/templates/forms/entry_form/entry_form.html:305
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:288
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:431
@@ -21544,7 +21584,7 @@ msgid "Reading reported values for this assignment…"
 msgstr "Reading reported values for this assignment…"
 
 #: app/routes/forms/validation_summary.py:2021
-#: app/templates/forms/entry_form/entry_form.html:734
+#: app/templates/forms/entry_form/entry_form.html:737
 msgid "Reading the assignment…"
 msgstr "Reading the assignment…"
 
@@ -21675,11 +21715,11 @@ msgstr "Recommended: narrow this key to the permissions its client needs."
 msgid "Recommended: set an expiry date for keys with sensitive access."
 msgstr "Recommended: set an expiry date for keys with sensitive access."
 
-#: app/templates/forms/entry_form/entry_form.html:3553
+#: app/templates/forms/entry_form/entry_form.html:3556
 msgid "Reconnected!"
 msgstr "Reconnected!"
 
-#: app/templates/forms/entry_form/entry_form.html:3547
+#: app/templates/forms/entry_form/entry_form.html:3550
 msgid "Reconnecting..."
 msgstr "Reconnecting..."
 
@@ -21933,7 +21973,7 @@ msgstr "Reload"
 msgid "Reload All Plugins"
 msgstr "Reload All Plugins"
 
-#: app/templates/forms/entry_form/entry_form.html:560
+#: app/templates/forms/entry_form/entry_form.html:563
 msgid "Reload Page"
 msgstr "Reload Page"
 
@@ -21977,7 +22017,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:1213
 #: app/templates/admin/organization/index.html:1214
 #: app/templates/admin/organization/index.html:1296
-#: app/templates/forms/form_builder/form_builder.html:498
+#: app/templates/forms/form_builder/form_builder.html:500
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:135
 msgid "Remove"
 msgstr "Remove"
@@ -22056,9 +22096,9 @@ msgstr ""
 "Remove this category? Values saved for it will be cleared on every National "
 "Society."
 
-#: app/templates/forms/entry_form/entry_form.html:1300
-#: app/templates/forms/entry_form/entry_form.html:2247
-#: app/templates/forms/entry_form/entry_form.html:4052
+#: app/templates/forms/entry_form/entry_form.html:1303
+#: app/templates/forms/entry_form/entry_form.html:2250
+#: app/templates/forms/entry_form/entry_form.html:4055
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:165
 msgid "Remove this indicator"
 msgstr "Remove this indicator"
@@ -22083,7 +22123,7 @@ msgstr ""
 
 #: app/templates/forms/form_builder/field_mapping.html:47
 #: app/templates/forms/form_builder/field_mapping.html:132
-#: app/templates/forms/form_builder/field_mapping.html:274
+#: app/templates/forms/form_builder/field_mapping.html:280
 msgid "Removed from draft"
 msgstr "Removed from draft"
 
@@ -22198,7 +22238,7 @@ msgstr "Repeat/dynamic data stays archived"
 msgid "Replace"
 msgstr "Replace"
 
-#: app/templates/forms/entry_form/entry_form.html:2891
+#: app/templates/forms/entry_form/entry_form.html:2894
 msgid "Replace Document"
 msgstr "Replace Document"
 
@@ -22332,7 +22372,7 @@ msgstr "Reporting periods"
 msgid "Reporting years"
 msgstr "Reporting years"
 
-#: app/templates/forms/entry_form/entry_form.html:750
+#: app/templates/forms/entry_form/entry_form.html:753
 msgid "Reporting-country comment"
 msgstr "Reporting-country comment"
 
@@ -22440,16 +22480,16 @@ msgstr "Request cancelled"
 
 #: app/templates/core/dashboard/_assignments_tab.html:314
 #: app/templates/core/dashboard/_assignments_tab.html:317
-#: app/templates/forms/entry_form/entry_form.html:670
-#: app/templates/forms/entry_form/entry_form.html:674
-#: app/templates/forms/entry_form/entry_form.html:2817
+#: app/templates/forms/entry_form/entry_form.html:673
+#: app/templates/forms/entry_form/entry_form.html:677
+#: app/templates/forms/entry_form/entry_form.html:2820
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:35
 msgid "Request changes"
 msgstr "Request changes"
 
 #: app/templates/core/dashboard/_assignments_tab.html:313
-#: app/templates/forms/entry_form/entry_form.html:669
-#: app/templates/forms/entry_form/entry_form.html:2816
+#: app/templates/forms/entry_form/entry_form.html:672
+#: app/templates/forms/entry_form/entry_form.html:2819
 msgid "Request changes?"
 msgstr "Request changes?"
 
@@ -22606,7 +22646,7 @@ msgstr "Reset to defaults"
 msgid "Reset to template"
 msgstr "Reset to template"
 
-#: app/templates/forms/entry_form/entry_form.html:715
+#: app/templates/forms/entry_form/entry_form.html:718
 msgid "Resize navigation panel"
 msgstr "Resize navigation panel"
 
@@ -22687,7 +22727,7 @@ msgstr "Restart app after saving (recommended to apply across all processes)"
 msgid "Restore"
 msgstr "Restore"
 
-#: app/templates/forms/form_builder/form_builder.html:424
+#: app/templates/forms/form_builder/form_builder.html:425
 msgid "Restore or create a draft from another version to make changes."
 msgstr "Restore or create a draft from another version to make changes."
 
@@ -22780,8 +22820,8 @@ msgstr ""
 "period match this assignment."
 
 #: app/templates/core/dashboard/_assignments_tab.html:315
-#: app/templates/forms/entry_form/entry_form.html:671
-#: app/templates/forms/entry_form/entry_form.html:2818
+#: app/templates/forms/entry_form/entry_form.html:674
+#: app/templates/forms/entry_form/entry_form.html:2821
 msgid "Return this assignment to the National Society for changes?"
 msgstr "Return this assignment to the National Society for changes?"
 
@@ -22797,7 +22837,7 @@ msgstr ""
 "Return this page to the National Society for changes? Other submitted pages "
 "will stay locked."
 
-#: app/templates/forms/form_builder/field_mapping.html:250
+#: app/templates/forms/form_builder/field_mapping.html:256
 msgid "Return to form builder"
 msgstr "Return to form builder"
 
@@ -22806,7 +22846,7 @@ msgid "Returned for revision"
 msgstr "Returned for revision"
 
 #: app/templates/core/dashboard/_assignments_tab.html:316
-#: app/templates/forms/entry_form/entry_form.html:672
+#: app/templates/forms/entry_form/entry_form.html:675
 msgid "Returning…"
 msgstr "Returning…"
 
@@ -22871,7 +22911,7 @@ msgstr "Review needed"
 msgid "Review outcome"
 msgstr "Review outcome"
 
-#: app/templates/forms/form_builder/field_mapping.html:264
+#: app/templates/forms/form_builder/field_mapping.html:270
 msgid "Review recommended"
 msgstr "Review recommended"
 
@@ -23136,8 +23176,8 @@ msgid "Rules Registry"
 msgstr "Rules Registry"
 
 #: app/templates/admin/data_exploration/explore_data.html:150
-#: app/templates/forms/entry_form/entry_form.html:2747
-#: app/templates/forms/entry_form/entry_form.html:2751
+#: app/templates/forms/entry_form/entry_form.html:2750
+#: app/templates/forms/entry_form/entry_form.html:2754
 msgid "Run AI validation"
 msgstr "Run AI validation"
 
@@ -23179,7 +23219,7 @@ msgstr "Run verification"
 msgid "Running"
 msgstr "Running"
 
-#: app/templates/forms/entry_form/entry_form.html:4107
+#: app/templates/forms/entry_form/entry_form.html:4110
 msgid "Running AI opinions..."
 msgstr "Running AI opinions..."
 
@@ -23278,10 +23318,10 @@ msgstr "Saturday"
 #: app/templates/admin/validation_rules.html:135
 #: app/templates/admin/validation_rules.html:168
 #: app/templates/admin/validation_rules.html:194
-#: app/templates/forms/entry_form/entry_form.html:625
-#: app/templates/forms/entry_form/entry_form.html:639
-#: app/templates/forms/entry_form/entry_form.html:2722
-#: app/templates/forms/entry_form/entry_form.html:2724
+#: app/templates/forms/entry_form/entry_form.html:628
+#: app/templates/forms/entry_form/entry_form.html:642
+#: app/templates/forms/entry_form/entry_form.html:2725
+#: app/templates/forms/entry_form/entry_form.html:2727
 #: app/templates/forms/entry_form/partials/discussion_panel.html:42
 #: app/templates/forms/entry_form/partials/discussion_panel_section.html:35
 #: app/templates/forms/form_builder/partials/_template_details.html:11
@@ -23308,8 +23348,8 @@ msgstr "Save All Translations"
 msgid "Save Changes"
 msgstr "Save Changes"
 
-#: app/templates/forms/entry_form/entry_form.html:681
-#: app/templates/forms/entry_form/entry_form.html:688
+#: app/templates/forms/entry_form/entry_form.html:684
+#: app/templates/forms/entry_form/entry_form.html:691
 msgid "Save Draft"
 msgstr "Save Draft"
 
@@ -23384,7 +23424,7 @@ msgstr ""
 msgid "Saved"
 msgstr "Saved"
 
-#: app/templates/forms/entry_form/entry_form.html:4031
+#: app/templates/forms/entry_form/entry_form.html:4034
 msgid ""
 "Saved value is no longer in the current list. It will still be submitted "
 "unless you choose another option."
@@ -23545,7 +23585,7 @@ msgstr "Search NS sub-branches..."
 msgid "Search Placeholder Text"
 msgstr "Search Placeholder Text"
 
-#: app/templates/forms/form_builder/form_builder.html:920
+#: app/templates/forms/form_builder/form_builder.html:922
 msgid "Search Placeholder Translations"
 msgstr "Search Placeholder Translations"
 
@@ -23865,7 +23905,7 @@ msgstr "Section Modified"
 msgid "Section Name"
 msgstr "Section Name"
 
-#: app/templates/forms/form_builder/form_builder.html:730
+#: app/templates/forms/form_builder/form_builder.html:732
 msgid "Section Name Translations"
 msgstr "Section Name Translations"
 
@@ -23916,11 +23956,11 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1136
 #: app/templates/admin/validation_dashboard.html:289
-#: app/templates/forms/entry_form/entry_form.html:903
+#: app/templates/forms/entry_form/entry_form.html:906
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:68
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:69
-#: app/templates/forms/form_builder/field_mapping.html:296
-#: app/templates/forms/form_builder/form_builder.html:1162
+#: app/templates/forms/form_builder/field_mapping.html:306
+#: app/templates/forms/form_builder/form_builder.html:1164
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:378
 msgid "Sections"
 msgstr "Sections"
@@ -24033,7 +24073,7 @@ msgid ""
 msgstr ""
 "Security settings configuration UI is not yet implemented in this view."
 
-#: app/templates/forms/entry_form/entry_form.html:4054
+#: app/templates/forms/entry_form/entry_form.html:4057
 msgid "Security token not found. Please refresh the page and try again."
 msgstr "Security token not found. Please refresh the page and try again."
 
@@ -24094,7 +24134,7 @@ msgstr "Select All Visible"
 msgid "Select Column..."
 msgstr "Select Column..."
 
-#: app/templates/forms/entry_form/entry_form.html:2923
+#: app/templates/forms/entry_form/entry_form.html:2926
 msgid "Select Document:"
 msgstr "Select Document:"
 
@@ -24106,7 +24146,7 @@ msgstr "Select Endpoint"
 msgid "Select Entities"
 msgstr "Select Entities"
 
-#: app/templates/forms/entry_form/entry_form.html:4058
+#: app/templates/forms/entry_form/entry_form.html:4061
 msgid "Select Indicator"
 msgstr "Select Indicator"
 
@@ -24403,7 +24443,7 @@ msgid "Select country you will manage data for"
 msgstr "Select country you will manage data for"
 
 #: app/templates/admin/documents/documents.html:186
-#: app/templates/forms/entry_form/entry_form.html:2994
+#: app/templates/forms/entry_form/entry_form.html:2997
 msgid "Select document type"
 msgstr "Select document type"
 
@@ -24434,7 +24474,7 @@ msgid "Select indicators"
 msgstr "Select indicators"
 
 #: app/templates/admin/documents/documents.html:195
-#: app/templates/forms/entry_form/entry_form.html:2961
+#: app/templates/forms/entry_form/entry_form.html:2964
 msgid "Select language"
 msgstr "Select language"
 
@@ -24549,11 +24589,11 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:268
 #: app/templates/admin/documents/documents.html:285
 #: app/templates/admin/documents/documents.html:311
-#: app/templates/forms/entry_form/entry_form.html:3023
-#: app/templates/forms/entry_form/entry_form.html:3037
-#: app/templates/forms/entry_form/entry_form.html:3047
-#: app/templates/forms/entry_form/entry_form.html:3064
-#: app/templates/forms/entry_form/entry_form.html:3090
+#: app/templates/forms/entry_form/entry_form.html:3026
+#: app/templates/forms/entry_form/entry_form.html:3040
+#: app/templates/forms/entry_form/entry_form.html:3050
+#: app/templates/forms/entry_form/entry_form.html:3067
+#: app/templates/forms/entry_form/entry_form.html:3093
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:126
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:138
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:148
@@ -24702,12 +24742,12 @@ msgstr ""
 msgid "Send digest now"
 msgstr "Send digest now"
 
-#: app/templates/forms/entry_form/entry_form.html:646
-#: app/templates/forms/entry_form/entry_form.html:650
+#: app/templates/forms/entry_form/entry_form.html:649
+#: app/templates/forms/entry_form/entry_form.html:653
 msgid "Send for Review"
 msgstr "Send for Review"
 
-#: app/templates/forms/entry_form/entry_form.html:645
+#: app/templates/forms/entry_form/entry_form.html:648
 msgid "Send for Review?"
 msgstr "Send for Review?"
 
@@ -24732,7 +24772,7 @@ msgstr ""
 msgid "Send test email"
 msgstr "Send test email"
 
-#: app/templates/forms/entry_form/entry_form.html:647
+#: app/templates/forms/entry_form/entry_form.html:650
 msgid ""
 "Send this assignment to delegation for review? You will not be able to edit "
 "it until they return it for changes."
@@ -24772,7 +24812,7 @@ msgstr ""
 #: app/templates/admin/communication/center.html:1571
 #: app/templates/admin/user_management/access_requests.html:377
 #: app/templates/auth/login.html:854
-#: app/templates/forms/entry_form/entry_form.html:648
+#: app/templates/forms/entry_form/entry_form.html:651
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -24826,8 +24866,8 @@ msgstr "Sent for review: %(assignment_title)s — %(country)s"
 #: app/templates/admin/assignments/manage_assignment.html:299
 #: app/templates/admin/documents/documents.html:296
 #: app/templates/admin/documents/documents.html:322
-#: app/templates/forms/entry_form/entry_form.html:3075
-#: app/templates/forms/entry_form/entry_form.html:3101
+#: app/templates/forms/entry_form/entry_form.html:3078
+#: app/templates/forms/entry_form/entry_form.html:3104
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:174
@@ -24955,7 +24995,7 @@ msgstr "Set Preferred"
 msgid "Set a new password"
 msgstr "Set a new password"
 
-#: app/templates/forms/form_builder/form_builder.html:977
+#: app/templates/forms/form_builder/form_builder.html:979
 msgid ""
 "Set the English display label and translations for each column. The column "
 "code (used for variable lookups) is shown in the first column. If no English"
@@ -24977,7 +25017,7 @@ msgstr "Set the name, access, and options for a new blank template."
 msgid "Set the template name, description, and access before creation."
 msgstr "Set the template name, description, and access before creation."
 
-#: app/templates/forms/form_builder/form_builder.html:990
+#: app/templates/forms/form_builder/form_builder.html:992
 msgid ""
 "Set translations for each row header. The English text is shown in the first"
 " column as a reference. Translations will be displayed to users based on "
@@ -25038,11 +25078,11 @@ msgstr "Setup"
 msgid "Severity"
 msgstr "Severity"
 
-#: app/templates/forms/entry_form/entry_form.html:1348
-#: app/templates/forms/entry_form/entry_form.html:1489
-#: app/templates/forms/entry_form/entry_form.html:1642
-#: app/templates/forms/entry_form/entry_form.html:2352
-#: app/templates/forms/entry_form/entry_form.html:2480
+#: app/templates/forms/entry_form/entry_form.html:1351
+#: app/templates/forms/entry_form/entry_form.html:1492
+#: app/templates/forms/entry_form/entry_form.html:1645
+#: app/templates/forms/entry_form/entry_form.html:2355
+#: app/templates/forms/entry_form/entry_form.html:2483
 #: app/templates/forms/entry_form/export_pdf.html:607
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:211
 msgid "Sex"
@@ -25176,7 +25216,7 @@ msgstr "Show All"
 msgid "Show All Years"
 msgstr "Show All Years"
 
-#: app/templates/forms/form_builder/form_builder.html:675
+#: app/templates/forms/form_builder/form_builder.html:677
 msgid "Show Archived Items/Sections"
 msgstr "Show Archived Items/Sections"
 
@@ -25248,7 +25288,7 @@ msgstr "Show details"
 msgid "Show divisions"
 msgstr "Show divisions"
 
-#: app/templates/forms/entry_form/entry_form.html:3184
+#: app/templates/forms/entry_form/entry_form.html:3187
 msgid "Show editors"
 msgstr "Show editors"
 
@@ -25535,7 +25575,7 @@ msgstr "Single PO"
 
 #: app/templates/admin/assignments/manage_assignment.html:246
 #: app/templates/admin/documents/documents.html:231
-#: app/templates/forms/entry_form/entry_form.html:3010
+#: app/templates/forms/entry_form/entry_form.html:3013
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:41
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:81
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:114
@@ -25789,7 +25829,7 @@ msgstr "Start"
 
 #: app/templates/admin/assignments/manage_assignment.html:267
 #: app/templates/admin/documents/documents.html:278
-#: app/templates/forms/entry_form/entry_form.html:3057
+#: app/templates/forms/entry_form/entry_form.html:3060
 msgid "Start Period"
 msgstr "Start Period"
 
@@ -25803,7 +25843,7 @@ msgstr "Start Translation"
 
 #: app/templates/admin/assignments/manage_assignment.html:258
 #: app/templates/admin/documents/documents.html:252
-#: app/templates/forms/entry_form/entry_form.html:3031
+#: app/templates/forms/entry_form/entry_form.html:3034
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:132
 msgid "Start Year"
 msgstr "Start Year"
@@ -25964,8 +26004,8 @@ msgstr "Static attachment(s)"
 #: app/templates/core/dashboard/_assignments_tab.html:75
 #: app/templates/core/dashboard/_assignments_tab.html:499
 #: app/templates/forms/entry_form/validation_summary_progress.html:322
-#: app/templates/forms/form_builder/field_mapping.html:318
-#: app/templates/forms/form_builder/field_mapping.html:339
+#: app/templates/forms/form_builder/field_mapping.html:328
+#: app/templates/forms/form_builder/field_mapping.html:349
 #: app/templates/forms/form_builder/partials/_versions_modal.html:12
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:45
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:131
@@ -26040,8 +26080,8 @@ msgstr "Steps in progress"
 msgid "Steps:"
 msgstr "Steps:"
 
-#: app/templates/forms/entry_form/entry_form.html:3314
-#: app/templates/forms/form_builder/form_builder.html:1319
+#: app/templates/forms/entry_form/entry_form.html:3317
+#: app/templates/forms/form_builder/form_builder.html:1321
 msgid "Still loading…"
 msgstr "Still loading…"
 
@@ -26049,11 +26089,11 @@ msgstr "Still loading…"
 #: app/templates/components/auto_translate_modal_js.html:62
 #: app/templates/core/chat_immersive.html:52
 #: app/templates/core/chat_immersive.html:262
-#: app/templates/forms/entry_form/entry_form.html:4105
+#: app/templates/forms/entry_form/entry_form.html:4108
 msgid "Stop"
 msgstr "Stop"
 
-#: app/templates/forms/entry_form/entry_form.html:4106
+#: app/templates/forms/entry_form/entry_form.html:4109
 msgid "Stop AI validation"
 msgstr "Stop AI validation"
 
@@ -26131,7 +26171,7 @@ msgstr "Strategy 2030 area from the IFRC SPEF catalog (SPs & EFs)."
 msgid "Strict (manual total must equal breakdown sum; blocks submit)"
 msgstr "Strict (manual total must equal breakdown sum; blocks submit)"
 
-#: app/templates/forms/form_builder/field_mapping.html:290
+#: app/templates/forms/form_builder/field_mapping.html:300
 msgid "Structure type"
 msgstr "Structure type"
 
@@ -26220,11 +26260,11 @@ msgstr "Submission status map"
 msgid "Submission successful"
 msgstr "Submission successful"
 
-#: app/templates/forms/entry_form/entry_form.html:630
-#: app/templates/forms/entry_form/entry_form.html:657
-#: app/templates/forms/entry_form/entry_form.html:661
-#: app/templates/forms/entry_form/entry_form.html:2729
-#: app/templates/forms/entry_form/entry_form.html:2731
+#: app/templates/forms/entry_form/entry_form.html:633
+#: app/templates/forms/entry_form/entry_form.html:660
+#: app/templates/forms/entry_form/entry_form.html:664
+#: app/templates/forms/entry_form/entry_form.html:2732
+#: app/templates/forms/entry_form/entry_form.html:2734
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:20
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:24
 msgid "Submit"
@@ -26234,7 +26274,7 @@ msgstr "Submit"
 msgid "Submit Documents"
 msgstr "Submit Documents"
 
-#: app/templates/forms/entry_form/entry_form.html:656
+#: app/templates/forms/entry_form/entry_form.html:659
 msgid "Submit Form?"
 msgstr "Submit Form?"
 
@@ -26289,7 +26329,7 @@ msgstr ""
 msgid "Submitted At"
 msgstr "Submitted At"
 
-#: app/templates/forms/form_builder/form_builder.html:965
+#: app/templates/forms/form_builder/form_builder.html:967
 msgid "Submitted Value Label Translations"
 msgstr "Submitted Value Label Translations"
 
@@ -26314,13 +26354,13 @@ msgstr "Submitted value label"
 msgid "Submitter"
 msgstr "Submitter"
 
-#: app/templates/forms/entry_form/entry_form.html:797
+#: app/templates/forms/entry_form/entry_form.html:800
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:10
 #: app/templates/public_submission_export_pdf.html:14
 msgid "Submitter Information"
 msgstr "Submitter Information"
 
-#: app/templates/forms/entry_form/entry_form.html:659
+#: app/templates/forms/entry_form/entry_form.html:662
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:22
 msgid "Submitting…"
 msgstr "Submitting…"
@@ -26393,8 +26433,8 @@ msgid "Successfully processed: {count}"
 msgstr "Successfully processed: {count}"
 
 #: app/templates/forms/form_builder/field_mapping.html:15
-#: app/templates/forms/form_builder/field_mapping.html:262
-#: app/templates/forms/form_builder/field_mapping.html:283
+#: app/templates/forms/form_builder/field_mapping.html:268
+#: app/templates/forms/form_builder/field_mapping.html:289
 #: plugins/upr/templates/upr/_language_select.html:14
 msgid "Suggested"
 msgstr "Suggested"
@@ -26445,7 +26485,7 @@ msgstr ""
 msgid "Sum of values"
 msgstr "Sum of values"
 
-#: app/templates/forms/entry_form/entry_form.html:2772
+#: app/templates/forms/entry_form/entry_form.html:2775
 #: app/templates/forms/entry_form/validation_summary_pdf.html:175
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:125
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:324
@@ -26465,7 +26505,7 @@ msgstr "Sunday"
 msgid "Supported Languages"
 msgstr "Supported Languages"
 
-#: app/templates/forms/entry_form/entry_form.html:2871
+#: app/templates/forms/entry_form/entry_form.html:2874
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Supported formats: .xlsx"
 msgstr "Supported formats: .xlsx"
@@ -26701,7 +26741,7 @@ msgstr ""
 "System managers only. Prepare data, generate reports, and configure system-"
 "sourced mappings."
 
-#: app/templates/forms/form_builder/field_mapping.html:283
+#: app/templates/forms/form_builder/field_mapping.html:289
 msgid ""
 "System matched by position (e.g. label changed) — confirm or pick another "
 "link."
@@ -26847,7 +26887,7 @@ msgstr "Technical safeguards include:"
 #: app/templates/admin/templates/data_sync_imputation.html:144
 #: app/templates/admin/validation_questions.html:64
 #: app/templates/admin/validation_questions.html:234
-#: app/templates/forms/form_builder/field_mapping.html:230
+#: app/templates/forms/form_builder/field_mapping.html:236
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:62
 msgid "Template"
 msgstr "Template"
@@ -26857,7 +26897,7 @@ msgstr "Template"
 msgid "Template %(id)s"
 msgstr "Template %(id)s"
 
-#: app/routes/admin/form_builder/templates.py:745
+#: app/routes/admin/form_builder/templates.py:746
 #, python-format
 msgid ""
 "Template '%(name)s' created and Excel import completed: %(pages)d pages, "
@@ -26866,7 +26906,7 @@ msgstr ""
 "Template '%(name)s' created and Excel import completed: %(pages)d pages, "
 "%(sections)d sections, and %(items)d items imported."
 
-#: app/routes/admin/form_builder/templates.py:459
+#: app/routes/admin/form_builder/templates.py:460
 #, python-format
 msgid ""
 "Template '%(name)s' created with %(sections)d sections and %(items)d items. "
@@ -26890,7 +26930,7 @@ msgstr "Template (for thresholds & check types)"
 msgid "Template Access"
 msgstr "Template Access"
 
-#: app/templates/forms/form_builder/form_builder.html:1380
+#: app/templates/forms/form_builder/form_builder.html:1382
 msgid "Template Access Management"
 msgstr "Template Access Management"
 
@@ -26931,7 +26971,7 @@ msgstr "Template Imported"
 #: app/templates/admin/lists/list_detail.html:65
 #: app/templates/admin/templates/new_template.html:28
 #: app/templates/admin/templates/templates.html:49
-#: app/templates/forms/form_builder/field_mapping.html:204
+#: app/templates/forms/form_builder/field_mapping.html:210
 #: app/templates/forms/form_builder/form_builder.html:78
 msgid "Template Management"
 msgstr "Template Management"
@@ -26949,12 +26989,12 @@ msgid "Template Modified"
 msgstr "Template Modified"
 
 #: app/forms/form_builder/template_forms.py:20
-#: app/templates/forms/form_builder/form_builder.html:1084
+#: app/templates/forms/form_builder/form_builder.html:1086
 #: app/templates/forms/form_builder/partials/_template_details.html:23
 msgid "Template Name"
 msgstr "Template Name"
 
-#: app/templates/forms/form_builder/form_builder.html:742
+#: app/templates/forms/form_builder/form_builder.html:744
 msgid "Template Name Translations"
 msgstr "Template Name Translations"
 
@@ -26971,7 +27011,7 @@ msgstr "Template Preview Mode"
 msgid "Template Structure"
 msgstr "Template Structure"
 
-#: app/templates/forms/form_builder/form_builder.html:670
+#: app/templates/forms/form_builder/form_builder.html:672
 #: app/templates/forms/form_builder/partials/_variables_modal.html:3
 #: app/templates/forms/form_builder/partials/_variables_modal.html:9
 msgid "Template Variables"
@@ -26996,7 +27036,7 @@ msgstr "Template administrator"
 msgid "Template created"
 msgstr "Template created"
 
-#: app/routes/admin/form_builder/templates.py:742
+#: app/routes/admin/form_builder/templates.py:743
 #, python-format
 msgid ""
 "Template created and Excel import completed with %(pages)d pages, "
@@ -27005,7 +27045,7 @@ msgstr ""
 "Template created and Excel import completed with %(pages)d pages, "
 "%(sections)d sections, and %(items)d items. Some errors occurred: %(errors)s"
 
-#: app/routes/admin/form_builder/templates.py:755
+#: app/routes/admin/form_builder/templates.py:756
 #, python-format
 msgid "Template created but Excel import failed: %(error)s"
 msgstr "Template created but Excel import failed: %(error)s"
@@ -27034,7 +27074,7 @@ msgstr "Template modified"
 
 #: app/templates/admin/templates/new_template.html:493
 #: app/templates/admin/templates/new_template.html:1138
-#: app/templates/forms/form_builder/form_builder.html:1164
+#: app/templates/forms/form_builder/form_builder.html:1166
 msgid "Template name"
 msgstr "Template name"
 
@@ -27262,7 +27302,7 @@ msgstr ""
 msgid "The following will be unassigned (kept for history):"
 msgstr "The following will be unassigned (kept for history):"
 
-#: app/templates/forms/entry_form/entry_form.html:3324
+#: app/templates/forms/entry_form/entry_form.html:3327
 msgid ""
 "The form is taking longer than expected to load. Please reload the page."
 msgstr ""
@@ -27372,7 +27412,7 @@ msgstr "The requested resource was not found."
 msgid "The review date must be in the future."
 msgstr "The review date must be in the future."
 
-#: app/templates/forms/entry_form/entry_form.html:4067
+#: app/templates/forms/entry_form/entry_form.html:4070
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr "The server is temporarily unavailable. Please try again in a moment."
 
@@ -27432,7 +27472,7 @@ msgstr "Their sector references will be cleared on deletion."
 msgid "There are no pending requests."
 msgstr "There are no pending requests."
 
-#: app/templates/forms/form_builder/field_mapping.html:249
+#: app/templates/forms/form_builder/field_mapping.html:255
 msgid ""
 "There is no published version to compare against, or this is the first "
 "publish for this template."
@@ -27484,7 +27524,7 @@ msgstr ""
 msgid "Third (4/12)"
 msgstr "Third (4/12)"
 
-#: app/templates/forms/form_builder/form_builder.html:1455
+#: app/templates/forms/form_builder/form_builder.html:1457
 msgid "This"
 msgstr "This"
 
@@ -27505,7 +27545,7 @@ msgstr ""
 msgid "This Week"
 msgstr "This Week"
 
-#: app/templates/forms/form_builder/form_builder.html:1171
+#: app/templates/forms/form_builder/form_builder.html:1173
 msgid "This action cannot be undone."
 msgstr "This action cannot be undone."
 
@@ -27517,7 +27557,7 @@ msgstr ""
 "This active assignment has no data owner. Consider assigning one for "
 "governance accountability."
 
-#: app/routes/forms/entry.py:778
+#: app/routes/forms/entry.py:779
 #, python-format
 msgid ""
 "This assignment for %(entity)s is in '%(status)s' status and cannot be "
@@ -27543,7 +27583,7 @@ msgstr "This assignment has no countries."
 msgid "This assignment is closed and no further changes are expected."
 msgstr "This assignment is closed and no further changes are expected."
 
-#: app/routes/forms/entry.py:137
+#: app/routes/forms/entry.py:138
 msgid "This assignment is currently inactive."
 msgstr "This assignment is currently inactive."
 
@@ -27553,7 +27593,7 @@ msgid ""
 msgstr ""
 "This assignment was cancelled and is no longer required for submission."
 
-#: app/routes/forms/entry.py:789 app/routes/forms/entry.py:792
+#: app/routes/forms/entry.py:801 app/routes/forms/entry.py:804
 msgid ""
 "This assignment was changed by someone else and can no longer be edited."
 msgstr ""
@@ -27619,12 +27659,12 @@ msgstr ""
 msgid "This feature is under development"
 msgstr "This feature is under development"
 
-#: app/templates/forms/entry_form/entry_form.html:1119
-#: app/templates/forms/entry_form/entry_form.html:2084
+#: app/templates/forms/entry_form/entry_form.html:1122
+#: app/templates/forms/entry_form/entry_form.html:2087
 msgid "This field type is no longer available. Please contact your"
 msgstr "This field type is no longer available. Please contact your"
 
-#: app/templates/forms/entry_form/entry_form.html:696
+#: app/templates/forms/entry_form/entry_form.html:699
 #, python-format
 msgid "This form has been %(status)s. Data entry is disabled."
 msgstr "This form has been %(status)s. Data entry is disabled."
@@ -27647,11 +27687,11 @@ msgstr ""
 "This form has been validated and is read-only. To request changes, please "
 "write to %(email)s and include your reason for the request."
 
-#: app/routes/forms/submission.py:574
+#: app/routes/forms/submission.py:590
 msgid "This form is closed."
 msgstr "This form is closed."
 
-#: app/routes/forms/submission.py:572
+#: app/routes/forms/submission.py:588
 msgid "This form is currently inactive."
 msgstr "This form is currently inactive."
 
@@ -27661,7 +27701,15 @@ msgid ""
 msgstr ""
 "This form is read-only. You can review the data but cannot make changes."
 
-#: app/templates/forms/entry_form/entry_form.html:2881
+#: app/routes/forms/entry.py:788 app/routes/forms/submission.py:57
+msgid ""
+"This form was updated while you were working on it. Reload the page to get "
+"the latest version; your unsaved changes on this page could not be saved."
+msgstr ""
+"This form was updated while you were working on it. Reload the page to get "
+"the latest version; your unsaved changes on this page could not be saved."
+
+#: app/templates/forms/entry_form/entry_form.html:2884
 msgid ""
 "This functionality is only available when working with actual assignments."
 msgstr ""
@@ -27683,11 +27731,11 @@ msgstr ""
 "This import is still running, or no change log has been written yet. Refresh"
 " after the job finishes."
 
-#: app/templates/forms/form_builder/form_builder.html:1170
+#: app/templates/forms/form_builder/form_builder.html:1172
 msgid "This import will permanently delete existing submission data:"
 msgstr "This import will permanently delete existing submission data:"
 
-#: app/templates/forms/entry_form/entry_form.html:4068
+#: app/templates/forms/entry_form/entry_form.html:4071
 msgid "This indicator is already added to this section."
 msgstr "This indicator is already added to this section."
 
@@ -27709,21 +27757,21 @@ msgstr ""
 "indicator bank. Use this to report on additional metrics relevant to your "
 "country."
 
-#: app/templates/forms/entry_form/entry_form.html:1475
-#: app/templates/forms/entry_form/entry_form.html:1522
-#: app/templates/forms/entry_form/entry_form.html:1628
-#: app/templates/forms/entry_form/entry_form.html:1675
-#: app/templates/forms/entry_form/entry_form.html:1712
-#: app/templates/forms/entry_form/entry_form.html:1775
-#: app/templates/forms/entry_form/entry_form.html:1785
-#: app/templates/forms/entry_form/entry_form.html:1798
-#: app/templates/forms/entry_form/entry_form.html:1813
-#: app/templates/forms/entry_form/entry_form.html:1837
-#: app/templates/forms/entry_form/entry_form.html:1845
-#: app/templates/forms/entry_form/entry_form.html:1859
-#: app/templates/forms/entry_form/entry_form.html:2298
-#: app/templates/forms/entry_form/entry_form.html:2395
-#: app/templates/forms/entry_form/entry_form.html:2418
+#: app/templates/forms/entry_form/entry_form.html:1478
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1631
+#: app/templates/forms/entry_form/entry_form.html:1678
+#: app/templates/forms/entry_form/entry_form.html:1715
+#: app/templates/forms/entry_form/entry_form.html:1778
+#: app/templates/forms/entry_form/entry_form.html:1788
+#: app/templates/forms/entry_form/entry_form.html:1801
+#: app/templates/forms/entry_form/entry_form.html:1816
+#: app/templates/forms/entry_form/entry_form.html:1840
+#: app/templates/forms/entry_form/entry_form.html:1848
+#: app/templates/forms/entry_form/entry_form.html:1862
+#: app/templates/forms/entry_form/entry_form.html:2301
+#: app/templates/forms/entry_form/entry_form.html:2398
+#: app/templates/forms/entry_form/entry_form.html:2421
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 #: app/templates/forms/entry_form/partials/matrix_table.html:139
 msgid "This is a prefilled value"
@@ -27737,21 +27785,21 @@ msgstr ""
 "This is a preview of how the template will appear to users. You can test "
 "data entry in this preview mode."
 
-#: app/templates/forms/entry_form/entry_form.html:1475
-#: app/templates/forms/entry_form/entry_form.html:1522
-#: app/templates/forms/entry_form/entry_form.html:1628
-#: app/templates/forms/entry_form/entry_form.html:1675
-#: app/templates/forms/entry_form/entry_form.html:1712
-#: app/templates/forms/entry_form/entry_form.html:1775
-#: app/templates/forms/entry_form/entry_form.html:1785
-#: app/templates/forms/entry_form/entry_form.html:1798
-#: app/templates/forms/entry_form/entry_form.html:1813
-#: app/templates/forms/entry_form/entry_form.html:1837
-#: app/templates/forms/entry_form/entry_form.html:1845
-#: app/templates/forms/entry_form/entry_form.html:1859
-#: app/templates/forms/entry_form/entry_form.html:2298
-#: app/templates/forms/entry_form/entry_form.html:2395
-#: app/templates/forms/entry_form/entry_form.html:2418
+#: app/templates/forms/entry_form/entry_form.html:1478
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1631
+#: app/templates/forms/entry_form/entry_form.html:1678
+#: app/templates/forms/entry_form/entry_form.html:1715
+#: app/templates/forms/entry_form/entry_form.html:1778
+#: app/templates/forms/entry_form/entry_form.html:1788
+#: app/templates/forms/entry_form/entry_form.html:1801
+#: app/templates/forms/entry_form/entry_form.html:1816
+#: app/templates/forms/entry_form/entry_form.html:1840
+#: app/templates/forms/entry_form/entry_form.html:1848
+#: app/templates/forms/entry_form/entry_form.html:1862
+#: app/templates/forms/entry_form/entry_form.html:2301
+#: app/templates/forms/entry_form/entry_form.html:2398
+#: app/templates/forms/entry_form/entry_form.html:2421
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 msgid "This is an imputed value"
 msgstr "This is an imputed value"
@@ -27861,7 +27909,7 @@ msgstr ""
 "here. Enter the exact email the person will sign in with — their roles and "
 "access below will be waiting the first time they sign in."
 
-#: app/templates/forms/entry_form/entry_form.html:933
+#: app/templates/forms/entry_form/entry_form.html:936
 msgid "This page is locked and cannot be edited."
 msgstr "This page is locked and cannot be edited."
 
@@ -27929,7 +27977,7 @@ msgstr ""
 msgid "This section contains %(count)s saved data entries."
 msgstr "This section contains %(count)s saved data entries."
 
-#: app/templates/forms/form_builder/form_builder.html:1450
+#: app/templates/forms/form_builder/form_builder.html:1452
 #, python-format
 msgid ""
 "This section contains %(count)s saved data entries. Choose an option below."
@@ -27986,7 +28034,7 @@ msgid "This sub-section contains %(count)s saved data entries."
 msgstr "This sub-section contains %(count)s saved data entries."
 
 #: app/templates/components/_section_renderer.html:69
-#: app/templates/forms/entry_form/entry_form.html:2643
+#: app/templates/forms/entry_form/entry_form.html:2646
 msgid "This sub-section has no fields."
 msgstr "This sub-section has no fields."
 
@@ -28003,7 +28051,7 @@ msgstr ""
 "This template has %(count)s saved data entries that will be permanently "
 "deleted. Continue?"
 
-#: app/routes/admin/form_builder/templates.py:285
+#: app/routes/admin/form_builder/templates.py:286
 #, python-format
 msgid ""
 "This template has %(count)s saved data entry that will be permanently "
@@ -28033,7 +28081,7 @@ msgstr ""
 msgid "This user is currently inactive."
 msgstr "This user is currently inactive."
 
-#: app/templates/forms/entry_form/entry_form.html:4123
+#: app/templates/forms/entry_form/entry_form.html:4126
 msgid "This value is prefilled and cannot be modified here."
 msgstr "This value is prefilled and cannot be modified here."
 
@@ -28054,12 +28102,12 @@ msgstr ""
 "This version is not yet published. When you're ready, deploy it to make it "
 "the live version."
 
-#: app/templates/forms/form_builder/form_builder.html:1177
+#: app/templates/forms/form_builder/form_builder.html:1179
 #: app/templates/forms/form_builder/partials/_excel_modal.html:40
 msgid "This will modify the published version."
 msgstr "This will modify the published version."
 
-#: app/templates/forms/form_builder/form_builder.html:1449
+#: app/templates/forms/form_builder/form_builder.html:1451
 #, python-format
 msgid ""
 "This will permanently delete 1 section and %(n)s sub-section(s) and all "
@@ -28068,11 +28116,11 @@ msgstr ""
 "This will permanently delete 1 section and %(n)s sub-section(s) and all "
 "their contents. Are you sure?"
 
-#: app/templates/forms/form_builder/form_builder.html:1446
+#: app/templates/forms/form_builder/form_builder.html:1448
 msgid "This will permanently delete __count__ data entries."
 msgstr "This will permanently delete __count__ data entries."
 
-#: app/templates/forms/form_builder/form_builder.html:1448
+#: app/templates/forms/form_builder/form_builder.html:1450
 msgid ""
 "This will permanently delete this section and all its contents. Are you "
 "sure?"
@@ -28080,7 +28128,7 @@ msgstr ""
 "This will permanently delete this section and all its contents. Are you "
 "sure?"
 
-#: app/templates/forms/form_builder/form_builder.html:1451
+#: app/templates/forms/form_builder/form_builder.html:1453
 #, python-format
 msgid ""
 "This will remove 1 section and %(n)s sub-section(s) and %(count)s saved data"
@@ -28257,7 +28305,7 @@ msgstr "Title and Embed URL are required."
 msgid "Title applies to a single file only"
 msgstr "Title applies to a single file only"
 
-#: app/templates/forms/form_builder/form_builder.html:886
+#: app/templates/forms/form_builder/form_builder.html:888
 msgid "Titles"
 msgstr "Titles"
 
@@ -28303,7 +28351,7 @@ msgstr "Toggle Sidebar"
 msgid "Toggle View"
 msgstr "Toggle View"
 
-#: app/templates/forms/form_builder/form_builder.html:675
+#: app/templates/forms/form_builder/form_builder.html:677
 msgid "Toggle archived items"
 msgstr "Toggle archived items"
 
@@ -28385,20 +28433,20 @@ msgstr "Top Tools Used"
 msgid "Total"
 msgstr "Total"
 
-#: app/templates/forms/entry_form/entry_form.html:1360
-#: app/templates/forms/entry_form/entry_form.html:1389
-#: app/templates/forms/entry_form/entry_form.html:1501
-#: app/templates/forms/entry_form/entry_form.html:1530
-#: app/templates/forms/entry_form/entry_form.html:1654
-#: app/templates/forms/entry_form/entry_form.html:1683
-#: app/templates/forms/entry_form/entry_form.html:1730
-#: app/templates/forms/entry_form/entry_form.html:1872
-#: app/templates/forms/entry_form/entry_form.html:2385
-#: app/templates/forms/entry_form/entry_form.html:2406
-#: app/templates/forms/entry_form/entry_form.html:2435
-#: app/templates/forms/entry_form/entry_form.html:2492
-#: app/templates/forms/entry_form/entry_form.html:2519
-#: app/templates/forms/entry_form/entry_form.html:2585
+#: app/templates/forms/entry_form/entry_form.html:1363
+#: app/templates/forms/entry_form/entry_form.html:1392
+#: app/templates/forms/entry_form/entry_form.html:1504
+#: app/templates/forms/entry_form/entry_form.html:1533
+#: app/templates/forms/entry_form/entry_form.html:1657
+#: app/templates/forms/entry_form/entry_form.html:1686
+#: app/templates/forms/entry_form/entry_form.html:1733
+#: app/templates/forms/entry_form/entry_form.html:1875
+#: app/templates/forms/entry_form/entry_form.html:2388
+#: app/templates/forms/entry_form/entry_form.html:2409
+#: app/templates/forms/entry_form/entry_form.html:2438
+#: app/templates/forms/entry_form/entry_form.html:2495
+#: app/templates/forms/entry_form/entry_form.html:2522
+#: app/templates/forms/entry_form/entry_form.html:2588
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:223
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:251
 msgid "Total (Direct + Indirect):"
@@ -28417,15 +28465,15 @@ msgstr "Total Assignments"
 msgid "Total Cost"
 msgstr "Total Cost"
 
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1380
-#: app/templates/forms/entry_form/entry_form.html:1474
-#: app/templates/forms/entry_form/entry_form.html:1521
-#: app/templates/forms/entry_form/entry_form.html:1627
-#: app/templates/forms/entry_form/entry_form.html:1674
-#: app/templates/forms/entry_form/entry_form.html:2297
-#: app/templates/forms/entry_form/entry_form.html:2465
-#: app/templates/forms/entry_form/entry_form.html:2510
+#: app/templates/forms/entry_form/entry_form.html:1336
+#: app/templates/forms/entry_form/entry_form.html:1383
+#: app/templates/forms/entry_form/entry_form.html:1477
+#: app/templates/forms/entry_form/entry_form.html:1524
+#: app/templates/forms/entry_form/entry_form.html:1630
+#: app/templates/forms/entry_form/entry_form.html:1677
+#: app/templates/forms/entry_form/entry_form.html:2300
+#: app/templates/forms/entry_form/entry_form.html:2468
+#: app/templates/forms/entry_form/entry_form.html:2513
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
 msgid "Total Direct:"
@@ -28563,20 +28611,20 @@ msgstr ""
 "Total-only reporting: indicators with a value but without a disaggregation "
 "breakdown."
 
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1371
-#: app/templates/forms/entry_form/entry_form.html:1380
-#: app/templates/forms/entry_form/entry_form.html:1474
-#: app/templates/forms/entry_form/entry_form.html:1512
-#: app/templates/forms/entry_form/entry_form.html:1521
-#: app/templates/forms/entry_form/entry_form.html:1627
-#: app/templates/forms/entry_form/entry_form.html:1665
-#: app/templates/forms/entry_form/entry_form.html:1674
-#: app/templates/forms/entry_form/entry_form.html:2297
-#: app/templates/forms/entry_form/entry_form.html:2394
-#: app/templates/forms/entry_form/entry_form.html:2465
-#: app/templates/forms/entry_form/entry_form.html:2502
-#: app/templates/forms/entry_form/entry_form.html:2510
+#: app/templates/forms/entry_form/entry_form.html:1336
+#: app/templates/forms/entry_form/entry_form.html:1374
+#: app/templates/forms/entry_form/entry_form.html:1383
+#: app/templates/forms/entry_form/entry_form.html:1477
+#: app/templates/forms/entry_form/entry_form.html:1515
+#: app/templates/forms/entry_form/entry_form.html:1524
+#: app/templates/forms/entry_form/entry_form.html:1630
+#: app/templates/forms/entry_form/entry_form.html:1668
+#: app/templates/forms/entry_form/entry_form.html:1677
+#: app/templates/forms/entry_form/entry_form.html:2300
+#: app/templates/forms/entry_form/entry_form.html:2397
+#: app/templates/forms/entry_form/entry_form.html:2468
+#: app/templates/forms/entry_form/entry_form.html:2505
+#: app/templates/forms/entry_form/entry_form.html:2513
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:234
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
@@ -28661,7 +28709,7 @@ msgstr "Translate all blank items to all languages"
 msgid "Translate all blank organization names to all languages"
 msgstr "Translate all blank organization names to all languages"
 
-#: app/templates/forms/form_builder/form_builder.html:1003
+#: app/templates/forms/form_builder/form_builder.html:1005
 msgid ""
 "Translate all blank template names, section names, questions, document "
 "fields, and page names to all languages"
@@ -29062,12 +29110,12 @@ msgstr "Two-letter locale code for localization"
 #: app/templates/components/_builder_items.html:86
 #: app/templates/components/_builder_items.html:92
 #: app/templates/components/_builder_items.html:105
-#: app/templates/forms/entry_form/entry_form.html:1226
-#: app/templates/forms/entry_form/entry_form.html:1257
-#: app/templates/forms/entry_form/entry_form.html:1259
-#: app/templates/forms/entry_form/entry_form.html:2179
-#: app/templates/forms/entry_form/entry_form.html:2209
-#: app/templates/forms/entry_form/entry_form.html:2211
+#: app/templates/forms/entry_form/entry_form.html:1229
+#: app/templates/forms/entry_form/entry_form.html:1260
+#: app/templates/forms/entry_form/entry_form.html:1262
+#: app/templates/forms/entry_form/entry_form.html:2182
+#: app/templates/forms/entry_form/entry_form.html:2212
+#: app/templates/forms/entry_form/entry_form.html:2214
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:38
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:96
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:126
@@ -29108,7 +29156,7 @@ msgstr "Type not set on this item"
 msgid "Type to search for rows to add..."
 msgstr "Type to search for rows to add..."
 
-#: app/templates/forms/entry_form/entry_form.html:4059
+#: app/templates/forms/entry_form/entry_form.html:4062
 msgid "Type to search indicators..."
 msgstr "Type to search indicators..."
 
@@ -29204,7 +29252,7 @@ msgstr "Unable to decline this document."
 msgid "Unable to determine which entity to show documents for."
 msgstr "Unable to determine which entity to show documents for."
 
-#: app/templates/forms/entry_form/entry_form.html:2908
+#: app/templates/forms/entry_form/entry_form.html:2911
 msgid ""
 "Unable to edit: document ID is invalid. Please refresh the page and try "
 "again."
@@ -29232,13 +29280,13 @@ msgstr "Unarchive Section"
 msgid "Unarchive Sub-section"
 msgstr "Unarchive Sub-section"
 
-#: app/templates/forms/entry_form/entry_form.html:894
+#: app/templates/forms/entry_form/entry_form.html:897
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:62
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:63
 msgid "Unassigned Sections"
 msgstr "Unassigned Sections"
 
-#: app/templates/forms/entry_form/entry_form.html:743
+#: app/templates/forms/entry_form/entry_form.html:746
 #: app/templates/forms/entry_form/validation_summary_pdf.html:186
 #: app/templates/forms/entry_form/validation_summary_progress.html:297
 msgid "Uncertain"
@@ -29353,10 +29401,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/neural_map.html:194
 #: app/templates/admin/templates/data_sync_imputation.html:262
 #: app/templates/components/_builder_items.html:50
-#: app/templates/forms/entry_form/entry_form.html:1227
-#: app/templates/forms/entry_form/entry_form.html:1261
-#: app/templates/forms/entry_form/entry_form.html:2180
-#: app/templates/forms/entry_form/entry_form.html:2213
+#: app/templates/forms/entry_form/entry_form.html:1230
+#: app/templates/forms/entry_form/entry_form.html:1264
+#: app/templates/forms/entry_form/entry_form.html:2183
+#: app/templates/forms/entry_form/entry_form.html:2216
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:97
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:130
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:15
@@ -29412,7 +29460,7 @@ msgstr "Units"
 #: app/templates/core/dashboard/_assignments_tab.html:194
 #: app/templates/core/dashboard/_assignments_tab.html:210
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:54
-#: app/templates/forms/form_builder/form_builder.html:1353
+#: app/templates/forms/form_builder/form_builder.html:1355
 #: app/utils/form_localization.py:527 app/utils/form_localization.py:533
 #: app/utils/form_localization.py:556
 msgid "Unknown"
@@ -29425,11 +29473,11 @@ msgstr "Unknown"
 msgid "Unknown Country"
 msgstr "Unknown Country"
 
-#: app/templates/forms/entry_form/entry_form.html:1291
-#: app/templates/forms/entry_form/entry_form.html:1299
-#: app/templates/forms/entry_form/entry_form.html:2238
-#: app/templates/forms/entry_form/entry_form.html:2246
-#: app/templates/forms/entry_form/entry_form.html:4053
+#: app/templates/forms/entry_form/entry_form.html:1294
+#: app/templates/forms/entry_form/entry_form.html:1302
+#: app/templates/forms/entry_form/entry_form.html:2241
+#: app/templates/forms/entry_form/entry_form.html:2249
+#: app/templates/forms/entry_form/entry_form.html:4056
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:156
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:164
 #: app/utils/form_localization.py:244 app/utils/form_localization.py:251
@@ -29468,7 +29516,7 @@ msgstr "Unknown User"
 msgid "Unknown error"
 msgstr "Unknown error"
 
-#: app/routes/admin/form_builder/templates.py:754
+#: app/routes/admin/form_builder/templates.py:755
 msgid "Unknown error during Excel import"
 msgstr "Unknown error during Excel import"
 
@@ -29609,7 +29657,7 @@ msgstr "Updating insights…"
 #: app/templates/admin/documents/documents.html:519
 #: app/templates/admin/settings/manage_settings.html:524
 #: app/templates/admin/settings/manage_settings.html:569
-#: app/templates/forms/entry_form/entry_form.html:3139
+#: app/templates/forms/entry_form/entry_form.html:3142
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:570
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:29
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:33
@@ -29632,9 +29680,9 @@ msgid "Upload Date"
 msgstr "Upload Date"
 
 #: app/templates/admin/documents/documents.html:44
-#: app/templates/forms/entry_form/entry_form.html:2890
-#: app/templates/forms/entry_form/entry_form.html:2910
-#: app/templates/forms/entry_form/entry_form.html:2911
+#: app/templates/forms/entry_form/entry_form.html:2893
+#: app/templates/forms/entry_form/entry_form.html:2913
+#: app/templates/forms/entry_form/entry_form.html:2914
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:203
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:209
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:211
@@ -29978,7 +30026,7 @@ msgstr ""
 "Use the assistant to compare values, find information, and interpret "
 "evidence from reports and plans."
 
-#: app/templates/forms/entry_form/entry_form.html:4042
+#: app/templates/forms/entry_form/entry_form.html:4045
 msgid "Use the button to add indicators to this section."
 msgstr "Use the button to add indicators to this section."
 
@@ -30312,7 +30360,7 @@ msgid "Valid XLSForm"
 msgstr "Valid XLSForm"
 
 #: app/templates/admin/templates/new_template.html:1133
-#: app/templates/forms/form_builder/form_builder.html:1160
+#: app/templates/forms/form_builder/form_builder.html:1162
 msgid "Valid export"
 msgstr "Valid export"
 
@@ -30336,7 +30384,7 @@ msgstr "Validated now:"
 
 #: app/templates/admin/templates/kobo_data_import.html:1153
 #: app/templates/admin/templates/new_template.html:1129
-#: app/templates/forms/form_builder/form_builder.html:1156
+#: app/templates/forms/form_builder/form_builder.html:1158
 msgid "Validating file…"
 msgstr "Validating file…"
 
@@ -30362,7 +30410,7 @@ msgstr "Validation Dashboard"
 msgid "Validation Message"
 msgstr "Validation Message"
 
-#: app/templates/forms/form_builder/form_builder.html:931
+#: app/templates/forms/form_builder/form_builder.html:933
 msgid "Validation Message Translations"
 msgstr "Validation Message Translations"
 
@@ -30388,7 +30436,7 @@ msgstr "Validation Rules Registry"
 msgid "Validation dashboard views"
 msgstr "Validation dashboard views"
 
-#: app/templates/forms/entry_form/entry_form.html:2758
+#: app/templates/forms/entry_form/entry_form.html:2761
 #: app/templates/forms/entry_form/validation_summary_pdf.html:9
 #: app/templates/forms/entry_form/validation_summary_pdf.html:17
 #: app/templates/forms/entry_form/validation_summary_progress.html:9
@@ -30406,7 +30454,7 @@ msgstr "Validation failed. Please choose a different file."
 
 #: app/templates/admin/templates/kobo_data_import.html:1154
 #: app/templates/admin/templates/new_template.html:1130
-#: app/templates/forms/form_builder/form_builder.html:1157
+#: app/templates/forms/form_builder/form_builder.html:1159
 msgid "Validation failed. Please fix the file and try again."
 msgstr "Validation failed. Please fix the file and try again."
 
@@ -30445,9 +30493,9 @@ msgstr "Validation rule pack"
 msgid "Validation rules registry views"
 msgstr "Validation rules registry views"
 
-#: app/templates/forms/entry_form/entry_form.html:753
 #: app/templates/forms/entry_form/entry_form.html:756
-#: app/templates/forms/entry_form/entry_form.html:2768
+#: app/templates/forms/entry_form/entry_form.html:759
+#: app/templates/forms/entry_form/entry_form.html:2771
 msgid "Validation summary"
 msgstr "Validation summary"
 
@@ -30687,8 +30735,8 @@ msgstr "View Detailed Logs"
 msgid "View Details"
 msgstr "View Details"
 
-#: app/templates/forms/entry_form/entry_form.html:1237
-#: app/templates/forms/entry_form/entry_form.html:2190
+#: app/templates/forms/entry_form/entry_form.html:1240
+#: app/templates/forms/entry_form/entry_form.html:2193
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:107
 msgid "View Full Details"
 msgstr "View Full Details"
@@ -30753,8 +30801,8 @@ msgid "View conversation"
 msgstr "View conversation"
 
 #: app/templates/admin/communication/center.html:73
-#: app/templates/forms/entry_form/entry_form.html:739
-#: app/templates/forms/entry_form/entry_form.html:762
+#: app/templates/forms/entry_form/entry_form.html:742
+#: app/templates/forms/entry_form/entry_form.html:765
 msgid "View details"
 msgstr "View details"
 
@@ -30888,7 +30936,7 @@ msgstr "Volunteers in Syria over time"
 msgid "Volunteers, 3-year mean"
 msgstr "Volunteers, 3-year mean"
 
-#: app/templates/forms/form_builder/form_builder.html:426
+#: app/templates/forms/form_builder/form_builder.html:427
 msgid "WARNING: You are making direct changes to a PUBLISHED version"
 msgstr "WARNING: You are making direct changes to a PUBLISHED version"
 
@@ -30993,7 +31041,7 @@ msgstr ""
 msgid "We could not switch your selection. Please try again."
 msgstr "We could not switch your selection. Please try again."
 
-#: app/templates/forms/form_builder/form_builder.html:1300
+#: app/templates/forms/form_builder/form_builder.html:1302
 msgid "We ran into an issue while loading. Please reload the page."
 msgstr "We ran into an issue while loading. Please reload the page."
 
@@ -31271,7 +31319,7 @@ msgstr "Width"
 msgid "Will be cleared on save"
 msgstr "Will be cleared on save"
 
-#: app/templates/forms/entry_form/entry_form.html:2899
+#: app/templates/forms/entry_form/entry_form.html:2902
 msgid "Will be deleted when you save the form."
 msgstr "Will be deleted when you save the form."
 
@@ -31397,7 +31445,7 @@ msgstr "Year"
 
 #: app/templates/admin/assignments/manage_assignment.html:247
 #: app/templates/admin/documents/documents.html:232
-#: app/templates/forms/entry_form/entry_form.html:3011
+#: app/templates/forms/entry_form/entry_form.html:3014
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:42
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:85
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:115
@@ -31436,11 +31484,11 @@ msgstr "Yellow"
 #: app/templates/components/_form_item_renderer.html:229
 #: app/templates/components/_status_label.html:84
 #: app/templates/components/ag_grid_i18n_js.html:35
-#: app/templates/forms/entry_form/entry_form.html:1409
-#: app/templates/forms/entry_form/entry_form.html:1544
-#: app/templates/forms/entry_form/entry_form.html:1697
-#: app/templates/forms/entry_form/entry_form.html:1822
-#: app/templates/forms/entry_form/entry_form.html:2538
+#: app/templates/forms/entry_form/entry_form.html:1412
+#: app/templates/forms/entry_form/entry_form.html:1547
+#: app/templates/forms/entry_form/entry_form.html:1700
+#: app/templates/forms/entry_form/entry_form.html:1825
+#: app/templates/forms/entry_form/entry_form.html:2541
 #: app/templates/forms/entry_form/partials/disability_questions.html:23
 #: app/templates/forms/entry_form/partials/disability_questions.html:48
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:270
@@ -31498,7 +31546,7 @@ msgstr "You already have access to: %(country)s"
 msgid "You already have pending requests for: %(countries)s"
 msgstr "You already have pending requests for: %(countries)s"
 
-#: app/templates/forms/form_builder/form_builder.html:1178
+#: app/templates/forms/form_builder/form_builder.html:1180
 #: app/templates/forms/form_builder/partials/_excel_modal.html:27
 msgid "You are already editing a draft version."
 msgstr "You are already editing a draft version."
@@ -31515,7 +31563,7 @@ msgstr ""
 msgid "You are editing a draft version"
 msgstr "You are editing a draft version"
 
-#: app/routes/forms/entry.py:152
+#: app/routes/forms/entry.py:153
 #, python-format
 msgid "You are not authorized to access this assignment for %(entity)s."
 msgstr "You are not authorized to access this assignment for %(entity)s."
@@ -31940,11 +31988,11 @@ msgid "at:"
 msgstr "at:"
 
 #: app/templates/admin/settings/manage_settings.html:1518
-#: app/templates/forms/entry_form/entry_form.html:4064
+#: app/templates/forms/entry_form/entry_form.html:4067
 msgid "available"
 msgstr "available"
 
-#: app/templates/forms/entry_form/entry_form.html:4065
+#: app/templates/forms/entry_form/entry_form.html:4068
 msgid "available in"
 msgstr "available in"
 
@@ -32263,7 +32311,7 @@ msgstr "failed"
 msgid "failed."
 msgstr "failed."
 
-#: app/templates/forms/entry_form/entry_form.html:4066
+#: app/templates/forms/entry_form/entry_form.html:4069
 msgid "filtered by"
 msgstr "filtered by"
 
@@ -32272,8 +32320,8 @@ msgstr "filtered by"
 msgid "filtered from"
 msgstr "filtered from"
 
-#: app/templates/forms/entry_form/entry_form.html:1119
-#: app/templates/forms/entry_form/entry_form.html:2084
+#: app/templates/forms/entry_form/entry_form.html:1122
+#: app/templates/forms/entry_form/entry_form.html:2087
 #: app/templates/forms/public/public_form_unavailable.html:38
 msgid "focal point for assistance."
 msgstr "focal point for assistance."
@@ -32286,7 +32334,7 @@ msgstr "form data entries"
 msgid "form items loaded"
 msgstr "form items loaded"
 
-#: app/templates/forms/entry_form/entry_form.html:4063
+#: app/templates/forms/entry_form/entry_form.html:4066
 msgid "found"
 msgstr "found"
 
@@ -32294,7 +32342,7 @@ msgstr "found"
 msgid "from selected rows"
 msgstr "from selected rows"
 
-#: app/templates/forms/form_builder/form_builder.html:1462
+#: app/templates/forms/form_builder/form_builder.html:1464
 msgid "from the template."
 msgstr "from the template."
 
@@ -32315,7 +32363,7 @@ msgstr "group"
 msgid "group, type key, label, description, priority…"
 msgstr "group, type key, label, description, priority…"
 
-#: app/templates/forms/form_builder/form_builder.html:1456
+#: app/templates/forms/form_builder/form_builder.html:1458
 msgid "has"
 msgstr "has"
 
@@ -32351,12 +32399,12 @@ msgstr "includes:"
 msgid "indexed"
 msgstr "indexed"
 
-#: app/templates/forms/entry_form/entry_form.html:4062
+#: app/templates/forms/entry_form/entry_form.html:4065
 #: plugins/pb_progress/templates/pb_progress/manage.html:240
 msgid "indicators"
 msgstr "indicators"
 
-#: app/templates/forms/entry_form/entry_form.html:4060
+#: app/templates/forms/entry_form/entry_form.html:4063
 msgid "indicators available"
 msgstr "indicators available"
 
@@ -32429,7 +32477,7 @@ msgstr "matched"
 msgid "matches"
 msgstr "matches"
 
-#: app/templates/forms/form_builder/form_builder.html:1458
+#: app/templates/forms/form_builder/form_builder.html:1460
 msgid "may have associated data."
 msgstr "may have associated data."
 
@@ -32536,7 +32584,7 @@ msgstr "notifications"
 #: app/templates/components/ag_grid_i18n_js.html:68
 #: app/templates/components/pagination.html:59
 #: app/templates/core/dashboard/_assignments_tab.html:640
-#: app/templates/forms/entry_form/entry_form.html:4021
+#: app/templates/forms/entry_form/entry_form.html:4024
 msgid "of"
 msgstr "of"
 
@@ -32741,7 +32789,7 @@ msgstr "rows"
 msgid "running"
 msgstr "running"
 
-#: app/templates/forms/form_builder/form_builder.html:1457
+#: app/templates/forms/form_builder/form_builder.html:1459
 msgid "saved data entries."
 msgstr "saved data entries."
 
@@ -32965,7 +33013,7 @@ msgstr "undocumented"
 msgid "unique"
 msgstr "unique"
 
-#: app/templates/forms/entry_form/entry_form.html:4051
+#: app/templates/forms/entry_form/entry_form.html:4054
 msgid "unlimited"
 msgstr "unlimited"
 

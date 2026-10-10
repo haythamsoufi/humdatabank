@@ -9,6 +9,7 @@ from app import db
 from app.models import FormItem
 from app.routes.admin.form_builder.helpers.field_mapping import (
     FieldMappingConflictError,
+    FieldMappingIncompatibleError,
     link_draft_item,
     unlink_draft_item,
 )
@@ -126,7 +127,7 @@ class TestLinkDraftItem:
         assert displaced is not None
         assert displaced['id'] == holder.id
 
-    def test_type_mismatch_returns_warning(self, db_session, admin_user):
+    def test_item_kind_mismatch_is_rejected(self, db_session, admin_user):
         template, published, draft = _draft_pair(db_session, admin_user)
         pub_section = create_test_section(db_session, template, version=published)
         draft_section = create_test_section(db_session, template, version=draft)
@@ -143,13 +144,14 @@ class TestLinkDraftItem:
         with patch(
             'app.routes.admin.form_builder.helpers.field_mapping.log_admin_action'
         ):
-            _key, warnings, _displaced = link_draft_item(
-                template=template,
-                draft_version=draft,
-                draft_item=draft_item,
-                published_stable_key=pub_key,
-            )
-        assert any('type mismatch' in w.lower() for w in warnings)
+            with pytest.raises(FieldMappingIncompatibleError) as caught:
+                link_draft_item(
+                    template=template,
+                    draft_version=draft,
+                    draft_item=draft_item,
+                    published_stable_key=pub_key,
+                )
+        assert 'type mismatch' in str(caught.value).lower()
 
     def test_unlink_generates_new_key(self, db_session, admin_user):
         template, published, draft = _draft_pair(db_session, admin_user)

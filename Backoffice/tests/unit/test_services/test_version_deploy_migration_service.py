@@ -64,7 +64,8 @@ def test_migrate_submission_fks_moves_form_data(db_session, admin_user):
 def test_migrate_leaves_orphan_data_and_archives_old_item(db_session, admin_user):
     template, published, draft = _make_published_with_draft(db_session, admin_user)
     pub_section = create_test_section(db_session, template, version=published)
-    create_test_section(db_session, template, version=draft)
+    draft_section = create_test_section(db_session, template, version=draft)
+    draft_section.stable_key = pub_section.stable_key
 
     orphan_key = generate_stable_key()
     pub_item = create_test_item(
@@ -198,6 +199,7 @@ def test_precondition_aborts_when_draft_has_section_submission_rows(db_session, 
     template, published, draft = _make_published_with_draft(db_session, admin_user)
     pub_section = create_test_section(db_session, template, version=published)
     draft_section = create_test_section(db_session, template, version=draft)
+    draft_section.stable_key = pub_section.stable_key
     shared_key = generate_stable_key()
     pub_item = create_test_item(
         db_session, pub_section, template, version=published, item_type='question', label='Q1'

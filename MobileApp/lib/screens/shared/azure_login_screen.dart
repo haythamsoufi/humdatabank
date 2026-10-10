@@ -16,6 +16,7 @@ import '../../providers/shared/auth_provider.dart';
 import '../../config/app_config.dart';
 import '../../config/routes.dart';
 import '../../utils/constants.dart';
+import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
@@ -343,11 +344,7 @@ class _AzureLoginScreenState extends State<AzureLoginScreen>
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(localizations.loginWithIfrcAccount),
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        foregroundColor: theme.appBarTheme.foregroundColor,
-      ),
+      appBar: AppAppBar(title: localizations.loginWithIfrcAccount),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

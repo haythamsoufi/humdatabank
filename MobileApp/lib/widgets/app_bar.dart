@@ -1,11 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../utils/constants.dart';
+import '../utils/ios_constants.dart';
+import 'glass_circle_button.dart';
+
+/// Screen header shared by every page.
+///
+/// Matches the Dashboard heading: a large, left-aligned bold title on the
+/// page background with no divider line. Back, menu and action icons sit in
+/// glass circle bubbles (see [GlassCircleBubble]) like the iOS 26 toolbar.
+///
+/// Pass `IconButton`s (or `PopupMenuButton`s) as [actions] and [leading]; they
+/// are sized to the bubble automatically.
 class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
+  /// Height of the header below the status bar.
+  static const double toolbarHeight = 64;
+
+  /// Horizontal inset, same as the Dashboard heading.
+  static const double horizontalPadding = 20;
+
+  /// Large heading text. An empty title leaves only the leading and action bubbles.
   final String title;
   final List<Widget>? actions;
   final Widget? leading;
   final bool automaticallyImplyLeading;
-  final bool useLargeTitle;
+
+  /// Defaults to transparent so the header shows the Scaffold's own background.
+  final Color? backgroundColor;
 
   const AppAppBar({
     super.key,
@@ -13,79 +35,101 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.leading,
     this.automaticallyImplyLeading = true,
-    this.useLargeTitle = false,
+    this.backgroundColor,
   });
+
+  Widget? _resolveLeading(BuildContext context) {
+    if (leading != null) return GlassCircleBubble(child: leading!);
+    if (!automaticallyImplyLeading) return null;
+
+    final scaffold = Scaffold.maybeOf(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    if (Navigator.canPop(context)) {
+      return GlassCircleButton(
+        icon: Icons.arrow_back_ios_new_rounded,
+        iconSize: 18,
+        color: colorScheme.onSurface,
+        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        onPressed: () => Navigator.maybePop(context),
+      );
+    }
+    if (scaffold != null && scaffold.hasDrawer) {
+      return GlassCircleButton(
+        icon: Icons.menu_rounded,
+        color: colorScheme.onSurface,
+        tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+        onPressed: scaffold.openDrawer,
+      );
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(AppConstants.defaultNavy);
+    final leadingWidget = _resolveLeading(context);
 
-    // iOS-style large title
-    if (useLargeTitle) {
-      return SliverAppBar(
-        pinned: true,
-        elevation: 0,
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        foregroundColor: theme.appBarTheme.foregroundColor,
-        surfaceTintColor: Colors.transparent,
-        leading: leading,
-        automaticallyImplyLeading: automaticallyImplyLeading,
-        actions: actions,
-        expandedHeight: 96,
-        // Must be >= [toolbarHeight] (default [kToolbarHeight]); a smaller
-        // collapsed height fails SliverAppBar's assertion on current Flutter SDKs.
-        toolbarHeight: kToolbarHeight,
-        collapsedHeight: kToolbarHeight,
-        flexibleSpace: FlexibleSpaceBar(
-          titlePadding: const EdgeInsets.only(left: 16, bottom: 16, right: 16),
-          title: Text(
-            title,
-            style: (textTheme.headlineLarge ?? const TextStyle()).copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.appBarTheme.foregroundColor,
+    final titleStyle = IOSTextStyle.largeTitle(context).copyWith(
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.6,
+      color: titleColor,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Material(
+        color: backgroundColor ?? Colors.transparent,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: toolbarHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+              ),
+              child: Row(
+                children: [
+                  if (leadingWidget != null) ...[
+                    leadingWidget,
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: title.isEmpty
+                        ? const SizedBox.shrink()
+                        : Semantics(
+                            header: true,
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: titleStyle,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                  for (final action in actions ?? const <Widget>[]) ...[
+                    const SizedBox(width: 8),
+                    GlassCircleBubble(child: action),
+                  ],
+                ],
+              ),
             ),
           ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Container(
-            color: theme.dividerColor.withValues(alpha: 0.5),
-            height: 0.5,
-          ),
-        ),
-      );
-    }
-
-    // Standard iOS-style title
-    return AppBar(
-      elevation: 0,
-      backgroundColor: theme.appBarTheme.backgroundColor,
-      foregroundColor: theme.appBarTheme.foregroundColor,
-      surfaceTintColor: Colors.transparent,
-      title: Text(
-        title,
-        style: textTheme.titleLarge!.copyWith(
-          fontWeight: FontWeight.w600,
-          color: theme.appBarTheme.foregroundColor,
-        ),
-      ),
-      leading: leading,
-      automaticallyImplyLeading: automaticallyImplyLeading,
-      actions: actions,
-      centerTitle: false,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(0.5),
-        child: Container(
-          color: theme.dividerColor.withValues(alpha: 0.5),
-          height: 0.5,
         ),
       ),
     );
   }
 
   @override
-  Size get preferredSize => useLargeTitle
-      ? const Size.fromHeight(96)
-      : const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(toolbarHeight);
 }

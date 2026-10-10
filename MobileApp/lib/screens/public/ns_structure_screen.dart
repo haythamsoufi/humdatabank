@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../utils/constants.dart';
+import '../../widgets/app_bar.dart';
 import '../../utils/theme_extensions.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/debug_logger.dart';
@@ -184,12 +185,7 @@ class _NSStructureScreenState extends State<NSStructureScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(localizations.nsStructure),
-        backgroundColor: Color(AppConstants.ifrcNavy),
-        foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
-      ),
+      appBar: AppAppBar(title: localizations.nsStructure),
       body: _isLoading
           ? const AppLoadingIndicator(
               message: 'Loading organizational structure...',

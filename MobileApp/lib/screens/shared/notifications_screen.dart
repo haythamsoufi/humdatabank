@@ -53,7 +53,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          appBar: AppAppBar(
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(AppAppBar.toolbarHeight),
+            // Rebuilds the header so the mark-all-read bubble disappears when
+            // nothing is unread, rather than leaving an empty glass circle.
+            child: Consumer<NotificationProvider>(
+              builder: (context, unreadSource, _) => AppAppBar(
             title: localizations.notifications,
             actions: [
               Consumer<NotificationProvider>(
@@ -76,6 +81,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   );
                 },
               ),
+              if (unreadSource.displayedNotifications.any((n) => !n.isRead))
               Consumer<NotificationProvider>(
                 builder: (context, provider, child) {
                   final unreadIds = provider.displayedNotifications
@@ -264,6 +270,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 tooltip: localizations.notificationPreferences,
               ),
             ],
+              ),
+            ),
           ),
           body: ColoredBox(
             color: theme.scaffoldBackgroundColor,

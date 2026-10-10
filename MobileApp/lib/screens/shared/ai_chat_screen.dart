@@ -22,7 +22,7 @@ import '../../utils/accessibility_helper.dart';
 import '../../utils/ai_chat_message_html_split.dart';
 import '../../widgets/chat_response_sources_details_extension.dart';
 import '../../widgets/bottom_navigation_bar.dart';
-import '../../widgets/ios_button.dart';
+import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -940,66 +940,35 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
         FocusManager.instance.primaryFocus?.unfocus();
         SystemChannels.textInput.invokeMethod('TextInput.hide');
       },
-      appBar: AppBar(
-        backgroundColor: _chatSurface(theme),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
+      appBar: AppAppBar(
+        title: appBarTitle,
         automaticallyImplyLeading: false,
         leading: Builder(
           builder: (scaffoldContext) {
-            return IOSIconButton(
-              icon: Icons.menu,
-              color: _chatBody(theme),
+            return IconButton(
+              icon: Icon(Icons.menu_rounded, color: _chatBody(theme)),
               onPressed: () {
                 FocusScope.of(scaffoldContext).unfocus();
                 _inputFocusNode.unfocus();
                 Scaffold.of(scaffoldContext).openDrawer();
               },
               tooltip: localizations.navigation,
-              semanticLabel: localizations.navigation,
-              semanticHint: localizations.aiSemanticOpenDrawerHint,
             );
           },
         ),
-        title: Text(
-          appBarTitle,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.3,
-            color: _chatBody(theme),
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        iconTheme: IconThemeData(
-          color: _chatBody(theme),
-        ),
         actions: [
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 14),
-            child: IOSIconButton(
-              icon: Icons.add_comment_outlined,
-              color: _chatBody(theme),
+          Semantics(
+            label: localizations.aiSemanticNewChatLabel,
+            hint: localizations.aiSemanticNewChatHint,
+            child: IconButton(
+              icon: Icon(Icons.add_comment_outlined, color: _chatBody(theme)),
               onPressed: () async {
                 await context.read<AiChatProvider>().startNewConversation();
               },
               tooltip: localizations.aiTooltipNewChat,
-              semanticLabel: localizations.aiSemanticNewChatLabel,
-              semanticHint: localizations.aiSemanticNewChatHint,
             ),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: _chatOutline(theme),
-          ),
-        ),
       ),
       drawer: _buildDrawer(context, auth, ai, isAuthed),
       body: SafeArea(

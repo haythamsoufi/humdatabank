@@ -7,11 +7,10 @@ import '../../config/routes.dart';
 import '../../utils/navigation_helper.dart';
 import '../../models/shared/ai_chat_launch_args.dart';
 import '../../utils/constants.dart';
-import '../../utils/ios_constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/countries_widget.dart';
-import '../../widgets/ios_button.dart';
+import '../../widgets/app_bar.dart';
 import '../../widgets/home_landing/landing_ai_entry_card.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/home_landing/landing_get_started_section.dart';
@@ -199,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen>
         // status-bar inset from the body's MediaQuery (padding.top == 0 there),
         // so the hero's SliverAppBar.expandedHeight never includes it.
         final heroBodyExtent = LandingHeroSliver.bodyHeroExtent();
-        final appBarH = theme.appBarTheme.toolbarHeight ?? kToolbarHeight;
+        const appBarH = AppAppBar.toolbarHeight;
 
         return CallbackShortcuts(
           bindings: <ShortcutActivator, VoidCallback>{
@@ -215,24 +214,18 @@ class _HomeScreenState extends State<HomeScreen>
                 // Prevent the swipe-to-open gesture from revealing the drawer
                 // while the chat is in focus mode.
                 drawerEnableOpenDragGesture: !_chatExpanded,
-                appBar: AppBar(
-                  backgroundColor: theme.scaffoldBackgroundColor,
-                  elevation: 0,
+                appBar: AppAppBar(
+                  title: localizations.home,
                   leading: Builder(
                     builder: (BuildContext scaffoldContext) {
-                      return IOSIconButton(
-                        icon: Icons.menu,
+                      return IconButton(
+                        icon: const Icon(Icons.menu_rounded),
                         onPressed: _chatExpanded
                             ? null
                             : () => Scaffold.of(scaffoldContext).openDrawer(),
                         tooltip: localizations.navigation,
-                        semanticLabel: localizations.navigation,
                       );
                     },
-                  ),
-                  title: Text(
-                    localizations.home,
-                    style: IOSTextStyle.headline(context),
                   ),
                 ),
                 drawer: AppNavigationDrawer(

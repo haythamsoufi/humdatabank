@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../utils/constants.dart';
+import '../../widgets/app_bar.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/url_helper.dart';
 import '../../config/app_config.dart';
@@ -167,12 +168,7 @@ class _CountriesScreenState extends State<CountriesScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(localizations.countries),
-        backgroundColor: Color(AppConstants.ifrcNavy),
-        foregroundColor: theme.colorScheme.onPrimary,
-        elevation: 0,
-      ),
+      appBar: AppAppBar(title: localizations.countries),
       body: _isLoading
           ? const AppLoadingIndicator(message: 'Loading countries...')
           : _error != null

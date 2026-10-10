@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 _TEST_PATH_MARKERS = ("/tests/",)
 _TEST_SUFFIXES = (".test.js", ".spec.js", ".test.ts", ".spec.ts")
 # Gettext catalogs are prose, never executed or served as markup. Regenerating them
-# re-emits unchanged entries (line references move), so entries that merely mention
-# "eval()" or "innerHTML" would otherwise be reported as newly introduced.
+# re-emits unchanged entries (line references move), so entries that merely describe
+# risky JavaScript APIs would otherwise be reported as newly introduced.
 _CATALOG_SUFFIXES = (".po", ".pot")
 
 

@@ -27,6 +27,20 @@ Que faire :
 
 Voir : [Générateur de formulaires (avancé)](form-builder-advanced.md)
 
+### « Le déploiement a été refusé » ou « des données semblent manquer après un déploiement »
+
+Causes fréquentes :
+- des champs supprimés contiennent encore des données soumises et le déploiement demande votre confirmation
+- deux champs partagent la même identité, ou un ancien modèle n'a pas encore de clés d'identité
+- un point focal a enregistré un formulaire ouvert avant le déploiement
+
+Que faire :
+- Ouvrez **Review field mapping** sur le brouillon et liez les champs renommés à leurs équivalents en ligne.
+- Les champs supprimés ne sont pas effacés : leurs données restent sur la version archivée. Redéployez-la pour revenir en arrière.
+- Pour les erreurs de clés d'identité, demandez à un développeur de suivre le runbook d'intégrité des versions de modèle.
+
+Voir : [Versions de modèle](template-versions.md)
+
 ## Problèmes de mission
 
 ### "Un pays manque de la mission"

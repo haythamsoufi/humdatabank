@@ -48,7 +48,15 @@ from .helpers import (
     _load_existing_data_for_public_submission,
     _prepare_submitted_documents_for_template,
     build_entry_form_features,
+    entry_form_is_stale,
 )
+
+
+def _stale_form_message():
+    return _(
+        "This form was updated while you were working on it. Reload the page to get the "
+        "latest version; your unsaved changes on this page could not be saved."
+    )
 
 
 def _authorize_public_submission(submission, action, *, as_json=False):
@@ -361,6 +369,8 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
             self.country = country
             self.status = "Public Submission"
             self.country_id = country.id
+            self.entity_type = "country"
+            self.entity_id = country.id
 
     dummy_acs = DummyACS(submission.id, submission.assigned_form, submission.country)
 
@@ -373,6 +383,10 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
     if request.method == "POST" and can_edit:
         csrf_form = FlaskForm()
         if csrf_form.validate_on_submit():
+            if entry_form_is_stale(form_template, request.form.get('form_version_id')):
+                request_transaction_rollback()
+                flash(_stale_form_message(), "warning")
+                return redirect(url_for("forms.edit_public_submission", submission_id=submission_id))
             try:
                 action = request.form.get('action', 'save')
 
@@ -536,6 +550,8 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                          get_localized_template_name=get_localized_template_name,
                          submission=submission,
                          is_public_submission=True,
+                         form_version_id=form_template.published_version_id,
+                         can_return_for_revision=False,
                          country_select_form=country_select_form,
                          submission_details_form=submission_details_form,
                          form_features=form_features,
@@ -603,6 +619,8 @@ def _fill_public_form_impl(public_token):
                 'period_name': period_name
             })()
             self.country = country
+            self.entity_type = 'country'
+            self.entity_id = getattr(country, 'id', None)
 
     dummy_acs = DummyACS()
 
@@ -661,6 +679,13 @@ def _fill_public_form_impl(public_token):
         current_app.logger.debug(f"Submitter name: {request.form.get('submitter_name', 'NOT_FOUND')}")
         current_app.logger.debug(f"Submitter email: {request.form.get('submitter_email', 'NOT_FOUND')}")
         current_app.logger.debug(f"Country ID: {request.form.get('country_id', 'NOT_FOUND')}")
+
+        if csrf_valid and submission_valid and country_valid and entry_form_is_stale(
+            form_template, request.form.get('form_version_id')
+        ):
+            request_transaction_rollback()
+            flash(_stale_form_message(), "warning")
+            return redirect(url_for("forms.fill_public_form", public_token=public_token))
 
         if csrf_valid and submission_valid and country_valid:
             selected_country_id = country_select_form.country_id.data
@@ -823,6 +848,8 @@ def _fill_public_form_impl(public_token):
                            get_localized_template_name=get_localized_template_name,
                            is_public_submission=True,
                            is_preview_mode=False,
+                           form_version_id=form_template.published_version_id,
+                           can_return_for_revision=False,
                            country_select_form=country_select_form,
                            submission_details_form=submission_details_form,
                            public_token=public_token,

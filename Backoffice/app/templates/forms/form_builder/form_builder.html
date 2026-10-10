@@ -330,6 +330,7 @@
                 if (!form) return;
 
                 const message = {{ _("Deploy this version? This will publish it as the live version.") | tojson }};
+                if (window.FormBuilderDeploy) { window.FormBuilderDeploy.confirm(form, message); return; }
                 const doSubmit = () => {
                     form.dataset.confirmed = 'true';
                     form.dataset.loadingText = {{ _('Deploying version…') | tojson }};
@@ -451,6 +452,7 @@
                 const form = this.closest('form');
                 if (!form) return;
                 const message = {{ _("Deploy this archived version? This will publish it as the live version.") | tojson }};
+                if (window.FormBuilderDeploy) { window.FormBuilderDeploy.confirm(form, message); return; }
                 const doSubmit = () => {
                     form.dataset.confirmed = 'true';
                     form.dataset.loadingText = {{ _('Deploying version…') | tojson }};

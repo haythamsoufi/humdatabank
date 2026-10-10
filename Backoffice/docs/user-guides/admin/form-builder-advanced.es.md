@@ -95,6 +95,8 @@ Siempre agrega texto de ayuda en la pregunta "padre" para que los usuarios entie
 
 ## Versionado de plantilla y cambios "seguros vs riesgosos"
 
+Para saber cómo funcionan el despliegue, la reversión y la correspondencia de campos, véase [Versiones de plantilla](template-versions.md).
+
 ### Cambios seguros (generalmente OK durante una recopilación en vivo)
 
 - Corrige errores tipográficos y redacción en etiquetas/texto de ayuda
@@ -139,6 +141,7 @@ Antes de publicar/usar una plantilla:
 
 ## Relacionado
 
+- [Versiones de plantilla: borrador, despliegue y reversión](template-versions.md)
 - [Editar una plantilla (Generador de formularios)](edit-template.md)
 - [Crear una plantilla de formulario](create-template.md)
 - [Ciclo de vida de una asignación](assignment-lifecycle.md)

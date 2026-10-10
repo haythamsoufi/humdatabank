@@ -29,7 +29,7 @@ function setButtonsLoading(rowEl, loading) {
     });
 }
 
-async function linkRow(rowEl, publishedStableKey, confirmReassign = false) {
+async function linkRow(rowEl, publishedStableKey, confirmReassign = false, confirmTypeMismatch = false) {
     const linkUrl = rowEl.dataset.linkUrl;
     if (!linkUrl || !publishedStableKey) return;
     setButtonsLoading(rowEl, true);
@@ -37,7 +37,27 @@ async function linkRow(rowEl, publishedStableKey, confirmReassign = false) {
         const { resp, data } = await postJson(linkUrl, {
             published_stable_key: publishedStableKey,
             confirm_reassign: confirmReassign,
+            confirm_type_mismatch: confirmTypeMismatch,
         });
+        if (resp.status === 409 && data.type_mismatch) {
+            const mismatchMessage =
+                `${data.error || 'These fields differ.'}\n\n` +
+                'Link them anyway? Check the field mapping guide before confirming.';
+            setButtonsLoading(rowEl, false);
+            if (window.showConfirmation) {
+                window.showConfirmation(
+                    mismatchMessage,
+                    () => { linkRow(rowEl, publishedStableKey, confirmReassign, true); },
+                    null,
+                    'Link anyway',
+                    'Cancel',
+                    'Fields differ'
+                );
+            } else if (window.confirm(mismatchMessage)) {
+                await linkRow(rowEl, publishedStableKey, confirmReassign, true);
+            }
+            return;
+        }
         if (resp.status === 409 && data.conflict) {
             const existing = data.existing_draft_item || data.existing_draft_section;
             const published = data.published_item || data.published_section;
@@ -52,14 +72,14 @@ async function linkRow(rowEl, publishedStableKey, confirmReassign = false) {
             if (window.showConfirmation) {
                 window.showConfirmation(
                     message,
-                    () => { linkRow(rowEl, publishedStableKey, true); },
+                    () => { linkRow(rowEl, publishedStableKey, true, confirmTypeMismatch); },
                     null,
                     'Confirm reassign',
                     'Cancel',
                     'Reassign field link?'
                 );
             } else if (window.confirm(message)) {
-                await linkRow(rowEl, publishedStableKey, true);
+                await linkRow(rowEl, publishedStableKey, true, confirmTypeMismatch);
             }
             return;
         }

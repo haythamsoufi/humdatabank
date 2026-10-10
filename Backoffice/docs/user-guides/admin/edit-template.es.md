@@ -74,6 +74,7 @@ Si tu flujo de trabajo usa el **Banco de indicadores**:
 2. Si tu sistema requiere publicación, **publica** la nueva versión.
 3. Crea una pequeña asignación de prueba (un país) y complétala tú mismo.
 4. Corrige etiquetas confusas y elimina campos requeridos innecesarios.
+5. Antes de desplegar una nueva versión, abra **Review field mapping** y compruebe que los campos eliminados o renombrados estén bien vinculados. Véase [Versiones de plantilla](template-versions.md).
 
 ## Problemas comunes
 

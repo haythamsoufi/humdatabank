@@ -32,8 +32,9 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error, require_json_data
 from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
 from config.config import Config
-from .helpers import (_handle_template_sharing, _handle_template_pages, _populate_template_sharing,
+from .helpers import (_handle_template_sharing, _handle_template_pages, PageInUseError, _populate_template_sharing,
     _build_template_data_for_js, _clone_template_structure_between_templates,
+    _remap_variable_item_refs,
     _get_or_create_draft_version, _update_version_timestamp, _ensure_template_access_or_redirect)
 from . import (_handle_version_translations, _handle_version_description_translations,
     _populate_version_translations, _populate_version_description_translations)
@@ -1473,6 +1474,13 @@ def edit_template(template_id):
             if is_json_request():
                 return json_ok(message=success_msg, redirect_url=redirect_url)
             return redirect(redirect_url)
+        except PageInUseError as page_err:
+            request_transaction_rollback()
+            if is_json_request():
+                return json_bad_request(str(page_err), success=False)
+            flash(str(page_err), "danger")
+            db.session.refresh(template)
+            form = FormTemplateForm(obj=template)
         except Exception as e:
             request_transaction_rollback()
             error_msg = "Error updating form template."
@@ -2017,12 +2025,14 @@ def duplicate_template(template_id):
         db.session.flush()
 
         if source_version:
-            _clone_template_structure_between_templates(
+            cloned_item_ids = _clone_template_structure_between_templates(
                 source_template_id=source_template.id,
                 source_version_id=source_version.id,
                 target_template_id=new_template.id,
                 target_version_id=new_published.id
             )
+            if new_published.variables:
+                new_published.variables = _remap_variable_item_refs(new_published.variables, cloned_item_ids)
 
         # Point new template to its published version
         new_template.published_version_id = new_published.id

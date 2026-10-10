@@ -1,6 +1,6 @@
 # Template versioning and submission data identity
 
-> **Status:** Design reviewed and finalised — ready for implementation  
+> **Status:** Implemented (stable_key identity, deploy-time remap, rollback, page status and variable remap). Operational guidance: [Template version integrity](runbooks/operations/template-version-integrity.md); admin guide: [Template versions](user-guides/admin/template-versions.md).  
 > **Last updated:** June 2026  
 > **Related code:** `app/models/forms.py` · `app/models/form_items.py` · `app/routes/admin/form_builder/versions.py` · `app/routes/admin/form_builder/helpers/cloning.py` · `app/services/template_excel_service.py` · `app/routes/admin/form_builder/items.py`
 

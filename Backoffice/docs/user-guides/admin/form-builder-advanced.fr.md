@@ -95,6 +95,8 @@ Ajoutez toujours du texte d'aide sur la question "parent" pour que les utilisate
 
 ## Versioning de modèle et modifications "sûres vs risquées"
 
+Pour le fonctionnement du déploiement, du retour arrière et de la correspondance des champs, voir [Versions de modèle](template-versions.md).
+
 ### Modifications sûres (généralement OK pendant une collecte en direct)
 
 - Corriger les fautes de frappe et la formulation dans les libellés/texte d'aide
@@ -139,6 +141,7 @@ Avant de publier/utiliser un modèle :
 
 ## Liens connexes
 
+- [Versions de modèle : brouillon, déploiement et retour arrière](template-versions.md)
 - [Modifier un modèle (Générateur de formulaires)](edit-template.md)
 - [Créer un modèle de formulaire](create-template.md)
 - [Cycle de vie d'une mission](assignment-lifecycle.md)

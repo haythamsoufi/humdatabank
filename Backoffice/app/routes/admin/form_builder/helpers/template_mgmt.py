@@ -175,6 +175,29 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
     return draft
 
 
+class PageInUseError(Exception):
+    """Raised when removing a page would erase workflow progress recorded against it."""
+
+
+def _pages_with_workflow_progress(page_ids):
+    """Subset of ``page_ids`` that have any status beyond not_started on any assignment."""
+    from app.models import AssignmentPageStatus
+    from app.models.enums import AssignmentSectionStatusValue
+
+    if not page_ids:
+        return {}
+    rows = (
+        db.session.query(AssignmentPageStatus.form_page_id, db.func.count(AssignmentPageStatus.id))
+        .filter(
+            AssignmentPageStatus.form_page_id.in_(list(page_ids)),
+            AssignmentPageStatus.status != AssignmentSectionStatusValue.not_started.value,
+        )
+        .group_by(AssignmentPageStatus.form_page_id)
+        .all()
+    )
+    return {page_id: count for page_id, count in rows}
+
+
 def _handle_template_pages(template, form_data, version_id: int):
     """Handle template pages data processing"""
     page_ids = form_data.getlist('page_ids')
@@ -255,6 +278,22 @@ def _handle_template_pages(template, form_data, version_id: int):
     if pages_to_delete:
         current_app.logger.debug(
             f"VERSIONING_DEBUG: _handle_template_pages - pages_to_delete={sorted(list(pages_to_delete))}"
+        )
+    doomed_ids = set()
+    for page_id in pages_to_delete:
+        try:
+            doomed_ids.add(int(page_id))
+        except (TypeError, ValueError):
+            continue
+    in_use = _pages_with_workflow_progress(doomed_ids)
+    if in_use:
+        names = ', '.join(
+            f"'{page.name}'" for page in existing_pages if page.id in in_use
+        )
+        raise PageInUseError(
+            f"Cannot remove page {names}: assignments already record progress on it "
+            f"({sum(in_use.values())} status record(s)). Create a new draft version and remove "
+            f"the page there, then deploy it."
         )
     for page_id in pages_to_delete:
         try:

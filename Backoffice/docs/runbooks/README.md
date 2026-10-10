@@ -11,6 +11,7 @@
 | Triage a production incident fast | [General incident triage](incidents/general-incident-triage.md) |
 | Add a new user or change their role | [User & role management](operations/user-and-role-management.md) |
 | Create or manage a form | [Form operations](operations/form-operations.md) |
+| Investigate a refused template deploy or audit template versions | [Template version integrity](operations/template-version-integrity.md) |
 | Run routine maintenance tasks | [Routine maintenance](operations/routine-maintenance.md) |
 | Get a shell in the production/staging container | [Container SSH access](operations/container-ssh-access.md) |
 | Deploy a code change or release | [Release process](development/release-process.md) + [Azure App Service](deployment/azure-app-service.md) |

@@ -188,6 +188,12 @@
     <form method="POST" action="{{ deploy_form_action }}" class="inline-block">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="version_id" value="{{ draft_version.id }}">
+        {% if mapping_summary.orphaned_items_with_data %}
+        <label class="flex items-start gap-2 text-xs text-amber-800 max-w-xs">
+            <input type="checkbox" name="acknowledge_orphaned_data" value="1" required class="mt-0.5">
+            <span>{{ _('%(count)s live field(s) with submitted data have no match in this draft. Their data stays on the archived version but will no longer appear in the live form or exports. I understand.', count=mapping_summary.orphaned_items_with_data) }}</span>
+        </label>
+        {% endif %}
         <button type="submit" class="professional-action-btn professional-action-btn-green" title="{{ _('Publish this draft and remap submission data')|forceescape }}">
             <i class="fas fa-rocket" aria-hidden="true"></i>
             <span>{{ _('Deploy draft') }}</span>
@@ -284,6 +290,10 @@
                 <li><strong>{{ _('New field') }}:</strong> {{ _('No published counterpart — starts fresh with no inherited data.') }}</li>
                 <li><strong>{{ _('Orphaned') }}:</strong> {{ _('Published field removed from draft — historical data stays on the archived version.') }}</li>
             </ul>
+            <p class="mt-3 mb-0 text-blue-800">
+                {{ _('Only fields of the same kind can be linked. If the data type or indicator differs you will be asked to confirm, because existing answers are carried over as they are.') }}
+                <a href="{{ url_for('admin_docs.view_doc', doc_path='user-guides/admin/template-versions') }}" target="_blank" rel="noopener" class="underline">{{ _('Read the guide') }}</a>
+            </p>
         </div>
 
         {# Entity tabs: Fields / Sections #}
@@ -364,6 +374,12 @@
                 <form method="POST" action="{{ deploy_form_action }}" class="inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="version_id" value="{{ draft_version.id }}">
+                    {% if mapping_summary.orphaned_items_with_data %}
+        <label class="flex items-start gap-2 text-xs text-amber-800 max-w-xs">
+            <input type="checkbox" name="acknowledge_orphaned_data" value="1" required class="mt-0.5">
+            <span>{{ _('%(count)s live field(s) with submitted data have no match in this draft. Their data stays on the archived version but will no longer appear in the live form or exports. I understand.', count=mapping_summary.orphaned_items_with_data) }}</span>
+        </label>
+        {% endif %}
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-rocket mr-1" aria-hidden="true"></i>{{ _('Deploy this version') }}
                     </button>

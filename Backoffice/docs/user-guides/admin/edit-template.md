@@ -74,6 +74,7 @@ If your workflow uses the **Indicator bank**:
 2. If your system requires publishing, **publish** the new version.
 3. Create a small test assignment (one country) and complete it yourself.
 4. Fix any confusing labels and remove unnecessary required fields.
+5. Before you deploy a new version, open **Review field mapping** and make sure removed or renamed fields are linked correctly. See [Template versions](template-versions.md).
 
 ## Common problems
 

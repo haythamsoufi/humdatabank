@@ -1065,6 +1065,21 @@ Cross-version submission continuity uses a template-scoped logical id on structu
 - Preserved on clone and Excel round-trip; auto-generated on new rows
 - On **deploy**, `VersionDeployMigrationService.migrate_submission_fks()` bulk-remaps submission FKs from the archived published version to the new version where keys match
 
+Deploy semantics worth knowing:
+
+- Identity is **never overwritten by position**: a row that already has a key keeps it. Positional pairing only backfills legacy rows whose key is `NULL`, and only when a position is held by exactly one row on each side.
+- Deploy is refused (fail-closed, nothing changes) if one version holds the same key on more than one row, or if submission rows would be left unmapped.
+- Besides submission tables, deploy carries forward `AssignmentPageStatus` (page identity inferred from matched sections) and `version.variables[*].source_form_item_id`.
+- Fields removed from the new version keep their data on the archived version (`archived=True`); **rolling back** (deploying an archived version) restores those rows.
+- Create-draft and deploy lock the `FormTemplate` row so concurrent version changes serialise. Deploy with an unknown/foreign `version_id` is an error — it never falls back to the draft.
+- Deleting a version is blocked while any data (including AI validations and page statuses) references it.
+- Deploy refuses until the admin sends `acknowledge_orphaned_data=1` when live fields holding data have no match in the target version (the Form Builder dialogs and the field-mapping page send it).
+- Data-entry saves post `form_version_id`; `entry_form_is_stale()` takes a share lock on the template row and refuses the save (HTTP 409 for AJAX) when the form belongs to an older published version. Same lock order as deploy: template, then assignment row.
+- The same check guards the public-submission edit page and public form links (`routes/forms/submission.py`). Other write paths that take ids from the client validate the version instead: Data Explorer `apply-imputed-value` (new rows only), `dynamic-indicators/add`, and the KoBo import column mapping (`item.version_id` must equal the live version). Imputation runs resolve items from the published version server-side. The mobile app saves data through the web entry form.
+- Field linking: different item kinds / section types are rejected; a differing data type or indicator needs `confirm_type_mismatch`.
+- A page with workflow progress cannot be removed from a version (`PageInUseError`); `duplicate_template` remaps `variables[*].source_form_item_id` to the cloned items.
+- Operations: `python scripts/ops/audit_template_versions.py` (read-only) and the runbook `Backoffice/docs/runbooks/operations/template-version-integrity.md`, which also lists the open decision on database constraints. Admin guide: `Backoffice/docs/user-guides/admin/template-versions.md`.
+
 Query all version rows for one logical field:
 
 ```python

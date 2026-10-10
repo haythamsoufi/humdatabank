@@ -40,6 +40,7 @@ from .cloning import (
     _remap_rule_payload_to_string,
     _clone_template_structure,
     _clone_template_structure_between_templates,
+    _remap_variable_item_refs,
 )
 
 from .js_builders import (
@@ -56,6 +57,7 @@ from .js_builders import (
 from .template_mgmt import (
     _get_or_create_draft_version,
     _handle_template_pages,
+    PageInUseError,
     _handle_template_sharing,
     _populate_template_sharing,
     _ensure_template_access_or_redirect,
@@ -91,6 +93,7 @@ __all__ = [
     '_remap_rule_payload_to_string',
     '_clone_template_structure',
     '_clone_template_structure_between_templates',
+    '_remap_variable_item_refs',
     # js_builders
     '_get_model_columns_config',
     '_get_plugin_measures',
@@ -103,6 +106,7 @@ __all__ = [
     # template_mgmt
     '_get_or_create_draft_version',
     '_handle_template_pages',
+    'PageInUseError',
     '_handle_template_sharing',
     '_populate_template_sharing',
     '_ensure_template_access_or_redirect',

@@ -37,7 +37,7 @@ from app.services.notification.core import (
 )
 from app.services.templates.preparation_service import TemplatePreparationService
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
 from app.utils.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
 from app.utils.form_localization import (
     get_localized_country_name,
@@ -61,6 +61,7 @@ from .helpers import (
     build_submitted_documents_dict,
     calculate_section_completion_status,
     compute_entry_form_progress_metrics,
+    entry_form_is_stale,
     process_existing_data_for_template,
     render_dynamic_indicator_item_html,
 )
@@ -781,6 +782,17 @@ def handle_assignment_form(aes_id):
         if csrf_form.validate_on_submit():
             from app.utils.form_authorization import lock_aes_for_update
 
+            # Template lock first, then the assignment row: deploy uses the same order.
+            if entry_form_is_stale(form_template, request.form.get('form_version_id')):
+                stale_msg = _(
+                    "This form was updated while you were working on it. Reload the page to get the "
+                    "latest version; your unsaved changes on this page could not be saved."
+                )
+                request_transaction_rollback()
+                if is_ajax:
+                    return json_error(stale_msg, 409, success=False, stale_form=True)
+                flash(stale_msg, "warning")
+                return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
             if lock_aes_for_update(assignment_entity_status):
                 can_edit = AuthorizationService.can_edit_assignment(
                     assignment_entity_status, current_user
@@ -1295,6 +1307,7 @@ def handle_assignment_form(aes_id):
         plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
         form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None,
         template_id=form_template.id,
+        form_version_id=form_template.published_version_id,
         assignment_entity_status_id=assignment_entity_status.id,
         template_variables=variable_configs if 'variable_configs' in locals() else {},
         form_features=form_features,

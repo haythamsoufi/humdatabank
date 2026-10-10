@@ -72,11 +72,20 @@ def deploy_template_version(template_id):
         version = None
         if target_version_id:
             try:
-                version = FormTemplateVersion.query.filter_by(id=int(target_version_id), template_id=template.id).first()
-                current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - found version by explicit ID: {version.id if version else None}")
-            except Exception as e:
-                current_app.logger.debug("deploy version_id parse failed: %s", e)
-                version = None
+                requested_id = int(target_version_id)
+            except (TypeError, ValueError):
+                requested_id = None
+            version = (
+                FormTemplateVersion.query.filter_by(id=requested_id, template_id=template.id).first()
+                if requested_id is not None else None
+            )
+            if not version:
+                # An explicit but unknown version must never fall back to "deploy whatever draft exists".
+                msg = 'The selected version was not found for this template.'
+                if is_ajax:
+                    return json_bad_request(msg, success=False)
+                flash(msg, 'warning')
+                return redirect(url_for("form_builder.edit_template", template_id=template.id))
         if not version:
             version = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first()
             current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - found draft version: {version.id if version else None}")
@@ -186,9 +195,11 @@ def deploy_template_version(template_id):
 
         current_app.logger.info(f"VERSIONING_DEBUG: deploy_template_version - successfully deployed version {version.id} for template {template_id}")
         deployed_version_id = version.id
-        if migration_summary and migration_summary.get('remapped_rows', 0) > 0:
+        if migration_summary and (
+            migration_summary.get('remapped_rows', 0) > 0 or migration_summary.get('orphaned_items', 0) > 0
+        ):
             flash(
-                f"Version deployed. {migration_summary['remapped_rows']} field value(s) carried forward; "
+                f"Version deployed. {migration_summary.get('remapped_rows', 0)} field value(s) carried forward; "
                 f"{migration_summary.get('orphaned_items', 0)} removed field(s) retained on archived version.",
                 'success',
             )
@@ -597,8 +608,8 @@ def delete_template_version(template_id, version_id):
         flash("Access denied.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
 
+    version = FormTemplateVersion.query.filter_by(id=version_id, template_id=template.id).first_or_404()
     try:
-        version = FormTemplateVersion.query.filter_by(id=version_id, template_id=template.id).first_or_404()
         current_app.logger.debug(f"VERSIONING_DEBUG: delete_template_version - found version {version_id} with status={version.status}")
 
         if template.published_version_id == version.id:

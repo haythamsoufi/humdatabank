@@ -237,8 +237,7 @@ class TestDeployTemplateVersion:
         db_session.add(row)
         db_session.commit()
 
-        with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
-             patch('app.routes.admin.form_builder.versions.register_post_commit'):
+        with patch('app.routes.admin.form_builder.versions.log_admin_action'):
             resp = logged_in_client.post(
                 f'/admin/templates/{template.id}/deploy',
                 data={'version_id': str(draft.id)},
@@ -248,22 +247,23 @@ class TestDeployTemplateVersion:
         db_session.refresh(row)
         assert row.form_item_id == draft_item.id
 
-    def test_deploy_schedules_notification_after_commit(
+    def test_deploy_refreshes_completion_rates(
         self, logged_in_client, db_session, admin_user, app
     ):
         _grant_template_permissions(db_session)
         template = _make_owned_template(db_session, admin_user)
         draft = _make_draft(db_session, template)
         with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
-             patch('app.routes.admin.form_builder.versions.register_post_commit') as mock_post_commit:
+             patch(
+                 'app.services.assignments.completion_service.AssignmentCompletionService.refresh_for_template'
+             ) as mock_refresh:
             resp = logged_in_client.post(
                 f'/admin/templates/{template.id}/deploy',
                 data={'version_id': str(draft.id)},
                 follow_redirects=False,
             )
         assert resp.status_code == 302
-        mock_post_commit.assert_called_once()
-        assert mock_post_commit.call_args[0][1] == template.id
+        mock_refresh.assert_called_once_with(template.id)
 
 
 # ---------------------------------------------------------------------------
@@ -389,14 +389,14 @@ class TestDeleteTemplateVersion:
         assert resp.status_code == 404
 
     def test_delete_version_404_version(self, logged_in_client, db_session, admin_user, app):
-        """POST for non-existent version redirects (NotFound is caught by exception handler)."""
+        """POST for non-existent version returns 404."""
         _grant_template_permissions(db_session)
         template = _make_owned_template(db_session, admin_user)
         resp = logged_in_client.post(
             f'/admin/templates/{template.id}/versions/999999/delete',
             data={},
         )
-        assert resp.status_code == 302
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -633,7 +633,7 @@ class TestUpdateVersionComment:
         assert resp.status_code == 404
 
     def test_update_version_comment_404_version(self, logged_in_client, db_session, admin_user, app):
-        """POST for non-existent version redirects (NotFound is caught by exception handler)."""
+        """POST for non-existent version returns 404."""
         template = _make_owned_template(db_session, admin_user)
         resp = logged_in_client.post(
             f'/admin/templates/{template.id}/versions/999999/comment',

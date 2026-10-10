@@ -1078,7 +1078,7 @@ Deploy semantics worth knowing:
 - The same check guards the public-submission edit page and public form links (`routes/forms/submission.py`). Other write paths that take ids from the client validate the version instead: Data Explorer `apply-imputed-value` (new rows only), `dynamic-indicators/add`, and the KoBo import column mapping (`item.version_id` must equal the live version). Imputation runs resolve items from the published version server-side. The mobile app saves data through the web entry form.
 - Field linking: different item kinds / section types are rejected; a differing data type or indicator needs `confirm_type_mismatch`.
 - A page with workflow progress cannot be removed from a version (`PageInUseError`); `duplicate_template` remaps `variables[*].source_form_item_id` to the cloned items.
-- Operations: `python scripts/ops/audit_template_versions.py` (read-only) and the runbook `Backoffice/docs/runbooks/operations/template-version-integrity.md`, which also lists the open decision on database constraints. Admin guide: `Backoffice/docs/user-guides/admin/template-versions.md`.
+- Operations: `python scripts/ops/audit_template_versions.py` (read-only) and the runbook `Backoffice/docs/runbooks/operations/template-version-integrity.md`, which also holds the plan and checklist for the database constraints (partial unique indexes: one draft per template, unique `stable_key` per version; migration `add_template_version_integrity_constraints`). Tests that need an invalid state use the `without_version_integrity_indexes` fixture. Admin guide: `Backoffice/docs/user-guides/admin/template-versions.md`.
 
 Query all version rows for one logical field:
 

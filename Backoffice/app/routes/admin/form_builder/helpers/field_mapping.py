@@ -213,6 +213,8 @@ def link_draft_item(
             )
         new_key = generate_stable_key()
         existing.stable_key = new_key
+        # Flush the displacement first: the unique index must never see the key on two rows.
+        db.session.flush()
         displaced = _serialize_item(existing, sections)
 
     draft_item.stable_key = key
@@ -315,6 +317,7 @@ def link_draft_section(
                 published_section=_serialize_section(published_section),
             )
         existing.stable_key = generate_stable_key()
+        db.session.flush()
         displaced = _serialize_section(existing)
 
     draft_section.stable_key = key

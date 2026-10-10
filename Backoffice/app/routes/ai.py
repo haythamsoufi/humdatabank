@@ -26,7 +26,7 @@ from contextlib import suppress
 from flask import Blueprint, Response, current_app, g, jsonify, request, send_file, stream_with_context, session
 from flask_login import login_required, current_user, login_user, logout_user
 
-from app.utils.ai_request_user import resolve_ai_identity
+from app.utils.ai_request_user import bearer_identity_needs_login, resolve_ai_identity
 from app.utils.ai_tokens import issue_ai_token
 from app.utils.ai_pricing import estimate_chat_cost
 from app.utils.outbound_url import is_local_dev_environment
@@ -1029,7 +1029,7 @@ def chat():
     # Ensure current_user reflects Bearer auth so existing RBAC helpers (used by tools) work.
     did_login = False
     try:
-        if identity.user and identity.auth_source == "bearer" and not current_user.is_authenticated:
+        if bearer_identity_needs_login(identity):
             login_user(identity.user, remember=False)
             did_login = True
             # Avoid emitting a session cookie for bearer-token clients.
@@ -1551,7 +1551,7 @@ def chat_stream():
         return budget_denied
     did_login = False
     try:
-        if identity.user and identity.auth_source == "bearer" and not current_user.is_authenticated:
+        if bearer_identity_needs_login(identity):
             login_user(identity.user, remember=False)
             did_login = True
             # Avoid emitting a session cookie for bearer-token clients.
@@ -2722,7 +2722,7 @@ def export_table_as_excel():
 
     # Ensure current_user reflects Bearer auth for consistency with the rest of ai_v2.
     try:
-        if identity.user and identity.auth_source == "bearer" and not current_user.is_authenticated:
+        if bearer_identity_needs_login(identity):
             login_user(identity.user, remember=False)
     except Exception as e:
         logger.debug("login_user failed for export_table: %s", e, exc_info=True)

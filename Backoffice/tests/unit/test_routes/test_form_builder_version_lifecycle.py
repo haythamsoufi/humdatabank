@@ -376,7 +376,7 @@ class TestDeployLifecycle:
         assert second.archived is False
 
     def test_failed_migration_leaves_versions_and_data_untouched(
-        self, logged_in_client, db_session, admin_user
+        self, logged_in_client, db_session, admin_user, without_version_integrity_indexes
     ):
         template = _template(db_session, admin_user)
         published, _section, first, _second = _structured_published(db_session, template)
@@ -1553,7 +1553,9 @@ class TestTemplateVersionAudit:
         assert report['has_blocking_issues'] is False
         assert report['multiple_drafts'] == []
 
-    def test_reports_several_drafts(self, app, db_session, admin_user):
+    def test_reports_several_drafts(
+        self, app, db_session, admin_user, without_version_integrity_indexes
+    ):
         template = create_test_template(db_session, owner_id=admin_user.id)
         first = create_test_draft_version(db_session, template)
         second = FormTemplateVersion(
@@ -1566,7 +1568,9 @@ class TestTemplateVersionAudit:
         assert report['has_blocking_issues'] is True
         assert report['multiple_drafts'][0]['version_ids'] == sorted([first.id, second.id])
 
-    def test_reports_duplicate_keys_inside_a_version(self, app, db_session, admin_user):
+    def test_reports_duplicate_keys_inside_a_version(
+        self, app, db_session, admin_user, without_version_integrity_indexes
+    ):
         template = create_test_template(db_session, owner_id=admin_user.id)
         section = create_test_section(db_session, template, version=template.published_version)
         a = create_test_item(

@@ -600,6 +600,73 @@ class TestListIndicators:
         _, status = _parse(resp)
         assert status == 200
 
+    def test_sector_names_survive_session_teardown(self, app, db_session, route_admin):
+        """Cached sector rows must stay readable after the request session is gone.
+
+        Production GET /admin/content/indicator-bank raised DetachedInstanceError
+        because the 60s lookup cache held Sector/SubSector instances past teardown.
+        """
+        from app.models import IndicatorBank, Sector, SubSector
+        from app.routes.api.mobile import admin_content
+
+        suffix = uuid.uuid4().hex[:8]
+        sector = Sector(name=f'Health {suffix}')
+        subsector = SubSector(name=f'Clinical {suffix}', sector=sector)
+        db_session.add_all([sector, subsector])
+        db_session.flush()
+        indicator = IndicatorBank(
+            name=f'People reached {suffix}',
+            type='number',
+            sector={'primary': sector.id},
+            sub_sector={'primary': subsector.id},
+            archived=False,
+        )
+        db_session.add(indicator)
+        db_session.commit()
+        sector_id = sector.id
+        subsector_id = subsector.id
+        sector_name = sector.name
+        subsector_name = subsector.name
+        admin_id = route_admin.id
+
+        admin_content._sector_cache['data'] = None
+        admin_content._sector_cache['expires'] = 0.0
+        admin_content._subsector_cache['data'] = None
+        admin_content._subsector_cache['expires'] = 0.0
+        try:
+            primed_sectors = admin_content._get_sector_dict()
+            primed_subsectors = admin_content._get_subsector_dict()
+            assert primed_sectors[sector_id] == sector_name
+            assert primed_subsectors[subsector_id] == subsector_name
+            assert isinstance(primed_sectors[sector_id], str)
+            assert isinstance(primed_subsectors[subsector_id], str)
+
+            # Match production teardown: expire loaded attributes, then drop the session.
+            db_session.expire_all()
+            db_session.remove()
+
+            assert admin_content._get_sector_dict()[sector_id] == sector_name
+            assert admin_content._get_subsector_dict()[subsector_id] == subsector_name
+
+            from app.models import User
+
+            with app.test_request_context(
+                '/api/mobile/v1/admin/content/indicator-bank', method='GET'
+            ):
+                login_user(db_session.get(User, admin_id))
+                resp = admin_content.list_indicators()
+                body, status = _parse(resp)
+                assert status == 200
+                payload = json.loads(body.get_data())
+                row = next(item for item in payload['data'] if item['name'] == f'People reached {suffix}')
+                assert row['sector'] == sector_name
+                assert row['sub_sector'] == subsector_name
+        finally:
+            admin_content._sector_cache['data'] = None
+            admin_content._sector_cache['expires'] = 0.0
+            admin_content._subsector_cache['data'] = None
+            admin_content._subsector_cache['expires'] = 0.0
+
 
 # ---------------------------------------------------------------------------
 # get_indicator

@@ -24,19 +24,28 @@ from app.routes.api.mobile import mobile_bp
 import time as _time
 
 # ---------------------------------------------------------------------------
-# Module-level lookup caches (60-second TTL) — avoids full table scans on
-# every request to list_indicators and similar endpoints.
+# Module-level id -> name snapshots (60-second TTL). Values are plain strings,
+# not ORM instances: the map outlives the request session, and a detached
+# Sector/SubSector raises DetachedInstanceError on attribute refresh.
 # ---------------------------------------------------------------------------
 _sector_cache: dict = {'data': None, 'expires': 0.0}
 _subsector_cache: dict = {'data': None, 'expires': 0.0}
 _LOOKUP_CACHE_TTL = 60.0
 
 
+def _load_id_name_map(model):
+    """Snapshot ``id -> name`` while the request session is still open."""
+    return {
+        row_id: name
+        for row_id, name in db.session.query(model.id, model.name).all()
+    }
+
+
 def _get_sector_dict():
     from app.models import Sector
     now = _time.monotonic()
     if _sector_cache['data'] is None or now > _sector_cache['expires']:
-        _sector_cache['data'] = {s.id: s for s in Sector.query.all()}
+        _sector_cache['data'] = _load_id_name_map(Sector)
         _sector_cache['expires'] = now + _LOOKUP_CACHE_TTL
     return _sector_cache['data']
 
@@ -45,7 +54,7 @@ def _get_subsector_dict():
     from app.models import SubSector
     now = _time.monotonic()
     if _subsector_cache['data'] is None or now > _subsector_cache['expires']:
-        _subsector_cache['data'] = {s.id: s for s in SubSector.query.all()}
+        _subsector_cache['data'] = _load_id_name_map(SubSector)
         _subsector_cache['expires'] = now + _LOOKUP_CACHE_TTL
     return _subsector_cache['data']
 
@@ -792,7 +801,7 @@ def list_indicators():
             for level in ('primary', 'secondary', 'tertiary'):
                 sid = indicator.sector.get(level) if isinstance(indicator.sector, dict) else None
                 if sid and sid in sectors_dict:
-                    sector_name = sectors_dict[sid].name
+                    sector_name = sectors_dict[sid]
                     break
 
         subsector_name = None
@@ -800,7 +809,7 @@ def list_indicators():
             for level in ('primary', 'secondary', 'tertiary'):
                 sid = indicator.sub_sector.get(level) if isinstance(indicator.sub_sector, dict) else None
                 if sid and sid in subsectors_dict:
-                    subsector_name = subsectors_dict[sid].name
+                    subsector_name = subsectors_dict[sid]
                     break
 
         items.append({

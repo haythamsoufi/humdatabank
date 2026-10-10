@@ -953,9 +953,31 @@ def apply_imputed_value():
                 .filter(AssignmentEntityStatus.id == int(submission_id))
                 .scalar()
             )
-            item_template_id = db.session.query(FormItem.template_id).filter(FormItem.id == int(form_item_id)).scalar()
-            if item_template_id is None or item_template_id != target_template_id:
+            item_row = (
+                db.session.query(FormItem.template_id, FormItem.version_id)
+                .filter(FormItem.id == int(form_item_id))
+                .first()
+            )
+            if item_row is None or item_row.template_id != target_template_id:
                 return json_bad_request("form_item_id does not belong to this submission's template")
+            live_version_id = (
+                db.session.query(FormTemplate.published_version_id)
+                .filter(FormTemplate.id == target_template_id)
+                .scalar()
+            )
+            has_row = (
+                db.session.query(FormData.id)
+                .filter(
+                    FormData.assignment_entity_status_id == int(submission_id),
+                    FormData.form_item_id == int(form_item_id),
+                )
+                .first()
+                is not None
+            )
+            if not has_row and live_version_id is not None and item_row.version_id != live_version_id:
+                return json_bad_request(
+                    "This field belongs to an older version of the template. Reload the page and try again."
+                )
 
             fd = (
                 FormData.query

@@ -1065,6 +1065,15 @@ Cross-version submission continuity uses a template-scoped logical id on structu
 - Preserved on clone and Excel round-trip; auto-generated on new rows
 - On **deploy**, `VersionDeployMigrationService.migrate_submission_fks()` bulk-remaps submission FKs from the archived published version to the new version where keys match
 
+Deploy semantics worth knowing:
+
+- Identity is **never overwritten by position**: a row that already has a key keeps it. Positional pairing only backfills legacy rows whose key is `NULL`, and only when a position is held by exactly one row on each side.
+- Deploy is refused (fail-closed, nothing changes) if one version holds the same key on more than one row, or if submission rows would be left unmapped.
+- Besides submission tables, deploy carries forward `AssignmentPageStatus` (page identity inferred from matched sections) and `version.variables[*].source_form_item_id`.
+- Fields removed from the new version keep their data on the archived version (`archived=True`); **rolling back** (deploying an archived version) restores those rows.
+- Create-draft and deploy lock the `FormTemplate` row so concurrent version changes serialise. Deploy with an unknown/foreign `version_id` is an error — it never falls back to the draft.
+- Deleting a version is blocked while any data (including AI validations and page statuses) references it.
+
 Query all version rows for one logical field:
 
 ```python

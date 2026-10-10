@@ -1,6 +1,8 @@
 """Template structure cloning helpers for the form_builder package."""
 
+import copy
 from contextlib import suppress
+from typing import Any, Dict, Optional
 from flask import current_app
 from app import db
 from app.models import FormPage, FormSection, FormItem
@@ -110,18 +112,45 @@ def _remap_rule_payload_to_string(rule_payload, id_map):
         return rule_payload
 
 
-def _clone_template_structure(template_id: int, source_version_id: int, target_version_id: int) -> None:
+def _clone_template_structure(template_id: int, source_version_id: int, target_version_id: int) -> Dict[int, int]:
     """Clone pages, sections, and items from source_version_id to target_version_id preserving order.
 
     Rows are inserted with new IDs and mapped FKs; stable_key values are carried over so
     the clone keeps cross-version identity with its source.
     """
-    _clone_template_structure_between_templates(
+    return _clone_template_structure_between_templates(
         source_template_id=template_id,
         source_version_id=source_version_id,
         target_template_id=template_id,
         target_version_id=target_version_id,
     )
+
+
+def _remap_variable_item_refs(variables, item_id_map) -> Optional[Dict[str, Any]]:
+    """Return a copy of template variables whose ``source_form_item_id`` points at cloned items.
+
+    Used when the clone lands in another template: an id that is not part of the clone would
+    otherwise keep reading a field of the source template.
+    """
+    if not isinstance(variables, dict):
+        return variables
+    remapped = copy.deepcopy(variables)
+    for config in remapped.values():
+        if not isinstance(config, dict):
+            continue
+        raw = config.get('source_form_item_id')
+        if raw in (None, ''):
+            continue
+        try:
+            old_id = int(raw)
+        except (TypeError, ValueError):
+            continue
+        new_id = item_id_map.get(old_id)
+        if new_id is None:
+            config.pop('source_form_item_id', None)
+        else:
+            config['source_form_item_id'] = new_id
+    return remapped
 
 
 def _remap_section_config_item_refs(section_pairs, item_id_map) -> int:
@@ -154,7 +183,7 @@ def _remap_section_config_item_refs(section_pairs, item_id_map) -> int:
     return remapped
 
 
-def _clone_template_structure_between_templates(*, source_template_id: int, source_version_id: int, target_template_id: int, target_version_id: int) -> None:
+def _clone_template_structure_between_templates(*, source_template_id: int, source_version_id: int, target_template_id: int, target_version_id: int) -> Dict[int, int]:
     """Clone pages, sections, and items from one template/version to another template/version.
 
     This mirrors _clone_template_structure but allows source and target template IDs to differ.
@@ -344,3 +373,4 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
     # Flush again to persist the remapped conditions
     db.session.flush()
     current_app.logger.info(f"VERSIONING_DEBUG: _clone_template_structure_between_templates - successfully cloned structure: {len(page_id_map)} pages, {len(section_id_map)} sections, {items_cloned} items from template {source_template_id}/version {source_version_id} to template {target_template_id}/version {target_version_id}, remapped {remapped_count} conditions")
+    return item_id_map

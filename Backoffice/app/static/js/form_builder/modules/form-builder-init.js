@@ -51,6 +51,11 @@ async function buildDeployConfirmMessage(baseMessage, form) {
         const summary = data.mapping_summary || {};
         const suggested = summary.suggested_items ?? 0;
         const orphanedWithData = summary.orphaned_items_with_data ?? 0;
+        if (orphanedWithData > 0) {
+            message += `\n\n${orphanedWithData} field(s) in the live version hold submitted data but have no match in this version. ` +
+                'Their data is kept (not deleted) on the archived version, but it will no longer appear in the entry form ' +
+                'or in exports of the live version. Deploying confirms you accept this.';
+        }
         if (suggested > 0 || orphanedWithData > 0) {
             message += `\n\n${suggested} field(s) have suggested matches`;
             if (orphanedWithData > 0) {
@@ -61,15 +66,39 @@ async function buildDeployConfirmMessage(baseMessage, form) {
         return {
             message,
             fieldMappingUrl: data.field_mapping_url || null,
+            orphanedWithData,
         };
     } catch (_e) {
-        return { message: baseMessage, fieldMappingUrl: null };
+        return { message: baseMessage, fieldMappingUrl: null, orphanedWithData: 0 };
     }
 }
 
+function setOrphanAcknowledgement(form, acknowledged) {
+    if (!form) return;
+    let input = form.querySelector('input[name="acknowledge_orphaned_data"]');
+    if (!acknowledged) {
+        if (input) input.remove();
+        return;
+    }
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'acknowledge_orphaned_data';
+        form.appendChild(input);
+    }
+    input.value = '1';
+}
+
 function confirmDeploy(form, baseMessage) {
-    const doDeploy = () => { if (form) submitBuilderForm(form); };
-    buildDeployConfirmMessage(baseMessage, form).then(({ message, fieldMappingUrl }) => {
+    let orphanedWithData = 0;
+    const doDeploy = () => {
+        if (!form) return;
+        setOrphanAcknowledgement(form, orphanedWithData > 0);
+        form.dataset.confirmed = 'true';
+        submitBuilderForm(form);
+    };
+    buildDeployConfirmMessage(baseMessage, form).then(({ message, fieldMappingUrl, orphanedWithData: orphaned }) => {
+        orphanedWithData = orphaned || 0;
         const onConfirm = () => {
             if (fieldMappingUrl && (message.includes('Review field mapping') || message.includes('suggested matches'))) {
                 const reviewFirst = window.confirm(
@@ -93,6 +122,8 @@ function confirmDeploy(form, baseMessage) {
 /**
  * Wire version modal actions (idempotent — safe after AJAX DOM swaps).
  */
+window.FormBuilderDeploy = { confirm: confirmDeploy };
+
 export function wireVersionsModal() {
     const versionsModalBtn = document.getElementById('versions-modal-btn');
     const versionsModal = document.getElementById('versions-modal');
@@ -830,23 +861,7 @@ function enhance() {
             if (!form) return;
             const message = (window.formBuilderMessages && window.formBuilderMessages.deployVersion)
                 || 'Deploy this version? This will publish it as the live version.';
-            const doSubmit = () => {
-                form.dataset.confirmed = 'true';
-                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                    window.FormBuilderAjax.submit(form);
-                } else if (typeof form.requestSubmit === 'function') {
-                    form.requestSubmit();
-                } else {
-                    form.submit();
-                }
-            };
-            buildDeployConfirmMessage(message, form).then((fullMessage) => {
-                if (window.showConfirmation) {
-                    window.showConfirmation(fullMessage, doSubmit, null, _t('Deploy'), _t('Cancel'), _t('Deploy Version?'));
-                } else if (window.confirm(fullMessage)) {
-                    doSubmit();
-                }
-            });
+            confirmDeploy(form, message);
         });
     }
 

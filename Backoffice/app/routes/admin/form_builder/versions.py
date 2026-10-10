@@ -17,6 +17,7 @@ from app.utils.api_responses import json_bad_request, json_server_error, json_ok
 from .helpers import _clone_template_structure
 from .helpers.field_mapping import (
     FieldMappingConflictError,
+    FieldMappingTypeMismatchError,
     FieldMappingValidationError,
     link_draft_item,
     link_draft_section,
@@ -25,6 +26,10 @@ from .helpers.field_mapping import (
     unlink_draft_item,
     unlink_draft_section,
 )
+
+
+def _truthy(value) -> bool:
+    return str(value or '').strip().lower() in ('1', 'true', 'yes', 'on')
 
 
 def _lock_template_for_version_change(template_id: int) -> FormTemplate:
@@ -115,6 +120,33 @@ def deploy_template_version(template_id):
 
         is_rollback = version.status == 'archived'
         prev = _previous_published_version(template, version.id)
+        if prev and prev.id != version.id:
+            from app.services.platform.version_deploy_migration_service import VersionDeployMigrationService
+            at_risk = VersionDeployMigrationService.count_field_mapping_summary(
+                prev.id, version.id, template.id
+            ).get('orphaned_items_with_data', 0)
+            if at_risk and not _truthy(get_request_data().get('acknowledge_orphaned_data')):
+                msg = (
+                    f"{at_risk} field(s) in the live version hold submitted data but have no match in "
+                    f"the version you are deploying. Their data is kept (not deleted) on the archived "
+                    f"version, but it will no longer appear in the entry form or in exports of the live "
+                    f"version. Review the field mapping, then confirm to deploy."
+                )
+                review_url = (
+                    url_for('form_builder.field_mapping_review', template_id=template.id, version_id=version.id)
+                    if version.status == 'draft' else None
+                )
+                if is_ajax:
+                    return json_bad_request(
+                        msg, success=False,
+                        requires_acknowledgement=True,
+                        orphaned_items_with_data=at_risk,
+                        field_mapping_url=review_url,
+                    )
+                flash(msg, 'warning')
+                return redirect(review_url or url_for(
+                    "form_builder.edit_template", template_id=template.id, version_id=version.id
+                ))
         if prev:
             prev_version_id = prev.id
             if prev.status == 'published':
@@ -374,6 +406,7 @@ def link_draft_item_route(template_id, version_id, item_id):
     data = get_request_data()
     published_stable_key = (data.get('published_stable_key') or '').strip()
     confirm_reassign = str(data.get('confirm_reassign', '')).lower() in ('1', 'true', 'yes')
+    confirm_type_mismatch = str(data.get('confirm_type_mismatch', '')).lower() in ('1', 'true', 'yes')
 
     try:
         stable_key, warnings, displaced = link_draft_item(
@@ -382,12 +415,22 @@ def link_draft_item_route(template_id, version_id, item_id):
             draft_item=draft_item,
             published_stable_key=published_stable_key,
             confirm_reassign=confirm_reassign,
+            confirm_type_mismatch=confirm_type_mismatch,
         )
         db.session.commit()
         return json_ok(
             stable_key=stable_key,
             warnings=warnings,
             displaced_draft_item=displaced,
+        )
+    except FieldMappingTypeMismatchError as mismatch:
+        request_transaction_rollback()
+        return json_error(
+            str(mismatch),
+            status=409,
+            success=False,
+            type_mismatch=True,
+            warnings=mismatch.warnings,
         )
     except FieldMappingConflictError as conflict:
         request_transaction_rollback()
@@ -464,6 +507,7 @@ def link_draft_section_route(template_id, version_id, section_id):
     data = get_request_data()
     published_stable_key = (data.get('published_stable_key') or '').strip()
     confirm_reassign = str(data.get('confirm_reassign', '')).lower() in ('1', 'true', 'yes')
+    confirm_type_mismatch = str(data.get('confirm_type_mismatch', '')).lower() in ('1', 'true', 'yes')
 
     try:
         stable_key, warnings, displaced = link_draft_section(
@@ -472,12 +516,22 @@ def link_draft_section_route(template_id, version_id, section_id):
             draft_section=draft_section,
             published_stable_key=published_stable_key,
             confirm_reassign=confirm_reassign,
+            confirm_type_mismatch=confirm_type_mismatch,
         )
         db.session.commit()
         return json_ok(
             stable_key=stable_key,
             warnings=warnings,
             displaced_draft_section=displaced,
+        )
+    except FieldMappingTypeMismatchError as mismatch:
+        request_transaction_rollback()
+        return json_error(
+            str(mismatch),
+            status=409,
+            success=False,
+            type_mismatch=True,
+            warnings=mismatch.warnings,
         )
     except FieldMappingConflictError as conflict:
         request_transaction_rollback()

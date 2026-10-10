@@ -426,6 +426,9 @@
             {% if template_id is defined %}
             <input type="hidden" name="template_id" value="{{ template_id }}">
             {% endif %}
+            {% if form_version_id is defined and form_version_id %}
+            <input type="hidden" name="form_version_id" value="{{ form_version_id }}">
+            {% endif %}
             {% if assignment_entity_status_id is defined %}
             <input type="hidden" name="assignment_entity_status_id" value="{{ assignment_entity_status_id }}">
             {% endif %}

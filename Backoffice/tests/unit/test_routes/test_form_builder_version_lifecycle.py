@@ -22,6 +22,18 @@ from app.models import (
     RepeatGroupInstance,
 )
 from app.models.assignments import AssignmentPageStatus
+from app.routes.admin.form_builder.helpers.field_mapping import (
+    FieldMappingIncompatibleError,
+    FieldMappingTypeMismatchError,
+    link_draft_item,
+    link_draft_section,
+)
+from app.routes.admin.form_builder.helpers.template_mgmt import (
+    PageInUseError,
+    _handle_template_pages,
+)
+from app.routes.forms.helpers import entry_form_is_stale
+from app.services.platform.template_version_audit import audit_template_versions
 from app.routes.admin.form_builder.helpers.cloning import (
     _clone_template_structure,
     _clone_template_structure_between_templates,
@@ -324,7 +336,7 @@ class TestDeployLifecycle:
         FormItem.query.filter_by(version_id=draft.id, label='Second').delete()
         db_session.commit()
 
-        _deploy(logged_in_client, template, draft)
+        _deploy(logged_in_client, template, draft, acknowledge_orphaned_data='1')
         db_session.refresh(row)
         db_session.refresh(second)
         assert row.form_item_id == second.id
@@ -347,7 +359,7 @@ class TestDeployLifecycle:
         v2 = _draft_of(template)
         FormItem.query.filter_by(version_id=v2.id, label='Second').delete()
         db_session.commit()
-        _deploy(logged_in_client, template, v2)
+        _deploy(logged_in_client, template, v2, acknowledge_orphaned_data='1')
 
         db_session.refresh(second)
         assert second.archived is True
@@ -1138,3 +1150,454 @@ class TestTemplateRowLock:
         )
         assert stale.published_version_id == original
         assert _lock_template_for_version_change(template.id).published_version_id == draft.id
+
+
+# ---------------------------------------------------------------------------
+# Link compatibility
+# ---------------------------------------------------------------------------
+
+def _linkable_pair(db_session, admin_user, *, pub_kwargs=None, draft_kwargs=None):
+    template = _template(db_session, admin_user)
+    published = template.published_version
+    draft = create_test_draft_version(db_session, template)
+    pub_section = create_test_section(db_session, template, version=published)
+    draft_section = create_test_section(db_session, template, version=draft)
+    key = generate_stable_key()
+    pub_item = create_test_item(
+        db_session, pub_section, template, version=published,
+        **{'item_type': 'question', 'label': 'Pub', **(pub_kwargs or {})},
+    )
+    pub_item.stable_key = key
+    draft_item = create_test_item(
+        db_session, draft_section, template, version=draft,
+        **{'item_type': 'question', 'label': 'Draft', **(draft_kwargs or {})},
+    )
+    db_session.commit()
+    return template, draft, draft_item, pub_item, key
+
+
+class TestLinkCompatibility:
+    def _link(self, template, draft, draft_item, key, **flags):
+        with patch('app.routes.admin.form_builder.helpers.field_mapping.log_admin_action'):
+            return link_draft_item(
+                template=template, draft_version=draft, draft_item=draft_item,
+                published_stable_key=key, **flags,
+            )
+
+    def test_different_item_kinds_can_never_be_linked(self, db_session, admin_user):
+        template, draft, draft_item, _pub, key = _linkable_pair(
+            db_session, admin_user, draft_kwargs={'item_type': 'matrix'}
+        )
+        original = draft_item.stable_key
+        with pytest.raises(FieldMappingIncompatibleError):
+            self._link(template, draft, draft_item, key, confirm_type_mismatch=True)
+        assert draft_item.stable_key == original
+
+    def test_data_type_difference_needs_confirmation(self, db_session, admin_user):
+        template, draft, draft_item, _pub, key = _linkable_pair(
+            db_session, admin_user,
+            pub_kwargs={'type': 'number'}, draft_kwargs={'type': 'text'},
+        )
+        original = draft_item.stable_key
+        with pytest.raises(FieldMappingTypeMismatchError) as caught:
+            self._link(template, draft, draft_item, key)
+        assert any('Data type differs' in w for w in caught.value.warnings)
+        assert draft_item.stable_key == original
+
+        linked_key, warnings, _displaced = self._link(
+            template, draft, draft_item, key, confirm_type_mismatch=True
+        )
+        assert linked_key == key
+        assert draft_item.stable_key == key
+        assert warnings
+
+    def test_matching_types_link_without_confirmation(self, db_session, admin_user):
+        template, draft, draft_item, _pub, key = _linkable_pair(
+            db_session, admin_user, pub_kwargs={'type': 'number'}, draft_kwargs={'type': 'number'}
+        )
+        linked_key, warnings, _displaced = self._link(template, draft, draft_item, key)
+        assert linked_key == key and warnings == []
+
+    def test_standard_and_repeat_sections_cannot_be_linked(self, db_session, admin_user):
+        template = _template(db_session, admin_user)
+        published = template.published_version
+        draft = create_test_draft_version(db_session, template)
+        pub_section = create_test_section(
+            db_session, template, version=published, section_type='standard'
+        )
+        key = generate_stable_key()
+        pub_section.stable_key = key
+        draft_section = create_test_section(
+            db_session, template, version=draft, section_type='repeat'
+        )
+        db_session.commit()
+        with patch('app.routes.admin.form_builder.helpers.field_mapping.log_admin_action'):
+            with pytest.raises(FieldMappingIncompatibleError):
+                link_draft_section(
+                    template=template, draft_version=draft, draft_section=draft_section,
+                    published_stable_key=key, confirm_type_mismatch=True,
+                )
+
+    def test_route_asks_for_confirmation_then_links(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template, draft, draft_item, _pub, key = _linkable_pair(
+            db_session, admin_user, pub_kwargs={'type': 'number'}, draft_kwargs={'type': 'text'}
+        )
+        url = f'/admin/templates/{template.id}/versions/{draft.id}/items/{draft_item.id}/link'
+        first = _json_post(logged_in_client, url, {'published_stable_key': key})
+        assert first.status_code == 409
+        assert first.get_json()['type_mismatch'] is True
+
+        second = _json_post(
+            logged_in_client, url, {'published_stable_key': key, 'confirm_type_mismatch': True}
+        )
+        assert second.status_code == 200
+        db_session.refresh(draft_item)
+        assert draft_item.stable_key == key
+
+    def test_route_rejects_incompatible_kinds_outright(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template, draft, draft_item, _pub, key = _linkable_pair(
+            db_session, admin_user, draft_kwargs={'item_type': 'matrix'}
+        )
+        url = f'/admin/templates/{template.id}/versions/{draft.id}/items/{draft_item.id}/link'
+        resp = _json_post(
+            logged_in_client, url, {'published_stable_key': key, 'confirm_type_mismatch': True}
+        )
+        assert resp.status_code == 400
+        assert 'mismatch' in resp.get_json()['error'].lower()
+
+
+# ---------------------------------------------------------------------------
+# Duplicating a template keeps variables pointing at its own fields
+# ---------------------------------------------------------------------------
+
+class TestDuplicateTemplateVariables:
+    def test_variables_point_at_the_copied_items(self, logged_in_client, db_session, admin_user):
+        template = _template(db_session, admin_user)
+        published, _section, first, _second = _structured_published(db_session, template)
+        published.variables = {
+            'source_var': {'variable_type': 'form_item', 'source_form_item_id': first.id},
+            'plain': {'variable_type': 'metadata', 'metadata_type': 'assignment_period'},
+            'dangling': {'variable_type': 'form_item', 'source_form_item_id': 987654},
+        }
+        db_session.commit()
+        _grant_role_permission(db_session, 'admin_core', 'admin.templates.duplicate')
+        db_session.commit()
+
+        with patch('app.routes.admin.form_builder.templates.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/duplicate/{template.id}', data={}, follow_redirects=False
+            )
+        assert resp.status_code == 302
+
+        copy = (
+            FormTemplate.query.filter(FormTemplate.id != template.id)
+            .order_by(FormTemplate.id.desc()).first()
+        )
+        copied_version = FormTemplateVersion.query.get(copy.published_version_id)
+        copied_first = FormItem.query.filter_by(version_id=copied_version.id, label='First').one()
+        assert copied_first.id != first.id
+        assert copied_version.variables['source_var']['source_form_item_id'] == copied_first.id
+        assert 'source_form_item_id' not in copied_version.variables['dangling']
+        assert copied_version.variables['plain'] == {
+            'variable_type': 'metadata', 'metadata_type': 'assignment_period'
+        }
+        db_session.refresh(published)
+        assert published.variables['source_var']['source_form_item_id'] == first.id
+
+
+# ---------------------------------------------------------------------------
+# Removing pages
+# ---------------------------------------------------------------------------
+
+class TestPageRemoval:
+    def _page_with_status(self, db_session, template, version, status):
+        page = FormPage(template_id=template.id, version_id=version.id, name='Gone', order=1)
+        db_session.add(page)
+        db_session.flush()
+        aes = create_test_assignment_entity_status(db_session, template=template)
+        db_session.add(AssignmentPageStatus(
+            assignment_entity_status_id=aes.id, form_page_id=page.id, status=status
+        ))
+        db_session.commit()
+        return page
+
+    def _submit_no_pages(self, template, version):
+        from werkzeug.datastructures import MultiDict
+        _handle_template_pages(template, MultiDict(), version_id=version.id)
+        db.session.flush()
+
+    def test_page_with_progress_cannot_be_removed(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        page = self._page_with_status(db_session, template, template.published_version, 'submitted')
+        with pytest.raises(PageInUseError) as caught:
+            self._submit_no_pages(template, template.published_version)
+        assert 'Gone' in str(caught.value)
+        db_session.rollback()
+        assert FormPage.query.get(page.id) is not None
+        assert AssignmentPageStatus.query.filter_by(form_page_id=page.id).count() == 1
+
+    def test_untouched_page_status_does_not_block_removal(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        page = self._page_with_status(db_session, template, template.published_version, 'not_started')
+        page_id = page.id
+        self._submit_no_pages(template, template.published_version)
+        db_session.expire_all()
+        assert FormPage.query.filter_by(id=page_id).count() == 0
+
+    def test_draft_page_without_statuses_can_be_removed(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        draft = create_test_draft_version(db_session, template)
+        page = FormPage(template_id=template.id, version_id=draft.id, name='Draft page', order=1)
+        db_session.add(page)
+        db_session.commit()
+        page_id = page.id
+        self._submit_no_pages(template, draft)
+        db_session.expire_all()
+        assert FormPage.query.filter_by(id=page_id).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Deploy requires acknowledging data that is left behind
+# ---------------------------------------------------------------------------
+
+def _draft_without_second_field(db_session, client, template, second, with_data=True):
+    if with_data:
+        aes = create_test_assignment_entity_status(db_session, template=template)
+        db_session.add(FormData(
+            assignment_entity_status_id=aes.id, form_item_id=second.id, value='reported'
+        ))
+        db_session.commit()
+    _create_draft(client, template)
+    draft = _draft_of(template)
+    FormItem.query.filter_by(version_id=draft.id, label='Second').delete()
+    db_session.commit()
+    return draft
+
+
+class TestOrphanedDataAcknowledgement:
+    def test_deploy_is_refused_until_acknowledged(self, logged_in_client, db_session, admin_user):
+        template = _template(db_session, admin_user)
+        published, _section, _first, second = _structured_published(db_session, template)
+        draft = _draft_without_second_field(db_session, logged_in_client, template, second)
+
+        _deploy(logged_in_client, template, draft)
+        db_session.refresh(template)
+        db_session.refresh(draft)
+        assert template.published_version_id == published.id
+        assert draft.status == 'draft'
+        assert any('hold submitted data' in m for m in _flashes(logged_in_client))
+
+    def test_ajax_deploy_reports_what_needs_acknowledging(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template = _template(db_session, admin_user)
+        _published, _section, _first, second = _structured_published(db_session, template)
+        draft = _draft_without_second_field(db_session, logged_in_client, template, second)
+
+        resp = logged_in_client.post(
+            f'/admin/templates/{template.id}/deploy',
+            data={'version_id': str(draft.id)},
+            headers={'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body['requires_acknowledgement'] is True
+        assert body['orphaned_items_with_data'] == 1
+        assert body['field_mapping_url'].endswith(f'/versions/{draft.id}/field-mapping')
+
+    def test_acknowledged_deploy_goes_ahead_and_keeps_the_data(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template = _template(db_session, admin_user)
+        _published, _section, _first, second = _structured_published(db_session, template)
+        draft = _draft_without_second_field(db_session, logged_in_client, template, second)
+
+        _deploy(logged_in_client, template, draft, acknowledge_orphaned_data='1')
+        db_session.refresh(template)
+        assert template.published_version_id == draft.id
+        db_session.refresh(second)
+        assert second.archived is True
+        assert FormData.query.filter_by(form_item_id=second.id).count() == 1
+
+    def test_no_acknowledgement_needed_when_the_removed_field_has_no_data(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template = _template(db_session, admin_user)
+        _published, _section, _first, second = _structured_published(db_session, template)
+        draft = _draft_without_second_field(
+            db_session, logged_in_client, template, second, with_data=False
+        )
+        _deploy(logged_in_client, template, draft)
+        db_session.refresh(template)
+        assert template.published_version_id == draft.id
+
+    def test_rollback_without_stranded_data_needs_no_acknowledgement(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template = _template(db_session, admin_user)
+        v1, _section, _first, _second = _structured_published(db_session, template)
+        _create_draft(logged_in_client, template)
+        v2 = _draft_of(template)
+        _deploy(logged_in_client, template, v2)
+
+        v2_first = FormItem.query.filter_by(version_id=v2.id, label='First').one()
+        aes = create_test_assignment_entity_status(db_session, template=template)
+        db_session.add(FormData(
+            assignment_entity_status_id=aes.id, form_item_id=v2_first.id, value='kept'
+        ))
+        db_session.commit()
+        _deploy(logged_in_client, template, v1)
+        db_session.refresh(template)
+        assert template.published_version_id == v1.id
+
+    def test_rollback_that_strands_data_requires_acknowledgement(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template = _template(db_session, admin_user)
+        v1, _section, _first, _second = _structured_published(db_session, template)
+        _create_draft(logged_in_client, template)
+        v2 = _draft_of(template)
+        v2_section = FormSection.query.filter_by(version_id=v2.id).one()
+        added = create_test_item(
+            db_session, v2_section, template, version=v2,
+            item_type='question', label='Added in v2', order=3,
+        )
+        db_session.commit()
+        _deploy(logged_in_client, template, v2)
+
+        aes = create_test_assignment_entity_status(db_session, template=template)
+        db_session.add(FormData(
+            assignment_entity_status_id=aes.id, form_item_id=added.id, value='only in v2'
+        ))
+        db_session.commit()
+
+        _deploy(logged_in_client, template, v1)
+        db_session.refresh(template)
+        assert template.published_version_id == v2.id
+
+        _deploy(logged_in_client, template, v1, acknowledge_orphaned_data='1')
+        db_session.refresh(template)
+        assert template.published_version_id == v1.id
+        assert FormData.query.filter_by(form_item_id=added.id).count() == 1
+
+    def test_review_page_shows_the_checkbox_only_when_needed(
+        self, logged_in_client, db_session, admin_user
+    ):
+        template = _template(db_session, admin_user)
+        _published, _section, _first, second = _structured_published(db_session, template)
+        draft = _draft_without_second_field(db_session, logged_in_client, template, second)
+        resp = logged_in_client.get(
+            f'/admin/templates/{template.id}/versions/{draft.id}/field-mapping'
+        )
+        assert resp.status_code == 200
+        assert b'name="acknowledge_orphaned_data"' in resp.data
+
+
+# ---------------------------------------------------------------------------
+# Data entry racing a deploy
+# ---------------------------------------------------------------------------
+
+class TestEntryFormStaleGuard:
+    def test_current_version_is_accepted(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        assert entry_form_is_stale(template, str(template.published_version_id)) is False
+
+    def test_form_from_before_a_deploy_is_stale(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        old_version_id = template.published_version_id
+        draft = create_test_draft_version(db_session, template)
+        template.published_version_id = draft.id
+        db_session.commit()
+        assert entry_form_is_stale(template, str(old_version_id)) is True
+        assert entry_form_is_stale(template, str(draft.id)) is False
+
+    def test_missing_version_marker_is_tolerated(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        assert entry_form_is_stale(template, None) is False
+        assert entry_form_is_stale(template, '') is False
+
+    def test_garbage_marker_is_treated_as_stale(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        assert entry_form_is_stale(template, 'abc') is True
+
+    def test_check_reads_the_committed_version_not_a_cached_one(
+        self, app, db_session, admin_user
+    ):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        old_version_id = template.published_version_id
+        draft = create_test_draft_version(db_session, template)
+        db_session.commit()
+        db_session.execute(
+            db.text('UPDATE form_template SET published_version_id = :v WHERE id = :t'),
+            {'v': draft.id, 't': template.id},
+        )
+        # The identity-mapped object still carries the old id until the lock refreshes it.
+        assert template.published_version_id == old_version_id
+        assert entry_form_is_stale(template, str(old_version_id)) is True
+        assert template.published_version_id == draft.id
+
+
+# ---------------------------------------------------------------------------
+# Audit
+# ---------------------------------------------------------------------------
+
+class TestTemplateVersionAudit:
+    def test_clean_template_has_no_findings(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        report = audit_template_versions(template.id)
+        assert report['has_blocking_issues'] is False
+        assert report['multiple_drafts'] == []
+
+    def test_reports_several_drafts(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        first = create_test_draft_version(db_session, template)
+        second = FormTemplateVersion(
+            template_id=template.id, version_number=first.version_number + 1,
+            status='draft', name='second',
+        )
+        db_session.add(second)
+        db_session.commit()
+        report = audit_template_versions(template.id)
+        assert report['has_blocking_issues'] is True
+        assert report['multiple_drafts'][0]['version_ids'] == sorted([first.id, second.id])
+
+    def test_reports_duplicate_keys_inside_a_version(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        section = create_test_section(db_session, template, version=template.published_version)
+        a = create_test_item(
+            db_session, section, template, version=template.published_version,
+            item_type='question', label='A', order=1,
+        )
+        b = create_test_item(
+            db_session, section, template, version=template.published_version,
+            item_type='question', label='B', order=2,
+        )
+        b.stable_key = a.stable_key
+        db_session.commit()
+        report = audit_template_versions(template.id)
+        assert report['has_blocking_issues'] is True
+        assert report['duplicate_item_keys'][0]['row_ids'] == sorted([a.id, b.id])
+
+    def test_reports_published_pointer_mismatch(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        draft = create_test_draft_version(db_session, template)
+        template.published_version_id = draft.id
+        db_session.commit()
+        problems = {f['problem'] for f in audit_template_versions(template.id)['published_inconsistencies']}
+        assert 'pointer_to_unpublished_version' in problems or 'pointer_mismatch' in problems
+
+    def test_missing_keys_are_advisory_only(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        create_test_draft_version(db_session, template)
+        section = create_test_section(db_session, template, version=template.published_version)
+        db_session.execute(
+            db.text('UPDATE form_section SET stable_key = NULL WHERE id = :i'), {'i': section.id}
+        )
+        db_session.commit()
+        report = audit_template_versions(template.id)
+        assert report['sections_without_key']
+        assert report['has_blocking_issues'] is False

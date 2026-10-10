@@ -615,3 +615,29 @@ def compute_entry_form_progress_metrics(
         'pages_submitted_count': pages_submitted_count,
         'pages_total_count': pages_total_count,
     }
+
+
+def entry_form_is_stale(form_template, posted_version_id) -> bool:
+    """Serialise a data-entry save against a deploy and report whether the form is outdated.
+
+    The share lock on the template row makes a concurrent deploy (which takes the row
+    exclusively) wait until this save commits, so the deploy's remap sees the saved rows.
+    If a deploy finished first, the form the user filled in belongs to a version that is no
+    longer live and its field ids would not match anything: the save must be refused rather
+    than silently dropped. A missing value (older cached page) is accepted for compatibility.
+    """
+    from app.models import FormTemplate
+
+    current = (
+        db.session.query(FormTemplate)
+        .filter(FormTemplate.id == form_template.id)
+        .with_for_update(read=True)
+        .populate_existing()
+        .first()
+    )
+    if current is None or posted_version_id in (None, ''):
+        return False
+    try:
+        return int(posted_version_id) != int(current.published_version_id or 0)
+    except (TypeError, ValueError):
+        return True

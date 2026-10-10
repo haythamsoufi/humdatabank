@@ -1073,6 +1073,11 @@ Deploy semantics worth knowing:
 - Fields removed from the new version keep their data on the archived version (`archived=True`); **rolling back** (deploying an archived version) restores those rows.
 - Create-draft and deploy lock the `FormTemplate` row so concurrent version changes serialise. Deploy with an unknown/foreign `version_id` is an error — it never falls back to the draft.
 - Deleting a version is blocked while any data (including AI validations and page statuses) references it.
+- Deploy refuses until the admin sends `acknowledge_orphaned_data=1` when live fields holding data have no match in the target version (the Form Builder dialogs and the field-mapping page send it).
+- Data-entry saves post `form_version_id`; `entry_form_is_stale()` takes a share lock on the template row and refuses the save (HTTP 409 for AJAX) when the form belongs to an older published version. Same lock order as deploy: template, then assignment row.
+- Field linking: different item kinds / section types are rejected; a differing data type or indicator needs `confirm_type_mismatch`.
+- A page with workflow progress cannot be removed from a version (`PageInUseError`); `duplicate_template` remaps `variables[*].source_form_item_id` to the cloned items.
+- Operations: `python scripts/ops/audit_template_versions.py` (read-only) and the runbook `Backoffice/docs/runbooks/operations/template-version-integrity.md`, which also lists the open decision on database constraints. Admin guide: `Backoffice/docs/user-guides/admin/template-versions.md`.
 
 Query all version rows for one logical field:
 

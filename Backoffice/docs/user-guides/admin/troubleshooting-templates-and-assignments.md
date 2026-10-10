@@ -27,6 +27,20 @@ What to do:
 
 See: [Form Builder (advanced)](form-builder-advanced.md)
 
+### "Deploy was refused" or "data seems missing after a deploy"
+
+Common causes:
+- removed fields still hold submitted data and the deploy needs your acknowledgement
+- two fields share the same identity, or an older template has no identity keys yet
+- a focal point saved a form that was opened before the deploy
+
+What to do:
+- Open **Review field mapping** on the draft and link renamed fields to their live counterparts.
+- Removed fields are not deleted: their data stays on the archived version. Deploy it again to roll back.
+- For identity key errors, ask a developer to follow the template version integrity runbook.
+
+See: [Template versions](template-versions.md)
+
 ## Assignment problems
 
 ### “A country is missing from the assignment”

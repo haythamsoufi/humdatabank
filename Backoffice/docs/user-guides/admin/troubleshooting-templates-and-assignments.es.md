@@ -27,6 +27,20 @@ Qué hacer:
 
 Ver: [Generador de formularios (avanzado)](form-builder-advanced.md)
 
+### «Se rechazó el despliegue» o «parecen faltar datos tras un despliegue»
+
+Causas habituales:
+- campos eliminados que aún contienen datos enviados y el despliegue requiere su confirmación
+- dos campos comparten la misma identidad, o una plantilla antigua aún no tiene claves de identidad
+- un punto focal guardó un formulario abierto antes del despliegue
+
+Qué hacer:
+- Abra **Review field mapping** en el borrador y vincule los campos renombrados con sus equivalentes en vivo.
+- Los campos eliminados no se borran: sus datos permanecen en la versión archivada. Despliéguela de nuevo para revertir.
+- Para errores de claves de identidad, pida a un desarrollador que siga el runbook de integridad de versiones de plantilla.
+
+Véase: [Versiones de plantilla](template-versions.md)
+
 ## Problemas de asignación
 
 ### "Falta un país de la asignación"

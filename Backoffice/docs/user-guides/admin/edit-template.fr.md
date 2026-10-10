@@ -74,6 +74,7 @@ Si votre flux de travail utilise la **Banque d'indicateurs** :
 2. Si votre système nécessite une publication, **publiez** la nouvelle version.
 3. Créez une petite mission de test (un pays) et complétez-la vous-même.
 4. Corrigez les libellés confus et supprimez les champs requis inutiles.
+5. Avant de déployer une nouvelle version, ouvrez **Review field mapping** et vérifiez que les champs supprimés ou renommés sont correctement liés. Voir [Versions de modèle](template-versions.md).
 
 ## Problèmes courants
 

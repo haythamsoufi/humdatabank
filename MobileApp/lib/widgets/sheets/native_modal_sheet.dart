@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/ios_constants.dart';
 import '../ios_button.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 
 /// Drag handle matching [HomeScreen] / resources / disaggregation bottom sheets.
 class NativeModalSheetDragHandle extends StatelessWidget {
@@ -168,16 +169,9 @@ Future<void> showReportingPeriodPickerSheet({
             final p = periods[index];
             final selected = p == selectedPeriod;
             return ListTile(
-              title: Text(
-                p,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
+              title: Text(p, maxLines: 3, overflow: TextOverflow.ellipsis),
               trailing: selected
-                  ? Icon(
-                      Icons.check,
-                      color: theme.colorScheme.secondary,
-                    )
+                  ? Icon(Icons.check, color: theme.colorScheme.secondary)
                   : null,
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -217,68 +211,79 @@ class ReportingPeriodPickerField extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final theme = Theme.of(context);
-    final effective =
-        value != null && periods.contains(value) ? value! : periods.first;
+    final effective = value != null && periods.contains(value)
+        ? value!
+        : periods.first;
     final isDark = theme.brightness == Brightness.dark;
-    final line = theme.colorScheme.outlineVariant
-        .withValues(alpha: isDark ? 0.5 : 0.38);
-
-    final topPad = compact ? 4.0 : 8.0;
-    final bottomPad = compact ? 8.0 : 10.0;
+    final line = theme.colorScheme.outlineVariant.withValues(
+      alpha: isDark ? 0.5 : 0.38,
+    );
 
     return Semantics(
       button: true,
       label: l10n.homeLandingGlobalPeriodFilterLabel,
       value: effective,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          showReportingPeriodPickerSheet(
-            context: context,
-            l10n: l10n,
-            periods: periods,
-            selectedPeriod: effective,
-            onSelected: (p) => onChanged(p),
-          );
-        },
-        child: Padding(
-          padding: EdgeInsets.only(top: topPad, bottom: bottomPad),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l10n.homeLandingGlobalPeriodFilterLabel,
-                style: theme.textTheme.bodySmall?.copyWith(
+      child: Material(
+        color: isDark ? theme.colorScheme.surfaceContainerHigh : GroupedDashboardPalette.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            showReportingPeriodPickerSheet(
+              context: context,
+              l10n: l10n,
+              periods: periods,
+              selectedPeriod: effective,
+              onSelected: (p) => onChanged(p),
+            );
+          },
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: compact ? 8 : 10,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 18,
+                  color: theme.colorScheme.secondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.homeLandingGlobalPeriodFilterLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        effective,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ),
-              SizedBox(height: compact ? 2 : 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      effective,
-                      style: (compact
-                              ? theme.textTheme.bodyMedium
-                              : theme.textTheme.bodyLarge)
-                          ?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              SizedBox(height: compact ? 6 : 8),
-              Divider(height: 1, thickness: 1, color: line),
-            ],
+              ],
+            ),
           ),
         ),
       ),

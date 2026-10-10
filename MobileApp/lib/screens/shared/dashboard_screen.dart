@@ -41,6 +41,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  // Past assignments stay collapsed until the user opens them (matches Backoffice).
+  bool _pastAssignmentsExpanded = false;
+
   // Filter state for past assignments
   String? _selectedPeriodFilter;
   String? _selectedTemplateFilter;
@@ -865,65 +868,93 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-          child: DashboardSectionLabel(
-            title: localizations.pastAssignments,
-            count: filteredAssignments.length,
+        Semantics(
+          button: true,
+          expanded: _pastAssignmentsExpanded,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _pastAssignmentsExpanded = !_pastAssignmentsExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DashboardSectionLabel(
+                      title: localizations.pastAssignments,
+                      count: provider.pastAssignments.length,
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _pastAssignmentsExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.expand_more_rounded,
+                      size: 22,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.48,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        // Filters Section - iOS style
-        if (periods.isNotEmpty || templates.isNotEmpty || statuses.isNotEmpty)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final canFitInline =
-                  constraints.maxWidth > 400; // Approximate breakpoint
-              return Container(
-                padding: EdgeInsets.fromLTRB(
-                  IOSSpacing.lgOf(context),
-                  IOSSpacing.smOf(context),
-                  IOSSpacing.lgOf(context),
-                  IOSSpacing.mdOf(context),
-                ),
-                child: canFitInline
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            localizations.filters.toUpperCase(),
-                            style: IOSTextStyle.footnote(context).copyWith(
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
+        if (_pastAssignmentsExpanded)
+          ..._buildPastAssignmentsBody(
+            localizations: localizations,
+            theme: theme,
+            periods: periods,
+            templates: templates,
+            statuses: statuses,
+            filteredAssignments: filteredAssignments,
+            sortedPast: sortedPast,
+          ),
+      ],
+    );
+  }
+
+  List<Widget> _buildPastAssignmentsBody({
+    required AppLocalizations localizations,
+    required ThemeData theme,
+    required List<String> periods,
+    required List<String> templates,
+    required List<String> statuses,
+    required List<Assignment> filteredAssignments,
+    required List<Assignment> sortedPast,
+  }) {
+    return [
+      // Filters Section - iOS style
+      if (periods.isNotEmpty || templates.isNotEmpty || statuses.isNotEmpty)
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final canFitInline =
+                constraints.maxWidth > 400; // Approximate breakpoint
+            return Container(
+              padding: EdgeInsets.fromLTRB(
+                IOSSpacing.lgOf(context),
+                IOSSpacing.smOf(context),
+                IOSSpacing.lgOf(context),
+                IOSSpacing.mdOf(context),
+              ),
+              child: canFitInline
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          localizations.filters.toUpperCase(),
+                          style: IOSTextStyle.footnote(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
                           ),
-                          SizedBox(width: IOSSpacing.mdOf(context)),
-                          Expanded(
-                            child: Wrap(
-                              spacing: IOSSpacing.sm,
-                              runSpacing: IOSSpacing.sm,
-                              children: _buildFilterButtons(
-                                localizations,
-                                theme,
-                                periods,
-                                templates,
-                                statuses,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            localizations.filters.toUpperCase(),
-                            style: IOSTextStyle.footnote(context).copyWith(
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          SizedBox(height: IOSSpacing.mdOf(context) - 4),
-                          Wrap(
+                        ),
+                        SizedBox(width: IOSSpacing.mdOf(context)),
+                        Expanded(
+                          child: Wrap(
                             spacing: IOSSpacing.sm,
                             runSpacing: IOSSpacing.sm,
                             children: _buildFilterButtons(
@@ -934,62 +965,86 @@ class _DashboardScreenState extends State<DashboardScreen>
                               statuses,
                             ),
                           ),
-                        ],
-                      ),
-              );
-            },
-          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localizations.filters.toUpperCase(),
+                          style: IOSTextStyle.footnote(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        SizedBox(height: IOSSpacing.mdOf(context) - 4),
+                        Wrap(
+                          spacing: IOSSpacing.sm,
+                          runSpacing: IOSSpacing.sm,
+                          children: _buildFilterButtons(
+                            localizations,
+                            theme,
+                            periods,
+                            templates,
+                            statuses,
+                          ),
+                        ),
+                      ],
+                    ),
+            );
+          },
+        ),
 
-        // Single list (dashboard.html: one table for all past rows)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, IOSSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (sortedPast.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: sortedPast.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      return _buildPastAssignmentCard(entry.value, index);
-                    }).toList(),
-                  ),
+      // Single list (dashboard.html: one table for all past rows)
+      Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, IOSSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (sortedPast.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: sortedPast.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    return _buildPastAssignmentCard(entry.value, index);
+                  }).toList(),
                 ),
+              ),
 
-              // Empty filtered state
-              if (filteredAssignments.isEmpty)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: IOSSpacing.lg),
-                  padding: const EdgeInsets.all(IOSSpacing.xxl),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.filter_alt_off_rounded,
-                        size: 48,
+            // Empty filtered state
+            if (filteredAssignments.isEmpty)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: IOSSpacing.lg),
+                padding: const EdgeInsets.all(IOSSpacing.xxl),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.filter_alt_off_rounded,
+                      size: 48,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                    SizedBox(height: IOSSpacing.mdOf(context)),
+                    Text(
+                      localizations.noAssignmentsMatchFilters,
+                      style: IOSTextStyle.subheadline(context).copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.4),
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w500,
                       ),
-                      SizedBox(height: IOSSpacing.mdOf(context)),
-                      Text(
-                        localizations.noAssignmentsMatchFilters,
-                        style: IOSTextStyle.subheadline(context).copyWith(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
-      ],
-    );
+      ),
+    ];
   }
 
   List<Widget> _buildFilterButtons(

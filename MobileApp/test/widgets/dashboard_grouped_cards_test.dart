@@ -7,6 +7,7 @@ import 'package:hum_databank_app/models/shared/focal_point_contact.dart';
 import 'package:hum_databank_app/theme/grouped_dashboard_palette.dart';
 import 'package:hum_databank_app/widgets/dashboard_focal_points_section.dart';
 import 'package:hum_databank_app/widgets/dashboard_grouped_assignment_card.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Assignment _assignment(String status) {
   return Assignment(
@@ -31,7 +32,9 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
 }
 
 void main() {
-  testWidgets('approved assignment card uses a blue wash, not grey', (
+  setUpAll(() => initializeDateFormatting('en'));
+
+  testWidgets('approved assignment card uses the Backoffice green wash', (
     tester,
   ) async {
     await _pump(
@@ -42,12 +45,14 @@ void main() {
     final colors = tester
         .widgetList<Material>(find.byType(Material))
         .map((material) => material.color);
-    expect(colors, contains(GroupedDashboardPalette.approvedCard));
-    expect(colors, isNot(contains(GroupedDashboardPalette.mutedWash)));
+    expect(colors, contains(GroupedDashboardPalette.success.background));
+    expect(colors, isNot(contains(GroupedDashboardPalette.neutral.background)));
     expect(find.text('Approved'), findsOneWidget);
   });
 
-  testWidgets('submitted assignment card uses a green wash', (tester) async {
+  testWidgets('submitted assignment card uses the Backoffice blue wash', (
+    tester,
+  ) async {
     await _pump(
       tester,
       DashboardGroupedAssignmentCard(assignment: _assignment('submitted')),
@@ -56,7 +61,82 @@ void main() {
     final colors = tester
         .widgetList<Material>(find.byType(Material))
         .map((material) => material.color);
-    expect(colors, contains(GroupedDashboardPalette.submittedCard));
+    expect(colors, contains(GroupedDashboardPalette.info.background));
+  });
+
+  testWidgets('sent for review and requires revision use Backoffice tones', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      Column(
+        children: [
+          DashboardGroupedAssignmentCard(
+            assignment: _assignment('sent_for_review'),
+          ),
+          DashboardGroupedAssignmentCard(
+            assignment: _assignment('requires_revision'),
+          ),
+        ],
+      ),
+    );
+
+    final colors = tester
+        .widgetList<Material>(find.byType(Material))
+        .map((material) => material.color);
+    expect(colors, contains(GroupedDashboardPalette.review.background));
+    expect(colors, contains(GroupedDashboardPalette.warning.background));
+    expect(find.text('Sent For Review'), findsOneWidget);
+  });
+
+  testWidgets('overdue assignment card uses the danger wash', (tester) async {
+    final overdue = Assignment(
+      id: 2,
+      name: 'Late form',
+      status: 'in_progress',
+      completionRate: 10,
+      dueDate: DateTime(2020, 1, 1),
+    );
+    await _pump(tester, DashboardGroupedAssignmentCard(assignment: overdue));
+
+    final colors = tester
+        .widgetList<Material>(find.byType(Material))
+        .map((material) => material.color);
+    expect(colors, contains(GroupedDashboardPalette.danger.background));
+    expect(find.text('Overdue'), findsOneWidget);
+    expect(find.text('In Progress'), findsOneWidget);
+  });
+
+  testWidgets('downloaded assignment shows only the saved cloud icon', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardGroupedAssignmentCard(
+        assignment: _assignment('pending'),
+        onDownloadForOffline: () {},
+        onOfflineBundleDetails: () {},
+        hasOfflineFormSnapshot: true,
+      ),
+    );
+
+    expect(find.byIcon(Icons.download_rounded), findsNothing);
+    expect(find.byIcon(Icons.cloud_done_rounded), findsOneWidget);
+  });
+
+  testWidgets('not yet downloaded assignment shows only the download icon', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      DashboardGroupedAssignmentCard(
+        assignment: _assignment('pending'),
+        onDownloadForOffline: () {},
+      ),
+    );
+
+    expect(find.byIcon(Icons.download_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_done_rounded), findsNothing);
   });
 
   testWidgets('focal points use envelope and Teams action marks', (

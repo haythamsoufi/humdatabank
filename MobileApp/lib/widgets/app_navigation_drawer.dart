@@ -153,7 +153,7 @@ class AppNavigationDrawer extends StatelessWidget {
                     ),
                   ),
                   ModernDrawerTile(
-                    icon: Icons.assistant_outlined,
+                    icon: Icons.bubble_chart_outlined,
                     title: localizations.aiAssistant,
                     onTap: () => _closeAndNavigate(
                       context,

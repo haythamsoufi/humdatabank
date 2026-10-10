@@ -7971,7 +7971,7 @@ class AppLocalizations {
 
   /// Localizes an assignment status value
   String localizeStatus(String status) {
-    final statusLower = status.toLowerCase().trim();
+    final statusLower = status.toLowerCase().trim().replaceAll('_', ' ');
     switch (statusLower) {
       case 'approved':
         return approved;

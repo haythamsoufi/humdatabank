@@ -16,6 +16,7 @@ import '../../utils/constants.dart';
 import '../sheets/native_modal_sheet.dart';
 import 'country_centroids_cache.dart';
 import 'world_geojson_cache.dart';
+import '../../theme/grouped_dashboard_palette.dart';
 
 /// Bubble markers vs filled country polygons (choropleth).
 enum FdrsMapVisualMode { bubble, choropleth }
@@ -43,8 +44,9 @@ class _FdrsEmbeddedMapPointerNotifierState
   int _count = 0;
 
   void _dispatch() {
-    FdrsEmbeddedMapPointerNotification(activePointerCount: _count)
-        .dispatch(context);
+    FdrsEmbeddedMapPointerNotification(
+      activePointerCount: _count,
+    ).dispatch(context);
   }
 
   @override
@@ -52,8 +54,9 @@ class _FdrsEmbeddedMapPointerNotifierState
     final was = _count;
     _count = 0;
     if (was != 0 && context.mounted) {
-      FdrsEmbeddedMapPointerNotification(activePointerCount: 0)
-          .dispatch(context);
+      FdrsEmbeddedMapPointerNotification(
+        activePointerCount: 0,
+      ).dispatch(context);
     }
     super.dispose();
   }
@@ -388,9 +391,7 @@ class _FdrsCountryTrendLoaderState extends State<_FdrsCountryTrendLoader> {
           );
         }
 
-        final maxY = withData
-            .map((e) => e.value!)
-            .reduce(math.max);
+        final maxY = withData.map((e) => e.value!).reduce(math.max);
         final gridColor = theme.colorScheme.outlineVariant.withValues(
           alpha: theme.brightness == Brightness.dark ? 0.35 : 0.45,
         );
@@ -420,8 +421,7 @@ class _FdrsCountryTrendLoaderState extends State<_FdrsCountryTrendLoader> {
                     touchTooltipData: LineTouchTooltipData(
                       getTooltipItems: (touchedSpots) {
                         return touchedSpots.map((s) {
-                          final i =
-                              s.x.round().clamp(0, withData.length - 1);
+                          final i = s.x.round().clamp(0, withData.length - 1);
                           final p = withData[i];
                           return LineTooltipItem(
                             '${p.period}\n'
@@ -439,12 +439,11 @@ class _FdrsCountryTrendLoaderState extends State<_FdrsCountryTrendLoader> {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        maxY > 0 ? (maxY / 4).clamp(1, double.infinity) : 1,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: gridColor,
-                      strokeWidth: 1,
-                    ),
+                    horizontalInterval: maxY > 0
+                        ? (maxY / 4).clamp(1, double.infinity)
+                        : 1,
+                    getDrawingHorizontalLine: (value) =>
+                        FlLine(color: gridColor, strokeWidth: 1),
                   ),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
@@ -525,10 +524,7 @@ class _FdrsCountryTrendLoaderState extends State<_FdrsCountryTrendLoader> {
                       ),
                       spots: [
                         for (var i = 0; i < withData.length; i++)
-                          FlSpot(
-                            i.toDouble(),
-                            withData[i].value!,
-                          ),
+                          FlSpot(i.toDouble(), withData[i].value!),
                       ],
                     ),
                   ],
@@ -647,10 +643,7 @@ class FdrsMapModeToggle extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final track = cs.surfaceContainerHighest.withValues(
-      alpha: isDark ? 0.55 : 0.65,
-    );
-    final border = cs.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.28);
+    final track = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.07);
 
     Widget pill({
       required FdrsMapVisualMode value,
@@ -674,14 +667,18 @@ class FdrsMapModeToggle extends StatelessWidget {
               curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
               decoration: BoxDecoration(
-                color: selected ? cs.secondaryContainer : Colors.transparent,
+                color: selected
+                    ? (isDark
+                          ? cs.surfaceContainerHigh
+                          : GroupedDashboardPalette.card)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: selected
                     ? [
-                        BoxShadow(
-                          color: cs.secondary.withValues(alpha: 0.12),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                        const BoxShadow(
+                          color: GroupedDashboardPalette.softShadow,
+                          blurRadius: 6,
+                          offset: Offset(0, 1),
                         ),
                       ]
                     : null,
@@ -692,9 +689,7 @@ class FdrsMapModeToggle extends StatelessWidget {
                   Icon(
                     icon,
                     size: 18,
-                    color: selected
-                        ? cs.onSecondaryContainer
-                        : cs.onSurfaceVariant,
+                    color: selected ? cs.secondary : cs.onSurfaceVariant,
                   ),
                   const SizedBox(width: 6),
                   Flexible(
@@ -706,9 +701,7 @@ class FdrsMapModeToggle extends StatelessWidget {
                         fontWeight: selected
                             ? FontWeight.w700
                             : FontWeight.w500,
-                        color: selected
-                            ? cs.onSecondaryContainer
-                            : cs.onSurfaceVariant,
+                        color: selected ? cs.onSurface : cs.onSurfaceVariant,
                         letterSpacing: 0.1,
                       ),
                     ),
@@ -725,7 +718,6 @@ class FdrsMapModeToggle extends StatelessWidget {
       decoration: BoxDecoration(
         color: track,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: border, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(4),
@@ -777,46 +769,26 @@ class FdrsIndicatorScrollBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final accent = cs.secondary;
-    final baseLine = cs.outlineVariant.withValues(alpha: isDark ? 0.55 : 0.4);
+    final cs = Theme.of(context).colorScheme;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: baseLine, width: 1)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(bottom: 2),
-        child: Row(
-          children: [
-            for (var i = 0; i < _ids.length; i++) ...[
-              if (i > 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: SizedBox(
-                    height: 28,
-                    child: Center(
-                      child: Container(width: 1, height: 22, color: baseLine),
-                    ),
-                  ),
-                ),
-              _IndicatorChip(
-                label: fdrsIndicatorTitle(l10n, _ids[i]),
-                selected: indicatorBankId == _ids[i],
-                accent: accent,
-                onSurface: cs.onSurface,
-                compact: compact,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  onSelect(_ids[i]);
-                },
-              ),
-            ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < _ids.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _IndicatorChip(
+              label: fdrsIndicatorTitle(l10n, _ids[i]),
+              selected: indicatorBankId == _ids[i],
+              accent: cs.secondary,
+              compact: compact,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onSelect(_ids[i]);
+              },
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -827,7 +799,6 @@ class _IndicatorChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.accent,
-    required this.onSurface,
     required this.compact,
     required this.onTap,
   });
@@ -835,43 +806,46 @@ class _IndicatorChip extends StatelessWidget {
   final String label;
   final bool selected;
   final Color accent;
-  final Color onSurface;
   final bool compact;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = cs.outlineVariant.withValues(alpha: isDark ? 0.6 : 0.7);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(20),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           padding: EdgeInsets.symmetric(
-            vertical: compact ? 9 : 12,
-            horizontal: compact ? 10 : 12,
+            vertical: compact ? 7 : 9,
+            horizontal: compact ? 12 : 14,
           ),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: selected ? accent : Colors.transparent,
-                width: selected ? 2.5 : 0,
-              ),
-            ),
+            color: selected
+                ? accent
+                : (isDark
+                      ? cs.surfaceContainerHigh
+                      : GroupedDashboardPalette.card),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: selected ? accent : borderColor),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: compact ? 11 : 12.5,
+              fontSize: compact ? 12 : 13,
               height: 1.2,
-              color: selected ? accent : onSurface,
+              color: selected ? GroupedDashboardPalette.onFill : cs.onSurface,
             ),
           ),
         ),
@@ -908,7 +882,10 @@ class FdrsChoroplethLegend extends StatelessWidget {
     return Material(
       color: theme.colorScheme.surface.withValues(alpha: 0.92),
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(side: BorderSide(color: border)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: border),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
@@ -925,6 +902,7 @@ class FdrsChoroplethLegend extends StatelessWidget {
               width: 120,
               height: 8,
               decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: border, width: 0.5),
                 gradient: LinearGradient(colors: [lowColor, highColor]),
               ),

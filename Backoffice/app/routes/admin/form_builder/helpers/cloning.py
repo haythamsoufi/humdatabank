@@ -112,184 +112,46 @@ def _remap_rule_payload_to_string(rule_payload, id_map):
 
 def _clone_template_structure(template_id: int, source_version_id: int, target_version_id: int) -> None:
     """Clone pages, sections, and items from source_version_id to target_version_id preserving order.
-    Returns nothing; rows are inserted with new IDs and mapped FKs.
+
+    Rows are inserted with new IDs and mapped FKs; stable_key values are carried over so
+    the clone keeps cross-version identity with its source.
     """
-    current_app.logger.debug(f"VERSIONING_DEBUG: _clone_template_structure called for template_id={template_id}, source_version_id={source_version_id}, target_version_id={target_version_id}")
-    # Maps for old->new IDs
-    page_id_map = {}
-    section_id_map = {}
+    _clone_template_structure_between_templates(
+        source_template_id=template_id,
+        source_version_id=source_version_id,
+        target_template_id=template_id,
+        target_version_id=target_version_id,
+    )
 
-    # Clone pages
-    src_pages = FormPage.query.filter_by(template_id=template_id, version_id=source_version_id).order_by(FormPage.order).all()
-    current_app.logger.debug(f"VERSIONING_DEBUG: _clone_template_structure - cloning {len(src_pages)} pages")
-    for p in src_pages:
-        new_p = FormPage(
-            template_id=template_id,
-            version_id=target_version_id,
-            name=p.name,
-            order=p.order,
-            name_translations=p.name_translations
-        )
-        db.session.add(new_p)
-        db.session.flush()
-        page_id_map[p.id] = new_p.id
-    current_app.logger.debug(f"VERSIONING_DEBUG: _clone_template_structure - cloned {len(page_id_map)} pages, page_id_map={page_id_map}")
 
-    # Clone sections (two-pass to preserve parents)
-    src_sections = FormSection.query.filter_by(template_id=template_id, version_id=source_version_id).order_by(FormSection.order).all()
-    current_app.logger.debug(f"VERSIONING_DEBUG: _clone_template_structure - cloning {len(src_sections)} sections")
-    # Create all sections without parent refs first
-    section_pairs = []  # (src_section, new_section) for later rule-id remap
-    for s in src_sections:
-        # Deep copy config to avoid cross-version mutations
-        _new_config = _deep_copy_json_value(s.config) if s.config is not None else None
-
-        new_s = FormSection(
-            template_id=template_id,
-            version_id=target_version_id,
-            name=s.name,
-            order=s.order,
-            parent_section_id=None,  # set later
-            page_id=page_id_map.get(s.page_id) if s.page_id else None,
-            section_type=s.section_type,
-            stable_key=s.stable_key,
-            max_dynamic_indicators=s.max_dynamic_indicators,
-            allowed_sectors=s.allowed_sectors,
-            indicator_filters=s.indicator_filters,
-            allow_data_not_available=s.allow_data_not_available,
-            allow_not_applicable=s.allow_not_applicable,
-            allowed_disaggregation_options=s.allowed_disaggregation_options,
-            data_entry_display_filters=s.data_entry_display_filters,
-            add_indicator_note=s.add_indicator_note,
-            name_translations=s.name_translations,
-            relevance_condition=None,  # Will be set after remapping
-            config=_new_config,
-            archived=getattr(s, 'archived', False)
-        )
-        if not s.stable_key:
-            defer_stable_key_autogen(new_s)
-        db.session.add(new_s)
-        db.session.flush()
-        section_id_map[s.id] = new_s.id
-        section_pairs.append((s, new_s))
-
-    # Second pass: set parent_section_id now that all new IDs exist
-    parent_updates = 0
-    for s in src_sections:
-        if s.parent_section_id:
-            new_id = section_id_map[s.id]
-            new_parent_id = section_id_map.get(s.parent_section_id)
-            if new_parent_id:
-                FormSection.query.filter_by(id=new_id).update({'parent_section_id': new_parent_id})
-                parent_updates += 1
-    current_app.logger.debug(f"VERSIONING_DEBUG: _clone_template_structure - cloned {len(section_id_map)} sections, updated {parent_updates} parent relationships, section_id_map={section_id_map}")
-
-    # Clone items (build old->new item id map, then remap rule JSON)
-    src_items = FormItem.query.join(FormSection, FormItem.section_id == FormSection.id).\
-        filter(FormItem.template_id == template_id, FormItem.version_id == source_version_id).\
-        order_by(FormItem.order).all()
-    current_app.logger.debug(f"VERSIONING_DEBUG: _clone_template_structure - cloning {len(src_items)} items")
-    items_cloned = 0
-    item_pairs = []  # (src_item, new_item) for later rule-id remap
-    for it in src_items:
-        # Deep copy config to avoid cross-version mutations
-        _new_config = _deep_copy_json_value(it.config) if it.config is not None else None
-
-        new_it = FormItem(
-            template_id=template_id,
-            version_id=target_version_id,
-            section_id=section_id_map.get(it.section_id),
-            item_type=it.item_type,
-            stable_key=it.stable_key,
-            label=it.label,
-            order=it.order,
-            relevance_condition=None,  # Will be set after remapping
-            config=_new_config,
-            indicator_bank_id=it.indicator_bank_id,
-            type=it.type,
-            unit=it.unit,
-            indicator_type_id=it.indicator_type_id,
-            indicator_unit_id=it.indicator_unit_id,
-            validation_condition=None,  # Will be set after remapping
-            validation_message=it.validation_message,
-            definition=it.definition,
-            options_json=_deep_copy_json_value(it.options_json),
-        )
-        # Copy optional lookup/list fields if exist on model
-        with suppress(Exception):
-            new_it.lookup_list_id = getattr(it, 'lookup_list_id', None)
-            new_it.list_display_column = getattr(it, 'list_display_column', None)
-            new_it.list_filters_json = _deep_copy_json_value(getattr(it, 'list_filters_json', None))
-            new_it.label_translations = _deep_copy_json_value(getattr(it, 'label_translations', None))
-            new_it.definition_translations = _deep_copy_json_value(getattr(it, 'definition_translations', None))
-            new_it.options_translations = _deep_copy_json_value(getattr(it, 'options_translations', None))
-            new_it.description_translations = _deep_copy_json_value(getattr(it, 'description_translations', None))
-            new_it.validation_message_translations = _deep_copy_json_value(getattr(it, 'validation_message_translations', None))
-            new_it.description = getattr(it, 'description', None)
-            new_it.archived = getattr(it, 'archived', False)
-            # Matrix/plugin configs are within config already
-        if not it.stable_key:
-            defer_stable_key_autogen(new_it)
-        db.session.add(new_it)
-        item_pairs.append((it, new_it))
-        items_cloned += 1
-        # no need to flush per-iteration beyond session add
-
-    # Flush once to obtain new IDs, then remap rule references to the new IDs.
-    db.session.flush()
-    item_id_map = {
-        src_it.id: new_it.id
-        for (src_it, new_it) in item_pairs
-        if getattr(src_it, 'id', None) is not None and getattr(new_it, 'id', None) is not None
-    }
-
-    # Remap relevance/validation conditions and calculated list filter references
-    current_app.logger.debug(f"VERSIONING_DEBUG: Remapping conditions using item_id_map with {len(item_id_map)} entries: {item_id_map}")
-    remapped_count = 0
-    for src_it, new_it in item_pairs:
+def _remap_section_config_item_refs(section_pairs, item_id_map) -> int:
+    """Point section config references (repeat entry label item) at the cloned items."""
+    remapped = 0
+    for _src_section, new_section in section_pairs:
+        config = new_section.config
+        if not isinstance(config, dict):
+            continue
+        old_ref = config.get('entry_label_item_id')
+        if old_ref in (None, ''):
+            continue
         try:
-            old_rel = getattr(src_it, 'relevance_condition', None)
-            if old_rel:
-                new_rel = _remap_rule_payload_to_string(old_rel, item_id_map)
-                new_it.relevance_condition = new_rel
-                if new_rel != old_rel:
-                    remapped_count += 1
-                    current_app.logger.debug(f"VERSIONING_DEBUG: Remapped relevance_condition for item {src_it.id} -> {new_it.id}: '{old_rel[:100]}...' -> '{new_rel[:100]}...'")
-                else:
-                    current_app.logger.debug(f"VERSIONING_DEBUG: No remapping needed for item {src_it.id} -> {new_it.id} relevance_condition")
-
-            old_val = getattr(src_it, 'validation_condition', None)
-            if old_val:
-                new_val = _remap_rule_payload_to_string(old_val, item_id_map)
-                new_it.validation_condition = new_val
-                if new_val != old_val:
-                    remapped_count += 1
-
-            with suppress(Exception):
-                lf = _deep_copy_json_value(getattr(src_it, 'list_filters_json', None))
-                if lf is not None:
-                    remapped_lf = _remap_ids_in_obj(lf, item_id_map)
-                    new_it.list_filters_json = remapped_lf
-        except Exception as e:
-            current_app.logger.warning(f"VERSIONING_DEBUG: Error remapping conditions for item {src_it.id} -> {new_it.id}: {e}", exc_info=True)
-
-    for src_s, new_s in section_pairs:
-        try:
-            old_rel = getattr(src_s, 'relevance_condition', None)
-            if old_rel:
-                new_rel = _remap_rule_payload_to_string(old_rel, item_id_map)
-                new_s.relevance_condition = new_rel
-                if new_rel != old_rel:
-                    remapped_count += 1
-                    current_app.logger.debug(f"VERSIONING_DEBUG: Remapped relevance_condition for section {src_s.id} -> {new_s.id}: '{old_rel[:100]}...' -> '{new_rel[:100]}...'")
-        except Exception as e:
-            current_app.logger.warning(f"VERSIONING_DEBUG: Error remapping section condition {src_s.id} -> {new_s.id}: {e}", exc_info=True)
-
-    # Flush again to persist the remapped conditions
-    db.session.flush()
-    current_app.logger.info(f"VERSIONING_DEBUG: Remapped {remapped_count} relevance/validation conditions")
-
-    current_app.logger.info(f"VERSIONING_DEBUG: _clone_template_structure - successfully cloned structure: {len(page_id_map)} pages, {len(section_id_map)} sections, {items_cloned} items from version {source_version_id} to {target_version_id}")
+            old_id = int(old_ref)
+        except (TypeError, ValueError):
+            continue
+        new_id = item_id_map.get(old_id)
+        if new_id is None:
+            # Referenced item is not part of the cloned structure; a dangling id
+            # would silently point at another version's row.
+            new_config = dict(config)
+            new_config.pop('entry_label_item_id', None)
+            new_section.config = new_config
+            continue
+        if new_id != old_id:
+            new_config = dict(config)
+            new_config['entry_label_item_id'] = new_id
+            new_section.config = new_config
+            remapped += 1
+    return remapped
 
 
 def _clone_template_structure_between_templates(*, source_template_id: int, source_version_id: int, target_template_id: int, target_version_id: int) -> None:
@@ -413,17 +275,16 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             definition=it.definition,
             options_json=_deep_copy_json_value(it.options_json),
         )
-        with suppress(Exception):
-            new_it.lookup_list_id = getattr(it, 'lookup_list_id', None)
-            new_it.list_display_column = getattr(it, 'list_display_column', None)
-            new_it.list_filters_json = _deep_copy_json_value(getattr(it, 'list_filters_json', None))
-            new_it.label_translations = _deep_copy_json_value(getattr(it, 'label_translations', None))
-            new_it.definition_translations = _deep_copy_json_value(getattr(it, 'definition_translations', None))
-            new_it.options_translations = _deep_copy_json_value(getattr(it, 'options_translations', None))
-            new_it.description_translations = _deep_copy_json_value(getattr(it, 'description_translations', None))
-            new_it.validation_message_translations = _deep_copy_json_value(getattr(it, 'validation_message_translations', None))
-            new_it.description = getattr(it, 'description', None)
-            new_it.archived = getattr(it, 'archived', False)
+        new_it.lookup_list_id = it.lookup_list_id
+        new_it.list_display_column = it.list_display_column
+        new_it.list_filters_json = _deep_copy_json_value(it.list_filters_json)
+        new_it.label_translations = _deep_copy_json_value(it.label_translations)
+        new_it.definition_translations = _deep_copy_json_value(it.definition_translations)
+        new_it.options_translations = _deep_copy_json_value(it.options_translations)
+        new_it.description_translations = _deep_copy_json_value(it.description_translations)
+        new_it.validation_message_translations = _deep_copy_json_value(it.validation_message_translations)
+        new_it.description = it.description
+        new_it.archived = bool(it.archived)
         if not it.stable_key:
             defer_stable_key_autogen(new_it)
         db.session.add(new_it)
@@ -477,6 +338,8 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
                     current_app.logger.debug(f"VERSIONING_DEBUG: Remapped relevance_condition for section {src_s.id} -> {new_s.id}: '{old_rel[:100]}...' -> '{new_rel[:100]}...'")
         except Exception as e:
             current_app.logger.warning(f"VERSIONING_DEBUG: Error remapping section condition {src_s.id} -> {new_s.id}: {e}", exc_info=True)
+
+    remapped_count += _remap_section_config_item_refs(section_pairs, item_id_map)
 
     # Flush again to persist the remapped conditions
     db.session.flush()

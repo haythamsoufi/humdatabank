@@ -27,6 +27,30 @@ from .helpers.field_mapping import (
 )
 
 
+def _lock_template_for_version_change(template_id: int) -> FormTemplate:
+    """Load the template row under a row lock so concurrent deploy/create calls serialize."""
+    template = (
+        FormTemplate.query
+        .filter_by(id=template_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if template is None:
+        from werkzeug.exceptions import NotFound
+        raise NotFound()
+    return template
+
+
+def _previous_published_version(template, target_version_id: int):
+    """Return the version currently published for the template, unless it is the target."""
+    if not template.published_version_id or template.published_version_id == target_version_id:
+        return None
+    return FormTemplateVersion.query.filter_by(
+        id=template.published_version_id, template_id=template.id
+    ).first()
+
+
 @bp.route("/templates/<int:template_id>/deploy", methods=["POST"])
 @permission_required('admin.templates.publish')
 def deploy_template_version(template_id):
@@ -37,6 +61,7 @@ def deploy_template_version(template_id):
         current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - access denied for template_id={template_id}, user_id={current_user.id}")
         flash("Access denied.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
+    template = _lock_template_for_version_change(template_id)
 
     deployed_version_id = None
     migration_summary = None
@@ -79,13 +104,14 @@ def deploy_template_version(template_id):
             flash(msg, "danger")
             return redirect(url_for("form_builder.edit_template", template_id=template.id, version_id=version.id))
 
-        if template.published_version_id and template.published_version_id != version.id:
-            prev = FormTemplateVersion.query.get(template.published_version_id)
-            if prev and prev.status == 'published':
+        is_rollback = version.status == 'archived'
+        prev = _previous_published_version(template, version.id)
+        if prev:
+            prev_version_id = prev.id
+            if prev.status == 'published':
                 current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - archiving previous published version {prev.id}")
                 prev.status = 'archived'
                 prev.updated_at = utcnow()
-                prev_version_id = prev.id
 
         current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - publishing version {version.id}, previous published_version_id={template.published_version_id}")
         version.status = 'published'
@@ -99,7 +125,7 @@ def deploy_template_version(template_id):
             )
             try:
                 migration_summary = VersionDeployMigrationService.migrate_submission_fks(
-                    prev_version_id, version.id, template.id
+                    prev_version_id, version.id, template.id, restore_archived=is_rollback
                 )
             except VersionDeployMigrationError as mig_err:
                 request_transaction_rollback()
@@ -199,11 +225,8 @@ def deploy_template_preflight(template_id):
     if not version:
         return json_bad_request('No target version found.', success=False)
 
-    prev_version_id = None
-    if template.published_version_id and template.published_version_id != version.id:
-        prev = FormTemplateVersion.query.get(template.published_version_id)
-        if prev and prev.status == 'published':
-            prev_version_id = prev.id
+    prev = _previous_published_version(template, version.id)
+    prev_version_id = prev.id if prev else None
 
     from app.services.platform.version_deploy_migration_service import VersionDeployMigrationService
     from flask import current_app as app_ctx
@@ -247,12 +270,8 @@ def _resolve_draft_version_for_mapping(template, version_id: int):
 
 
 def _resolve_prev_published_version_id(template, draft_version_id: int):
-    if not template.published_version_id or template.published_version_id == draft_version_id:
-        return None
-    prev = FormTemplateVersion.query.get(template.published_version_id)
-    if prev and prev.status == 'published':
-        return prev.id
-    return None
+    prev = _previous_published_version(template, draft_version_id)
+    return prev.id if prev else None
 
 
 @bp.route("/templates/<int:template_id>/versions/<int:version_id>/field-mapping", methods=["GET"])
@@ -592,22 +611,31 @@ def delete_template_version(template_id, version_id):
 
         current_app.logger.debug(f"VERSIONING_DEBUG: delete_template_version - deleting version {version_id} and associated rows")
 
-        from app.models import FormData, RepeatGroupData, RepeatGroupInstance, DynamicIndicatorData, DynamicSectionContext
+        from app.models import (
+            AIFormDataValidation,
+            AssignmentPageStatus,
+            DynamicIndicatorData,
+            DynamicSectionContext,
+            FormData,
+            RepeatGroupData,
+            RepeatGroupInstance,
+        )
         from app.models.documents import SubmittedDocument
         item_ids_subq = select(FormItem.id).filter_by(template_id=template.id, version_id=version.id).scalar_subquery()
         section_ids_subq = select(FormSection.id).filter_by(template_id=template.id, version_id=version.id).scalar_subquery()
+        page_ids_subq = select(FormPage.id).filter_by(template_id=template.id, version_id=version.id).scalar_subquery()
 
+        # Fail closed: if the dependent-data check cannot run, the version must not be deleted.
         data_counts = 0
-        try:
-            data_counts += db.session.query(func.count(FormData.id)).filter(FormData.form_item_id.in_(item_ids_subq)).scalar() or 0
-            data_counts += db.session.query(func.count(RepeatGroupData.id)).filter(RepeatGroupData.form_item_id.in_(item_ids_subq)).scalar() or 0
-            data_counts += db.session.query(func.count(RepeatGroupInstance.id)).filter(RepeatGroupInstance.section_id.in_(section_ids_subq)).scalar() or 0
-            data_counts += db.session.query(func.count(DynamicIndicatorData.id)).filter(DynamicIndicatorData.section_id.in_(section_ids_subq)).scalar() or 0
-            data_counts += db.session.query(func.count(DynamicSectionContext.id)).filter(DynamicSectionContext.section_id.in_(section_ids_subq)).scalar() or 0
-            data_counts += db.session.query(func.count(SubmittedDocument.id)).filter(SubmittedDocument.form_item_id.in_(item_ids_subq)).scalar() or 0
-        except Exception as _e:
-            current_app.logger.error(f"VERSIONING_DEBUG: delete_template_version - error counting dependent data: {_e}")
-            data_counts = None
+        data_counts += db.session.query(func.count(FormData.id)).filter(FormData.form_item_id.in_(item_ids_subq)).scalar() or 0
+        data_counts += db.session.query(func.count(RepeatGroupData.id)).filter(RepeatGroupData.form_item_id.in_(item_ids_subq)).scalar() or 0
+        data_counts += db.session.query(func.count(RepeatGroupInstance.id)).filter(RepeatGroupInstance.section_id.in_(section_ids_subq)).scalar() or 0
+        data_counts += db.session.query(func.count(DynamicIndicatorData.id)).filter(DynamicIndicatorData.section_id.in_(section_ids_subq)).scalar() or 0
+        data_counts += db.session.query(func.count(DynamicSectionContext.id)).filter(DynamicSectionContext.section_id.in_(section_ids_subq)).scalar() or 0
+        data_counts += db.session.query(func.count(SubmittedDocument.id)).filter(SubmittedDocument.form_item_id.in_(item_ids_subq)).scalar() or 0
+        # These FKs cascade on delete, so removing the version would silently erase them.
+        data_counts += db.session.query(func.count(AIFormDataValidation.id)).filter(AIFormDataValidation.form_item_id.in_(item_ids_subq)).scalar() or 0
+        data_counts += db.session.query(func.count(AssignmentPageStatus.id)).filter(AssignmentPageStatus.form_page_id.in_(page_ids_subq)).scalar() or 0
 
         if data_counts and data_counts > 0:
             current_app.logger.warning(
@@ -717,6 +745,7 @@ def create_draft_version(template_id):
         flash("Access denied.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
     try:
+        template = _lock_template_for_version_change(template_id)
         existing_draft = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first()
         if existing_draft:
             current_app.logger.warning(

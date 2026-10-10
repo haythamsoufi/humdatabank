@@ -304,24 +304,21 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
             title: localizations.indicatorBankTitle,
             leading: Builder(
               builder: (BuildContext scaffoldContext) {
-                return IOSIconButton(
-                  icon: Icons.menu,
+                return IconButton(
+                  icon: const Icon(Icons.menu_rounded),
                   onPressed: () {
                     Scaffold.of(scaffoldContext).openDrawer();
                   },
                   tooltip: localizations.navigation,
-                  semanticLabel: localizations.navigation,
-                  semanticHint: localizations.navigation,
                 );
               },
             ),
             actions: [
               if (indicatorProvider.viewMode == 'table')
-                IOSIconButton(
-                  icon: Icons.filter_list,
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
                   onPressed: () => _openIndicatorBankFilters(indicatorProvider),
                   tooltip: localizations.indicatorBankShowFilters,
-                  semanticLabel: localizations.indicatorBankShowFilters,
                 ),
               IconButton(
                 icon: const Icon(Icons.add),

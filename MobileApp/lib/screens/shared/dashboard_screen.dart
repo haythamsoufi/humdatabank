@@ -18,6 +18,7 @@ import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/app_fade_in_up.dart';
@@ -1435,12 +1436,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final groupedBackground = IOSColors.getGroupedBackground(context);
         return Scaffold(
           appBar: canPop
-              ? AppBar(
-                  backgroundColor: groupedBackground,
-                  elevation: 0,
-                  scrolledUnderElevation: 0,
-                  surfaceTintColor: Colors.transparent,
-                )
+              ? const AppAppBar(title: '')
               : null,
           backgroundColor: groupedBackground,
           body: SafeArea(

@@ -55,20 +55,20 @@ class GlassCircleBubble extends StatelessWidget {
       );
     } else {
       final fillTop = isDark
-          ? Colors.white.withValues(alpha: 0.16)
-          : Colors.white.withValues(alpha: 0.85);
+          ? cs.onSurface.withValues(alpha: 0.16)
+          : cs.surface.withValues(alpha: 0.85);
       final fillBottom = isDark
-          ? Colors.white.withValues(alpha: 0.06)
-          : Colors.white.withValues(alpha: 0.5);
+          ? cs.onSurface.withValues(alpha: 0.06)
+          : cs.surface.withValues(alpha: 0.5);
       final hairline = isDark
           ? cs.outlineVariant.withValues(alpha: 0.7)
-          : Colors.white.withValues(alpha: 0.9);
+          : cs.surface.withValues(alpha: 0.9);
       surface = DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+              color: cs.shadow.withValues(alpha: isDark ? 0.4 : 0.08),
               blurRadius: 12,
               offset: const Offset(0, 3),
             ),

@@ -944,6 +944,26 @@ class AiChatProvider with ChangeNotifier {
     _wsBranchConversationHistory = branchConversationHistory;
     _wsStreamConversationId = _conversationId;
     final wsListenGeneration = _wsConnectionSession;
+    var httpFallbackStarted = false;
+    Future<void> fallbackToHttp() async {
+      if (httpFallbackStarted) return;
+      httpFallbackStarted = true;
+      if (wsListenGeneration != _wsConnectionSession) return;
+      // Drop any partial streamed text: the HTTP reply carries the full answer.
+      if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
+        _messages.removeLast();
+      }
+      _clearAgentProgress();
+      await _sendHttpIntoLastAssistant(
+        message,
+        isAuthenticated: isAuthenticated,
+        persistUserMessage: false,
+        clientMessageId: clientMessageId,
+        branchFromEdit: _wsBranchFromEdit,
+        branchConversationHistory: _wsBranchConversationHistory,
+      );
+    }
+
     _channel = await _service.connectWebSocket();
     _channel!.sink.add(jsonEncode(_webSocketPayload(
       message: message,
@@ -969,6 +989,7 @@ class AiChatProvider with ChangeNotifier {
               isAuthenticated) {
             final branchFromEdit = _wsBranchFromEdit;
             final branchHistory = _wsBranchConversationHistory;
+            httpFallbackStarted = true;
             _clearAgentProgress();
             _streamStatusHint = null;
             notifyListeners();
@@ -988,8 +1009,8 @@ class AiChatProvider with ChangeNotifier {
           await _handleWsJson(data, outboundMessage: message, isAuthenticated: isAuthenticated);
           if (wsListenGeneration != _wsConnectionSession) return;
           notifyListeners();
-        } catch (_) {
-          /* malformed */
+        } catch (e) {
+          DebugLogger.logWarn('AI', 'Failed to handle WS message: $e');
         }
       },
       onError: (e) async {
@@ -999,34 +1020,20 @@ class AiChatProvider with ChangeNotifier {
           return;
         }
         DebugLogger.logWarn('AI', 'WS error, falling back to HTTP: $e');
-        if (_messages.isNotEmpty && _messages.last.role == 'assistant' && _messages.last.content.isEmpty) {
-          _messages.removeLast();
-        }
-        _clearAgentProgress();
-        _isStreaming = false;
-        notifyListeners();
-        if (wsListenGeneration != _wsConnectionSession) return;
-        await _sendHttpIntoLastAssistant(
-          message,
-          isAuthenticated: isAuthenticated,
-          persistUserMessage: false,
-          clientMessageId: clientMessageId,
-          branchFromEdit: _wsBranchFromEdit,
-          branchConversationHistory: _wsBranchConversationHistory,
-        );
+        await fallbackToHttp();
       },
-      onDone: () {
+      onDone: () async {
         if (wsListenGeneration != _wsConnectionSession) return;
         if (_wsUserCancelled) {
           _wsUserCancelled = false;
           return;
         }
-        if (_messages.isNotEmpty && _messages.last.role == 'assistant' && _messages.last.content.isEmpty) {
-          _messages.removeLast();
-        }
-        _clearAgentProgress();
-        _isStreaming = false;
-        notifyListeners();
+        // A normal completion ('done' / 'error' envelopes) already cleared [_isStreaming].
+        // Still streaming here means the socket closed without a final envelope (proxy or
+        // server dropped it); retry over HTTP instead of silently resetting the composer.
+        if (!_isStreaming) return;
+        DebugLogger.logWarn('AI', 'WS closed before completion, falling back to HTTP');
+        await fallbackToHttp();
       },
     );
   }
@@ -1550,6 +1557,14 @@ class AiChatProvider with ChangeNotifier {
     List<Map<String, dynamic>>? branchConversationHistory,
   }) async {
     _clearAgentProgress();
+    // Keep an empty assistant row at the tail so the progress panel / typing indicator
+    // shows while the HTTP request runs (the WebSocket fallback removes its placeholder).
+    if (_messages.isEmpty ||
+        _messages.last.role != 'assistant' ||
+        _messages.last.content.isNotEmpty) {
+      _messages.add(AiChatMessage(role: 'assistant', content: ''));
+    }
+    _initAgentProgressIfNeeded();
     _isStreaming = true;
     notifyListeners();
     final navEpoch = _navigationEpoch;
@@ -1664,6 +1679,7 @@ class AiChatProvider with ChangeNotifier {
         }
       }
       _isStreaming = false;
+      _clearAgentProgress();
       notifyListeners();
     } catch (e) {
       if (navEpoch != _navigationEpoch) {
@@ -1672,6 +1688,7 @@ class AiChatProvider with ChangeNotifier {
         return;
       }
       _isStreaming = false; // Stop streaming immediately on error
+      _clearAgentProgress();
 
       // Keep raw string for logging / edge cases; [errorType] drives user-facing copy in the UI.
       String errorMessage = e.toString();

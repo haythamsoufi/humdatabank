@@ -37,10 +37,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<NotificationProvider>(
-        context,
-        listen: false,
-      ).loadNotifications();
+      Provider.of<NotificationProvider>(context, listen: false)
+          .loadNotifications();
     });
   }
 
@@ -61,244 +59,217 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             // nothing is unread, rather than leaving an empty glass circle.
             child: Consumer<NotificationProvider>(
               builder: (context, unreadSource, _) => AppAppBar(
-                title: localizations.notifications,
-                actions: [
-                  Consumer<NotificationProvider>(
-                    builder: (context, np, _) {
-                      return IconButton(
-                        tooltip: localizations.notificationsFilter,
-                        icon: Badge(
-                          isLabelVisible: np.hasActiveNotificationFilters,
-                          smallSize: 7,
-                          backgroundColor: theme.colorScheme.error,
-                          child: Icon(
-                            Icons.tune_outlined,
-                            color: context.isDarkTheme
-                                ? const Color(
-                                    AppConstants.themeSwitchCheckboxActiveDark,
-                                  )
-                                : theme.colorScheme.primary,
-                          ),
-                        ),
-                        onPressed: () => showNotificationFiltersSheet(context),
-                      );
-                    },
-                  ),
-                  if (unreadSource.displayedNotifications.any((n) => !n.isRead))
-                    Consumer<NotificationProvider>(
-                      builder: (context, provider, child) {
-                        final unreadIds = provider.displayedNotifications
-                            .where((n) => !n.isRead)
-                            .map((n) => n.id)
-                            .toList();
+            title: localizations.notifications,
+            actions: [
+              Consumer<NotificationProvider>(
+                builder: (context, np, _) {
+                  return IconButton(
+                    tooltip: localizations.notificationsFilter,
+                    icon: Badge(
+                      isLabelVisible: np.hasActiveNotificationFilters,
+                      smallSize: 7,
+                      backgroundColor: theme.colorScheme.error,
+                      child: Icon(
+                        Icons.tune_outlined,
+                        color: context.isDarkTheme
+                            ? const Color(
+                                AppConstants.themeSwitchCheckboxActiveDark)
+                            : theme.colorScheme.primary,
+                      ),
+                    ),
+                    onPressed: () => showNotificationFiltersSheet(context),
+                  );
+                },
+              ),
+              if (unreadSource.displayedNotifications.any((n) => !n.isRead))
+              Consumer<NotificationProvider>(
+                builder: (context, provider, child) {
+                  final unreadIds = provider.displayedNotifications
+                      .where((n) => !n.isRead)
+                      .map((n) => n.id)
+                      .toList();
 
-                        if (unreadIds.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
+                  if (unreadIds.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
 
-                        return Semantics(
-                          label: localizations.markAllRead,
-                          button: true,
-                          enabled: !_isMarkingAllAsRead,
-                          child: IconButton(
-                            icon: _isMarkingAllAsRead
-                                ? SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        context.isDarkTheme
-                                            ? const Color(
-                                                AppConstants
-                                                    .themeSwitchCheckboxActiveDark,
-                                              )
-                                            : Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
+                  return Semantics(
+                    label: localizations.markAllRead,
+                    button: true,
+                    enabled: !_isMarkingAllAsRead,
+                    child: IconButton(
+                      icon: _isMarkingAllAsRead
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  context.isDarkTheme
+                                      ? const Color(AppConstants
+                                          .themeSwitchCheckboxActiveDark)
+                                      : Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.done_all,
+                              color:
+                                  context.isDarkTheme
+                                      ? const Color(AppConstants
+                                          .themeSwitchCheckboxActiveDark)
+                                      : Theme.of(context).colorScheme.primary,
+                            ),
+                      onPressed: _isMarkingAllAsRead
+                          ? null
+                          : () async {
+                            // Show confirmation dialog
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (BuildContext dialogContext) {
+                                return AlertDialog(
+                                  title: Text(localizations.markAllRead),
+                                  content: Text(
+                                    'Are you sure you want to mark all ${unreadIds.length} notification${unreadIds.length == 1 ? '' : 's'} as read?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(dialogContext).pop(false);
+                                      },
+                                      child: Text(
+                                        localizations.cancel,
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .textTheme
+                                              .bodyLarge
+                                              ?.color,
+                                        ),
                                       ),
                                     ),
-                                  )
-                                : Icon(
-                                    Icons.done_all,
-                                    color: context.isDarkTheme
-                                        ? const Color(
-                                            AppConstants
-                                                .themeSwitchCheckboxActiveDark,
-                                          )
-                                        : Theme.of(context).colorScheme.primary,
+                                    Semantics(
+                                      label: localizations.markAllRead,
+                                      button: true,
+                                      child: FilledButton(
+                                        onPressed: () {
+                                          Navigator.of(dialogContext).pop(true);
+                                        },
+                                        child: Text(localizations.markAllRead),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+
+                            if (confirmed != true || !stateContext.mounted) {
+                              return;
+                            }
+
+                            setState(() {
+                              _isMarkingAllAsRead = true;
+                            });
+
+                            try {
+                              final success =
+                                  await provider.markAsRead(unreadIds);
+
+                              if (!stateContext.mounted) {
+                                return;
+                              }
+                              if (success) {
+                                // Refresh notifications to ensure UI is in sync
+                                await provider.loadNotifications();
+
+                                if (!stateContext.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(stateContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(localizations
+                                        .allNotificationsMarkedAsRead),
+                                    duration: const Duration(seconds: 2),
+                                    backgroundColor:
+                                        Theme.of(stateContext)
+                                            .colorScheme
+                                            .primary,
                                   ),
-                            onPressed: _isMarkingAllAsRead
-                                ? null
-                                : () async {
-                                    // Show confirmation dialog
-                                    final confirmed = await showDialog<bool>(
-                                      context: context,
-                                      builder: (BuildContext dialogContext) {
-                                        return AlertDialog(
-                                          title: Text(
-                                            localizations.markAllRead,
-                                          ),
-                                          content: Text(
-                                            'Are you sure you want to mark all ${unreadIds.length} notification${unreadIds.length == 1 ? '' : 's'} as read?',
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.of(
-                                                  dialogContext,
-                                                ).pop(false);
-                                              },
-                                              child: Text(
-                                                localizations.cancel,
-                                                style: TextStyle(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).textTheme.bodyLarge?.color,
-                                                ),
-                                              ),
-                                            ),
-                                            Semantics(
-                                              label: localizations.markAllRead,
-                                              button: true,
-                                              child: FilledButton(
-                                                onPressed: () {
-                                                  Navigator.of(
-                                                    dialogContext,
-                                                  ).pop(true);
-                                                },
-                                                child: Text(
-                                                  localizations.markAllRead,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    );
+                                );
+                              } else {
+                                // Refresh to get latest state even on failure
+                                await provider.loadNotifications();
 
-                                    if (confirmed != true ||
-                                        !stateContext.mounted) {
-                                      return;
-                                    }
+                                if (!stateContext.mounted) {
+                                  return;
+                                }
+                                ScaffoldMessenger.of(stateContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      provider.error ??
+                                          'Failed to mark notifications as read',
+                                    ),
+                                    duration: const Duration(seconds: 4),
+                                    backgroundColor:
+                                        Theme.of(stateContext)
+                                            .colorScheme
+                                            .error,
+                                  ),
+                                );
+                              }
+                            } catch (e, stackTrace) {
+                              // Refresh to get latest state even on error
+                              await provider.loadNotifications();
 
-                                    setState(() {
-                                      _isMarkingAllAsRead = true;
-                                    });
+                              if (!stateContext.mounted) {
+                                return;
+                              }
+                              final errorHandler = ErrorHandler();
+                              final error = errorHandler.parseError(
+                                error: e,
+                                stackTrace: stackTrace,
+                                context: 'Mark All Notifications Read',
+                              );
+                              errorHandler.logError(error);
 
-                                    try {
-                                      final success = await provider.markAsRead(
-                                        unreadIds,
-                                      );
-
-                                      if (!stateContext.mounted) {
-                                        return;
-                                      }
-                                      if (success) {
-                                        // Refresh notifications to ensure UI is in sync
-                                        await provider.loadNotifications();
-
-                                        if (!stateContext.mounted) {
-                                          return;
-                                        }
-                                        ScaffoldMessenger.of(
-                                          stateContext,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              localizations
-                                                  .allNotificationsMarkedAsRead,
-                                            ),
-                                            duration: const Duration(
-                                              seconds: 2,
-                                            ),
-                                            backgroundColor: Theme.of(
-                                              stateContext,
-                                            ).colorScheme.primary,
-                                          ),
-                                        );
-                                      } else {
-                                        // Refresh to get latest state even on failure
-                                        await provider.loadNotifications();
-
-                                        if (!stateContext.mounted) {
-                                          return;
-                                        }
-                                        ScaffoldMessenger.of(
-                                          stateContext,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              provider.error ??
-                                                  'Failed to mark notifications as read',
-                                            ),
-                                            duration: const Duration(
-                                              seconds: 4,
-                                            ),
-                                            backgroundColor: Theme.of(
-                                              stateContext,
-                                            ).colorScheme.error,
-                                          ),
-                                        );
-                                      }
-                                    } catch (e, stackTrace) {
-                                      // Refresh to get latest state even on error
-                                      await provider.loadNotifications();
-
-                                      if (!stateContext.mounted) {
-                                        return;
-                                      }
-                                      final errorHandler = ErrorHandler();
-                                      final error = errorHandler.parseError(
-                                        error: e,
-                                        stackTrace: stackTrace,
-                                        context: 'Mark All Notifications Read',
-                                      );
-                                      errorHandler.logError(error);
-
-                                      ScaffoldMessenger.of(
-                                        stateContext,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(error.getUserMessage()),
-                                          duration: const Duration(seconds: 4),
-                                          backgroundColor: Theme.of(
-                                            stateContext,
-                                          ).colorScheme.error,
-                                        ),
-                                      );
-                                    } finally {
-                                      if (stateContext.mounted) {
-                                        setState(() {
-                                          _isMarkingAllAsRead = false;
-                                        });
-                                      }
-                                    }
-                                  },
-                            tooltip: localizations.markAllRead,
-                          ),
-                        );
-                      },
+                              ScaffoldMessenger.of(stateContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(error.getUserMessage()),
+                                  duration: const Duration(seconds: 4),
+                                  backgroundColor:
+                                      Theme.of(stateContext)
+                                          .colorScheme
+                                          .error,
+                                ),
+                              );
+                            } finally {
+                              if (stateContext.mounted) {
+                                setState(() {
+                                  _isMarkingAllAsRead = false;
+                                });
+                              }
+                            }
+                          },
+                    tooltip: localizations.markAllRead,
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.settings_outlined),
-                    onPressed: () {
-                      final nav =
-                          appNavigatorKey.currentState ??
-                          Navigator.of(context, rootNavigator: true);
-                      nav.push(
-                        MaterialPageRoute(
-                          settings: const RouteSettings(
-                            name: '/notification-preferences',
-                          ),
-                          builder: (context) =>
-                              const NotificationPreferencesScreen(),
-                        ),
-                      );
-                    },
-                    tooltip: localizations.notificationPreferences,
-                  ),
-                ],
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () {
+                  final nav = appNavigatorKey.currentState ??
+                      Navigator.of(context, rootNavigator: true);
+                  nav.push(
+                    MaterialPageRoute(
+                      settings: const RouteSettings(name: '/notification-preferences'),
+                      builder: (context) =>
+                          const NotificationPreferencesScreen(),
+                    ),
+                  );
+                },
+                tooltip: localizations.notificationPreferences,
+              ),
+            ],
               ),
             ),
           ),
@@ -328,8 +299,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           const SizedBox(height: 16),
                           Text(
                             localizations.somethingWentWrong,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -384,7 +359,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           const SizedBox(height: 16),
                           Text(
                             localizations.notificationsFilterNoMatchesLoaded,
-                            style: Theme.of(context).textTheme.titleMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                             textAlign: TextAlign.center,
                           ),
@@ -402,8 +379,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 }
 
                 final localizations = AppLocalizations.of(context)!;
-                final showLoadMoreFooter =
-                    provider.hasMoreNotifications ||
+                final showLoadMoreFooter = provider.hasMoreNotifications ||
                     provider.isLoadingMore ||
                     (provider.loadMoreError != null);
                 return RefreshIndicator(
@@ -418,7 +394,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ? 0
                           : MediaQuery.paddingOf(context).bottom + 12,
                     ),
-                    itemCount: displayed.length + (showLoadMoreFooter ? 1 : 0),
+                    itemCount: displayed.length +
+                        (showLoadMoreFooter ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index >= displayed.length) {
                         return _NotificationsLoadMoreFooter(
@@ -550,8 +527,7 @@ class _RestrictedSwipeDismissibleState
   Future<void> _navigateToRoute(BuildContext context, String route) async {
     try {
       // Check if this is a download URL
-      final isDownloadUrl =
-          route.contains('/api/download-app') ||
+      final isDownloadUrl = route.contains('/api/download-app') ||
           route.contains('/download') ||
           route.endsWith('.apk') ||
           route.endsWith('.ipa') ||
@@ -607,7 +583,10 @@ class _RestrictedSwipeDismissibleState
 
       // If it's a full URL, open in webview
       if (route.startsWith('http://') || route.startsWith('https://')) {
-        Navigator.of(context).pushNamed(AppRoutes.webview, arguments: route);
+        Navigator.of(context).pushNamed(
+          AppRoutes.webview,
+          arguments: route,
+        );
       } else if (route.startsWith('/')) {
         // Relative path - navigate to app screen or webview
         // Check if it's a known app route
@@ -623,9 +602,10 @@ class _RestrictedSwipeDismissibleState
               ? AppConfig.backendUrl
               : AppConfig.frontendUrl;
           final fullUrl = '$base$route';
-          Navigator.of(
-            context,
-          ).pushNamed(AppRoutes.webview, arguments: fullUrl);
+          Navigator.of(context).pushNamed(
+            AppRoutes.webview,
+            arguments: fullUrl,
+          );
         }
       }
     } catch (e) {
@@ -680,7 +660,9 @@ class _RestrictedSwipeDismissibleState
               Dismissible(
                 key: widget.key!,
                 direction: DismissDirection.endToStart,
-                dismissThresholds: const {DismissDirection.endToStart: 0.4},
+                dismissThresholds: const {
+                  DismissDirection.endToStart: 0.4,
+                },
                 movementDuration: const Duration(milliseconds: 200),
                 background: Builder(
                   builder: (context) {
@@ -714,13 +696,12 @@ class _RestrictedSwipeDismissibleState
                             widget.notification.isRead
                                 ? widget.localizations.markAsUnread
                                 : widget.localizations.markAsRead,
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.onPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                           ),
                         ],
                       ),
@@ -737,13 +718,11 @@ class _RestrictedSwipeDismissibleState
                   // Update the notification state
                   bool success = false;
                   if (widget.notification.isRead) {
-                    success = await widget.provider.markAsUnread([
-                      widget.notification.id,
-                    ]);
+                    success = await widget.provider
+                        .markAsUnread([widget.notification.id]);
                   } else {
-                    success = await widget.provider.markAsRead([
-                      widget.notification.id,
-                    ]);
+                    success = await widget.provider
+                        .markAsRead([widget.notification.id]);
                   }
 
                   // Show error message if operation failed
@@ -767,9 +746,8 @@ class _RestrictedSwipeDismissibleState
                   notification: widget.notification,
                   onTap: () async {
                     if (!widget.notification.isRead) {
-                      await widget.provider.markAsRead([
-                        widget.notification.id,
-                      ]);
+                      await widget.provider
+                          .markAsRead([widget.notification.id]);
                     }
                     if (!context.mounted) {
                       return;
@@ -829,8 +807,7 @@ class _NotificationLeadingAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final mainActionIcon =
-        (notification.actorActionIcon != null &&
+    final mainActionIcon = (notification.actorActionIcon != null &&
             notification.actorActionIcon!.isNotEmpty)
         ? faIconForSuffix(notification.actorActionIcon)
         : faIconFromApiIconClass(notification.iconClass);
@@ -840,13 +817,11 @@ class _NotificationLeadingAvatar extends StatelessWidget {
       final initials = actor.initials.length > 2
           ? actor.initials.substring(0, 2)
           : actor.initials;
-      final badge =
-          (notification.actorActionIcon != null &&
+      final badge = (notification.actorActionIcon != null &&
               notification.actorActionIcon!.isNotEmpty)
           ? faIconForSuffix(notification.actorActionIcon)
           : null;
-      final diskColor =
-          parseProfileColorHex(actor.profileColor) ??
+      final diskColor = parseProfileColorHex(actor.profileColor) ??
           const Color(AppConstants.semanticSubtleText);
       return ProfileLeadingAvatar(
         initials: initials,
@@ -866,7 +841,10 @@ class _NotificationTile extends StatelessWidget {
   final model.Notification notification;
   final VoidCallback onTap;
 
-  const _NotificationTile({required this.notification, required this.onTap});
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -909,13 +887,13 @@ class _NotificationTile extends StatelessWidget {
 
     final primaryLine = notification.primaryIsMessage
         ? (notification.message.isNotEmpty
-              ? notification.message
-              : notification.title)
+            ? notification.message
+            : notification.title)
         : notification.title;
     final secondaryLine = notification.primaryIsMessage
         ? (notification.title.isNotEmpty && notification.title != primaryLine
-              ? notification.title
-              : '')
+            ? notification.title
+            : '')
         : notification.message;
 
     final titleChipsRow = Row(
@@ -924,45 +902,40 @@ class _NotificationTile extends StatelessWidget {
           child: Text(
             primaryLine,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: isUnread
-                  ? FontWeight.w600
-                  : (isHighPriority ? FontWeight.w500 : FontWeight.w400),
-              color: isHighPriority
-                  ? (isUnread
-                        ? (theme.isDarkTheme
-                              ? const Color(
-                                  AppConstants
-                                      .semanticNotificationOrangeDarkUnread,
-                                )
-                              : const Color(
-                                  AppConstants
-                                      .semanticNotificationOrangeTextStrongLight,
-                                ))
-                        : (theme.isDarkTheme
-                              ? const Color(
-                                  AppConstants
-                                      .semanticNotificationOrangeDarkRead,
-                                )
-                              : const Color(
-                                  AppConstants
-                                      .semanticNotificationOrangeTextMutedLight,
-                                )))
-                  : theme.textTheme.bodyLarge?.color,
-            ),
+                  fontWeight: isUnread
+                      ? FontWeight.w600
+                      : (isHighPriority
+                          ? FontWeight.w500
+                          : FontWeight.w400),
+                  color: isHighPriority
+                      ? (isUnread
+                          ? (theme.isDarkTheme
+                              ? const Color(AppConstants
+                                  .semanticNotificationOrangeDarkUnread)
+                              : const Color(AppConstants
+                                  .semanticNotificationOrangeTextStrongLight))
+                          : (theme.isDarkTheme
+                              ? const Color(AppConstants
+                                  .semanticNotificationOrangeDarkRead)
+                              : const Color(AppConstants
+                                  .semanticNotificationOrangeTextMutedLight)))
+                      : theme.textTheme.bodyLarge?.color,
+                ),
           ),
         ),
         if (isAdminMessage)
           Container(
             margin: const EdgeInsets.only(left: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: 2,
+            ),
             decoration: BoxDecoration(
               color: theme.isDarkTheme
-                  ? const Color(
-                      AppConstants.themeSwitchCheckboxActiveDark,
-                    ).withValues(alpha: isUnread ? 1.0 : 0.7)
-                  : theme.colorScheme.primary.withValues(
-                      alpha: isUnread ? 1.0 : 0.7,
-                    ),
+                  ? const Color(AppConstants.themeSwitchCheckboxActiveDark)
+                      .withValues(alpha: isUnread ? 1.0 : 0.7)
+                  : theme.colorScheme.primary
+                      .withValues(alpha: isUnread ? 1.0 : 0.7),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -981,12 +954,10 @@ class _NotificationTile extends StatelessWidget {
               Icons.open_in_new,
               size: 14,
               color: theme.isDarkTheme
-                  ? const Color(
-                      AppConstants.themeSwitchCheckboxActiveDark,
-                    ).withValues(alpha: isUnread ? 1.0 : 0.7)
-                  : theme.colorScheme.primary.withValues(
-                      alpha: isUnread ? 1.0 : 0.7,
-                    ),
+                  ? const Color(AppConstants.themeSwitchCheckboxActiveDark)
+                      .withValues(alpha: isUnread ? 1.0 : 0.7)
+                  : theme.colorScheme.primary
+                      .withValues(alpha: isUnread ? 1.0 : 0.7),
             ),
           ),
       ],
@@ -997,12 +968,9 @@ class _NotificationTile extends StatelessWidget {
       if (theme.isDarkTheme) {
         if (isUnread) {
           return isHighPriority
-              ? const Color(
-                  AppConstants.semanticNotificationOrange,
-                ).withValues(alpha: 0.15)
-              : const Color(
-                  AppConstants.themeSwitchCheckboxActiveDark,
-                ).withValues(alpha: 0.25);
+              ? const Color(AppConstants.semanticNotificationOrange).withValues(alpha: 0.15)
+              : const Color(AppConstants.themeSwitchCheckboxActiveDark)
+                  .withValues(alpha: 0.25);
         }
         return theme.cardTheme.color ?? theme.colorScheme.surface;
       } else {
@@ -1021,20 +989,23 @@ class _NotificationTile extends StatelessWidget {
         border: Border(
           left: isHighPriority
               ? (isUnread
-                    ? const BorderSide(
-                        color: Color(AppConstants.semanticNotificationOrange),
-                        width: 6,
-                      )
-                    : BorderSide.none)
+                  ? const BorderSide(
+                      color: Color(AppConstants.semanticNotificationOrange),
+                      width: 6,
+                    )
+                  : BorderSide.none)
               : (isUnread
-                    ? BorderSide(
-                        color: theme.isDarkTheme
-                            ? context.linkOnSurfaceColor
-                            : const Color(AppConstants.errorColor),
-                        width: 6,
-                      )
-                    : BorderSide.none),
-          bottom: BorderSide(color: theme.dividerColor, width: 0.5),
+                  ? BorderSide(
+                      color: theme.isDarkTheme
+                          ? context.linkOnSurfaceColor
+                          : const Color(AppConstants.errorColor),
+                      width: 6,
+                    )
+                  : BorderSide.none),
+          bottom: BorderSide(
+            color: theme.dividerColor,
+            width: 0.5,
+          ),
         ),
       ),
       child: Material(
@@ -1061,12 +1032,18 @@ class _NotificationTile extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(children: [Expanded(child: titleChipsRow)]),
+                            Row(
+                              children: [
+                                Expanded(child: titleChipsRow),
+                              ],
+                            ),
                             if (secondaryLine.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 secondaryLine,
-                                style: Theme.of(context).textTheme.bodyMedium
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
                                     ?.copyWith(
                                       height: 1.4,
                                       fontSize: notification.primaryIsMessage
@@ -1093,25 +1070,20 @@ class _NotificationTile extends StatelessWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: theme.isDarkTheme
-                                            ? const Color(
-                                                AppConstants
-                                                    .semanticNotificationSky,
-                                              ).withValues(alpha: 0.2)
-                                            : const Color(
-                                                AppConstants
-                                                    .semanticEntityChipLightWash,
-                                              ),
+                                            ? const Color(AppConstants
+                                                    .semanticNotificationSky)
+                                                .withValues(alpha: 0.2)
+                                            : const Color(AppConstants
+                                                .semanticEntityChipLightWash),
                                         borderRadius: BorderRadius.circular(4),
                                         border: Border.all(
                                           color: theme.isDarkTheme
-                                              ? const Color(
-                                                  AppConstants
-                                                      .semanticNotificationSky,
-                                                ).withValues(alpha: 0.5)
-                                              : const Color(
-                                                  AppConstants
-                                                      .semanticNotificationSky,
-                                                ).withValues(alpha: 0.3),
+                                              ? const Color(AppConstants
+                                                      .semanticNotificationSky)
+                                                  .withValues(alpha: 0.5)
+                                              : const Color(AppConstants
+                                                      .semanticNotificationSky)
+                                                  .withValues(alpha: 0.3),
                                           width: 0.5,
                                         ),
                                       ),
@@ -1122,14 +1094,10 @@ class _NotificationTile extends StatelessWidget {
                                             Icons.location_on,
                                             size: 12,
                                             color: theme.isDarkTheme
-                                                ? const Color(
-                                                    AppConstants
-                                                        .semanticNotificationSkyLight,
-                                                  )
-                                                : const Color(
-                                                    AppConstants
-                                                        .semanticNotificationSky,
-                                                  ),
+                                                ? const Color(AppConstants
+                                                    .semanticNotificationSkyLight)
+                                                : const Color(AppConstants
+                                                    .semanticNotificationSky),
                                           ),
                                           const SizedBox(width: 4),
                                           Flexible(
@@ -1137,17 +1105,13 @@ class _NotificationTile extends StatelessWidget {
                                               notification.entityName!,
                                               style: theme.textTheme.labelSmall
                                                   ?.copyWith(
-                                                    fontWeight: FontWeight.w500,
-                                                    color: theme.isDarkTheme
-                                                        ? const Color(
-                                                            AppConstants
-                                                                .semanticNotificationSkyLight,
-                                                          )
-                                                        : const Color(
-                                                            AppConstants
-                                                                .semanticNotificationSky,
-                                                          ),
-                                                  ),
+                                                fontWeight: FontWeight.w500,
+                                                color: theme.isDarkTheme
+                                                    ? const Color(AppConstants
+                                                        .semanticNotificationSkyLight)
+                                                    : const Color(AppConstants
+                                                        .semanticNotificationSky),
+                                              ),
                                               overflow: TextOverflow.ellipsis,
                                               maxLines: 1,
                                             ),
@@ -1162,9 +1126,7 @@ class _NotificationTile extends StatelessWidget {
                                 Flexible(
                                   child: Text(
                                     formattedDate,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                    style: Theme.of(context).textTheme.bodySmall,
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
                                   ),
@@ -1187,13 +1149,10 @@ class _NotificationTile extends StatelessWidget {
                                 color: theme.isDarkTheme
                                     ? theme.colorScheme.inversePrimary
                                     : (isHighPriority
-                                          ? const Color(
-                                              AppConstants
-                                                  .semanticNotificationOrange,
-                                            )
-                                          : const Color(
-                                              AppConstants.errorColor,
-                                            )),
+                                        ? const Color(
+                                            AppConstants
+                                                .semanticNotificationOrange)
+                                        : const Color(AppConstants.errorColor)),
                                 shape: BoxShape.circle,
                               ),
                             ),

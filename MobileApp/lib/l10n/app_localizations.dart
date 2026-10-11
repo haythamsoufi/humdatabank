@@ -582,6 +582,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'This offline copy may not match the current online form. Update it to avoid version issues.',
       'offline_stale_bundle_update_now': 'Update offline copy',
+      'offline_submit_requires_connection': 'You are offline. Your changes are saved as a draft on this device. Submit when you are back online; the form is checked before it is submitted.',
+      'offline_storage_title': 'Offline forms',
+      'offline_storage_subtitle': 'Saved copies on this device',
+      'offline_storage_empty': 'No forms are saved for offline use.',
+      'offline_storage_remove_all': 'Remove all',
+      'offline_storage_remove_all_confirm': 'Remove every offline form saved on this device? Unsaved drafts are not affected.',
+      'offline_storage_remove': 'Remove',
+      'offline_storage_auto_download': 'Keep open forms available offline',
+      'offline_storage_auto_download_hint': 'Downloads on Wi-Fi only',
+      'offline_storage_copies': 'Copies',
       'approve': 'Approve',
       'reopen': 'Reopen',
       'view_public_submissions': 'View Public Submissions',
@@ -1779,6 +1789,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'Esta copia sin conexión puede no coincidir con el formulario en línea actual. Actualícela para evitar problemas de versión.',
       'offline_stale_bundle_update_now': 'Actualizar copia sin conexión',
+      'offline_submit_requires_connection': 'Está sin conexión. Sus cambios se guardan como borrador en este dispositivo. Envíe el formulario cuando vuelva a tener conexión; se validará antes de enviarse.',
+      'offline_storage_title': 'Formularios sin conexión',
+      'offline_storage_subtitle': 'Copias guardadas en este dispositivo',
+      'offline_storage_empty': 'No hay formularios guardados para uso sin conexión.',
+      'offline_storage_remove_all': 'Eliminar todos',
+      'offline_storage_remove_all_confirm': '¿Eliminar todos los formularios sin conexión guardados en este dispositivo? Los borradores no se verán afectados.',
+      'offline_storage_remove': 'Eliminar',
+      'offline_storage_auto_download': 'Mantener los formularios abiertos disponibles sin conexión',
+      'offline_storage_auto_download_hint': 'Solo se descarga con Wi-Fi',
+      'offline_storage_copies': 'Copias',
       'approve': 'Aprobar',
       'reopen': 'Reabrir',
       'view_public_submissions': 'Ver Envíos Públicos',
@@ -2806,6 +2826,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'Cette copie hors ligne peut ne plus correspondre au formulaire en ligne actuel. Mettez-la à jour pour éviter des problèmes de version.',
       'offline_stale_bundle_update_now': 'Mettre à jour la copie hors ligne',
+      'offline_submit_requires_connection': 'Vous êtes hors ligne. Vos modifications sont enregistrées comme brouillon sur cet appareil. Soumettez le formulaire une fois reconnecté ; il sera vérifié avant l’envoi.',
+      'offline_storage_title': 'Formulaires hors ligne',
+      'offline_storage_subtitle': 'Copies enregistrées sur cet appareil',
+      'offline_storage_empty': 'Aucun formulaire n’est enregistré pour une utilisation hors ligne.',
+      'offline_storage_remove_all': 'Tout supprimer',
+      'offline_storage_remove_all_confirm': 'Supprimer tous les formulaires hors ligne enregistrés sur cet appareil ? Les brouillons ne sont pas affectés.',
+      'offline_storage_remove': 'Supprimer',
+      'offline_storage_auto_download': 'Garder les formulaires ouverts disponibles hors ligne',
+      'offline_storage_auto_download_hint': 'Téléchargement uniquement en Wi-Fi',
+      'offline_storage_copies': 'Copies',
       'approve': 'Approuver',
       'reopen': 'Rouvrir',
       'view_public_submissions': 'Voir les Soumissions Publiques',
@@ -3822,6 +3852,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'قد لا تطابق هذه النسخة دون اتصال النموذج الحالي على الخادم. حدّثها لتجنب مشاكل الإصدارات.',
       'offline_stale_bundle_update_now': 'تحديث النسخة دون اتصال',
+      'offline_submit_requires_connection': 'أنت غير متصل بالإنترنت. تم حفظ تغييراتك كمسودة على هذا الجهاز. أرسل النموذج عند عودة الاتصال؛ سيتم التحقق منه قبل الإرسال.',
+      'offline_storage_title': 'النماذج دون اتصال',
+      'offline_storage_subtitle': 'النسخ المحفوظة على هذا الجهاز',
+      'offline_storage_empty': 'لا توجد نماذج محفوظة للاستخدام دون اتصال.',
+      'offline_storage_remove_all': 'إزالة الكل',
+      'offline_storage_remove_all_confirm': 'هل تريد إزالة جميع النماذج المحفوظة دون اتصال على هذا الجهاز؟ لن تتأثر المسودات.',
+      'offline_storage_remove': 'إزالة',
+      'offline_storage_auto_download': 'إبقاء النماذج المفتوحة متاحة دون اتصال',
+      'offline_storage_auto_download_hint': 'يتم التنزيل عبر Wi-Fi فقط',
+      'offline_storage_copies': 'النسخ',
       'approve': 'الموافقة',
       'reopen': 'إعادة الفتح',
       'view_public_submissions': 'عرض التقديمات العامة',
@@ -4816,6 +4856,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'यह ऑफ़लाइन प्रति वर्तमान ऑनलाइन फ़ॉर्म से मेल नहीं खा सकती। संस्करण समस्याओं से बचने के लिए अपडेट करें।',
       'offline_stale_bundle_update_now': 'ऑफ़लाइन प्रति अपडेट करें',
+      'offline_submit_requires_connection': 'आप ऑफ़लाइन हैं। आपके बदलाव इस डिवाइस पर ड्राफ़्ट के रूप में सहेजे गए हैं। ऑनलाइन होने पर फ़ॉर्म जमा करें; जमा करने से पहले उसकी जाँच की जाएगी।',
+      'offline_storage_title': 'ऑफ़लाइन फ़ॉर्म',
+      'offline_storage_subtitle': 'इस डिवाइस पर सहेजी गई प्रतियाँ',
+      'offline_storage_empty': 'ऑफ़लाइन उपयोग के लिए कोई फ़ॉर्म सहेजा नहीं गया है।',
+      'offline_storage_remove_all': 'सभी हटाएँ',
+      'offline_storage_remove_all_confirm': 'इस डिवाइस पर सहेजे गए सभी ऑफ़लाइन फ़ॉर्म हटाएँ? ड्राफ़्ट प्रभावित नहीं होंगे।',
+      'offline_storage_remove': 'हटाएँ',
+      'offline_storage_auto_download': 'खुले फ़ॉर्म ऑफ़लाइन उपलब्ध रखें',
+      'offline_storage_auto_download_hint': 'केवल Wi-Fi पर डाउनलोड',
+      'offline_storage_copies': 'प्रतियाँ',
       'approve': 'अनुमोदित करें',
       'reopen': 'पुनः खोलें',
       'view_public_submissions': 'सार्वजनिक सबमिशन देखें',
@@ -5835,6 +5885,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'Эта офлайн-копия может не соответствовать текущей онлайн-форме. Обновите её, чтобы избежать проблем с версией.',
       'offline_stale_bundle_update_now': 'Обновить офлайн-копию',
+      'offline_submit_requires_connection': 'Вы не в сети. Ваши изменения сохранены как черновик на этом устройстве. Отправьте форму, когда снова появится подключение; перед отправкой она будет проверена.',
+      'offline_storage_title': 'Офлайн-формы',
+      'offline_storage_subtitle': 'Копии, сохранённые на этом устройстве',
+      'offline_storage_empty': 'Нет форм, сохранённых для офлайн-использования.',
+      'offline_storage_remove_all': 'Удалить все',
+      'offline_storage_remove_all_confirm': 'Удалить все офлайн-формы, сохранённые на этом устройстве? Черновики не затрагиваются.',
+      'offline_storage_remove': 'Удалить',
+      'offline_storage_auto_download': 'Хранить открытые формы для работы офлайн',
+      'offline_storage_auto_download_hint': 'Загрузка только по Wi-Fi',
+      'offline_storage_copies': 'Копии',
       'approve': 'Одобрить',
       'reopen': 'Переоткрыть',
       'view_public_submissions': 'Просмотр Публичных Отправок',
@@ -6822,6 +6882,16 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           '此离线副本可能与当前在线表单不一致。请更新以避免版本问题。',
       'offline_stale_bundle_update_now': '更新离线副本',
+      'offline_submit_requires_connection': '您当前处于离线状态。您的更改已作为草稿保存在此设备上。恢复联网后再提交表单；提交前会对其进行校验。',
+      'offline_storage_title': '离线表单',
+      'offline_storage_subtitle': '保存在此设备上的副本',
+      'offline_storage_empty': '没有保存用于离线使用的表单。',
+      'offline_storage_remove_all': '全部移除',
+      'offline_storage_remove_all_confirm': '移除此设备上保存的所有离线表单？草稿不受影响。',
+      'offline_storage_remove': '移除',
+      'offline_storage_auto_download': '保持未完成的表单可离线使用',
+      'offline_storage_auto_download_hint': '仅在 Wi-Fi 下下载',
+      'offline_storage_copies': '副本',
       'approve': '批准',
       'reopen': '重新开放',
       'view_public_submissions': '查看公开提交',
@@ -8106,6 +8176,17 @@ class AppLocalizations {
       translate('offline_stale_bundle_sheet_notice');
   String get offlineStaleBundleUpdateNow =>
       translate('offline_stale_bundle_update_now');
+  String get offlineSubmitRequiresConnection =>
+      translate('offline_submit_requires_connection');
+  String get offlineStorageTitle => translate('offline_storage_title');
+  String get offlineStorageSubtitle => translate('offline_storage_subtitle');
+  String get offlineStorageEmpty => translate('offline_storage_empty');
+  String get offlineStorageRemoveAll => translate('offline_storage_remove_all');
+  String get offlineStorageRemoveAllConfirm => translate('offline_storage_remove_all_confirm');
+  String get offlineStorageRemove => translate('offline_storage_remove');
+  String get offlineStorageAutoDownload => translate('offline_storage_auto_download');
+  String get offlineStorageAutoDownloadHint => translate('offline_storage_auto_download_hint');
+  String get offlineStorageCopies => translate('offline_storage_copies');
   String get approve => translate('approve');
   String get reopen => translate('reopen');
   String get viewPublicSubmissions => translate('view_public_submissions');

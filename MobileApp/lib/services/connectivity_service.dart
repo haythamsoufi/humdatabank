@@ -34,6 +34,18 @@ class ConnectivityService {
   // Check if currently offline
   bool get isOffline => _currentStatus == NetworkStatus.disconnected;
 
+  /// True on Wi-Fi or Ethernet. Background downloads (offline copies prepared
+  /// without the user asking) only run on these so they never use mobile data.
+  Future<bool> isOnUnmeteredNetwork() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      return results.contains(ConnectivityResult.wifi) ||
+          results.contains(ConnectivityResult.ethernet);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Initialize connectivity monitoring
   Future<void> initialize() async {
     if (_initialized) {

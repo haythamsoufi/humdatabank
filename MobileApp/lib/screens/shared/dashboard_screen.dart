@@ -25,6 +25,8 @@ import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/dashboard_focal_points_section.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
 import '../../services/assignment_offline_bundle_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/offline_api_recorder.dart';
 import '../../services/storage_service.dart';
 import '../../utils/network_availability.dart';
 import '../../di/service_locator.dart';
@@ -62,6 +64,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   String? _dismissedStaleBundleSignature;
   OfflineProvider? _offlineProviderListenerRef;
   bool _offlineStaleAutoRefreshInProgress = false;
+  bool _templatePrefetchInProgress = false;
+  /// Assignments whose background preparation failed, with the time of failure;
+  /// retried after [_templatePrefetchRetryAfter].
+  final Map<int, DateTime> _templatePrefetchFailedAt = {};
+  static const Duration _templatePrefetchRetryAfter = Duration(minutes: 10);
+  DashboardProvider? _dashboardProviderListenerRef;
+  String _lastAssignmentSetSignature = '';
 
   /// Own controller so this list does not share the route's primary scroller
   /// with the other tabs in the page view. Those siblings can leave a non-zero
@@ -100,12 +109,26 @@ class _DashboardScreenState extends State<DashboardScreen>
         listen: false,
       );
       _offlineProviderListenerRef!.addListener(_onOfflineProviderChanged);
+      _dashboardProviderListenerRef = Provider.of<DashboardProvider>(
+        context,
+        listen: false,
+      );
+      _dashboardProviderListenerRef!.addListener(_onDashboardProviderChanged);
+      AssignmentOfflineBundleService.savedCopiesChanged
+          .addListener(_onSavedCopiesChanged);
+      AssignmentOfflineBundleService.autoDownloadChanged
+          .addListener(_onAutoDownloadChanged);
     });
   }
 
   @override
   void dispose() {
     _offlineProviderListenerRef?.removeListener(_onOfflineProviderChanged);
+    _dashboardProviderListenerRef?.removeListener(_onDashboardProviderChanged);
+    AssignmentOfflineBundleService.savedCopiesChanged
+        .removeListener(_onSavedCopiesChanged);
+    AssignmentOfflineBundleService.autoDownloadChanged
+        .removeListener(_onAutoDownloadChanged);
     _scrollController.removeListener(_onDashboardScroll);
     _scrollController.dispose();
     _animationController.dispose();
@@ -143,6 +166,108 @@ class _DashboardScreenState extends State<DashboardScreen>
     unawaited(_tryAutoRefreshStaleOfflineCopies());
   }
 
+  void _onAutoDownloadChanged() {
+    if (!mounted) return;
+    _templatePrefetchFailedAt.clear();
+    unawaited(_prepareAssignmentsForSavedTemplates());
+  }
+
+  void _onSavedCopiesChanged() {
+    if (!mounted) return;
+    final provider = _dashboardProviderListenerRef;
+    if (provider == null) return;
+    unawaited(
+      _syncOfflineBundleAndStaleState(
+        provider.currentAssignments,
+        provider.pastAssignments,
+      ),
+    );
+  }
+
+  /// The assignment list changes when another entity is selected; offline copy
+  /// state is keyed by assignment id, so it has to be recomputed for the new list.
+  void _onDashboardProviderChanged() {
+    if (!mounted) return;
+    final provider = _dashboardProviderListenerRef;
+    if (provider == null || provider.isLoading) return;
+    final signature = [
+      ...provider.currentAssignments.map((a) => a.id),
+      -1,
+      ...provider.pastAssignments.map((a) => a.id),
+    ].join(',');
+    if (signature == _lastAssignmentSetSignature) return;
+    _lastAssignmentSetSignature = signature;
+    unawaited(() async {
+      await _syncOfflineBundleAndStaleState(
+        provider.currentAssignments,
+        provider.pastAssignments,
+      );
+      await _prepareAssignmentsForSavedTemplates();
+    }());
+  }
+
+  /// Offline forms are saved per template, not per entity. Assignments (for the
+  /// current entity) that use a template already saved on this device get their
+  /// own copy prepared automatically; shared static files are reused locally.
+  Future<void> _prepareAssignmentsForSavedTemplates() async {
+    if (!mounted || _templatePrefetchInProgress || shouldDeferRemoteFetch) {
+      return;
+    }
+    final offline = Provider.of<OfflineProvider>(context, listen: false);
+    if (!offline.isOnline) return;
+    if (!await ConnectivityService().isOnUnmeteredNetwork()) return;
+    if (!mounted) return;
+
+    final dashboardProvider = Provider.of<DashboardProvider>(
+      context,
+      listen: false,
+    );
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
+    final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
+
+    _templatePrefetchInProgress = true;
+    try {
+      final svc = AssignmentOfflineBundleService();
+      final savedTemplateIds = await svc.templateIdsWithBundles();
+      final prepareAll = await svc.isAutoDownloadEnabled();
+      if (savedTemplateIds.isEmpty && !prepareAll) return;
+      final pending = dashboardProvider.currentAssignments.where((a) {
+        final templateId = a.templateId;
+        return (prepareAll ||
+                (templateId != null && savedTemplateIds.contains(templateId))) &&
+            !_offlineBundleAssignmentIds.contains(a.id) &&
+            !_downloadingOfflineAssignmentIds.contains(a.id) &&
+            !_prefetchRecentlyFailed(a.id) &&
+            _shouldShowEnterDataButton(role, a);
+      }).toList();
+      for (final assignment in pending) {
+        if (!mounted || shouldDeferRemoteFetch) break;
+        final ok = await _downloadOfflineBundle(
+          context,
+          assignment,
+          languageProvider,
+          silent: true,
+        );
+        if (ok) {
+          _templatePrefetchFailedAt.remove(assignment.id);
+        } else {
+          _templatePrefetchFailedAt[assignment.id] = DateTime.now();
+        }
+      }
+    } finally {
+      _templatePrefetchInProgress = false;
+    }
+  }
+
+  bool _prefetchRecentlyFailed(int id) {
+    final at = _templatePrefetchFailedAt[id];
+    return at != null &&
+        DateTime.now().difference(at) < _templatePrefetchRetryAfter;
+  }
+
   String _staleBundleSignature() {
     final ids = _staleOfflineBundleAssignmentIds.toList()..sort();
     return ids.join(',');
@@ -155,6 +280,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     final offline = Provider.of<OfflineProvider>(context, listen: false);
     if (!offline.isOnline) return;
+    if (!await ConnectivityService().isOnUnmeteredNetwork()) return;
+    if (!mounted) return;
 
     _offlineStaleAutoRefreshInProgress = true;
     final loc = AppLocalizations.of(context)!;
@@ -262,6 +389,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       forceRefresh: isAuthenticated || forceRefresh,
     );
 
+    await _pruneOfflineBundles(
+      dashboardProvider.currentAssignments,
+      dashboardProvider.pastAssignments,
+    );
     await _syncOfflineBundleAndStaleState(
       dashboardProvider.currentAssignments,
       dashboardProvider.pastAssignments,
@@ -276,6 +407,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     if (mounted) {
       unawaited(_tryAutoRefreshStaleOfflineCopies());
+      if (forceRefresh) _templatePrefetchFailedAt.clear();
+      unawaited(_prepareAssignmentsForSavedTemplates());
     }
 
     // [checkAuthStatus(forceRevalidate: true)] already validated the session and
@@ -286,6 +419,24 @@ class _DashboardScreenState extends State<DashboardScreen>
       dashboardProvider.loadEntities();
       notificationProvider.refreshUnreadCount(authProvider: authProvider);
     }
+  }
+
+  /// Frees storage held by copies that are old or belong to closed assignments.
+  /// Only runs after a successful online load so an empty or failed response
+  /// can never be mistaken for "everything is closed".
+  Future<void> _pruneOfflineBundles(
+    List<Assignment> current,
+    List<Assignment> past,
+  ) async {
+    if (current.isEmpty && past.isEmpty) return;
+    try {
+      await AssignmentOfflineBundleService().pruneBundles(
+        closedAssignmentIds: {
+          ...past.map((a) => a.id),
+          ...current.where((a) => a.isEffectivelyClosed).map((a) => a.id),
+        },
+      );
+    } catch (_) {}
   }
 
   /// Resolves which assignment IDs have a saved offline bundle on disk and
@@ -307,6 +458,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       for (final a in [...current, ...past]) a.id: a,
     };
     final svc = AssignmentOfflineBundleService();
+    final language = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    ).currentLanguage;
     final bundles = <int>{};
     final stale = <int>{};
     for (final id in ids) {
@@ -315,7 +470,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       final assignment = byId[id];
       if (assignment == null) continue;
       final meta = await svc.readBundleMeta(id);
-      if (isAssignmentOfflineBundleStale(assignment, meta)) {
+      final templateId = assignment.templateId;
+      if (templateId != null && meta != null && meta.templateId == null) {
+        await svc.backfillTemplateId(id, templateId);
+      }
+      if (isAssignmentOfflineBundleStale(assignment, meta,
+          language: language)) {
         stale.add(id);
       }
     }
@@ -404,6 +564,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         formDefinitionUpdatedAtIso: assignment.formDefinitionUpdatedAt
             ?.toUtc()
             .toIso8601String(),
+        templateId: assignment.templateId,
+        staticVersion: assignment.staticVersion,
+        dataVersion: assignment.dataVersion,
+        title: assignment.templateName ?? assignment.name,
+        submitBlockedMessage: loc.offlineSubmitRequiresConnection,
+        recordApiResponses: (formUrl) => OfflineApiRecorder.recordFormLoad(
+          formUrl: formUrl,
+          language: languageProvider.currentLanguage,
+        ),
       );
       if (!context.mounted) return false;
       setState(() {
@@ -444,7 +613,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       listen: false,
     );
     try {
-      await AssignmentOfflineBundleService().deleteBundle(assignment.id);
+      final svc = AssignmentOfflineBundleService();
+      final templateId = assignment.templateId;
+      if (templateId != null) {
+        await svc.deleteBundlesForTemplate(
+          templateId,
+          alsoAssignmentId: assignment.id,
+        );
+      } else {
+        await svc.deleteBundle(assignment.id);
+      }
       if (!context.mounted) return;
       await _syncOfflineBundleAndStaleState(
         dashboardProvider.currentAssignments,
@@ -500,7 +678,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     if (!context.mounted) return;
 
-    final isStale = isAssignmentOfflineBundleStale(assignment, meta);
+    final isStale = isAssignmentOfflineBundleStale(
+      assignment,
+      meta,
+      language: Provider.of<LanguageProvider>(
+        context,
+        listen: false,
+      ).currentLanguage,
+    );
     final offline = Provider.of<OfflineProvider>(context, listen: false);
     final canUpdateNow = offline.isOnline && !shouldDeferRemoteFetch && isStale;
 

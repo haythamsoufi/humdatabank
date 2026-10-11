@@ -20,6 +20,7 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../providers/shared/tab_customization_provider.dart';
 import '../../widgets/profile_color_picker_dialog.dart';
 import '../../widgets/settings_dialogs.dart';
+import '../../widgets/offline_storage_sheet.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/shared/user.dart';
 
@@ -409,6 +410,27 @@ class SettingsScreen extends StatelessWidget {
         },
       ),
     );
+
+    if (isAuthenticated) {
+      actions.add(
+        IOSListTile(
+          leading: IOSSettingsStyle.leadingIcon(
+            context,
+            cupertino.CupertinoIcons.cloud_download,
+          ),
+          title: Text(
+            localizations.offlineStorageTitle,
+            style: IOSSettingsStyle.rowTitleStyle(context),
+          ),
+          subtitle: Text(
+            localizations.offlineStorageSubtitle,
+            style: IOSSettingsStyle.rowSubtitleStyle(context),
+          ),
+          trailing: IOSSettingsStyle.disclosureChevron(context),
+          onTap: () => showOfflineStorageSheet(context),
+        ),
+      );
+    }
 
     actions.add(
       Consumer<LanguageProvider>(

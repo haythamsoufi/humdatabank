@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import '../models/shared/assignment.dart';
 import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
 import '../utils/url_helper.dart';
+import 'offline_form_scripts.dart';
+import 'user_scope_service.dart';
 
 /// Metadata written alongside [AssignmentOfflineBundleService] disk snapshots.
 class AssignmentOfflineBundleMeta {
@@ -20,11 +23,29 @@ class AssignmentOfflineBundleMeta {
     required this.assetCount,
     this.formDefinitionUpdatedAtIso,
     this.templateId,
+    this.staticVersion,
+    this.dataVersion,
+    this.language,
+    this.apiEntryCount = 0,
+    this.missingAssetCount = 0,
+    this.externalRefCount = 0,
   });
 
   final int assignmentId;
   /// Form template the saved page belongs to (null for bundles saved by older builds).
   final int? templateId;
+  /// Server static-files release the copy was captured from.
+  final String? staticVersion;
+  /// [Assignment.dataVersion] at capture time.
+  final String? dataVersion;
+  /// Language of the saved page markup.
+  final String? language;
+  /// Number of recorded API responses (lookup lists, plugin data, …) saved with the form.
+  final int apiEntryCount;
+  /// Same-origin assets referenced by the page that could not be saved.
+  final int missingAssetCount;
+  /// Third-party URLs referenced by the page (not saved; need a connection).
+  final int externalRefCount;
   final String? sourceUrl;
   final DateTime? savedAtUtc;
   final int assetCount;
@@ -32,44 +53,109 @@ class AssignmentOfflineBundleMeta {
   final String? formDefinitionUpdatedAtIso;
 }
 
-/// True when the on-disk bundle was captured for an older form definition than the server reports.
+/// True when the on-disk copy no longer matches what the server (or the app)
+/// would produce today: a newer form definition, a new static-files release,
+/// changed assignment data, or a different display language.
 bool isAssignmentOfflineBundleStale(
   Assignment assignment,
-  AssignmentOfflineBundleMeta? meta,
-) {
-  final server = assignment.formDefinitionUpdatedAt;
-  if (server == null) return false;
-  final raw = meta?.formDefinitionUpdatedAtIso;
-  if (raw == null || raw.isEmpty) return true;
-  final cached = DateTime.tryParse(raw);
-  if (cached == null) return true;
-  final delta = server.toUtc().millisecondsSinceEpoch -
-      cached.toUtc().millisecondsSinceEpoch;
-  return delta.abs() > 1500;
+  AssignmentOfflineBundleMeta? meta, {
+  String? language,
+}) {
+  bool differs(DateTime? server, String? cachedIso) {
+    if (server == null) return false;
+    if (cachedIso == null || cachedIso.isEmpty) return true;
+    final cached = DateTime.tryParse(cachedIso);
+    if (cached == null) return true;
+    final delta = server.toUtc().millisecondsSinceEpoch -
+        cached.toUtc().millisecondsSinceEpoch;
+    return delta.abs() > 1500;
+  }
+
+  if (differs(assignment.formDefinitionUpdatedAt,
+      meta?.formDefinitionUpdatedAtIso)) {
+    return true;
+  }
+
+  final server = assignment.staticVersion;
+  if (server != null && server.isNotEmpty && meta?.staticVersion != server) {
+    return true;
+  }
+
+  final serverData = assignment.dataVersion;
+  if (serverData != null && serverData.isNotEmpty) {
+    final cachedData = meta?.dataVersion;
+    if (cachedData == null || cachedData.isEmpty) return true;
+    final a = DateTime.tryParse(serverData);
+    final b = DateTime.tryParse(cachedData);
+    if (a != null && b != null) {
+      if ((a.toUtc().millisecondsSinceEpoch - b.toUtc().millisecondsSinceEpoch)
+              .abs() >
+          1500) {
+        return true;
+      }
+    } else if (serverData != cachedData) {
+      return true;
+    }
+  }
+
+  final metaLanguage = meta?.language;
+  if (language != null &&
+      language.isNotEmpty &&
+      metaLanguage != null &&
+      metaLanguage.isNotEmpty &&
+      metaLanguage != language) {
+    return true;
+  }
+  return false;
 }
 
 /// Persists a crawlable snapshot of an assignment entry form (HTML + same-origin
 /// static assets) so the form can open from disk when the device is offline.
 class AssignmentOfflineBundleService {
-  AssignmentOfflineBundleService._internal();
+  AssignmentOfflineBundleService._internal()
+      : _dio = _buildDio(),
+        _baseDirOverride = null,
+        _scopeOverride = null;
+
+  /// Test hook: inject the HTTP client, storage directory and user scope.
+  @visibleForTesting
+  AssignmentOfflineBundleService.forTesting({
+    required Dio dio,
+    required Directory baseDir,
+    String scope = 'user_test',
+  })  : _dio = dio,
+        _baseDirOverride = baseDir,
+        _scopeOverride = scope;
+
   factory AssignmentOfflineBundleService() => _instance;
   static final AssignmentOfflineBundleService _instance =
       AssignmentOfflineBundleService._internal();
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 120),
-      followRedirects: true,
-      maxRedirects: 8,
-      validateStatus: (code) => code != null && code < 500,
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Encoding': 'identity',
-        'X-Mobile-App': 'IFRC-Databank-Flutter',
-      },
-    ),
-  );
+  static Dio _buildDio() => Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 120),
+          followRedirects: true,
+          maxRedirects: 8,
+          validateStatus: (code) => code != null && code < 500,
+          headers: {
+            'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Encoding': 'identity',
+            'X-Mobile-App': 'IFRC-Databank-Flutter',
+          },
+        ),
+      );
+
+  final Dio _dio;
+  final Directory? _baseDirOverride;
+  final String? _scopeOverride;
+  String? _housekeptScope;
+
+  static const String _apiCacheJsonFile = 'offline_api_cache.json';
+  static const String _apiCacheScriptFile = 'offline_api_cache.js';
+  static const int _maxApiEntryBytes = 4 * 1024 * 1024;
+  static const int _maxApiCacheBytes = 20 * 1024 * 1024;
 
   static const String _metaFileName = 'bundle_meta.json';
   /// Serialized [savedRelByAbsolute] for post-download / migration HTML rewrites.
@@ -79,20 +165,108 @@ class AssignmentOfflineBundleService {
   static const String _offlineRepairStampValue = '6';
   /// Legacy flag from earlier builds; removed when v2 repair runs.
   static const String _legacyStaticRootRepairFlag = '.static_root_demoted_v1';
-  static const int _maxAssets = 400;
+  static const int _maxAssets = 1500;
   static const int _maxHtmlBytes = 25 * 1024 * 1024;
   static const int _maxAssetBytes = 12 * 1024 * 1024;
 
   /// POSIX paths only (URLs in HTML/CSS use forward slashes).
   static final p.Context _posix = p.Context(style: p.Style.posix);
 
-  Future<Directory> _rootDir() async {
+  Future<Directory> _bundlesBase() async {
+    final override = _baseDirOverride;
+    if (override != null) {
+      if (!await override.exists()) await override.create(recursive: true);
+      return override;
+    }
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory(p.join(base.path, 'offline_assignment_bundles'));
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
     return dir;
+  }
+
+  static String _safeScope(String scope) =>
+      scope.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+
+  /// Saved forms contain a user's data, so they live under a per-user folder.
+  /// Folders from earlier builds (shared, unscoped) and other users' folders
+  /// are removed the first time a stable user scope is seen.
+  Future<Directory> _rootDir() async {
+    final base = await _bundlesBase();
+    final scope = _safeScope(
+      _scopeOverride ?? await UserScopeService().getScope(includeAuth: true),
+    );
+    final dir = Directory(p.join(base.path, scope));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    if (_housekeptScope != scope) {
+      _housekeptScope = scope;
+      try {
+        await for (final e in base.list(followLinks: false)) {
+          final name = p.basename(e.path);
+          if (e is Directory && name == scope) continue;
+          if (e is Directory && name.startsWith('assignment_')) {
+            await e.delete(recursive: true);
+          } else if (e is Directory && scope.startsWith('user_')) {
+            await e.delete(recursive: true);
+          }
+        }
+      } catch (e) {
+        DebugLogger.logWarn('OFFLINE_BUNDLE', 'Housekeeping failed: $e');
+      }
+    }
+    return dir;
+  }
+
+  /// Deletes every saved form for every user (used on logout).
+  Future<void> clearAll() async {
+    try {
+      final base = await _bundlesBase();
+      await for (final e in base.list(followLinks: false)) {
+        await e.delete(recursive: true);
+      }
+      _housekeptScope = null;
+    } catch (e) {
+      DebugLogger.logWarn('OFFLINE_BUNDLE', 'clearAll failed: $e');
+    }
+  }
+
+  /// Deletes copies that are very old, beyond [maxBundles] (oldest first), or for
+  /// assignments in [closedAssignmentIds] (they can no longer be edited).
+  Future<int> pruneBundles({
+    Duration maxAge = const Duration(days: 45),
+    int maxBundles = 60,
+    Set<int> closedAssignmentIds = const {},
+    DateTime? now,
+  }) async {
+    final clock = (now ?? DateTime.now()).toUtc();
+    final entries = <({Directory dir, int id, DateTime savedAt})>[];
+    var removed = 0;
+    for (final dir in await _bundleDirs()) {
+      final id = int.tryParse(p.basename(dir.path).substring('assignment_'.length));
+      if (id == null) continue;
+      final meta = await _readMetaJson(dir);
+      final savedAt =
+          DateTime.tryParse(meta?['saved_at']?.toString() ?? '')?.toUtc() ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      if (closedAssignmentIds.contains(id) ||
+          clock.difference(savedAt) > maxAge) {
+        await dir.delete(recursive: true);
+        removed++;
+        continue;
+      }
+      entries.add((dir: dir, id: id, savedAt: savedAt));
+    }
+    if (entries.length > maxBundles) {
+      entries.sort((a, b) => a.savedAt.compareTo(b.savedAt));
+      for (final e in entries.take(entries.length - maxBundles)) {
+        await e.dir.delete(recursive: true);
+        removed++;
+      }
+    }
+    return removed;
   }
 
   Future<Directory> bundleDirFor(int assignmentId) async {
@@ -126,6 +300,12 @@ class AssignmentOfflineBundleService {
         formDefinitionUpdatedAtIso:
             raw['form_definition_updated_at']?.toString(),
         templateId: (raw['template_id'] as num?)?.toInt(),
+        staticVersion: raw['static_version']?.toString(),
+        dataVersion: raw['data_version']?.toString(),
+        language: raw['language']?.toString(),
+        apiEntryCount: (raw['api_entry_count'] as num?)?.toInt() ?? 0,
+        missingAssetCount: (raw['missing_asset_count'] as num?)?.toInt() ?? 0,
+        externalRefCount: (raw['external_ref_count'] as num?)?.toInt() ?? 0,
       );
     } catch (_) {
       return null;
@@ -195,39 +375,53 @@ class AssignmentOfflineBundleService {
     }
   }
 
-  /// A saved copy of the same template whose static files can be reused locally.
-  /// Requires the same published form definition so assets and markup were
-  /// captured from the same server release.
+  bool _staticFilesCompatible(
+    Map<String, dynamic> meta, {
+    required String? staticVersion,
+    required String? formDefinitionUpdatedAtIso,
+  }) {
+    if (staticVersion != null && staticVersion.isNotEmpty) {
+      return meta['static_version']?.toString() == staticVersion;
+    }
+    // Older servers do not report a static release; fall back to requiring the
+    // same published form definition.
+    final wanted = DateTime.tryParse(formDefinitionUpdatedAtIso ?? '');
+    final cached =
+        DateTime.tryParse(meta['form_definition_updated_at']?.toString() ?? '');
+    if (wanted == null || cached == null) return false;
+    return (cached.toUtc().millisecondsSinceEpoch -
+                wanted.toUtc().millisecondsSinceEpoch)
+            .abs() <=
+        1500;
+  }
+
+  /// A saved copy whose `/static/` files can be copied locally instead of
+  /// downloaded again: the assignment's own previous copy first, otherwise the
+  /// newest copy of the same template. Both must come from the same static release.
   Future<Directory?> _findReusableBundleDir({
-    required int templateId,
-    required int excludeAssignmentId,
+    required int assignmentId,
+    required int? templateId,
+    required String? staticVersion,
     required String? formDefinitionUpdatedAtIso,
   }) async {
-    if (formDefinitionUpdatedAtIso == null ||
-        formDefinitionUpdatedAtIso.isEmpty) {
-      return null;
-    }
-    final wanted = DateTime.tryParse(formDefinitionUpdatedAtIso);
-    if (wanted == null) return null;
     Directory? best;
     DateTime? bestSavedAt;
     for (final dir in await _bundleDirs()) {
-      if (p.basename(dir.path) == 'assignment_$excludeAssignmentId') continue;
       if (!File(p.join(dir.path, 'index.html')).existsSync()) continue;
       final meta = await _readMetaJson(dir);
-      if (meta == null || (meta['template_id'] as num?)?.toInt() != templateId) {
+      if (meta == null) continue;
+      final isOwn = p.basename(dir.path) == 'assignment_$assignmentId';
+      final sameTemplate = templateId != null &&
+          (meta['template_id'] as num?)?.toInt() == templateId;
+      if (!isOwn && !sameTemplate) continue;
+      if (!_staticFilesCompatible(
+        meta,
+        staticVersion: staticVersion,
+        formDefinitionUpdatedAtIso: formDefinitionUpdatedAtIso,
+      )) {
         continue;
       }
-      final cached = DateTime.tryParse(
-        meta['form_definition_updated_at']?.toString() ?? '',
-      );
-      if (cached == null ||
-          (cached.toUtc().millisecondsSinceEpoch -
-                      wanted.toUtc().millisecondsSinceEpoch)
-                  .abs() >
-              1500) {
-        continue;
-      }
+      if (isOwn) return dir;
       final savedAt =
           DateTime.tryParse(meta['saved_at']?.toString() ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
@@ -302,14 +496,20 @@ class AssignmentOfflineBundleService {
     String? sessionCookieHeader,
     String? formDefinitionUpdatedAtIso,
     int? templateId,
+    String? staticVersion,
+    String? dataVersion,
+    String submitBlockedMessage =
+        'You are offline. Your changes are saved as a draft on this device. '
+        'Submit when you are back online; the form is validated before it is submitted.',
+    Future<List<Map<String, dynamic>>> Function(String formUrl)?
+        recordApiResponses,
   }) async {
-    final reuseDir = templateId == null
-        ? null
-        : await _findReusableBundleDir(
-            templateId: templateId,
-            excludeAssignmentId: assignmentId,
-            formDefinitionUpdatedAtIso: formDefinitionUpdatedAtIso,
-          );
+    final reuseDir = await _findReusableBundleDir(
+      assignmentId: assignmentId,
+      templateId: templateId,
+      staticVersion: staticVersion,
+      formDefinitionUpdatedAtIso: formDefinitionUpdatedAtIso,
+    );
     final resolved = UrlHelper.resolveWebViewInitialUrl(formPath, language);
     final pageUri = Uri.parse(resolved);
 
@@ -343,7 +543,7 @@ class AssignmentOfflineBundleService {
       throw AssignmentOfflineBundleException('Form page is too large to cache offline.');
     }
 
-    var html = utf8.decode(bytes, allowMalformed: true);
+    final html = utf8.decode(bytes, allowMalformed: true);
     final doc = html_parser.parse(html, generateSpans: false);
     final refs = <Uri>{
       ..._collectAssetRefs(doc, pageUri),
@@ -385,17 +585,80 @@ class AssignmentOfflineBundleService {
       'page=${pageUri.host}',
     );
 
-    final dir = await bundleDirFor(assignmentId);
+    // Build next to the live copy and swap at the end so a failed refresh never
+    // destroys a working offline copy.
+    final finalDir = await bundleDirFor(assignmentId);
+    final dir = Directory(p.join(finalDir.parent.path, 'tmp_assignment_$assignmentId'));
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
     await dir.create(recursive: true);
 
+    try {
+      await _buildBundleInto(
+        dir: dir,
+        finalDir: finalDir,
+        assignmentId: assignmentId,
+        resolved: resolved,
+        pageUri: pageUri,
+        html: html,
+        refs: refs,
+        otherHostRefs: otherHostRefs,
+        headers: headers,
+        reuseDir: reuseDir,
+        templateId: templateId,
+        staticVersion: staticVersion,
+        dataVersion: dataVersion,
+        language: language,
+        formDefinitionUpdatedAtIso: formDefinitionUpdatedAtIso,
+        submitBlockedMessage: submitBlockedMessage,
+        recordApiResponses: recordApiResponses,
+      );
+    } catch (_) {
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _buildBundleInto({
+    required Directory dir,
+    required Directory finalDir,
+    required int assignmentId,
+    required String resolved,
+    required Uri pageUri,
+    required String html,
+    required Set<Uri> refs,
+    required int otherHostRefs,
+    required Map<String, String> headers,
+    required Directory? reuseDir,
+    required int? templateId,
+    required String? staticVersion,
+    required String? dataVersion,
+    required String language,
+    required String? formDefinitionUpdatedAtIso,
+    required String submitBlockedMessage,
+    required Future<List<Map<String, dynamic>>> Function(String formUrl)?
+        recordApiResponses,
+  }) async {
     final savedRelByAbsolute = <String, String>{};
     var count = 0;
 
     final pending = ListQueue<Uri>();
     final enqueued = <String>{};
+    final missingAssets = <Uri>[];
+    final criticalMissing = <Uri>[];
+
+    void markMissing(Uri u) {
+      missingAssets.add(u);
+      final lower = u.path.toLowerCase();
+      if (lower.endsWith('.js') ||
+          lower.endsWith('.mjs') ||
+          lower.endsWith('.css')) {
+        criticalMissing.add(u);
+      }
+    }
 
     void enqueue(Uri u) {
       if (!_shouldMirror(u, pageUri)) return;
@@ -453,11 +716,13 @@ class AssignmentOfflineBundleService {
                 'OFFLINE_BUNDLE',
                 'Skip asset HTTP $sc${isCss ? ' (CSS)' : ''}: $absolute',
               );
+              markMissing(absolute);
             }
             continue;
           }
           if (r.data!.length > _maxAssetBytes) {
             DebugLogger.logWarn('OFFLINE_BUNDLE', 'Skip large asset: $absolute');
+            markMissing(absolute);
             continue;
           }
           body = r.data!;
@@ -501,7 +766,15 @@ class AssignmentOfflineBundleService {
           'OFFLINE_BUNDLE',
           'Failed asset${isCss ? ' (CSS)' : ''} $absolute: $e',
         );
+        markMissing(absolute);
       }
+    }
+
+    if (criticalMissing.isNotEmpty) {
+      throw AssignmentOfflineBundleException(
+        'Offline copy is incomplete: ${criticalMissing.length} script/style '
+        'file(s) could not be saved (first: ${criticalMissing.first.path}).',
+      );
     }
 
     if (count >= _maxAssets) {
@@ -516,7 +789,21 @@ class AssignmentOfflineBundleService {
     html = _rewriteHtmlAssetRefs(html, savedRelByAbsolute);
     html = _demoteHtmlRootStaticPaths(html);
     html = _stripStaticUrlCacheQuery(html);
-    html = _injectOfflineHead(html);
+    html = _injectOfflineHead(html, submitBlockedMessage);
+
+    var apiEntries = <String, dynamic>{};
+    if (recordApiResponses != null) {
+      try {
+        final recorded = await recordApiResponses(resolved);
+        apiEntries = _mergeApiEntries(const {}, recorded);
+      } catch (e, st) {
+        DebugLogger.logWarn(
+          'OFFLINE_BUNDLE',
+          'Could not record form API data for assignment $assignmentId: $e\n$st',
+        );
+      }
+    }
+    await _writeApiCache(dir, apiEntries);
 
     final indexFile = File(p.join(dir.path, 'index.html'));
     await indexFile.writeAsString(html, flush: true);
@@ -527,10 +814,18 @@ class AssignmentOfflineBundleService {
 
     final meta = <String, dynamic>{
       'assignment_id': assignmentId,
-      if (templateId != null) 'template_id': templateId,
+      'template_id': ?templateId,
       'source_url': resolved,
       'saved_at': DateTime.now().toUtc().toIso8601String(),
       'asset_count': count,
+      'api_entry_count': apiEntries.length,
+      'missing_asset_count': missingAssets.length,
+      'external_ref_count': otherHostRefs,
+      'language': language,
+      if (staticVersion != null && staticVersion.isNotEmpty)
+        'static_version': staticVersion,
+      if (dataVersion != null && dataVersion.isNotEmpty)
+        'data_version': dataVersion,
       if (formDefinitionUpdatedAtIso != null &&
           formDefinitionUpdatedAtIso.isNotEmpty)
         'form_definition_updated_at': formDefinitionUpdatedAtIso,
@@ -548,12 +843,95 @@ class AssignmentOfflineBundleService {
           r"href\s*=\s*'(static/[^']+\.css[^']*)'",
           caseSensitive: false,
         ).allMatches(html).length;
+    if (await finalDir.exists()) {
+      await finalDir.delete(recursive: true);
+    }
+    await dir.rename(finalDir.path);
+
     DebugLogger.logInfo(
       'OFFLINE_BUNDLE',
       'Saved bundle assignment=$assignmentId files=$count '
+      'missing=${missingAssets.length} api=${apiEntries.length} '
       'index.html~${html.length}B .css-mentions~$cssInIndex '
-      'href=static/*.css~$relStaticCssHrefs dir=${dir.path}',
+      'href=static/*.css~$relStaticCssHrefs dir=${finalDir.path}',
     );
+  }
+
+  /// Merges recorded `{k, s, t, b}` entries into [existing], keeping the newest
+  /// and dropping oversized entries.
+  Map<String, dynamic> _mergeApiEntries(
+    Map<String, dynamic> existing,
+    List<Map<String, dynamic>> incoming,
+  ) {
+    final out = Map<String, dynamic>.from(existing);
+    final now = DateTime.now().toUtc().toIso8601String();
+    for (final e in incoming) {
+      final key = e['k']?.toString();
+      final body = e['b']?.toString();
+      if (key == null || key.isEmpty || body == null) continue;
+      if (body.length > _maxApiEntryBytes) continue;
+      out[key] = {
+        's': (e['s'] as num?)?.toInt() ?? 200,
+        't': e['t']?.toString() ?? 'application/json',
+        'b': body,
+        'at': now,
+      };
+    }
+    var total = out.values.fold<int>(
+      0,
+      (sum, v) => sum + ((v as Map)['b'] as String).length,
+    );
+    if (total > _maxApiCacheBytes) {
+      final byAge = out.entries.toList()
+        ..sort(
+          (a, b) => ((a.value as Map)['at'] as String)
+              .compareTo((b.value as Map)['at'] as String),
+        );
+      for (final entry in byAge) {
+        if (total <= _maxApiCacheBytes) break;
+        total -= ((entry.value as Map)['b'] as String).length;
+        out.remove(entry.key);
+      }
+    }
+    return out;
+  }
+
+  Future<void> _writeApiCache(Directory dir, Map<String, dynamic> entries) async {
+    final json = jsonEncode(entries);
+    await File(p.join(dir.path, _apiCacheJsonFile))
+        .writeAsString(json, flush: true);
+    await File(p.join(dir.path, _apiCacheScriptFile))
+        .writeAsString('window.__IFRC_OFFLINE_API__=$json;', flush: true);
+  }
+
+  Future<Map<String, dynamic>> _readApiCache(Directory dir) async {
+    final f = File(p.join(dir.path, _apiCacheJsonFile));
+    try {
+      if (!await f.exists()) return <String, dynamic>{};
+      final raw = jsonDecode(await f.readAsString());
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+    } catch (_) {}
+    return <String, dynamic>{};
+  }
+
+  /// Adds API responses seen while the form was open online (lookup lists,
+  /// plugin data, resolved variables …) to this assignment's saved copy.
+  /// Returns false when there is no saved copy to add them to.
+  Future<bool> mergeApiCache(
+    int assignmentId,
+    List<Map<String, dynamic>> entries,
+  ) async {
+    if (entries.isEmpty || !await hasOfflineBundle(assignmentId)) return false;
+    final dir = await bundleDirFor(assignmentId);
+    final merged = _mergeApiEntries(await _readApiCache(dir), entries);
+    await _writeApiCache(dir, merged);
+    final meta = await _readMetaJson(dir);
+    if (meta != null) {
+      meta['api_entry_count'] = merged.length;
+      await File(p.join(dir.path, _metaFileName))
+          .writeAsString(jsonEncode(meta), flush: true);
+    }
+    return true;
   }
 
   bool _pathLooksLikeCss(String path) {
@@ -979,25 +1357,11 @@ class AssignmentOfflineBundleService {
     return s;
   }
 
-  /// Disables service worker registration and stubs `getStaticUrl` for disk layout.
-  String _injectOfflineHead(String html) {
-    const patch = r'''
-<script>
-(function () {
-  try {
-    if (navigator.serviceWorker && navigator.serviceWorker.register) {
-      navigator.serviceWorker.register = function () { return Promise.resolve({}); };
-    }
-  } catch (e) {}
-  try {
-    window.getStaticUrl = function (filename) {
-      filename = String(filename || '').replace(/^\/+/, '').replace(/^static\/+/, '');
-      return 'static/' + filename;
-    };
-  } catch (e) {}
-})();
-</script>
-''';
+  /// Adds the offline runtime (API replay, online-only actions, static URL stub).
+  String _injectOfflineHead(String html, String submitBlockedMessage) {
+    final patch = buildOfflineHeadPatch(
+      submitBlockedMessage: submitBlockedMessage,
+    );
     final lower = html.toLowerCase();
     final idx = lower.indexOf('</head>');
     if (idx != -1) {

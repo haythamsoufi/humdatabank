@@ -610,5 +610,7 @@ class TestGetDashboard:
                 "id", "name", "status", "due_date", "completion_rate",
                 "template_name", "period_name", "is_effectively_closed",
                 "contributor_names", "is_public",
+                "template_id", "static_version", "data_version",
+                "form_definition_updated_at",
             ):
                 assert field in asgn, f"Missing field in assignment: {field}"

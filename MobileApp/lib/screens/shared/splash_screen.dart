@@ -219,60 +219,64 @@ class _SplashScreenState extends State<SplashScreen>
                   Opacity(
                     opacity: _interval(t, 0.62, 0.92),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(28, 0, 28, 18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            localizations.poweredByHumDatabank,
-                            style: TextStyle(
-                              color: SplashHeroPalette.ink.withValues(
-                                alpha: 0.9,
-                              ),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Material(
-                            color: SplashHeroPalette.ink,
-                            elevation: 3,
-                            shadowColor: SplashHeroPalette.shadow.withValues(
-                              alpha: 0.45,
-                            ),
-                            shape: const StadiumBorder(),
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: _openHumDatabankGithub,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 11,
+                      padding: const EdgeInsets.fromLTRB(28, 0, 28, 40),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              localizations.poweredByHumDatabank,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: SplashHeroPalette.ink.withValues(
+                                  alpha: 0.9,
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const FaIcon(
-                                      FontAwesomeIcons.github,
-                                      size: 18,
-                                      color: SplashHeroPalette.navy,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      localizations.openOnGithub,
-                                      style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Material(
+                              color: SplashHeroPalette.ink,
+                              elevation: 3,
+                              shadowColor: SplashHeroPalette.shadow.withValues(
+                                alpha: 0.45,
+                              ),
+                              shape: const StadiumBorder(),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: _openHumDatabankGithub,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 11,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const FaIcon(
+                                        FontAwesomeIcons.github,
+                                        size: 18,
                                         color: SplashHeroPalette.navy,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        localizations.openOnGithub,
+                                        style: const TextStyle(
+                                          color: SplashHeroPalette.navy,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

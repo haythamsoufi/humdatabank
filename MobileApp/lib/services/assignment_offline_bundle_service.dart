@@ -139,6 +139,31 @@ class AssignmentOfflineBundleService {
   /// Bumped when the "keep open forms available offline" preference changes.
   static final ValueNotifier<int> autoDownloadChanged = ValueNotifier<int>(0);
 
+  final Map<int, List<String>> _traces = {};
+
+  /// Step-by-step record of the latest download attempt for [assignmentId]
+  /// (paths and outcomes only; never cookies or tokens). Sent with failure reports.
+  List<String> traceFor(int assignmentId) =>
+      List.unmodifiable(_traces[assignmentId] ?? const <String>[]);
+
+  void _trace(int assignmentId, String line) {
+    final list = _traces.putIfAbsent(assignmentId, () => <String>[]);
+    if (list.length >= 120) list.removeAt(0);
+    list.add(line.length > 300 ? line.substring(0, 300) : line);
+  }
+
+  static String _tracePath(Uri u) =>
+      u.path.isEmpty ? u.host : (u.host.isEmpty ? u.path : '${u.host}${u.path}');
+
+  static String _describeError(Object e) {
+    if (e is DioException) {
+      final code = e.response?.statusCode;
+      return 'dio:${e.type.name}${code != null ? ' HTTP $code' : ''}'
+          '${e.message != null ? ' (${e.message})' : ''}';
+    }
+    return '${e.runtimeType}: $e';
+  }
+
   static const String _autoDownloadPrefKey = 'offline_auto_download_open_forms';
 
   /// When on, every open assignment on the dashboard gets an offline copy while
@@ -585,6 +610,8 @@ class AssignmentOfflineBundleService {
     Future<List<Map<String, dynamic>>> Function(String formUrl)?
         recordApiResponses,
   }) async {
+    _traces[assignmentId] = <String>[];
+    _trace(assignmentId, 'start template=$templateId static=$staticVersion lang=$language');
     final reuseDir = await _findReusableBundleDir(
       assignmentId: assignmentId,
       templateId: templateId,
@@ -610,6 +637,8 @@ class AssignmentOfflineBundleService {
     );
 
     final status = htmlResp.statusCode ?? 0;
+    _trace(assignmentId,
+        'page ${_tracePath(Uri.parse(resolved))} HTTP $status bytes=${htmlResp.data?.length ?? 0}');
     if (status >= 400) {
       throw AssignmentOfflineBundleException(
         'Failed to load form page (HTTP $status).',
@@ -660,6 +689,8 @@ class AssignmentOfflineBundleService {
               !u.path.startsWith('/static/'),
         )
         .length;
+    _trace(assignmentId,
+        'refs total=${refs.length} dom=${domRefs.length} other-host=$otherHostRefs reuse=${reuseDir == null ? 'none' : p.basename(reuseDir.path)}');
     DebugLogger.logInfo(
       'OFFLINE_BUNDLE',
       'HTML refs total=${refs.length} same-host-/static/=$sameHostStatic '
@@ -698,7 +729,8 @@ class AssignmentOfflineBundleService {
         submitBlockedMessage: submitBlockedMessage,
         recordApiResponses: recordApiResponses,
       );
-    } catch (_) {
+    } catch (e) {
+      _trace(assignmentId, 'build failed ${_describeError(e)}');
       if (await dir.exists()) {
         await dir.delete(recursive: true);
       }
@@ -742,7 +774,7 @@ class AssignmentOfflineBundleService {
     final speculative = <String>{};
     final domKeys = domRefs.map((u) => u.toString()).toSet();
 
-    void markMissing(Uri u) {
+    void markMissing(Uri u, String reason) {
       missingAssets.add(u);
       final lower = u.path.toLowerCase();
       if (_isSameOrigin(u, pageUri) &&
@@ -753,6 +785,9 @@ class AssignmentOfflineBundleService {
               lower.endsWith('.css'))) {
         criticalMissing.add(u);
       }
+      final critical = criticalMissing.contains(u);
+      _trace(assignmentId,
+          'missing ${_tracePath(u)} $reason${critical ? ' CRITICAL' : speculative.contains(u.toString()) ? ' (guessed)' : ''}');
     }
 
     void enqueue(Uri u, {bool isSpeculative = false}) {
@@ -818,13 +853,13 @@ class AssignmentOfflineBundleService {
                 'OFFLINE_BUNDLE',
                 'Skip asset HTTP $sc${isCss ? ' (CSS)' : ''}: $absolute',
               );
-              markMissing(absolute);
+              markMissing(absolute, 'HTTP $sc');
             }
             continue;
           }
           if (r.data!.length > _maxAssetBytes) {
             DebugLogger.logWarn('OFFLINE_BUNDLE', 'Skip large asset: $absolute');
-            markMissing(absolute);
+            markMissing(absolute, 'too large (${r.data!.length}B)');
             continue;
           }
           body = r.data!;
@@ -877,7 +912,7 @@ class AssignmentOfflineBundleService {
           'OFFLINE_BUNDLE',
           'Failed asset${isCss ? ' (CSS)' : ''} $absolute: $e',
         );
-        markMissing(absolute);
+        markMissing(absolute, _describeError(e));
       }
     }
 
@@ -885,6 +920,11 @@ class AssignmentOfflineBundleService {
       throw AssignmentOfflineBundleException(
         'Offline copy is incomplete: ${criticalMissing.length} script/style '
         'file(s) could not be saved (first: ${criticalMissing.first.path}).',
+        details: {
+          'critical_missing': [
+            for (final u in criticalMissing.take(40)) _tracePath(u),
+          ],
+        },
       );
     }
 
@@ -900,6 +940,7 @@ class AssignmentOfflineBundleService {
       await _rewriteRootStaticInBundleScripts(dir);
       await _rewriteExternalUrlsInCss(dir, savedRelByAbsolute);
     } catch (e, st) {
+      _trace(assignmentId, 'rewrite failed ${_describeError(e)}');
       DebugLogger.logWarn(
         'OFFLINE_BUNDLE',
         'Path rewriting failed for assignment $assignmentId: $e\n$st',
@@ -925,7 +966,9 @@ class AssignmentOfflineBundleService {
       try {
         final recorded = await recordApiResponses(resolved);
         apiEntries = _mergeApiEntries(const {}, recorded);
+        _trace(assignmentId, 'recorder entries=${apiEntries.length}');
       } catch (e, st) {
+        _trace(assignmentId, 'recorder failed ${_describeError(e)}');
         DebugLogger.logWarn(
           'OFFLINE_BUNDLE',
           'Could not record form API data for assignment $assignmentId: $e\n$st',
@@ -977,6 +1020,7 @@ class AssignmentOfflineBundleService {
       await finalDir.delete(recursive: true);
     }
     await dir.rename(finalDir.path);
+    _trace(assignmentId, 'saved files=$count missing=${missingAssets.length}');
 
     DebugLogger.logInfo(
       'OFFLINE_BUNDLE',
@@ -1731,7 +1775,8 @@ class AssignmentOfflineBundleService {
 
 class AssignmentOfflineBundleException implements Exception {
   final String message;
-  AssignmentOfflineBundleException(this.message);
+  final Map<String, dynamic> details;
+  AssignmentOfflineBundleException(this.message, {this.details = const {}});
 
   @override
   String toString() => message;

@@ -28,6 +28,7 @@ from app.utils.api_usage_logging_skip import should_skip_api_usage_path
         ("/api/mobile/v1/analytics/screen-view", "POST", True),
         ("/api/mobile/v1/devices/heartbeat", "POST", True),
         ("/api/mobile/v1/devices/register", "POST", True),
+        ("/api/mobile/v1/diagnostics/client-error", "POST", True),
         ("/api/mobile/v1/auth/session", "GET", True),
         ("/api/mobile/v1/auth/refresh", "POST", True),
         ("/api/notifications/list", "GET", True),

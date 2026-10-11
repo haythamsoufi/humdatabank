@@ -18,6 +18,7 @@ import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/client_diagnostics_service.dart';
 import '../../utils/debug_logger.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
@@ -591,6 +592,18 @@ class _DashboardScreenState extends State<DashboardScreen>
       DebugLogger.logWarn(
         'OFFLINE_BUNDLE',
         'Download failed for assignment ${assignment.id}: $e\n$st',
+      );
+      unawaited(
+        ClientDiagnosticsService.report(
+          category: ClientDiagnosticsService.categoryOfflineDownload,
+          error: e,
+          stackTrace: st,
+          assignmentId: assignment.id,
+          templateId: assignment.templateId,
+          language: languageProvider.currentLanguage,
+          trace: AssignmentOfflineBundleService().traceFor(assignment.id),
+          extraDetails: {'silent': silent},
+        ),
       );
       if (!context.mounted) return false;
       setState(() {

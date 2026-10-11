@@ -114,6 +114,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         listen: false,
       );
       _dashboardProviderListenerRef!.addListener(_onDashboardProviderChanged);
+      AssignmentOfflineBundleService.savedCopiesChanged
+          .addListener(_onSavedCopiesChanged);
     });
   }
 
@@ -121,6 +123,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   void dispose() {
     _offlineProviderListenerRef?.removeListener(_onOfflineProviderChanged);
     _dashboardProviderListenerRef?.removeListener(_onDashboardProviderChanged);
+    AssignmentOfflineBundleService.savedCopiesChanged
+        .removeListener(_onSavedCopiesChanged);
     _scrollController.removeListener(_onDashboardScroll);
     _scrollController.dispose();
     _animationController.dispose();
@@ -156,6 +160,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _onOfflineProviderChanged() {
     if (!mounted) return;
     unawaited(_tryAutoRefreshStaleOfflineCopies());
+  }
+
+  void _onSavedCopiesChanged() {
+    if (!mounted) return;
+    final provider = _dashboardProviderListenerRef;
+    if (provider == null) return;
+    unawaited(
+      _syncOfflineBundleAndStaleState(
+        provider.currentAssignments,
+        provider.pastAssignments,
+      ),
+    );
   }
 
   /// The assignment list changes when another entity is selected; offline copy
@@ -540,6 +556,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         templateId: assignment.templateId,
         staticVersion: assignment.staticVersion,
         dataVersion: assignment.dataVersion,
+        title: [
+          assignment.templateName ?? assignment.name,
+          assignment.periodName,
+        ].whereType<String>().where((t) => t.isNotEmpty).join(' · '),
         submitBlockedMessage: loc.offlineSubmitRequiresConnection,
         recordApiResponses: (formUrl) => OfflineApiRecorder.recordFormLoad(
           formUrl: formUrl,

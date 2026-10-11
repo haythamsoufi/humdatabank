@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -29,9 +29,12 @@ class AssignmentOfflineBundleMeta {
     this.apiEntryCount = 0,
     this.missingAssetCount = 0,
     this.externalRefCount = 0,
+    this.title,
   });
 
   final int assignmentId;
+  /// Human-readable form name captured at download time (for storage screens).
+  final String? title;
   /// Form template the saved page belongs to (null for bundles saved by older builds).
   final int? templateId;
   /// Server static-files release the copy was captured from.
@@ -51,6 +54,23 @@ class AssignmentOfflineBundleMeta {
   final int assetCount;
   /// ISO-8601 UTC snapshot of [Assignment.formDefinitionUpdatedAt] when the bundle was saved.
   final String? formDefinitionUpdatedAtIso;
+}
+
+/// One saved offline copy, as listed on the storage screen.
+class OfflineCopySummary {
+  const OfflineCopySummary({
+    required this.assignmentId,
+    this.templateId,
+    this.title,
+    this.savedAt,
+    required this.sizeBytes,
+  });
+
+  final int assignmentId;
+  final int? templateId;
+  final String? title;
+  final DateTime? savedAt;
+  final int sizeBytes;
 }
 
 /// True when the on-disk copy no longer matches what the server (or the app)
@@ -112,6 +132,9 @@ bool isAssignmentOfflineBundleStale(
 /// Persists a crawlable snapshot of an assignment entry form (HTML + same-origin
 /// static assets) so the form can open from disk when the device is offline.
 class AssignmentOfflineBundleService {
+  /// Bumped whenever saved copies are removed so open screens can refresh.
+  static final ValueNotifier<int> savedCopiesChanged = ValueNotifier<int>(0);
+
   AssignmentOfflineBundleService._internal()
       : _dio = _buildDio(),
         _baseDirOverride = null,
@@ -222,6 +245,7 @@ class AssignmentOfflineBundleService {
 
   /// Deletes every saved form for every user (used on logout).
   Future<void> clearAll() async {
+    savedCopiesChanged.value++;
     try {
       final base = await _bundlesBase();
       await for (final e in base.list(followLinks: false)) {
@@ -266,6 +290,7 @@ class AssignmentOfflineBundleService {
         removed++;
       }
     }
+    if (removed > 0) savedCopiesChanged.value++;
     return removed;
   }
 
@@ -306,6 +331,7 @@ class AssignmentOfflineBundleService {
         apiEntryCount: (raw['api_entry_count'] as num?)?.toInt() ?? 0,
         missingAssetCount: (raw['missing_asset_count'] as num?)?.toInt() ?? 0,
         externalRefCount: (raw['external_ref_count'] as num?)?.toInt() ?? 0,
+        title: raw['title']?.toString(),
       );
     } catch (_) {
       return null;
@@ -330,6 +356,36 @@ class AssignmentOfflineBundleService {
         out.add(e);
       }
     }
+    return out;
+  }
+
+  /// Every saved copy for the current user with its disk footprint, newest first.
+  Future<List<OfflineCopySummary>> listSavedCopies() async {
+    final out = <OfflineCopySummary>[];
+    for (final dir in await _bundleDirs()) {
+      if (!File(p.join(dir.path, 'index.html')).existsSync()) continue;
+      final id = int.tryParse(p.basename(dir.path).replaceFirst('assignment_', ''));
+      if (id == null) continue;
+      final meta = await _readMetaJson(dir);
+      var size = 0;
+      try {
+        await for (final e in dir.list(recursive: true, followLinks: false)) {
+          if (e is File) size += await e.length();
+        }
+      } catch (_) {}
+      out.add(
+        OfflineCopySummary(
+          assignmentId: id,
+          templateId: (meta?['template_id'] as num?)?.toInt(),
+          title: meta?['title']?.toString(),
+          savedAt: DateTime.tryParse(meta?['saved_at']?.toString() ?? '')
+              ?.toLocal(),
+          sizeBytes: size,
+        ),
+      );
+    }
+    out.sort((a, b) => (b.savedAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+        .compareTo(a.savedAt ?? DateTime.fromMillisecondsSinceEpoch(0)));
     return out;
   }
 
@@ -373,6 +429,7 @@ class AssignmentOfflineBundleService {
     if (alsoAssignmentId != null) {
       await deleteBundle(alsoAssignmentId);
     }
+    savedCopiesChanged.value++;
   }
 
   bool _staticFilesCompatible(
@@ -498,6 +555,7 @@ class AssignmentOfflineBundleService {
     int? templateId,
     String? staticVersion,
     String? dataVersion,
+    String? title,
     String submitBlockedMessage =
         'You are offline. Your changes are saved as a draft on this device. '
         'Submit when you are back online; the form is validated before it is submitted.',
@@ -609,6 +667,7 @@ class AssignmentOfflineBundleService {
         templateId: templateId,
         staticVersion: staticVersion,
         dataVersion: dataVersion,
+        title: title,
         language: language,
         formDefinitionUpdatedAtIso: formDefinitionUpdatedAtIso,
         submitBlockedMessage: submitBlockedMessage,
@@ -636,6 +695,7 @@ class AssignmentOfflineBundleService {
     required int? templateId,
     required String? staticVersion,
     required String? dataVersion,
+    required String? title,
     required String language,
     required String? formDefinitionUpdatedAtIso,
     required String submitBlockedMessage,
@@ -653,9 +713,10 @@ class AssignmentOfflineBundleService {
     void markMissing(Uri u) {
       missingAssets.add(u);
       final lower = u.path.toLowerCase();
-      if (lower.endsWith('.js') ||
-          lower.endsWith('.mjs') ||
-          lower.endsWith('.css')) {
+      if (_isSameOrigin(u, pageUri) &&
+          (lower.endsWith('.js') ||
+              lower.endsWith('.mjs') ||
+              lower.endsWith('.css'))) {
         criticalMissing.add(u);
       }
     }
@@ -680,11 +741,14 @@ class AssignmentOfflineBundleService {
       }
 
       // Canonical paths so ES module relative imports match on-disk names.
-      final relPath = _relativePathForUrl(
-        absolute,
-        pageUri,
-        foldCacheQueryIntoFileName: false,
-      );
+      final external = !_isSameOrigin(absolute, pageUri);
+      final relPath = external
+          ? _externalRelativePath(absolute)
+          : _relativePathForUrl(
+              absolute,
+              pageUri,
+              foldCacheQueryIntoFileName: false,
+            );
       final localFile = File(p.join(dir.path, relPath));
       await localFile.parent.create(recursive: true);
 
@@ -699,7 +763,7 @@ class AssignmentOfflineBundleService {
             absKey,
             options: Options(
               responseType: ResponseType.bytes,
-              headers: headers,
+              headers: external ? _headersWithoutCredentials(headers) : headers,
             ),
           );
           final sc = r.statusCode ?? 0;
@@ -730,10 +794,12 @@ class AssignmentOfflineBundleService {
         await localFile.writeAsBytes(body, flush: true);
         final relPosix = relPath.replaceAll(r'\', '/');
         savedRelByAbsolute[absKey] = relPosix;
-        _registerMirrorRewriteKeys(absolute, relPosix, savedRelByAbsolute);
+        if (!external) {
+          _registerMirrorRewriteKeys(absolute, relPosix, savedRelByAbsolute);
+        }
         count++;
 
-        if (absolute.path.toLowerCase().endsWith('.css')) {
+        if (relPath.toLowerCase().endsWith('.css')) {
           final cssText = utf8.decode(body, allowMalformed: true);
           for (final child in _urlsFromCss(cssText, absolute)) {
             enqueue(child);
@@ -741,7 +807,7 @@ class AssignmentOfflineBundleService {
         }
 
         final pathLower = absolute.path.toLowerCase();
-        if (pathLower.endsWith('.js') || pathLower.endsWith('.mjs')) {
+        if (!external && (pathLower.endsWith('.js') || pathLower.endsWith('.mjs'))) {
           final jsText = utf8.decode(body, allowMalformed: true);
           for (final child in _urlsFromJavaScript(jsText, absolute)) {
             enqueue(child);
@@ -785,6 +851,16 @@ class AssignmentOfflineBundleService {
     }
 
     await _rewriteAllCssRootStaticInBundle(dir);
+    await _rewriteExternalUrlsInCss(dir, savedRelByAbsolute);
+    final unmirroredExternalRefs = refs
+        .where(
+          (u) =>
+              u.hasScheme &&
+              (u.scheme == 'http' || u.scheme == 'https') &&
+              !_isSameOrigin(u, pageUri) &&
+              !savedRelByAbsolute.containsKey(u.toString()),
+        )
+        .length;
 
     html = _rewriteHtmlAssetRefs(html, savedRelByAbsolute);
     html = _demoteHtmlRootStaticPaths(html);
@@ -820,8 +896,9 @@ class AssignmentOfflineBundleService {
       'asset_count': count,
       'api_entry_count': apiEntries.length,
       'missing_asset_count': missingAssets.length,
-      'external_ref_count': otherHostRefs,
+      'external_ref_count': unmirroredExternalRefs,
       'language': language,
+      if (title != null && title.isNotEmpty) 'title': title,
       if (staticVersion != null && staticVersion.isNotEmpty)
         'static_version': staticVersion,
       if (dataVersion != null && dataVersion.isNotEmpty)
@@ -954,17 +1031,79 @@ class AssignmentOfflineBundleService {
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
+    savedCopiesChanged.value++;
+  }
+
+  static const Set<String> _externalMirrorExtensions = {
+    '.js', '.mjs', '.css', '.woff', '.woff2', '.ttf', '.otf', '.eot',
+    '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico',
+  };
+
+  static const List<String> _externalSkipHosts = [
+    'google-analytics.com',
+    'googletagmanager.com',
+    'doubleclick.net',
+    'sentry.io',
+    'hotjar.com',
+    'clarity.ms',
+  ];
+
+  static const String _externalDirName = 'static/ext';
+
+  bool _isSameOrigin(Uri asset, Uri pageUri) =>
+      asset.host == pageUri.host && asset.port == pageUri.port;
+
+  /// Third-party styles, scripts and fonts the form needs (CDN libraries, web
+  /// fonts). Pages and API endpoints are never mirrored.
+  bool _isMirrorableExternal(Uri asset) {
+    final host = asset.host.toLowerCase();
+    if (host.isEmpty) return false;
+    for (final skip in _externalSkipHosts) {
+      if (host == skip || host.endsWith('.$skip')) return false;
+    }
+    if (host == 'www.gstatic.com' && asset.path.startsWith('/charts/')) {
+      return false;
+    }
+    if (host == 'fonts.googleapis.com' && asset.path.startsWith('/css')) {
+      return true;
+    }
+    final ext = p.extension(asset.path).toLowerCase();
+    return _externalMirrorExtensions.contains(ext);
   }
 
   bool _shouldMirror(Uri asset, Uri pageUri) {
     if (!asset.hasScheme || (asset.scheme != 'http' && asset.scheme != 'https')) {
       return false;
     }
-    if (asset.host != pageUri.host || asset.port != pageUri.port) {
-      return false;
+    if (!_isSameOrigin(asset, pageUri)) {
+      return _isMirrorableExternal(asset);
     }
-    final path = asset.path;
-    return path.startsWith('/static/');
+    return asset.path.startsWith('/static/');
+  }
+
+  /// Stable on-disk path for a third-party file, kept under its host so relative
+  /// references inside CDN stylesheets keep resolving.
+  String _externalRelativePath(Uri absolute) {
+    final host = absolute.hasPort
+        ? '${absolute.host}_${absolute.port}'
+        : absolute.host;
+    var path = absolute.path;
+    if (path.isEmpty || path.endsWith('/')) path = '${path}index';
+    var ext = p.extension(path);
+    if (ext.isEmpty && absolute.host == 'fonts.googleapis.com') ext = '.css';
+    final base = p.extension(path).isEmpty
+        ? path
+        : path.substring(0, path.length - p.extension(path).length);
+    var queryTag = '';
+    if (absolute.hasQuery) {
+      var h = 5381;
+      for (final c in absolute.query.codeUnits) {
+        h = ((h * 33) ^ c) & 0xFFFFFFFF;
+      }
+      queryTag = '.${h.toRadixString(36)}';
+    }
+    final safe = '$base$queryTag$ext'.replaceAll(RegExp(r'[^a-zA-Z0-9._/@-]'), '_');
+    return '$_externalDirName/$host${safe.startsWith('/') ? safe : '/$safe'}';
   }
 
   String _relativePathForUrl(
@@ -1104,7 +1243,7 @@ class AssignmentOfflineBundleService {
       addRaw(m.group(2));
     }
     for (final m in RegExp(
-          r'url\(\s*((?:\.\./|\./|/)[^)\s\x22\x27]+)\s*\)',
+          r'url\(\s*((?:\.\./|\./|/|https?:)[^)\s\x22\x27]+)\s*\)',
           caseSensitive: false,
         )
         .allMatches(css)) {
@@ -1332,6 +1471,56 @@ class AssignmentOfflineBundleService {
     return out;
   }
 
+  Map<String, String> _headersWithoutCredentials(Map<String, String> headers) {
+    return {
+      for (final e in headers.entries)
+        if (e.key.toLowerCase() != 'cookie' &&
+            e.key.toLowerCase() != 'authorization')
+          e.key: e.value,
+    };
+  }
+
+  /// Points absolute third-party URLs inside saved stylesheets (web font files,
+  /// nested imports) at their mirrored copies.
+  Future<void> _rewriteExternalUrlsInCss(
+    Directory dir,
+    Map<String, String> savedRelByAbsolute,
+  ) async {
+    final mirrored = <String, String>{
+      for (final e in savedRelByAbsolute.entries)
+        if (e.value.startsWith('$_externalDirName/')) e.key: e.value,
+    };
+    if (mirrored.isEmpty) return;
+    final keys = mirrored.keys.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is! File || !entity.path.toLowerCase().endsWith('.css')) {
+        continue;
+      }
+      late final String raw;
+      try {
+        raw = await entity.readAsString(encoding: utf8);
+      } catch (_) {
+        continue;
+      }
+      final fileRel =
+          p.relative(entity.path, from: dir.path).replaceAll(r'\', '/');
+      final fromDir = _posix.dirname(fileRel);
+      var next = raw;
+      for (final abs in keys) {
+        if (!next.contains(abs) && !next.contains(abs.substring(abs.indexOf('//')))) {
+          continue;
+        }
+        final target = _posix.relative(mirrored[abs]!, from: fromDir);
+        next = next.split(abs).join(target);
+        next = next.split(abs.substring(abs.indexOf('//'))).join(target);
+      }
+      if (next != raw) {
+        await entity.writeAsString(next, flush: true);
+      }
+    }
+  }
+
   /// Rewrites occurrences of mirrored absolute URLs to relative paths.
   String _rewriteHtmlAssetRefs(
     String html,
@@ -1346,11 +1535,21 @@ class AssignmentOfflineBundleService {
       final withoutQuery =
           Uri(scheme: uri.scheme, userInfo: uri.userInfo, host: uri.host, port: uri.port, path: uri.path)
               .toString();
-      for (final candidate in <String>{abs, withoutQuery}) {
+      final candidates = <String>{abs};
+      if (!uri.hasQuery || uri.path.startsWith('/static/')) {
+        candidates.add(withoutQuery);
+      }
+      for (final c in List<String>.of(candidates)) {
+        final i = c.indexOf('//');
+        if (i != -1) candidates.add(c.substring(i));
+      }
+      for (final candidate in candidates) {
         s = s.split(candidate).join(rel);
-        final esc = const HtmlEscape().convert(candidate);
-        if (esc != candidate) {
-          s = s.split(esc).join(rel);
+        for (final esc in <String>{
+          const HtmlEscape().convert(candidate),
+          const HtmlEscape(HtmlEscapeMode.attribute).convert(candidate),
+        }) {
+          if (esc != candidate) s = s.split(esc).join(rel);
         }
       }
     }

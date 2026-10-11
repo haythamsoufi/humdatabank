@@ -14,6 +14,7 @@ class _FakeAdapter implements HttpClientAdapter {
 
   final Map<String, ({int status, String body})> routes;
   final List<String> requested = [];
+  final Map<String, Map<String, dynamic>> headersByHost = {};
 
   @override
   Future<ResponseBody> fetch(
@@ -22,6 +23,7 @@ class _FakeAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requested.add(options.uri.path);
+    headersByHost[options.uri.host] = Map.of(options.headers);
     final r = routes[options.uri.path];
     if (r == null) return ResponseBody.fromBytes(<int>[], 404);
     return ResponseBody.fromBytes(utf8.encode(r.body), r.status);
@@ -93,6 +95,109 @@ void main() {
 
   tearDown(() async {
     if (await tmp.exists()) await tmp.delete(recursive: true);
+  });
+
+  group('storage listing', () {
+    test('lists copies with size and title and notifies on removal', () async {
+      await svc.downloadAndSave(
+        assignmentId: 5,
+        formPath: '/forms/assignment/5',
+        language: 'en',
+        templateId: 7,
+        title: 'Annual report · 2026',
+      );
+      final copies = await svc.listSavedCopies();
+      expect(copies, hasLength(1));
+      expect(copies.single.assignmentId, 5);
+      expect(copies.single.templateId, 7);
+      expect(copies.single.title, 'Annual report · 2026');
+      expect(copies.single.sizeBytes, greaterThan(0));
+
+      final before = AssignmentOfflineBundleService.savedCopiesChanged.value;
+      await svc.deleteBundle(5);
+      expect(AssignmentOfflineBundleService.savedCopiesChanged.value, greaterThan(before));
+      expect(await svc.listSavedCopies(), isEmpty);
+    });
+  });
+
+  group('third-party files', () {
+    const extHtml = '<html><head>'
+        '<link rel="stylesheet" href="/static/css/app.css?v=1">'
+        '<link rel="stylesheet" '
+        'href="https://fonts.googleapis.com/css2?family=Inter:wght@400&amp;display=swap">'
+        '<script src="https://cdn.example.com/lib/chart.min.js"></script>'
+        '<script src="https://www.googletagmanager.com/gtag/js?id=X"></script>'
+        '<link rel="preconnect" href="https://fonts.gstatic.com">'
+        '</head><body>form</body></html>';
+
+    _FakeAdapter extAdapter() => _FakeAdapter({
+          ..._routes(),
+          '/forms/assignment/5': (status: 200, body: extHtml),
+          '/css2': (
+            status: 200,
+            body: '@font-face{src:url(https://fonts.gstatic.com/s/inter/v1/a.woff2)}'
+          ),
+          '/s/inter/v1/a.woff2': (status: 200, body: 'FONT'),
+          '/lib/chart.min.js': (status: 200, body: 'chart();'),
+        });
+
+    test('mirrors CDN libraries and web fonts and rewrites references',
+        () async {
+      final a = extAdapter();
+      final s = build(a);
+      await download(s, 5);
+      final dir = Directory(await s.offlineBundleDirectoryPath(5));
+
+      final html = (await s.readOfflineIndexHtml(5))!;
+      expect(html, isNot(contains('https://cdn.example.com')));
+      expect(html, isNot(contains('https://fonts.googleapis.com')));
+      expect(html, contains('static/ext/cdn.example.com/lib/chart.min.js'));
+
+      final chart = File(p.join(dir.path, 'static/ext/cdn.example.com/lib/chart.min.js'));
+      expect(chart.existsSync(), isTrue);
+
+      final fontCss = Directory(p.join(dir.path, 'static/ext/fonts.googleapis.com'))
+          .listSync()
+          .whereType<File>()
+          .single;
+      expect(fontCss.path, endsWith('.css'));
+      final css = fontCss.readAsStringSync();
+      expect(css, isNot(contains('https://')));
+      expect(
+        File(p.normalize(p.join(
+          fontCss.parent.path,
+          RegExp(r'url\(([^)]+)\)').firstMatch(css)!.group(1)!,
+        ))).existsSync(),
+        isTrue,
+      );
+      expect(a.requested, isNot(contains('/gtag/js')));
+    });
+
+    test('never sends the session cookie to third-party hosts', () async {
+      final a = extAdapter();
+      final s = build(a);
+      await s.downloadAndSave(
+        assignmentId: 5,
+        formPath: '/forms/assignment/5',
+        language: 'en',
+        sessionCookieHeader: 'session=secret',
+        templateId: 7,
+      );
+      expect(a.headersByHost['cdn.example.com']?['Cookie'], isNull);
+      expect(a.headersByHost['fonts.googleapis.com']?['Cookie'], isNull);
+      expect(a.headersByHost['databank.ifrc.org']?['Cookie'], 'session=secret');
+    });
+
+    test('a failing CDN file does not block the download', () async {
+      final a = _FakeAdapter({
+        ..._routes(),
+        '/forms/assignment/5': (status: 200, body: extHtml),
+      });
+      final s = build(a);
+      await download(s, 5);
+      expect(await s.hasOfflineBundle(5), isTrue);
+      expect((await s.readBundleMeta(5))!.missingAssetCount, greaterThan(0));
+    });
   });
 
   group('downloadAndSave', () {

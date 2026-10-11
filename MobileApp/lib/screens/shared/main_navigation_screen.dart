@@ -22,6 +22,7 @@ import '../public/unified_planning_documents_screen.dart';
 import '../admin/admin_screen.dart';
 // Widgets
 import '../../widgets/bottom_navigation_bar.dart';
+import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/horizontal_swipe_page_view.dart';
 import '../../widgets/offline_indicator.dart';
 
@@ -41,6 +42,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   late PageController _pageController;
   final ScreenViewTracker _screenViewTracker = ScreenViewTracker();
   bool _initialTabTracked = false;
+
+  /// True while a tab page's side drawer is open. The drawer belongs to the
+  /// page scaffold, so this shell hides its tab bar instead of painting it
+  /// over the menu.
+  bool _sideDrawerOpen = false;
 
   // Screen cache
   List<Widget>? _cachedScreens;
@@ -341,76 +347,86 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
           extendBody: true,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           resizeToAvoidBottomInset: !onAiChatPage,
-          body: Stack(
-            fit: StackFit.expand,
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                // [Scaffold.extendBody] only raises padding.bottom to the bar
-                // height. Pages that size their trailing space from
-                // viewPadding.bottom would still end under the capsule.
-                child: Builder(
-                  builder: (context) {
-                    final mq = MediaQuery.of(context);
-                    return MediaQuery(
-                      data: mq.copyWith(
-                        viewPadding: mq.viewPadding.copyWith(
-                          bottom: math.max(
-                            mq.viewPadding.bottom,
-                            mq.padding.bottom,
+          body: NotificationListener<ShellDrawerOpenNotification>(
+            onNotification: (notification) {
+              if (_sideDrawerOpen == notification.isOpen) return true;
+              setState(() => _sideDrawerOpen = notification.isOpen);
+              return true;
+            },
+            child: Stack(
+              fit: StackFit.expand,
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  // [Scaffold.extendBody] only raises padding.bottom to the bar
+                  // height. Pages that size their trailing space from
+                  // viewPadding.bottom would still end under the capsule.
+                  child: Builder(
+                    builder: (context) {
+                      final mq = MediaQuery.of(context);
+                      return MediaQuery(
+                        data: mq.copyWith(
+                          viewPadding: mq.viewPadding.copyWith(
+                            bottom: math.max(
+                              mq.viewPadding.bottom,
+                              mq.padding.bottom,
+                            ),
                           ),
                         ),
-                      ),
-                      child: HorizontalSwipePageView(
-                        controller: _pageController,
-                        onPageChanged: (index) {
-                          DebugLogger.logNav(
-                              'onPageChanged $_currentIndex → $index');
-                          _navVersion++;
-                          setState(() => _currentIndex = index);
-                          _trackTabScreenView(index, visibleTabs);
-                        },
-                        children: screens,
-                      ),
-                    );
-                  },
+                        child: HorizontalSwipePageView(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            DebugLogger.logNav(
+                                'onPageChanged $_currentIndex → $index');
+                            _navVersion++;
+                            setState(() => _currentIndex = index);
+                            _trackTabScreenView(index, visibleTabs);
+                          },
+                          children: screens,
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              const Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: OfflineBanner(),
-              ),
-            ],
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: OfflineBanner(),
+                ),
+              ],
+            ),
           ),
-          bottomNavigationBar: AppBottomNavigationBar(
-            currentIndex: validIndex,
-            chatbotEnabled: chatbotEnabled,
-            visibleTabs: visibleTabs,
-            enableCustomization: true,
-            onTap: (index) {
-              if (index < 0 || index >= visibleTabs.length) return;
+          bottomNavigationBar: DrawerAwareBottomBar(
+            hidden: _sideDrawerOpen,
+            child: AppBottomNavigationBar(
+              currentIndex: validIndex,
+              chatbotEnabled: chatbotEnabled,
+              visibleTabs: visibleTabs,
+              enableCustomization: true,
+              onTap: (index) {
+                if (index < 0 || index >= visibleTabs.length) return;
 
-              if (index == defaultHomeIndex &&
-                  validIndex == defaultHomeIndex) {
-                DebugLogger.logNav('tap nav[$index] → home reload');
-                HomeScreen.reloadFromKey(_homeScreenKey);
-              } else {
-                DebugLogger.logNav('tap nav[$index] → page[$index]');
-                // Ensure we are the registered navigation handler before
-                // animating.  After certain route transitions (e.g. logout
-                // pushNamedAndRemoveUntil) the static handler can be cleared
-                // before the new screen's first frame completes.
-                if (!NavigationHelper.isRegistered) {
-                  DebugLogger.logNav(
-                      'tap nav[$index]: handler missing — re-registering first');
-                  _registerNavigation();
+                if (index == defaultHomeIndex &&
+                    validIndex == defaultHomeIndex) {
+                  DebugLogger.logNav('tap nav[$index] → home reload');
+                  HomeScreen.reloadFromKey(_homeScreenKey);
+                } else {
+                  DebugLogger.logNav('tap nav[$index] → page[$index]');
+                  // Ensure we are the registered navigation handler before
+                  // animating.  After certain route transitions (e.g. logout
+                  // pushNamedAndRemoveUntil) the static handler can be cleared
+                  // before the new screen's first frame completes.
+                  if (!NavigationHelper.isRegistered) {
+                    DebugLogger.logNav(
+                        'tap nav[$index]: handler missing — re-registering first');
+                    _registerNavigation();
+                  }
+                  NavigationHelper.animateToMainTab(index);
                 }
-                NavigationHelper.animateToMainTab(index);
-              }
-            },
-            isFocalPoint: isFocalPoint,
+              },
+              isFocalPoint: isFocalPoint,
+            ),
           ),
         );
       },

@@ -23,6 +23,7 @@ import '../../utils/ai_chat_plain_text.dart';
 import '../../utils/ai_chat_message_html_split.dart';
 import '../../widgets/chat_response_sources_details_extension.dart';
 import '../../widgets/bottom_navigation_bar.dart';
+import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../l10n/app_localizations.dart';
@@ -934,6 +935,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
       resizeToAvoidBottomInset: false,
       backgroundColor: _chatSurface(theme),
       onDrawerChanged: (isOpened) {
+        ShellDrawerOpenNotification(isOpen: isOpened).dispatch(context);
         if (isOpened != true) return;
         // Keep keyboard hidden until the user taps the drawer search field.
         _inputFocusNode.unfocus();
@@ -2739,8 +2741,16 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
 }
 
 /// Pushes [AiChatScreen] with the same bottom bar as [MainNavigationScreen]; tab taps use [NavigationHelper].
-class AiChatScreenWithBottomNav extends StatelessWidget {
+class AiChatScreenWithBottomNav extends StatefulWidget {
   const AiChatScreenWithBottomNav({super.key});
+
+  @override
+  State<AiChatScreenWithBottomNav> createState() =>
+      _AiChatScreenWithBottomNavState();
+}
+
+class _AiChatScreenWithBottomNavState extends State<AiChatScreenWithBottomNav> {
+  bool _sideDrawerOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -2751,19 +2761,29 @@ class AiChatScreenWithBottomNav extends StatelessWidget {
       builder: (context, auth, _) {
         final isFocalPoint = auth.user?.role == 'focal_point';
         final chatbot = auth.user?.chatbotEnabled ?? false;
-        return Scaffold(
-          resizeToAvoidBottomInset: false,
-          // Same as MainNavigationScreen: the composer reads the bar height from
-          // padding.bottom instead of inferring it from the body size.
-          extendBody: true,
-          body: const AiChatScreen(),
-          // When AiChatScreenWithBottomNav is shown as a standalone route
-          // (deep link, notification tap, etc.), tapping any tab navigates to
-          // the main screen at the requested tab index.
-          bottomNavigationBar: AppBottomNavigationBar(
-            currentIndex: navTabIndex,
-            isFocalPoint: isFocalPoint,
-            chatbotEnabled: chatbot,
+        return NotificationListener<ShellDrawerOpenNotification>(
+          onNotification: (notification) {
+            if (_sideDrawerOpen == notification.isOpen) return true;
+            setState(() => _sideDrawerOpen = notification.isOpen);
+            return true;
+          },
+          child: Scaffold(
+            resizeToAvoidBottomInset: false,
+            // Same as MainNavigationScreen: the composer reads the bar height from
+            // padding.bottom instead of inferring it from the body size.
+            extendBody: true,
+            body: const AiChatScreen(),
+            // When AiChatScreenWithBottomNav is shown as a standalone route
+            // (deep link, notification tap, etc.), tapping any tab navigates to
+            // the main screen at the requested tab index.
+            bottomNavigationBar: DrawerAwareBottomBar(
+              hidden: _sideDrawerOpen,
+              child: AppBottomNavigationBar(
+                currentIndex: navTabIndex,
+                isFocalPoint: isFocalPoint,
+                chatbotEnabled: chatbot,
+              ),
+            ),
           ),
         );
       },

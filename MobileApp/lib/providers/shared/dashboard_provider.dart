@@ -9,7 +9,10 @@ import '../../utils/debug_logger.dart';
 /// Provider for dashboard state management.
 /// Focuses on UI state (loading, error) and delegates data access to DashboardRepository.
 class DashboardProvider with ChangeNotifier {
-  final DashboardRepository _repository = DashboardRepository();
+  final DashboardRepository _repository;
+
+  DashboardProvider({DashboardRepository? repository})
+      : _repository = repository ?? DashboardRepository();
 
   List<Assignment> _currentAssignments = [];
   List<Assignment> _pastAssignments = [];
@@ -30,7 +33,11 @@ class DashboardProvider with ChangeNotifier {
   String? get error => _error;
 
   /// Load dashboard data.
-  /// Loads from cache first (if not forcing refresh), then fetches from API.
+  /// Hydrates empty in-memory state from cache, then fetches from API.
+  ///
+  /// A forced refresh still applies the last snapshot first. This keeps downloaded
+  /// assignments reachable when connectivity is reported as available but the
+  /// dashboard request fails.
   /// Optionally accepts entity to pass directly to API (bypasses session).
   Future<void> loadDashboard({
     bool forceRefresh = false,
@@ -41,19 +48,30 @@ class DashboardProvider with ChangeNotifier {
       'loadDashboard(forceRefresh=$forceRefresh, preserveEntity=$preserveSelectedEntity, '
       'entity=${entity?.selectionKey ?? "null"})',
     );
+    var hasLocalSnapshot = false;
 
-    // Load from cache first if available and not forcing refresh
-    if (!forceRefresh) {
-      final cachedData = await _repository.loadDashboardFromCache();
+    // Always hydrate an empty provider from disk before a remote refresh. Use an
+    // expired snapshot during a forced refresh because it is still preferable to
+    // an inaccessible dashboard if the request fails.
+    if (_currentAssignments.isEmpty && _pastAssignments.isEmpty) {
+      final cachedData = await _repository.loadDashboardFromCache(
+        ignoreExpiry: forceRefresh,
+      );
       if (cachedData != null) {
+        hasLocalSnapshot = true;
         DebugLogger.logDashboard(
           'Applied cached dashboard: current=${cachedData.currentAssignments.length}, '
           'past=${cachedData.pastAssignments.length}, entities=${cachedData.entities.length}',
         );
-        _updateStateFromData(cachedData, preserveSelectedEntity: preserveSelectedEntity);
+        _updateStateFromData(
+          cachedData,
+          preserveSelectedEntity: preserveSelectedEntity,
+        );
         notifyListeners();
       } else {
-        DebugLogger.logDashboard('No valid cached dashboard (miss or expired)');
+        DebugLogger.logDashboard(
+          'No cached dashboard available (miss${forceRefresh ? "" : " or expired"})',
+        );
       }
     }
 
@@ -69,13 +87,35 @@ class DashboardProvider with ChangeNotifier {
     );
 
     if (data == null) {
+      // The normal cache read above can reject an expired snapshot. Retry without
+      // the TTL after a network failure so offline access does not disappear just
+      // because the last successful sync is more than an hour old.
+      if (_currentAssignments.isEmpty && _pastAssignments.isEmpty) {
+        final staleData = await _repository.loadDashboardFromCache(
+          ignoreExpiry: true,
+        );
+        if (staleData != null) {
+          hasLocalSnapshot = true;
+          DebugLogger.logDashboard(
+            'API failed; applied stale dashboard snapshot: '
+            'current=${staleData.currentAssignments.length}, '
+            'past=${staleData.pastAssignments.length}',
+          );
+          _updateStateFromData(
+            staleData,
+            preserveSelectedEntity: preserveSelectedEntity,
+          );
+        }
+      }
       DebugLogger.logWarn(
         'DASHBOARD',
         'API returned null — keeping prior state (current=${_currentAssignments.length}, '
         'past=${_pastAssignments.length})',
       );
       // API call failed - check if we have cached data to display
-      if (_currentAssignments.isEmpty && _pastAssignments.isEmpty) {
+      if (!hasLocalSnapshot &&
+          _currentAssignments.isEmpty &&
+          _pastAssignments.isEmpty) {
         _error =
             'Unable to load dashboard. Please check your connection and try again.';
       } else {

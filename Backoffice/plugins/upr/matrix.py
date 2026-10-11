@@ -252,8 +252,9 @@ def _sum_funding_by_area(cells: dict[str, Any]) -> dict[str, dict[str, float]]:
 
 
 def _is_support_funding_column(col: str | None) -> bool:
+    """Reported funding only. Planning ``Funding Requirement`` is a different figure."""
     text = (col or "").strip().lower()
-    if not text or "expend" in text or "transfer" in text:
+    if not text or "expend" in text or "transfer" in text or "requirement" in text:
         return False
     return text in {"total", "row_total"} or "funding" in text
 

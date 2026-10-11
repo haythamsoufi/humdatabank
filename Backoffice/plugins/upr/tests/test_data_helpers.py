@@ -29,6 +29,7 @@ from plugins.upr.data import (
     _support_from_cells,
     _usable_ifrc_actual,
     _report_financial,
+    _report_support,
     build_report_network_entities,
     ifrc_secretariat_actuals_for_report,
     max_people_by_area,
@@ -42,7 +43,13 @@ from plugins.upr.data import (
     t23_host_funding_by_pns,
 )
 from plugins.upr.catalog import SUPPORT_AREA_CODES
+from plugins.upr.matrix import _is_support_funding_column
 from plugins.upr.people_reached import _plan_people_reached
+from plugins.upr.pns_funding import (
+    t23_funding_column,
+    t23_host_row_metrics,
+    t23_reported_funding,
+)
 
 
 @pytest.mark.unit
@@ -340,6 +347,161 @@ def test_t23_host_funding_by_pns():
     )
     amounts = t23_host_funding_by_pns([entry], 49, {10: 7})
     assert amounts[7] == 780_000
+
+
+@pytest.mark.unit
+def test_support_funding_column_ignores_funding_requirement():
+    assert _is_support_funding_column("Total Funding") is True
+    assert _is_support_funding_column("Total") is True
+    assert _is_support_funding_column("Funding Requirement") is False
+    assert _is_support_funding_column("Total Expenditure") is False
+
+
+@pytest.mark.unit
+def test_t23_funding_column_identifies_exact_columns():
+    assert t23_funding_column("Total Funding") == "total funding"
+    assert t23_funding_column("  total   funding ") == "total funding"
+    assert t23_funding_column("Total Expenditure") == "total expenditure"
+    assert t23_funding_column("Total Transferred to HNS") == "total transferred to hns"
+    assert t23_funding_column("Total Transferred") == "total transferred to hns"
+    # Planning figure and unrelated columns are not reported value columns.
+    assert t23_funding_column("Funding Requirement") is None
+    assert t23_funding_column("SP1") is None
+    assert t23_funding_column("") is None
+    assert t23_funding_column(None) is None
+
+
+@pytest.mark.unit
+def test_t23_host_row_metrics_reads_only_host_row_value_columns():
+    cells = {
+        "49_Funding Requirement": 2_600_000,
+        "49_Total Funding": 100_000,
+        "49_Total Expenditure": 90_000,
+        "49_Total Transferred to HNS": 80_000,
+        "49_SP1": 5,
+        "12_Total Funding": 999,  # different host row, ignored
+    }
+    metrics = t23_host_row_metrics(cells, 49)
+    assert metrics == {
+        "total funding": 100_000,
+        "total expenditure": 90_000,
+        "total transferred to hns": 80_000,
+    }
+
+
+@pytest.mark.unit
+def test_t23_reported_funding_priority_fallback():
+    # Total Funding wins when present.
+    assert t23_reported_funding(
+        {"total funding": 100, "total expenditure": 90, "total transferred to hns": 80}
+    ) == 100
+    # Falls back to Total Expenditure when Total Funding is absent/zero.
+    assert t23_reported_funding(
+        {"total funding": 0, "total expenditure": 90, "total transferred to hns": 80}
+    ) == 90
+    assert t23_reported_funding(
+        {"total expenditure": 90, "total transferred to hns": 80}
+    ) == 90
+    # Falls back to Total Transferred to HNS when the first two are absent/zero.
+    assert t23_reported_funding({"total transferred to hns": 80}) == 80
+    # Nothing reported.
+    assert t23_reported_funding({}) == 0.0
+
+
+@pytest.mark.unit
+def test_t23_host_funding_by_pns_falls_back_to_expenditure_then_transferred():
+    funding_only = SimpleNamespace(
+        assignment_entity_status_id=1,
+        get_display_disagg_data=lambda: {"49_Total Funding": 100_000, "49_Total Expenditure": 1},
+    )
+    expenditure_only = SimpleNamespace(
+        assignment_entity_status_id=2,
+        get_display_disagg_data=lambda: {
+            "49_Funding Requirement": 2_600_000,
+            "49_Total Expenditure": 70_000,
+        },
+    )
+    transferred_only = SimpleNamespace(
+        assignment_entity_status_id=3,
+        get_display_disagg_data=lambda: {"49_Total Transferred to HNS": 55_000},
+    )
+    amounts = t23_host_funding_by_pns(
+        [funding_only, expenditure_only, transferred_only],
+        49,
+        {1: 7, 2: 12, 3: 20},
+    )
+    assert amounts == {7: 100_000, 12: 70_000, 20: 55_000}
+
+
+@pytest.mark.unit
+def test_t23_host_funding_by_pns_uses_total_funding_not_requirement():
+    entry = SimpleNamespace(
+        assignment_entity_status_id=10,
+        get_display_disagg_data=lambda: {
+            "mode": "matrix",
+            "values": {
+                "49_Funding Requirement": 2_600_000,
+                "49_Total Funding": 100_000,
+                "49_Total Expenditure": 10,
+            },
+        },
+    )
+    amounts = t23_host_funding_by_pns([entry], 49, {10: 7})
+    assert amounts[7] == 100_000
+
+
+@pytest.mark.unit
+def test_t23_host_funding_by_pns_skips_requirement_when_total_funding_missing():
+    entry = SimpleNamespace(
+        assignment_entity_status_id=10,
+        get_display_disagg_data=lambda: {
+            "mode": "matrix",
+            "values": {"49_Funding Requirement": 2_600_000},
+        },
+    )
+    assert t23_host_funding_by_pns([entry], 49, {10: 7}) == {}
+
+
+@pytest.mark.unit
+def test_sum_t23_host_cells_ignores_funding_requirement():
+    host = SimpleNamespace(
+        get_display_disagg_data=lambda: {
+            "49_Funding Requirement": 2_600_000,
+            "49_Total Funding": 100,
+            "49_Total Expenditure": 80,
+        }
+    )
+    totals = sum_t23_host_cells([host], 49)
+    assert totals["funding"] == 100
+    assert totals["expenditure"] == 80
+    assert totals["assignments"] == 1
+
+
+@pytest.mark.unit
+def test_report_support_does_not_use_planning_requirement(monkeypatch):
+    monkeypatch.setattr(
+        "plugins.upr.support._load_t23_funding_by_pns",
+        lambda *_args, **_kwargs: {7: 100_000},
+    )
+    monkeypatch.setattr(
+        "plugins.upr.support._load_t22_funding_by_pns",
+        lambda *_args, **_kwargs: {7: 2_600_000, 12: 9_000_000},
+    )
+    monkeypatch.setattr(
+        "plugins.upr.support._ns_names",
+        lambda ids: {7: "Danish Red Cross", 12: "Austrian Red Cross"},
+    )
+    rows = _report_support(
+        [],
+        {},
+        host_ns_id=1,
+        host_country_id=1,
+        period_name="2025",
+        year=2025,
+    )
+    by_id = {row["ns_id"]: row for row in rows}
+    assert by_id[7]["funding"] == 100_000
+    assert 12 not in by_id
 
 
 @pytest.mark.unit

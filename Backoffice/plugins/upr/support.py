@@ -79,6 +79,13 @@ def _report_support(
     period_name: str = "",
     year: int | None = None,
 ) -> list[dict[str, Any]]:
+    """Bilateral support for a country report.
+
+    Funding Reported is T23 Total Funding for this host National Society.
+    The T22 planning matrix is the funding requirement, so it is not used here
+    (``host_country_id`` is accepted for callers and ignored).
+    """
+    del host_country_id
     item = _resolve_item(items, REPORT_LABEL_NEEDLES["support"], REPORT_ITEM_FALLBACKS["support"])
     rows = _support_from_cells(_matrix_cells(by_item.get(item.id) if item else None), planned=False)
     amounts: dict[int, float] = {}
@@ -87,12 +94,6 @@ def _report_support(
             amounts.update(_load_t23_funding_by_pns(int(host_ns_id), period_name, year))
         except Exception:
             logger.exception("UPR: failed to load T23 PNS funding rows for host NS %s", host_ns_id)
-    if host_country_id:
-        try:
-            for ns_id, value in _load_t22_funding_by_pns(int(host_country_id), period_name, year).items():
-                amounts.setdefault(int(ns_id), value)
-        except Exception:
-            logger.exception("UPR: failed to load T22 PNS funding rows for host country %s", host_country_id)
     rows = _apply_support_funding(rows, amounts)
     return _extend_support_with_funding(rows, amounts)
 

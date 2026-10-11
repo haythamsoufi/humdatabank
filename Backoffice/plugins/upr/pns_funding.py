@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -24,13 +25,104 @@ from plugins.upr.formatters import _year_token, to_number
 from plugins.upr.matrix import (
     _funding_area_code,
     _funding_column_bucket,
-    _is_support_funding_column,
     _iter_matrix_numbers,
     _matrix_cells,
     _resolve_item,
     _split_cell_key,
 )
 from app.utils.api_serialization import _resolve_matrix_cell
+
+# --------------------------------------------------------------------------- #
+# Published T23 (PNS Reporting) funding-matrix columns.
+#
+# The reporting National Society fills one row per host NS it supports, keyed
+# ``{host_ns_id}_{column}``. The published matrix has exactly these value
+# columns (see ``import_upr_excel_data.T23_PNS_FUNDING_COLUMNS``):
+#
+#   - "Total Funding"             → reported funding
+#   - "Total Expenditure"         → reported expenditure
+#   - "Total Transferred to HNS"  → reported transfer to the host NS
+#
+# A "Funding Requirement" column is also present: it is a *planning* figure
+# copied from the Unified Country Plan and must never be read as a reported
+# amount. We identify columns by exact (whitespace/case-normalized) name so a
+# requirement value can never leak into a reported figure.
+# --------------------------------------------------------------------------- #
+T23_COL_FUNDING = "total funding"
+T23_COL_EXPENDITURE = "total expenditure"
+T23_COL_TRANSFERRED = "total transferred to hns"
+
+# Canonical name → accepted (normalized) header spellings. Keep this tight: the
+# importer writes the canonical names, these variants only guard against minor
+# header drift in the published form definition.
+_T23_COLUMN_ALIASES: dict[str, frozenset[str]] = {
+    T23_COL_FUNDING: frozenset({T23_COL_FUNDING}),
+    T23_COL_EXPENDITURE: frozenset({T23_COL_EXPENDITURE}),
+    T23_COL_TRANSFERRED: frozenset({
+        T23_COL_TRANSFERRED,
+        "total transferred",
+        "transferred to hns",
+    }),
+}
+
+# Reported-funding selection order for the support visual's single amount:
+# Total Funding first, then Total Expenditure, then Total Transferred to HNS.
+T23_FUNDING_PRIORITY: tuple[str, ...] = (
+    T23_COL_FUNDING,
+    T23_COL_EXPENDITURE,
+    T23_COL_TRANSFERRED,
+)
+
+
+def _normalize_column(col: str | None) -> str:
+    """Lowercase, trim, and collapse internal whitespace for header matching."""
+    return re.sub(r"\s+", " ", str(col or "").strip()).casefold()
+
+
+def t23_funding_column(col: str | None) -> str | None:
+    """Canonical T23 value column for *col*, or ``None`` (incl. Funding Requirement)."""
+    text = _normalize_column(col)
+    if not text:
+        return None
+    for canonical, aliases in _T23_COLUMN_ALIASES.items():
+        if text in aliases:
+            return canonical
+    return None
+
+
+def t23_host_row_metrics(cells: dict[str, Any], host_ns_id: int) -> dict[str, float]:
+    """Total Funding / Expenditure / Transferred for *host_ns_id*'s row in *cells*.
+
+    Only the three canonical columns are summed; anything else (Funding
+    Requirement, SP/EF splits, etc.) is ignored. Returns an empty dict when the
+    host NS has no reported value on this matrix.
+    """
+    prefix = f"{int(host_ns_id)}_"
+    metrics: dict[str, float] = {}
+    for key, raw in cells.items():
+        key_s = str(key)
+        if not key_s.startswith(prefix):
+            continue
+        row, col = _split_cell_key(key_s)
+        if str(row) != str(host_ns_id):
+            continue
+        canonical = t23_funding_column(col)
+        if not canonical:
+            continue
+        number = to_number(_resolve_matrix_cell(raw))
+        if not number:
+            continue
+        metrics[canonical] = metrics.get(canonical, 0.0) + number
+    return metrics
+
+
+def t23_reported_funding(metrics: dict[str, float]) -> float:
+    """Reported funding with fallback: Total Funding → Expenditure → Transferred."""
+    for column in T23_FUNDING_PRIORITY:
+        value = metrics.get(column)
+        if value:
+            return value
+    return 0.0
 
 def _load_t23_pns_totals(host_ns_id: int, period_name: str, year: int | None) -> dict[str, Any]:
     item_id = _pns_report_funding_item_id()
@@ -118,32 +210,22 @@ def _pns_ns_id_by_aes(assignments: list[AssignmentEntityStatus]) -> dict[int, in
 
 
 def sum_t23_host_cells(entries: list, host_ns_id: int) -> dict[str, Any]:
-    """Sum published T23 funding-matrix cells whose row is this host National Society."""
+    """Sum published T23 funding-matrix cells whose row is this host National Society.
+
+    Each metric (Total Funding / Total Expenditure / Total Transferred to HNS)
+    is kept separate for the financial network block. ``Funding Requirement`` is
+    a planning figure and is never counted.
+    """
     funding = expenditure = transferred = 0.0
     assignments = 0
-    prefix = f"{int(host_ns_id)}_"
     for entry in entries:
-        cells = _matrix_cells(entry)
-        hit = False
-        for key, raw in cells.items():
-            if not str(key).startswith(prefix):
-                continue
-            row, col = _split_cell_key(str(key))
-            if str(row) != str(host_ns_id):
-                continue
-            number = to_number(_resolve_matrix_cell(raw))
-            if not number:
-                continue
-            hit = True
-            lower = (col or "").lower()
-            if "expend" in lower:
-                expenditure += number
-            elif "transfer" in lower:
-                transferred += number
-            elif "fund" in lower:
-                funding += number
-        if hit:
-            assignments += 1
+        metrics = t23_host_row_metrics(_matrix_cells(entry), host_ns_id)
+        if not metrics:
+            continue
+        assignments += 1
+        funding += metrics.get(T23_COL_FUNDING, 0.0)
+        expenditure += metrics.get(T23_COL_EXPENDITURE, 0.0)
+        transferred += metrics.get(T23_COL_TRANSFERRED, 0.0)
     return {
         "funding": funding,
         "expenditure": expenditure,
@@ -311,23 +393,22 @@ def t23_host_funding_by_pns(
     host_ns_id: int,
     pns_ns_by_aes: dict[int, int],
 ) -> dict[int, float]:
-    """Per-PNS Total Funding from the published T23 funding matrix for this host NS."""
+    """Per-PNS reported funding from the published T23 matrix for this host NS.
+
+    For each reporting NS we read its row for *host_ns_id* and take, in order,
+    Total Funding → Total Expenditure → Total Transferred to HNS (first
+    non-empty wins). ``Funding Requirement`` is a planning figure and is never
+    used.
+    """
     by_pns: dict[int, float] = {}
-    prefix = f"{int(host_ns_id)}_"
     for entry in entries:
         pns_ns_id = pns_ns_by_aes.get(int(getattr(entry, "assignment_entity_status_id", 0) or 0))
         if not pns_ns_id:
             continue
-        cells = _matrix_cells(entry)
-        for key, raw in cells.items():
-            if not str(key).startswith(prefix):
-                continue
-            row, col = _split_cell_key(str(key))
-            if str(row) != str(host_ns_id) or not _is_support_funding_column(col):
-                continue
-            number = to_number(_resolve_matrix_cell(raw))
-            if number:
-                by_pns[int(pns_ns_id)] = by_pns.get(int(pns_ns_id), 0.0) + number
+        metrics = t23_host_row_metrics(_matrix_cells(entry), host_ns_id)
+        value = t23_reported_funding(metrics)
+        if value:
+            by_pns[int(pns_ns_id)] = by_pns.get(int(pns_ns_id), 0.0) + value
     return by_pns
 
 

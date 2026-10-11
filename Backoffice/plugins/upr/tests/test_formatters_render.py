@@ -544,6 +544,24 @@ def test_reach_full_row_packs_when_all_icons_present():
     empty_html = render_dashboard_html(empty_funding, "support")
     assert "<td class='upr-num' dir='ltr'>&nbsp;</td>" in empty_html
     assert "upr-support-total" in empty_html
+
+    # Zero total → blank cell, never "CHF 0".
+    zero_total = _payload()
+    zero_total["meta"]["kind"] = "report"
+    zero_total["support_total"] = {"value": 0, "display": ""}
+    zero_total_html = render_dashboard_html(zero_total, "support")
+    assert "CHF 0" not in zero_total_html
+    zero_footer = zero_total_html[zero_total_html.find("upr-support-total-row") :]
+    assert "upr-support-total'" in zero_footer
+    assert "CHF" not in zero_footer
+
+    # Plan support with a zero funding-requirement total is also blank.
+    zero_plan = _payload()
+    zero_plan["meta"]["kind"] = "plan"
+    zero_plan["support_total"] = {"value": 0, "display": ""}
+    zero_plan_html = render_dashboard_html(zero_plan, "support")
+    plan_footer = zero_plan_html[zero_plan_html.find("upr-support-total-row") :]
+    assert "CHF 0" not in plan_footer
     report_reach = render_dashboard_html(report_payload, "reach")
     assert "PEOPLE REACHED" in report_reach
     assert "upr-reach-headline" not in report_reach

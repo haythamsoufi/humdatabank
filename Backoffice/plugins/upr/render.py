@@ -27,6 +27,7 @@ from plugins.upr.formatters import (
     format_compact_chf,
     split_display_amount,
     strip_trailing_period,
+    to_number,
     with_chf,
 )
 from plugins.upr.audience import INTERNAL_COVER_BANNER, is_internal_narrative
@@ -100,6 +101,20 @@ def _amount_html(text: str | None) -> str:
             f"</span>"
         )
     return escape(raw)
+
+
+def _support_total_amount_html(total: dict[str, Any] | None) -> str:
+    """Support-table total cell. Blank (``&nbsp;``) when nothing is reported.
+
+    A zero total means no National Society reported a figure, so we leave the
+    cell empty rather than printing ``CHF 0``.
+    """
+    total = total or {}
+    value = to_number(total.get("value")) or 0
+    if not value:
+        return "&nbsp;"
+    display = (total.get("display") or "").strip() or format_compact_chf(value)
+    return _amount_html(with_chf(escape(display), prefix=True)) or "&nbsp;"
 
 
 def _metric_html(text: str | None, *, fallback: str | None = None) -> str:
@@ -1097,7 +1112,8 @@ def _support_plan(payload: dict[str, Any]) -> str:
             body.append(f"<tr>{_ltr_row(cells)}</tr>")
         index += span
     total = payload.get("support_total") or {}
-    total_display = escape((total.get("display") or "").strip() or format_compact_chf(total.get("value")) or "0")
+    # Nothing reported → leave the total blank instead of showing "CHF 0".
+    total_amount = _support_total_amount_html(total)
     confirmed_total = sum(float(row.get("confirmed") or 0) for row in rows)
     confirmed_total_display = format_compact_chf(confirmed_total) if confirmed_total else ""
     cols = [
@@ -1117,7 +1133,7 @@ def _support_plan(payload: dict[str, Any]) -> str:
     foot = [
         f"<td class='upr-ns'>{escape(t('Total'))}</td>",
         "<td></td>",
-        f"<td class='upr-num upr-support-total'{_ltr_num_attr()}>{_amount_html(with_chf(total_display, prefix=True))}</td>",
+        f"<td class='upr-num upr-support-total'{_ltr_num_attr()}>{total_amount}</td>",
         f"<td class='upr-num upr-support-confirmed'{_ltr_num_attr()}>{_amount_html(confirmed_total_display) or '&nbsp;'}</td>",
         f"<td colspan='{n_areas}'></td>",
     ]
@@ -1162,7 +1178,6 @@ def _support_report(payload: dict[str, Any]) -> str:
             + "</tr>"
         )
     total = payload.get("support_total") or {}
-    total_display = escape((total.get("display") or "").strip() or format_compact_chf(total.get("value")) or "0")
     cols = [
         "<col class='upr-support-col-ns'>",
         "<col class='upr-support-col-num'>",
@@ -1173,9 +1188,8 @@ def _support_report(payload: dict[str, Any]) -> str:
         f"<th class='upr-support-th'><span>{_wrapped_th_label(meta.get('support_funding_label') or t('Funding Reported'))}</span></th>",
         *_support_area_header_cells(),
     ]
-    total_amount = (
-        f"{_amount_html(with_chf(total_display, prefix=True))}"
-    )
+    # Nothing reported → leave the total blank instead of showing "CHF 0".
+    total_amount = _support_total_amount_html(total)
     # Report totals sit next to the number column; merge the remaining cells
     # in RTL so "Total" does not collide with the LTR amount. Plan support
     # has two amount columns plus a year gap, so it keeps the LTR colspan.

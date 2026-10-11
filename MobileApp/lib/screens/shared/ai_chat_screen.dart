@@ -19,6 +19,7 @@ import '../../config/routes.dart';
 import '../../theme/chat_immersive_palette.dart';
 import '../../utils/theme_extensions.dart';
 import '../../utils/accessibility_helper.dart';
+import '../../utils/ai_chat_plain_text.dart';
 import '../../utils/ai_chat_message_html_split.dart';
 import '../../widgets/chat_response_sources_details_extension.dart';
 import '../../widgets/bottom_navigation_bar.dart';
@@ -1231,7 +1232,8 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                               ),
                             ),
                           )
-                        : ListView.builder(
+                        : SelectionArea(
+                            child: ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(
                               _chatPagePaddingH,
@@ -1460,7 +1462,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                                 _buildActionIcon(
                                                   icon: Icons.copy,
                                                   color: _chatMuted(theme),
-                                                  onTap: () => _copyToClipboard(context, m.content, i),
+                                                  onTap: () => _copyToClipboard(context, aiChatHtmlToPlainText(m.content), i),
                                                   tooltip: localizations.aiTooltipCopy,
                                                 ),
                                                 if (_copiedMessageIndex == i)
@@ -1507,6 +1509,7 @@ class _AiChatScreenState extends State<AiChatScreen> with AutomaticKeepAliveClie
                                 ),
                               );
                             },
+                          ),
                           ),
                   ),
                 ),

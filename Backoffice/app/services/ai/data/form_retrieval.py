@@ -12,6 +12,7 @@ import math
 import re
 import unicodedata
 from contextlib import suppress
+from datetime import datetime as _dt
 from typing import Callable, Dict, List, Optional, Union, Any
 
 from sqlalchemy import func, or_
@@ -26,6 +27,7 @@ from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
 from app.utils.constants import DEFAULT_LIMIT_PERIODS, MAX_LIMIT_PERIODS
 from app.utils.datetime_helpers import utcnow
 from app.utils.form_localization import get_localized_country_name, get_localized_indicator_name
+from app.services.forms.reporting_period_service import period_chronology_sort_key
 from app.services.platform.app_settings_service import get_organization_name
 from app.utils.sql_utils import safe_ilike_pattern
 from flask_babel import gettext as _

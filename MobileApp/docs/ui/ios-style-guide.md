@@ -227,7 +227,8 @@ AppAppBar(
 ```
 
 The header matches the Dashboard heading (large left-aligned title, no divider).
-Back and menu icons are added automatically; `actions` are plain `IconButton`s.
+Back, menu and `actions` icons are placed in glass circle bubbles automatically;
+pass plain `IconButton`s and do not wrap them yourself.
 
 ### Bottom Navigation
 

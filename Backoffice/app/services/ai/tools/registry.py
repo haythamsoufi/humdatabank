@@ -181,6 +181,22 @@ def _indicator_bank_mgmt_allowed_tools() -> Set[str]:
     return allowed
 
 
+def _soft_error_from_result(result: Any) -> Optional[str]:
+    """Return the error message when a tool *returned* a failure dict instead of raising.
+
+    Service helpers report failures as ``{"error": ...}`` / ``{"success": False, "error": ...}``;
+    those must not be reported as a successful tool call (or cached as one).
+    """
+    if not isinstance(result, dict) or result.get("success") is True:
+        return None
+    err = result.get("error")
+    if err:
+        return str(err)
+    if result.get("success") is False:
+        return "Tool returned an unsuccessful result."
+    return None
+
+
 def tool_wrapper(func: Callable) -> Callable:
     """Decorator to wrap tool execution with caching, source gating, error handling, and logging."""
     @wraps(func)
@@ -309,21 +325,26 @@ def tool_wrapper(func: Callable) -> Callable:
             execution_time = (time.time() - start_time) * 1000
 
             logger.info("Tool %s completed in %.0fms", tool_name, execution_time)
+            result_error = _soft_error_from_result(result)
             payload = {
-                'success': True,
+                'success': result_error is None,
                 'result': result,
                 'execution_time_ms': execution_time,
             }
+            if result_error is not None:
+                payload['error'] = result_error
+                payload['error_type'] = 'ToolResultError'
+                logger.warning("Tool %s returned an error result: %s", tool_name, result_error)
             log_tool_usage(
                 tool_name=tool_name,
                 tool_input=log_kwargs,
                 tool_output=payload,
-                success=True,
-                error_message=None,
+                success=result_error is None,
+                error_message=result_error,
                 execution_time_ms=execution_time,
                 user_id=user_id,
             )
-            if cache_key:
+            if cache_key and result_error is None:
                 tool_cache_set(cache_key, payload, ttl_seconds=ttl_seconds, max_entries=max_entries)
             return payload
         except ToolExecutionError as e:

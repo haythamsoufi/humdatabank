@@ -56,6 +56,7 @@ from app.routes.api.mobile import (  # noqa: F401, E402
     auth,
     notifications,
     devices,
+    diagnostics,
     admin_users,
     admin_requests,
     admin_analytics,

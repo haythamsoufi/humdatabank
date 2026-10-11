@@ -110,6 +110,8 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
         return True
     if path.startswith("/api/mobile/v1/devices/"):
         return True
+    if path == "/api/mobile/v1/diagnostics/client-error":
+        return True
     if path in ("/api/mobile/v1/auth/session", "/api/mobile/v1/auth/refresh"):
         return True
 

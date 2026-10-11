@@ -51,6 +51,17 @@ class RetryConfig {
   });
 }
 
+/// An open streaming POST (for example Server-Sent Events). The caller must call [close]
+/// when done so the underlying connection is released.
+class ApiStreamedPost {
+  ApiStreamedPost(this.response, this._client);
+
+  final http.StreamedResponse response;
+  final http.Client _client;
+
+  void close() => _client.close();
+}
+
 class ApiService {
   static const String contentTypeJson = 'application/json';
   static const String contentTypeFormUrlEncoded =
@@ -340,6 +351,42 @@ class ApiService {
     if (!usedLiveNetwork) return;
     if (!BackendReachabilityService().matchesPrimaryBackend(uri)) return;
     BackendReachabilityService().recordPrimaryBackendTransportFailure();
+  }
+
+  /// Opens a streaming JSON POST using the same base URL and auth/platform headers as [post],
+  /// without its buffering, retries or response timeout. Used for Server-Sent Events.
+  Future<ApiStreamedPost> openStreamingPost(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    bool includeAuth = true,
+    Map<String, String>? additionalHeaders,
+    Duration connectTimeout = const Duration(seconds: 30),
+  }) async {
+    if (includeAuth) await _guardSessionExpiry();
+
+    final uri = Uri.parse('${AppConfig.baseApiUrl}$endpoint');
+    var headers = await _getHeaders(
+      includeAuth: includeAuth,
+      additionalHeaders: additionalHeaders,
+      httpMethod: 'POST',
+      endpoint: endpoint,
+    );
+    headers = await _applyRequestInterceptors(headers, endpoint);
+    headers['Accept'] = 'text/event-stream';
+    headers['Cache-Control'] = 'no-cache';
+
+    DebugLogger.logApi('POST (stream) ${uri.toString()}');
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', uri)
+        ..headers.addAll(headers)
+        ..body = jsonEncode(body);
+      final response = await client.send(request).timeout(connectTimeout);
+      return ApiStreamedPost(response, client);
+    } catch (_) {
+      client.close();
+      rethrow;
+    }
   }
 
   Future<http.Response> get(

@@ -6,6 +6,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../config/app_config.dart';
 import '../utils/debug_logger.dart';
+import '../utils/sse_event_parser.dart';
 import 'ai_chat_exception.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
@@ -168,6 +169,152 @@ class AiChatService {
     }
 
     throw lastError ?? Exception('Chat failed after retries');
+  }
+
+  /// Streams a chat turn over Server-Sent Events (`POST /api/ai/v2/chat/stream`).
+  ///
+  /// Each event is the decoded JSON object the server emitted (`meta`, `step`, `step_detail`,
+  /// `delta`, `structured`, `done`, `error`, `heartbeat`), i.e. the same envelopes the
+  /// WebSocket transport delivers. Unlike the WebSocket this works whenever the backend runs
+  /// with `WEBSOCKET_ENABLED=false`. Cancelling the subscription closes the connection.
+  ///
+  /// Failures before the stream opens (HTTP status, network) surface as stream errors:
+  /// [AiChatHttpException] for non-200 responses, transport exceptions otherwise.
+  Stream<Map<String, dynamic>> streamChatSse({
+    required String message,
+    String? conversationId,
+    String? clientMessageId,
+    Map<String, dynamic>? pageContext,
+    String preferredLanguage = 'en',
+    List<Map<String, dynamic>>? conversationHistory,
+    List<String>? sources,
+    bool branchFromEdit = false,
+    bool isAuthenticated = true,
+  }) {
+    final controller = StreamController<Map<String, dynamic>>();
+    ApiStreamedPost? open;
+    StreamSubscription<String>? lineSub;
+    var cancelled = false;
+
+    Future<void> release() async {
+      cancelled = true;
+      try {
+        await lineSub?.cancel();
+      } catch (_) {}
+      lineSub = null;
+      open?.close();
+      open = null;
+    }
+
+    controller.onCancel = release;
+
+    final Map<String, dynamic> body = {
+      ..._buildChatRequestBody(
+        message: message,
+        conversationId: conversationId,
+        clientMessageId: clientMessageId,
+        pageContext: pageContext,
+        preferredLanguage: preferredLanguage,
+        conversationHistory: conversationHistory,
+        sources: sources,
+        branchFromEdit: branchFromEdit,
+      ),
+      'keep_running_on_disconnect': true,
+    };
+
+    Future<ApiStreamedPost> openWith(String? token) {
+      return _api.openStreamingPost(
+        AppConfig.aiV2ChatStreamEndpoint,
+        body: body,
+        includeAuth: isAuthenticated,
+        additionalHeaders:
+            (token != null && token.isNotEmpty) ? {'Authorization': 'Bearer $token'} : null,
+      );
+    }
+
+    Future<void> run() async {
+      try {
+        var handle = await openWith(await getCachedToken());
+        if (cancelled) {
+          handle.close();
+          return;
+        }
+        if (isAuthenticated &&
+            (handle.response.statusCode == 401 || handle.response.statusCode == 403)) {
+          handle.close();
+          DebugLogger.logWarn(
+            'AI',
+            'Chat stream HTTP ${handle.response.statusCode}; refreshing token and retrying once',
+          );
+          await clearToken();
+          final refreshed = await fetchAndCacheToken();
+          if (refreshed == null || refreshed.isEmpty) {
+            throw AiChatHttpException.fromResponse(handle.response.statusCode, '');
+          }
+          handle = await openWith(refreshed);
+          if (cancelled) {
+            handle.close();
+            return;
+          }
+        }
+        open = handle;
+
+        if (handle.response.statusCode != 200) {
+          final errorBody = await handle.response.stream.bytesToString();
+          throw AiChatHttpException.fromResponse(handle.response.statusCode, errorBody);
+        }
+
+        final done = Completer<void>();
+        final parser = SseEventParser();
+
+        void emit(Map<String, dynamic>? event) {
+          if (event != null && !controller.isClosed && !cancelled) controller.add(event);
+        }
+
+        lineSub = handle.response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .listen(
+          (line) => emit(parser.addLine(line)),
+          onError: (Object e, StackTrace st) {
+            if (!done.isCompleted) done.completeError(e, st);
+          },
+          onDone: () {
+            emit(parser.flush());
+            if (!done.isCompleted) done.complete();
+          },
+          cancelOnError: true,
+        );
+
+        await done.future;
+      } catch (e, st) {
+        if (!cancelled && !controller.isClosed) controller.addError(e, st);
+      } finally {
+        open?.close();
+        open = null;
+        if (!controller.isClosed) await controller.close();
+      }
+    }
+
+    unawaited(run());
+    return controller.stream;
+  }
+
+  /// Best-effort server-side cancel for an SSE stream (the user pressed stop).
+  Future<void> cancelChatStream(String requestId) async {
+    if (requestId.isEmpty) return;
+    try {
+      final token = await getCachedToken();
+      await _api.post(
+        AppConfig.aiV2ChatCancelEndpoint,
+        includeAuth: true,
+        body: {'request_id': requestId},
+        additionalHeaders:
+            (token != null && token.isNotEmpty) ? {'Authorization': 'Bearer $token'} : null,
+      );
+    } catch (e) {
+      DebugLogger.logWarn('AI', 'Chat cancel request failed: $e');
+    }
   }
 
   Map<String, dynamic> _decodeChatSuccess(String body) {

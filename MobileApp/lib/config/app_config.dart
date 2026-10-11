@@ -581,7 +581,16 @@ class AppConfig {
   static const String aiApiV2Prefix = '/api/ai/v2';
   static const String aiV2TokenEndpoint = '$aiApiV2Prefix/token';
   static const String aiV2ChatEndpoint = '$aiApiV2Prefix/chat';
+  static const String aiV2ChatStreamEndpoint = '$aiApiV2Prefix/chat/stream';
+  static const String aiV2ChatCancelEndpoint = '$aiApiV2Prefix/chat/cancel';
   static const String aiV2WsEndpoint = '$aiApiV2Prefix/ws';
+
+  /// Stream AI replies over the WebSocket instead of Server-Sent Events. The backend only
+  /// serves `/api/ai/v2/ws` when it runs with `WEBSOCKET_ENABLED=true` (off in production), so
+  /// SSE is the default transport. Build with `--dart-define=AI_USE_WEBSOCKET=true` (or set it
+  /// in `.env`) against a backend that enables WebSockets.
+  static final bool aiUseWebSocket =
+      _envFlag('AI_USE_WEBSOCKET', defaultValue: false);
   static const String aiV2ConversationsEndpoint = '$aiApiV2Prefix/conversations';
   static const String aiV2FeedbackEndpoint = '$aiApiV2Prefix/feedback';
 }

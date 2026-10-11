@@ -74,7 +74,13 @@ class TestUprMasterAllowedRounds:
     def test_later_selected_rounds_do_not_map_to_periods(self):
         assert _periods_for_import_rounds({"P26", "P27"}) == {"2026"}
         assert _periods_for_import_rounds({"MYR26"}) == set()
-        assert _periods_for_import_rounds(None) is None
+        # Empty/omitted rounds = full allowlist, never "every period".
+        all_periods = _periods_for_import_rounds(None)
+        assert all_periods is not None
+        assert "2026" in all_periods  # P26
+        assert "Jan-Jun 2026" not in all_periods
+        assert "2027" not in all_periods
+        assert _periods_for_import_rounds(set()) == all_periods
 
 
 class TestRowCache:

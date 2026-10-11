@@ -27,6 +27,7 @@ from import_upr_excel_data import (  # noqa: E402
     is_pns_data_source,
     parse_pns_reported_yes,
     plan_non_reported_pns_aes_by_template,
+    pns_clear_periods_for_template,
     plan_pns_assignment_status_updates,
     t23_matrix_has_funding_columns,
     transform_to_import_rows,
@@ -277,13 +278,43 @@ class TestNonReportedPnsPlanning:
         ctx.pns_funding_item_id = 1433
         ctx.assignment_by_template = {
             22: {("2026", "GBR"): 3221, ("2026", "NLD"): 3208},
-            23: {("2026", "NLD"): 5001},
+            23: {("2025", "NLD"): 5001},
         }
-        by_tpl = plan_non_reported_pns_aes_by_template(ctx, [22, 23], periods={"2026"})
+        by_tpl = plan_non_reported_pns_aes_by_template(ctx, [22, 23], periods={"2025", "2026"})
         assert by_tpl[22] == {3208}
         assert by_tpl[23] == {5001}
         assert upr_pns_import_item_ids(ctx, 22) == {1303, 1314}
         assert upr_pns_import_item_ids(ctx, 23) == {1433}
+
+    def test_live_periods_never_planned_for_clearing_with_empty_rounds(self):
+        """MYR26 (T23 Jan-Jun 2026), AR26 and P27 are live: never non-reported."""
+        ctx = UprImportContext(template_ids=[22, 23])
+        ctx.assignment_by_template = {
+            22: {("2026", "NLD"): 3208, ("2027", "NLD"): 3300},
+            23: {
+                ("2025", "AUT"): 4001,
+                ("2026", "AUT"): 4002,
+                ("Jan-Jun 2026", "AUT"): 4096,
+                ("Jan-Jun 2025", "AUT"): 4003,
+            },
+        }
+        for rounds in (None, set()):
+            by_tpl = plan_non_reported_pns_aes_by_template(ctx, [22, 23], rounds=rounds)
+            assert by_tpl[22] == {3208}
+            assert by_tpl[23] == {4001}
+            plan = plan_pns_assignment_status_updates(ctx, [22, 23], rounds=rounds)
+            assert {r["assignment_entity_status_id"] for r in plan} == {3208, 4001}
+
+    def test_explicit_live_round_clears_nothing(self):
+        ctx = UprImportContext(template_ids=[23])
+        ctx.assignment_by_template = {23: {("Jan-Jun 2026", "AUT"): 4096}}
+        assert plan_non_reported_pns_aes_by_template(ctx, [23], rounds={"MYR26"})[23] == set()
+        assert plan_non_reported_pns_aes_by_template(ctx, [23], rounds={"AR26"})[23] == set()
+        assert pns_clear_periods_for_template(23, {"MYR25"}) == set()
+        assert pns_clear_periods_for_template(23, None) == {
+            "2021", "2022", "2023", "2024", "2025"
+        }
+        assert pns_clear_periods_for_template(22, None) == {"2023", "2024", "2025", "2026"}
 
 
 class TestPnsPendingResetMetadata:

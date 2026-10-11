@@ -543,16 +543,16 @@ def _build_pns_reported_yes_sets(
     return t22_yes, t23_yes
 
 
-def _periods_for_import_rounds(rounds: Optional[Set[str]]) -> Optional[Set[str]]:
-    """Map selected UPR round codes to assignment period names (None = all periods).
+def _periods_for_import_rounds(rounds: Optional[Set[str]]) -> Set[str]:
+    """Map selected UPR round codes to assignment period names.
 
-    Explicit later/unknown rounds (P27, MYR26, …) do not expand the period set.
-    An empty result is an empty set, not ``None`` (which would mean every period).
+    Always returns a concrete set (never ``None`` = "every period"). Empty/omitted
+    ``rounds`` means the full closed allowlist (``UPR_MASTER_ALLOWED_ROUNDS``);
+    explicit later/unknown rounds (P27, AR26, MYR26, …) are dropped.
     """
-    if not rounds:
-        return None
+    candidates = rounds if rounds else UPR_MASTER_ALLOWED_ROUNDS
     periods: Set[str] = set()
-    for rnd in rounds:
+    for rnd in candidates:
         if not is_upr_master_importable_round(rnd):
             continue
         period = round_to_period(rnd)
@@ -561,13 +561,49 @@ def _periods_for_import_rounds(rounds: Optional[Set[str]]) -> Optional[Set[str]]
     return periods
 
 
+def pns_clear_periods_for_template(
+    template_id: int,
+    rounds: Optional[Set[str]] = None,
+) -> Set[str]:
+    """Assignment periods the importer may treat as "not reported" for a PNS template.
+
+    Limited to allowlisted rounds whose prefix the template actually imports
+    (T22 → ``P``; T23 → ``AR``). Live periods such as ``Jan-Jun 2026`` (MYR26),
+    ``2026`` for T23 (AR26) etc. are never in scope, so their form data and status
+    are never cleared just because UPR Master has no row for them.
+    """
+    profile = UPR_TEMPLATE_PROFILES.get(int(template_id)) or {}
+    prefixes = tuple(str(p).upper() for p in (profile.get("round_prefixes") or ()))
+    if not prefixes:
+        return set()
+    candidates = rounds if rounds else UPR_MASTER_ALLOWED_ROUNDS
+    scoped: Set[str] = set()
+    for rnd in candidates:
+        code = str(rnd or "").strip().upper()
+        if not is_upr_master_importable_round(code):
+            continue
+        # "MYR" must not match prefix "P" etc.; compare against the alpha prefix.
+        alpha = "".join(ch for ch in code if ch.isalpha())
+        if alpha not in prefixes:
+            continue
+        period = round_to_period(code)
+        if period:
+            scoped.add(period)
+    return scoped
+
+
 def plan_non_reported_pns_aes_by_template(
     ctx: UprImportContext,
     template_ids: List[int],
     *,
     periods: Optional[Set[str]] = None,
+    rounds: Optional[Set[str]] = None,
 ) -> Dict[int, Set[int]]:
-    """Map template id → AES ids with no ``PNS reported = Yes`` in the import scope."""
+    """Map template id → AES ids with no ``PNS reported = Yes`` in the import scope.
+
+    Scope is always the allowlisted, template-appropriate periods (see
+    ``pns_clear_periods_for_template``); ``periods`` can only narrow it further.
+    """
     out: Dict[int, Set[int]] = {22: set(), 23: set()}
     template_reported = (
         (22, ctx.pns_t22_reported_aes),
@@ -576,8 +612,11 @@ def plan_non_reported_pns_aes_by_template(
     for tpl_id, reported_aes in template_reported:
         if tpl_id not in template_ids:
             continue
+        scope = pns_clear_periods_for_template(tpl_id, rounds)
+        if periods is not None:
+            scope &= set(periods)
         for (period, _iso3), aes_id in ctx.assignment_by_template.get(tpl_id, {}).items():
-            if periods is not None and period not in periods:
+            if period not in scope:
                 continue
             if int(aes_id) in reported_aes:
                 continue
@@ -605,9 +644,12 @@ def plan_pns_assignment_status_updates(
     template_ids: List[int],
     *,
     periods: Optional[Set[str]] = None,
+    rounds: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
     """Plan ``pending`` status for PNS templates with no ``PNS reported = Yes`` in Excel."""
-    by_template = plan_non_reported_pns_aes_by_template(ctx, template_ids, periods=periods)
+    by_template = plan_non_reported_pns_aes_by_template(
+        ctx, template_ids, periods=periods, rounds=rounds
+    )
     plan: List[Dict[str, Any]] = []
     for aes_ids in by_template.values():
         for aes_id in aes_ids:
@@ -640,7 +682,7 @@ def clear_non_reported_pns_form_data(
     by_template = plan_non_reported_pns_aes_by_template(
         ctx,
         template_ids,
-        periods=_periods_for_import_rounds(rounds),
+        rounds=rounds,
     )
 
     for tpl_id, aes_ids in by_template.items():
@@ -678,6 +720,26 @@ def clear_non_reported_pns_form_data(
     return stats, updated_sources
 
 
+def _refresh_completion_for_aes_ids(aes_ids: Set[int]) -> int:
+    """Recompute stored ``completion_rate`` so the UI never shows a stale 100% after import."""
+    if not aes_ids:
+        return 0
+    from app.extensions import db
+    from app.services.assignments.completion_service import AssignmentCompletionService
+
+    refreshed = 0
+    for aes_id in sorted(aes_ids):
+        try:
+            AssignmentCompletionService.refresh_and_persist(int(aes_id))
+            refreshed += 1
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning("Completion refresh failed (aes_id=%s): %s", aes_id, exc)
+    if refreshed:
+        db.session.commit()
+    return refreshed
+
+
 def sync_non_reported_pns_assignments(
     ctx: UprImportContext,
     template_ids: List[int],
@@ -695,9 +757,14 @@ def sync_non_reported_pns_assignments(
     status_plan = plan_pns_assignment_status_updates(
         ctx,
         template_ids,
-        periods=_periods_for_import_rounds(rounds),
+        rounds=rounds,
     )
     status_stats = apply_pns_pending_status_resets(status_plan, dry_run=dry_run)
+    if not dry_run:
+        _refresh_completion_for_aes_ids(
+            {int(src[0]) for src in updated_sources}
+            | {int(r["assignment_entity_status_id"]) for r in status_plan}
+        )
 
     if not dry_run and updated_sources:
         from app.services.forms.variable_resolution_service import VariableResolutionService

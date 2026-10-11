@@ -9,6 +9,7 @@ import '../../models/shared/ai_chat_launch_args.dart';
 import '../../utils/constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_navigation_drawer.dart';
+import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/home_landing/landing_ai_entry_card.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
@@ -212,6 +213,10 @@ class _HomeScreenState extends State<HomeScreen>
                 // Prevent the swipe-to-open gesture from revealing the drawer
                 // while the chat is in focus mode.
                 drawerEnableOpenDragGesture: !_chatExpanded,
+                onDrawerChanged: (isOpened) {
+                  ShellDrawerOpenNotification(isOpen: isOpened)
+                      .dispatch(context);
+                },
                 drawer: AppNavigationDrawer(
                   activeScreen: ActiveDrawerScreen.home,
                   onHomeSelected: reload,

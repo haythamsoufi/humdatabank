@@ -14,6 +14,7 @@ import '../../utils/navigation_helper.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
+import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/error_state.dart';
@@ -30,6 +31,13 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showSearch = false;
   String? _lastLanguage;
+  bool _sideDrawerOpen = false;
+
+  void _onDrawerChanged(bool isOpened) {
+    ShellDrawerOpenNotification(isOpen: isOpened).dispatch(context);
+    if (!mounted || _sideDrawerOpen == isOpened) return;
+    setState(() => _sideDrawerOpen = isOpened);
+  }
 
   @override
   void initState() {
@@ -121,6 +129,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         final language = languageProvider.currentLanguage;
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
+          onDrawerChanged: _onDrawerChanged,
           appBar: AppAppBar(
             title: _resourcesAppBarTitle(loc, provider),
             leading: Builder(
@@ -188,12 +197,15 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
             ],
           ),
           bottomNavigationBar: isStandalone
-              ? AppBottomNavigationBar(
-                  currentIndex: 2,
-                  onTap: (index) {
-                    NavigationHelper.popToMainThenOpenAiIfNeeded(
-                        context, index);
-                  },
+              ? DrawerAwareBottomBar(
+                  hidden: _sideDrawerOpen,
+                  child: AppBottomNavigationBar(
+                    currentIndex: 2,
+                    onTap: (index) {
+                      NavigationHelper.popToMainThenOpenAiIfNeeded(
+                          context, index);
+                    },
+                  ),
                 )
               : null,
         );

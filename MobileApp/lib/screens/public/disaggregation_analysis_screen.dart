@@ -13,6 +13,7 @@ import '../../services/disaggregation_data_service.dart';
 import '../../utils/navigation_helper.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
+import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/disaggregation/disagg_chart_panel.dart';
@@ -46,6 +47,13 @@ class _DisaggregationAnalysisScreenState
   String? _error;
   String? _lastLanguage;
   bool? _lastAuthenticated;
+  bool _sideDrawerOpen = false;
+
+  void _onDrawerChanged(bool isOpened) {
+    ShellDrawerOpenNotification(isOpen: isOpened).dispatch(context);
+    if (!mounted || _sideDrawerOpen == isOpened) return;
+    setState(() => _sideDrawerOpen = isOpened);
+  }
 
   @override
   bool get wantKeepAlive => true;
@@ -253,6 +261,7 @@ class _DisaggregationAnalysisScreenState
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      onDrawerChanged: _onDrawerChanged,
       appBar: AppAppBar(
         title: loc.disaggregationAnalysis,
         leading: Builder(
@@ -292,14 +301,17 @@ class _DisaggregationAnalysisScreenState
                   isFocalPoint: user?.isFocalPoint ?? false,
                   chatbotEnabled: chatbot,
                 );
-                return AppBottomNavigationBar(
-                  currentIndex: analysisIndex >= 0 ? analysisIndex : 0,
-                  onTap: (index) {
-                    NavigationHelper.popToMainThenOpenAiIfNeeded(
-                      context,
-                      index,
-                    );
-                  },
+                return DrawerAwareBottomBar(
+                  hidden: _sideDrawerOpen,
+                  child: AppBottomNavigationBar(
+                    currentIndex: analysisIndex >= 0 ? analysisIndex : 0,
+                    onTap: (index) {
+                      NavigationHelper.popToMainThenOpenAiIfNeeded(
+                        context,
+                        index,
+                      );
+                    },
+                  ),
                 );
               },
             )

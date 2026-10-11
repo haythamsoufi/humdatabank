@@ -11,6 +11,7 @@ import '../../utils/theme_extensions.dart';
 import '../../utils/ios_constants.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
+import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/admin_filter_panel.dart';
@@ -125,6 +126,13 @@ class IndicatorBankScreen extends StatefulWidget {
 class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _lastLanguage;
+  bool _sideDrawerOpen = false;
+
+  void _onDrawerChanged(bool isOpened) {
+    ShellDrawerOpenNotification(isOpen: isOpened).dispatch(context);
+    if (!mounted || _sideDrawerOpen == isOpened) return;
+    setState(() => _sideDrawerOpen = isOpened);
+  }
 
   @override
   void initState() {
@@ -300,6 +308,7 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
         return Scaffold(
           primary: true,
           backgroundColor: theme.scaffoldBackgroundColor,
+          onDrawerChanged: _onDrawerChanged,
           appBar: AppAppBar(
             title: localizations.indicatorBankTitle,
             leading: Builder(
@@ -406,14 +415,17 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
             ),
           ),
           bottomNavigationBar: _isStandaloneScreen(context)
-              ? AppBottomNavigationBar(
-                  currentIndex: 2, // Home tab highlighted
-                  onTap: (index) {
-                    NavigationHelper.popToMainThenOpenAiIfNeeded(
-                      context,
-                      index,
-                    );
-                  },
+              ? DrawerAwareBottomBar(
+                  hidden: _sideDrawerOpen,
+                  child: AppBottomNavigationBar(
+                    currentIndex: 2, // Home tab highlighted
+                    onTap: (index) {
+                      NavigationHelper.popToMainThenOpenAiIfNeeded(
+                        context,
+                        index,
+                      );
+                    },
+                  ),
                 )
               : null,
         );

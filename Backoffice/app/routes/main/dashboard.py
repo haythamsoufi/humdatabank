@@ -938,11 +938,11 @@ def dashboard():
     recent_activities = []
 
     if selected_country:
-        # Get recent activities for this country (last month, initial load of 10)
+        # Most recent activities for this country, however old (initial load of 10)
         recent_activities = filter_dashboard_assignment_activities(
             get_country_recent_activities(
                 country_id=selected_country.id,
-                days=30,
+                days=None,
                 limit=10,
             )
         )
@@ -1033,12 +1033,12 @@ def load_more_activities():
             from app.utils.api_responses import json_forbidden
             return json_forbidden('Access denied')
 
-        # Get more activities - when loading more, go beyond the 1 month limit
+        # Get more activities - no date cutoff, same ordering as the initial load
         fetch_limit = offset + limit + 1
         all_activities = filter_dashboard_assignment_activities(
             get_country_recent_activities(
                 country_id=country_id,
-                days=365,
+                days=None,
                 limit=fetch_limit,
             )
         )

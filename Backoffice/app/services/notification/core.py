@@ -594,22 +594,23 @@ def get_country_recent_activities(country_id, days=7, limit=50):
 
     Args:
         country_id (int): Country ID
-        days (int): Number of days to look back
+        days (int | None): Number of days to look back. ``None`` = no date cutoff
+            (the ``limit`` most recent entries, however old).
         limit (int): Maximum number of activities to return
 
     Returns:
         List of enhanced activity objects with audit trail information
     """
-    since_date = utcnow() - timedelta(days=days)
-
     # Get country activities - this is the main source of activities
     # Use entity-based query for consistency
+    conditions = [
+        EntityActivityLog.entity_type == 'country',
+        EntityActivityLog.entity_id == country_id,
+    ]
+    if days is not None:
+        conditions.append(EntityActivityLog.timestamp >= utcnow() - timedelta(days=days))
     country_activities = EntityActivityLog.query.filter(
-        and_(
-            EntityActivityLog.entity_type == 'country',
-            EntityActivityLog.entity_id == country_id,
-            EntityActivityLog.timestamp >= since_date
-        )
+        and_(*conditions)
     ).order_by(desc(EntityActivityLog.timestamp)).limit(limit).all()
 
     current_app.logger.debug(f"Found {len(country_activities)} country activities for country {country_id}")

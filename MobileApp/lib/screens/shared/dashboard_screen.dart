@@ -62,6 +62,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   String? _dismissedStaleBundleSignature;
   OfflineProvider? _offlineProviderListenerRef;
   bool _offlineStaleAutoRefreshInProgress = false;
+  bool _templatePrefetchInProgress = false;
+  final Set<int> _templatePrefetchFailedIds = {};
+  DashboardProvider? _dashboardProviderListenerRef;
+  String _lastAssignmentSetSignature = '';
 
   /// Own controller so this list does not share the route's primary scroller
   /// with the other tabs in the page view. Those siblings can leave a non-zero
@@ -100,12 +104,18 @@ class _DashboardScreenState extends State<DashboardScreen>
         listen: false,
       );
       _offlineProviderListenerRef!.addListener(_onOfflineProviderChanged);
+      _dashboardProviderListenerRef = Provider.of<DashboardProvider>(
+        context,
+        listen: false,
+      );
+      _dashboardProviderListenerRef!.addListener(_onDashboardProviderChanged);
     });
   }
 
   @override
   void dispose() {
     _offlineProviderListenerRef?.removeListener(_onOfflineProviderChanged);
+    _dashboardProviderListenerRef?.removeListener(_onDashboardProviderChanged);
     _scrollController.removeListener(_onDashboardScroll);
     _scrollController.dispose();
     _animationController.dispose();
@@ -141,6 +151,77 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _onOfflineProviderChanged() {
     if (!mounted) return;
     unawaited(_tryAutoRefreshStaleOfflineCopies());
+  }
+
+  /// The assignment list changes when another entity is selected; offline copy
+  /// state is keyed by assignment id, so it has to be recomputed for the new list.
+  void _onDashboardProviderChanged() {
+    if (!mounted) return;
+    final provider = _dashboardProviderListenerRef;
+    if (provider == null || provider.isLoading) return;
+    final signature = [
+      ...provider.currentAssignments.map((a) => a.id),
+      -1,
+      ...provider.pastAssignments.map((a) => a.id),
+    ].join(',');
+    if (signature == _lastAssignmentSetSignature) return;
+    _lastAssignmentSetSignature = signature;
+    unawaited(() async {
+      await _syncOfflineBundleAndStaleState(
+        provider.currentAssignments,
+        provider.pastAssignments,
+      );
+      await _prepareAssignmentsForSavedTemplates();
+    }());
+  }
+
+  /// Offline forms are saved per template, not per entity. Assignments (for the
+  /// current entity) that use a template already saved on this device get their
+  /// own copy prepared automatically; shared static files are reused locally.
+  Future<void> _prepareAssignmentsForSavedTemplates() async {
+    if (!mounted || _templatePrefetchInProgress || shouldDeferRemoteFetch) {
+      return;
+    }
+    final offline = Provider.of<OfflineProvider>(context, listen: false);
+    if (!offline.isOnline) return;
+
+    final dashboardProvider = Provider.of<DashboardProvider>(
+      context,
+      listen: false,
+    );
+    final languageProvider = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    );
+    final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
+
+    _templatePrefetchInProgress = true;
+    try {
+      final savedTemplateIds =
+          await AssignmentOfflineBundleService().templateIdsWithBundles();
+      if (savedTemplateIds.isEmpty) return;
+      final pending = dashboardProvider.currentAssignments.where((a) {
+        final templateId = a.templateId;
+        return templateId != null &&
+            savedTemplateIds.contains(templateId) &&
+            !_offlineBundleAssignmentIds.contains(a.id) &&
+            !_downloadingOfflineAssignmentIds.contains(a.id) &&
+            !_templatePrefetchFailedIds.contains(a.id) &&
+            _shouldShowEnterDataButton(role, a);
+      }).toList();
+      for (final assignment in pending) {
+        if (!mounted || shouldDeferRemoteFetch) break;
+        final ok = await _downloadOfflineBundle(
+          context,
+          assignment,
+          languageProvider,
+          silent: true,
+        );
+        if (!ok) _templatePrefetchFailedIds.add(assignment.id);
+      }
+    } finally {
+      _templatePrefetchInProgress = false;
+    }
   }
 
   String _staleBundleSignature() {
@@ -276,6 +357,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     if (mounted) {
       unawaited(_tryAutoRefreshStaleOfflineCopies());
+      if (forceRefresh) _templatePrefetchFailedIds.clear();
+      unawaited(_prepareAssignmentsForSavedTemplates());
     }
 
     // [checkAuthStatus(forceRevalidate: true)] already validated the session and
@@ -315,6 +398,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       final assignment = byId[id];
       if (assignment == null) continue;
       final meta = await svc.readBundleMeta(id);
+      final templateId = assignment.templateId;
+      if (templateId != null && meta != null && meta.templateId == null) {
+        await svc.backfillTemplateId(id, templateId);
+      }
       if (isAssignmentOfflineBundleStale(assignment, meta)) {
         stale.add(id);
       }
@@ -404,6 +491,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         formDefinitionUpdatedAtIso: assignment.formDefinitionUpdatedAt
             ?.toUtc()
             .toIso8601String(),
+        templateId: assignment.templateId,
       );
       if (!context.mounted) return false;
       setState(() {
@@ -444,7 +532,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       listen: false,
     );
     try {
-      await AssignmentOfflineBundleService().deleteBundle(assignment.id);
+      final svc = AssignmentOfflineBundleService();
+      final templateId = assignment.templateId;
+      if (templateId != null) {
+        await svc.deleteBundlesForTemplate(
+          templateId,
+          alsoAssignmentId: assignment.id,
+        );
+      } else {
+        await svc.deleteBundle(assignment.id);
+      }
       if (!context.mounted) return;
       await _syncOfflineBundleAndStaleState(
         dashboardProvider.currentAssignments,

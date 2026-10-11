@@ -62,6 +62,14 @@ void main() {
       expect(a.completionRate, 1.0);
     });
 
+    test('parses template_id and round-trips it through toJson', () {
+      final a = Assignment.fromJson({'id': 1, 'name': 'x', 'template_id': 42});
+
+      expect(a.templateId, 42);
+      expect(a.toJson()['template_id'], 42);
+      expect(Assignment.fromJson({'id': 1, 'name': 'x'}).templateId, isNull);
+    });
+
     test('is_effectively_closed defaults to false for non-boolean values', () {
       final a = Assignment.fromJson({
         'id': 1,

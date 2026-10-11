@@ -19,9 +19,12 @@ class AssignmentOfflineBundleMeta {
     this.savedAtUtc,
     required this.assetCount,
     this.formDefinitionUpdatedAtIso,
+    this.templateId,
   });
 
   final int assignmentId;
+  /// Form template the saved page belongs to (null for bundles saved by older builds).
+  final int? templateId;
   final String? sourceUrl;
   final DateTime? savedAtUtc;
   final int assetCount;
@@ -122,10 +125,118 @@ class AssignmentOfflineBundleService {
         assetCount: (raw['asset_count'] as num?)?.toInt() ?? 0,
         formDefinitionUpdatedAtIso:
             raw['form_definition_updated_at']?.toString(),
+        templateId: (raw['template_id'] as num?)?.toInt(),
       );
     } catch (_) {
       return null;
     }
+  }
+
+  Future<Map<String, dynamic>?> _readMetaJson(Directory dir) async {
+    final f = File(p.join(dir.path, _metaFileName));
+    try {
+      if (!await f.exists()) return null;
+      final raw = jsonDecode(await f.readAsString());
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+    } catch (_) {}
+    return null;
+  }
+
+  Future<List<Directory>> _bundleDirs() async {
+    final root = await _rootDir();
+    final out = <Directory>[];
+    await for (final e in root.list(followLinks: false)) {
+      if (e is Directory && p.basename(e.path).startsWith('assignment_')) {
+        out.add(e);
+      }
+    }
+    return out;
+  }
+
+  /// Template ids that have at least one saved offline form on this device.
+  ///
+  /// The package (form markup + `/static/` assets) is template-wide, so any
+  /// assignment — for any entity — that uses one of these templates can be
+  /// prepared from it without re-downloading the shared files.
+  Future<Set<int>> templateIdsWithBundles() async {
+    final ids = <int>{};
+    for (final dir in await _bundleDirs()) {
+      if (!File(p.join(dir.path, 'index.html')).existsSync()) continue;
+      final id = ((await _readMetaJson(dir))?['template_id'] as num?)?.toInt();
+      if (id != null) ids.add(id);
+    }
+    return ids;
+  }
+
+  /// Records [templateId] on a bundle saved before template ids were tracked.
+  Future<void> backfillTemplateId(int assignmentId, int templateId) async {
+    final dir = await bundleDirFor(assignmentId);
+    final meta = await _readMetaJson(dir);
+    if (meta == null || meta['template_id'] != null) return;
+    meta['template_id'] = templateId;
+    await File(p.join(dir.path, _metaFileName))
+        .writeAsString(jsonEncode(meta), flush: true);
+  }
+
+  /// Removes every saved form that belongs to [templateId], plus
+  /// [alsoAssignmentId]'s own copy.
+  Future<void> deleteBundlesForTemplate(
+    int templateId, {
+    int? alsoAssignmentId,
+  }) async {
+    for (final dir in await _bundleDirs()) {
+      final id = ((await _readMetaJson(dir))?['template_id'] as num?)?.toInt();
+      if (id == templateId) {
+        await dir.delete(recursive: true);
+      }
+    }
+    if (alsoAssignmentId != null) {
+      await deleteBundle(alsoAssignmentId);
+    }
+  }
+
+  /// A saved copy of the same template whose static files can be reused locally.
+  /// Requires the same published form definition so assets and markup were
+  /// captured from the same server release.
+  Future<Directory?> _findReusableBundleDir({
+    required int templateId,
+    required int excludeAssignmentId,
+    required String? formDefinitionUpdatedAtIso,
+  }) async {
+    if (formDefinitionUpdatedAtIso == null ||
+        formDefinitionUpdatedAtIso.isEmpty) {
+      return null;
+    }
+    final wanted = DateTime.tryParse(formDefinitionUpdatedAtIso);
+    if (wanted == null) return null;
+    Directory? best;
+    DateTime? bestSavedAt;
+    for (final dir in await _bundleDirs()) {
+      if (p.basename(dir.path) == 'assignment_$excludeAssignmentId') continue;
+      if (!File(p.join(dir.path, 'index.html')).existsSync()) continue;
+      final meta = await _readMetaJson(dir);
+      if (meta == null || (meta['template_id'] as num?)?.toInt() != templateId) {
+        continue;
+      }
+      final cached = DateTime.tryParse(
+        meta['form_definition_updated_at']?.toString() ?? '',
+      );
+      if (cached == null ||
+          (cached.toUtc().millisecondsSinceEpoch -
+                      wanted.toUtc().millisecondsSinceEpoch)
+                  .abs() >
+              1500) {
+        continue;
+      }
+      final savedAt =
+          DateTime.tryParse(meta['saved_at']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+      if (bestSavedAt == null || savedAt.isAfter(bestSavedAt)) {
+        best = dir;
+        bestSavedAt = savedAt;
+      }
+    }
+    return best;
   }
 
   Future<String?> readOfflineIndexHtml(int assignmentId) async {
@@ -190,7 +301,15 @@ class AssignmentOfflineBundleService {
     required String language,
     String? sessionCookieHeader,
     String? formDefinitionUpdatedAtIso,
+    int? templateId,
   }) async {
+    final reuseDir = templateId == null
+        ? null
+        : await _findReusableBundleDir(
+            templateId: templateId,
+            excludeAssignmentId: assignmentId,
+            formDefinitionUpdatedAtIso: formDefinitionUpdatedAtIso,
+          );
     final resolved = UrlHelper.resolveWebViewInitialUrl(formPath, language);
     final pageUri = Uri.parse(resolved);
 
@@ -307,35 +426,42 @@ class AssignmentOfflineBundleService {
       await localFile.parent.create(recursive: true);
 
       try {
-        final r = await _dio.get<List<int>>(
-          absKey,
-          options: Options(
-            responseType: ResponseType.bytes,
-            headers: headers,
-          ),
-        );
-        final sc = r.statusCode ?? 0;
-        if (sc >= 400 || r.data == null) {
-          final isCss = _pathLooksLikeCss(absolute.path);
-          if (_mirrorSkipIsBenign404(absolute, sc)) {
-            DebugLogger.log(
-              'OFFLINE_BUNDLE',
-              'Skip optional/missing asset HTTP $sc: $absolute',
-              level: LogLevel.debug,
-            );
-          } else {
-            DebugLogger.logWarn(
-              'OFFLINE_BUNDLE',
-              'Skip asset HTTP $sc${isCss ? ' (CSS)' : ''}: $absolute',
-            );
+        final reusable =
+            reuseDir == null ? null : File(p.join(reuseDir.path, relPath));
+        final List<int> body;
+        if (reusable != null && await reusable.exists()) {
+          body = await reusable.readAsBytes();
+        } else {
+          final r = await _dio.get<List<int>>(
+            absKey,
+            options: Options(
+              responseType: ResponseType.bytes,
+              headers: headers,
+            ),
+          );
+          final sc = r.statusCode ?? 0;
+          if (sc >= 400 || r.data == null) {
+            final isCss = _pathLooksLikeCss(absolute.path);
+            if (_mirrorSkipIsBenign404(absolute, sc)) {
+              DebugLogger.log(
+                'OFFLINE_BUNDLE',
+                'Skip optional/missing asset HTTP $sc: $absolute',
+                level: LogLevel.debug,
+              );
+            } else {
+              DebugLogger.logWarn(
+                'OFFLINE_BUNDLE',
+                'Skip asset HTTP $sc${isCss ? ' (CSS)' : ''}: $absolute',
+              );
+            }
+            continue;
           }
-          continue;
+          if (r.data!.length > _maxAssetBytes) {
+            DebugLogger.logWarn('OFFLINE_BUNDLE', 'Skip large asset: $absolute');
+            continue;
+          }
+          body = r.data!;
         }
-        if (r.data!.length > _maxAssetBytes) {
-          DebugLogger.logWarn('OFFLINE_BUNDLE', 'Skip large asset: $absolute');
-          continue;
-        }
-        final body = r.data!;
         await localFile.writeAsBytes(body, flush: true);
         final relPosix = relPath.replaceAll(r'\', '/');
         savedRelByAbsolute[absKey] = relPosix;
@@ -401,6 +527,7 @@ class AssignmentOfflineBundleService {
 
     final meta = <String, dynamic>{
       'assignment_id': assignmentId,
+      if (templateId != null) 'template_id': templateId,
       'source_url': resolved,
       'saved_at': DateTime.now().toUtc().toIso8601String(),
       'asset_count': count,

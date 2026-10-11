@@ -168,6 +168,7 @@ Supported mappings (XLSForm → native):
 **Offline flow:**
 1. User taps "Download" on an `AssignmentCard` while online.
 2. `AssignmentOfflineBundleService` crawls the HTML page + up to ~400 same-origin static assets, rewrites URLs for `file://`, patches out the service worker registration.
+   The download is template-scoped: the dashboard API returns `template_id`, bundle metadata records it, and any other assignment (including for another entity) that uses a template already saved on the device is prepared automatically while online, reusing the saved `/static/` files locally. "Remove offline copy" removes all saved copies of that template.
 3. When offline, `WebViewScreen` loads `file://…/offline_assignment_bundles/assignment_<id>/index.html`.
 4. `auth-drafts.js` (Backoffice JS) intercepts Save/Submit → saves to IndexedDB → shows "draft saved" message.
 5. **There is no submission outbox.** The user must come back online and manually resubmit.

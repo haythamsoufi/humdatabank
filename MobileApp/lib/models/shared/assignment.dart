@@ -23,6 +23,10 @@ class Assignment {
   /// Used to detect outdated offline bundles vs the live form definition.
   final DateTime? formDefinitionUpdatedAt;
 
+  /// Form template this assignment was created from. Offline form packages are
+  /// shared by every assignment (and entity) that uses the same template.
+  final int? templateId;
+
   Assignment({
     required this.id,
     required this.name,
@@ -43,6 +47,7 @@ class Assignment {
     this.latestPublicSubmissionAt,
     this.isEffectivelyClosed = false,
     this.formDefinitionUpdatedAt,
+    this.templateId,
   });
 
   factory Assignment.fromJson(Map<String, dynamic> json) {
@@ -87,6 +92,7 @@ class Assignment {
       formDefinitionUpdatedAt: json['form_definition_updated_at'] != null
           ? DateTime.tryParse(json['form_definition_updated_at'].toString())
           : null,
+      templateId: (json['template_id'] as num?)?.toInt(),
     );
   }
 
@@ -113,6 +119,7 @@ class Assignment {
       'is_effectively_closed': isEffectivelyClosed,
       'form_definition_updated_at':
           formDefinitionUpdatedAt?.toUtc().toIso8601String(),
+      'template_id': templateId,
     };
   }
 

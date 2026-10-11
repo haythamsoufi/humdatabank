@@ -885,6 +885,7 @@ def get_dashboard():
                     assigned_form and assigned_form.is_public_accessible()
                 )
 
+                template_id = assigned_form.template_id if assigned_form else None
                 form_definition_updated_at = None
                 if assigned_form and assigned_form.template:
                     pv = assigned_form.template.published_version
@@ -917,6 +918,7 @@ def get_dashboard():
                     if pub_latest_at
                     else None,
                     'form_definition_updated_at': form_definition_updated_at,
+                    'template_id': template_id,
                 }
 
                 # Categorize as current or past (same rules as main.dashboard)

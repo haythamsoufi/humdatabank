@@ -169,8 +169,13 @@ Supported mappings (XLSForm → native):
 1. User taps "Download" on an `AssignmentCard` while online.
 2. `AssignmentOfflineBundleService` crawls the HTML page + up to ~400 same-origin static assets, rewrites URLs for `file://`, patches out the service worker registration.
    The download is template-scoped: the dashboard API returns `template_id`, bundle metadata records it, and any other assignment (including for another entity) that uses a template already saved on the device is prepared automatically while online, reusing the saved `/static/` files locally. "Remove offline copy" removes all saved copies of that template.
+   Preparation of sibling assignments runs on Wi-Fi/Ethernet only, with a 10-minute retry backoff after a failure.
+   The crawl is built in a temporary folder and swapped in only when every JS/CSS file was fetched, so a failed refresh keeps the previous working copy.
+   Copies live under a per-user folder and are deleted on logout; copies for closed assignments or older than 45 days (or beyond 60 copies) are pruned after an online dashboard load.
+   **Form data for offline use:** while downloading, a headless WebView loads the live form and a `fetch` recorder (`offline_form_scripts.dart`) captures the JSON the form itself requests (variable resolution, plugin/emergency-operations lookups, matrix data). Responses are stored in `offline_api_cache.json/.js` inside the bundle and replayed by an offline `fetch` wrapper; anything not cached falls through to the network and fails gracefully. The live WebView also keeps appending to the cache while the user works online.
+   Staleness compares the form definition timestamp, `static_version` (deployed asset version), `data_version` (latest assignment activity), and the app language.
 3. When offline, `WebViewScreen` loads `file://…/offline_assignment_bundles/assignment_<id>/index.html`.
-4. `auth-drafts.js` (Backoffice JS) intercepts Save/Submit → saves to IndexedDB → shows "draft saved" message.
+4. `auth-drafts.js` (Backoffice JS) intercepts Save → saves to IndexedDB. In the offline bundle, Submit / Send for review / Approve / Reopen are blocked with an "online only" message (the draft is saved first); validation and evaluation run on the server when the user submits online.
 5. **There is no submission outbox.** The user must come back online and manually resubmit.
 
 **Why the offline bundle approach is fragile:**

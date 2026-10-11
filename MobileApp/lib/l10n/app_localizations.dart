@@ -582,6 +582,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'This offline copy may not match the current online form. Update it to avoid version issues.',
       'offline_stale_bundle_update_now': 'Update offline copy',
+      'offline_submit_requires_connection': 'You are offline. Your changes are saved as a draft on this device. Submit when you are back online; the form is checked before it is submitted.',
       'approve': 'Approve',
       'reopen': 'Reopen',
       'view_public_submissions': 'View Public Submissions',
@@ -1779,6 +1780,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'Esta copia sin conexión puede no coincidir con el formulario en línea actual. Actualícela para evitar problemas de versión.',
       'offline_stale_bundle_update_now': 'Actualizar copia sin conexión',
+      'offline_submit_requires_connection': 'Está sin conexión. Sus cambios se guardan como borrador en este dispositivo. Envíe el formulario cuando vuelva a tener conexión; se validará antes de enviarse.',
       'approve': 'Aprobar',
       'reopen': 'Reabrir',
       'view_public_submissions': 'Ver Envíos Públicos',
@@ -2806,6 +2808,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'Cette copie hors ligne peut ne plus correspondre au formulaire en ligne actuel. Mettez-la à jour pour éviter des problèmes de version.',
       'offline_stale_bundle_update_now': 'Mettre à jour la copie hors ligne',
+      'offline_submit_requires_connection': 'Vous êtes hors ligne. Vos modifications sont enregistrées comme brouillon sur cet appareil. Soumettez le formulaire une fois reconnecté ; il sera vérifié avant l’envoi.',
       'approve': 'Approuver',
       'reopen': 'Rouvrir',
       'view_public_submissions': 'Voir les Soumissions Publiques',
@@ -3822,6 +3825,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'قد لا تطابق هذه النسخة دون اتصال النموذج الحالي على الخادم. حدّثها لتجنب مشاكل الإصدارات.',
       'offline_stale_bundle_update_now': 'تحديث النسخة دون اتصال',
+      'offline_submit_requires_connection': 'أنت غير متصل بالإنترنت. تم حفظ تغييراتك كمسودة على هذا الجهاز. أرسل النموذج عند عودة الاتصال؛ سيتم التحقق منه قبل الإرسال.',
       'approve': 'الموافقة',
       'reopen': 'إعادة الفتح',
       'view_public_submissions': 'عرض التقديمات العامة',
@@ -4816,6 +4820,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'यह ऑफ़लाइन प्रति वर्तमान ऑनलाइन फ़ॉर्म से मेल नहीं खा सकती। संस्करण समस्याओं से बचने के लिए अपडेट करें।',
       'offline_stale_bundle_update_now': 'ऑफ़लाइन प्रति अपडेट करें',
+      'offline_submit_requires_connection': 'आप ऑफ़लाइन हैं। आपके बदलाव इस डिवाइस पर ड्राफ़्ट के रूप में सहेजे गए हैं। ऑनलाइन होने पर फ़ॉर्म जमा करें; जमा करने से पहले उसकी जाँच की जाएगी।',
       'approve': 'अनुमोदित करें',
       'reopen': 'पुनः खोलें',
       'view_public_submissions': 'सार्वजनिक सबमिशन देखें',
@@ -5835,6 +5840,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           'Эта офлайн-копия может не соответствовать текущей онлайн-форме. Обновите её, чтобы избежать проблем с версией.',
       'offline_stale_bundle_update_now': 'Обновить офлайн-копию',
+      'offline_submit_requires_connection': 'Вы не в сети. Ваши изменения сохранены как черновик на этом устройстве. Отправьте форму, когда снова появится подключение; перед отправкой она будет проверена.',
       'approve': 'Одобрить',
       'reopen': 'Переоткрыть',
       'view_public_submissions': 'Просмотр Публичных Отправок',
@@ -6822,6 +6828,7 @@ class AppLocalizations {
       'offline_stale_bundle_sheet_notice':
           '此离线副本可能与当前在线表单不一致。请更新以避免版本问题。',
       'offline_stale_bundle_update_now': '更新离线副本',
+      'offline_submit_requires_connection': '您当前处于离线状态。您的更改已作为草稿保存在此设备上。恢复联网后再提交表单；提交前会对其进行校验。',
       'approve': '批准',
       'reopen': '重新开放',
       'view_public_submissions': '查看公开提交',
@@ -8106,6 +8113,8 @@ class AppLocalizations {
       translate('offline_stale_bundle_sheet_notice');
   String get offlineStaleBundleUpdateNow =>
       translate('offline_stale_bundle_update_now');
+  String get offlineSubmitRequiresConnection =>
+      translate('offline_submit_requires_connection');
   String get approve => translate('approve');
   String get reopen => translate('reopen');
   String get viewPublicSubmissions => translate('view_public_submissions');

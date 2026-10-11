@@ -25,6 +25,8 @@ import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/dashboard_focal_points_section.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
 import '../../services/assignment_offline_bundle_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../services/offline_api_recorder.dart';
 import '../../services/storage_service.dart';
 import '../../utils/network_availability.dart';
 import '../../di/service_locator.dart';
@@ -63,7 +65,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   OfflineProvider? _offlineProviderListenerRef;
   bool _offlineStaleAutoRefreshInProgress = false;
   bool _templatePrefetchInProgress = false;
-  final Set<int> _templatePrefetchFailedIds = {};
+  /// Assignments whose background preparation failed, with the time of failure;
+  /// retried after [_templatePrefetchRetryAfter].
+  final Map<int, DateTime> _templatePrefetchFailedAt = {};
+  static const Duration _templatePrefetchRetryAfter = Duration(minutes: 10);
   DashboardProvider? _dashboardProviderListenerRef;
   String _lastAssignmentSetSignature = '';
 
@@ -184,6 +189,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     final offline = Provider.of<OfflineProvider>(context, listen: false);
     if (!offline.isOnline) return;
+    if (!await ConnectivityService().isOnUnmeteredNetwork()) return;
+    if (!mounted) return;
 
     final dashboardProvider = Provider.of<DashboardProvider>(
       context,
@@ -206,7 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             savedTemplateIds.contains(templateId) &&
             !_offlineBundleAssignmentIds.contains(a.id) &&
             !_downloadingOfflineAssignmentIds.contains(a.id) &&
-            !_templatePrefetchFailedIds.contains(a.id) &&
+            !_prefetchRecentlyFailed(a.id) &&
             _shouldShowEnterDataButton(role, a);
       }).toList();
       for (final assignment in pending) {
@@ -217,11 +224,21 @@ class _DashboardScreenState extends State<DashboardScreen>
           languageProvider,
           silent: true,
         );
-        if (!ok) _templatePrefetchFailedIds.add(assignment.id);
+        if (ok) {
+          _templatePrefetchFailedAt.remove(assignment.id);
+        } else {
+          _templatePrefetchFailedAt[assignment.id] = DateTime.now();
+        }
       }
     } finally {
       _templatePrefetchInProgress = false;
     }
+  }
+
+  bool _prefetchRecentlyFailed(int id) {
+    final at = _templatePrefetchFailedAt[id];
+    return at != null &&
+        DateTime.now().difference(at) < _templatePrefetchRetryAfter;
   }
 
   String _staleBundleSignature() {
@@ -236,6 +253,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     final offline = Provider.of<OfflineProvider>(context, listen: false);
     if (!offline.isOnline) return;
+    if (!await ConnectivityService().isOnUnmeteredNetwork()) return;
+    if (!mounted) return;
 
     _offlineStaleAutoRefreshInProgress = true;
     final loc = AppLocalizations.of(context)!;
@@ -343,6 +362,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       forceRefresh: isAuthenticated || forceRefresh,
     );
 
+    await _pruneOfflineBundles(
+      dashboardProvider.currentAssignments,
+      dashboardProvider.pastAssignments,
+    );
     await _syncOfflineBundleAndStaleState(
       dashboardProvider.currentAssignments,
       dashboardProvider.pastAssignments,
@@ -357,7 +380,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     if (mounted) {
       unawaited(_tryAutoRefreshStaleOfflineCopies());
-      if (forceRefresh) _templatePrefetchFailedIds.clear();
+      if (forceRefresh) _templatePrefetchFailedAt.clear();
       unawaited(_prepareAssignmentsForSavedTemplates());
     }
 
@@ -369,6 +392,24 @@ class _DashboardScreenState extends State<DashboardScreen>
       dashboardProvider.loadEntities();
       notificationProvider.refreshUnreadCount(authProvider: authProvider);
     }
+  }
+
+  /// Frees storage held by copies that are old or belong to closed assignments.
+  /// Only runs after a successful online load so an empty or failed response
+  /// can never be mistaken for "everything is closed".
+  Future<void> _pruneOfflineBundles(
+    List<Assignment> current,
+    List<Assignment> past,
+  ) async {
+    if (current.isEmpty && past.isEmpty) return;
+    try {
+      await AssignmentOfflineBundleService().pruneBundles(
+        closedAssignmentIds: {
+          ...past.map((a) => a.id),
+          ...current.where((a) => a.isEffectivelyClosed).map((a) => a.id),
+        },
+      );
+    } catch (_) {}
   }
 
   /// Resolves which assignment IDs have a saved offline bundle on disk and
@@ -390,6 +431,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       for (final a in [...current, ...past]) a.id: a,
     };
     final svc = AssignmentOfflineBundleService();
+    final language = Provider.of<LanguageProvider>(
+      context,
+      listen: false,
+    ).currentLanguage;
     final bundles = <int>{};
     final stale = <int>{};
     for (final id in ids) {
@@ -402,7 +447,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (templateId != null && meta != null && meta.templateId == null) {
         await svc.backfillTemplateId(id, templateId);
       }
-      if (isAssignmentOfflineBundleStale(assignment, meta)) {
+      if (isAssignmentOfflineBundleStale(assignment, meta,
+          language: language)) {
         stale.add(id);
       }
     }
@@ -492,6 +538,13 @@ class _DashboardScreenState extends State<DashboardScreen>
             ?.toUtc()
             .toIso8601String(),
         templateId: assignment.templateId,
+        staticVersion: assignment.staticVersion,
+        dataVersion: assignment.dataVersion,
+        submitBlockedMessage: loc.offlineSubmitRequiresConnection,
+        recordApiResponses: (formUrl) => OfflineApiRecorder.recordFormLoad(
+          formUrl: formUrl,
+          language: languageProvider.currentLanguage,
+        ),
       );
       if (!context.mounted) return false;
       setState(() {
@@ -597,7 +650,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     if (!context.mounted) return;
 
-    final isStale = isAssignmentOfflineBundleStale(assignment, meta);
+    final isStale = isAssignmentOfflineBundleStale(
+      assignment,
+      meta,
+      language: Provider.of<LanguageProvider>(
+        context,
+        listen: false,
+      ).currentLanguage,
+    );
     final offline = Provider.of<OfflineProvider>(context, listen: false);
     final canUpdateNow = offline.isOnline && !shouldDeferRemoteFetch && isStale;
 

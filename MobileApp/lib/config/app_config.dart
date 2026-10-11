@@ -306,6 +306,9 @@ class AppConfig {
   static const String deviceUnregisterEndpoint = '$mobileApiPrefix/devices/unregister';
   static const String deviceHeartbeatEndpoint = '$mobileApiPrefix/devices/heartbeat';
 
+  // Diagnostics
+  static const String clientDiagnosticsEndpoint = '$mobileApiPrefix/diagnostics/client-error';
+
   // Admin -- Users
   static const String mobileAdminUsersEndpoint = '$mobileApiPrefix/admin/users';
   static const String mobileRbacRolesEndpoint = '$mobileApiPrefix/admin/users/rbac-roles';

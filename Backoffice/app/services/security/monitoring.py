@@ -9,6 +9,11 @@ from app.models import SecurityEvent, AdminActionLog
 from app import db
 from app.utils.datetime_helpers import utcnow
 
+# Client-reported diagnostics (browser JS errors, mobile app failures): recorded for
+# debugging, never emailed to admins and never above 'low' severity.
+AUDIT_ONLY_EVENT_TYPES = frozenset({'client_javascript_error', 'mobile_client_error'})
+
+
 class SecurityMonitor:
     """Security monitoring and alerting system."""
 
@@ -58,7 +63,7 @@ class SecurityMonitor:
 
             # Client-side JS bugs are audit-only: never page admins by email, even if a
             # caller passes notify_admins=True or a high severity by mistake.
-            if event_type == 'client_javascript_error':
+            if event_type in AUDIT_ONLY_EVENT_TYPES:
                 notify_admins = False
                 if severity in ('high', 'critical'):
                     severity = 'low'
@@ -152,7 +157,7 @@ class SecurityMonitor:
                 with it — when the same event type fires many times in a short burst
                 (e.g. a platform 502/503/504 storm reported by many browser tabs).
         """
-        if event.event_type == 'client_javascript_error':
+        if event.event_type in AUDIT_ONLY_EVENT_TYPES:
             return
 
         try:

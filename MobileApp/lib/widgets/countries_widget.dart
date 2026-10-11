@@ -263,14 +263,6 @@ class _CountriesWidgetState extends State<CountriesWidget> {
                             _searchQuery = '';
                           });
                         },
-                        selectedColor:
-                            Color(AppConstants.ifrcRed),
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? theme.colorScheme.onSecondary
-                              : theme.colorScheme.onSurface,
-                          fontSize: 12,
-                        ),
                       ),
                     );
                   }).toList(),

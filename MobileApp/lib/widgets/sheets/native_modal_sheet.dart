@@ -4,30 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../utils/ios_constants.dart';
-import '../ios_button.dart';
-import '../../theme/grouped_dashboard_palette.dart';
+import '../../theme/grouped_sheet_style.dart';
 
-/// Drag handle matching [HomeScreen] / resources / disaggregation bottom sheets.
+/// Drag handle matching the grouped assignments dashboard sheets.
 class NativeModalSheetDragHandle extends StatelessWidget {
-  const NativeModalSheetDragHandle({super.key, required this.theme});
-
-  final ThemeData theme;
+  const NativeModalSheetDragHandle({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(
-        top: IOSSpacing.md - 4,
-        bottom: IOSSpacing.sm,
-      ),
-      width: 40,
-      height: 4,
-      decoration: BoxDecoration(
-        color: theme.dividerColor,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
+    return const GroupedSheetDragHandle();
   }
 }
 
@@ -69,70 +54,127 @@ class NativeModalSheetScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * maxHeightFraction,
-      ),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final bodyMax = math.max(
-              120.0,
-              constraints.maxHeight - _chromeHeightEstimate,
-            );
-            return Column(
-              mainAxisSize: bodyExpands ? MainAxisSize.max : MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Align(
-                  alignment: Alignment.center,
-                  child: NativeModalSheetDragHandle(theme: theme),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: IOSSpacing.xl,
-                    vertical: IOSSpacing.md,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
+    return Theme(
+      data: theme,
+      child: Builder(
+        builder: (context) {
+          return Theme(
+            data: GroupedSheetStyle.controlsTheme(context),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * maxHeightFraction,
+              ),
+              decoration: GroupedSheetStyle.sheetDecoration(context),
+              child: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bodyMax = math.max(
+                      120.0,
+                      constraints.maxHeight - _chromeHeightEstimate,
+                    );
+                    return Column(
+                      mainAxisSize: bodyExpands
+                          ? MainAxisSize.max
+                          : MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Align(
+                          alignment: Alignment.center,
+                          child: NativeModalSheetDragHandle(),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 12, 10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: GroupedSheetStyle.title(context),
+                                ),
+                              ),
+                              GroupedSheetCloseButton(
+                                onPressed: onClose,
+                                tooltip: closeTooltip,
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      IOSIconButton(
-                        icon: Icons.close,
-                        onPressed: onClose,
-                        tooltip: closeTooltip,
-                        semanticLabel: closeTooltip,
-                      ),
-                    ],
-                  ),
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: GroupedSheetStyle.hairline(context),
+                        ),
+                        if (bodyExpands)
+                          Expanded(child: child)
+                        else
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: bodyMax),
+                            child: child,
+                          ),
+                      ],
+                    );
+                  },
                 ),
-                const Divider(height: 1),
-                if (bodyExpands)
-                  Expanded(child: child)
-                else
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: bodyMax),
-                    child: child,
-                  ),
-              ],
-            );
-          },
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
+}
+
+/// One labeled choice in [showGroupedOptionPicker].
+class GroupedPickerChoice {
+  const GroupedPickerChoice({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+}
+
+/// Scrollable option list in the grouped sheet chrome.
+Future<void> showGroupedOptionPicker({
+  required BuildContext context,
+  required String title,
+  required String closeTooltip,
+  required List<GroupedPickerChoice> choices,
+  double maxHeightFraction = 0.72,
+}) async {
+  if (choices.isEmpty) return;
+  final theme = Theme.of(context);
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      return NativeModalSheetScaffold(
+        theme: theme,
+        title: title,
+        closeTooltip: closeTooltip,
+        maxHeightFraction: maxHeightFraction,
+        onClose: () => Navigator.pop(sheetContext),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          children: [
+            for (final choice in choices)
+              GroupedSheetOption(
+                label: choice.label,
+                selected: choice.selected,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  choice.onSelected();
+                },
+              ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 /// FDRS reporting period list in the shared native sheet chrome.
@@ -157,29 +199,19 @@ Future<void> showReportingPeriodPickerSheet({
         closeTooltip: l10n.close,
         maxHeightFraction: maxHeightFraction,
         onClose: () => Navigator.pop(bottomSheetContext),
-        child: ListView.separated(
-          padding: const EdgeInsets.only(bottom: 16),
-          itemCount: periods.length,
-          separatorBuilder: (_, _) => Divider(
-            height: 1,
-            thickness: 1,
-            color: theme.dividerColor.withValues(alpha: 0.35),
-          ),
-          itemBuilder: (context, index) {
-            final p = periods[index];
-            final selected = p == selectedPeriod;
-            return ListTile(
-              title: Text(p, maxLines: 3, overflow: TextOverflow.ellipsis),
-              trailing: selected
-                  ? Icon(Icons.check, color: theme.colorScheme.secondary)
-                  : null,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onSelected(p);
-                Navigator.pop(bottomSheetContext);
-              },
-            );
-          },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          children: [
+            for (final p in periods)
+              GroupedSheetOption(
+                label: p,
+                selected: p == selectedPeriod,
+                onTap: () {
+                  onSelected(p);
+                  Navigator.pop(bottomSheetContext);
+                },
+              ),
+          ],
         ),
       );
     },
@@ -214,20 +246,15 @@ class ReportingPeriodPickerField extends StatelessWidget {
     final effective = value != null && periods.contains(value)
         ? value!
         : periods.first;
-    final isDark = theme.brightness == Brightness.dark;
-    final line = theme.colorScheme.outlineVariant.withValues(
-      alpha: isDark ? 0.5 : 0.38,
-    );
-
     return Semantics(
       button: true,
       label: l10n.homeLandingGlobalPeriodFilterLabel,
       value: effective,
       child: Material(
-        color: isDark ? theme.colorScheme.surfaceContainerHigh : GroupedDashboardPalette.card,
+        color: GroupedSheetStyle.card(context),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: line),
+          borderRadius: BorderRadius.circular(GroupedSheetStyle.cardRadius),
+          side: BorderSide(color: GroupedSheetStyle.hairline(context)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -251,7 +278,7 @@ class ReportingPeriodPickerField extends StatelessWidget {
                 Icon(
                   Icons.calendar_today_rounded,
                   size: 18,
-                  color: theme.colorScheme.secondary,
+                  color: GroupedSheetStyle.titleColor(context),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -269,7 +296,7 @@ class ReportingPeriodPickerField extends StatelessWidget {
                       Text(
                         effective,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface,
+                          color: GroupedSheetStyle.titleColor(context),
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 2,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'shared/elevated_list_card.dart';
+import '../theme/grouped_sheet_style.dart';
 
 /// Shared filter pane: optional card-style surface, themed inputs, and optional Apply/Clear row.
 /// Use inline, under [AnimatedCrossFade], or inside `showAdminFiltersBottomSheet` from
@@ -42,6 +42,7 @@ class AdminFilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final accent = GroupedSheetStyle.selectedForeground(context);
 
     final inner = Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -52,50 +53,33 @@ class AdminFilterPanel extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (surfaceCard)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: scheme.primary.withValues(alpha: 0.45),
-                    ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: GroupedSheetStyle.selectedFill(context),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: GroupedSheetStyle.selectedBorder(context),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                      leadingIcon,
-                      size: 20,
-                      color: scheme.onPrimaryContainer,
-                    ),
-                  ),
-                )
-              else
-                Icon(
-                  leadingIcon,
-                  size: 24,
-                  color: scheme.primary,
                 ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(leadingIcon, size: 20, color: accent),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.15,
-                          ),
-                    ),
+                    Text(title, style: GroupedSheetStyle.title(context)),
                     if (subtitle != null && subtitle!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         subtitle!,
                         style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              height: 1.25,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                          height: 1.25,
+                        ),
                       ),
                     ],
                   ],
@@ -108,7 +92,7 @@ class AdminFilterPanel extends StatelessWidget {
             Divider(
               height: 1,
               thickness: 1,
-              color: scheme.outline.withValues(alpha: 0.45),
+              color: GroupedSheetStyle.hairline(context),
             ),
             const SizedBox(height: 12),
           ] else
@@ -125,105 +109,19 @@ class AdminFilterPanel extends StatelessWidget {
     return Padding(
       padding: padding,
       child: Theme(
-        data: _filterTheme(context),
+        data: GroupedSheetStyle.controlsTheme(context),
         child: surfaceCard
             ? DecoratedBox(
                 decoration: BoxDecoration(
-                  color: elevatedListCardSurfaceColor(theme),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: scheme.outline.withValues(alpha: 0.55),
+                  color: GroupedSheetStyle.card(context),
+                  borderRadius: BorderRadius.circular(
+                    GroupedSheetStyle.cardRadius,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  border: Border.all(color: GroupedSheetStyle.hairline(context)),
                 ),
                 child: inner,
               )
             : inner,
-      ),
-    );
-  }
-
-  ThemeData _filterTheme(BuildContext context) {
-    final base = Theme.of(context);
-    final scheme = base.colorScheme;
-    final borderRadius = BorderRadius.circular(12);
-
-    final input = InputDecorationTheme(
-      filled: true,
-      fillColor: scheme.surface.withValues(alpha: 0.55),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      isDense: false,
-      border: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: 0.55),
-        ),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: BorderSide(color: scheme.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: BorderSide(color: scheme.error),
-      ),
-      labelStyle: base.textTheme.bodyMedium?.copyWith(
-        color: scheme.onSurfaceVariant,
-      ),
-      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
-        if (states.contains(WidgetState.focused)) {
-          return TextStyle(color: scheme.primary, fontWeight: FontWeight.w600);
-        }
-        return TextStyle(color: scheme.onSurfaceVariant);
-      }),
-    );
-
-    final filledBtn = FilledButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      elevation: 0,
-    );
-
-    final outlineBtn = OutlinedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    );
-
-    return base.copyWith(
-      inputDecorationTheme: input,
-      filledButtonTheme: FilledButtonThemeData(style: filledBtn),
-      outlinedButtonTheme: OutlinedButtonThemeData(style: outlineBtn),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) {
-            return scheme.onSurface.withValues(alpha: 0.38);
-          }
-          if (states.contains(WidgetState.selected)) {
-            return scheme.onPrimary;
-          }
-          return scheme.onSurfaceVariant;
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) {
-            return scheme.onSurface.withValues(alpha: 0.12);
-          }
-          if (states.contains(WidgetState.selected)) {
-            return scheme.primary;
-          }
-          return scheme.outline.withValues(alpha: 0.55);
-        }),
       ),
     );
   }
@@ -246,22 +144,11 @@ class AdminFilterPanelActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: FilledButton(
-            onPressed: onApply,
-            child: Text(applyLabel),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: onClear,
-            child: Text(clearLabel),
-          ),
-        ),
-      ],
+    return GroupedSheetActions(
+      applyLabel: applyLabel,
+      clearLabel: clearLabel,
+      onApply: onApply,
+      onClear: onClear,
     );
   }
 }

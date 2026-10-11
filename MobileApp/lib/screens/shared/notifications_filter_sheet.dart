@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/shared/notification.dart';
 import '../../providers/shared/notification_provider.dart';
+import '../../theme/grouped_sheet_style.dart';
 import '../../utils/notification_filter_types.dart';
 
 /// Opens a bottom sheet to configure notification list filters.
@@ -21,7 +22,9 @@ Future<void> showNotificationFiltersSheet(BuildContext context) async {
     isScrollControlled: true,
     showDragHandle: true,
     builder: (ctx) {
-      return Padding(
+      return Theme(
+        data: GroupedSheetStyle.controlsTheme(ctx),
+        child: Padding(
         padding: EdgeInsets.only(
           left: 20,
           right: 20,
@@ -37,13 +40,9 @@ Future<void> showNotificationFiltersSheet(BuildContext context) async {
               required Widget child,
             }) {
               return InputDecorator(
-                decoration: InputDecoration(
-                  labelText: label,
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
+                decoration: GroupedSheetStyle.fieldDecoration(
+                  context,
+                  label: label,
                 ),
                 child: child,
               );
@@ -142,15 +141,10 @@ Future<void> showNotificationFiltersSheet(BuildContext context) async {
                 children: [
                   Text(
                     loc.notificationsFilterTitle,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: GroupedSheetStyle.title(context),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    loc.notificationsFilterReadStatus,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                  GroupedSheetSectionLabel(loc.notificationsFilterReadStatus),
                   const SizedBox(height: 8),
                   SegmentedButton<bool>(
                     segments: [
@@ -183,38 +177,28 @@ Future<void> showNotificationFiltersSheet(BuildContext context) async {
                       ),
                     ),
                   const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            Navigator.of(context).pop();
-                            await provider.clearListFilters();
-                          },
-                          child: Text(loc.notificationsFilterReset),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () async {
-                            Navigator.of(context).pop();
-                            await provider.applyListFilters(
-                              unreadOnly: unreadOnly,
-                              notificationType: notificationType,
-                              priority: priority,
-                              actorUserId: actorUserId,
-                            );
-                          },
-                          child: Text(loc.notificationsFilterApply),
-                        ),
-                      ),
-                    ],
+                  GroupedSheetActions(
+                    clearLabel: loc.notificationsFilterReset,
+                    applyLabel: loc.notificationsFilterApply,
+                    onClear: () async {
+                      Navigator.of(context).pop();
+                      await provider.clearListFilters();
+                    },
+                    onApply: () async {
+                      Navigator.of(context).pop();
+                      await provider.applyListFilters(
+                        unreadOnly: unreadOnly,
+                        notificationType: notificationType,
+                        priority: priority,
+                        actorUserId: actorUserId,
+                      );
+                    },
                   ),
                 ],
               ),
             );
           },
+        ),
         ),
       );
     },

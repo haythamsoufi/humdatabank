@@ -17,6 +17,7 @@ import '../sheets/native_modal_sheet.dart';
 import 'country_centroids_cache.dart';
 import 'world_geojson_cache.dart';
 import '../../theme/grouped_dashboard_palette.dart';
+import '../../theme/grouped_sheet_style.dart';
 
 /// Bubble markers vs filled country polygons (choropleth).
 enum FdrsMapVisualMode { bubble, choropleth }
@@ -240,7 +241,6 @@ void showFdrsCountryInsightSheet({
 
   showModalBottomSheet<void>(
     context: context,
-    backgroundColor: theme.colorScheme.surface,
     showDragHandle: true,
     isScrollControlled: true,
     builder: (ctx) {
@@ -251,12 +251,7 @@ void showFdrsCountryInsightSheet({
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              name,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text(name, style: GroupedSheetStyle.title(ctx)),
             const SizedBox(height: 6),
             Text(
               indicatorLabel,

@@ -2,16 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../theme/grouped_sheet_style.dart';
 import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 
-/// Surface fill for bordered list cards: white in light theme, elevated
-/// container tint in dark.
+/// Surface fill for bordered list cards: white in light theme, the same
+/// elevated fill as grouped dashboard cards in dark.
 Color elevatedListCardSurfaceColor(ThemeData theme) {
-  final scheme = theme.colorScheme;
-  return theme.brightness == Brightness.light
-      ? Colors.white
-      : scheme.surfaceContainerHighest.withValues(alpha: 0.65);
+  return GroupedSheetStyle.cardOf(theme);
 }
 
 /// Lightly filled list row (grouped-card look).
@@ -21,7 +19,7 @@ class ElevatedListCard extends StatelessWidget {
     required this.child,
     this.marginBottom = 10,
     this.padding = const EdgeInsets.fromLTRB(14, 12, 14, 12),
-    this.borderRadius = 12,
+    this.borderRadius = GroupedSheetStyle.cardRadius,
     this.outlineColor,
     this.backgroundColor,
     this.boxShadow,
@@ -43,9 +41,9 @@ class ElevatedListCard extends StatelessWidget {
     final theme = Theme.of(context);
     final surfaceColor =
         backgroundColor ?? elevatedListCardSurfaceColor(theme);
-    final side = outlineColor != null
-        ? BorderSide(color: outlineColor!, width: 0.5)
-        : BorderSide.none;
+    final side = BorderSide(
+      color: outlineColor ?? GroupedSheetStyle.hairlineOf(theme),
+    );
 
     final radius = BorderRadius.circular(borderRadius);
     Widget material = Material(

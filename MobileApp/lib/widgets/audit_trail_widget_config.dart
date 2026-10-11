@@ -53,7 +53,6 @@ class _AuditTrailWidgetConfigState extends State<AuditTrailWidgetConfig> {
       label: Text(label),
       selected: _activityFilter.contains(type),
       onSelected: (_) => _toggle(type),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       showCheckmark: false,
     );
   }

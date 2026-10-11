@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/assignment_offline_bundle_service.dart';
+import '../theme/grouped_sheet_style.dart';
 
 String formatOfflineCopySize(int bytes) {
   if (bytes < 1024) return '$bytes B';
@@ -142,7 +143,7 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                       children: [
                         Text(
                           loc.offlineStorageTitle,
-                          style: theme.textTheme.titleMedium,
+                          style: GroupedSheetStyle.title(context),
                         ),
                         Text(
                           copies == null || copies.isEmpty
@@ -169,7 +170,7 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
               title: Text(loc.offlineStorageAutoDownload),
               subtitle: Text(loc.offlineStorageAutoDownloadHint),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: GroupedSheetStyle.hairline(context)),
             if (copies == null)
               const Padding(
                 padding: EdgeInsets.all(32),
@@ -184,8 +185,9 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
               Flexible(
                 child: ListView.separated(
                   shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   itemCount: groups.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final g = groups[i];
                     final newest = g.copies
@@ -195,23 +197,39 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                           null,
                           (a, b) => a == null || b.isAfter(a) ? b : a,
                         );
-                    return ListTile(
-                      title: Text(
-                        g.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                    return Material(
+                      color: GroupedSheetStyle.card(context),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          GroupedSheetStyle.cardRadius,
+                        ),
+                        side: BorderSide(
+                          color: GroupedSheetStyle.hairline(context),
+                        ),
                       ),
-                      subtitle: Text(
-                        [
-                          '${loc.offlineStorageCopies}: ${g.copies.length}',
-                          formatOfflineCopySize(g.sizeBytes),
-                          if (newest != null) _dateLabel(newest),
-                        ].join(' · '),
-                      ),
-                      trailing: IconButton(
-                        tooltip: loc.offlineStorageRemove,
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _remove(g),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                        title: Text(
+                          g.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: GroupedSheetStyle.titleColor(context),
+                          ),
+                        ),
+                        subtitle: Text(
+                          [
+                            '${loc.offlineStorageCopies}: ${g.copies.length}',
+                            formatOfflineCopySize(g.sizeBytes),
+                            if (newest != null) _dateLabel(newest),
+                          ].join(' · '),
+                        ),
+                        trailing: IconButton(
+                          tooltip: loc.offlineStorageRemove,
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _remove(g),
+                        ),
                       ),
                     );
                   },

@@ -9,6 +9,7 @@ import '../../models/admin/session_log_item.dart';
 import '../../providers/admin/session_logs_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../widgets/admin_filter_panel.dart';
+import '../../theme/grouped_sheet_style.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_fade_in_up.dart';
@@ -454,9 +455,7 @@ Future<void> showSessionPathBreakdownSheet(
             children: [
               Text(
                 loc.sessionLogsPathBreakdownTitle,
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: GroupedSheetStyle.title(ctx),
               ),
               if (entries.isEmpty && log.pageViews > 0) ...[
                 const SizedBox(height: 8),

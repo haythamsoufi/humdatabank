@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert' show jsonDecode;
 import 'dart:io';
 
@@ -14,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/session_service.dart';
 import '../../services/assignment_offline_bundle_service.dart';
+import '../../services/offline_api_recorder.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../providers/shared/language_provider.dart';
 import '../../config/routes.dart';
@@ -818,15 +820,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
 
     final url = payload.onlineUrl;
+    final recordsFormData = OfflineApiRecorder.assignmentIdForUrl(url) != null;
     return InAppWebView(
       key: ValueKey('online|$url|$language'),
       initialUrlRequest: URLRequest(
         url: WebUri(url),
         headers: WebViewService.defaultRequestHeaders,
       ),
-      initialUserScripts: WebViewService.getRequestInterceptorScripts(
-        language: language,
-      ),
+      initialUserScripts: recordsFormData
+          ? UnmodifiableListView<UserScript>([
+              ...WebViewService.getRequestInterceptorScripts(
+                language: language,
+              ),
+              OfflineApiRecorder.userScript,
+            ])
+          : WebViewService.getRequestInterceptorScripts(language: language),
       // Allow passive/active mixed content for this trusted surface only (some
       // deployments still emit occasional http:// asset URLs behind proxies).
       initialSettings: WebViewService.defaultSettings(allowMixedContent: true),
@@ -834,6 +842,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
         _webViewController = controller;
         _registerAuthDraftTelemetryHandler(controller);
         _registerAuthDraftHostHandlers(controller);
+        if (recordsFormData) {
+          OfflineApiRecorder.registerLiveHandler(controller);
+        }
         DebugLogger.logInfo('WEBVIEW', 'online WebView created initialUrl=$url');
       },
       onConsoleMessage: (controller, consoleMessage) {

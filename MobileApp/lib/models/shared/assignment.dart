@@ -23,6 +23,17 @@ class Assignment {
   /// Used to detect outdated offline bundles vs the live form definition.
   final DateTime? formDefinitionUpdatedAt;
 
+  /// Form template this assignment was created from. Offline form packages are
+  /// shared by every assignment (and entity) that uses the same template.
+  final int? templateId;
+
+  /// Server release identifier for the static files (JS/CSS) the entry form loads.
+  final String? staticVersion;
+
+  /// Opaque marker that changes whenever this assignment's data or workflow
+  /// state changes on the server. Compared with the value saved with an offline copy.
+  final String? dataVersion;
+
   Assignment({
     required this.id,
     required this.name,
@@ -43,6 +54,9 @@ class Assignment {
     this.latestPublicSubmissionAt,
     this.isEffectivelyClosed = false,
     this.formDefinitionUpdatedAt,
+    this.templateId,
+    this.staticVersion,
+    this.dataVersion,
   });
 
   factory Assignment.fromJson(Map<String, dynamic> json) {
@@ -87,6 +101,9 @@ class Assignment {
       formDefinitionUpdatedAt: json['form_definition_updated_at'] != null
           ? DateTime.tryParse(json['form_definition_updated_at'].toString())
           : null,
+      templateId: (json['template_id'] as num?)?.toInt(),
+      staticVersion: json['static_version']?.toString(),
+      dataVersion: json['data_version']?.toString(),
     );
   }
 
@@ -113,6 +130,9 @@ class Assignment {
       'is_effectively_closed': isEffectivelyClosed,
       'form_definition_updated_at':
           formDefinitionUpdatedAt?.toUtc().toIso8601String(),
+      'template_id': templateId,
+      'static_version': staticVersion,
+      'data_version': dataVersion,
     };
   }
 

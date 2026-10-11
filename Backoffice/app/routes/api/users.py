@@ -38,6 +38,7 @@ from app.utils.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS
 from app.utils.dashboard_focal_points import get_focal_points_for_country
 from app.utils.request_validation import enforce_csrf_json
 from app.routes.main.helpers import DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+from app.static_version import deploy_asset_version
 from app import db
 
 
@@ -460,6 +461,20 @@ def update_current_user_profile():
         return api_error('Could not update user profile', 500)
 
 
+def _assignment_data_version(aes, last_activity_at):
+    """Opaque marker that changes whenever an assignment's data or workflow state does.
+
+    The mobile app stores it with an offline copy so it can tell when the saved
+    form no longer reflects the server.
+    """
+    stamps = [
+        ensure_utc(ts)
+        for ts in (last_activity_at, aes.status_timestamp, aes.submitted_at)
+        if ts is not None
+    ]
+    return max(stamps).isoformat() if stamps else None
+
+
 @api_bp.route('/dashboard', methods=['GET'])
 @login_required
 def get_dashboard():
@@ -668,6 +683,7 @@ def get_dashboard():
         # Get assignments for selected entity
         current_assignments = []
         past_assignments = []
+        static_version = deploy_asset_version(current_app)
 
         if selected_entity:
             selected_entity_type = selected_entity['entity_type']
@@ -709,6 +725,7 @@ def get_dashboard():
             completion_prefetch = AssignmentCompletionService.prefetch(template_ids, aes_ids)
 
             last_modified_user_by_assignment = {}
+            last_activity_at_by_assignment = {}
             contributors_by_assignment = {}
             public_count_by_assigned_form = {}
             if aes_ids:
@@ -729,7 +746,7 @@ def get_dashboard():
                 ).subquery()
 
                 aid_uid_rows = (
-                    db.session.query(subq.c.aid, EntityActivityLog.user_id)
+                    db.session.query(subq.c.aid, EntityActivityLog.user_id, subq.c.max_ts)
                     .join(
                         EntityActivityLog,
                         and_(
@@ -741,7 +758,10 @@ def get_dashboard():
                     )
                     .all()
                 )
-                lm_user_ids = {uid for _, uid in aid_uid_rows if uid is not None}
+                last_activity_at_by_assignment = {
+                    aid: max_ts for aid, _, max_ts in aid_uid_rows if max_ts is not None
+                }
+                lm_user_ids = {uid for _, uid, _ in aid_uid_rows if uid is not None}
                 lm_user_map = {}
                 if lm_user_ids:
                     lm_user_map = {
@@ -749,7 +769,7 @@ def get_dashboard():
                     }
                 last_modified_user_by_assignment = {
                     aid: lm_user_map.get(uid)
-                    for aid, uid in aid_uid_rows
+                    for aid, uid, _ in aid_uid_rows
                     if uid is not None
                 }
 
@@ -885,6 +905,7 @@ def get_dashboard():
                     assigned_form and assigned_form.is_public_accessible()
                 )
 
+                template_id = assigned_form.template_id if assigned_form else None
                 form_definition_updated_at = None
                 if assigned_form and assigned_form.template:
                     pv = assigned_form.template.published_version
@@ -917,6 +938,11 @@ def get_dashboard():
                     if pub_latest_at
                     else None,
                     'form_definition_updated_at': form_definition_updated_at,
+                    'template_id': template_id,
+                    'static_version': static_version,
+                    'data_version': _assignment_data_version(
+                        aes, last_activity_at_by_assignment.get(aes.id)
+                    ),
                 }
 
                 # Categorize as current or past (same rules as main.dashboard)

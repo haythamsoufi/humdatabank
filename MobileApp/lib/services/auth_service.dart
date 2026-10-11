@@ -16,6 +16,7 @@ import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
 import '../utils/network_availability.dart';
 import 'offline_cache_service.dart';
 import 'offline_queue_service.dart';
+import 'assignment_offline_bundle_service.dart';
 import 'ai_chat_service.dart';
 import 'ai_chat_persistence_service.dart';
 import 'push_notification_service.dart';
@@ -540,6 +541,7 @@ class AuthService {
 
       await OfflineCacheService().clearAll();
       await OfflineQueueService().clearAll();
+      await AssignmentOfflineBundleService().clearAll();
       await AiChatPersistenceService().clearAllConversations();
 
       // Clear Sentry user context on logout

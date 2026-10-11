@@ -1985,6 +1985,11 @@
   align-items: stretch;
 }
 
+#upr-scope-toggle[hidden],
+#upr-scope-menu[hidden] {
+  display: none !important;
+}
+
 .upr-scope__chevron {
   display: inline-flex;
   align-items: center;

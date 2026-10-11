@@ -70,6 +70,10 @@ class AiChatProvider with ChangeNotifier {
   String? _lastPreparingQueryDetail;
   bool _wsUserCancelled = false;
 
+  /// Server `request_id` of the in-flight SSE stream (from the `meta` envelope); used so the stop
+  /// button can ask the backend to cancel generation instead of only dropping the connection.
+  String? _streamRequestId;
+
   bool _policyAcknowledged = false;
   /// True once [loadChatUiPrefs] has completed at least once.
   /// Guards the policy banner and the send gate so we never incorrectly
@@ -299,8 +303,12 @@ class AiChatProvider with ChangeNotifier {
   Future<void> stopStreaming({required bool isAuthenticated}) async {
     if (!_isStreaming && !_inflightRestoreActive) return;
     final cid = _conversationId;
+    final cancelRequestId = _streamRequestId;
     if (_isStreaming) {
       _wsUserCancelled = true;
+      if (cancelRequestId != null && cancelRequestId.isNotEmpty) {
+        unawaited(_service.cancelChatStream(cancelRequestId));
+      }
       await _disconnectWs();
       _isStreaming = false;
       if (_messages.isNotEmpty && _messages.last.role == 'assistant' && _messages.last.content.isEmpty) {
@@ -712,6 +720,8 @@ class AiChatProvider with ChangeNotifier {
 
     final type = data['type']?.toString();
     if (type == 'meta') {
+      final rid = data['request_id']?.toString();
+      if (rid != null && rid.isNotEmpty) _streamRequestId = rid;
       final cid = data['conversation_id']?.toString();
       if (cid != null && cid.isNotEmpty && cid != _conversationId) {
         _conversationId = cid;
@@ -930,6 +940,117 @@ class AiChatProvider with ChangeNotifier {
         retryDelay: _retryDelay,
       ));
     }
+  }
+
+  /// Starts a streamed reply: Server-Sent Events by default, WebSocket when
+  /// [AppConfig.aiUseWebSocket] is set (the backend only serves it with `WEBSOCKET_ENABLED=true`).
+  Future<void> _runStream({
+    required String message,
+    required bool isAuthenticated,
+    String? clientMessageId,
+    bool branchFromEdit = false,
+    List<Map<String, dynamic>>? branchConversationHistory,
+  }) {
+    if (AppConfig.aiUseWebSocket) {
+      return _runWebSocketStream(
+        message: message,
+        isAuthenticated: isAuthenticated,
+        clientMessageId: clientMessageId,
+        branchFromEdit: branchFromEdit,
+        branchConversationHistory: branchConversationHistory,
+      );
+    }
+    return _runSseStream(
+      message: message,
+      isAuthenticated: isAuthenticated,
+      clientMessageId: clientMessageId,
+      branchFromEdit: branchFromEdit,
+      branchConversationHistory: branchConversationHistory,
+    );
+  }
+
+  Future<void> _runSseStream({
+    required String message,
+    required bool isAuthenticated,
+    String? clientMessageId,
+    bool branchFromEdit = false,
+    List<Map<String, dynamic>>? branchConversationHistory,
+  }) async {
+    await _disconnectWs();
+    _wsBranchFromEdit = branchFromEdit;
+    _wsBranchConversationHistory = branchConversationHistory;
+    _wsStreamConversationId = _conversationId;
+    final streamGeneration = _wsConnectionSession;
+    var httpFallbackStarted = false;
+
+    // Any stream failure (HTTP status, network, proxy drop) retries once over the plain
+    // HTTP endpoint, which also renders the backend's error message when the failure is real.
+    Future<void> fallbackToHttp() async {
+      if (httpFallbackStarted) return;
+      httpFallbackStarted = true;
+      if (streamGeneration != _wsConnectionSession) return;
+      if (_messages.isNotEmpty && _messages.last.role == 'assistant') {
+        _messages.removeLast();
+      }
+      _clearAgentProgress();
+      await _sendHttpIntoLastAssistant(
+        message,
+        isAuthenticated: isAuthenticated,
+        persistUserMessage: false,
+        clientMessageId: clientMessageId,
+        branchFromEdit: _wsBranchFromEdit,
+        branchConversationHistory: _wsBranchConversationHistory,
+      );
+    }
+
+    final history = branchFromEdit && branchConversationHistory != null
+        ? branchConversationHistory
+        : _conversationHistoryPayload();
+    final events = _service.streamChatSse(
+      message: message,
+      conversationId: _conversationId,
+      clientMessageId: clientMessageId,
+      pageContext: _mobilePageContext(),
+      preferredLanguage: _preferredLanguageCode,
+      conversationHistory: history,
+      sources: _sourcesForPayload(),
+      branchFromEdit: branchFromEdit,
+      isAuthenticated: isAuthenticated,
+    );
+
+    _wsSub = events.listen(
+      (data) async {
+        try {
+          if (streamGeneration != _wsConnectionSession) return;
+          await _handleWsJson(data, outboundMessage: message, isAuthenticated: isAuthenticated);
+          if (streamGeneration != _wsConnectionSession) return;
+          notifyListeners();
+        } catch (e) {
+          DebugLogger.logWarn('AI', 'Failed to handle SSE event: $e');
+        }
+      },
+      onError: (Object e) async {
+        if (streamGeneration != _wsConnectionSession) return;
+        if (_wsUserCancelled) {
+          _wsUserCancelled = false;
+          return;
+        }
+        DebugLogger.logWarn('AI', 'SSE stream error, falling back to HTTP: $e');
+        await fallbackToHttp();
+      },
+      onDone: () async {
+        if (streamGeneration != _wsConnectionSession) return;
+        if (_wsUserCancelled) {
+          _wsUserCancelled = false;
+          return;
+        }
+        // 'done' / 'error' envelopes clear [_isStreaming]; still streaming means the
+        // connection ended without a final envelope.
+        if (!_isStreaming) return;
+        DebugLogger.logWarn('AI', 'SSE stream ended before completion, falling back to HTTP');
+        await fallbackToHttp();
+      },
+    );
   }
 
   Future<void> _runWebSocketStream({
@@ -1321,13 +1442,13 @@ class AiChatProvider with ChangeNotifier {
     _clearAgentProgress();
     _initAgentProgressIfNeeded();
     try {
-      await _runWebSocketStream(
+      await _runStream(
         message: message,
         isAuthenticated: isAuthenticated,
         clientMessageId: null,
       );
     } catch (e) {
-      DebugLogger.logWarn('AI', 'WS connect failed, falling back to HTTP: $e');
+      DebugLogger.logWarn('AI', 'Stream start failed, falling back to HTTP: $e');
       _isStreaming = false;
       _clearAgentProgress();
       notifyListeners();
@@ -1469,7 +1590,7 @@ class AiChatProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await _runWebSocketStream(
+      await _runStream(
         message: message,
         isAuthenticated: isAuthenticated,
         clientMessageId: userLocalId,
@@ -1477,7 +1598,7 @@ class AiChatProvider with ChangeNotifier {
         branchConversationHistory: branchPayload,
       );
     } catch (e) {
-      DebugLogger.logWarn('AI', 'WS connect failed, falling back to HTTP: $e');
+      DebugLogger.logWarn('AI', 'Stream start failed, falling back to HTTP: $e');
       _isStreaming = false;
       _clearAgentProgress();
       notifyListeners();
@@ -1529,13 +1650,13 @@ class AiChatProvider with ChangeNotifier {
     _clearAgentProgress();
     _initAgentProgressIfNeeded();
     try {
-      await _runWebSocketStream(
+      await _runStream(
         message: message,
         isAuthenticated: isAuthenticated,
         clientMessageId: userLocalId,
       );
     } catch (e) {
-      DebugLogger.logWarn('AI', 'WS connect failed, falling back to HTTP: $e');
+      DebugLogger.logWarn('AI', 'Stream start failed, falling back to HTTP: $e');
       _isStreaming = false;
       _clearAgentProgress();
       notifyListeners();
@@ -1789,6 +1910,7 @@ class AiChatProvider with ChangeNotifier {
   Future<void> _disconnectWs() async {
     _wsConnectionSession++;
     _wsStreamConversationId = null;
+    _streamRequestId = null;
     try {
       await _wsSub?.cancel();
     } catch (_) {}

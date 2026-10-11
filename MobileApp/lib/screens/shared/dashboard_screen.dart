@@ -18,6 +18,7 @@ import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/debug_logger.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
@@ -586,15 +587,22 @@ class _DashboardScreenState extends State<DashboardScreen>
         ).showSnackBar(SnackBar(content: Text(loc.offlineFormSaved)));
       }
       return true;
-    } catch (e) {
+    } catch (e, st) {
+      DebugLogger.logWarn(
+        'OFFLINE_BUNDLE',
+        'Download failed for assignment ${assignment.id}: $e\n$st',
+      );
       if (!context.mounted) return false;
       setState(() {
         _downloadingOfflineAssignmentIds.remove(assignment.id);
       });
       if (!silent) {
+        final detail = e is AssignmentOfflineBundleException
+            ? e.message
+            : e.runtimeType.toString();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.offlineFormSaveFailed),
+            content: Text('${loc.offlineFormSaveFailed}\n($detail)'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );

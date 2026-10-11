@@ -216,6 +216,54 @@ void main() {
     });
   });
 
+  group('best-effort assets', () {
+    test('a file only mentioned in inline script text cannot fail the download',
+        () async {
+      final a = _FakeAdapter({
+        ..._routes(),
+        '/forms/assignment/5': (
+          status: 200,
+          body: '<html><head>'
+              '<link rel="stylesheet" href="/static/css/app.css?v=1">'
+              '<script src="/static/js/app.js?v=1"></script>'
+              "<script>var x = '/static/js/ghost.js';</script>"
+              '</head><body></body></html>',
+        ),
+      });
+      final s = build(a);
+      await download(s, 5);
+      expect(await s.hasOfflineBundle(5), isTrue);
+      expect((await s.readBundleMeta(5))!.missingAssetCount, 1);
+    });
+
+    test('a missing plugin file cannot fail the download', () async {
+      final a = _FakeAdapter({
+        ..._routes(),
+        '/forms/assignment/5': (
+          status: 200,
+          body: '<html><head>'
+              '<link rel="stylesheet" href="/static/css/app.css?v=1">'
+              '<script src="/static/js/app.js?v=1"></script>'
+              '<link rel="stylesheet" href="/plugins/static/eo/css/gone.css">'
+              '</head><body></body></html>',
+        ),
+      });
+      final s = build(a);
+      await download(s, 5);
+      expect(await s.hasOfflineBundle(5), isTrue);
+    });
+
+    test('a missing script the page loads still fails the download', () async {
+      final a = _FakeAdapter({
+        ..._routes(),
+        '/static/js/app.js': (status: 404, body: ''),
+      });
+      final s = build(a);
+      await expectLater(download(s, 5), throwsA(isA<AssignmentOfflineBundleException>()));
+      expect(await s.hasOfflineBundle(5), isFalse);
+    });
+  });
+
   group('third-party files', () {
     const extHtml = '<html><head>'
         '<link rel="stylesheet" href="/static/css/app.css?v=1">'

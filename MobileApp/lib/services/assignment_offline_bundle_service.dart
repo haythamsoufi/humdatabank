@@ -626,8 +626,9 @@ class AssignmentOfflineBundleService {
 
     final html = utf8.decode(bytes, allowMalformed: true);
     final doc = html_parser.parse(html, generateSpans: false);
+    final domRefs = _collectAssetRefs(doc, pageUri);
     final refs = <Uri>{
-      ..._collectAssetRefs(doc, pageUri),
+      ...domRefs,
       ..._collectStaticRefsFromRawHtml(html, pageUri),
     };
 
@@ -684,6 +685,7 @@ class AssignmentOfflineBundleService {
         pageUri: pageUri,
         html: html,
         refs: refs,
+        domRefs: domRefs,
         otherHostRefs: otherHostRefs,
         headers: headers,
         reuseDir: reuseDir,
@@ -712,6 +714,7 @@ class AssignmentOfflineBundleService {
     required Uri pageUri,
     required String html,
     required Set<Uri> refs,
+    required Set<Uri> domRefs,
     required int otherHostRefs,
     required Map<String, String> headers,
     required Directory? reuseDir,
@@ -733,10 +736,18 @@ class AssignmentOfflineBundleService {
     final missingAssets = <Uri>[];
     final criticalMissing = <Uri>[];
 
+    // Only files the page itself loads (script/link tags and what they import)
+    // must be present. Paths merely spotted in inline script text or plugin
+    // code are best-effort: a miss is logged but never fails the download.
+    final speculative = <String>{};
+    final domKeys = domRefs.map((u) => u.toString()).toSet();
+
     void markMissing(Uri u) {
       missingAssets.add(u);
       final lower = u.path.toLowerCase();
       if (_isSameOrigin(u, pageUri) &&
+          !u.path.startsWith('/plugins/static/') &&
+          !speculative.contains(u.toString()) &&
           (lower.endsWith('.js') ||
               lower.endsWith('.mjs') ||
               lower.endsWith('.css'))) {
@@ -744,16 +755,20 @@ class AssignmentOfflineBundleService {
       }
     }
 
-    void enqueue(Uri u) {
+    void enqueue(Uri u, {bool isSpeculative = false}) {
       if (!_shouldMirror(u, pageUri)) return;
       final key = u.toString();
-      if (enqueued.contains(key)) return;
+      if (enqueued.contains(key)) {
+        if (!isSpeculative) speculative.remove(key);
+        return;
+      }
       enqueued.add(key);
+      if (isSpeculative) speculative.add(key);
       pending.addLast(u);
     }
 
     for (final u in refs) {
-      enqueue(u);
+      enqueue(u, isSpeculative: !domKeys.contains(u.toString()));
     }
 
     while (pending.isNotEmpty && count < _maxAssets) {
@@ -824,20 +839,22 @@ class AssignmentOfflineBundleService {
 
         if (relPath.toLowerCase().endsWith('.css')) {
           final cssText = utf8.decode(body, allowMalformed: true);
+          final parentSpeculative = speculative.contains(absKey);
           for (final child in _urlsFromCss(cssText, absolute)) {
-            enqueue(child);
+            enqueue(child, isSpeculative: parentSpeculative);
           }
         }
 
         final pathLower = absolute.path.toLowerCase();
         if (!external && (pathLower.endsWith('.js') || pathLower.endsWith('.mjs'))) {
           final jsText = utf8.decode(body, allowMalformed: true);
+          final parentSpeculative = speculative.contains(absKey);
           for (final child in _urlsFromJavaScript(jsText, absolute)) {
-            enqueue(child);
+            enqueue(child, isSpeculative: parentSpeculative);
           }
           if (absolute.path.startsWith('/plugins/static/')) {
             for (final child in _staticLiteralsFromJavaScript(jsText, absolute)) {
-              enqueue(child);
+              enqueue(child, isSpeculative: true);
             }
           }
         }
@@ -879,8 +896,15 @@ class AssignmentOfflineBundleService {
     }
 
     await _rewriteAllCssRootStaticInBundle(dir);
-    await _rewriteRootStaticInBundleScripts(dir);
-    await _rewriteExternalUrlsInCss(dir, savedRelByAbsolute);
+    try {
+      await _rewriteRootStaticInBundleScripts(dir);
+      await _rewriteExternalUrlsInCss(dir, savedRelByAbsolute);
+    } catch (e, st) {
+      DebugLogger.logWarn(
+        'OFFLINE_BUNDLE',
+        'Path rewriting failed for assignment $assignmentId: $e\n$st',
+      );
+    }
     final unmirroredExternalRefs = refs
         .where(
           (u) =>

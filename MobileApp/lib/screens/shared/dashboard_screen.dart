@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/cupertino.dart' as cupertino;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/shared/dashboard_provider.dart';
@@ -14,6 +13,8 @@ import '../../widgets/dashboard_grouped_assignment_card.dart';
 import '../../config/routes.dart';
 import '../../config/app_config.dart';
 import '../../theme/grouped_dashboard_palette.dart';
+import '../../theme/grouped_sheet_style.dart';
+import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
@@ -719,7 +720,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
-        return SafeArea(
+        return Theme(
+          data: GroupedSheetStyle.controlsTheme(sheetContext),
+          child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               IOSSpacing.lg,
@@ -733,9 +736,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: [
                 Text(
                   loc.offlineCopySheetTitle,
-                  style: IOSTextStyle.title3(
-                    sheetContext,
-                  ).copyWith(fontWeight: FontWeight.w700),
+                  style: GroupedSheetStyle.title(sheetContext),
                 ),
                 SizedBox(height: IOSSpacing.smOf(sheetContext)),
                 Text(
@@ -821,6 +822,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   label: Text(loc.removeOfflineCopy),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: scheme.error,
+                    side: BorderSide(color: scheme.error.withValues(alpha: 0.45)),
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -828,6 +830,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ],
             ),
           ),
+        ),
         );
       },
     );
@@ -1114,7 +1117,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         if (_pastAssignmentsExpanded)
           ..._buildPastAssignmentsBody(
             localizations: localizations,
-            theme: theme,
             periods: periods,
             templates: templates,
             statuses: statuses,
@@ -1127,7 +1129,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   List<Widget> _buildPastAssignmentsBody({
     required AppLocalizations localizations,
-    required ThemeData theme,
     required List<String> periods,
     required List<String> templates,
     required List<String> statuses,
@@ -1152,13 +1153,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text(
-                          localizations.filters.toUpperCase(),
-                          style: IOSTextStyle.footnote(context).copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        GroupedSheetSectionLabel(localizations.filters),
                         SizedBox(width: IOSSpacing.mdOf(context)),
                         Expanded(
                           child: Wrap(
@@ -1166,7 +1161,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                             runSpacing: IOSSpacing.sm,
                             children: _buildFilterButtons(
                               localizations,
-                              theme,
                               periods,
                               templates,
                               statuses,
@@ -1178,20 +1172,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          localizations.filters.toUpperCase(),
-                          style: IOSTextStyle.footnote(context).copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        GroupedSheetSectionLabel(localizations.filters),
                         SizedBox(height: IOSSpacing.mdOf(context) - 4),
                         Wrap(
                           spacing: IOSSpacing.sm,
                           runSpacing: IOSSpacing.sm,
                           children: _buildFilterButtons(
                             localizations,
-                            theme,
                             periods,
                             templates,
                             statuses,
@@ -1256,7 +1243,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   List<Widget> _buildFilterButtons(
     AppLocalizations localizations,
-    ThemeData theme,
     List<String> periods,
     List<String> templates,
     List<String> statuses,
@@ -1267,7 +1253,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         _buildIOSFilterButton(
           label: localizations.period,
           value: _selectedPeriodFilter,
-          options: periods,
           onTap: () => _showIOSFilterPicker(
             context: context,
             title: localizations.period,
@@ -1288,7 +1273,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         _buildIOSFilterButton(
           label: localizations.template,
           value: _selectedTemplateFilter,
-          options: templates,
           onTap: () => _showIOSFilterPicker(
             context: context,
             title: localizations.template,
@@ -1309,7 +1293,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         _buildIOSFilterButton(
           label: localizations.status,
           value: _selectedStatusFilter,
-          options: statuses,
           onTap: () => _showIOSFilterPicker(
             context: context,
             title: localizations.status,
@@ -1330,32 +1313,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (_selectedPeriodFilter != null ||
           _selectedTemplateFilter != null ||
           _selectedStatusFilter != null)
-        cupertino.CupertinoButton(
-          padding: const EdgeInsets.symmetric(
-            horizontal: IOSSpacing.md - 4,
-            vertical: IOSSpacing.xs + 2,
-          ),
-          onPressed: () {
-            HapticFeedback.lightImpact();
+        GroupedFilterChip(
+          label: localizations.clear,
+          icon: Icons.close_rounded,
+          showChevron: false,
+          onTap: () {
             setState(() {
               _selectedPeriodFilter = null;
               _selectedTemplateFilter = null;
               _selectedStatusFilter = null;
             });
           },
-          minimumSize: Size.zero,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                cupertino.CupertinoIcons.clear,
-                size: 14,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-              SizedBox(width: IOSSpacing.xsOf(context)),
-              Text(localizations.clear, style: IOSTextStyle.footnote(context)),
-            ],
-          ),
         ),
     ];
   }
@@ -1363,12 +1331,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildIOSFilterButton({
     required String label,
     required String? value,
-    required List<String?> options,
     required VoidCallback onTap,
     bool isStatusFilter = false,
   }) {
     final localizations = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final hasSelection = value != null;
 
     String displayText = label;
@@ -1378,56 +1344,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           : value;
     }
 
-    return cupertino.CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      minimumSize: Size.zero,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: IOSSpacing.md - 6,
-          vertical: IOSSpacing.xs + 2,
-        ),
-        decoration: BoxDecoration(
-          color: hasSelection
-              ? IOSColors.getSystemBlue(context).withValues(alpha: 0.1)
-              : theme.colorScheme.onSurface.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(6),
-          border: hasSelection
-              ? Border.all(
-                  color: IOSColors.getSystemBlue(
-                    context,
-                  ).withValues(alpha: 0.3),
-                  width: 0.5,
-                )
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                displayText,
-                style: IOSTextStyle.footnote(context).copyWith(
-                  fontWeight: hasSelection ? FontWeight.w600 : FontWeight.w400,
-                  color: hasSelection
-                      ? IOSColors.getSystemBlue(context)
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(width: IOSSpacing.xsOf(context)),
-            Icon(
-              cupertino.CupertinoIcons.chevron_down,
-              size: 12,
-              color: hasSelection
-                  ? IOSColors.getSystemBlue(context)
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
-            ),
-          ],
-        ),
-      ),
+    return GroupedFilterChip(
+      label: displayText,
+      selected: hasSelection,
+      onTap: onTap,
     );
   }
 
@@ -1440,68 +1360,30 @@ class _DashboardScreenState extends State<DashboardScreen>
     required AppLocalizations localizations,
     bool isStatusFilter = false,
   }) {
-    HapticFeedback.selectionClick();
-
-    cupertino.showCupertinoModalPopup(
+    final allLabel = localizations.allYears.split(' ').first;
+    showGroupedOptionPicker(
       context: context,
-      builder: (context) => cupertino.CupertinoActionSheet(
-        title: Text(title, style: IOSTextStyle.headline(context)),
-        actions: [
-          // "All" option
-          cupertino.CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(context).pop();
-              onSelected(null);
-            },
-            child: Text(
-              localizations.allYears.split(' ')[0],
-              style: IOSTextStyle.body(context).copyWith(
-                color: selectedValue == null
-                    ? IOSColors.getSystemBlue(context)
-                    : Theme.of(context).colorScheme.onSurface,
-                fontWeight: selectedValue == null
-                    ? FontWeight.w600
-                    : FontWeight.w400,
-              ),
-            ),
-          ),
-          // Options
-          ...options.map((option) {
-            final displayText = isStatusFilter
-                ? (option != null
-                      ? localizations.localizeStatus(option)
-                      : localizations.nA)
-                : (option ?? localizations.nA);
-            final isSelected = option == selectedValue;
-
-            return cupertino.CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(context).pop();
-                onSelected(option);
-              },
-              child: Text(
-                displayText,
-                style: IOSTextStyle.body(context).copyWith(
-                  color: isSelected
-                      ? IOSColors.getSystemBlue(context)
-                      : Theme.of(context).colorScheme.onSurface,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            );
-          }),
-        ],
-        cancelButton: cupertino.CupertinoActionSheetAction(
-          isDestructiveAction: false,
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            localizations.cancel,
-            style: IOSTextStyle.body(
-              context,
-            ).copyWith(fontWeight: FontWeight.w600),
-          ),
+      title: title,
+      closeTooltip: localizations.close,
+      choices: [
+        GroupedPickerChoice(
+          label: allLabel,
+          selected: selectedValue == null,
+          onSelected: () => onSelected(null),
         ),
-      ),
+        ...options.map((option) {
+          final displayText = isStatusFilter
+              ? (option != null
+                    ? localizations.localizeStatus(option)
+                    : localizations.nA)
+              : (option ?? localizations.nA);
+          return GroupedPickerChoice(
+            label: displayText,
+            selected: option == selectedValue,
+            onSelected: () => onSelected(option),
+          );
+        }),
+      ],
     );
   }
 

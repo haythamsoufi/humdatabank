@@ -16,6 +16,7 @@ import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
+import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/disaggregation/disagg_chart_panel.dart';
 import '../../widgets/disaggregation/disagg_filter_sheet.dart';
 import '../../widgets/disaggregation/disagg_summary_cards.dart';
@@ -194,58 +195,19 @@ class _DisaggregationAnalysisScreenState
   }
 
   void _showCountriesSheet(BuildContext context, ThemeData theme) {
-    showModalBottomSheet(
+    final loc = AppLocalizations.of(context)!;
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context)!.countries,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(sheetContext),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                const Expanded(child: CountriesWidget()),
-              ],
-            ),
-          ),
+        return NativeModalSheetScaffold(
+          theme: theme,
+          title: loc.countries,
+          closeTooltip: loc.close,
+          maxHeightFraction: 0.9,
+          onClose: () => Navigator.pop(sheetContext),
+          child: const CountriesWidget(),
         );
       },
     );

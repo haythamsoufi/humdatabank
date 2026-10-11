@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart' as cupertino;
 import 'package:flutter/services.dart';
 import '../providers/shared/dashboard_provider.dart';
 import '../models/shared/entity.dart';
 import '../l10n/app_localizations.dart';
-import '../utils/theme_extensions.dart';
+import '../theme/grouped_sheet_style.dart';
 import '../utils/ios_constants.dart';
 import 'app_fade_in_up.dart';
 
@@ -38,8 +37,10 @@ class EntitySelectorBottomSheet extends StatefulWidget {
 
     HapticFeedback.selectionClick();
 
-    cupertino.showCupertinoModalPopup(
+    showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => EntitySelectorBottomSheet(
         provider: provider,
         theme: theme,
@@ -145,69 +146,44 @@ class _EntitySelectorBottomSheetState
     final localizations = AppLocalizations.of(context)!;
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
-      decoration: BoxDecoration(
-        color: widget.theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
+      decoration: GroupedSheetStyle.sheetDecoration(context),
+      child: SafeArea(
+        child: Column(
         children: [
-          Container(
-            margin: const EdgeInsets.only(top: 8, bottom: 4),
-            width: 36,
-            height: 5,
-            decoration: BoxDecoration(
-              color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(2.5),
-            ),
-          ),
+          const GroupedSheetDragHandle(),
           Padding(
-            padding: EdgeInsets.fromLTRB(
-              IOSSpacing.lgOf(context),
-              IOSSpacing.mdOf(context) - 4,
-              IOSSpacing.mdOf(context),
-              IOSSpacing.smOf(context),
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     localizations.entities,
-                    style: IOSTextStyle.title1(context),
+                    style: GroupedSheetStyle.title(context),
                   ),
                 ),
-                Semantics(
-                  label: localizations.close,
-                  button: true,
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: widget.theme.colorScheme.onSurface,
-                      size: 24,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
+                GroupedSheetCloseButton(
+                  tooltip: localizations.close,
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(
-              IOSSpacing.lgOf(context),
-              IOSSpacing.smOf(context),
-              IOSSpacing.lgOf(context),
-              IOSSpacing.mdOf(context) - 4,
-            ),
-            child: cupertino.CupertinoSearchTextField(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: TextField(
               controller: _searchController,
-              placeholder: localizations.searchPlaceholder,
-              placeholderStyle: IOSTextStyle.subheadline(context).copyWith(
-                color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
               style: IOSTextStyle.subheadline(context).copyWith(
                 color: widget.theme.colorScheme.onSurface,
               ),
-              backgroundColor: widget.theme.colorScheme.onSurface.withValues(alpha: 0.06),
-              itemColor: widget.theme.colorScheme.onSurface,
+              decoration: GroupedSheetStyle.fieldDecoration(
+                context,
+                hint: localizations.searchPlaceholder,
+              ).copyWith(
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: widget.theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -258,12 +234,12 @@ class _EntitySelectorBottomSheetState
 
                         return AppFadeInUp(
                           staggerIndex: index,
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: GroupedSheetOption(
+                              label: entity.displayLabel,
+                              selected: isSelected,
                               onTap: () {
-                                HapticFeedback.selectionClick();
-
                                 final entityToSelect = entity;
                                 final providerToUse = widget.provider;
 
@@ -274,50 +250,6 @@ class _EntitySelectorBottomSheetState
                                   providerToUse.selectEntity(entityToSelect);
                                 });
                               },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: IOSSpacing.sm + 6,
-                                    horizontal: IOSSpacing.lg),
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: widget.theme.dividerColor
-                                          .withValues(alpha: 0.5),
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        entity.displayLabel,
-                                        style: IOSTextStyle.callout(context)
-                                            .copyWith(
-                                          fontWeight: isSelected
-                                              ? FontWeight.w600
-                                              : FontWeight.w400,
-                                          color: isSelected
-                                              ? (widget.theme.isDarkTheme
-                                                  ? widget.theme.colorScheme
-                                                      .tertiary
-                                                  : context.navyTextColor)
-                                              : widget.theme.colorScheme
-                                                  .onSurface,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isSelected)
-                                      Icon(
-                                        Icons.check_rounded,
-                                        color: widget.theme.isDarkTheme
-                                            ? widget.theme.colorScheme.tertiary
-                                            : context.navyIconColor,
-                                        size: 22,
-                                      ),
-                                  ],
-                                ),
-                              ),
                             ),
                           ),
                         );
@@ -329,60 +261,26 @@ class _EntitySelectorBottomSheetState
           ),
         ],
       ),
+      ),
     );
   }
 
   Widget _buildSectionHeader(String entityType) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        IOSSpacing.lgOf(context),
-        IOSSpacing.mdOf(context) + 4,
-        IOSSpacing.lgOf(context),
-        IOSSpacing.smOf(context),
-      ),
-      decoration: BoxDecoration(
-        color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.04),
-        border: Border(
-          bottom: BorderSide(
-            color: widget.theme.dividerColor.withValues(alpha: 0.3),
-            width: 0.5,
-          ),
-        ),
-      ),
+    final count = '${_groupedEntities[entityType]?.length ?? 0}';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
       child: Row(
         children: [
           Icon(
             _getEntityIcon(entityType),
             size: 16,
-            color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.48),
           ),
-          SizedBox(width: IOSSpacing.smOf(context)),
-          Text(
-            _getEntityTypeLabel(entityType).toUpperCase(),
-            style: IOSTextStyle.footnote(context).copyWith(
-              fontWeight: FontWeight.w600,
-              color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              letterSpacing: 0.5,
-            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GroupedSheetSectionLabel(_getEntityTypeLabel(entityType)),
           ),
-          SizedBox(width: IOSSpacing.smOf(context)),
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: IOSSpacing.xsOf(context) + 2,
-              vertical: IOSSpacing.xsOf(context) / 2,
-            ),
-            decoration: BoxDecoration(
-              color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '${_groupedEntities[entityType]?.length ?? 0}',
-              style: IOSTextStyle.caption2(context).copyWith(
-                color: widget.theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          Text(count, style: GroupedSheetStyle.section(context)),
         ],
       ),
     );

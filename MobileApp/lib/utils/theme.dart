@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'arabic_text_font.dart';
 import '../theme/app_shell_tokens.dart';
+import '../theme/grouped_dashboard_palette.dart';
+import '../theme/grouped_sheet_style.dart';
 import 'app_spacing.dart';
 import 'constants.dart';
 
@@ -105,7 +107,15 @@ class AppTheme {
     final bodyMediumColor =
         isDark ? Colors.white.withValues(alpha: 0.9) : textPrimary;
 
-    final inputRadius = BorderRadius.circular(AppConstants.radiusMedium);
+    final inputRadius = BorderRadius.circular(GroupedSheetStyle.cardRadius);
+    final sheetHairline = GroupedSheetStyle.hairlineFor(
+      isDark: isDark,
+      scheme: colorScheme,
+    );
+    final sheetCard = GroupedSheetStyle.cardFor(
+      isDark: isDark,
+      scheme: colorScheme,
+    );
 
     final shellTokens = AppShellTokens.fromBridge(
       isDark: isDark,
@@ -316,35 +326,18 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark
-            ? const Color(AppConstants.themeElevatedSurfaceDark)
-            : const Color(AppConstants.themeInputFillLight),
+        fillColor: sheetCard,
         border: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : const Color(AppConstants.themeInputBorderLight),
-            width: 1,
-          ),
+          borderSide: BorderSide(color: sheetHairline, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : const Color(AppConstants.themeInputBorderLight),
-            width: 1,
-          ),
+          borderSide: BorderSide(color: sheetHairline, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: inputRadius,
-          borderSide: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.7)
-                : const Color(AppConstants.themeInputBorderFocusedLight),
-            width: isDark ? 1.5 : 2,
-          ),
+          borderSide: BorderSide(color: primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: inputRadius,
@@ -373,43 +366,60 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        elevation: isDark ? 0 : 1,
-        shadowColor: isDark
-            ? Colors.black.withValues(alpha: 0.35)
-            : Colors.black.withValues(alpha: 0.06),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+          borderRadius: BorderRadius.circular(GroupedSheetStyle.cardRadius),
+          side: BorderSide(color: sheetHairline),
         ),
         margin: EdgeInsets.zero,
-        color: isDark
-            ? const Color(AppConstants.themeSurfaceDark)
-            : Colors.white,
+        color: sheetCard,
         surfaceTintColor: Colors.transparent,
       ),
       dividerTheme: DividerThemeData(
         color: isDark
             ? Colors.white.withValues(alpha: 0.15)
-            : const Color(AppConstants.borderColor),
+            : GroupedDashboardPalette.hairline,
         thickness: 1,
         space: 1,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: isDark
-            ? const Color(AppConstants.themeElevatedSurfaceDark)
-            : colorScheme.surfaceContainerLow,
-        selectedColor: primary.withValues(alpha: isDark ? 0.3 : 0.1),
+        backgroundColor: sheetCard,
+        selectedColor: isDark
+            ? GroupedDashboardPalette.info.accent.withValues(alpha: 0.22)
+            : GroupedDashboardPalette.info.background,
+        checkmarkColor: isDark
+            ? Color.lerp(
+                GroupedDashboardPalette.info.accent,
+                Colors.white,
+                0.5,
+              )
+            : GroupedDashboardPalette.info.accent,
+        side: BorderSide(color: sheetHairline),
         labelStyle: getTextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
           color: textPrimary,
         ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 8,
+        secondaryLabelStyle: getTextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: isDark
+              ? Color.lerp(
+                  GroupedDashboardPalette.info.accent,
+                  Colors.white,
+                  0.5,
+                )!
+              : GroupedDashboardPalette.info.foreground,
         ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+          borderRadius: BorderRadius.circular(GroupedSheetStyle.chipRadius),
         ),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        pressElevation: 0,
+        showCheckmark: false,
       ),
       listTileTheme: ListTileThemeData(
         contentPadding: const EdgeInsets.symmetric(
@@ -454,18 +464,14 @@ class AppTheme {
       ),
       bottomSheetTheme: BottomSheetThemeData(
         showDragHandle: true,
-        dragHandleColor: isDark
-            ? Colors.white.withValues(alpha: 0.35)
-            : Colors.black.withValues(alpha: 0.25),
-        backgroundColor: isDark
-            ? const Color(AppConstants.themeSurfaceDark)
-            : Colors.white,
+        dragHandleColor: GroupedSheetStyle.dragHandleFor(isDark: isDark),
+        dragHandleSize: const Size(36, 4),
+        backgroundColor: GroupedSheetStyle.canvasFor(isDark: isDark),
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppConstants.radiusXLarge),
-          ),
-        ),
+        elevation: 0,
+        modalElevation: 8,
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+        shape: GroupedSheetStyle.shape,
       ),
       dialogTheme: DialogThemeData(
         elevation: 3,
@@ -474,7 +480,8 @@ class AppTheme {
             : Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.radiusXLarge),
+          borderRadius: BorderRadius.circular(GroupedSheetStyle.sheetRadius),
+          side: BorderSide(color: sheetHairline),
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(

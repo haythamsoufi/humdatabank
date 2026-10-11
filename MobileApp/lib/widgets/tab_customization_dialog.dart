@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/shared/tab_customization_provider.dart';
 import '../providers/shared/auth_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/grouped_sheet_style.dart';
 import '../utils/theme_extensions.dart';
 
 class _EditableTab {
@@ -145,10 +146,7 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
     final theme = Theme.of(context);
 
     return Container(
-      decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      decoration: GroupedSheetStyle.sheetDecoration(context),
       child: DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,
@@ -158,21 +156,11 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
           return Column(
             children: [
               // ── Drag handle ───────────────────────────────────────────
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.borderColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const Center(child: GroupedSheetDragHandle()),
 
               // ── Header ────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
                 child: Row(
                   children: [
                     Expanded(
@@ -181,8 +169,7 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
                         children: [
                           Text(
                             l10n.customizeTabs,
-                            style: theme.textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w600),
+                            style: GroupedSheetStyle.title(context),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -202,7 +189,10 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
                   ],
                 ),
               ),
-              Divider(height: 1, color: context.borderColor),
+              Divider(
+                height: 1,
+                color: GroupedSheetStyle.hairline(context),
+              ),
 
               // ── Reorderable tab list ──────────────────────────────────
               Expanded(
@@ -214,8 +204,10 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
                   proxyDecorator: (child, _, _) {
                     return Material(
                       elevation: 4,
-                      color: context.surfaceColor,
-                      borderRadius: BorderRadius.circular(8),
+                      color: GroupedSheetStyle.card(context),
+                      borderRadius: BorderRadius.circular(
+                        GroupedSheetStyle.cardRadius,
+                      ),
                       child: child,
                     );
                   },
@@ -225,9 +217,20 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
                     final isEffectivelyRequired = tab.def.isRequired ||
                         _roleRequiredTabs.contains(tab.def.id);
 
-                    return Material(
+                    return Padding(
                       key: ValueKey(tab.def.id),
-                      color: Colors.transparent,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Material(
+                      color: GroupedSheetStyle.card(context),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          GroupedSheetStyle.cardRadius,
+                        ),
+                        side: BorderSide(
+                          color: GroupedSheetStyle.hairline(context),
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
                       child: ListTile(
                         leading: Icon(
                           tab.visible
@@ -279,33 +282,29 @@ class _TabCustomizationDialogState extends State<TabCustomizationDialog> {
                           ],
                         ),
                       ),
+                      ),
                     );
                   },
                 ),
               ),
-              Divider(height: 1, color: context.borderColor),
+              Divider(
+                height: 1,
+                color: GroupedSheetStyle.hairline(context),
+              ),
 
               // ── Action buttons ────────────────────────────────────────
               SafeArea(
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(l10n.cancel),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _save,
-                          child: Text(l10n.save),
-                        ),
-                      ),
-                    ],
+                  child: Theme(
+                    data: GroupedSheetStyle.controlsTheme(context),
+                    child: GroupedSheetActions(
+                      clearLabel: l10n.cancel,
+                      applyLabel: l10n.save,
+                      onClear: () => Navigator.of(context).pop(),
+                      onApply: _save,
+                    ),
                   ),
                 ),
               ),

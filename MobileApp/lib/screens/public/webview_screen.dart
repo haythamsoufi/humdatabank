@@ -24,7 +24,9 @@ import '../../utils/theme_extensions.dart';
 import '../../utils/url_helper.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/app_bar.dart';
+import '../../theme/grouped_sheet_style.dart';
 import '../../widgets/countries_widget.dart';
+import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../services/webview_service.dart';
 import '../../services/webview_auth_draft_host_store.dart';
@@ -1244,49 +1246,19 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final user = authProvider.user;
     final isFocalPoint = user?.isFocalPoint ?? false;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (BuildContext bottomSheetContext) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
-          ),
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  child: Text(
-                    localizations.navigation,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                const Divider(height: 1),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
+        return NativeModalSheetScaffold(
+          theme: theme,
+          title: localizations.navigation,
+          closeTooltip: localizations.close,
+          maxHeightFraction: 0.85,
+          onClose: () => Navigator.pop(bottomSheetContext),
+          child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                     physics: const ClampingScrollPhysics(),
                     children: [
                       _buildMenuTile(
@@ -1406,10 +1378,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                  ),
-                ),
-              ],
-            ),
           ),
         );
       },
@@ -1418,60 +1386,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   void _showCountriesSheet(BuildContext context, ThemeData theme) {
     final loc = AppLocalizations.of(context)!;
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (BuildContext bottomSheetContext) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        loc.countries,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(bottomSheetContext),
-                        tooltip: loc.close,
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                const Expanded(child: CountriesWidget()),
-              ],
-            ),
-          ),
+      builder: (bottomSheetContext) {
+        return NativeModalSheetScaffold(
+          theme: theme,
+          title: loc.countries,
+          closeTooltip: loc.close,
+          maxHeightFraction: 0.9,
+          onClose: () => Navigator.pop(bottomSheetContext),
+          child: const CountriesWidget(),
         );
       },
     );
@@ -1484,23 +1410,35 @@ class _WebViewScreenState extends State<WebViewScreen> {
     required String title,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(icon, color: Color(AppConstants.ifrcRed), size: 20),
-      title: Text(
-        title,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w500,
-          color: theme.colorScheme.onSurface,
+    final titleColor = GroupedSheetStyle.titleColor(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: GroupedSheetStyle.card(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(GroupedSheetStyle.cardRadius),
+          side: BorderSide(color: GroupedSheetStyle.hairline(context)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          leading: Icon(icon, color: titleColor, size: 20),
+          title: Text(
+            title,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: titleColor,
+            ),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            size: 20,
+          ),
+          onTap: onTap,
         ),
       ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-        size: 20,
-      ),
-      onTap: onTap,
     );
   }
 }

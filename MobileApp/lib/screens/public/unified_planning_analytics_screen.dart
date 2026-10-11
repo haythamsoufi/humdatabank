@@ -10,6 +10,7 @@ import '../../providers/public/public_resources_provider.dart';
 import '../../services/ifrc_unified_planning_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/unified_planning_analytics_filter_cache.dart';
+import '../../theme/grouped_sheet_style.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
@@ -1133,13 +1134,14 @@ class _AnalyticsFilterSheetState extends State<_AnalyticsFilterSheet> {
   @override
   Widget build(BuildContext context) {
     final loc = widget.loc;
-    final theme = widget.theme;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final screenH = MediaQuery.sizeOf(context).height;
     // Cap scroll region: short content keeps a compact sheet; long lists scroll inside.
     final scrollMax = (screenH * 0.5).clamp(200.0, 400.0);
 
-    return Padding(
+    return Theme(
+      data: GroupedSheetStyle.controlsTheme(context),
+      child: Padding(
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
@@ -1155,10 +1157,7 @@ class _AnalyticsFilterSheetState extends State<_AnalyticsFilterSheet> {
               Expanded(
                 child: Text(
                   loc.unifiedPlanningAnalyticsFiltersTitle,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
-                  ),
+                  style: GroupedSheetStyle.title(context),
                 ),
               ),
               TextButton(
@@ -1180,12 +1179,8 @@ class _AnalyticsFilterSheetState extends State<_AnalyticsFilterSheet> {
               shrinkWrap: true,
               physics: const ClampingScrollPhysics(),
               children: [
-                Text(
+                GroupedSheetSectionLabel(
                   loc.unifiedPlanningAnalyticsFilterYears,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: context.textColor,
-                  ),
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -1226,12 +1221,8 @@ class _AnalyticsFilterSheetState extends State<_AnalyticsFilterSheet> {
                   ],
                 ),
                 const SizedBox(height: 22),
-                Text(
+                GroupedSheetSectionLabel(
                   loc.unifiedPlanningAnalyticsFilterRounds,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: context.textColor,
-                  ),
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -1281,6 +1272,7 @@ class _AnalyticsFilterSheetState extends State<_AnalyticsFilterSheet> {
             child: Text(loc.unifiedPlanningAnalyticsFilterApply),
           ),
         ],
+      ),
       ),
     );
   }

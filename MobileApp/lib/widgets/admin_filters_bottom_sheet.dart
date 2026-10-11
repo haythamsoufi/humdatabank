@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../theme/grouped_sheet_style.dart';
+
 /// Shows a scrollable admin filter sheet from the bottom of the screen.
 ///
 /// Use with [AdminFilterPanel] (or any child) for consistent behavior:
@@ -19,14 +21,14 @@ Future<T?> showAdminFiltersBottomSheet<T>({
     StateSetter setModalState,
   ) builder,
 }) {
+  final theme = Theme.of(context);
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+    backgroundColor: GroupedSheetStyle.canvasOf(theme),
+    shape: GroupedSheetStyle.shape,
     builder: (sheetContext) {
       return StatefulBuilder(
         builder: (context, setModalState) {

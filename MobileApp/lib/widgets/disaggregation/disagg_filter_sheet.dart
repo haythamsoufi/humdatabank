@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../config/fdrs_constants.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/disaggregation/disaggregation_overview.dart';
-import '../../utils/constants.dart';
+import '../../theme/grouped_sheet_style.dart';
 import '../../widgets/home_landing/fdrs_world_map.dart';
 import '../../widgets/sheets/native_modal_sheet.dart';
 
@@ -48,9 +48,6 @@ class DisaggFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Column(
@@ -61,9 +58,26 @@ class DisaggFilterBar extends StatelessWidget {
             child: Row(
               children: [
                 ActionChip(
-                  avatar: Icon(Icons.tune, size: 18, color: cs.primary),
+                  avatar: Icon(
+                    Icons.tune,
+                    size: 18,
+                    color: GroupedSheetStyle.selectedForeground(context),
+                  ),
                   label: Text(loc.disaggFilterButton),
                   onPressed: onOpenFilters,
+                  backgroundColor: GroupedSheetStyle.selectedFill(context),
+                  side: BorderSide(
+                    color: GroupedSheetStyle.selectedBorder(context),
+                  ),
+                  labelStyle: TextStyle(
+                    color: GroupedSheetStyle.selectedForeground(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      GroupedSheetStyle.chipRadius,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 _FilterChip(label: _periodLabel(), icon: Icons.calendar_today),
@@ -87,7 +101,9 @@ class DisaggFilterBar extends StatelessWidget {
                 icon: const Icon(Icons.clear_all, size: 18),
                 label: Text(loc.disaggFilterClear),
                 style: TextButton.styleFrom(
-                  foregroundColor: Color(AppConstants.ifrcRed),
+                  foregroundColor: GroupedSheetStyle.titleColor(
+                    context,
+                  ).withValues(alpha: 0.75),
                 ),
               ),
             ),
@@ -106,13 +122,21 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     return Chip(
-      avatar: Icon(icon, size: 16, color: cs.onSurfaceVariant),
-      label: Text(
-        label,
-        overflow: TextOverflow.ellipsis,
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: GroupedSheetStyle.titleColor(context).withValues(alpha: 0.7),
+      ),
+      label: Text(label, overflow: TextOverflow.ellipsis),
+      backgroundColor: GroupedSheetStyle.card(context),
+      side: BorderSide(color: GroupedSheetStyle.hairline(context)),
+      labelStyle: TextStyle(
+        color: GroupedSheetStyle.titleColor(context).withValues(alpha: 0.8),
+        fontWeight: FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(GroupedSheetStyle.chipRadius),
       ),
       visualDensity: VisualDensity.compact,
     );
@@ -203,12 +227,7 @@ class _DisaggFilterSheetState extends State<_DisaggFilterSheet> {
         shrinkWrap: true,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
-          Text(
-            loc.disaggFilterPeriod,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          GroupedSheetSectionLabel(loc.disaggFilterPeriod),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -229,20 +248,12 @@ class _DisaggFilterSheetState extends State<_DisaggFilterSheet> {
           ),
           if (widget.showCountryFilter) ...[
             const SizedBox(height: 20),
-            Text(
-              loc.disaggFilterCountry,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            GroupedSheetSectionLabel(loc.disaggFilterCountry),
             const SizedBox(height: 8),
             DropdownButtonFormField<int?>(
               key: ValueKey<int?>(_countryId),
               initialValue: _countryId,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                isDense: true,
-              ),
+              decoration: GroupedSheetStyle.fieldDecoration(context),
               items: [
                 DropdownMenuItem<int?>(
                   value: null,
@@ -258,20 +269,12 @@ class _DisaggFilterSheetState extends State<_DisaggFilterSheet> {
             ),
           ],
           const SizedBox(height: 20),
-          Text(
-            loc.disaggFilterIndicator,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          GroupedSheetSectionLabel(loc.disaggFilterIndicator),
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
             key: ValueKey<int>(_indicatorId),
             initialValue: _indicatorId,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              isDense: true,
-            ),
+            decoration: GroupedSheetStyle.fieldDecoration(context),
             items: [
               for (final id in _indicatorOptions)
                 DropdownMenuItem<int>(
@@ -299,7 +302,6 @@ class _DisaggFilterSheetState extends State<_DisaggFilterSheet> {
             },
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
-              backgroundColor: Color(AppConstants.ifrcRed),
             ),
             child: Text(loc.disaggFilterApply),
           ),

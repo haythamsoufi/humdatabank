@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/shared/unified_planning_document.dart';
 import '../../providers/public/public_resources_provider.dart';
 import '../../services/unified_planning_pdf_thumbnail_cache.dart';
+import '../../theme/grouped_sheet_style.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
 import '../../widgets/app_bar.dart';
@@ -286,12 +287,11 @@ class _UnifiedPlanningDocumentsScreenState
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      showDragHandle: true,
       builder: (ctx) {
-        return Padding(
+        return Theme(
+          data: GroupedSheetStyle.controlsTheme(ctx),
+          child: Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
@@ -307,17 +307,12 @@ class _UnifiedPlanningDocumentsScreenState
                 children: [
                   Text(
                     loc.indicatorBankFilters,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                    style: GroupedSheetStyle.title(context),
                   ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      loc.unifiedPlanningSortBy,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
+                    child: GroupedSheetSectionLabel(loc.unifiedPlanningSortBy),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<UnifiedPlanningListSort>(
@@ -344,10 +339,7 @@ class _UnifiedPlanningDocumentsScreenState
                   const SizedBox(height: 14),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      loc.countries,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
+                    child: GroupedSheetSectionLabel(loc.countries),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String?>(
@@ -373,10 +365,7 @@ class _UnifiedPlanningDocumentsScreenState
                   const SizedBox(height: 14),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      loc.indicatorBankFilterType,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
+                    child: GroupedSheetSectionLabel(loc.indicatorBankFilterType),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int?>(
@@ -400,12 +389,9 @@ class _UnifiedPlanningDocumentsScreenState
                     onChanged: (v) => setModalState(() => tempType = v),
                   ),
                   const SizedBox(height: 14),
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Year',
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
+                    child: GroupedSheetSectionLabel('Year'),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int?>(
@@ -449,9 +435,6 @@ class _UnifiedPlanningDocumentsScreenState
                       const SizedBox(width: 12),
                       Expanded(
                         child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Color(AppConstants.ifrcRed),
-                          ),
                           onPressed: () {
                             setState(() {
                               _filterCountryName = tempCountry;
@@ -471,21 +454,14 @@ class _UnifiedPlanningDocumentsScreenState
               );
             },
           ),
+          ),
         );
       },
     );
   }
 
   static InputDecoration _filterFieldDecoration(BuildContext context) {
-    return InputDecoration(
-      filled: true,
-      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    );
+    return GroupedSheetStyle.fieldDecoration(context);
   }
 
   /// Keeps [DropdownButton] menus from using the full screen height; reads as in-sheet.

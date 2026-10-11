@@ -8,7 +8,6 @@ import '../../models/indicator_bank/indicator.dart';
 import '../../models/indicator_bank/sector.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme_extensions.dart';
-import '../../utils/ios_constants.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/app_navigation_drawer.dart';
 import '../../widgets/drawer_aware_bottom_bar.dart';
@@ -16,7 +15,7 @@ import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/countries_widget.dart';
 import '../../widgets/admin_filter_panel.dart';
 import '../../widgets/admin_filters_bottom_sheet.dart';
-import '../../widgets/ios_button.dart';
+import '../../widgets/sheets/native_modal_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/shimmer_list_placeholder.dart';
 import '../../widgets/error_state.dart';
@@ -174,69 +173,18 @@ class _IndicatorBankScreenState extends State<IndicatorBankScreen> {
 
   void _showCountriesSheet(BuildContext context, ThemeData theme) {
     final localizations = AppLocalizations.of(context)!;
-    final sheetHeight = MediaQuery.sizeOf(context).height * 0.9;
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (BuildContext bottomSheetContext) {
-        return SizedBox(
-          height: sheetHeight,
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Handle bar
-                  Container(
-                    margin: const EdgeInsets.only(
-                      top: IOSSpacing.md - 4,
-                      bottom: IOSSpacing.sm,
-                    ),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.dividerColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  // Title
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: IOSSpacing.xl,
-                      vertical: IOSSpacing.md,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          localizations.countries,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                        IOSIconButton(
-                          icon: Icons.close,
-                          onPressed: () => Navigator.pop(bottomSheetContext),
-                          tooltip: localizations.close,
-                          semanticLabel: localizations.close,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  const Expanded(child: CountriesWidget()),
-                ],
-              ),
-            ),
-          ),
+      builder: (bottomSheetContext) {
+        return NativeModalSheetScaffold(
+          theme: theme,
+          title: localizations.countries,
+          closeTooltip: localizations.close,
+          maxHeightFraction: 0.9,
+          onClose: () => Navigator.pop(bottomSheetContext),
+          child: const CountriesWidget(),
         );
       },
     );

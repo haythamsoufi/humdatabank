@@ -3,8 +3,10 @@ description: Humanitarian Databank Mobile Application - Generic mobile app for H
 publish_to: 'none'
 version: 1.0.0+1
 
-# CI pins Flutter 3.41.6 in .github/workflows (android-build / ios-build*). That SDK
-# ships Dart 3.11.x — keep this `environment.sdk` and caps below aligned with it.
+# CI pins Flutter 3.41.9 in .github/workflows (android-build / ios-build*). That SDK
+# ships Dart 3.11.x (3.41.9 did not bump Dart) — keep this `environment.sdk` and caps
+# below aligned with it. 3.41.7+ fixes debug launches on physical iOS devices with
+# Xcode 26.4+ (Dart VM JIT pages left non-executable; the process dies at startup).
 # When CI upgrades Flutter further (e.g. Dart 3.12+), you can relax caps:
 # font_awesome_flutter → ^11.0.0, flutter_local_notifications → ^21.0.0, etc.
 environment:

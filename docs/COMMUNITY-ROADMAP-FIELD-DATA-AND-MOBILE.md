@@ -174,7 +174,7 @@ Supported mappings (XLSForm → native):
    Copies live under a per-user folder and are deleted on logout; copies for closed assignments or older than 45 days (or beyond 60 copies) are pruned after an online dashboard load.
    **Form data for offline use:** while downloading, a headless WebView loads the live form and a `fetch` recorder (`offline_form_scripts.dart`) captures the JSON the form itself requests (variable resolution, plugin/emergency-operations lookups, matrix data). Responses are stored in `offline_api_cache.json/.js` inside the bundle and replayed by an offline `fetch` wrapper; anything not cached falls through to the network and fails gracefully. The live WebView also keeps appending to the cache while the user works online.
    Third-party CSS/JS/fonts the form references (e.g. Google Fonts, CDN libraries) are mirrored under `static/ext/<host>/` and referenced locally; analytics hosts are skipped and the session cookie is never sent to third-party hosts. A third-party file that cannot be fetched does not block the download.
-   Users can see what is stored and free space from Settings → Offline forms (per-copy size, remove one or all).
+   Users can see what is stored and free space from Settings → Offline forms (per-template copies and size, remove a template or all). The same screen has a "Keep open forms available offline" switch that prepares every open assignment (not only templates downloaded by hand) on Wi-Fi.
    Staleness compares the form definition timestamp, `static_version` (deployed asset version), `data_version` (latest assignment activity), and the app language.
 3. When offline, `WebViewScreen` loads `file://…/offline_assignment_bundles/assignment_<id>/index.html`.
 4. `auth-drafts.js` (Backoffice JS) intercepts Save → saves to IndexedDB. In the offline bundle, Submit / Send for review / Approve / Reopen are blocked with an "online only" message (the draft is saved first); validation and evaluation run on the server when the user submits online.
@@ -259,7 +259,7 @@ Any web-based photo capture requires both relaxing the Permissions-Policy and ex
 - **Two production plugins exist:** `interactive_map` and `emergency_operations`.
 - `emergency_operations` is display-only — it does not save submitted data.
 - **Plugins run in-process with full app privileges.** No sandboxing.
-- **Plugin assets are not explicitly listed** in the offline bundle manifest. The HTML crawl may or may not capture all plugin JS/CSS depending on how they are loaded.
+- **Plugin assets** (`/plugins/static/…`, named in each field's `data-entry-form-config`) are discovered from the page, mirrored with their imports, and made loadable from `file://` (root-absolute module paths are rewritten and the config paths are pointed at the saved files before the form scripts run). Assets that only a plugin loads by an unusual mechanism may still be missed; the download fails if a same-origin script/style is missing.
 
 ### 2.11 Template versioning model
 
@@ -626,7 +626,7 @@ Template variables (`FormTemplateVersion.variables`) allow linking a field's def
 **Plugins**
 
 - Write a contributor kit: document `BasePlugin` / `BaseFieldType` contracts, add a starter template ZIP, add a plugin smoke-test pattern (install → builder render → entry render → submit mock data).
-- **Offline:** add explicit plugin asset manifest to `AssignmentOfflineBundleService` so plugin JS/CSS is reliably included in offline bundles.
+- **Offline:** plugin JS/CSS is now mirrored from the page's `data-entry-form-config` (see Offline flow); a server-provided manifest is only needed if plugins start loading assets the page does not name.
 - **Mobile admin:** expose `/admin/plugins` in mobile admin drawer (WebView route). The route constant `AppRoutes.pluginManagement` exists but is not in the drawer.
 
 **Form testing**

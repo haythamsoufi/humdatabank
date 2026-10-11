@@ -7,6 +7,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hum_databank_app/models/shared/assignment.dart';
 import 'package:hum_databank_app/services/assignment_offline_bundle_service.dart';
+import 'package:hum_databank_app/widgets/offline_storage_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 
 class _FakeAdapter implements HttpClientAdapter {
@@ -117,6 +119,100 @@ void main() {
       await svc.deleteBundle(5);
       expect(AssignmentOfflineBundleService.savedCopiesChanged.value, greaterThan(before));
       expect(await svc.listSavedCopies(), isEmpty);
+    });
+
+    test('groups copies by template for the storage screen', () {
+      final now = DateTime(2026, 1, 1);
+      final groups = groupOfflineCopies([
+        OfflineCopySummary(assignmentId: 1, templateId: 7, title: 'A', savedAt: now, sizeBytes: 10),
+        OfflineCopySummary(assignmentId: 2, templateId: 7, title: 'A', savedAt: now, sizeBytes: 20),
+        const OfflineCopySummary(assignmentId: 3, sizeBytes: 5),
+      ]);
+      expect(groups, hasLength(2));
+      expect(groups.first.copies, hasLength(2));
+      expect(groups.first.sizeBytes, 30);
+      expect(groups.last.title, '#3');
+    });
+
+    test('auto-download preference persists and notifies', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      expect(await svc.isAutoDownloadEnabled(), isFalse);
+      final before = AssignmentOfflineBundleService.autoDownloadChanged.value;
+      await svc.setAutoDownloadEnabled(true);
+      expect(await svc.isAutoDownloadEnabled(), isTrue);
+      expect(AssignmentOfflineBundleService.autoDownloadChanged.value, greaterThan(before));
+    });
+  });
+
+  group('plugin fields', () {
+    const pluginHtml = '<html><head>'
+        '<script type="module" src="/static/js/forms/main.js?v=1"></script>'
+        '</head><body>'
+        "<div class=\"plugin-field-container\" data-entry-form-config='"
+        '{&#34;es_module_path&#34;: &#34;/plugins/static/eo/js/field.js&#34;, '
+        '&#34;css_files&#34;: [&#34;/plugins/static/eo/css/field.css&#34;]}'
+        "'></div>"
+        '<script type="module">import { X } from "/plugins/static/eo/js/inline.js";</script>'
+        '<link rel="stylesheet" href="/plugins/static/eo/css/field.css">'
+        '</body></html>';
+
+    _FakeAdapter pluginAdapter() => _FakeAdapter({
+          '/forms/assignment/5': (status: 200, body: pluginHtml),
+          '/static/js/forms/main.js': (status: 200, body: 'export const a=1;'),
+          '/plugins/static/eo/js/field.js': (
+            status: 200,
+            body: "import { log } from '/static/js/forms/modules/debug.js';\n"
+                "import { h } from './helper.js';\n"
+                "const mod = await import('/plugins/static/eo/js/lazy.js');\n"
+                "script.src = '/static/vendor/leaflet/leaflet.js';\n"
+          ),
+          '/plugins/static/eo/js/helper.js': (status: 200, body: 'export const h=1;'),
+          '/plugins/static/eo/js/lazy.js': (status: 200, body: 'export const l=1;'),
+          '/plugins/static/eo/js/inline.js': (status: 200, body: 'export const X=1;'),
+          '/plugins/static/eo/css/field.css': (status: 200, body: '.eo{color:red}'),
+          '/static/js/forms/modules/debug.js': (status: 200, body: 'export const log=1;'),
+          '/static/vendor/leaflet/leaflet.js': (status: 200, body: 'L={};'),
+        });
+
+    test('mirrors plugin modules, styles and their imports', () async {
+      final s = build(pluginAdapter());
+      await download(s, 5);
+      final dir = Directory(await s.offlineBundleDirectoryPath(5));
+      for (final f in [
+        'plugins/static/eo/js/field.js',
+        'plugins/static/eo/js/helper.js',
+        'plugins/static/eo/js/lazy.js',
+        'plugins/static/eo/js/inline.js',
+        'plugins/static/eo/css/field.css',
+        'static/js/forms/modules/debug.js',
+        'static/vendor/leaflet/leaflet.js',
+      ]) {
+        expect(File(p.join(dir.path, f)).existsSync(), isTrue, reason: f);
+      }
+    });
+
+    test('makes root-absolute paths inside plugin scripts work from disk',
+        () async {
+      final s = build(pluginAdapter());
+      await download(s, 5);
+      final dir = Directory(await s.offlineBundleDirectoryPath(5));
+      final js = File(p.join(dir.path, 'plugins/static/eo/js/field.js'))
+          .readAsStringSync();
+      expect(js, contains("from '../../../../static/js/forms/modules/debug.js'"));
+      expect(js, contains("import('./lazy.js')"));
+      expect(js, contains("script.src = 'static/vendor/leaflet/leaflet.js'"));
+      expect(js, isNot(contains("'/static/")));
+    });
+
+    test('points the page at saved plugin files', () async {
+      final s = build(pluginAdapter());
+      await download(s, 5);
+      final html = (await s.readOfflineIndexHtml(5))!;
+      expect(html, contains('href="plugins/static/eo/css/field.css"'));
+      expect(html, contains('from "./plugins/static/eo/js/inline.js"'));
+      expect(html, contains('data-entry-form-config'));
+      expect(html, contains("var P = '/plugins/static/'"));
+      expect(html.lastIndexOf('var P = ') < html.toLowerCase().lastIndexOf('</body>'), isTrue);
     });
   });
 

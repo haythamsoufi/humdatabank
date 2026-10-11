@@ -9,6 +9,33 @@ String formatOfflineCopySize(int bytes) {
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
+/// Saved copies of one form template (one per assignment/entity).
+class OfflineTemplateGroup {
+  OfflineTemplateGroup({required this.templateId, required this.title});
+
+  final int? templateId;
+  final String title;
+  final List<OfflineCopySummary> copies = [];
+
+  int get sizeBytes => copies.fold(0, (sum, c) => sum + c.sizeBytes);
+}
+
+/// Groups copies by template (copies without a known template stand alone).
+List<OfflineTemplateGroup> groupOfflineCopies(List<OfflineCopySummary> copies) {
+  final groups = <String, OfflineTemplateGroup>{};
+  for (final c in copies) {
+    final key = c.templateId != null ? 't${c.templateId}' : 'a${c.assignmentId}';
+    final title = (c.title != null && c.title!.isNotEmpty)
+        ? c.title!
+        : '#${c.assignmentId}';
+    groups.putIfAbsent(
+      key,
+      () => OfflineTemplateGroup(templateId: c.templateId, title: title),
+    ).copies.add(c);
+  }
+  return groups.values.toList();
+}
+
 /// Lists the forms saved for offline use and lets the user free the space.
 Future<void> showOfflineStorageSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -29,11 +56,15 @@ class _OfflineStorageSheet extends StatefulWidget {
 class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
   final _service = AssignmentOfflineBundleService();
   List<OfflineCopySummary>? _copies;
+  bool _autoDownload = false;
 
   @override
   void initState() {
     super.initState();
     _reload();
+    _service.isAutoDownloadEnabled().then((v) {
+      if (mounted) setState(() => _autoDownload = v);
+    });
   }
 
   Future<void> _reload() async {
@@ -41,9 +72,21 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
     if (mounted) setState(() => _copies = copies);
   }
 
-  Future<void> _remove(OfflineCopySummary copy) async {
-    await _service.deleteBundle(copy.assignmentId);
+  Future<void> _remove(OfflineTemplateGroup group) async {
+    final id = group.templateId;
+    if (id != null) {
+      await _service.deleteBundlesForTemplate(id);
+    } else {
+      for (final c in group.copies) {
+        await _service.deleteBundle(c.assignmentId);
+      }
+    }
     await _reload();
+  }
+
+  Future<void> _toggleAutoDownload(bool value) async {
+    setState(() => _autoDownload = value);
+    await _service.setAutoDownloadEnabled(value);
   }
 
   Future<void> _removeAll() async {
@@ -78,6 +121,7 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
     final theme = Theme.of(context);
     final copies = _copies;
     final total = copies?.fold<int>(0, (sum, c) => sum + c.sizeBytes) ?? 0;
+    final groups = groupOfflineCopies(copies ?? const []);
 
     return SafeArea(
       child: ConstrainedBox(
@@ -119,6 +163,13 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                 ],
               ),
             ),
+            SwitchListTile(
+              value: _autoDownload,
+              onChanged: _toggleAutoDownload,
+              title: Text(loc.offlineStorageAutoDownload),
+              subtitle: Text(loc.offlineStorageAutoDownloadHint),
+            ),
+            const Divider(height: 1),
             if (copies == null)
               const Padding(
                 padding: EdgeInsets.all(32),
@@ -133,25 +184,34 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
               Flexible(
                 child: ListView.separated(
                   shrinkWrap: true,
-                  itemCount: copies.length,
+                  itemCount: groups.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, i) {
-                    final c = copies[i];
-                    final title = (c.title != null && c.title!.isNotEmpty)
-                        ? c.title!
-                        : '#${c.assignmentId}';
+                    final g = groups[i];
+                    final newest = g.copies
+                        .map((c) => c.savedAt)
+                        .whereType<DateTime>()
+                        .fold<DateTime?>(
+                          null,
+                          (a, b) => a == null || b.isAfter(a) ? b : a,
+                        );
                     return ListTile(
-                      title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      title: Text(
+                        g.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       subtitle: Text(
                         [
-                          formatOfflineCopySize(c.sizeBytes),
-                          if (c.savedAt != null) _dateLabel(c.savedAt!),
+                          '${loc.offlineStorageCopies}: ${g.copies.length}',
+                          formatOfflineCopySize(g.sizeBytes),
+                          if (newest != null) _dateLabel(newest),
                         ].join(' · '),
                       ),
                       trailing: IconButton(
                         tooltip: loc.offlineStorageRemove,
                         icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _remove(c),
+                        onPressed: () => _remove(g),
                       ),
                     );
                   },

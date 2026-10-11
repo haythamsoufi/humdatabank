@@ -204,3 +204,26 @@ $kOfflineApiKeyJs
 </script>
 ''';
 }
+
+/// Runs while the page is still being parsed (before deferred/module scripts),
+/// pointing plugin module and stylesheet paths at the saved files. The form's
+/// plugin loader imports `es_module_path` dynamically, and a root-absolute
+/// `/plugins/static/…` does not exist under `file://`.
+const String kOfflinePluginPathsScript = r'''
+<script>
+(function () {
+  try {
+    var base = location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, '');
+    var P = '/plugins/static/';
+    var abs = base + 'plugins/static/';
+    var els = document.querySelectorAll('[data-entry-form-config]');
+    for (var i = 0; i < els.length; i++) {
+      var v = els[i].getAttribute('data-entry-form-config');
+      if (v && v.indexOf(P) !== -1) {
+        els[i].setAttribute('data-entry-form-config', v.split(P).join(abs));
+      }
+    }
+  } catch (e) {}
+})();
+</script>
+''';

@@ -116,6 +116,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       _dashboardProviderListenerRef!.addListener(_onDashboardProviderChanged);
       AssignmentOfflineBundleService.savedCopiesChanged
           .addListener(_onSavedCopiesChanged);
+      AssignmentOfflineBundleService.autoDownloadChanged
+          .addListener(_onAutoDownloadChanged);
     });
   }
 
@@ -125,6 +127,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     _dashboardProviderListenerRef?.removeListener(_onDashboardProviderChanged);
     AssignmentOfflineBundleService.savedCopiesChanged
         .removeListener(_onSavedCopiesChanged);
+    AssignmentOfflineBundleService.autoDownloadChanged
+        .removeListener(_onAutoDownloadChanged);
     _scrollController.removeListener(_onDashboardScroll);
     _scrollController.dispose();
     _animationController.dispose();
@@ -160,6 +164,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _onOfflineProviderChanged() {
     if (!mounted) return;
     unawaited(_tryAutoRefreshStaleOfflineCopies());
+  }
+
+  void _onAutoDownloadChanged() {
+    if (!mounted) return;
+    _templatePrefetchFailedAt.clear();
+    unawaited(_prepareAssignmentsForSavedTemplates());
   }
 
   void _onSavedCopiesChanged() {
@@ -220,13 +230,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _templatePrefetchInProgress = true;
     try {
-      final savedTemplateIds =
-          await AssignmentOfflineBundleService().templateIdsWithBundles();
-      if (savedTemplateIds.isEmpty) return;
+      final svc = AssignmentOfflineBundleService();
+      final savedTemplateIds = await svc.templateIdsWithBundles();
+      final prepareAll = await svc.isAutoDownloadEnabled();
+      if (savedTemplateIds.isEmpty && !prepareAll) return;
       final pending = dashboardProvider.currentAssignments.where((a) {
         final templateId = a.templateId;
-        return templateId != null &&
-            savedTemplateIds.contains(templateId) &&
+        return (prepareAll ||
+                (templateId != null && savedTemplateIds.contains(templateId))) &&
             !_offlineBundleAssignmentIds.contains(a.id) &&
             !_downloadingOfflineAssignmentIds.contains(a.id) &&
             !_prefetchRecentlyFailed(a.id) &&
@@ -556,10 +567,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         templateId: assignment.templateId,
         staticVersion: assignment.staticVersion,
         dataVersion: assignment.dataVersion,
-        title: [
-          assignment.templateName ?? assignment.name,
-          assignment.periodName,
-        ].whereType<String>().where((t) => t.isNotEmpty).join(' · '),
+        title: assignment.templateName ?? assignment.name,
         submitBlockedMessage: loc.offlineSubmitRequiresConnection,
         recordApiResponses: (formUrl) => OfflineApiRecorder.recordFormLoad(
           formUrl: formUrl,

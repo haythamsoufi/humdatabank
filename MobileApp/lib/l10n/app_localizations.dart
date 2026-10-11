@@ -589,6 +589,9 @@ class AppLocalizations {
       'offline_storage_remove_all': 'Remove all',
       'offline_storage_remove_all_confirm': 'Remove every offline form saved on this device? Unsaved drafts are not affected.',
       'offline_storage_remove': 'Remove',
+      'offline_storage_auto_download': 'Keep open forms available offline',
+      'offline_storage_auto_download_hint': 'Downloads on Wi-Fi only',
+      'offline_storage_copies': 'Copies',
       'approve': 'Approve',
       'reopen': 'Reopen',
       'view_public_submissions': 'View Public Submissions',
@@ -1793,6 +1796,9 @@ class AppLocalizations {
       'offline_storage_remove_all': 'Eliminar todos',
       'offline_storage_remove_all_confirm': '¿Eliminar todos los formularios sin conexión guardados en este dispositivo? Los borradores no se verán afectados.',
       'offline_storage_remove': 'Eliminar',
+      'offline_storage_auto_download': 'Mantener los formularios abiertos disponibles sin conexión',
+      'offline_storage_auto_download_hint': 'Solo se descarga con Wi-Fi',
+      'offline_storage_copies': 'Copias',
       'approve': 'Aprobar',
       'reopen': 'Reabrir',
       'view_public_submissions': 'Ver Envíos Públicos',
@@ -2827,6 +2833,9 @@ class AppLocalizations {
       'offline_storage_remove_all': 'Tout supprimer',
       'offline_storage_remove_all_confirm': 'Supprimer tous les formulaires hors ligne enregistrés sur cet appareil ? Les brouillons ne sont pas affectés.',
       'offline_storage_remove': 'Supprimer',
+      'offline_storage_auto_download': 'Garder les formulaires ouverts disponibles hors ligne',
+      'offline_storage_auto_download_hint': 'Téléchargement uniquement en Wi-Fi',
+      'offline_storage_copies': 'Copies',
       'approve': 'Approuver',
       'reopen': 'Rouvrir',
       'view_public_submissions': 'Voir les Soumissions Publiques',
@@ -3850,6 +3859,9 @@ class AppLocalizations {
       'offline_storage_remove_all': 'إزالة الكل',
       'offline_storage_remove_all_confirm': 'هل تريد إزالة جميع النماذج المحفوظة دون اتصال على هذا الجهاز؟ لن تتأثر المسودات.',
       'offline_storage_remove': 'إزالة',
+      'offline_storage_auto_download': 'إبقاء النماذج المفتوحة متاحة دون اتصال',
+      'offline_storage_auto_download_hint': 'يتم التنزيل عبر Wi-Fi فقط',
+      'offline_storage_copies': 'النسخ',
       'approve': 'الموافقة',
       'reopen': 'إعادة الفتح',
       'view_public_submissions': 'عرض التقديمات العامة',
@@ -4851,6 +4863,9 @@ class AppLocalizations {
       'offline_storage_remove_all': 'सभी हटाएँ',
       'offline_storage_remove_all_confirm': 'इस डिवाइस पर सहेजे गए सभी ऑफ़लाइन फ़ॉर्म हटाएँ? ड्राफ़्ट प्रभावित नहीं होंगे।',
       'offline_storage_remove': 'हटाएँ',
+      'offline_storage_auto_download': 'खुले फ़ॉर्म ऑफ़लाइन उपलब्ध रखें',
+      'offline_storage_auto_download_hint': 'केवल Wi-Fi पर डाउनलोड',
+      'offline_storage_copies': 'प्रतियाँ',
       'approve': 'अनुमोदित करें',
       'reopen': 'पुनः खोलें',
       'view_public_submissions': 'सार्वजनिक सबमिशन देखें',
@@ -5877,6 +5892,9 @@ class AppLocalizations {
       'offline_storage_remove_all': 'Удалить все',
       'offline_storage_remove_all_confirm': 'Удалить все офлайн-формы, сохранённые на этом устройстве? Черновики не затрагиваются.',
       'offline_storage_remove': 'Удалить',
+      'offline_storage_auto_download': 'Хранить открытые формы для работы офлайн',
+      'offline_storage_auto_download_hint': 'Загрузка только по Wi-Fi',
+      'offline_storage_copies': 'Копии',
       'approve': 'Одобрить',
       'reopen': 'Переоткрыть',
       'view_public_submissions': 'Просмотр Публичных Отправок',
@@ -6871,6 +6889,9 @@ class AppLocalizations {
       'offline_storage_remove_all': '全部移除',
       'offline_storage_remove_all_confirm': '移除此设备上保存的所有离线表单？草稿不受影响。',
       'offline_storage_remove': '移除',
+      'offline_storage_auto_download': '保持未完成的表单可离线使用',
+      'offline_storage_auto_download_hint': '仅在 Wi-Fi 下下载',
+      'offline_storage_copies': '副本',
       'approve': '批准',
       'reopen': '重新开放',
       'view_public_submissions': '查看公开提交',
@@ -8163,6 +8184,9 @@ class AppLocalizations {
   String get offlineStorageRemoveAll => translate('offline_storage_remove_all');
   String get offlineStorageRemoveAllConfirm => translate('offline_storage_remove_all_confirm');
   String get offlineStorageRemove => translate('offline_storage_remove');
+  String get offlineStorageAutoDownload => translate('offline_storage_auto_download');
+  String get offlineStorageAutoDownloadHint => translate('offline_storage_auto_download_hint');
+  String get offlineStorageCopies => translate('offline_storage_copies');
   String get approve => translate('approve');
   String get reopen => translate('reopen');
   String get viewPublicSubmissions => translate('view_public_submissions');

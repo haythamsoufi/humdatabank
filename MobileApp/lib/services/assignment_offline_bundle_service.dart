@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/shared/assignment.dart';
 import '../utils/debug_logger.dart' show DebugLogger, LogLevel;
@@ -134,6 +135,28 @@ bool isAssignmentOfflineBundleStale(
 class AssignmentOfflineBundleService {
   /// Bumped whenever saved copies are removed so open screens can refresh.
   static final ValueNotifier<int> savedCopiesChanged = ValueNotifier<int>(0);
+
+  /// Bumped when the "keep open forms available offline" preference changes.
+  static final ValueNotifier<int> autoDownloadChanged = ValueNotifier<int>(0);
+
+  static const String _autoDownloadPrefKey = 'offline_auto_download_open_forms';
+
+  /// When on, every open assignment on the dashboard gets an offline copy while
+  /// on Wi-Fi, instead of only templates that were downloaded by hand.
+  Future<bool> isAutoDownloadEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_autoDownloadPrefKey) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> setAutoDownloadEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoDownloadPrefKey, enabled);
+    autoDownloadChanged.value++;
+  }
 
   AssignmentOfflineBundleService._internal()
       : _dio = _buildDio(),
@@ -812,6 +835,11 @@ class AssignmentOfflineBundleService {
           for (final child in _urlsFromJavaScript(jsText, absolute)) {
             enqueue(child);
           }
+          if (absolute.path.startsWith('/plugins/static/')) {
+            for (final child in _staticLiteralsFromJavaScript(jsText, absolute)) {
+              enqueue(child);
+            }
+          }
         }
 
         if (_pathLooksLikeCss(absolute.path)) {
@@ -851,6 +879,7 @@ class AssignmentOfflineBundleService {
     }
 
     await _rewriteAllCssRootStaticInBundle(dir);
+    await _rewriteRootStaticInBundleScripts(dir);
     await _rewriteExternalUrlsInCss(dir, savedRelByAbsolute);
     final unmirroredExternalRefs = refs
         .where(
@@ -1078,8 +1107,11 @@ class AssignmentOfflineBundleService {
     if (!_isSameOrigin(asset, pageUri)) {
       return _isMirrorableExternal(asset);
     }
-    return asset.path.startsWith('/static/');
+    return _isBundledPath(asset.path);
   }
+
+  static bool _isBundledPath(String path) =>
+      path.startsWith('/static/') || path.startsWith('/plugins/static/');
 
   /// Stable on-disk path for a third-party file, kept under its host so relative
   /// references inside CDN stylesheets keep resolving.
@@ -1203,8 +1235,20 @@ class AssignmentOfflineBundleService {
     } catch (_) {}
 
     try {
-      final relRe = RegExp(tail, caseSensitive: false);
+      final relRe = RegExp(r'(?<!/plugins)' + tail, caseSensitive: false);
       for (final m in relRe.allMatches(html)) {
+        out.add(pageUri.resolve(m.group(0)!));
+      }
+    } catch (_) {}
+
+    // Plugin field modules/styles (/plugins/static/…) are named in the page's
+    // data-entry-form-config JSON and are imported at runtime.
+    try {
+      final pluginRe = RegExp(
+        r'/plugins/static/[\w./-]+\.' + ext,
+        caseSensitive: false,
+      );
+      for (final m in pluginRe.allMatches(html)) {
         out.add(pageUri.resolve(m.group(0)!));
       }
     } catch (_) {}
@@ -1259,6 +1303,77 @@ class AssignmentOfflineBundleService {
     return out;
   }
 
+  static final RegExp _jsStaticLiteral = RegExp(
+    r'''(["'`])(/(?:plugins/)?static/[\w./@-]*)\1''',
+  );
+
+  /// `'/static/…'` / `'/plugins/static/…'` string literals in plugin scripts
+  /// (e.g. vendor libraries added with `script.src = …` at runtime).
+  Set<Uri> _staticLiteralsFromJavaScript(String js, Uri jsLocation) {
+    final out = <Uri>{};
+    for (final m in _jsStaticLiteral.allMatches(js)) {
+      final path = m.group(2)!;
+      if (!RegExp(r'\.[A-Za-z0-9]{2,5}$').hasMatch(path)) continue;
+      try {
+        out.add(jsLocation.resolve(path));
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  /// `file://` has no site root, so root-absolute asset paths inside saved
+  /// scripts must be made relative: module specifiers (which resolve against the
+  /// importing file) and, for plugin scripts, other string literals (which
+  /// resolve against the page).
+  String _rewriteRootStaticInJs(String js, String fileRelPosix) {
+    final fromDir = _posix.dirname(fileRelPosix);
+    final isPlugin = fileRelPosix.startsWith('plugins/static/');
+
+    String fileRelative(String rootPath) {
+      var q = rootPath.indexOf('?');
+      final hash = rootPath.indexOf('#');
+      if (hash != -1 && (q == -1 || hash < q)) q = hash;
+      final pathOnly = q == -1 ? rootPath : rootPath.substring(0, q);
+      final suffix = q == -1 ? '' : rootPath.substring(q);
+      var rel = _posix.relative(pathOnly.substring(1), from: fromDir);
+      if (!rel.startsWith('.')) rel = './$rel';
+      return '$rel$suffix';
+    }
+
+    var out = js.replaceAllMapped(
+      RegExp(
+        r'''(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'])(/(?:plugins/)?static/[^"'\s]+)\2''',
+      ),
+      (m) => '${m[1]}${m[2]}${fileRelative(m[3]!)}${m[2]}',
+    );
+    if (isPlugin) {
+      out = out.replaceAllMapped(
+        _jsStaticLiteral,
+        (m) => '${m[1]}${m[2]!.substring(1)}${m[1]}',
+      );
+    }
+    return out;
+  }
+
+  Future<void> _rewriteRootStaticInBundleScripts(Directory dir) async {
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final lower = entity.path.toLowerCase();
+      if (!lower.endsWith('.js') && !lower.endsWith('.mjs')) continue;
+      final rel = p.relative(entity.path, from: dir.path).replaceAll(r'\', '/');
+      if (rel.startsWith('$_externalDirName/')) continue;
+      late final String raw;
+      try {
+        raw = await entity.readAsString(encoding: utf8);
+      } catch (_) {
+        continue;
+      }
+      if (!raw.contains('/static/')) continue;
+      final next = _rewriteRootStaticInJs(raw, rel);
+      if (next != raw) await entity.writeAsString(next, flush: true);
+    }
+  }
+
   /// Static `import` / `export … from` specifiers in JS modules (not visible in HTML).
   Set<Uri> _urlsFromJavaScript(String js, Uri jsLocation) {
     final out = <Uri>{};
@@ -1268,7 +1383,8 @@ class AssignmentOfflineBundleService {
       if (s.isEmpty || s.startsWith('data:')) return;
       if (!s.startsWith('./') &&
           !s.startsWith('../') &&
-          !s.startsWith('/static/')) {
+          !s.startsWith('/static/') &&
+          !s.startsWith('/plugins/static/')) {
         return;
       }
       final hash = s.indexOf('#');
@@ -1286,14 +1402,14 @@ class AssignmentOfflineBundleService {
 
     // import … from "…" / '…'
     for (final m in RegExp(
-          r'from\s+"(\./[^"]+|\.\./[^"]+|/static/[^"]+)"',
+          r'from\s+"(\./[^"]+|\.\./[^"]+|/(?:plugins/)?static/[^"]+)"',
           caseSensitive: false,
         )
         .allMatches(js)) {
       addSpec(m.group(1));
     }
     for (final m in RegExp(
-          r"from\s+'(\./[^']+|\.\./[^']+|/static/[^']+)'",
+          r"from\s+'(\./[^']+|\.\./[^']+|/(?:plugins/)?static/[^']+)'",
           caseSensitive: false,
         )
         .allMatches(js)) {
@@ -1301,14 +1417,14 @@ class AssignmentOfflineBundleService {
     }
     // import "…" / '…' (side-effect)
     for (final m in RegExp(
-          r'import\s+"(\./[^"]+|\.\./[^"]+|/static/[^"]+)"',
+          r'import\s+"(\./[^"]+|\.\./[^"]+|/(?:plugins/)?static/[^"]+)"',
           caseSensitive: false,
         )
         .allMatches(js)) {
       addSpec(m.group(1));
     }
     for (final m in RegExp(
-          r"import\s+'(\./[^']+|\.\./[^']+|/static/[^']+)'",
+          r"import\s+'(\./[^']+|\.\./[^']+|/(?:plugins/)?static/[^']+)'",
           caseSensitive: false,
         )
         .allMatches(js)) {
@@ -1316,14 +1432,14 @@ class AssignmentOfflineBundleService {
     }
     // import("…") / import('…')
     for (final m in RegExp(
-          r'import\s*\(\s*"(\./[^"]+|\.\./[^"]+|/static/[^"]+)"\s*\)',
+          r'import\s*\(\s*"(\./[^"]+|\.\./[^"]+|/(?:plugins/)?static/[^"]+)"\s*\)',
           caseSensitive: false,
         )
         .allMatches(js)) {
       addSpec(m.group(1));
     }
     for (final m in RegExp(
-          r"import\s*\(\s*'(\./[^']+|\.\./[^']+|/static/[^']+)'\s*\)",
+          r"import\s*\(\s*'(\./[^']+|\.\./[^']+|/(?:plugins/)?static/[^']+)'\s*\)",
           caseSensitive: false,
         )
         .allMatches(js)) {
@@ -1364,6 +1480,21 @@ class AssignmentOfflineBundleService {
         caseSensitive: true,
       ),
       (m) => '${m[1]}=${m[2]}static/',
+    );
+    s = s.replaceAllMapped(
+      RegExp(
+        r'\b(href|src)\s*=\s*([\x22\x27])/plugins/static/',
+        caseSensitive: true,
+      ),
+      (m) => '${m[1]}=${m[2]}plugins/static/',
+    );
+    s = s.replaceAllMapped(
+      RegExp(
+        r'(<script\b[^>]*\btype\s*=\s*[\x22\x27]module[\x22\x27][^>]*>)([\s\S]*?)(</script>)',
+        caseSensitive: false,
+      ),
+      (m) =>
+          '${m[1]}${m[2]!.replaceAll('"/plugins/static/', '"./plugins/static/').replaceAll("'/plugins/static/", "'./plugins/static/")}${m[3]}',
     );
     s = s.replaceAll('url(/static/', 'url(static/');
     s = s.replaceAll('url("/static/', 'url("static/');
@@ -1563,10 +1694,14 @@ class AssignmentOfflineBundleService {
     );
     final lower = html.toLowerCase();
     final idx = lower.indexOf('</head>');
-    if (idx != -1) {
-      return html.substring(0, idx) + patch + html.substring(idx);
-    }
-    return patch + html;
+    final withHead = idx != -1
+        ? html.substring(0, idx) + patch + html.substring(idx)
+        : patch + html;
+    final bodyEnd = withHead.toLowerCase().lastIndexOf('</body>');
+    if (bodyEnd == -1) return withHead + kOfflinePluginPathsScript;
+    return withHead.substring(0, bodyEnd) +
+        kOfflinePluginPathsScript +
+        withHead.substring(bodyEnd);
   }
 }
 

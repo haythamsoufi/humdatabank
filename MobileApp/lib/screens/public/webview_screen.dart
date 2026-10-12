@@ -81,17 +81,23 @@ class WebViewScreenArgs {
 
 class _WebViewPayload {
   final bool isOfflineBundle;
-  final String? offlineBundleDir;
+
+  /// Saved page opened from disk (offline only).
+  final String? offlinePagePath;
   final String onlineUrl;
 
   const _WebViewPayload.online(this.onlineUrl)
-      : isOfflineBundle = false,
-        offlineBundleDir = null;
+    : isOfflineBundle = false,
+      offlinePagePath = null;
 
   const _WebViewPayload.offline({
-    required this.offlineBundleDir,
+    required String this.offlinePagePath,
     required this.onlineUrl,
   }) : isOfflineBundle = true;
+
+  /// Folder holding the page and the files it references.
+  String? get offlineBundleDir =>
+      offlinePagePath == null ? null : p.dirname(offlinePagePath!);
 }
 
 class WebViewScreen extends StatefulWidget {
@@ -185,13 +191,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
             if (decoded['hasRecord'] != null) {
               buf.write(' hasRecord=${decoded['hasRecord']}');
             }
-            if (decoded['suffix'] != null) buf.write(' suffix=${decoded['suffix']}');
+            if (decoded['suffix'] != null) {
+              buf.write(' suffix=${decoded['suffix']}');
+            }
             if (decoded['dbVersion'] != null) {
               buf.write(' dbVer=${decoded['dbVersion']}');
             }
             if (decoded['ms'] != null) buf.write(' ms=${decoded['ms']}');
             if (decoded['err'] != null) buf.write(' err=${decoded['err']}');
-            if (decoded['name'] != null && decoded['name'].toString().isNotEmpty) {
+            if (decoded['name'] != null &&
+                decoded['name'].toString().isNotEmpty) {
               buf.write(' name=${decoded['name']}');
             }
             if (decoded['reason'] != null) {
@@ -260,7 +269,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
     required String source,
   }) async {
     try {
-      final raw = await controller.evaluateJavascript(source: _authDraftPeekSyncJs);
+      final raw = await controller.evaluateJavascript(
+        source: _authDraftPeekSyncJs,
+      );
       final str = raw?.toString().trim() ?? '';
       if (str.isEmpty) {
         DebugLogger.logWarn('AUTH_DRAFT_PEEK', '$source empty WebView result');
@@ -300,9 +311,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     _authDraftDebugPollTimer?.cancel();
     _authDraftDebugPollTimer = null;
     if (!_wantsAuthDraftPeekPoll) return;
-    unawaited(
-      _logAuthDraftPeekToTerminal(controller, source: 'poll_initial'),
-    );
+    unawaited(_logAuthDraftPeekToTerminal(controller, source: 'poll_initial'));
     _authDraftDebugPollTimer = Timer.periodic(
       const Duration(seconds: 12),
       (_) => unawaited(_logAuthDraftPeekToTerminal(controller, source: 'poll')),
@@ -453,7 +462,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
       try {
         final webUri = WebUri(url.toString());
         final stored = await CookieManager.instance().getCookies(url: webUri);
-        final cookieHeader = stored.map((c) => '${c.name}=${c.value}').join('; ');
+        final cookieHeader = stored
+            .map((c) => '${c.name}=${c.value}')
+            .join('; ');
         final headers = <String, String>{
           ...WebViewService.defaultRequestHeaders,
           if (cookieHeader.isNotEmpty) HttpHeaders.cookieHeader: cookieHeader,
@@ -467,7 +478,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
           throw const FormatException('Not a PDF (session may have expired)');
         }
         if (url.path.contains('/export_excel') && !_bytesLookLikeZip(body)) {
-          throw const FormatException('Not an Excel file (session may have expired)');
+          throw const FormatException(
+            'Not an Excel file (session may have expired)',
+          );
         }
         final dir = await getTemporaryDirectory();
         final name = _suggestedExportFileName(url, body);
@@ -477,16 +490,19 @@ class _WebViewScreenState extends State<WebViewScreen> {
           if (mounted) {
             await Navigator.of(context).pushNamed(
               AppRoutes.pdfViewer,
-              arguments: <String, String>{
-                'filePath': file.path,
-                'title': name,
-              },
+              arguments: <String, String>{'filePath': file.path, 'title': name},
             );
           }
-          DebugLogger.logInfo('WEBVIEW', 'Session PDF export opened in viewer: $name');
+          DebugLogger.logInfo(
+            'WEBVIEW',
+            'Session PDF export opened in viewer: $name',
+          );
         } else {
           await Share.shareXFiles([XFile(file.path)], subject: name);
-          DebugLogger.logInfo('WEBVIEW', 'Session export saved for share: $name');
+          DebugLogger.logInfo(
+            'WEBVIEW',
+            'Session export saved for share: $name',
+          );
         }
       } catch (e, st) {
         DebugLogger.logError('WEBVIEW session export failed: $e\n$st');
@@ -495,9 +511,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
           final localizations = AppLocalizations.of(context)!;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                localizations.errorOpeningDownload,
-              ),
+              content: Text(localizations.errorOpeningDownload),
               backgroundColor: theme.colorScheme.error,
             ),
           );
@@ -554,31 +568,27 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final onlineUrl = _buildUrl(widget.initialUrl, language);
     if (widget.forceOfflineAssignmentBundle &&
         widget.offlineAssignmentId != null) {
-      final svc = AssignmentOfflineBundleService();
-      final html =
-          await svc.readOfflineIndexHtml(widget.offlineAssignmentId!);
-      if (html != null && html.isNotEmpty) {
-        final dir = await svc.offlineBundleDirectoryPath(
-          widget.offlineAssignmentId!,
-        );
+      final pagePath = await AssignmentOfflineBundleService().offlinePagePath(
+        widget.offlineAssignmentId!,
+      );
+      if (pagePath != null) {
         DebugLogger.logInfo(
           'WEBVIEW',
-          'Using offline bundle assignment=${widget.offlineAssignmentId} '
-          'dir=$dir htmlChars=${html.length} onlineRef=$onlineUrl',
+          'Using offline page assignment=${widget.offlineAssignmentId} '
+              'path=$pagePath onlineRef=$onlineUrl',
         );
-        final indexPath = p.join(dir, 'index.html');
         _offlineWebViewLine(
-          'open bundle assignment=${widget.offlineAssignmentId} → $indexPath',
+          'open page assignment=${widget.offlineAssignmentId} → $pagePath',
         );
         return _WebViewPayload.offline(
-          offlineBundleDir: dir,
+          offlinePagePath: pagePath,
           onlineUrl: onlineUrl,
         );
       }
       DebugLogger.logWarn(
         'WEBVIEW',
         'Offline bundle missing/empty for assignment=${widget.offlineAssignmentId}; '
-        'falling back to online $onlineUrl',
+            'falling back to online $onlineUrl',
       );
     }
     DebugLogger.logInfo('WEBVIEW', 'Using online WebView url=$onlineUrl');
@@ -608,7 +618,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }) {
     final u = url?.toString() ?? '(null url)';
     final lower = u.toLowerCase();
-    final highlight = isForMainFrame ||
+    final highlight =
+        isForMainFrame ||
         lower.contains('.css') ||
         lower.contains('/static/') ||
         lower.contains('stylesheet');
@@ -635,7 +646,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
       DebugLogger.logInfo(
         'WEBVIEW_CSS',
         'stylesheet_diag offline=$offline bundleDir=${bundleDir ?? "-"} '
-        'pageUrl=${pageUrl ?? "-"} => $s',
+            'pageUrl=${pageUrl ?? "-"} => $s',
       );
     } catch (e, st) {
       DebugLogger.logWarn('WEBVIEW_CSS', 'stylesheet_diag failed: $e\n$st');
@@ -648,13 +659,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
     required AppLocalizations localizations,
   }) {
     if (payload.isOfflineBundle) {
+      final indexPath = payload.offlinePagePath!;
       final bundleDir = payload.offlineBundleDir!;
-      final indexPath = p.join(bundleDir, 'index.html');
       final indexUri = WebUri.uri(Uri.file(indexPath));
       return InAppWebView(
         key: ValueKey('offline|file|$indexPath|$language'),
         // iOS WKWebView often renders nothing when using [InAppWebViewInitialData]
-        // (loadHTMLString + file base URL). Loading `index.html` via file:// matches
+        // (loadHTMLString + file base URL). Loading the saved page via file:// matches
         // Safari/WKWebView expectations and fixes a blank white WebView on iOS.
         initialUrlRequest: URLRequest(url: indexUri),
         initialUserScripts: WebViewService.getRequestInterceptorScripts(
@@ -778,7 +789,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             DebugLogger.logInfo(
               'WEBVIEW',
               'offline mainFrame net error ignored (clearing loading): '
-              '${error.description}',
+                  '${error.description}',
             );
             if (mounted) {
               setState(() {
@@ -788,9 +799,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             }
             return;
           }
-          _offlineWebViewLine(
-            'load error: ${error.type} ${error.description}',
-          );
+          _offlineWebViewLine('load error: ${error.type} ${error.description}');
           setState(() {
             _isLoading = false;
             _error = error.description;
@@ -816,8 +825,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
         },
         onDownloadStartRequest:
             (InAppWebViewController controller, DownloadStartRequest request) {
-          _handleDownload(Uri.parse(request.url.toString()), controller);
-        },
+              _handleDownload(Uri.parse(request.url.toString()), controller);
+            },
       );
     }
 
@@ -847,7 +856,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
         if (recordsFormData) {
           OfflineApiRecorder.registerLiveHandler(controller);
         }
-        DebugLogger.logInfo('WEBVIEW', 'online WebView created initialUrl=$url');
+        DebugLogger.logInfo(
+          'WEBVIEW',
+          'online WebView created initialUrl=$url',
+        );
       },
       onConsoleMessage: (controller, consoleMessage) {
         if (!DebugLogger.verboseDebugLogs) return;
@@ -863,7 +875,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
         if (navigationAction.isForMainFrame != true) {
           final subUrl = navigationAction.request.url;
           if (subUrl != null && !WebViewService.isUrlAllowed(subUrl)) {
-            DebugLogger.logWarn('WEBVIEW', 'Blocked subframe navigation: $subUrl');
+            DebugLogger.logWarn(
+              'WEBVIEW',
+              'Blocked subframe navigation: $subUrl',
+            );
             return NavigationActionPolicy.CANCEL;
           }
           return NavigationActionPolicy.ALLOW;
@@ -881,7 +896,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
           }
           return NavigationActionPolicy.CANCEL;
         }
-        final parsedNav = navUrl != null ? Uri.tryParse(navUrl.toString()) : null;
+        final parsedNav = navUrl != null
+            ? Uri.tryParse(navUrl.toString())
+            : null;
         if (parsedNav != null &&
             WebViewService.isFormAssignmentSessionDownloadUrl(parsedNav)) {
           unawaited(
@@ -983,8 +1000,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
       },
       onDownloadStartRequest:
           (InAppWebViewController controller, DownloadStartRequest request) {
-        _handleDownload(Uri.parse(request.url.toString()), controller);
-      },
+            _handleDownload(Uri.parse(request.url.toString()), controller);
+          },
     );
   }
 
@@ -1171,8 +1188,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
                                         setState(() {
                                           _error = null;
                                         });
-                                        if (widget.forceOfflineAssignmentBundle &&
-                                            widget.offlineAssignmentId != null) {
+                                        if (widget
+                                                .forceOfflineAssignmentBundle &&
+                                            widget.offlineAssignmentId !=
+                                                null) {
                                           _invalidatePayload();
                                           setState(() {});
                                           return;
@@ -1258,126 +1277,117 @@ class _WebViewScreenState extends State<WebViewScreen> {
           maxHeightFraction: 0.85,
           onClose: () => Navigator.pop(bottomSheetContext),
           child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                    physics: const ClampingScrollPhysics(),
-                    children: [
-                      _buildMenuTile(
-                        context: context,
-                        theme: theme,
-                        icon: Icons.home,
-                        title: localizations.home,
-                        onTap: () {
-                          Navigator.pop(bottomSheetContext);
-                          Navigator.of(context).popUntil((route) {
-                            return route.isFirst ||
-                                route.settings.name == AppRoutes.dashboard;
-                          });
-                        },
-                      ),
-                      _buildMenuTile(
-                        context: context,
-                        theme: theme,
-                        icon: Icons.library_books,
-                        title: localizations.indicatorBank,
-                        onTap: () {
-                          Navigator.pop(bottomSheetContext);
-                          Navigator.of(context).pop();
-                          Navigator.of(
-                            context,
-                          ).pushNamed(AppRoutes.indicatorBank);
-                        },
-                      ),
-                      // Resources/Notifications - navigate to native screen
-                      if (isFocalPoint)
-                        _buildMenuTile(
-                          context: context,
-                          theme: theme,
-                          icon: Icons.notifications,
-                          title: localizations.notifications,
-                          onTap: () {
-                            Navigator.pop(bottomSheetContext);
-                            Navigator.of(context).pop();
-                            Navigator.of(
-                              context,
-                            ).pushNamed(AppRoutes.notifications);
-                          },
-                        )
-                      else
-                        _buildMenuTile(
-                          context: context,
-                          theme: theme,
-                          icon: Icons.folder,
-                          title: localizations.resources,
-                          onTap: () {
-                            Navigator.pop(bottomSheetContext);
-                            Navigator.of(context).pop();
-                            Navigator.of(
-                              context,
-                            ).pushNamed(AppRoutes.resources);
-                          },
-                        ),
-                      _buildMenuTile(
-                        context: context,
-                        theme: theme,
-                        icon: Icons.public,
-                        title: localizations.countries,
-                        onTap: () {
-                          Navigator.pop(bottomSheetContext);
-                          Navigator.of(context).pop();
-                          _showCountriesSheet(context, theme);
-                        },
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          top: 8,
-                          left: 24,
-                          right: 24,
-                          bottom: 8,
-                        ),
-                        child: Text(
-                          localizations.analysis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.7,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Disaggregation Analysis - navigate to native screen
-                      _buildMenuTile(
-                        context: context,
-                        theme: theme,
-                        icon: Icons.analytics,
-                        title: localizations.disaggregationAnalysis,
-                        onTap: () {
-                          Navigator.pop(bottomSheetContext);
-                          Navigator.of(context).pop();
-                          Navigator.of(
-                            context,
-                          ).pushNamed(AppRoutes.disaggregationAnalysis);
-                        },
-                      ),
-                      _buildMenuTile(
-                        context: context,
-                        theme: theme,
-                        icon: Icons.bar_chart,
-                        title: localizations.dataVisualization,
-                        onTap: () {
-                          Navigator.pop(bottomSheetContext);
-                          Navigator.of(context).pop();
-                          final fullUrl =
-                              UrlHelper.buildFrontendUrlWithLanguage(
-                                '/dataviz',
-                                language,
-                              );
-                          Navigator.of(
-                            context,
-                          ).pushNamed(AppRoutes.webview, arguments: fullUrl);
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            physics: const ClampingScrollPhysics(),
+            children: [
+              _buildMenuTile(
+                context: context,
+                theme: theme,
+                icon: Icons.home,
+                title: localizations.home,
+                onTap: () {
+                  Navigator.pop(bottomSheetContext);
+                  Navigator.of(context).popUntil((route) {
+                    return route.isFirst ||
+                        route.settings.name == AppRoutes.dashboard;
+                  });
+                },
+              ),
+              _buildMenuTile(
+                context: context,
+                theme: theme,
+                icon: Icons.library_books,
+                title: localizations.indicatorBank,
+                onTap: () {
+                  Navigator.pop(bottomSheetContext);
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushNamed(AppRoutes.indicatorBank);
+                },
+              ),
+              // Resources/Notifications - navigate to native screen
+              if (isFocalPoint)
+                _buildMenuTile(
+                  context: context,
+                  theme: theme,
+                  icon: Icons.notifications,
+                  title: localizations.notifications,
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pushNamed(AppRoutes.notifications);
+                  },
+                )
+              else
+                _buildMenuTile(
+                  context: context,
+                  theme: theme,
+                  icon: Icons.folder,
+                  title: localizations.resources,
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pushNamed(AppRoutes.resources);
+                  },
+                ),
+              _buildMenuTile(
+                context: context,
+                theme: theme,
+                icon: Icons.public,
+                title: localizations.countries,
+                onTap: () {
+                  Navigator.pop(bottomSheetContext);
+                  Navigator.of(context).pop();
+                  _showCountriesSheet(context, theme);
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(
+                  top: 8,
+                  left: 24,
+                  right: 24,
+                  bottom: 8,
+                ),
+                child: Text(
+                  localizations.analysis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+              // Disaggregation Analysis - navigate to native screen
+              _buildMenuTile(
+                context: context,
+                theme: theme,
+                icon: Icons.analytics,
+                title: localizations.disaggregationAnalysis,
+                onTap: () {
+                  Navigator.pop(bottomSheetContext);
+                  Navigator.of(context).pop();
+                  Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.disaggregationAnalysis);
+                },
+              ),
+              _buildMenuTile(
+                context: context,
+                theme: theme,
+                icon: Icons.bar_chart,
+                title: localizations.dataVisualization,
+                onTap: () {
+                  Navigator.pop(bottomSheetContext);
+                  Navigator.of(context).pop();
+                  final fullUrl = UrlHelper.buildFrontendUrlWithLanguage(
+                    '/dataviz',
+                    language,
+                  );
+                  Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.webview, arguments: fullUrl);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         );
       },
@@ -1422,7 +1432,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
         clipBehavior: Clip.antiAlias,
         child: ListTile(
           dense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 2,
+          ),
           leading: Icon(icon, color: titleColor, size: 20),
           title: Text(
             title,

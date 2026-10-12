@@ -27,9 +27,9 @@ class OfflineApiRecorder {
   }
 
   static UserScript get userScript => UserScript(
-        source: kOfflineApiRecorderJs,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      );
+    source: kOfflineApiRecorderJs,
+    injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+  );
 
   /// Parses a `{aesId, entries}` JSON payload from the page.
   static ({int aesId, List<RecordedApiEntry> entries})? parsePayload(
@@ -140,7 +140,7 @@ class OfflineApiRecorder {
 
     final started = DateTime.now();
     try {
-      await headless.run();
+      await headless.run().timeout(const Duration(seconds: 20));
       while (DateTime.now().difference(started) < timeout) {
         await Future<void>.delayed(const Duration(milliseconds: 400));
         if (failure != null) break;
@@ -151,15 +151,17 @@ class OfflineApiRecorder {
         if (quietSinceLoad && quietSinceEntry) break;
       }
       try {
-        await controller?.evaluateJavascript(
-          source:
-              'window.__ifrcApiRecorderFlush && window.__ifrcApiRecorderFlush();',
-        );
+        await controller
+            ?.evaluateJavascript(
+              source:
+                  'window.__ifrcApiRecorderFlush && window.__ifrcApiRecorderFlush();',
+            )
+            .timeout(const Duration(seconds: 5));
         await Future<void>.delayed(const Duration(milliseconds: 300));
       } catch (_) {}
     } finally {
       try {
-        await headless.dispose();
+        await headless.dispose().timeout(const Duration(seconds: 5));
       } catch (_) {}
     }
 

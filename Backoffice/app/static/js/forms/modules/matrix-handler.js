@@ -72,6 +72,7 @@ import { matrixVariablesMixin } from './matrix/variables.js';
 import { matrixDynamicRowsMixin } from './matrix/dynamic-rows.js';
 import { matrixAutoLoadMixin } from './matrix/auto-load.js';
 import { matrixSelectableHeadersMixin, __matrixCellIsHeaderGated, __isMatrixHeaderDataKey } from './matrix/selectable-headers.js';
+import { matrixSelectionMixin } from './matrix/selection.js';
 
 class MatrixHandler {
     constructor() {
@@ -617,6 +618,11 @@ class MatrixHandler {
                 this.repositionOpenHeaderPickers();
             }, 150);
         });
+
+        // Spreadsheet-style range selection + Excel copy/paste.
+        // Registered last so its Shift+Arrow handler runs after the
+        // keyboard-navigation listener has already moved focus.
+        this.setupMatrixSelection();
     }
 
     /**
@@ -1620,6 +1626,7 @@ Object.assign(
     matrixDynamicRowsMixin,
     matrixAutoLoadMixin,
     matrixSelectableHeadersMixin,
+    matrixSelectionMixin,
 );
 // Create and export singleton instance
 export const matrixHandler = new MatrixHandler();

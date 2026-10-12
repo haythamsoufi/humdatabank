@@ -191,8 +191,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
             if (decoded['hasRecord'] != null) {
               buf.write(' hasRecord=${decoded['hasRecord']}');
             }
-            if (decoded['suffix'] != null)
+            if (decoded['suffix'] != null) {
               buf.write(' suffix=${decoded['suffix']}');
+            }
             if (decoded['dbVersion'] != null) {
               buf.write(' dbVer=${decoded['dbVersion']}');
             }

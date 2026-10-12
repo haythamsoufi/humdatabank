@@ -773,6 +773,46 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
 },
 
 /**
+ * Capture which auto-filled variable cells are about to be sent to the server,
+ * together with the value being sent. Pair with commitSavedVariableCells.
+ * @returns {Map<string, Map<string, string>>}
+ */
+snapshotAutoFilledVariableCells() {
+    const snapshot = new Map();
+    this.matrices.forEach((matrix, fieldId) => {
+        const autoFilled = matrix.autoFilledVariableCells;
+        if (!autoFilled || autoFilled.size === 0) return;
+        const cells = new Map();
+        autoFilled.forEach((cellKey) => {
+            if (matrix.data && matrix.data[cellKey] !== undefined) {
+                cells.set(cellKey, JSON.stringify(matrix.data[cellKey]));
+            }
+        });
+        if (cells.size > 0) snapshot.set(fieldId, cells);
+    });
+    return snapshot;
+},
+
+/**
+ * After a successful save, auto-filled cells whose value was persisted are real
+ * saved values: later lookup differences are legitimate modifications. Cells that
+ * changed while the request was in flight stay auto-filled.
+ */
+commitSavedVariableCells(snapshot) {
+    if (!snapshot || typeof snapshot.forEach !== 'function') return;
+    snapshot.forEach((cells, fieldId) => {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix || !matrix.autoFilledVariableCells) return;
+        cells.forEach((sentJson, cellKey) => {
+            if (!matrix.autoFilledVariableCells.has(cellKey)) return;
+            if (JSON.stringify(matrix.data?.[cellKey]) === sentJson) {
+                matrix.autoFilledVariableCells.delete(cellKey);
+            }
+        });
+    });
+},
+
+/**
  * Resolve variables for a specific matrix row
  */
 async resolveVariablesForRow(fieldId, rowEntityId, rowData = null) {

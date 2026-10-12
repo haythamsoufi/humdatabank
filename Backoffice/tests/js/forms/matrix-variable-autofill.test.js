@@ -216,3 +216,105 @@ describe('auto-load batch flag', () => {
     expect(matrixHandler.batchOperationsInProgress.has('does-not-exist')).toBe(false);
   });
 });
+
+describe('auto-filled cells after a successful save', () => {
+  let matrixHandler;
+
+  beforeEach(async () => {
+    ({ matrixHandler } = await import('../../../app/static/js/forms/modules/matrix-handler.js'));
+  });
+
+  afterEach(() => {
+    matrixHandler.matrices.clear();
+    document.body.innerHTML = '';
+  });
+
+  function applyTo(input, row, value) {
+    matrixHandler._applyResolvedVariablesToRow(
+      FIELD_ID, '10', row, [input], { planned_var: value },
+    );
+  }
+
+  it('treats a persisted auto-filled value as saved and flags a later differing lookup', () => {
+    const { input, row } = buildMatrix(matrixHandler);
+    applyTo(input, row, 100);
+
+    const snapshot = matrixHandler.snapshotAutoFilledVariableCells();
+    matrixHandler.commitSavedVariableCells(snapshot);
+    applyTo(input, row, 250);
+
+    expect(input.value).toBe('100');
+    expect(matrixHandler.matrices.get(FIELD_ID).data[CELL_KEY]).toBe('100');
+    expect(input.classList.contains('variable-modified')).toBe(true);
+  });
+
+  it('keeps following the lookup when the value changed while the save was in flight', () => {
+    const { input, row } = buildMatrix(matrixHandler);
+    applyTo(input, row, 100);
+
+    const snapshot = matrixHandler.snapshotAutoFilledVariableCells();
+    applyTo(input, row, 250);
+    matrixHandler.commitSavedVariableCells(snapshot);
+    applyTo(input, row, 300);
+
+    expect(input.value).toBe('300');
+    expect(input.classList.contains('variable-modified')).toBe(false);
+  });
+
+  it('does not commit anything without a snapshot', () => {
+    const { input, row } = buildMatrix(matrixHandler);
+    applyTo(input, row, 100);
+
+    matrixHandler.commitSavedVariableCells(null);
+    applyTo(input, row, 250);
+
+    expect(input.value).toBe('250');
+    expect(input.classList.contains('variable-modified')).toBe(false);
+  });
+});
+
+describe('disabled cells are not treated as user-cleared', () => {
+  let matrixHandler;
+
+  beforeEach(async () => {
+    ({ matrixHandler } = await import('../../../app/static/js/forms/modules/matrix-handler.js'));
+  });
+
+  afterEach(() => {
+    matrixHandler.matrices.clear();
+    document.body.innerHTML = '';
+  });
+
+  it('keeps stored data for a disabled empty variable cell', () => {
+    const { input } = buildMatrix(matrixHandler, { data: { [CELL_KEY]: '100' } });
+    input.value = '';
+    input.disabled = true;
+
+    matrixHandler.updateMatrixData(FIELD_ID, input);
+
+    expect(matrixHandler.matrices.get(FIELD_ID).data[CELL_KEY]).toBe('100');
+  });
+
+  it('keeps stored data for a disabled empty number cell', () => {
+    const { input } = buildMatrix(matrixHandler, { data: { [CELL_KEY]: '7' } });
+    input.dataset.columnType = 'number';
+    input.value = '';
+    input.disabled = true;
+
+    matrixHandler.updateMatrixData(FIELD_ID, input);
+
+    expect(matrixHandler.matrices.get(FIELD_ID).data[CELL_KEY]).toBe('7');
+  });
+
+  it('still clears a cell flagged as user-edited (data not available)', () => {
+    const { input } = buildMatrix(matrixHandler, { data: { [CELL_KEY]: '7' } });
+    input.dataset.columnType = 'number';
+    input.value = '';
+    input.disabled = true;
+    input.dataset.userEdited = '1';
+
+    matrixHandler.updateMatrixData(FIELD_ID, input);
+
+    expect(matrixHandler.matrices.get(FIELD_ID).data).not.toHaveProperty(CELL_KEY);
+  });
+});

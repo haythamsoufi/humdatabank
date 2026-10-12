@@ -866,11 +866,13 @@ class MatrixHandler {
     }
 
     /**
-     * True when the user (or "data not available") changed this cell, so an empty
-     * input means "cleared" rather than "not filled in yet".
+     * True when the user (or "data not available", which flags its cells) changed
+     * this cell, so an empty input means "cleared" rather than "not filled in yet".
+     * Disabled alone does not count: header-gated, read-only and view-only cells are
+     * disabled without the user having cleared anything.
      */
     _matrixInputWasEdited(input) {
-        return input.dataset.userEdited === '1' || input.disabled === true;
+        return input.dataset.userEdited === '1';
     }
 
     /**

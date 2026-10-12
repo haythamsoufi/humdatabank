@@ -692,6 +692,26 @@ function attachMatrixColumnHeadersModal() {
       tbody.replaceChildren();
       const map = [];
 
+      // Collapsing only hides rows, never removes them: save and auto-translate pair
+      // table rows with `map` by position.
+      let groupSeq = 0;
+      const collapsedGroups = new Set();
+      const applyCollapse = () => {
+        tbody.querySelectorAll('tr').forEach(tr => {
+          const ancestors = (tr.dataset.ancestors || '').split(',').filter(Boolean);
+          tr.classList.toggle('hidden', ancestors.some(id => collapsedGroups.has(id)));
+          const groupId = tr.dataset.groupId;
+          const toggle = groupId ? tr.querySelector('.matrix-translation-group-toggle') : null;
+          if (toggle) {
+            const isCollapsed = collapsedGroups.has(groupId);
+            toggle.setAttribute('aria-expanded', String(!isCollapsed));
+            toggle.title = isCollapsed ? 'Expand group' : 'Collapse group';
+            const icon = toggle.querySelector('i');
+            if (icon) icon.className = isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+          }
+        });
+      };
+
       const children = Array.from(columnsContainer.children);
       let hasAnyItem = false;
 
@@ -708,13 +728,36 @@ function attachMatrixColumnHeadersModal() {
           if (labelTranslationsInput && labelTranslationsInput.value) {
             try { translations = JSON.parse(labelTranslationsInput.value) || {}; } catch (_) {}
           }
-          if (translations && typeof translations === 'object') delete translations.header_color;
+          if (translations && typeof translations === 'object') {
+            delete translations.header_color;
+            delete translations.apply_color_to_columns;
+            delete translations.apply_color_to_headers;
+            delete translations.apply_color_to_cells;
+          }
 
-          const appendGroupRow = (groupEl, label, groupTranslations, badgeText, indentClass) => {
+          // Returns this group's id so rows beneath it can be collapsed with it.
+          const appendGroupRow = (groupEl, label, groupTranslations, badgeText, indentClass, ancestors = []) => {
             const row = document.createElement('tr');
             row.className = 'border-b border-indigo-200 bg-indigo-50';
+            const groupId = `g${++groupSeq}`;
+            row.dataset.groupId = groupId;
+            row.dataset.ancestors = ancestors.join(',');
             const headerTd = document.createElement('td');
             headerTd.className = 'px-4 py-3 border-r border-gray-300' + (indentClass ? ' ' + indentClass : '');
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'matrix-translation-group-toggle mr-2 text-indigo-600 hover:text-indigo-800 focus:outline-none';
+            toggle.setAttribute('aria-expanded', 'true');
+            toggle.title = 'Collapse group';
+            const toggleIcon = document.createElement('i');
+            toggleIcon.className = 'fas fa-chevron-down';
+            toggle.appendChild(toggleIcon);
+            toggle.addEventListener('click', () => {
+              if (collapsedGroups.has(groupId)) collapsedGroups.delete(groupId);
+              else collapsedGroups.add(groupId);
+              applyCollapse();
+            });
+            headerTd.appendChild(toggle);
             const badge = document.createElement('span');
             badge.className = 'inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded mr-1 font-semibold';
             badge.textContent = badgeText;
@@ -724,9 +767,10 @@ function attachMatrixColumnHeadersModal() {
             generateCells(groupTranslations).forEach(cell => row.appendChild(cell));
             tbody.appendChild(row);
             map.push({ type: 'group', element: groupEl, sourceLabel: label });
+            return groupId;
           };
 
-          const appendColumnRow = (columnDiv, indentClass) => {
+          const appendColumnRow = (columnDiv, indentClass, ancestors = []) => {
             const textInput = columnDiv.querySelector('.column-text');
             const colTranslationsInput = columnDiv.querySelector('.column-name-translations');
             const columnText = textInput ? textInput.value.trim() : '';
@@ -740,6 +784,7 @@ function attachMatrixColumnHeadersModal() {
 
             const colRow = document.createElement('tr');
             colRow.className = 'border-b border-gray-200 hover:bg-gray-50';
+            colRow.dataset.ancestors = ancestors.join(',');
             const codeTd = document.createElement('td');
             codeTd.className = 'px-4 py-3 text-sm text-gray-700 border-r border-gray-300 ' + indentClass;
             codeTd.textContent = '↳ ' + columnText;
@@ -749,13 +794,13 @@ function attachMatrixColumnHeadersModal() {
             map.push({ type: 'column', element: columnDiv, sourceLabel: columnText });
           };
 
-          appendGroupRow(child, groupLabel, translations, 'Group', '');
+          const groupRowId = appendGroupRow(child, groupLabel, translations, 'Group', '');
 
           // ── Columns and subgroups inside this group, in builder order ──
           const groupList = child.querySelector(':scope > .matrix-group-columns');
           Array.from(groupList ? groupList.children : []).forEach(groupChild => {
             if (groupChild.classList.contains('matrix-column')) {
-              appendColumnRow(groupChild, 'pl-8');
+              appendColumnRow(groupChild, 'pl-8', [groupRowId]);
             } else if (groupChild.classList.contains('matrix-group')) {
               const subLabelInput = groupChild.querySelector(':scope > .matrix-group-header .group-label-text');
               const subLabel = subLabelInput ? subLabelInput.value.trim() : '';
@@ -766,10 +811,15 @@ function attachMatrixColumnHeadersModal() {
               if (subTranslationsInput && subTranslationsInput.value) {
                 try { subTranslations = JSON.parse(subTranslationsInput.value) || {}; } catch (_) {}
               }
-              if (subTranslations && typeof subTranslations === 'object') delete subTranslations.header_color;
-              appendGroupRow(groupChild, subLabel, subTranslations, 'Subgroup', 'pl-8');
+              if (subTranslations && typeof subTranslations === 'object') {
+                delete subTranslations.header_color;
+                delete subTranslations.apply_color_to_columns;
+                delete subTranslations.apply_color_to_headers;
+                delete subTranslations.apply_color_to_cells;
+              }
+              const subRowId = appendGroupRow(groupChild, subLabel, subTranslations, 'Subgroup', 'pl-8', [groupRowId]);
               groupChild.querySelectorAll(':scope > .matrix-group-columns > .matrix-column').forEach(columnDiv => {
-                appendColumnRow(columnDiv, 'pl-12');
+                appendColumnRow(columnDiv, 'pl-12', [groupRowId, subRowId]);
               });
             }
           });

@@ -13,6 +13,29 @@ import {
     confirmMatrixColumnMigration,
 } from './matrix-column-migration.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
+/**
+ * Put the item modal's submit button into a loading state (disabled + spinner + label).
+ * Returns a function that restores it.
+ */
+function setSubmitButtonBusy(form, label) {
+    const btn = form && form.querySelector ? form.querySelector('#item-modal-submit-btn') : null;
+    if (!btn) return () => {};
+    const originalNodes = Array.from(btn.childNodes).map((n) => n.cloneNode(true));
+    const wasDisabled = btn.disabled;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-spinner fa-spin mr-2';
+    btn.replaceChildren(icon, document.createTextNode(label));
+    return () => {
+        btn.replaceChildren(...originalNodes);
+        btn.disabled = wasDisabled;
+        btn.removeAttribute('aria-busy');
+    };
+}
+
 export const FormSubmitMixin = {
     /**
      * Ensure the modal serializes UI state BEFORE the AJAX layer snapshots FormData.
@@ -177,11 +200,24 @@ export const FormSubmitMixin = {
     },
 
     /**
+     * Client-side check before an item save. For matrix items, column codes must be
+     * unique and not reserved. Highlights the offenders, reveals the first one and
+     * returns a message, or null when everything is valid.
+     */
+    validateBeforeSave: function() {
+        if (this.currentItemType !== 'matrix' || !this.modalElement) return null;
+        const issues = MatrixItem.markColumnCodeIssues(this.modalElement);
+        if (!issues.length) return null;
+        MatrixItem.revealColumnInput(issues[0].input);
+        return Array.from(new Set(issues.map((i) => i.message))).slice(0, 3).join(' ');
+    },
+
+    /**
      * Before an item save: if matrix column codes were renamed and saved data exists under
      * the old codes, ask whether to migrate it. Called by FormSubmitUI with the FormData
      * snapshot. Resolves to 'none' (nothing to ask), 'migrate', 'skip' or 'cancel'.
      */
-    resolveMatrixColumnMigration: async function(snapshot) {
+    resolveMatrixColumnMigration: async function(snapshot, formEl) {
         if (this.currentItemType !== 'matrix' || this.currentMode !== 'edit' || !this.currentItemId) {
             return 'none';
         }
@@ -195,6 +231,8 @@ export const FormSubmitMixin = {
         if (!Array.isArray(renames) || !renames.length) return 'none';
 
         let preview = null;
+        // The preview is a server round trip; show progress on the save button meanwhile.
+        const endBusy = setSubmitButtonBusy(formEl || this.formElement, _t('Checking saved data…'));
         try {
             const versionId = document.getElementById('item-modal-version-id')?.value || null;
             preview = await fetchMatrixColumnMigrationPreview(this.currentItemId, renames, versionId);
@@ -202,6 +240,8 @@ export const FormSubmitMixin = {
             // Without a preview we cannot tell whether data exists; save as before.
             console.warn('[ItemModal] matrix column migration preview failed', e);
             return 'none';
+        } finally {
+            endBusy();
         }
         if (!hasMigratableData(preview)) return 'none';
         return confirmMatrixColumnMigration(preview);

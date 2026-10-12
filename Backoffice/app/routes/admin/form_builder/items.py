@@ -20,6 +20,7 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import (json_forbidden, json_bad_request, json_ok,
     json_server_error, json_form_errors)
 from app.services.forms.item_duplication_service import ItemDuplicationService
+from app.services.forms.matrix_column_validation import validate_matrix_config
 from app.services.forms.matrix_column_migration_service import (
     MatrixColumnMigrationService, column_codes, validate_renames, rewrite_matrix_config_refs)
 from .helpers import (_create_form_item, _update_indicator_fields, _update_question_fields,
@@ -135,6 +136,15 @@ def _stored_matrix_column_codes(config):
     return column_codes((matrix_config or {}).get('columns') if isinstance(matrix_config, dict) else None)
 
 
+def _matrix_column_code_error_response(errors, is_ajax, template_id, version_id):
+    """Reject a matrix save whose column codes are invalid (duplicates, reserved, ...)."""
+    message = ' '.join(errors)
+    if is_ajax:
+        return json_bad_request(message, success=False, errors={'matrix_config': list(errors)})
+    flash(message, 'danger')
+    return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=version_id))
+
+
 @bp.route("/items/<int:item_id>/matrix-column-rename-preview", methods=["POST"])
 @permission_required('admin.templates.edit')
 def matrix_column_rename_preview(item_id):
@@ -212,6 +222,15 @@ def new_section_item(template_id, section_id):
         if is_ajax:
             return json_bad_request("Item type is required", success=False, errors={'item_type': ["Item type is required"]}, redirect_url=redirect_url)
         return redirect(redirect_url)
+
+    if item_type == 'matrix':
+        code_errors = validate_matrix_config(
+            coerce_single_text(data.get('matrix_config')) or coerce_single_text(data.get('config'))
+        )
+        if code_errors:
+            return _matrix_column_code_error_response(
+                code_errors, is_ajax, template_id, data.get('version_id') or section.version_id
+            )
 
     try:
         form_item = _create_form_item(template, section, data, item_type)
@@ -453,6 +472,13 @@ def edit_item(item_id):
             form.image_config.data = data['image_config']
         elif 'config' in data:
             form.image_config.data = data['config']
+
+    if submitted_item_type == 'matrix':
+        code_errors = validate_matrix_config(form.matrix_config.data)
+        if code_errors:
+            return _matrix_column_code_error_response(
+                code_errors, is_ajax, template_id, data.get('version_id') or form_item.version_id
+            )
 
     if form.validate_on_submit():
         current_app.logger.info(f"Edit {form_item.item_type.title()} Form validated. Processed form data: {form.data}")

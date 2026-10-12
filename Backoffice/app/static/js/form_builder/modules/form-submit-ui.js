@@ -603,10 +603,19 @@ export const FormSubmitUI = {
       };
 
       try {
+        // Invalid item config (e.g. duplicate matrix column codes): stop before saving and
+        // leave the modal open so the highlighted fields can be fixed.
+        if (isItemModalForm && window.ItemModal && typeof window.ItemModal.validateBeforeSave === 'function') {
+          const problem = window.ItemModal.validateBeforeSave();
+          if (problem) {
+            this.showError(_t('Fix the highlighted fields'), problem);
+            return;
+          }
+        }
         // Renamed matrix column codes: offer to move data saved under the old codes.
         // Runs before the modal is hidden, so Cancel leaves the user's edits in place.
         if (isItemModalForm && window.ItemModal && typeof window.ItemModal.resolveMatrixColumnMigration === 'function') {
-          const decision = await window.ItemModal.resolveMatrixColumnMigration(snapshot);
+          const decision = await window.ItemModal.resolveMatrixColumnMigration(snapshot, form);
           if (decision === 'cancel') return;
           if (decision === 'migrate') {
             const flag = ['migrate_matrix_columns', '1'];

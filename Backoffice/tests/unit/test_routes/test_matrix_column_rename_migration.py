@@ -166,6 +166,41 @@ class TestEditItemColumnRename:
         assert variables['other']['matrix_column_name'] == 'SP2'
 
 
+class TestColumnCodeValidationOnSave:
+    def test_edit_rejects_duplicate_codes_and_keeps_the_stored_config(
+        self, logged_in_client, db_session, admin_user
+    ):
+        _t, section, item, _aes, _row = _setup(db_session, admin_user)
+        resp = _edit(logged_in_client, item, section, ['SP1', 'SP1'])
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body['success'] is False
+        assert 'unique' in body['error'] or 'unique' in json.dumps(body)
+        assert body['errors']['matrix_config']
+        assert _codes(item.id) == ['SP1', 'SP2']
+
+    def test_edit_rejects_reserved_code(self, logged_in_client, db_session, admin_user):
+        _t, section, item, _aes, _row = _setup(db_session, admin_user)
+        resp = _edit(logged_in_client, item, section, ['SP1', 'Total'])
+        assert resp.status_code == 400
+        assert _codes(item.id) == ['SP1', 'SP2']
+
+    def test_create_rejects_duplicate_codes(self, logged_in_client, db_session, admin_user):
+        template, section, _item, _aes, _row = _setup(db_session, admin_user)
+        before = FormItem.query.filter_by(section_id=section.id).count()
+        payload = {
+            'item_type': 'matrix', 'label': 'New matrix', 'section_id': str(section.id),
+            'config': json.dumps(_matrix_config('A', 'A')), 'version_id': str(section.version_id),
+        }
+        with patch('app.routes.admin.form_builder.items.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/{section.id}/items/new', json=payload
+            )
+        assert resp.status_code == 400
+        db.session.expire_all()
+        assert FormItem.query.filter_by(section_id=section.id).count() == before
+
+
 class TestRenamePreviewEndpoint:
     def _preview(self, client, item, renames):
         return client.post(

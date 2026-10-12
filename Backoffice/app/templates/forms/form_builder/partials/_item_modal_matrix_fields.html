@@ -258,7 +258,7 @@
                                     <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-300 hover:text-gray-500 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder')|forceescape }}" draggable="false">
                                         <i class="fas fa-grip-vertical"></i>
                                     </span>
-                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}">
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}" data-enable-variables="true" title="{{ _('Type [ to insert a variable, e.g. [assignment_period]. Saved data uses the resolved value.')|forceescape }}">
                                     <input type="hidden" class="column-name-translations" value="{}">
                                     <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md">
                                         <option value="number_whole">{{ _('Number (Whole)') }}</option>
@@ -487,8 +487,12 @@
                                         <i class="fas fa-grip-vertical text-xs"></i>
                                         <i class="fas fa-layer-group text-xs"></i>
                                     </span>
-                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}">
+                                    <button type="button" class="matrix-group-toggle-btn inline-flex items-center justify-center shrink-0 p-1 min-w-[1.5rem] min-h-[1.5rem] rounded hover:bg-black/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400" aria-expanded="true" title="{{ _('Collapse group')|forceescape }}" data-collapse-title="{{ _('Collapse group')|forceescape }}" data-expand-title="{{ _('Expand group')|forceescape }}">
+                                        <i class="fas fa-chevron-down matrix-group-toggle-icon text-xs transition-transform duration-200" aria-hidden="true"></i>
+                                    </button>
+                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}" data-enable-variables="true" title="{{ _('Type [ to insert a variable, e.g. [assignment_period].')|forceescape }}">
                                     <input type="hidden" class="group-label-translations" value="{}">
+                                    <span class="matrix-group-count hidden shrink-0 text-xs opacity-75 whitespace-nowrap"></span>
                                     <label class="inline-flex items-center gap-1 shrink-0 text-xs text-gray-600" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
                                         <span>{{ _('Header') }}</span>
                                         <input type="color" class="group-header-color cursor-pointer rounded border border-gray-300 bg-white" style="width:2rem;height:1.5rem;padding:0;" value="#f3f4f6" aria-label="{{ _('Group header colour')|forceescape }}">
@@ -500,10 +504,15 @@
                                 <div class="matrix-group-columns space-y-2 px-2 pt-2 pb-1 border-l-2 border-indigo-200 ml-2">
                                     {# grouped .matrix-column items inserted here #}
                                 </div>
-                                <div class="px-2 pb-2 pt-1">
+                                <div class="matrix-group-footer flex items-center gap-4 px-2 pb-2 pt-1">
                                     <button type="button" class="add-column-to-group-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
                                         <i class="fas fa-plus w-3 h-3 mr-1"></i>
                                         {{ _('Add Column inside Group') }}
+                                    </button>
+                                    {# Hidden by JS for groups that are already nested: only two levels are supported. #}
+                                    <button type="button" class="add-subgroup-to-group-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
+                                        <i class="fas fa-layer-group w-3 h-3 mr-1"></i>
+                                        {{ _('Add Subgroup') }}
                                     </button>
                                 </div>
                             </div>

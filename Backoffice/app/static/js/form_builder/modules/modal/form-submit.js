@@ -7,6 +7,11 @@ import { PluginItem } from '../items/plugin.js';
 import { serializeCarryForwardSources } from './carry-forward.js';
 import { clearDisabledDescriptions } from './description-hint-ui.js';
 import { serializeConfigCheckboxes } from './config-checkbox-serializer.js';
+import {
+    fetchMatrixColumnMigrationPreview,
+    hasMigratableData,
+    confirmMatrixColumnMigration,
+} from './matrix-column-migration.js';
 
 export const FormSubmitMixin = {
     /**
@@ -116,6 +121,13 @@ export const FormSubmitMixin = {
         try {
             if (this.currentItemType === 'matrix') {
                 MatrixItem.updateConfig(this.modalElement);
+                // Renamed column codes (edit only). The migrate flag is decided per save in
+                // resolveMatrixColumnMigration, so it never carries over from a previous one.
+                const renames = this.currentMode === 'edit'
+                    ? MatrixItem.collectColumnRenames(this.modalElement)
+                    : [];
+                setHiddenField(form, 'matrix_column_renames', renames.length ? JSON.stringify(renames) : '');
+                setHiddenField(form, 'migrate_matrix_columns', '');
             }
         } catch (_e) {}
 
@@ -162,6 +174,37 @@ export const FormSubmitMixin = {
         try {
             this.prepareAddFormAction(form);
         } catch (_e) {}
+    },
+
+    /**
+     * Before an item save: if matrix column codes were renamed and saved data exists under
+     * the old codes, ask whether to migrate it. Called by FormSubmitUI with the FormData
+     * snapshot. Resolves to 'none' (nothing to ask), 'migrate', 'skip' or 'cancel'.
+     */
+    resolveMatrixColumnMigration: async function(snapshot) {
+        if (this.currentItemType !== 'matrix' || this.currentMode !== 'edit' || !this.currentItemId) {
+            return 'none';
+        }
+        const entry = (snapshot || []).find(([key]) => key === 'matrix_column_renames');
+        let renames = [];
+        try {
+            renames = JSON.parse((entry && entry[1]) || '[]');
+        } catch (_e) {
+            renames = [];
+        }
+        if (!Array.isArray(renames) || !renames.length) return 'none';
+
+        let preview = null;
+        try {
+            const versionId = document.getElementById('item-modal-version-id')?.value || null;
+            preview = await fetchMatrixColumnMigrationPreview(this.currentItemId, renames, versionId);
+        } catch (e) {
+            // Without a preview we cannot tell whether data exists; save as before.
+            console.warn('[ItemModal] matrix column migration preview failed', e);
+            return 'none';
+        }
+        if (!hasMigratableData(preview)) return 'none';
+        return confirmMatrixColumnMigration(preview);
     },
 
     populateEditFormFields: function() {

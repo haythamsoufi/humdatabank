@@ -710,23 +710,23 @@ function attachMatrixColumnHeadersModal() {
           }
           if (translations && typeof translations === 'object') delete translations.header_color;
 
-          const row = document.createElement('tr');
-          row.className = 'border-b border-indigo-200 bg-indigo-50';
-          const headerTd = document.createElement('td');
-          headerTd.className = 'px-4 py-3 border-r border-gray-300';
-          const badge = document.createElement('span');
-          badge.className = 'inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded mr-1 font-semibold';
-          badge.textContent = 'Group';
-          const labelText = document.createTextNode(groupLabel);
-          headerTd.appendChild(badge);
-          headerTd.appendChild(labelText);
-          row.appendChild(headerTd);
-          generateCells(translations).forEach(cell => row.appendChild(cell));
-          tbody.appendChild(row);
-          map.push({ type: 'group', element: child, sourceLabel: groupLabel });
+          const appendGroupRow = (groupEl, label, groupTranslations, badgeText, indentClass) => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-indigo-200 bg-indigo-50';
+            const headerTd = document.createElement('td');
+            headerTd.className = 'px-4 py-3 border-r border-gray-300' + (indentClass ? ' ' + indentClass : '');
+            const badge = document.createElement('span');
+            badge.className = 'inline-block px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded mr-1 font-semibold';
+            badge.textContent = badgeText;
+            headerTd.appendChild(badge);
+            headerTd.appendChild(document.createTextNode(label));
+            row.appendChild(headerTd);
+            generateCells(groupTranslations).forEach(cell => row.appendChild(cell));
+            tbody.appendChild(row);
+            map.push({ type: 'group', element: groupEl, sourceLabel: label });
+          };
 
-          // ── Column rows inside this group ──
-          child.querySelectorAll('.matrix-group-columns > .matrix-column').forEach(columnDiv => {
+          const appendColumnRow = (columnDiv, indentClass) => {
             const textInput = columnDiv.querySelector('.column-text');
             const colTranslationsInput = columnDiv.querySelector('.column-name-translations');
             const columnText = textInput ? textInput.value.trim() : '';
@@ -741,12 +741,37 @@ function attachMatrixColumnHeadersModal() {
             const colRow = document.createElement('tr');
             colRow.className = 'border-b border-gray-200 hover:bg-gray-50';
             const codeTd = document.createElement('td');
-            codeTd.className = 'px-4 py-3 text-sm text-gray-700 border-r border-gray-300 pl-8';
+            codeTd.className = 'px-4 py-3 text-sm text-gray-700 border-r border-gray-300 ' + indentClass;
             codeTd.textContent = '↳ ' + columnText;
             colRow.appendChild(codeTd);
             generateCells(colTranslations).forEach(cell => colRow.appendChild(cell));
             tbody.appendChild(colRow);
             map.push({ type: 'column', element: columnDiv, sourceLabel: columnText });
+          };
+
+          appendGroupRow(child, groupLabel, translations, 'Group', '');
+
+          // ── Columns and subgroups inside this group, in builder order ──
+          const groupList = child.querySelector(':scope > .matrix-group-columns');
+          Array.from(groupList ? groupList.children : []).forEach(groupChild => {
+            if (groupChild.classList.contains('matrix-column')) {
+              appendColumnRow(groupChild, 'pl-8');
+            } else if (groupChild.classList.contains('matrix-group')) {
+              const subLabelInput = groupChild.querySelector(':scope > .matrix-group-header .group-label-text');
+              const subLabel = subLabelInput ? subLabelInput.value.trim() : '';
+              if (!subLabel) return;
+              hasAnyItem = true;
+              const subTranslationsInput = groupChild.querySelector(':scope > .matrix-group-header .group-label-translations');
+              let subTranslations = {};
+              if (subTranslationsInput && subTranslationsInput.value) {
+                try { subTranslations = JSON.parse(subTranslationsInput.value) || {}; } catch (_) {}
+              }
+              if (subTranslations && typeof subTranslations === 'object') delete subTranslations.header_color;
+              appendGroupRow(groupChild, subLabel, subTranslations, 'Subgroup', 'pl-8');
+              groupChild.querySelectorAll(':scope > .matrix-group-columns > .matrix-column').forEach(columnDiv => {
+                appendColumnRow(columnDiv, 'pl-12');
+              });
+            }
           });
 
         } else if (child.classList.contains('matrix-column')) {

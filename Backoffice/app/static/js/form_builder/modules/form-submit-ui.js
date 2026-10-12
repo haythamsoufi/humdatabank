@@ -603,6 +603,17 @@ export const FormSubmitUI = {
       };
 
       try {
+        // Renamed matrix column codes: offer to move data saved under the old codes.
+        // Runs before the modal is hidden, so Cancel leaves the user's edits in place.
+        if (isItemModalForm && window.ItemModal && typeof window.ItemModal.resolveMatrixColumnMigration === 'function') {
+          const decision = await window.ItemModal.resolveMatrixColumnMigration(snapshot);
+          if (decision === 'cancel') return;
+          if (decision === 'migrate') {
+            const flag = ['migrate_matrix_columns', '1'];
+            const at = snapshot.findIndex(([key]) => key === 'migrate_matrix_columns');
+            if (at >= 0) snapshot[at] = flag; else snapshot.push(flag);
+          }
+        }
         await doSubmit();
       } catch (err) {
         // If aborted due to a newer submit, don't show an error.

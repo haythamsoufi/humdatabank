@@ -409,6 +409,82 @@ class VariableResolutionService:
         return columns if isinstance(columns, list) else None
 
     @classmethod
+    def _matrix_lookup_columns_and_code(cls, entry, matrix_column_name):
+        """Source-matrix columns and column code to read for a lookup variable.
+
+        Saved cell keys use the *resolved* column code, so a column such as
+        ``[assignment_period] Planned`` is stored as ``2026 Planned`` for that
+        assignment. Returns the columns resolved for the entry's assignment and
+        the code to build the ``{row}_{code}`` key from.
+
+        ``matrix_column_name`` is matched against column codes first, exactly as
+        before, so existing variables keep working. Only when it is not a code
+        does it fall back to: the same text with placeholders resolved, the raw
+        (unresolved) code of a templated column, then a unique display label or
+        translation. Anything unmatched is returned unchanged.
+        """
+        raw_columns = cls._matrix_columns_from_entry(entry)
+        if not raw_columns or not matrix_column_name or matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
+            return raw_columns, matrix_column_name
+
+        columns = raw_columns
+        resolved_vars: Dict[str, Any] = {}
+        var_configs: Dict[str, Any] = {}
+        has_placeholders = any(
+            isinstance(col, dict) and cls.matrix_config_has_placeholders({'columns': [col]})
+            for col in raw_columns
+        )
+        aes = getattr(entry, 'assignment_entity_status', None)
+        if aes is not None and (has_placeholders or '[' in str(matrix_column_name)):
+            try:
+                resolved_vars, var_configs = cls.resolve_for_assignment_display(aes)
+                if has_placeholders and resolved_vars:
+                    resolved_columns, _ = cls.resolve_matrix_display_headers(
+                        {'columns': raw_columns}, resolved_vars, var_configs
+                    )
+                    if resolved_columns is not None:
+                        columns = resolved_columns
+            except Exception as e:
+                logger.debug("_matrix_lookup_columns_and_code: could not resolve columns: %s", e)
+
+        return columns, cls._match_matrix_column_code(
+            str(matrix_column_name), raw_columns, columns, resolved_vars, var_configs
+        )
+
+    @classmethod
+    def _match_matrix_column_code(cls, configured, raw_columns, columns, resolved_vars, var_configs):
+        names = [col.get('name') for col in columns if isinstance(col, dict) and col.get('name')]
+        if configured in names:
+            return configured
+
+        if '[' in configured and resolved_vars:
+            resolved_text = cls.replace_variables_in_text(configured, resolved_vars, var_configs)
+            if resolved_text in names:
+                return resolved_text
+
+        # The raw code of a templated column, e.g. "[assignment_period] Planned".
+        for raw_col, col in zip(raw_columns, columns):
+            if isinstance(raw_col, dict) and isinstance(col, dict) and col.get('name') \
+                    and raw_col.get('name') == configured:
+                return col['name']
+
+        # A display label or translation, only when it points at exactly one column.
+        needle = configured.strip().casefold()
+        matches = set()
+        for col in columns:
+            if not isinstance(col, dict) or not col.get('name'):
+                continue
+            labels = [col.get('label')]
+            translations = col.get('name_translations')
+            if isinstance(translations, dict):
+                labels.extend(translations.values())
+            if any(isinstance(label, str) and label.strip().casefold() == needle for label in labels):
+                matches.add(col['name'])
+        if len(matches) == 1:
+            return next(iter(matches))
+        return configured
+
+    @classmethod
     def _matrix_calculated_lookup(cls, disagg_data, row_entity_id, column_name, columns):
         """Return (True, value) when column_name is a calculated column, else (False, None)."""
         if not columns or not isinstance(disagg_data, dict):
@@ -627,8 +703,19 @@ class VariableResolutionService:
                 ]
 
                 for consumer_item_id, column_name in column_bindings:
-                    suffix = f"_{column_name}"
                     for consumer_aes_id in consumer_aes_ids:
+                        # Column codes may contain [variables]; saved keys use the resolved code.
+                        resolved_column_name = column_name
+                        if '[' in column_name:
+                            try:
+                                consumer_aes = db.session.get(AssignmentEntityStatus, consumer_aes_id)
+                                c_vars, c_cfgs = cls.resolve_for_assignment_display(consumer_aes)
+                                resolved_column_name = cls.replace_variables_in_text(
+                                    column_name, c_vars, c_cfgs
+                                ) or column_name
+                            except Exception as e:
+                                logger.debug("refresh_stale_variable_matrix_cells: %s", e)
+                        suffix = f"_{resolved_column_name}"
                         form_data = FormData.query.filter_by(
                             assignment_entity_status_id=consumer_aes_id,
                             form_item_id=consumer_item_id,
@@ -1190,7 +1277,7 @@ class VariableResolutionService:
 
         if matrix_column_name and row_entity_id is not None and entry.disagg_data:
             if isinstance(entry.disagg_data, dict):
-                columns = cls._matrix_columns_from_entry(entry)
+                columns, matrix_column_name = cls._matrix_lookup_columns_and_code(entry, matrix_column_name)
                 if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
                     # Row total: sum of columns that count toward the row total
                     total = cls._matrix_row_total(entry.disagg_data, row_entity_id, columns)
@@ -1457,7 +1544,7 @@ class VariableResolutionService:
             # or with variable-column format: {"61_Planned": {"original": "...", "modified": "...", "isModified": bool}}
             # When matrix_column_name is _row_total, use sum of all column values for this row.
             if isinstance(entry.disagg_data, dict):
-                columns = cls._matrix_columns_from_entry(entry)
+                columns, matrix_column_name = cls._matrix_lookup_columns_and_code(entry, matrix_column_name)
                 if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
                     total = cls._matrix_row_total(entry.disagg_data, row_entity_id, columns)
                     return total
@@ -1598,7 +1685,7 @@ class VariableResolutionService:
         # Look up the actual cell value (or row total) using lookup key or row total
         # In entities_containing, the "row" in the source matrix is the current assignment's entity (lookup_entity_id)
         if isinstance(form_data_entry.disagg_data, dict):
-            columns = cls._matrix_columns_from_entry(form_data_entry)
+            columns, matrix_column_name = cls._matrix_lookup_columns_and_code(form_data_entry, matrix_column_name)
             if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
                 total = cls._matrix_row_total(form_data_entry.disagg_data, lookup_entity_id, columns)
                 numeric_value = total if total is not None else 0
@@ -2171,6 +2258,57 @@ class VariableResolutionService:
         return resolved if changed else translation_map
 
     @classmethod
+    def _replace_placeholders_deep(cls, value: Any, replacer) -> Tuple[Any, bool]:
+        """Apply ``replacer`` to every string (and dict key) inside ``value``.
+
+        Returns ``(new_value, changed)``. Unchanged containers are returned as the
+        same object so callers can cheaply tell nothing was resolved.
+        """
+        if isinstance(value, str):
+            if '[' not in value:
+                return value, False
+            new_text = replacer(value)
+            return new_text, new_text != value
+        if isinstance(value, list):
+            items: List[Any] = []
+            changed = False
+            for item in value:
+                new_item, item_changed = cls._replace_placeholders_deep(item, replacer)
+                items.append(new_item)
+                changed = changed or item_changed
+            return (items, True) if changed else (value, False)
+        if isinstance(value, dict):
+            out: Dict[Any, Any] = {}
+            changed = False
+            for key, item in value.items():
+                new_key = key
+                if isinstance(key, str) and '[' in key:
+                    new_key = replacer(key)
+                    changed = changed or new_key != key
+                new_item, item_changed = cls._replace_placeholders_deep(item, replacer)
+                out[new_key] = new_item
+                changed = changed or item_changed
+            return (out, True) if changed else (value, False)
+        return value, False
+
+    @classmethod
+    def matrix_config_has_placeholders(cls, matrix_config: Optional[Dict[str, Any]]) -> bool:
+        """True when any column or column-group text carries a ``[variable]`` placeholder."""
+        if not isinstance(matrix_config, dict):
+            return False
+
+        def _has(value: Any) -> bool:
+            if isinstance(value, str):
+                return '[' in value
+            if isinstance(value, list):
+                return any(_has(item) for item in value)
+            if isinstance(value, dict):
+                return any(_has(key) or _has(item) for key, item in value.items())
+            return False
+
+        return _has(matrix_config.get('columns')) or _has(matrix_config.get('column_groups'))
+
+    @classmethod
     def resolve_matrix_display_headers(
         cls,
         matrix_config: Optional[Dict[str, Any]],
@@ -2179,77 +2317,67 @@ class VariableResolutionService:
         replace_fn=None,
     ) -> Tuple[Optional[List[Any]], Optional[Dict[str, Any]]]:
         """
-        Resolve [variable] placeholders in matrix column header and group-label translations.
+        Resolve [variable] placeholders across matrix columns and column groups.
+
+        Every string on a column is resolved: its ``name`` (the code that saved cell
+        keys are built from), ``group`` / ``subgroup``, translations, and the names
+        a calculation refers to. Group labels, subgroup labels and their translations
+        in ``column_groups`` are resolved too, so a column's ``group`` still matches
+        its ``column_groups`` key after resolution.
 
         Returns (resolved_columns, resolved_column_groups). Each value is None when unchanged.
         """
         if not isinstance(matrix_config, dict) or not resolved_variables:
             return None, None
 
+        replacer = replace_fn or (
+            lambda text: cls.replace_variables_in_text(text, resolved_variables, variable_configs)
+        )
+
         resolved_columns: Optional[List[Any]] = None
         resolved_groups: Optional[Dict[str, Any]] = None
 
         columns = matrix_config.get('columns')
         if isinstance(columns, list):
-            new_columns: List[Any] = []
-            columns_changed = False
-            for col in columns:
-                if not isinstance(col, dict):
-                    new_columns.append(col)
-                    continue
-                new_col = dict(col)
-                name_translations = col.get('name_translations')
-                if isinstance(name_translations, dict) and name_translations:
-                    resolved_map = cls.resolve_translation_map(
-                        name_translations,
-                        resolved_variables,
-                        variable_configs,
-                        replace_fn=replace_fn,
-                    )
-                    if resolved_map is not name_translations:
-                        new_col['name_translations'] = resolved_map
-                        columns_changed = True
-                new_columns.append(new_col)
+            new_columns, columns_changed = cls._replace_placeholders_deep(columns, replacer)
             if columns_changed:
                 resolved_columns = new_columns
 
         column_groups = matrix_config.get('column_groups')
         if isinstance(column_groups, dict) and column_groups:
-            new_groups: Dict[str, Any] = {}
-            groups_changed = False
-            for group_key, group_translations in column_groups.items():
-                if isinstance(group_translations, dict) and group_translations:
-                    # header_color is presentation metadata, not a language.
-                    # Keep the original dict when only translations are unchanged
-                    # so a custom colour still reaches the matrix header.
-                    header_color = group_translations.get('header_color')
-                    translations = group_translations
-                    if 'header_color' in group_translations:
-                        translations = {
-                            k: v for k, v in group_translations.items() if k != 'header_color'
-                        }
-                    resolved_map = translations
-                    if translations:
-                        resolved_map = cls.resolve_translation_map(
-                            translations,
-                            resolved_variables,
-                            variable_configs,
-                            replace_fn=replace_fn,
-                        )
-                    if resolved_map is translations:
-                        new_groups[group_key] = group_translations
-                    else:
-                        merged = dict(resolved_map or {})
-                        if header_color not in (None, ''):
-                            merged['header_color'] = header_color
-                        new_groups[group_key] = merged
-                        groups_changed = True
-                else:
-                    new_groups[group_key] = group_translations
+            new_groups, groups_changed = cls._replace_placeholders_deep(column_groups, replacer)
             if groups_changed:
                 resolved_groups = new_groups
 
         return resolved_columns, resolved_groups
+
+    @classmethod
+    def resolve_matrix_config_for_assignment(
+        cls,
+        matrix_config: Optional[Dict[str, Any]],
+        assignment_entity_status: Optional[AssignmentEntityStatus],
+    ) -> Optional[Dict[str, Any]]:
+        """Matrix config with column / group placeholders resolved for one assignment.
+
+        Saved cell keys are built from the resolved column names, so anything that
+        matches stored keys against the config (pruning, exports, API) must use this
+        instead of the raw config. Returns ``matrix_config`` itself when nothing
+        needs resolving, so the common case costs one scan and no DB access.
+        """
+        if not assignment_entity_status or not cls.matrix_config_has_placeholders(matrix_config):
+            return matrix_config
+        resolved, configs = cls.resolve_for_assignment_display(assignment_entity_status)
+        if not resolved:
+            return matrix_config
+        columns, groups = cls.resolve_matrix_display_headers(matrix_config, resolved, configs)
+        if columns is None and groups is None:
+            return matrix_config
+        out = dict(matrix_config)
+        if columns is not None:
+            out['columns'] = columns
+        if groups is not None:
+            out['column_groups'] = groups
+        return out
 
     @classmethod
     def resolve_matrix_display_rows(

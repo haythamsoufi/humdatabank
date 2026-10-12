@@ -920,7 +920,7 @@ export class TemplateVariablesManager {
 
                 tooltipText = 'Matrix lookup configured. The variable will lookup values from the "' + matrixColumnInput.value + '" column in the source matrix. How it works: entity_scope determines which entity\'s submission contains the source matrix. row_entity_id (from the current matrix row) is used to find the specific cell (e.g., "61_' + matrixColumnInput.value + '"). Entity Scope for matrix lookups: ' + scopeGuidance + (warningText || '');
             } else if (isMatrix && selectedOption && selectedOption.value) {
-                tooltipText = 'Matrix Column Name: Since the selected form item is a matrix, you can optionally specify a column name to lookup specific values per row. Example: If you enter "Planned", the variable will lookup values like "61_Planned", "62_Planned" etc., where the number is the row entity ID from your current matrix row. Leave empty if you want to lookup the entire matrix row data or if this is not a matrix lookup.';
+                tooltipText = 'Matrix Column Code: Since the selected form item is a matrix, you can optionally specify a column code to lookup specific values per row. If the source column code contains [variables] (e.g. "[assignment_period] Planned"), enter it as written or in its resolved form; it is resolved for the source assignment. Example: If you enter "Planned", the variable will lookup values like "61_Planned", "62_Planned" etc., where the number is the row entity ID from your current matrix row. Leave empty if you want to lookup the entire matrix row data or if this is not a matrix lookup.';
             }
 
             tooltipTextSpan.textContent = tooltipText;

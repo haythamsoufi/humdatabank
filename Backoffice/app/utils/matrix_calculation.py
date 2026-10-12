@@ -319,6 +319,46 @@ def _brace_refs(formula: str) -> List[str]:
     return refs
 
 
+def rename_formula_refs(formula: str, renames: Mapping[str, str]) -> str:
+    """Rewrite column references in a formula after columns were renamed.
+
+    References written bare (``income``) or in braces (``{Total Funding}``) are
+    replaced in a single pass, so swaps and chains (A->B, B->C) are safe. Function
+    names are never touched, and everything else in the text is kept as written.
+    A new code that is not a plain identifier is written in braces.
+    """
+    if not formula or not renames:
+        return formula
+    out: List[str] = []
+    index = 0
+    length = len(formula)
+    while index < length:
+        char = formula[index]
+        if char == '{':
+            end = formula.find('}', index + 1)
+            if end < 0:
+                out.append(formula[index:])
+                break
+            inner = formula[index + 1:end]
+            new_name = renames.get(inner.strip())
+            out.append('{' + (new_name.replace('}', '') if new_name else inner) + '}')
+            index = end + 1
+            continue
+        if char.isalpha() or char == '_':
+            end = index
+            while end < length and (formula[end].isalnum() or formula[end] == '_'):
+                end += 1
+            word = formula[index:end]
+            new_name = renames.get(word)
+            is_call = formula[end:].lstrip()[:1] == '('
+            out.append(_column_ref(new_name) if new_name and not is_call else word)
+            index = end
+            continue
+        out.append(char)
+        index += 1
+    return ''.join(out)
+
+
 def _tokenize(formula: str) -> List[tuple]:
     tokens: List[tuple] = []
     index = 0

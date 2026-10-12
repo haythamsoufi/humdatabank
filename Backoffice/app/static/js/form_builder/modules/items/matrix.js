@@ -7,6 +7,12 @@ import { checkFormulaSyntax, compileCalculation } from '../../../forms/modules/m
 /** Same grey as a normal matrix column header (Tailwind bg-gray-100). */
 const DEFAULT_MATRIX_GROUP_HEADER_COLOR = '#f3f4f6';
 const GROUP_HEADER_COLOR_KEY = 'header_color';
+/**
+ * Subgroups are stored in column_groups under "<group>::<subgroup>", and each of
+ * their columns carries `group` (outer) and `subgroup` (inner). Keep in sync with
+ * the matrix_table.html and export_pdf.html templates.
+ */
+const SUBGROUP_KEY_SEPARATOR = '::';
 
 function normalizeMatrixGroupHeaderColor(value) {
     const raw = String(value || '').trim().toLowerCase();
@@ -413,12 +419,29 @@ export const MatrixItem = {
                 e.preventDefault();
                 this.addGroup(modalElement);
                 this.updateConfig(modalElement);
+            } else if (target.classList.contains('matrix-group-toggle-btn')) {
+                e.preventDefault();
+                const groupDiv = target.closest('.matrix-group');
+                if (groupDiv) {
+                    this._setGroupCollapsed(groupDiv, !groupDiv.classList.contains('is-collapsed'));
+                }
             } else if (target.classList.contains('add-column-to-group-btn')) {
                 e.preventDefault();
                 const groupDiv = target.closest('.matrix-group');
                 if (groupDiv) {
-                    const groupColumnsContainer = groupDiv.querySelector('.matrix-group-columns');
+                    this._setGroupCollapsed(groupDiv, false);
+                    const groupColumnsContainer = groupDiv.querySelector(':scope > .matrix-group-columns');
                     this.addColumn(modalElement, '', 'number_whole', false, '', true, true, {}, groupColumnsContainer);
+                    this.updateConfig(modalElement);
+                }
+            } else if (target.classList.contains('add-subgroup-to-group-btn')) {
+                e.preventDefault();
+                const groupDiv = target.closest('.matrix-group');
+                // Only top-level groups can hold a subgroup.
+                if (groupDiv && groupDiv.parentElement?.id === 'matrix-columns-container') {
+                    this._setGroupCollapsed(groupDiv, false);
+                    const groupColumnsContainer = groupDiv.querySelector(':scope > .matrix-group-columns');
+                    this.addGroup(modalElement, '', {}, '', groupColumnsContainer);
                     this.updateConfig(modalElement);
                 }
             } else if (target.classList.contains('remove-group-btn')) {
@@ -841,6 +864,9 @@ export const MatrixItem = {
         if (input) {
             input.value = text || '';
             input.dataset.prevName = (text || '').trim();
+            // The code this column was saved under. Unlike prevName it never follows edits,
+            // so on save it shows which columns were renamed (see collectColumnRenames).
+            input.dataset.originalName = (text || '').trim();
         }
         if (translationsInput) {
             try {
@@ -997,12 +1023,18 @@ export const MatrixItem = {
         this.updateAutoLoadVisibility(modalElement);
     },
 
-    addGroup(modalElement, label = '', labelTranslations = {}, headerColor = '') {
-        const columnsContainer = Utils.getElementById('matrix-columns-container');
+    /**
+     * Add a column group. Pass `targetContainer` (a top-level group's
+     * `.matrix-group-columns`) to create a subgroup inside it. Only two levels
+     * are supported: groups inside a group cannot contain further groups.
+     * Returns the new `.matrix-group` element.
+     */
+    addGroup(modalElement, label = '', labelTranslations = {}, headerColor = '', targetContainer = null) {
+        const columnsContainer = targetContainer || Utils.getElementById('matrix-columns-container');
         const template = Utils.getElementById('matrix-group-template');
         if (!columnsContainer || !template) {
             console.error('Matrix group container or template not found');
-            return;
+            return null;
         }
         const clone = template.content.cloneNode(true);
         const groupEl = clone.querySelector('.matrix-group');
@@ -1027,6 +1059,71 @@ export const MatrixItem = {
         }
         this._paintGroupHeader(groupEl);
         columnsContainer.appendChild(clone);
+        this._syncGroupDepth();
+        return groupEl;
+    },
+
+    /**
+     * Mark each group as top-level or nested. Nested groups get a lighter indent
+     * and lose the "Add Subgroup" button (two levels maximum).
+     */
+    _syncGroupDepth() {
+        const root = Utils.getElementById('matrix-columns-container');
+        if (!root) return;
+        root.querySelectorAll('.matrix-group').forEach(groupEl => {
+            const nested = groupEl.parentElement?.classList.contains('matrix-group-columns') === true;
+            groupEl.dataset.depth = nested ? '2' : '1';
+            groupEl.querySelector(':scope > .matrix-group-footer .add-subgroup-to-group-btn')
+                ?.classList.toggle('hidden', nested);
+            groupEl.classList.toggle('bg-white', nested);
+        });
+    },
+
+    _groupLabel(groupEl) {
+        return groupEl?.querySelector(':scope > .matrix-group-header .group-label-text')?.value?.trim() || '';
+    },
+
+    /** Label translations plus optional header colour for a group, as persisted in column_groups. */
+    _groupMeta(groupEl) {
+        const translationsInput = groupEl.querySelector(':scope > .matrix-group-header .group-label-translations');
+        let labelTranslations = {};
+        if (translationsInput?.value) {
+            try { labelTranslations = JSON.parse(translationsInput.value) || {}; } catch (_) {}
+        }
+        if (!labelTranslations || typeof labelTranslations !== 'object' || Array.isArray(labelTranslations)) {
+            labelTranslations = {};
+        }
+        delete labelTranslations[GROUP_HEADER_COLOR_KEY];
+        // The default grey is not stored, so groups look like other columns.
+        const headerColor = customMatrixGroupHeaderColor(
+            groupEl.querySelector(':scope > .matrix-group-header .group-header-color')?.value
+        );
+        if (headerColor) labelTranslations[GROUP_HEADER_COLOR_KEY] = headerColor;
+        return labelTranslations;
+    },
+
+    /**
+     * Ordered list of the data columns saved for a top-level group, with the
+     * subgroup label ('' for columns sitting directly in the group).
+     * Unnamed groups and subgroups are skipped, matching updateConfig.
+     */
+    _collectGroupColumns(groupEl) {
+        const result = [];
+        const group = this._groupLabel(groupEl);
+        if (!group) return result;
+        const list = groupEl.querySelector(':scope > .matrix-group-columns');
+        Array.from(list?.children || []).forEach(child => {
+            if (child.classList.contains('matrix-column')) {
+                result.push({ columnDiv: child, group, subgroup: '', subgroupEl: null });
+            } else if (child.classList.contains('matrix-group')) {
+                const subgroup = this._groupLabel(child);
+                if (!subgroup) return;
+                child.querySelectorAll(':scope > .matrix-group-columns > .matrix-column').forEach(columnDiv => {
+                    result.push({ columnDiv, group, subgroup, subgroupEl: child });
+                });
+            }
+        });
+        return result;
     },
 
     /**
@@ -1054,6 +1151,37 @@ export const MatrixItem = {
         if (handle) handle.style.color = dark ? text : '';
     },
 
+    /**
+     * Collapse or expand a column group in the builder. UI-only state: collapsed
+     * groups keep their columns in the DOM, so updateConfig still saves them.
+     */
+    _setGroupCollapsed(groupEl, collapsed) {
+        if (!groupEl) return;
+        // :scope > keeps nested subgroups from matching the parent's elements.
+        const columns = groupEl.querySelector(':scope > .matrix-group-columns');
+        const footer = groupEl.querySelector(':scope > .matrix-group-footer');
+        const header = groupEl.querySelector(':scope > .matrix-group-header');
+        const toggle = header?.querySelector('.matrix-group-toggle-btn');
+        const icon = header?.querySelector('.matrix-group-toggle-icon');
+        const count = header?.querySelector('.matrix-group-count');
+
+        groupEl.classList.toggle('is-collapsed', collapsed);
+        columns?.classList.toggle('hidden', collapsed);
+        footer?.classList.toggle('hidden', collapsed);
+        header?.classList.toggle('rounded-b-md', collapsed);
+        if (icon) icon.style.transform = collapsed ? 'rotate(-90deg)' : '';
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            const title = collapsed ? toggle.dataset.expandTitle : toggle.dataset.collapseTitle;
+            if (title) toggle.title = title;
+        }
+        if (count) {
+            const n = columns ? columns.querySelectorAll('.matrix-column').length : 0;
+            count.textContent = `(${n})`;
+            count.classList.toggle('hidden', !collapsed);
+        }
+    },
+
     moveGroup(button, direction) {
         const group = button.closest('.matrix-group');
         const container = group ? group.parentElement : null;
@@ -1063,6 +1191,25 @@ export const MatrixItem = {
         } else if (direction === 'down' && group.nextElementSibling) {
             container.insertBefore(group.nextElementSibling, group);
         }
+    },
+
+    /**
+     * Columns whose code was changed in this edit: [{from, to}].
+     * Saved cell keys embed the column code, so the server uses this to offer moving
+     * saved data to the new code. New columns (no original code) are never renames.
+     */
+    collectColumnRenames(modalElement) {
+        const container = modalElement?.querySelector('#matrix-columns-container')
+            || Utils.getElementById('matrix-columns-container');
+        if (!container) return [];
+        const renames = [];
+        container.querySelectorAll('.matrix-column').forEach((columnDiv) => {
+            const input = columnDiv.querySelector('.column-text');
+            const from = (input?.dataset?.originalName || '').trim();
+            const to = (input?.value || '').trim();
+            if (from && to && from !== to) renames.push({ from, to });
+        });
+        return renames;
     },
 
     /**
@@ -1180,7 +1327,7 @@ export const MatrixItem = {
         if (!element) return 0;
         if (element.classList.contains('matrix-group')) {
             let count = 0;
-            element.querySelectorAll('.matrix-group-columns > .matrix-column').forEach(columnDiv => {
+            this._collectGroupColumns(element).forEach(({ columnDiv }) => {
                 if (this._extractColumnConfig(columnDiv)) count += 1;
             });
             return count;
@@ -1315,13 +1462,112 @@ export const MatrixItem = {
         const indicator = document.createElement('div');
         indicator.className = 'matrix-dnd-indicator';
         indicator.style.cssText = 'height:2px;background:#6366f1;border-radius:1px;pointer-events:none;margin:1px 0;';
-        const removeIndicator = () => indicator.remove();
+        // Group that a dragged group would be nested into (outlined while hovering).
+        let nestTarget = null;
+        const setNestTarget = (groupEl) => {
+            if (nestTarget === groupEl) return;
+            if (nestTarget) {
+                nestTarget.style.outline = '';
+                nestTarget.style.outlineOffset = '';
+            }
+            nestTarget = groupEl;
+            if (nestTarget) {
+                nestTarget.style.outline = '2px dashed #6366f1';
+                nestTarget.style.outlineOffset = '2px';
+            }
+        };
+        const removeIndicator = () => {
+            indicator.remove();
+            setNestTarget(null);
+        };
+
+        // The `.matrix-group-columns` list of the top-level group that contains `cols`
+        // (itself when `cols` already belongs to a top-level group).
+        const topLevelColumnsOf = (cols) => {
+            let current = cols;
+            while (current) {
+                const group = current.closest('.matrix-group');
+                if (!group) return null;
+                if (group.parentElement === container) return current;
+                current = group.parentElement?.closest('.matrix-group-columns') || null;
+            }
+            return null;
+        };
 
         // ── Compute insertion target from pointer position ──
         const getInsertionInfo = (e) => {
             if (!dragged) return null;
             const isDraggingColumn = dragged.classList.contains('matrix-column');
             const isDraggingRowTotal = dragged.classList.contains('matrix-row-total-column');
+            // A subgroup can move within its group, into another group, or out to the top level.
+            // Top-level groups only reorder at the top level (use "Add Subgroup" to nest).
+            const isDraggingSubgroup = dragged.classList.contains('matrix-group') && dragged.parentElement !== container;
+
+            if (isDraggingSubgroup) {
+                const header = e.target.closest('.matrix-group-header');
+                const headerGroup = header?.closest('.matrix-group');
+                let targetCols = null;
+                if (headerGroup && headerGroup !== dragged && !headerGroup.classList.contains('is-collapsed')) {
+                    targetCols = topLevelColumnsOf(headerGroup.parentElement === container
+                        ? headerGroup.querySelector(':scope > .matrix-group-columns')
+                        : headerGroup.parentElement);
+                } else {
+                    const pointerCols = e.target.closest('.matrix-group-columns');
+                    targetCols = pointerCols ? topLevelColumnsOf(pointerCols) : null;
+                }
+                if (targetCols && !dragged.contains(targetCols)) {
+                    const siblings = Array.from(targetCols.children).filter(c => c !== dragged && c !== indicator);
+                    for (const sib of siblings) {
+                        const r = sib.getBoundingClientRect();
+                        if (e.clientY < r.top + r.height / 2) return { cont: targetCols, before: sib };
+                    }
+                    return { cont: targetCols, before: null };
+                }
+            }
+
+            // A top-level group without subgroups of its own can be dropped into another
+            // top-level group to become its subgroup (two levels maximum). The drop
+            // nests when the pointer is in the target's column list or the middle of its
+            // header; the top/bottom edge of a header, and anywhere else, still reorders.
+            const isDraggingTopGroup = dragged.classList.contains('matrix-group')
+                && dragged.parentElement === container
+                && !dragged.querySelector('.matrix-group');
+            if (isDraggingTopGroup) {
+                let targetGroup = e.target.closest('.matrix-group');
+                while (targetGroup && targetGroup.parentElement !== container) {
+                    targetGroup = targetGroup.parentElement?.closest('.matrix-group') || null;
+                }
+                if (targetGroup && targetGroup !== dragged && !targetGroup.classList.contains('is-collapsed')) {
+                    const targetCols = targetGroup.querySelector(':scope > .matrix-group-columns');
+                    const header = targetGroup.querySelector(':scope > .matrix-group-header');
+                    const inColumns = !!targetCols && !!e.target.closest('.matrix-group-columns') && targetCols.contains(e.target);
+                    let inHeaderMiddle = false;
+                    if (header && header.contains(e.target)) {
+                        const r = header.getBoundingClientRect();
+                        inHeaderMiddle = e.clientY > r.top + r.height * 0.25 && e.clientY < r.bottom - r.height * 0.25;
+                    }
+                    if (targetCols && (inColumns || inHeaderMiddle)) {
+                        let before = null;
+                        if (inColumns) {
+                            for (const sib of Array.from(targetCols.children).filter(c => c !== indicator)) {
+                                const r = sib.getBoundingClientRect();
+                                if (e.clientY < r.top + r.height / 2) { before = sib; break; }
+                            }
+                        }
+                        return { cont: targetCols, before, nestInto: targetGroup };
+                    }
+                } else if (targetGroup && targetGroup !== dragged && targetGroup.classList.contains('is-collapsed')) {
+                    // Collapsed target: only its header is visible, so the middle band nests.
+                    const header = targetGroup.querySelector(':scope > .matrix-group-header');
+                    const targetCols = targetGroup.querySelector(':scope > .matrix-group-columns');
+                    if (header && header.contains(e.target) && targetCols) {
+                        const r = header.getBoundingClientRect();
+                        if (e.clientY > r.top + r.height * 0.25 && e.clientY < r.bottom - r.height * 0.25) {
+                            return { cont: targetCols, before: null, nestInto: targetGroup };
+                        }
+                    }
+                }
+            }
 
             if (isDraggingColumn && !isDraggingRowTotal) {
                 // Over a group-columns area → insert inside the group at the right position
@@ -1337,8 +1583,12 @@ export const MatrixItem = {
                 // Over a group header → append into that group
                 const groupHeader = e.target.closest('.matrix-group-header');
                 if (groupHeader) {
-                    const gc = groupHeader.closest('.matrix-group')?.querySelector('.matrix-group-columns');
-                    if (gc) return { cont: gc, before: null };
+                    const headerGroup = groupHeader.closest('.matrix-group');
+                    // A collapsed group's column list is hidden; fall through to outer-level insertion.
+                    if (headerGroup && !headerGroup.classList.contains('is-collapsed')) {
+                        const gc = headerGroup.querySelector(':scope > .matrix-group-columns');
+                        if (gc) return { cont: gc, before: null };
+                    }
                 }
             }
 
@@ -1405,6 +1655,7 @@ export const MatrixItem = {
             e.dataTransfer.dropEffect = 'move';
             const info = getInsertionInfo(e);
             if (!info) { removeIndicator(); return; }
+            setNestTarget(info.nestInto || null);
             if (info.before) {
                 info.before.parentNode.insertBefore(indicator, info.before);
             } else {
@@ -1423,13 +1674,21 @@ export const MatrixItem = {
             const info = getInsertionInfo(e);
             removeIndicator();
             if (!info) return;
-            // Groups and the row-total column stay at the outer level only
-            if ((dragged.classList.contains('matrix-group') || dragged.classList.contains('matrix-row-total-column')) && info.cont !== container) return;
+            // The row-total column and top-level groups stay at the outer level only.
+            // A subgroup may also move into a (top-level) group's column list.
+            const isSubgroup = dragged.classList.contains('matrix-group') && dragged.parentElement !== container;
+            if ((dragged.classList.contains('matrix-group') || dragged.classList.contains('matrix-row-total-column')) && info.cont !== container) {
+                // A top-level group is only accepted where getInsertionInfo chose to nest it.
+                const nestsTopGroup = !!info.nestInto && !isSubgroup && dragged.classList.contains('matrix-group');
+                if (!(isSubgroup || nestsTopGroup) || dragged.contains(info.cont)) return;
+            }
+            if (info.nestInto) this._setGroupCollapsed(info.nestInto, false);
             if (info.before) {
                 info.cont.insertBefore(dragged, info.before);
             } else {
                 info.cont.appendChild(dragged);
             }
+            this._syncGroupDepth();
             this.updateConfig(modalElement);
         });
 
@@ -2397,30 +2656,23 @@ export const MatrixItem = {
         // Walk direct children: .matrix-group containers and standalone .matrix-column elements
         Array.from(columnsContainer.children).forEach(child => {
             if (child.classList.contains('matrix-group')) {
-                const labelInput = child.querySelector('.group-label-text');
-                const groupLabel = labelInput?.value?.trim() || '';
+                const groupLabel = this._groupLabel(child);
                 if (!groupLabel) return; // skip unnamed groups
 
                 // Persist group label translations and an optional header colour.
-                // The default grey is not stored, so groups look like other columns.
-                const labelTranslationsInput = child.querySelector('.group-label-translations');
-                let labelTranslations = {};
-                if (labelTranslationsInput?.value) {
-                    try { labelTranslations = JSON.parse(labelTranslationsInput.value) || {}; } catch (_) {}
-                }
-                if (!labelTranslations || typeof labelTranslations !== 'object' || Array.isArray(labelTranslations)) {
-                    labelTranslations = {};
-                }
-                delete labelTranslations[GROUP_HEADER_COLOR_KEY];
-                const headerColor = customMatrixGroupHeaderColor(child.querySelector('.group-header-color')?.value);
-                if (headerColor) labelTranslations[GROUP_HEADER_COLOR_KEY] = headerColor;
-                column_groups[groupLabel] = labelTranslations;
+                column_groups[groupLabel] = this._groupMeta(child);
 
-                // Extract all columns inside this group
-                child.querySelectorAll('.matrix-group-columns > .matrix-column').forEach(columnDiv => {
+                // Columns directly inside the group and inside its subgroups, in DOM order
+                const seenSubgroups = new Set();
+                this._collectGroupColumns(child).forEach(({ columnDiv, group, subgroup, subgroupEl }) => {
+                    if (subgroup && !seenSubgroups.has(subgroupEl)) {
+                        seenSubgroups.add(subgroupEl);
+                        column_groups[`${group}${SUBGROUP_KEY_SEPARATOR}${subgroup}`] = this._groupMeta(subgroupEl);
+                    }
                     const col = this._extractColumnConfig(columnDiv);
                     if (col) {
-                        col.group = groupLabel;
+                        col.group = group;
+                        if (subgroup) col.subgroup = subgroup;
                         columns.push(col);
                     }
                 });
@@ -2784,11 +3036,33 @@ export const MatrixItem = {
                             delete translations[GROUP_HEADER_COLOR_KEY];
                             this.addGroup(modalElement, item.label, translations, headerColor);
                             const groupContainer = columnsContainer.lastElementChild;
-                            const groupColumnsContainer = groupContainer?.querySelector('.matrix-group-columns');
+                            const groupColumnsContainer = groupContainer?.querySelector(':scope > .matrix-group-columns');
+                            // Consecutive columns sharing a `subgroup` label go into one subgroup.
+                            let lastSubgroupLabel = '';
+                            let subgroupColumnsContainer = null;
                             item.columns.forEach(colData => {
                                 if (!colData || typeof colData !== 'object') return;
+                                const subgroupLabel = colData.subgroup || '';
+                                let targetColumns = groupColumnsContainer;
+                                if (subgroupLabel) {
+                                    if (subgroupLabel !== lastSubgroupLabel || !subgroupColumnsContainer) {
+                                        const subMeta = columnGroupsData[`${item.label}${SUBGROUP_KEY_SEPARATOR}${subgroupLabel}`];
+                                        const subMetaObj = (subMeta && typeof subMeta === 'object' && !Array.isArray(subMeta)) ? subMeta : {};
+                                        const subTranslations = { ...subMetaObj };
+                                        delete subTranslations[GROUP_HEADER_COLOR_KEY];
+                                        const subgroupEl = this.addGroup(
+                                            modalElement, subgroupLabel, subTranslations,
+                                            subMetaObj[GROUP_HEADER_COLOR_KEY] || '', groupColumnsContainer
+                                        );
+                                        subgroupColumnsContainer = subgroupEl?.querySelector(':scope > .matrix-group-columns') || null;
+                                    }
+                                    targetColumns = subgroupColumnsContainer || groupColumnsContainer;
+                                } else {
+                                    subgroupColumnsContainer = null;
+                                }
+                                lastSubgroupLabel = subgroupLabel;
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value });
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, targetColumns, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value });
                             });
                         } else {
                             const colData = item.data;

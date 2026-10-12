@@ -226,25 +226,22 @@ def handle_assignment_form(aes_id):
                                                                 names.update(placeholder_pattern.findall(str(v)))
                                                     elif isinstance(row, str) and '[' in row:
                                                         names.update(placeholder_pattern.findall(row))
-                                            columns = matrix_config.get('columns', [])
-                                            if isinstance(columns, list):
-                                                for col in columns:
-                                                    if not isinstance(col, dict):
-                                                        continue
-                                                    name_translations = col.get('name_translations')
-                                                    if isinstance(name_translations, dict):
-                                                        for v in name_translations.values():
-                                                            if v and '[' in str(v):
-                                                                names.update(placeholder_pattern.findall(str(v)))
-                                            column_groups = matrix_config.get('column_groups', {})
-                                            if isinstance(column_groups, dict):
-                                                for group_translations in column_groups.values():
-                                                    if isinstance(group_translations, dict):
-                                                        for key, v in group_translations.items():
-                                                            if key == 'header_color':
-                                                                continue
-                                                            if v and '[' in str(v):
-                                                                names.update(placeholder_pattern.findall(str(v)))
+                                        # Column codes, group / subgroup labels and their translations can
+                                        # carry placeholders in every row mode (saved keys use the resolved code).
+                                        def _collect_matrix_header_placeholders(node):
+                                            if isinstance(node, str):
+                                                if '[' in node:
+                                                    names.update(placeholder_pattern.findall(node))
+                                            elif isinstance(node, list):
+                                                for child in node:
+                                                    _collect_matrix_header_placeholders(child)
+                                            elif isinstance(node, dict):
+                                                for key, child in node.items():
+                                                    _collect_matrix_header_placeholders(key)
+                                                    _collect_matrix_header_placeholders(child)
+
+                                        _collect_matrix_header_placeholders(matrix_config.get('columns', []))
+                                        _collect_matrix_header_placeholders(matrix_config.get('column_groups', {}))
                                 except Exception as e:
                                     current_app.logger.debug("Placeholder extraction from row failed: %s", e)
                     return names

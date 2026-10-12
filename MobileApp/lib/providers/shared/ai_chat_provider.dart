@@ -117,6 +117,14 @@ class AiChatProvider with ChangeNotifier {
     return 'server_error';
   }
 
+  /// True for stream `error` envelopes with no specific `error_type` (the backend's catch-all
+  /// emits `"Error"`), as opposed to actionable ones such as quota, DLP or auth failures.
+  @visibleForTesting
+  static bool isUnclassifiedStreamError(Object? errorType) {
+    final t = errorType?.toString().trim() ?? '';
+    return t.isEmpty || t == 'Error';
+  }
+
   static const _preparingQueryLabel = 'Preparing query…';
   /// [AiChatAgentProgressCopy] maps this to a localized "Done." in the UI.
   static const aiAgentStepDoneSentinel = '__AI_STEP_DONE__';
@@ -1022,6 +1030,14 @@ class AiChatProvider with ChangeNotifier {
       (data) async {
         try {
           if (streamGeneration != _wsConnectionSession) return;
+          // The stream worker reports any unclassified server exception as error_type "Error".
+          // Retry those once over plain HTTP (the long-standing path) instead of surfacing a
+          // generic failure; classified errors (quota, DLP, auth, timeout...) are shown as-is.
+          if (data['type'] == 'error' && isUnclassifiedStreamError(data['error_type'])) {
+            DebugLogger.logWarn('AI', 'SSE stream reported a server error, falling back to HTTP');
+            await fallbackToHttp();
+            return;
+          }
           await _handleWsJson(data, outboundMessage: message, isAuthenticated: isAuthenticated);
           if (streamGeneration != _wsConnectionSession) return;
           notifyListeners();

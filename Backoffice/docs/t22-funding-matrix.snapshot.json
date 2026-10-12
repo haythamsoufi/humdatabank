@@ -1,0 +1,842 @@
+{
+  "template_id": 22,
+  "template_name": "Planning - International Bilateral Support",
+  "published_version_id": 22,
+  "version_number": 1,
+  "version_updated_at": "2026-10-12 21:19:53.174111",
+  "item_id": 1303,
+  "item_label": "Funding Requirements",
+  "item_version_id": 22,
+  "matrix_config": {
+    "type": "matrix",
+    "columns": [
+      {
+        "name": "SP2_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الاستجابة - الكوارث والأزمات",
+          "en": "Response - Disasters and Crises",
+          "es": "Respuesta - Desastres y crisis",
+          "fr": "Réponse - Catastrophes et crises",
+          "ru": "Реагирование — катастрофы и кризисы"
+        },
+        "is_variable": true,
+        "variable": "fr_sp2",
+        "variable_name": "fr_sp2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP1_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "المرونة - المناخ والبيئة",
+          "en": "Resilience - Climate and environment",
+          "es": "Resiliencia - Clima y medio ambiente",
+          "fr": "Résilience - Climat et environnement",
+          "ru": "Устойчивость — климат и окружающая среда"
+        },
+        "is_variable": true,
+        "variable": "fr_sp1",
+        "variable_name": "fr_sp1",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP3_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "المرونة - الصحة والرفاهية",
+          "en": "Resilience - Health and wellbeing",
+          "es": "Resiliencia - Salud y bienestar",
+          "fr": "Résilience - Santé et bien-être",
+          "ru": "Устойчивость — здоровье и благополучие"
+        },
+        "is_variable": true,
+        "variable": "fr_sp3",
+        "variable_name": "fr_sp3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP4_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الصمود - الهجرة والنزوح",
+          "en": "Resilience - Migration and displacement",
+          "es": "Resiliencia - Migración y desplazamiento",
+          "fr": "Résilience - Migration et déplacement",
+          "ru": "Устойчивость — миграция и перемещение"
+        },
+        "is_variable": true,
+        "variable": "fr_sp4",
+        "variable_name": "fr_sp4",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP5_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الاحترام - القيم، السلطة والشمول",
+          "en": "Respect - Values, power and inclusion",
+          "es": "Respeto - Valores, poder e inclusión",
+          "fr": "Respect - Valeurs, pouvoir et inclusion",
+          "ru": "Уважение — ценности, власть и инклюзия"
+        },
+        "is_variable": true,
+        "variable": "fr_sp5",
+        "variable_name": "fr_sp5",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "EFs_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الوظائف الممكنة",
+          "en": "Enabling Functions",
+          "es": "Funciones habilitadoras",
+          "fr": "Fonctions d’activation",
+          "ru": "Функционирующие функции"
+        },
+        "is_variable": true,
+        "variable": "fr_efs",
+        "variable_name": "fr_efs",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "fr_tot_[assignment_year]",
+        "type": "calculated",
+        "name_translations": {
+          "ar": "إجمالي متطلبات التمويل",
+          "en": "Total Funding Requirement",
+          "es": "Requisito total de financiación",
+          "fr": "Exigence totale de financement",
+          "ru": "Общие требования к финансированию"
+        },
+        "calculation": {
+          "operation": "sum",
+          "sources": [
+            "SP2_[assignment_year]",
+            "SP1_[assignment_year]",
+            "SP3_[assignment_year]",
+            "SP4_[assignment_year]",
+            "SP5_[assignment_year]",
+            "EFs_[assignment_year]"
+          ],
+          "subtrahends": [],
+          "denominators": [],
+          "decimals": 0,
+          "blank_as_zero": true,
+          "formula": "SUM({SP2_[assignment_year]}, {SP1_[assignment_year]}, {SP3_[assignment_year]}, {SP4_[assignment_year]}, {SP5_[assignment_year]}, {EFs_[assignment_year]})"
+        },
+        "calculation_readonly": false,
+        "calculation_save_value": true,
+        "group": "year_[assignment_year]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "confirmedfn_[assignment_year]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "التمويل المؤكد",
+          "en": "Confirmed Funding",
+          "es": "Financiación confirmada",
+          "fr": "Financement confirmé",
+          "ru": "Подтверждённое финансирование"
+        },
+        "group": "year_[assignment_year]"
+      },
+      {
+        "name": "SP2_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الاستجابة - الكوارث والأزمات",
+          "en": "Response - Disasters and Crises",
+          "es": "Respuesta - Desastres y crisis",
+          "fr": "Réponse - Catastrophes et crises",
+          "ru": "Реагирование — катастрофы и кризисы"
+        },
+        "is_variable": true,
+        "variable": "fr_sp2_2",
+        "variable_name": "fr_sp2_2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP1_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "المرونة - المناخ والبيئة",
+          "en": "Resilience - Climate and environment",
+          "es": "Resiliencia - Clima y medio ambiente",
+          "fr": "Résilience - Climat et environnement",
+          "ru": "Устойчивость — климат и окружающая среда"
+        },
+        "is_variable": true,
+        "variable": "fr_sp1_2",
+        "variable_name": "fr_sp1_2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP3_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "المرونة - الصحة والرفاهية",
+          "en": "Resilience - Health and wellbeing",
+          "es": "Resiliencia - Salud y bienestar",
+          "fr": "Résilience - Santé et bien-être",
+          "ru": "Устойчивость — здоровье и благополучие"
+        },
+        "is_variable": true,
+        "variable": "fr_sp3_2",
+        "variable_name": "fr_sp3_2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP4_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الصمود - الهجرة والنزوح",
+          "en": "Resilience - Migration and displacement",
+          "es": "Resiliencia - Migración y desplazamiento",
+          "fr": "Résilience - Migration et déplacement",
+          "ru": "Устойчивость — миграция и перемещение"
+        },
+        "is_variable": true,
+        "variable": "fr_sp4_2",
+        "variable_name": "fr_sp4_2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP5_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الاحترام - القيم، السلطة والشمول",
+          "en": "Respect - Values, power and inclusion",
+          "es": "Respeto - Valores, poder e inclusión",
+          "fr": "Respect - Valeurs, pouvoir et inclusion",
+          "ru": "Уважение — ценности, власть и инклюзия"
+        },
+        "is_variable": true,
+        "variable": "fr_sp5_2",
+        "variable_name": "fr_sp5_2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "EFs_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الوظائف الممكنة",
+          "en": "Enabling Functions",
+          "es": "Funciones habilitadoras",
+          "fr": "Fonctions d’activation",
+          "ru": "Функционирующие функции"
+        },
+        "is_variable": true,
+        "variable": "fr_efs_2",
+        "variable_name": "fr_efs_2",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "fr_tot_[[assignment_year]+1]",
+        "type": "calculated",
+        "name_translations": {
+          "ar": "إجمالي متطلبات التمويل",
+          "en": "Total Funding Requirement",
+          "es": "Requisito total de financiación",
+          "fr": "Exigence totale de financement",
+          "ru": "Общие требования к финансированию"
+        },
+        "calculation": {
+          "operation": "sum",
+          "sources": [
+            "SP2_[[assignment_year]+1]",
+            "SP1_[[assignment_year]+1]",
+            "SP3_[[assignment_year]+1]",
+            "SP4_[[assignment_year]+1]",
+            "SP5_[[assignment_year]+1]",
+            "EFs_[[assignment_year]+1]"
+          ],
+          "subtrahends": [],
+          "denominators": [],
+          "decimals": 0,
+          "blank_as_zero": true,
+          "formula": "SUM({SP2_[[assignment_year]+1]}, {SP1_[[assignment_year]+1]}, {SP3_[[assignment_year]+1]}, {SP4_[[assignment_year]+1]}, {SP5_[[assignment_year]+1]}, {EFs_[[assignment_year]+1]})"
+        },
+        "calculation_readonly": false,
+        "calculation_save_value": true,
+        "group": "year_[[assignment_year]+1]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "confirmedfn_[[assignment_year]+1]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "التمويل المؤكد",
+          "en": "Confirmed Funding",
+          "es": "Financiación confirmada",
+          "fr": "Financement confirmé",
+          "ru": "Подтверждённое финансирование"
+        },
+        "group": "year_[[assignment_year]+1]"
+      },
+      {
+        "name": "SP2_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الاستجابة - الكوارث والأزمات",
+          "en": "Response - Disasters and Crises",
+          "es": "Respuesta - Desastres y crisis",
+          "fr": "Réponse - Catastrophes et crises",
+          "ru": "Реагирование — катастрофы и кризисы"
+        },
+        "is_variable": true,
+        "variable": "fr_sp2_3",
+        "variable_name": "fr_sp2_3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP1_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "المرونة - المناخ والبيئة",
+          "en": "Resilience - Climate and environment",
+          "es": "Resiliencia - Clima y medio ambiente",
+          "fr": "Résilience - Climat et environnement",
+          "ru": "Устойчивость — климат и окружающая среда"
+        },
+        "is_variable": true,
+        "variable": "fr_sp1_3",
+        "variable_name": "fr_sp1_3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP3_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "المرونة - الصحة والرفاهية",
+          "en": "Resilience - Health and wellbeing",
+          "es": "Resiliencia - Salud y bienestar",
+          "fr": "Résilience - Santé et bien-être",
+          "ru": "Устойчивость — здоровье и благополучие"
+        },
+        "is_variable": true,
+        "variable": "fr_sp3_3",
+        "variable_name": "fr_sp3_3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP4_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الصمود - الهجرة والنزوح",
+          "en": "Resilience - Migration and displacement",
+          "es": "Resiliencia - Migración y desplazamiento",
+          "fr": "Résilience - Migration et déplacement",
+          "ru": "Устойчивость — миграция и перемещение"
+        },
+        "is_variable": true,
+        "variable": "fr_sp4_3",
+        "variable_name": "fr_sp4_3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "SP5_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الاحترام - القيم، السلطة والشمول",
+          "en": "Respect - Values, power and inclusion",
+          "es": "Respeto - Valores, poder e inclusión",
+          "fr": "Respect - Valeurs, pouvoir et inclusion",
+          "ru": "Уважение — ценности, власть и инклюзия"
+        },
+        "is_variable": true,
+        "variable": "fr_sp5_3",
+        "variable_name": "fr_sp5_3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "EFs_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "الوظائف الممكنة",
+          "en": "Enabling Functions",
+          "es": "Funciones habilitadoras",
+          "fr": "Fonctions d’activation",
+          "ru": "Функционирующие функции"
+        },
+        "is_variable": true,
+        "variable": "fr_efs_3",
+        "variable_name": "fr_efs_3",
+        "variable_readonly": false,
+        "variable_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "fr_tot_[[assignment_year]+2]",
+        "type": "calculated",
+        "name_translations": {
+          "ar": "إجمالي متطلبات التمويل",
+          "en": "Total Funding Requirement",
+          "es": "Requisito total de financiación",
+          "fr": "Exigence totale de financement",
+          "ru": "Общие требования к финансированию"
+        },
+        "calculation": {
+          "operation": "sum",
+          "sources": [
+            "SP2_[[assignment_year]+2]",
+            "SP1_[[assignment_year]+2]",
+            "SP3_[[assignment_year]+2]",
+            "SP4_[[assignment_year]+2]",
+            "SP5_[[assignment_year]+2]",
+            "EFs_[[assignment_year]+2]"
+          ],
+          "subtrahends": [],
+          "denominators": [],
+          "decimals": 0,
+          "blank_as_zero": true,
+          "formula": "SUM({SP2_[[assignment_year]+2]}, {SP1_[[assignment_year]+2]}, {SP3_[[assignment_year]+2]}, {SP4_[[assignment_year]+2]}, {SP5_[[assignment_year]+2]}, {EFs_[[assignment_year]+2]})"
+        },
+        "calculation_readonly": false,
+        "calculation_save_value": true,
+        "group": "year_[[assignment_year]+2]",
+        "subgroup": "fun_req"
+      },
+      {
+        "name": "confirmedfn_[[assignment_year]+2]",
+        "type": "number_whole",
+        "name_translations": {
+          "ar": "التمويل المؤكد",
+          "en": "Confirmed Funding",
+          "es": "Financiación confirmada",
+          "fr": "Financement confirmé",
+          "ru": "Подтверждённое финансирование"
+        },
+        "group": "year_[[assignment_year]+2]"
+      }
+    ],
+    "show_row_totals": false,
+    "show_column_totals": true,
+    "include_calculated_totals_in_api": true,
+    "row_mode": "list_library",
+    "highlight_manual_rows": true,
+    "column_groups": {
+      "year_[assignment_year]": {
+        "ar": "[assignment_year]",
+        "en": "[assignment_year]",
+        "es": "[assignment_year]",
+        "fr": "[assignment_year]",
+        "ru": "[assignment_year]"
+      },
+      "year_[assignment_year]::fun_req": {
+        "ar": "متطلبات التمويل",
+        "en": "Funding Requirements",
+        "es": "Requisitos de financiación",
+        "fr": "Exigences de financement",
+        "ru": "Требования к финансированию"
+      },
+      "year_[[assignment_year]+1]": {
+        "ar": "[[assignment_year]+1]",
+        "en": "[[assignment_year]+1]",
+        "es": "[[assignment_year]+1]",
+        "fr": "[[assignment_year]+1]",
+        "ru": "[[assignment_year]+1]",
+        "header_color": "#e8f3c9",
+        "apply_color_to_headers": true,
+        "apply_color_to_cells": true
+      },
+      "year_[[assignment_year]+1]::fun_req": {
+        "ar": "متطلبات التمويل",
+        "en": "Funding Requirements",
+        "es": "Requisitos de financiación",
+        "fr": "Exigences de financement",
+        "ru": "Требования к финансированию",
+        "header_color": "#fbffeb",
+        "apply_color_to_headers": true,
+        "apply_color_to_cells": true
+      },
+      "year_[[assignment_year]+2]": {
+        "ar": "[[assignment_year]+2]",
+        "en": "[[assignment_year]+2]",
+        "es": "[[assignment_year]+2]",
+        "fr": "[[assignment_year]+2]",
+        "ru": "[[assignment_year]+2]",
+        "header_color": "#e8f3c9",
+        "apply_color_to_headers": true,
+        "apply_color_to_cells": true
+      },
+      "year_[[assignment_year]+2]::fun_req": {
+        "ar": "متطلبات التمويل",
+        "en": "Funding Requirements",
+        "es": "Requisitos de financiación",
+        "fr": "Exigences de financement",
+        "ru": "Требования к финансированию",
+        "header_color": "#fbffeb",
+        "apply_color_to_headers": true,
+        "apply_color_to_cells": true
+      }
+    },
+    "legend_text": "Manually added row",
+    "legend_hide": false,
+    "auto_load_entities": true,
+    "variable_lookup_tooltip_label": "Country reported value",
+    "variable_lookup_tooltip_label_translations": {
+      "ar": "القيمة المبلغ عنها من الدولة",
+      "es": "Valor declarado por país",
+      "fr": "Valeur déclarée par pays",
+      "ru": "Стоимость, сообщаемая по стране,"
+    },
+    "variable_submitted_tooltip_label": "Your value",
+    "variable_submitted_tooltip_label_translations": {
+      "ar": "قيمتك",
+      "es": "Tu valor",
+      "fr": "Votre valeur",
+      "ru": "Ваша ценность"
+    },
+    "lookup_list_id": "country_map",
+    "list_display_column": "name",
+    "search_placeholder": "Search and select a row to add...",
+    "list_filters": [],
+    "allow_other": false,
+    "rows": []
+  },
+  "variables": {
+    "fr_efs": {
+      "default_value": null,
+      "display_name": "FR EFs",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "EFs",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 967,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp1": {
+      "default_value": null,
+      "display_name": "FR SP1",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP1",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 967,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp1_2": {
+      "default_value": null,
+      "display_name": "FR SP1 Second year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP1",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 968,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp2": {
+      "default_value": null,
+      "display_name": "FR SP2",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP2",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 967,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp2_2": {
+      "default_value": null,
+      "display_name": "FR SP2 Second year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP2",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 968,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp3": {
+      "default_value": null,
+      "display_name": "FR SP3",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP3",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 967,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp3_2": {
+      "default_value": null,
+      "display_name": "FR SP3 Second year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP3",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 968,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp4": {
+      "default_value": null,
+      "display_name": "FR SP4",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP4",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 967,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp4_2": {
+      "default_value": null,
+      "display_name": "FR SP4 Second year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP4",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 968,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp5": {
+      "default_value": null,
+      "display_name": "FR SP5",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP5",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 967,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp5_2": {
+      "default_value": null,
+      "display_name": "FR SP5 Second year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP5",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 968,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_efs_2": {
+      "variable_type": "lookup",
+      "display_name": "FR EFs Second year",
+      "default_value": null,
+      "source_template_id": 24,
+      "source_assignment_period": "__current__",
+      "match_by_indicator_bank": false,
+      "source_form_item_id": 968,
+      "entity_scope": "entities_containing",
+      "specific_entity_type": null,
+      "specific_entity_id": null,
+      "return_format": "auto_load_format",
+      "matrix_column_name": "EFs",
+      "format_thousands_separator": false,
+      "format_decimal_places": "auto"
+    },
+    "fr_sp1_3": {
+      "default_value": null,
+      "display_name": "FR SP1 Third year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP1",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 974,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp2_3": {
+      "default_value": null,
+      "display_name": "FR SP2 Third year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP2",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 974,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp3_3": {
+      "default_value": null,
+      "display_name": "FR SP3 Third year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP3",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 974,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp4_3": {
+      "default_value": null,
+      "display_name": "FR SP4 Third year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP4",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 974,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_sp5_3": {
+      "default_value": null,
+      "display_name": "FR SP5 Third year",
+      "entity_scope": "entities_containing",
+      "format_decimal_places": "auto",
+      "format_thousands_separator": false,
+      "match_by_indicator_bank": false,
+      "matrix_column_name": "SP5",
+      "return_format": "auto_load_format",
+      "source_assignment_period": "__current__",
+      "source_form_item_id": 974,
+      "source_template_id": 24,
+      "specific_entity_id": null,
+      "specific_entity_type": null,
+      "variable_type": "lookup"
+    },
+    "fr_efs_3": {
+      "variable_type": "lookup",
+      "display_name": "FR EFs Third year",
+      "default_value": null,
+      "source_template_id": 24,
+      "source_assignment_period": "__current__",
+      "match_by_indicator_bank": false,
+      "source_form_item_id": 974,
+      "entity_scope": "entities_containing",
+      "specific_entity_type": null,
+      "specific_entity_id": null,
+      "return_format": "auto_load_format",
+      "matrix_column_name": "EFs",
+      "format_thousands_separator": false,
+      "format_decimal_places": "auto"
+    }
+  }
+}

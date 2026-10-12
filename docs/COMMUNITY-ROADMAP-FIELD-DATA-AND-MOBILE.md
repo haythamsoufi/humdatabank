@@ -167,16 +167,15 @@ Supported mappings (XLSForm → native):
 
 **Offline flow:**
 1. User taps "Download" on an `AssignmentCard` while online.
-2. `AssignmentOfflineBundleService` crawls the HTML page + up to ~400 same-origin static assets, rewrites URLs for `file://`, patches out the service worker registration.
-   The download is template-scoped: the dashboard API returns `template_id`, bundle metadata records it, and any other assignment (including for another entity) that uses a template already saved on the device is prepared automatically while online, reusing the saved `/static/` files locally. "Remove offline copy" removes all saved copies of that template.
-   Preparation of sibling assignments runs on Wi-Fi/Ethernet only, with a 10-minute retry backoff after a failure.
-   The crawl is built in a temporary folder and swapped in only when every JS/CSS file was fetched, so a failed refresh keeps the previous working copy.
-   Copies live under a per-user folder and are deleted on logout; copies for closed assignments or older than 45 days (or beyond 60 copies) are pruned after an online dashboard load.
-   **Form data for offline use:** while downloading, a headless WebView loads the live form and a `fetch` recorder (`offline_form_scripts.dart`) captures the JSON the form itself requests (variable resolution, plugin/emergency-operations lookups, matrix data). Responses are stored in `offline_api_cache.json/.js` inside the bundle and replayed by an offline `fetch` wrapper; anything not cached falls through to the network and fails gracefully. The live WebView also keeps appending to the cache while the user works online.
-   Third-party CSS/JS/fonts the form references (e.g. Google Fonts, CDN libraries) are mirrored under `static/ext/<host>/` and referenced locally; analytics hosts are skipped and the session cookie is never sent to third-party hosts. A third-party file that cannot be fetched does not block the download.
-   Users can see what is stored and free space from Settings → Offline forms (per-template copies and size, remove a template or all). The same screen has a "Keep open forms available offline" switch that prepares every open assignment (not only templates downloaded by hand) on Wi-Fi.
-   Staleness compares the form definition timestamp, `static_version` (deployed asset version), `data_version` (latest assignment activity), and the app language.
-3. When offline, `WebViewScreen` loads `file://…/offline_assignment_bundles/assignment_<id>/index.html`.
+2. Offline storage is split into one shared **package per form template** and one small **page per assignment** (`lib/services/offline/`, `assignment_offline_bundle_service.dart`).
+   - **Package** (`offline_forms/<user>/template_<id>/`): static, plugin and third-party assets (mirrored under `static/ext/<host>/`; analytics hosts skipped, session cookie never sent to third parties) plus a template-wide API cache (`offline_api_cache.json/.js`) holding the JSON the form requests (variable resolution, emergency-operations lookups, matrix data). Built in a temporary folder with a parallel crawl, rewritten for `file://` in a background isolate, and swapped in atomically, so a failed refresh keeps the previous working copy. Only files the page itself loads must succeed; plugin and third-party files are best-effort.
+   - **Page** (`pages/assignment_<id>.html`): the HTML for a single assignment/entity. Fetching it is cheap (one request plus any assets the package lacks).
+   - Switching to another entity with a saved template only fetches its page; the package is never downloaded again. `data_version` changes only mark a page stale, never the package.
+   - `OfflineFormsController` is the single background worker used by the dashboard. A pure planner (`planOfflineJobs`) decides the work; jobs run serially with timeouts, cancellation and a 10-minute failure backoff. Pages refresh automatically (any network). Package downloads happen only on an explicit tap, when a saved package is outdated (new `static_version`/form definition/language) on Wi-Fi/Ethernet, or when "Keep open forms available offline" is on.
+   - Copies live under a per-user folder and are deleted on logout; closed assignments, copies older than 90 days (or beyond 80 pages) are pruned after an online dashboard load. Copies from the previous per-assignment layout are deleted on first run and must be downloaded again.
+   - Failures are reported as `mobile_client_error` security events (category `offline_download`) with a trace for debugging.
+   - Settings → Offline forms shows per-template packages (assignments, size, date) with remove/remove all.
+3. When offline, `WebViewScreen` loads `file://…/offline_forms/<user>/template_<id>/pages/assignment_<id>.html`.
 4. `auth-drafts.js` (Backoffice JS) intercepts Save → saves to IndexedDB. In the offline bundle, Submit / Send for review / Approve / Reopen are blocked with an "online only" message (the draft is saved first); validation and evaluation run on the server when the user submits online.
 5. **There is no submission outbox.** The user must come back online and manually resubmit.
 

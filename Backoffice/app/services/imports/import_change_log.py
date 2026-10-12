@@ -632,6 +632,194 @@ def load_import_log_summary(log_id: str, *, log_dir: Optional[str] = None) -> Op
     return payload if isinstance(payload, dict) else None
 
 
+def _salvage_truncated_object(text: str) -> Optional[Dict[str, Any]]:
+    """Parse a ``compact_import_value`` preview, keeping only complete entries.
+
+    The preview is the start of a sorted JSON object plus an ellipsis. Entries cut off
+    mid-value are dropped.
+    """
+    raw = str(text or "").strip()
+    if raw.endswith("…"):
+        raw = raw[:-1].rstrip()
+    if not raw.startswith("{"):
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return parsed
+    depth = 0
+    in_string = False
+    escaped = False
+    last_complete: Optional[int] = None
+    for index, char in enumerate(raw):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+            if depth == 1:
+                last_complete = index + 1
+        elif char == "," and depth == 1:
+            last_complete = index
+    if not last_complete:
+        return None
+    snippet = raw[:last_complete].rstrip().rstrip(",") + "}"
+    try:
+        parsed = json.loads(snippet)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _logged_object(value: Any) -> tuple[Dict[str, Any], bool, Optional[int]]:
+    """``(object, truncated, key_count)`` from a logged disagg value."""
+    if not isinstance(value, dict):
+        return {}, False, None
+    if "preview" in value and set(value.keys()) <= {"keys", "n", "preview"}:
+        parsed = _salvage_truncated_object(str(value.get("preview") or "")) or {}
+        count = value.get("keys")
+        return parsed, True, int(count) if isinstance(count, int) else None
+    return value, False, None
+
+
+def _cell_map(value: Any) -> tuple[Dict[str, Any], bool, Optional[int]]:
+    """Flat matrix cells from a logged disagg value. Empty when it is not a matrix."""
+    obj, truncated, count = _logged_object(value)
+    if not obj:
+        return {}, truncated, count
+    if "mode" in obj and obj.get("mode") not in (None, "matrix"):
+        return {}, truncated, count
+    cells = obj.get("values") if isinstance(obj.get("values"), dict) and "mode" in obj else obj
+    if not isinstance(cells, dict):
+        return {}, truncated, count
+    if not any(isinstance(key, str) and ("_" in key or "|" in key) for key in cells):
+        return {}, truncated, count
+    return {str(key): raw for key, raw in cells.items()}, truncated, count
+
+
+def _split_matrix_key(key: str) -> tuple[str, str]:
+    """``(row, column)`` for a saved matrix cell key."""
+    if key.startswith("row_go_unmatched|"):
+        return f"Unmatched appeal {key.split('|', 1)[1]}", ""
+    if "_" not in key:
+        return key, ""
+    row, _sep, column = key.partition("_")
+    if row.isdigit():
+        return row, column
+    row, column = key.rsplit("_", 1)
+    return row, column
+
+
+def matrix_ns_ids(changes: Iterable[Dict[str, Any]]) -> List[int]:
+    """National Society ids used as matrix row keys in these logged changes."""
+    ids: set[int] = set()
+    for change in changes:
+        if not isinstance(change, dict):
+            continue
+        for side in ("old_disagg", "new_disagg"):
+            cells, _truncated, _count = _cell_map(change.get(side))
+            for key in cells:
+                row, _column = _split_matrix_key(key)
+                if row.isdigit():
+                    ids.add(int(row))
+    return sorted(ids)
+
+
+def _format_cell_value(raw: Any) -> str:
+    if isinstance(raw, dict) and ("modified" in raw or "original" in raw):
+        modified = raw.get("modified")
+        original = raw.get("original")
+        if modified not in (None, ""):
+            return _format_cell_value(modified)
+        if modified == "" and original not in (None, ""):
+            return f"cleared (was {_format_cell_value(original)})"
+        if modified == "":
+            return "cleared"
+        return _format_cell_value(original)
+    if isinstance(raw, bool) or raw is None or raw == "":
+        return "—" if raw in (None, "") else str(raw)
+    if isinstance(raw, int) and not isinstance(raw, bool):
+        return f"{raw:,}"
+    if isinstance(raw, float) and raw.is_integer():
+        return f"{int(raw):,}"
+    return str(raw)
+
+
+def present_matrix_change(
+    old: Any,
+    new: Any,
+    ns_names: Optional[Dict[int, str]] = None,
+    *,
+    limit: int = 40,
+) -> Optional[Dict[str, Any]]:
+    """Readable before/after rows for a logged matrix.
+
+    A truncated preview only includes cells that survived the cut. Those missing on one
+    side are shown as unknown (``…``), not as added or removed, because the rest of the
+    matrix was not kept in the log. A complete value is a real diff: unchanged cells are
+    left out.
+    """
+    old_cells, old_truncated, old_count = _cell_map(old)
+    new_cells, new_truncated, new_count = _cell_map(new)
+    if not old_cells and not new_cells:
+        return None
+    truncated = old_truncated or new_truncated
+    names = ns_names or {}
+    rows: List[Dict[str, str]] = []
+    for key in sorted(set(old_cells) | set(new_cells)):
+        in_old = key in old_cells
+        in_new = key in new_cells
+        if in_old and in_new and old_cells[key] == new_cells[key]:
+            continue
+        row_key, column = _split_matrix_key(key)
+        label = names.get(int(row_key), row_key) if row_key.isdigit() else row_key
+        if truncated and not in_old:
+            before, change = "…", ""
+        elif truncated and not in_new:
+            before, change = _format_cell_value(old_cells[key]), ""
+        elif not in_old:
+            before, change = "—", "added"
+        else:
+            before = _format_cell_value(old_cells[key])
+            change = "" if in_new and old_cells[key] == new_cells[key] else "changed"
+            if not in_new:
+                change = "removed"
+        if truncated and not in_new:
+            after = "…"
+        elif not in_new:
+            after = "—"
+        else:
+            after = _format_cell_value(new_cells[key])
+        rows.append({
+            "row": label,
+            "column": column,
+            "before": before,
+            "after": after,
+            "change": change,
+        })
+    if not rows:
+        return None
+    hidden = max(len(rows) - limit, 0)
+    return {
+        "truncated": truncated,
+        "old_count": old_count if old_truncated else len(old_cells),
+        "new_count": new_count if new_truncated else len(new_cells),
+        "cells": rows[:limit],
+        "hidden": hidden,
+    }
+
+
 def iter_import_log_changes(
     log_id: str,
     *,

@@ -12,7 +12,9 @@ from app.services.imports.import_change_log import (
     is_noop_import_change,
     is_valid_import_log_id,
     iter_import_log_changes,
+    matrix_ns_ids,
     persist_import_change_log,
+    present_matrix_change,
     staged_payload_changes,
 )
 
@@ -251,6 +253,66 @@ class TestImportChangeLogStorage:
             assert rows[0]["iso3"] == "KEN"
             storage_service.delete(STORAGE_CATEGORY, _storage_rel(log_id, "json"))
             storage_service.delete(STORAGE_CATEGORY, _storage_rel(log_id, "jsonl"))
+
+
+class TestPresentMatrixChange:
+    def test_complete_matrix_is_a_diff_with_ns_names(self):
+        view = present_matrix_change(
+            {
+                "MDRAR022_Total People to be reached": 20000,
+                "row_go_unmatched|MDRAR022": 1,
+            },
+            {"MDRAR022 Argentina - Economic Crisis_Total People to be reached": 20000},
+            {10: "Austrian Red Cross"},
+        )
+        assert view["truncated"] is False
+        by_change = {}
+        for cell in view["cells"]:
+            by_change.setdefault(cell["change"], []).append(cell)
+        assert by_change["removed"][0]["row"] == "MDRAR022"
+        assert by_change["removed"][0]["before"] == "20,000"
+        assert any(cell["row"] == "Unmatched appeal MDRAR022" for cell in by_change["removed"])
+        added = by_change["added"][0]
+        assert added["row"] == "MDRAR022 Argentina - Economic Crisis"
+        assert added["column"] == "Total People to be reached"
+        assert added["after"] == "20,000"
+
+    def test_numeric_row_uses_national_society_name(self):
+        view = present_matrix_change({"10_SP1": 5}, {"10_SP1": 0}, {10: "Austrian Red Cross"})
+        assert view["cells"] == [{
+            "row": "Austrian Red Cross",
+            "column": "SP1",
+            "before": "5",
+            "after": "0",
+            "change": "changed",
+        }]
+
+    def test_cleared_lookup_shows_the_previous_amount(self):
+        view = present_matrix_change(
+            {"10_EFs": 350000},
+            {"10_EFs": {"original": 350000, "modified": "", "isModified": True}},
+        )
+        assert view["cells"][0]["after"] == "cleared (was 350,000)"
+
+    def test_truncated_preview_does_not_call_missing_cells_removed(self):
+        old_cells = {f"{i:02d}_SP1": 1 for i in range(40)}
+        new_cells = dict(old_cells)
+        new_cells["00_SP1"] = 2
+        old = compact_import_value(old_cells, limit=70)
+        new = compact_import_value(new_cells, limit=70)
+        assert isinstance(old, dict) and str(old["preview"]).endswith("…")
+        view = present_matrix_change(old, new)
+        assert view["truncated"] is True
+        assert view["cells"][0]["change"] == "changed"
+        assert view["cells"][0]["before"] == "1"
+        assert view["cells"][0]["after"] == "2"
+        assert all(cell["change"] != "removed" for cell in view["cells"])
+
+    def test_matrix_ns_ids_reads_both_sides(self):
+        assert matrix_ns_ids([
+            {"old_disagg": {"10_SP1": 1, "HNS_SP2": 2}, "new_disagg": {"12_EFs": 3}},
+            {"old_disagg": "not a matrix"},
+        ]) == [10, 12]
 
 
 class TestSetImportAuditDetails:

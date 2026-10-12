@@ -164,21 +164,24 @@ def _load_t22_funding_by_pns(host_country_id: int, period_name: str, year: int |
     if not rows:
         return {}
     pns_ns_by_aes = _pns_ns_id_by_aes([aes for _entry, aes in rows])
-    return t22_host_funding_by_pns([entry for entry, _aes in rows], host_country_id, pns_ns_by_aes)
+    return t22_host_funding_by_pns([entry for entry, _aes in rows], host_country_id, pns_ns_by_aes, year)
 
 
 @dataclass(frozen=True)
 class PnsPlanOverride:
-    """A PNS's own T22 figure for one host country (takes priority over the host's T24 entry).
+    """A PNS's own T22 figure for one host country and one plan year.
 
-    ``total`` is the PNS row ``Total`` (else the sum of its SP/EF cells). It is ``0`` when the
-    PNS submitted its form but left this host country blank. ``areas`` holds the non-zero
-    SP1-SP5 / EFs amounts the PNS entered.
+    ``total`` is the sum of the PNS's SP/EF cells for that year (else the year's total column).
+    It is ``0`` when the PNS submitted its form but left this host country blank. ``areas``
+    holds the non-zero SP1-SP5 / EFs amounts the PNS entered.
     """
 
     total: float = 0.0
     areas: dict[str, float] = field(default_factory=dict)
 
+
+# ``{ns_id: {plan_year: override}}`` for PNSs that self-reported in T22.
+PnsPlanOverrides = dict[int, dict[int, PnsPlanOverride]]
 
 # A PNS counts as having self-reported once its T22 assignment is submitted or approved.
 T22_SELF_REPORTED_STATUSES = (
@@ -186,12 +189,28 @@ T22_SELF_REPORTED_STATUSES = (
     AssignmentEntityStatusValue.approved,
 )
 
+# T22 item 1303 columns are saved resolved per assignment: ``SP1_[assignment_year]`` ->
+# ``SP1_2026``, ``SP1_[[assignment_year]+1]`` -> ``SP1_2027`` (key ``{host_country_id}_SP1_2026``).
+# Rows saved before the multi-year columns existed use plain ``SP1`` / ``Total``.
+_T22_YEAR_COLUMN = re.compile(r"^(?P<code>SP[1-5]|EFs|fr_tot|confirmedfn)_(?P<year>\d{4})$", re.IGNORECASE)
 
-def t22_host_plan_override(cells: dict[str, Any], host_country_id: int) -> PnsPlanOverride:
-    """Read this host country's row from a PNS's T22 funding matrix (blank row -> zeros)."""
+
+def t22_funding_cells_by_year(
+    cells: dict[str, Any],
+    host_country_id: int,
+    first_year: int | None,
+) -> dict[int, PnsPlanOverride]:
+    """Read this host country's row of a PNS's T22 funding matrix, one entry per plan year.
+
+    Year-suffixed columns (``SP1_2027``) belong to that year; the SP/EF cells win and the year's
+    total column (``fr_tot_2027``) is only a fallback. Legacy plain ``SP1`` / ``Total`` cells
+    belong to *first_year*, where ``Total`` wins as it always did. Blank cells count as zero.
+    """
     prefix = f"{int(host_country_id)}_"
-    total = 0.0
-    areas: dict[str, float] = {}
+    areas: dict[int, dict[str, float]] = {}
+    totals: dict[int, float] = {}
+    legacy_areas: dict[str, float] = {}
+    legacy_total = 0.0
     for key, raw in cells.items():
         if not str(key).startswith(prefix):
             continue
@@ -201,26 +220,47 @@ def t22_host_plan_override(cells: dict[str, Any], host_country_id: int) -> PnsPl
         number = to_number(_resolve_matrix_cell(raw))
         if not number:
             continue
-        bucket = _funding_column_bucket(col)
-        if bucket == "row_total" or (col or "").strip().lower() == "total":
-            total += number
+        col = (col or "").strip()
+        match = _T22_YEAR_COLUMN.match(col)
+        if match:
+            code, year = match.group("code"), int(match.group("year"))
+            if code.lower() == "fr_tot":
+                totals[year] = totals.get(year, 0.0) + number
+            elif code.lower() != "confirmedfn":
+                area = "EFs" if code.lower() == "efs" else code.upper()
+                areas.setdefault(year, {})
+                areas[year][area] = areas[year].get(area, 0.0) + number
+            continue
+        if col.lower() == "total":
+            legacy_total += number
             continue
         code = _funding_area_code(col)
         if code:
-            areas[code] = areas.get(code, 0.0) + number
-    return PnsPlanOverride(total=total or sum(areas.values()), areas=areas)
+            legacy_areas[code] = legacy_areas.get(code, 0.0) + number
+    out: dict[int, PnsPlanOverride] = {}
+    for year in sorted(set(areas) | set(totals)):
+        year_areas = areas.get(year, {})
+        out[year] = PnsPlanOverride(total=sum(year_areas.values()) or totals.get(year, 0.0), areas=year_areas)
+    legacy_year = first_year if first_year is not None else 0  # 0 = year unknown
+    if legacy_year not in out and (legacy_total or legacy_areas):
+        out[legacy_year] = PnsPlanOverride(
+            total=legacy_total or sum(legacy_areas.values()),
+            areas=legacy_areas,
+        )
+    return out
 
 
 def load_t22_pns_overrides(
     host_country_id: int,
     period_name: str,
     year: int | None,
-) -> dict[int, PnsPlanOverride]:
-    """Per-PNS (``NationalSociety.id``) T22 figures for hosts whose PNS has self-reported.
+) -> PnsPlanOverrides:
+    """Per-PNS (``NationalSociety.id``) T22 figures for PNSs that have self-reported.
 
     Every PNS whose T22 assignment for the period is submitted/approved is authoritative for
-    *this* host country, even when its row is empty (that yields a zero override). PNSs that
-    have not submitted are absent, so the host's own T24 figure still applies to them.
+    *this* host country, even when its row is empty (a year it left blank reads as zero via
+    :func:`overrides_for_year`). PNSs that have not submitted are absent, so the host's own T24
+    figure still applies to them. *year* is the assignment (first plan) year.
     """
     item_id = _pns_plan_funding_item_id()
     names = _period_names(period_name, year)
@@ -245,16 +285,23 @@ def load_t22_pns_overrides(
         .all()
     }
     pns_ns_by_aes = _pns_ns_id_by_aes(aes_rows)
-    overrides: dict[int, PnsPlanOverride] = {}
+    overrides: PnsPlanOverrides = {}
     for aes in aes_rows:
         ns_id = pns_ns_by_aes.get(int(aes.id))
         if not ns_id:
             continue
-        override = t22_host_plan_override(_matrix_cells(entries.get(int(aes.id))), host_country_id)
+        by_year = t22_funding_cells_by_year(_matrix_cells(entries.get(int(aes.id))), host_country_id, year)
         previous = overrides.get(int(ns_id))
-        if previous is None or (override.total and not previous.total):
-            overrides[int(ns_id)] = override
+        if previous is None or (
+            sum(o.total for o in by_year.values()) > sum(o.total for o in previous.values())
+        ):
+            overrides[int(ns_id)] = by_year
     return overrides
+
+
+def overrides_for_year(overrides: PnsPlanOverrides, year: int) -> dict[int, PnsPlanOverride]:
+    """``{ns_id: override}`` for one plan year; a PNS with nothing for that year reads as zero."""
+    return {ns_id: by_year.get(year, PnsPlanOverride()) for ns_id, by_year in overrides.items()}
 
 
 def strip_pns_rows(cells: dict[str, Any], ns_ids: set[int] | frozenset[int]) -> dict[str, Any]:
@@ -521,32 +568,24 @@ def t22_host_funding_by_pns(
     entries: list,
     host_country_id: int,
     pns_ns_by_aes: dict[int, int],
+    year: int | None = None,
 ) -> dict[int, float]:
-    """Per-PNS host-country totals from T22 item 1303 (`{country_id}_Total` or SP sum)."""
+    """Per-PNS host-country totals from T22 item 1303 for the first plan year *year*.
+
+    Reads the year's SP/EF columns (``SP1_2026``) or, for rows saved before the multi-year
+    columns, the legacy ``{country_id}_Total`` / plain SP sum.
+    """
     by_pns: dict[int, float] = {}
-    prefix = f"{int(host_country_id)}_"
     for entry in entries:
         pns_ns_id = pns_ns_by_aes.get(int(getattr(entry, "assignment_entity_status_id", 0) or 0))
         if not pns_ns_id:
             continue
-        cells = _matrix_cells(entry)
-        total = 0.0
-        areas = 0.0
-        for key, raw in cells.items():
-            if not str(key).startswith(prefix):
-                continue
-            row, col = _split_cell_key(str(key))
-            if str(row) != str(host_country_id):
-                continue
-            number = to_number(_resolve_matrix_cell(raw))
-            if not number:
-                continue
-            bucket = _funding_column_bucket(col)
-            if bucket == "row_total" or (col or "").strip().lower() == "total":
-                total += number
-            elif bucket in {"longer_term", "emergency"}:
-                areas += number
-        value = total or areas
+        by_year = t22_funding_cells_by_year(_matrix_cells(entry), host_country_id, year)
+        if year is None and by_year:
+            year_key = min(by_year)
+        else:
+            year_key = year
+        value = by_year[year_key].total if year_key in by_year else 0.0
         if value:
             by_pns[int(pns_ns_id)] = by_pns.get(int(pns_ns_id), 0.0) + value
     return by_pns

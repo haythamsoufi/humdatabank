@@ -89,8 +89,7 @@
             <th class="px-3 py-2 text-left font-medium">{{ _('Op') }}</th>
             <th class="px-3 py-2 text-left font-medium">{{ _('Country') }}</th>
             <th class="px-3 py-2 text-left font-medium">{{ _('Item') }}</th>
-            <th class="px-3 py-2 text-left font-medium">{{ _('Before') }}</th>
-            <th class="px-3 py-2 text-left font-medium">{{ _('After') }}</th>
+            <th class="px-3 py-2 text-left font-medium">{{ _('Change') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -99,15 +98,53 @@
             <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ row.op or '—' }}</td>
             <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ row.iso3 or '—' }}{% if row.year %} {{ row.year }}{% endif %}</td>
             <td class="px-3 py-2 text-gray-800">{{ row.label or row.kpi or row.item_id or '—' }}</td>
-            <td class="px-3 py-2 text-gray-600 break-all max-w-xs">
-              {{ row.old_value if row.old_value is not none else row.old_disagg if row.old_disagg is not none else '—' }}
-              {% if row.old_data_not_available %}<div class="text-amber-800">{{ _('Data not available') }}</div>{% endif %}
-              {% if row.old_not_applicable %}<div class="text-amber-800">{{ _('Not applicable') }}</div>{% endif %}
-            </td>
-            <td class="px-3 py-2 text-gray-900 break-all max-w-xs">
-              {{ row.new_value if row.new_value is not none else row.new_disagg if row.new_disagg is not none else '—' }}
-              {% if row.new_data_not_available %}<div class="text-amber-800">{{ _('Data not available') }}</div>{% endif %}
-              {% if row.new_not_applicable %}<div class="text-amber-800">{{ _('Not applicable') }}</div>{% endif %}
+            <td class="px-3 py-2 text-gray-900">
+              {% if row.matrix_view %}
+                {% set view = row.matrix_view %}
+                {% if view.truncated %}
+                <p class="text-amber-800 mb-1">{{ _('Showing the start of this matrix (%(before)s cells before, %(after)s after). The log does not keep the rest, so “…” means that side was cut off, not that the cell was removed.', before=view.old_count, after=view.new_count) }}</p>
+                {% endif %}
+                <table class="min-w-full">
+                  <thead class="text-gray-500">
+                    <tr>
+                      <th class="pr-3 py-0.5 text-left font-medium">{{ _('Row') }}</th>
+                      <th class="pr-3 py-0.5 text-left font-medium">{{ _('Column') }}</th>
+                      <th class="pr-3 py-0.5 text-left font-medium">{{ _('Before') }}</th>
+                      <th class="pr-3 py-0.5 text-left font-medium">{{ _('After') }}</th>
+                      <th class="py-0.5 text-left font-medium">{{ _('Change') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for cell in view.cells %}
+                    <tr>
+                      <td class="pr-3 py-0.5 whitespace-nowrap">{{ cell.row }}</td>
+                      <td class="pr-3 py-0.5 whitespace-nowrap text-gray-600">{{ cell.column or '—' }}</td>
+                      <td class="pr-3 py-0.5 whitespace-nowrap text-gray-600">{{ cell.before }}</td>
+                      <td class="pr-3 py-0.5 whitespace-nowrap">{{ cell.after }}</td>
+                      <td class="py-0.5 whitespace-nowrap text-gray-500">{{ cell.change }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% if view.hidden %}
+                <p class="text-gray-500 mt-1">{{ _('And %(n)s more cells.', n=view.hidden) }}</p>
+                {% endif %}
+              {% else %}
+              <div class="grid grid-cols-2 gap-3">
+                <div class="text-gray-600 break-all">
+                  <div class="text-gray-500">{{ _('Before') }}</div>
+                  {{ row.old_value if row.old_value is not none else row.old_disagg if row.old_disagg is not none else '—' }}
+                  {% if row.old_data_not_available %}<div class="text-amber-800">{{ _('Data not available') }}</div>{% endif %}
+                  {% if row.old_not_applicable %}<div class="text-amber-800">{{ _('Not applicable') }}</div>{% endif %}
+                </div>
+                <div class="break-all">
+                  <div class="text-gray-500">{{ _('After') }}</div>
+                  {{ row.new_value if row.new_value is not none else row.new_disagg if row.new_disagg is not none else '—' }}
+                  {% if row.new_data_not_available %}<div class="text-amber-800">{{ _('Data not available') }}</div>{% endif %}
+                  {% if row.new_not_applicable %}<div class="text-amber-800">{{ _('Not applicable') }}</div>{% endif %}
+                </div>
+              </div>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

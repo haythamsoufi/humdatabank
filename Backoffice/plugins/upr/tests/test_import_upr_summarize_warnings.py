@@ -64,7 +64,7 @@ class TestSummarizeWarnings:
         result = summarize_warnings(warnings)
         assert result["warning_unique_count"] == 1
         assert "MDRTD022" in result["warnings"][0]
-        assert "imported using Excel labels" in result["warnings"][0]
+        assert "not found in GO API" in result["warnings"][0]
         assert "×2" in result["warnings"][0]
         assert "TCD" in result["warnings"][0]
         assert "ETH" in result["warnings"][0]
@@ -96,7 +96,8 @@ class TestSummarizeWarnings:
         assert "MDRBD018" in line
         assert "BEN" in line
         assert "BGD" in line
-        assert "is not listed in GO for " in line
+        assert "is not listed in GO" in line
+        assert "please review it on the form" not in line
 
     def test_emergency_appeal_warning_names_the_assignment(self):
         warnings = [
@@ -179,6 +180,83 @@ class TestSummarizeWarnings:
         assert "×2" in line
         assert "2 countries" in line
         assert "AR2025" in line
+
+    def test_collapses_repeated_appeal_assignments_to_countries(self):
+        places = [
+            "Bulgaria (BGR) — Reporting - Country 2024 (assignment 3770)",
+            "Bulgaria (BGR) — Reporting - Country 2025 (assignment 3483)",
+            "Croatia (HRV) — Reporting - Country 2024 (assignment 3771)",
+            "Russian Federation (RUS) — Reporting - Country 2024 (assignment 3784)",
+        ]
+        warnings = []
+        for place in places:
+            detail = None
+            if place.startswith("Russian Federation"):
+                detail = "Possible GO matches for this country: MDRRU028, MDRRU027."
+            warnings.append({
+                "message": (
+                    "Emergency appeal MGR65002 is not listed for this country in GO "
+                    f"({place}). The Excel name and code were imported — please review it on the form."
+                ),
+                "code": "MGR65002",
+                "place": place,
+                "detail": detail,
+            })
+        result = summarize_warnings(warnings)
+        assert result["warning_unique_count"] == 1
+        line = result["warnings"][0]
+        assert "assignment 3770" not in line
+        assert "Bulgaria (BGR) ×2" in line
+        assert "Croatia (HRV)" in line
+        assert "Possible GO matches: MDRRU028, MDRRU027" in line
+        assert "for this country" not in line
+        review = result["warning_groups"][0]
+        assert review["id"] == "review"
+        assert review["items"][0]["lines"][0].startswith("Bulgaria (BGR)")
+
+    def test_keeps_one_unlisted_assignment_in_full(self):
+        place = "Chad (TCD) — Reporting - Country 2025 (assignment 42)"
+        result = summarize_warnings([{
+            "message": (
+                "Emergency appeal MDRTD999 is not listed for this country in GO "
+                f"({place}). The Excel name and code were imported — please review it on the form."
+            ),
+            "code": "MDRTD999",
+            "place": place,
+        }])
+        line = result["warnings"][0]
+        assert "assignment 42" in line
+        item = result["warning_groups"][0]["items"][0]
+        assert item["text"] == "Emergency appeal MDRTD999 is not listed in GO"
+        assert item["lines"] == ["Chad (TCD) — Reporting - Country 2025 (assignment 42)"]
+
+    def test_groups_matched_appeals_by_code(self):
+        warnings = [
+            "Emergency appeal MGR65002 for Moldova, Republic of (MDA) — Reporting - Country 2024 (assignment 3779) was matched to MDRMD007 Ukraine Crisis - Moldova (part of MGR65002) (the country appeal under that group).",
+            "Emergency appeal MGR65002 for Moldova, Republic of (MDA) — Reporting - Country 2025 (assignment 3492) was matched to MDRMD007 Ukraine Crisis - Moldova (part of MGR65002) (the country appeal under that group).",
+            "Emergency appeal MGR65002 for Poland (POL) — Reporting - Country 2024 (assignment 3782) was matched to MDRPL002 Ukraine Crisis - Poland (part of MGR65002) (the country appeal under that group).",
+            "Emergency appeal MDR66001 for Romania (ROU) — Reporting - Country 2025 (assignment 3496) was matched to MDRRO005 Ukraine Crisis - Romania (part of MGR65002) (the same group (MGR65002)).",
+        ]
+        result = summarize_warnings(warnings)
+        assert result["warning_unique_count"] == 2
+        grouped = result["warnings"][0]
+        assert "assignment 3779" not in grouped
+        assert "Moldova, Republic of (MDA) → MDRMD007 Ukraine Crisis - Moldova ×2" in grouped
+        assert "Poland (POL) → MDRPL002 Ukraine Crisis - Poland" in grouped
+        assert "(part of MGR65002)" not in grouped
+        assert result["warning_groups"][0]["id"] == "matched"
+        same_group = result["warnings"][1]
+        assert "MDR66001" in same_group
+        assert "Romania (ROU)" in same_group
+        assert "MDRRO005 Ukraine Crisis - Romania" in same_group
+        assert "assignment 3496" not in same_group
+
+    def test_review_warnings_are_listed_before_matches(self):
+        result = summarize_warnings([
+            "Emergency appeal MGR60001 for Angola (AGO) — Reporting - Country 2024 (assignment 1) was matched to MDRAO007 Angola - Hunger Crisis (part of MGR60001) (the country appeal under that group).",
+            "National Society not found: 'Hong Kong Red Cross'",
+        ])
+        assert [group["id"] for group in result["warning_groups"]] == ["review", "matched"]
 
     def test_keeps_distinct_percentage_indicators_separate(self):
         warnings = [

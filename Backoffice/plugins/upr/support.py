@@ -28,8 +28,9 @@ from plugins.upr.matrix import (
 )
 from plugins.upr.i18n import localized_ns_display_name
 from plugins.upr.pns_funding import (
-    PnsPlanOverride,
+    PnsPlanOverrides,
     load_t22_pns_overrides,
+    overrides_for_year,
     _find_country_aes_for_year,
     _load_t22_funding_by_pns,
     _load_t23_funding_by_pns,
@@ -61,18 +62,18 @@ def _plan_support(
         year_totals[year] = pns_funding_from_plan_cells(cells)
         year_areas[year] = pns_area_funding_from_plan_cells(cells)
     # A PNS that has self-reported (submitted T22) takes priority over the host's T24 entry for
-    # the first planning year, even when its row is blank. T22 has no later-year columns.
-    overrides: dict[int, PnsPlanOverride] = {}
+    # each planning year (T22 has assignment-year, +1 and +2 column groups), even when blank.
+    overrides: PnsPlanOverrides = {}
     if country_id and years:
         try:
             overrides = load_t22_pns_overrides(int(country_id), period_name, years[0])
         except Exception:
             logger.exception("UPR: failed to load T22 PNS self-reports for host country %s", country_id)
     if overrides:
-        first = years[0]
-        for ns_id, override in overrides.items():
-            year_totals[first][ns_id] = override.total
-            year_areas[first][ns_id] = dict(override.areas)
+        for year in years:
+            for ns_id, override in overrides_for_year(overrides, year).items():
+                year_totals[year][ns_id] = override.total
+                year_areas[year][ns_id] = dict(override.areas)
         tick_rows = [
             {**row, "funding": None, "funding_display": ""} if row.get("ns_id") in overrides else row
             for row in tick_rows

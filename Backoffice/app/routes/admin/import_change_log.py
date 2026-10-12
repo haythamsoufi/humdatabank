@@ -8,6 +8,7 @@ from flask_login import current_user
 from app.models.core import UserActivityLog
 from app.routes.admin.shared import admin_required, user_has_permission
 from app.services.organization.authorization_service import AuthorizationService
+from app.models.organization import NationalSociety
 from app.services.imports.import_change_log import (
     VIEWER_CHANGE_LIMIT,
     count_import_log_changes,
@@ -16,6 +17,8 @@ from app.services.imports.import_change_log import (
     is_valid_import_log_id,
     iter_import_log_changes,
     load_import_log_summary,
+    matrix_ns_ids,
+    present_matrix_change,
     stream_import_log_file,
 )
 
@@ -54,6 +57,17 @@ def view_log(log_id: str):
     log_id = _require_log_id(log_id)
     summary = load_import_log_summary(log_id) or {}
     changes = list(iter_import_log_changes(log_id, limit=VIEWER_CHANGE_LIMIT))
+    ns_ids = matrix_ns_ids(changes)
+    ns_names = {}
+    if ns_ids:
+        ns_names = {
+            int(ns.id): ns.name
+            for ns in NationalSociety.query.filter(NationalSociety.id.in_(ns_ids))
+        }
+    for change in changes:
+        matrix = present_matrix_change(change.get("old_disagg"), change.get("new_disagg"), ns_names)
+        if matrix:
+            change["matrix_view"] = matrix
     change_total = count_import_log_changes(log_id)
     stats = dict((summary.get("stats") or {}))
     noop_count = count_import_log_noops(log_id)

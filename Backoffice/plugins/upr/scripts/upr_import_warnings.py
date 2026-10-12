@@ -51,6 +51,7 @@ def make_import_warning(
     iso3: Optional[str] = None,
     place: Optional[str] = None,
     detail: Optional[str] = None,
+    match_target: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build a structured import warning the entry form can turn into a jump-link."""
     out: Dict[str, Any] = {"message": str(message or "").strip()}
@@ -64,6 +65,8 @@ def make_import_warning(
         out["place"] = str(place).strip()
     if detail:
         out["detail"] = str(detail).strip()
+    if match_target:
+        out["match_target"] = str(match_target).strip()
     return out
 
 
@@ -217,6 +220,65 @@ class _WarningClassification:
     bank_id: Optional[str] = None
     place: Optional[str] = None
     detail: Optional[str] = None
+    match_target: Optional[str] = None
+
+
+_MATCHED_HOW_COUNTRY = "the country appeal under that group"
+_MATCHED_HOW_GROUP_LIST = "the group appeal on the GO list"
+_PLACE_COUNTRY_SPLIT = " — "
+
+
+def _place_country(place: str) -> str:
+    """Country label from an assignment place (drops the template and assignment id)."""
+    text = str(place or "").strip()
+    if _PLACE_COUNTRY_SPLIT in text:
+        text = text.split(_PLACE_COUNTRY_SPLIT, 1)[0].strip()
+    return text
+
+
+def _short_match_target(target: str) -> str:
+    """Drop the redundant ``(part of PARENT)`` suffix from a GO operation label."""
+    return re.sub(r" \(part of [A-Z0-9]+\)$", "", str(target or "").strip()).strip()
+
+
+def _clean_go_match_detail(detail: str) -> str:
+    text = str(detail or "").strip()
+    text = re.sub(r"^Possible GO matches for this country:\s*", "Possible GO matches: ", text)
+    return text.rstrip(".")
+
+
+def _parse_matched_warning(message: str) -> Optional[Tuple[str, str, str, str]]:
+    """Return (excel code, place, GO target, how) for a grouped-appeal match warning."""
+    prefix = "Emergency appeal "
+    if not message.startswith(prefix) or " was matched to " not in message:
+        return None
+    how = ""
+    body = message
+    for suffix, label in (
+        (f" ({_MATCHED_HOW_COUNTRY}).", _MATCHED_HOW_COUNTRY),
+        (f" ({_MATCHED_HOW_GROUP_LIST}).", _MATCHED_HOW_GROUP_LIST),
+    ):
+        if body.endswith(suffix):
+            how = label
+            body = body[: -len(suffix)]
+            break
+    if not how:
+        same_group = re.search(r" \(the same group \(([A-Z0-9]+)\)\)\.$", body)
+        if not same_group:
+            return None
+        how = f"the same group ({same_group.group(1)})"
+        body = body[: same_group.start()]
+    left, target = body.split(" was matched to ", 1)
+    left = left[len(prefix):]
+    if " for " in left:
+        code, place = left.split(" for ", 1)
+    else:
+        code, place = left, ""
+    code = code.strip()
+    target = target.strip()
+    if not code or not target:
+        return None
+    return code, place.strip(), target, how
 
 
 def _ea_place_from_raw(raw: Any, iso3: Optional[str] = None) -> Optional[str]:
@@ -233,8 +295,32 @@ def _ea_place_from_raw(raw: Any, iso3: Optional[str] = None) -> Optional[str]:
     return None
 
 
+def _matched_classification(code: str, how: str, target: str, place: Optional[str]) -> _WarningClassification:
+    short = _short_match_target(target)
+    return _WarningClassification(
+        group_key=f"ea_matched|{code}|{how}",
+        display_base=f"Emergency appeal {code} was matched to {how}",
+        place=place,
+        match_target=short or target,
+    )
+
+
 def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _WarningClassification:
     """Map a warning to a group key and display base, stripping country/round when useful."""
+    if isinstance(raw, dict) and raw.get("match_target"):
+        code = str(raw.get("code") or "").strip().upper()
+        how = str(raw.get("detail") or "").strip()
+        if code and how:
+            return _matched_classification(
+                code,
+                how,
+                str(raw.get("match_target") or ""),
+                _ea_place_from_raw(raw),
+            )
+    matched = _parse_matched_warning(message)
+    if matched:
+        code, place, target, how = matched
+        return _matched_classification(code, how, target, place or None)
     if isinstance(raw, dict) and raw.get("code"):
         code = str(raw["code"]).upper()
         return _WarningClassification(
@@ -395,7 +481,11 @@ def _format_warning_group_suffix(
     if count > 1:
         parts.append(f"×{count}")
     if len(countries) > 1:
-        parts.append(f"{len(countries)} countries")
+        ordered_countries = sorted(countries)
+        if len(ordered_countries) <= 8:
+            parts.append(f"{len(ordered_countries)} countries: {', '.join(ordered_countries)}")
+        else:
+            parts.append(f"{len(ordered_countries)} countries")
     if bank_ids and len(bank_ids) > 1:
         parts.append(f"{len(bank_ids)} indicators")
     if rounds:
@@ -409,17 +499,143 @@ def _format_warning_group_suffix(
     return f" ({', '.join(parts)})"
 
 
-def _insert_ea_places(label: str, places: Set[str]) -> str:
-    """Put country and assignment names into an emergency-appeal warning."""
-    where = "; ".join(sorted(place for place in places if place))
-    if not where:
-        return label
-    for needle in ("is not listed in GO —", "not found in GO API —"):
-        if needle in label:
-            return label.replace(needle, needle.replace(" —", f" for {where} —"), 1)
-    if label.startswith("Emergency appeal code "):
-        return f"{label} for {where}"
-    return f"{label} ({where})"
+def _detail_suffix(details: Iterable[str]) -> str:
+    cleaned = [_clean_go_match_detail(detail) for detail in details if _clean_go_match_detail(detail)]
+    if not cleaned:
+        return ""
+    return " — " + "; ".join(cleaned)
+
+
+def _short_place(place: str) -> str:
+    """Drop the assignment id; keep the country and form name."""
+    return re.sub(r" \(assignment \d+\)$", "", str(place or "").strip()).strip()
+
+
+def _unlisted_country_lines(places: Set[str], place_details: Dict[str, Set[str]]) -> List[str]:
+    """Country lines for an appeal. A few forms stay named; long lists collapse to countries."""
+    ordered = sorted(place for place in places if place)
+    if len(ordered) == 1:
+        place = ordered[0]
+        return [place + _detail_suffix(sorted(place_details.get(place) or ()))]
+    if len(ordered) <= 3:
+        return [
+            _short_place(place) + _detail_suffix(sorted(place_details.get(place) or ()))
+            for place in ordered
+        ]
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for place in places:
+        country = _place_country(place)
+        bucket = buckets.setdefault(country, {"count": 0, "details": []})
+        bucket["count"] += 1
+        for detail in sorted(place_details.get(place) or ()):
+            cleaned = _clean_go_match_detail(detail)
+            if cleaned and cleaned not in bucket["details"]:
+                bucket["details"].append(cleaned)
+    lines: List[str] = []
+    for country in sorted(buckets):
+        bucket = buckets[country]
+        line = country
+        if bucket["count"] > 1:
+            line += f" ×{bucket['count']}"
+        if bucket["details"]:
+            line += " — " + "; ".join(bucket["details"])
+        lines.append(line)
+    return lines
+
+
+_EA_TITLE_SUFFIXES = (
+    " — imported using the Excel name and code; please review it on the form",
+    " — imported using Excel labels; review in form",
+)
+
+
+def _short_ea_title(label: str) -> str:
+    """Drop the repeated review instruction; the preview section heading carries it."""
+    for suffix in _EA_TITLE_SUFFIXES:
+        if label.endswith(suffix):
+            return label[: -len(suffix)]
+    return label
+
+
+def _warning_section(key: str, label: str) -> str:
+    if key.startswith("ea_matched|"):
+        return "matched"
+    review_prefixes = (
+        "ea_code_not_found|",
+        "missing_reporting_item|",
+        "unknown_sp_breakdown|",
+        "missing_indicator_bank|",
+        "percentage_out_of_range|",
+        "no_t22_assignment|",
+    )
+    if key.startswith(review_prefixes) or key in {"no_host_ns", "no_country_id", "funding_missing_year"}:
+        return "review"
+    lowered = label.lower()
+    if "not found" in lowered or "please review" in lowered or "outside the valid" in lowered:
+        return "review"
+    return "other"
+
+
+def _matched_pair_line(country: str, target: str, count: int) -> str:
+    line = f"{country} → {target}" if country else target
+    if count > 1:
+        line += f" ×{count}"
+    return line
+
+
+def _compose_warning_group(key: str, group: Any) -> Dict[str, Any]:
+    """Turn one warning group into a short headline plus optional country lines."""
+    label = group.label
+    section = _warning_section(key, label)
+    lines: List[str] = []
+    meta = ""
+
+    if key.startswith("ea_matched|"):
+        _prefix, code, how = key.split("|", 2)
+        pairs = sorted(group.match_counts)
+        if len(pairs) <= 1:
+            country, target = pairs[0] if pairs else ("", "")
+            where = f" for {country}" if country else ""
+            target_bit = f" {target}" if target else ""
+            text = f"Emergency appeal {code}{where} was matched to{target_bit} ({how})."
+        else:
+            text = f"Emergency appeal {code} was matched to {how}"
+            lines = [_matched_pair_line(country, target, group.match_counts[(country, target)]) for country, target in pairs]
+        meta = f"×{group.count}" if group.count > 1 else ""
+    elif key.startswith("ea_code_not_found|") and group.places:
+        text = _short_ea_title(label)
+        lines = _unlisted_country_lines(group.places, group.place_details)
+        attached = {detail for details in group.place_details.values() for detail in details}
+        loose = [
+            _clean_go_match_detail(detail)
+            for detail in sorted(group.details - attached)
+            if _clean_go_match_detail(detail)
+        ]
+        if loose:
+            text = f"{text} {' '.join(loose)}"
+        meta = f"×{group.count}" if group.count > 1 else ""
+    else:
+        if group.details:
+            label = f"{label} {' '.join(sorted(group.details))}"
+        text = label + _format_warning_group_suffix(
+            group.count,
+            group.countries,
+            group.rounds,
+            bank_ids=group.bank_ids or None,
+        )
+
+    log = text
+    if meta:
+        log += f" ({meta})"
+    if lines:
+        log += ": " + "; ".join(lines)
+    item: Dict[str, Any] = {"text": text}
+    if meta:
+        item["meta"] = meta
+    if lines:
+        item["lines"] = lines
+    return {"section": section, "log": log, "item": item}
 
 
 def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
@@ -433,6 +649,8 @@ def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
         bank_ids: Set[str] = field(default_factory=set)
         places: Set[str] = field(default_factory=set)
         details: Set[str] = field(default_factory=set)
+        place_details: Dict[str, Set[str]] = field(default_factory=dict)
+        match_counts: Dict[Tuple[str, str], int] = field(default_factory=dict)
 
     groups: Dict[str, _Group] = {}
     order: List[str] = []
@@ -451,29 +669,37 @@ def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
             group.rounds.add(parts.rnd)
         if parts.bank_id:
             group.bank_ids.add(parts.bank_id)
-        if parts.place:
+        if parts.match_target:
+            country = _place_country(parts.place) if parts.place else ""
+            pair = (country, parts.match_target)
+            group.match_counts[pair] = group.match_counts.get(pair, 0) + 1
+        elif parts.place:
             group.places.add(parts.place)
-        if parts.detail:
+            if parts.detail:
+                group.place_details.setdefault(parts.place, set()).add(parts.detail)
+        if parts.detail and not parts.match_target:
             group.details.add(parts.detail)
 
-    summarized = []
+    summarized: List[str] = []
+    section_items: Dict[str, List[Dict[str, Any]]] = {"review": [], "matched": [], "other": []}
     for key in order:
-        group = groups[key]
-        label = group.label
-        if key.startswith("ea_code_not_found|") and group.places:
-            label = _insert_ea_places(label, group.places)
-        if group.details:
-            label = f"{label} {' '.join(sorted(group.details))}"
-        summarized.append(
-            label + _format_warning_group_suffix(
-                group.count,
-                group.countries,
-                group.rounds,
-                bank_ids=group.bank_ids or None,
-            )
-        )
+        rendered = _compose_warning_group(key, groups[key])
+        summarized.append(rendered["log"])
+        section_items[rendered["section"]].append(rendered["item"])
+    warning_groups = []
+    for section in ("review", "matched", "other"):
+        items = section_items[section]
+        if not items:
+            continue
+        group: Dict[str, Any] = {"id": section, "items": items}
+        if section == "review" and any(
+            "not listed in GO" in item["text"] or "not found in GO" in item["text"] for item in items
+        ):
+            group["note"] = "unlisted_imported"
+        warning_groups.append(group)
     return {
         "warnings": summarized,
+        "warning_groups": warning_groups,
         "warning_count": len(warnings),
         "warning_unique_count": len(order),
     }

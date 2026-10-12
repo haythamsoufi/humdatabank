@@ -215,7 +215,8 @@ T24_LONGER_TERM_LABELS: Tuple[str, ...] = ("longer term programme",)
 T24_EMERGENCY_LABELS: Tuple[str, ...] = ("emergency appeal",)
 T24_BILATERAL_LABELS: Tuple[str, ...] = ("supporting bilaterally", "list national societies")
 T22_FUNDING_LABELS: Tuple[str, ...] = ("funding requirements",)
-T22_ROW_TOTAL_COLUMN = "Total"  # matrix row-total cell suffix (row_total_manual_enabled)
+T22_ROW_TOTAL_COLUMN = "Total"  # Excel Area for the aggregate row
+T22_TOTAL_COLUMN_CODE = "fr_tot"  # item 1303 calculated total column (``fr_tot_<year>``)
 # Plain number column on the T22 funding matrix (not a variable SP/EF column).
 T22_CONFIRMED_FUNDING_COLUMN = "confirmedfn"
 # Item 1303 variable columns (Excel Area names) — overridden when PNS reports totals only.
@@ -2216,7 +2217,14 @@ def _note_grouped_appeal_match(
     else:
         how = "the group appeal on the GO list"
     ctx.warnings.append(
-        f"Emergency appeal {excel_code}{where} was matched to {_emergency_op_row_id(op)} ({how})."
+        make_import_warning(
+            f"Emergency appeal {excel_code}{where} was matched to {_emergency_op_row_id(op)} ({how}).",
+            code=excel_code,
+            iso3=(iso3 or "").upper() or None,
+            place=place or None,
+            detail=how,
+            match_target=_emergency_op_row_id(op),
+        )
     )
 
 
@@ -2807,7 +2815,11 @@ def _resolve_t22_funding_item_id(ctx: "UprImportContext") -> Optional[int]:
     if len(exact) == 1:
         return int(exact[0].id)
     for item in items:
-        names = {name.strip().lower() for name in _form_item_matrix_column_names(item)}
+        # Columns may carry a year placeholder (``SP1_[assignment_year]``, ``EFs_[[assignment_year]+1]``).
+        names = {
+            re.sub(r"_\[+assignment_year\]\+?\d*\]*$", "", name.strip().lower())
+            for name in _form_item_matrix_column_names(item)
+        }
         if {"sp1", "efs"} <= names and "intl_delegates_hns" not in names:
             return int(item.id)
     return None
@@ -4034,14 +4046,36 @@ def _t22_pns_import_cell_value(
     return None
 
 
+def _t22_cell_key(
+    host_cid: int,
+    code: str,
+    assignment_period: Optional[str],
+    offset: int,
+) -> Optional[str]:
+    """T22 item 1303 cell key ``{host_country_id}_{column}_{year}``.
+
+    The matrix columns are ``SP1_[assignment_year]`` / ``SP1_[[assignment_year]+1]`` / ``+2``
+    and are saved resolved for the assignment, so a 2026 assignment uses ``SP1_2026``,
+    ``SP1_2027`` and ``SP1_2028``. ``code`` is an SP/EF area, ``Total`` (the calculated
+    ``fr_tot`` column) or ``confirmedfn``. Returns ``None`` when the period has no year.
+    """
+    try:
+        year = int(str(assignment_period).strip()) + int(offset)
+    except (TypeError, ValueError):
+        return None
+    column = T22_TOTAL_COLUMN_CODE if code == T22_ROW_TOTAL_COLUMN else code
+    return f"{host_cid}_{column}_{year}"
+
+
 def _t22_total_only_breakdown_cell(
-    pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]],
+    pns_t22_staging: Dict[Tuple[int, int, int, str], Tuple[Optional[float], Optional[float]]],
     pns_aes: int,
     host_cid: int,
+    offset: int,
     area: str,
 ) -> Optional[Any]:
     """PNS reported a row total only — blank breakdown where country reported a value."""
-    cv, pv = pns_t22_staging.get((pns_aes, host_cid, area), (None, None))
+    cv, pv = pns_t22_staging.get((pns_aes, host_cid, offset, area), (None, None))
     if cv is None and pv is None:
         return None
     return _t22_pns_import_cell_value(cv, pv)
@@ -4078,12 +4112,13 @@ def transform_to_import_rows(
 
     # ── Planning T22 PNS funding staging ──────────────────────────────────────
     # Collected across all rows then converted to scalar matrix cells.
-    # Keyed by (pns_aes_id, host_country_id, area) → (country_val, pns_val).
-    pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]] = {}
-    # Area=Total rows (PNS reported aggregate only) → row-total column on item 1303.
-    pns_t22_total_staging: Dict[Tuple[int, int], Tuple[Optional[float], Optional[float]]] = {}
-    # Confirmed Funding (Area=Total, current year) → plain ``confirmedfn`` number column.
-    pns_t22_confirmed_staging: Dict[Tuple[int, int], float] = {}
+    # Keyed by (pns_aes_id, host_country_id, year_offset, area) → (country_val, pns_val).
+    # Item 1303 has an assignment-year, +1 and +2 column group, so every year offset is staged.
+    pns_t22_staging: Dict[Tuple[int, int, int, str], Tuple[Optional[float], Optional[float]]] = {}
+    # Area=Total rows (PNS reported aggregate only) → ``fr_tot_<year>`` column on item 1303.
+    pns_t22_total_staging: Dict[Tuple[int, int, int], Tuple[Optional[float], Optional[float]]] = {}
+    # Confirmed Funding (Area=Total) → plain ``confirmedfn_<year>`` number column.
+    pns_t22_confirmed_staging: Dict[Tuple[int, int, int], float] = {}
 
     # ── Reporting country funding staging ─────────────────────────────────────
     # Entity=IFRC/PNS/Other rows (Attribute=Funding Source only, Indicator=Funding) accumulated
@@ -4194,12 +4229,11 @@ def transform_to_import_rows(
             country_val = parse_value_num(row.get("Country Value"))
             pns_val = parse_value_num(row.get("PNS Value"))
 
-            # Confirmed Funding is a single plain number on the current-year T22 matrix.
-            # Later years have no column; SP/EF breakdowns are not part of this indicator.
+            # Confirmed Funding is a single plain number per year on the T22 matrix
+            # (``confirmedfn_<year>``); SP/EF breakdowns are not part of this indicator.
             if is_confirmed:
                 if (
                     area == "Total"
-                    and offset == 0
                     and 22 in tids
                     and ent_upper == "PNS"
                     and parse_pns_reported_yes(row)
@@ -4219,14 +4253,13 @@ def transform_to_import_rows(
                             if not host_cid:
                                 ctx.warnings.append(f"Cannot resolve Country.id for ISO3: {iso3!r}")
                             else:
-                                pns_t22_confirmed_staging[(pns_aes, host_cid)] = pns_val
+                                pns_t22_confirmed_staging[(pns_aes, host_cid, offset)] = pns_val
                 continue
 
-            # Aggregate Excel areas (Total) → T22 row-total column when PNS has no SP/EF breakdown.
+            # Aggregate Excel areas (Total) → T22 ``fr_tot_<year>`` when PNS has no SP/EF breakdown.
             if (not area or area in AGGREGATE_AREA):
                 if (
                     area == "Total"
-                    and offset == 0
                     and 22 in tids
                     and ent_upper == "PNS"
                     and parse_pns_reported_yes(row)
@@ -4249,8 +4282,9 @@ def transform_to_import_rows(
                                 if pns_val:
                                     ctx.warnings.append(f"Cannot resolve Country.id for ISO3: {iso3!r}")
                             else:
-                                prev_cv, prev_pv = pns_t22_total_staging.get((pns_aes, host_cid), (None, None))
-                                pns_t22_total_staging[(pns_aes, host_cid)] = (
+                                total_key = (pns_aes, host_cid, offset)
+                                prev_cv, prev_pv = pns_t22_total_staging.get(total_key, (None, None))
+                                pns_t22_total_staging[total_key] = (
                                     country_val if country_val is not None else prev_cv,
                                     pns_val if pns_val is not None else prev_pv,
                                 )
@@ -4336,8 +4370,8 @@ def transform_to_import_rows(
             if area in PLANNING_EA_FUNDING_AREAS:
                 continue
 
-            # T22 item 1303 is the current planning year only (offset 0).
-            if 22 in tids and offset == 0 and parse_pns_reported_yes(row) and (country_val or pns_val):
+            # T22 item 1303 carries the assignment year, +1 and +2 (offsets 0/1/2).
+            if 22 in tids and parse_pns_reported_yes(row) and (country_val or pns_val):
                 pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
                 if not pns_iso3:
                     if pns_val:
@@ -4355,7 +4389,7 @@ def transform_to_import_rows(
                             if pns_val:
                                 ctx.warnings.append(f"Cannot resolve Country.id for ISO3: {iso3!r}")
                         else:
-                            key = (pns_aes, host_cid, area)
+                            key = (pns_aes, host_cid, offset, area)
                             prev_cv, prev_pv = pns_t22_staging.get(key, (None, None))
                             pns_t22_staging[key] = (
                                 country_val if country_val is not None else prev_cv,
@@ -4763,29 +4797,41 @@ def transform_to_import_rows(
 
     # ── Post-loop: T22 PNS funding → submitted cells (PNS Value only when reported) ──
     if ctx.t22_funding_item_id:
-        for (pns_aes, host_cid, area), (cv, pv) in pns_t22_staging.items():
+        # Item 1303 columns are saved resolved per assignment (``SP1_[assignment_year]`` ->
+        # ``SP1_2026``; the +1 / +2 groups -> ``SP1_2027`` / ``SP1_2028``).
+        t22_period_by_aes = {
+            int(aes): period for (period, _iso3), aes in ctx.assignment_by_template.get(22, {}).items()
+        }
+
+        def t22_cell_key(pns_aes: int, host_cid: int, code: str, offset: int) -> Optional[str]:
+            return _t22_cell_key(host_cid, code, t22_period_by_aes.get(int(pns_aes)), offset)
+
+        for (pns_aes, host_cid, offset, area), (cv, pv) in pns_t22_staging.items():
             host_iso3 = iso3_by_host_cid.get(host_cid)
             if not host_iso3 or (pns_aes, host_iso3) not in pns_t22_reported_yes:
                 continue
             cell = _t22_pns_import_cell_value(cv, pv)
-            if cell is not None:
-                matrix_cells[(pns_aes, ctx.t22_funding_item_id)][f"{host_cid}_{area}"] = cell
+            cell_key = t22_cell_key(pns_aes, host_cid, area, offset)
+            if cell is not None and cell_key:
+                matrix_cells[(pns_aes, ctx.t22_funding_item_id)][cell_key] = cell
 
-        # ── Post-loop: T22 PNS Total (Excel Area=Total) → row-total column ──
-        for (pns_aes, host_cid), (cv, pv) in pns_t22_total_staging.items():
+        # ── Post-loop: T22 PNS Total (Excel Area=Total) → ``fr_tot_<year>`` ──
+        for (pns_aes, host_cid, offset), (cv, pv) in pns_t22_total_staging.items():
             host_iso3 = iso3_by_host_cid.get(host_cid)
             pns_reported = bool(host_iso3 and (pns_aes, host_iso3) in pns_t22_reported_yes)
             if not pns_reported:
                 continue
             cell = _t22_pns_import_cell_value(cv, pv)
-            if cell is not None:
+            total_key = t22_cell_key(pns_aes, host_cid, T22_ROW_TOTAL_COLUMN, offset)
+            if cell is not None and total_key:
                 item_cells = matrix_cells[(pns_aes, ctx.t22_funding_item_id)]
-                item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = cell
+                item_cells[total_key] = cell
             # PNS reported row totals only (no SP/EF breakdown) — blank breakdown cells
             # where country reported amounts but PNS did not provide SP/EF values.
             has_pns_breakdown = any(
                 k[0] == pns_aes
                 and k[1] == host_cid
+                and k[2] == offset
                 and pns_t22_staging[k][1] is not None
                 for k in pns_t22_staging
             )
@@ -4793,18 +4839,19 @@ def transform_to_import_rows(
                 item_cells = matrix_cells[(pns_aes, ctx.t22_funding_item_id)]
                 for area in T22_BREAKDOWN_AREAS:
                     breakdown_cell = _t22_total_only_breakdown_cell(
-                        pns_t22_staging, pns_aes, host_cid, area
+                        pns_t22_staging, pns_aes, host_cid, offset, area
                     )
-                    if breakdown_cell is not None:
-                        item_cells[f"{host_cid}_{area}"] = breakdown_cell
+                    area_key = t22_cell_key(pns_aes, host_cid, area, offset)
+                    if breakdown_cell is not None and area_key:
+                        item_cells[area_key] = breakdown_cell
 
-        for (pns_aes, host_cid), amount in pns_t22_confirmed_staging.items():
+        for (pns_aes, host_cid, offset), amount in pns_t22_confirmed_staging.items():
             host_iso3 = iso3_by_host_cid.get(host_cid)
             if not host_iso3 or (pns_aes, host_iso3) not in pns_t22_reported_yes:
                 continue
-            matrix_cells[(pns_aes, ctx.t22_funding_item_id)][
-                f"{host_cid}_{T22_CONFIRMED_FUNDING_COLUMN}"
-            ] = amount
+            confirmed_key = t22_cell_key(pns_aes, host_cid, T22_CONFIRMED_FUNDING_COLUMN, offset)
+            if confirmed_key:
+                matrix_cells[(pns_aes, ctx.t22_funding_item_id)][confirmed_key] = amount
 
     # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
     reporting_funding_col = reporting_funding_matrix_column(ctx)

@@ -98,7 +98,7 @@ class TestTransformT22PnsReportedGate:
         item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
-        assert cells["34_Total"] == 242030
+        assert cells["34_fr_tot_2026"] == 242030
 
     def test_skips_t22_when_pns_not_reported(self):
         ctx = UprImportContext(template_ids=[24, 22])
@@ -179,9 +179,9 @@ class TestConfirmedFundingColumn:
         item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
-        assert cells["27_Total"] == 1350000
-        assert cells[f"27_{T22_CONFIRMED_FUNDING_COLUMN}"] == 850000
-        assert 400000 not in cells.values()
+        assert cells["27_fr_tot_2026"] == 1350000
+        assert cells[f"27_{T22_CONFIRMED_FUNDING_COLUMN}_2026"] == 850000
+        assert cells[f"27_{T22_CONFIRMED_FUNDING_COLUMN}_2027"] == 400000
 
     def test_confirmed_funding_alone_marks_pns_reported(self):
         ctx = UprImportContext(template_ids=[24, 22])
@@ -211,8 +211,52 @@ class TestConfirmedFundingColumn:
         item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
-        assert cells == {f"29_{T22_CONFIRMED_FUNDING_COLUMN}": 164817}
+        assert cells == {f"29_{T22_CONFIRMED_FUNDING_COLUMN}_2026": 164817}
         assert not any(r["item_id"] != str(ITEM_FUNDING_REQUIREMENTS_T22) for r in import_rows)
+
+
+class TestT22MultiYearColumns:
+    """Item 1303 has assignment-year, +1 and +2 column groups saved as ``SP1_2026`` etc."""
+
+    def _ctx(self):
+        ctx = UprImportContext(template_ids=[24, 22])
+        ctx.ns_home_country_iso3 = {"british red cross": "GBR"}
+        ctx.country_id_by_iso3 = {"BFA": 34}
+        ctx.assignment_by_template = {22: {("2026", "GBR"): 3221}, 24: {("2026", "BFA"): 9999}}
+        return ctx
+
+    def _t22_cells(self, rows):
+        import_rows = transform_to_import_rows(rows, self._ctx(), template_ids=[24, 22], rounds={"P26"})
+        item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
+        assert len(item_rows) == 1
+        return json.loads(item_rows[0]["disagg_data"])
+
+    def test_sp_rows_write_each_year_column(self):
+        rows = [
+            _funding_row(Area="SP2", Year=2026, **{"PNS Value": 100}),
+            _funding_row(Area="SP2", Year=2027, **{"PNS Value": 200}),
+            _funding_row(Area="EFs", Year=2028, **{"PNS Value": 300}),
+        ]
+        cells = self._t22_cells(rows)
+        assert cells == {"34_SP2_2026": 100, "34_SP2_2027": 200, "34_EFs_2028": 300}
+
+    def test_total_only_later_year_writes_that_years_total(self):
+        cells = self._t22_cells([_funding_row(Area="Total", Year=2027, **{"PNS Value": 500})])
+        assert cells == {"34_fr_tot_2027": 500}
+
+    def test_breakdown_fallback_is_per_year(self):
+        rows = [
+            # 2026: PNS gave a real SP2 breakdown; 2027: total only, country had SP2 amount
+            _funding_row(Area="SP2", Year=2026, **{"PNS Value": 100}),
+            _funding_row(Area="Total", Year=2026, **{"PNS Value": 100}),
+            _funding_row(Area="SP2", Year=2027, **{"Country Value": 70, "PNS Value": None}),
+            _funding_row(Area="Total", Year=2027, **{"Country Value": 70, "PNS Value": 90}),
+        ]
+        cells = self._t22_cells(rows)
+        assert cells["34_SP2_2026"] == 100
+        assert cells["34_fr_tot_2027"] == 90
+        # 2027 had no PNS breakdown -> the country's SP2 value is cleared for that year only
+        assert cells["34_SP2_2027"] == {"original": 70, "modified": "", "isModified": True}
 
 
 class TestT22PnsValueOnlyWhenReported:
@@ -238,7 +282,7 @@ class TestT22PnsValueOnlyWhenReported:
         item_rows = [r for r in import_rows if r["item_id"] == str(ITEM_FUNDING_REQUIREMENTS_T22)]
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
-        assert cells["99_Total"] == {
+        assert cells["99_fr_tot_2026"] == {
             "original": 50000.0,
             "modified": "",
             "isModified": True,

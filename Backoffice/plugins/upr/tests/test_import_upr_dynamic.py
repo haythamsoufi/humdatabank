@@ -72,15 +72,16 @@ class TestT22PnsImportCellValue:
 
 class TestT22TotalOnlyBreakdownCell:
     def test_returns_cleared_cell_when_country_value_present(self):
-        staging = {(1, 2, "SP1"): (500.0, None)}
-        assert _t22_total_only_breakdown_cell(staging, 1, 2, "SP1") == {
+        staging = {(1, 2, 0, "SP1"): (500.0, None), (1, 2, 1, "SP1"): (900.0, None)}
+        assert _t22_total_only_breakdown_cell(staging, 1, 2, 0, "SP1") == {
             "original": 500.0,
             "modified": "",
             "isModified": True,
         }
     def test_returns_none_when_no_country_value(self):
-        staging = {(1, 2, "SP1"): (None, None)}
-        assert _t22_total_only_breakdown_cell(staging, 1, 2, "SP1") is None
+        staging = {(1, 2, 0, "SP1"): (None, None)}
+        assert _t22_total_only_breakdown_cell(staging, 1, 2, 0, "SP1") is None
+        assert _t22_total_only_breakdown_cell(staging, 1, 2, 1, "SP1") is None  # other year: nothing staged
 
 
 class TestResolveItemByBankAndArea:

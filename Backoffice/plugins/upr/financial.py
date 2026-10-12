@@ -45,9 +45,11 @@ from plugins.upr.matrix import (
 )
 from plugins.upr.pns_funding import (
     PnsPlanOverride,
+    PnsPlanOverrides,
     _find_country_aes_for_year,
     _load_t23_pns_totals,
     load_t22_pns_overrides,
+    overrides_for_year,
     strip_pns_rows,
 )
 from app.utils.api_serialization import _resolve_matrix_cell
@@ -76,7 +78,7 @@ _IFRC_ACTUALS_MIN_CHF = 1000.0
 
 def _safe_t22_overrides(
     country_id: int | None, period_name: str, year: int | None
-) -> dict[int, PnsPlanOverride]:
+) -> PnsPlanOverrides:
     if not country_id or not year:
         return {}
     try:
@@ -100,8 +102,8 @@ def _plan_financial(
     """Plan financial overview.
 
     A PNS that has self-reported (submitted T22) replaces whatever the host country entered for
-    it on the T24 matrix, including with zero. T22 only covers the first planning year, so later
-    years keep the host-entered figures.
+    it on the T24 matrix, including with zero. T22 carries three year column groups
+    (assignment year, +1, +2) that map to the three T24 funding matrices, so this applies per year.
     """
     years = planning_years(period_name)
     overrides = _safe_t22_overrides(country_id, period_name, years[0] if years else None)
@@ -112,7 +114,7 @@ def _plan_financial(
         fallback_key = f"funding_y{offset}"
         item = _resolve_funding_year_item(items, offset, PLAN_ITEM_FALLBACKS[fallback_key])
         cells = _matrix_cells(by_item.get(item.id) if item else None)
-        year_overrides = overrides if offset == 0 else {}
+        year_overrides = overrides_for_year(overrides, year) if overrides else {}
         if year_overrides:
             cells = strip_pns_rows(cells, frozenset(year_overrides))
         grouped = _sum_funding_rows(cells)
@@ -539,7 +541,7 @@ def _load_plan_funding_buckets(country_id: int, year: int) -> tuple[dict[str, di
     by_item = {row.form_item_id: row for row in _load_entries(aes.id)}
     item = _resolve_funding_year_item(items, 0, PLAN_ITEM_FALLBACKS["funding_y0"])
     cells = _matrix_cells(by_item.get(item.id) if item else None)
-    overrides = _safe_t22_overrides(country_id, assigned.period_name or "", year)
+    overrides = overrides_for_year(_safe_t22_overrides(country_id, assigned.period_name or "", year), year)
     if overrides:
         cells = strip_pns_rows(cells, frozenset(overrides))
     buckets = _sum_funding_by_bucket(cells)

@@ -505,40 +505,83 @@ document.addEventListener('DOMContentLoaded', function () {
     return p;
   }
 
+  var warningSectionTitle = {
+    review: {{ _("Review on the form")|tojson|safe }},
+    matched: {{ _("Matched to a GO appeal")|tojson|safe }},
+    other: {{ _("Other")|tojson|safe }}
+  };
+  var warningSectionNote = {
+    unlisted_imported: {{ _("Emergency appeals that are not in GO were imported with the Excel name and code.")|tojson|safe }}
+  };
+
+  function renderWarningItem(item, className) {
+    if (typeof item === 'string') {
+      return el('li', className, item);
+    }
+    var li = el('li', className);
+    appendText(li, item.text || '');
+    if (item.meta) {
+      var meta = el('span', 'font-medium');
+      appendText(meta, ' (' + item.meta + ')');
+      li.appendChild(meta);
+    }
+    if (item.lines && item.lines.length) {
+      var sub = el('div', 'mt-1 ml-1 text-xs');
+      item.lines.forEach(function (line) {
+        sub.appendChild(el('div', '', line));
+      });
+      li.appendChild(sub);
+    }
+    if (item.detail) {
+      li.appendChild(el('div', 'mt-1 text-xs', item.detail));
+    }
+    return li;
+  }
+
+  function renderWarningGroups(wrap, data) {
+    var groups = data.warning_groups || [];
+    if (!groups.length) {
+      var list = el('ul', 'list-disc ml-5 space-y-1 text-amber-900 text-sm');
+      (data.warnings || []).forEach(function (w) {
+        list.appendChild(el('li', '', w));
+      });
+      wrap.appendChild(list);
+      return;
+    }
+    groups.forEach(function (group, index) {
+      var block = el('div', index ? 'mt-3' : '');
+      var title = warningSectionTitle[group.id] || group.id;
+      var count = (group.items || []).length;
+      var headingClass = group.id === 'matched' ? 'font-medium text-gray-700 mb-1' : 'font-medium text-amber-900 mb-1';
+      block.appendChild(el('p', headingClass, title + ' (' + count + ')'));
+      if (group.note) {
+        block.appendChild(el('p', 'text-xs text-amber-800 mb-1', warningSectionNote[group.note] || group.note));
+      }
+      var listClass = group.id === 'matched'
+        ? 'list-disc ml-5 space-y-1 text-sm text-gray-700'
+        : 'list-disc ml-5 space-y-1 text-sm text-amber-900';
+      var list = el('ul', listClass);
+      (group.items || []).forEach(function (item) {
+        list.appendChild(renderWarningItem(item, ''));
+      });
+      block.appendChild(list);
+      wrap.appendChild(block);
+    });
+  }
+
   function renderPreviewSummary(container, data) {
     var nodes = [
       labeledParagraph({{ _("Transformed form_data rows")|tojson|safe }}, data.transformed_rows),
       labeledParagraph({{ _("Countries with data")|tojson|safe }}, data.countries)
     ];
-    if (data.targets && data.targets.length) {
-      var tl = el('ul', 'list-disc ml-5 mt-1 space-y-0.5 text-sm');
-      data.targets.forEach(function (t) {
-        var text = t.key + ' (' + t.template_name + ', ' + t.round + ' → ' + t.period + ') → '
-          + {{ _("assigned form")|tojson|safe }} + ' #' + t.assigned_form_id;
-        if (t.pns_clear && t.pns_clear.aes_to_clear) {
-          text += ' — ' + {{ _("clears")|tojson|safe }} + ' ' + t.pns_clear.aes_to_clear + ' '
-            + {{ _("non-reported PNS assignment(s)")|tojson|safe }} + ' (' + t.pns_clear.aes_with_data + ' '
-            + {{ _("with data")|tojson|safe }} + ')';
-        }
-        tl.appendChild(el('li', '', text));
-      });
-      var tw = el('div', '');
-      tw.appendChild(el('strong', '', {{ _("Targets written")|tojson|safe }} + ':'));
-      tw.appendChild(tl);
-      nodes.splice(1, 0, tw);
-    }
     if (data.warning_count) {
       var warnLabel = String(data.warning_count);
       if (data.warning_unique_count && data.warning_unique_count !== data.warning_count) {
         warnLabel += ' (' + data.warning_unique_count + ' ' + {{ _("unique")|tojson|safe }} + ')';
       }
       nodes.push(labeledParagraph({{ _("Warnings")|tojson|safe }}, warnLabel, 'text-amber-700'));
-      var wrap = el('div', 'max-h-72 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3');
-      var list = el('ul', 'list-disc ml-5 space-y-1 text-amber-900 text-sm');
-      (data.warnings || []).forEach(function (w) {
-        list.appendChild(el('li', '', w));
-      });
-      wrap.appendChild(list);
+      var wrap = el('div', 'max-h-96 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3');
+      renderWarningGroups(wrap, data);
       nodes.push(wrap);
     }
     container.replaceChildren.apply(container, nodes);

@@ -19,6 +19,7 @@ from app.services.imports.import_change_log import (
     set_import_audit_details,
 )
 from plugins.upr.catalog import UPR_TEMPLATE_CHOICES
+from plugins.upr.excel._scripts_path import ensure_scripts_in_path as _ensure_scripts_in_path
 from plugins.upr.excel.excel_import_service import UprExcelImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_helpers import get_json_safe
@@ -69,41 +70,74 @@ def _upr_template_labels(template_ids: List[int]) -> List[str]:
     return [names.get(int(tid), str(tid)) for tid in template_ids]
 
 
+def _resolve_targets(data: Dict[str, Any]):
+    """Parse the request into validated ``(template, round)`` targets.
+
+    Returns ``(targets, error)``. ``targets`` wins; the legacy ``template_ids`` +
+    ``rounds`` payload is accepted only with an explicit, non-empty ``rounds`` list.
+    """
+    _ensure_scripts_in_path()
+    from upr_import_targets import (
+        ImportTargetError,
+        normalize_targets,
+        targets_from_templates_and_rounds,
+    )
+
+    try:
+        raw = data.get("targets")
+        if raw:
+            return normalize_targets(raw), None
+        return (
+            targets_from_templates_and_rounds(
+                data.get("template_ids") or [], data.get("rounds") or []
+            ),
+            None,
+        )
+    except ImportTargetError as exc:
+        return None, exc
+
+
+def _target_summary(targets) -> Dict[str, Any]:
+    """Audit/change-log friendly view of the selected targets."""
+    return {
+        "targets": [t.key for t in targets],
+        "template_ids": sorted({t.template_id for t in targets}),
+        "rounds": sorted({t.round_code for t in targets}),
+    }
+
+
 def _run_upr_import_with_change_log(
     *,
     log_id: str,
     file_path: str,
-    template_ids: List[int],
-    rounds: List[str],
+    targets,
     dry_run: bool,
     batch_size: int,
-    ensure_staff_matrix: bool,
     progress_cb=None,
     cancel_check=None,
     user_id: Optional[int] = None,
     filename: Optional[str] = None,
 ) -> Dict[str, Any]:
+    summary = _target_summary(targets)
     writer = ImportChangeLogWriter(
         log_id,
         kind="upr_excel",
         meta={
             "filename": filename or os.path.basename(file_path),
-            "template_ids": list(template_ids),
-            "rounds": list(rounds or []),
+            **summary,
             "dry_run": bool(dry_run),
         },
     )
     try:
         stats = UprExcelImportService.run_import(
             file_path=file_path,
-            template_ids=template_ids,
-            rounds=rounds,
+            targets=targets,
             dry_run=dry_run,
             batch_size=batch_size,
-            ensure_staff_matrix=ensure_staff_matrix,
             progress_cb=progress_cb,
             cancel_check=cancel_check,
             change_recorder=writer.record,
+            user_id=user_id,
         )
     except Exception:
         writer.finalize({"errors": 1, "success": False})
@@ -161,16 +195,30 @@ def analyze():
     return json_ok(**result)
 
 
+@bp.route("/plan", methods=["POST"])
+@admin_permission_required("admin.templates.edit")
+@system_manager_required
+def plan():
+    """Verify every legal (template, round) target against the workbook and live data."""
+    result = UprExcelImportService.plan()
+    if not result.get("success"):
+        return json_bad_request(result.get("message") or "Plan failed")
+    return json_ok(**result)
+
+
 @bp.route("/preview", methods=["POST"])
 @admin_permission_required("admin.templates.edit")
 @system_manager_required
 def preview():
     data = get_json_safe()
-    template_ids = [int(x) for x in (data.get("template_ids") or [24, 22])]
-    rounds = data.get("rounds") or []
-    result = UprExcelImportService.preview(template_ids=template_ids, rounds=rounds)
+    targets, error = _resolve_targets(data)
+    if error is not None:
+        return json_bad_request(str(error), errors=error.errors)
+    result = UprExcelImportService.preview(targets=targets)
     if not result.get("success"):
-        return json_bad_request(result.get("message") or "Preview failed")
+        return json_bad_request(
+            result.get("message") or "Preview failed", errors=result.get("errors") or []
+        )
     return json_ok(**result)
 
 
@@ -179,11 +227,14 @@ def preview():
 @system_manager_required
 def run_import():
     data = get_json_safe()
-    template_ids = [int(x) for x in (data.get("template_ids") or [24, 22])]
-    rounds = data.get("rounds") or []
+    targets, error = _resolve_targets(data)
+    if error is not None:
+        return json_bad_request(str(error), errors=error.errors)
+    summary = _target_summary(targets)
+    rounds = summary["rounds"]
+    template_ids = summary["template_ids"]
     dry_run = bool(data.get("dry_run", False))
     batch_size = int(data.get("batch_size") or 1000)
-    ensure_staff_matrix = bool(data.get("ensure_staff_matrix", True))  # kept for backward compat
     async_mode = bool(data.get("async", True))
 
     if batch_size < 100:
@@ -205,15 +256,14 @@ def run_import():
                 rounds=rounds,
                 templates=_upr_template_labels(template_ids),
                 dry_run=dry_run,
+                extra={"targets": summary["targets"]},
             )
             stats = _run_upr_import_with_change_log(
                 log_id=log_id,
                 file_path=file_path,
-                template_ids=template_ids,
-                rounds=rounds,
+                targets=targets,
                 dry_run=dry_run,
                 batch_size=batch_size,
-                ensure_staff_matrix=ensure_staff_matrix,
                 user_id=int(getattr(current_user, "id", 0) or 0) or None,
                 filename=os.path.basename(file_path),
             )
@@ -233,6 +283,7 @@ def run_import():
         rounds=rounds,
         templates=_upr_template_labels(template_ids),
         dry_run=dry_run,
+        extra={"targets": summary["targets"]},
     )
 
     with _DATA_SYNC_LOCK:
@@ -301,11 +352,9 @@ def run_import():
                 stats = _run_upr_import_with_change_log(
                     log_id=job_id,
                     file_path=file_path,
-                    template_ids=template_ids,
-                    rounds=rounds,
+                    targets=targets,
                     dry_run=dry_run,
                     batch_size=batch_size,
-                    ensure_staff_matrix=ensure_staff_matrix,
                     progress_cb=_progress_cb,
                     cancel_check=_cancel_check,
                     user_id=actor_user_id,

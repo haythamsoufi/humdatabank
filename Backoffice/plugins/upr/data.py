@@ -226,7 +226,9 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
 
     if kind == "plan":
         payload["people_reached"] = _plan_people_reached(items, by_item, period_name)
-        payload["financial"] = _plan_financial(items, by_item, period_name)
+        payload["financial"] = _plan_financial(
+            items, by_item, period_name, country_id=country.id if country else None
+        )
         payload["support"] = _plan_support(
             items,
             by_item,

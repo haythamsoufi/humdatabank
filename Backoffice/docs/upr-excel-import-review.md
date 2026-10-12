@@ -43,7 +43,7 @@ Run this against the database the import will write to (local, staging, or produ
    - T22 staff and T23 funding (`national_society`): `{host NationalSociety.id}_{column}`.
    - T24 hybrid funding PNS rows (`national_society`): `{NationalSociety.id}_{column}`. HNS and IFRC Secretariat use those row labels.
    - When a matrix changes from national societies to countries, confirm the numeric ids in existing cells still match the new lookup. Equal NS and country ids (Norway 130, Lebanon 101) do not prove every other country matches.
-5. **Import both sides of a planning round together.** Template 22’s profile section list is Staff only. PNS funding is written from the Funding section when template **24 and 22** are both selected.
+5. **Template 22 is self-sufficient for PNS funding — confirm it stays that way.** `UPR_TEMPLATE_PROFILES[22]["sections"]` must contain both `Staff` and `Funding`; a regression back to `Staff`-only would silently drop every PNS funding row again when template 22 is imported as its own `(22, P*)` target (no longer requires pairing with 24). Check `test_template_22_alone_keeps_planning_funding_rows` in `test_upr_import_targets.py` still passes.
 
 ---
 

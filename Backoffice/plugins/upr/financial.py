@@ -18,6 +18,7 @@ from plugins.upr.catalog import (
     REPORT_LABEL_NEEDLES,
     REPORTING_SP_BREAKDOWN_AREA_TO_ROW,
     SP_CODES,
+    SUPPORT_AREA_CODES,
 )
 from plugins.upr.formatters import (
     format_chf,
@@ -42,7 +43,13 @@ from plugins.upr.matrix import (
     _sum_funding_by_bucket,
     _sum_funding_rows,
 )
-from plugins.upr.pns_funding import _find_country_aes_for_year, _load_t23_pns_totals
+from plugins.upr.pns_funding import (
+    PnsPlanOverride,
+    _find_country_aes_for_year,
+    _load_t23_pns_totals,
+    load_t22_pns_overrides,
+    strip_pns_rows,
+)
 from app.utils.api_serialization import _resolve_matrix_cell
 
 logger = logging.getLogger(__name__)
@@ -67,8 +74,37 @@ _IFRC_ACTUALS_SNAPSHOTS: dict[str, tuple[str, Path]] = {
 }
 _IFRC_ACTUALS_MIN_CHF = 1000.0
 
-def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
+def _safe_t22_overrides(
+    country_id: int | None, period_name: str, year: int | None
+) -> dict[int, PnsPlanOverride]:
+    if not country_id or not year:
+        return {}
+    try:
+        return load_t22_pns_overrides(int(country_id), period_name, year)
+    except Exception:
+        logger.exception("UPR: failed to load T22 PNS self-reports for country %s year %s", country_id, year)
+        return {}
+
+
+def _add_overrides_to_buckets(buckets: dict[str, dict[str, float]], overrides: dict[int, PnsPlanOverride]) -> None:
+    """Add PNS self-reported T22 amounts to the PNS entry of ``_sum_funding_by_bucket`` output."""
+    rec = buckets.setdefault("PNS", {"overall": 0.0, "longer_term": 0.0, "emergency": 0.0})
+    for override in overrides.values():
+        rec["overall"] = rec.get("overall", 0.0) + override.total
+        rec["longer_term"] = rec.get("longer_term", 0.0) + sum(override.areas.values())
+
+
+def _plan_financial(
+    items, by_item, period_name: str, *, country_id: int | None = None
+) -> dict[str, Any]:
+    """Plan financial overview.
+
+    A PNS that has self-reported (submitted T22) replaces whatever the host country entered for
+    it on the T24 matrix, including with zero. T22 only covers the first planning year, so later
+    years keep the host-entered figures.
+    """
     years = planning_years(period_name)
+    overrides = _safe_t22_overrides(country_id, period_name, years[0] if years else None)
     year_rows = []
     area_years = []
     source_totals = {"HNS": 0.0, "IFRC Secretariat": 0.0, "PNS": 0.0}
@@ -76,9 +112,20 @@ def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
         fallback_key = f"funding_y{offset}"
         item = _resolve_funding_year_item(items, offset, PLAN_ITEM_FALLBACKS[fallback_key])
         cells = _matrix_cells(by_item.get(item.id) if item else None)
+        year_overrides = overrides if offset == 0 else {}
+        if year_overrides:
+            cells = strip_pns_rows(cells, frozenset(year_overrides))
         grouped = _sum_funding_rows(cells)
         by_area = _sum_funding_by_area(cells)
         buckets = _sum_funding_by_bucket(cells)
+        if year_overrides:
+            grouped["PNS"] = grouped.get("PNS", 0.0) + sum(o.total for o in year_overrides.values())
+            pns_area = by_area.setdefault("PNS", {code: 0.0 for code in SUPPORT_AREA_CODES} | {"total": 0.0})
+            for override in year_overrides.values():
+                for code, amount in override.areas.items():
+                    pns_area[code] = pns_area.get(code, 0.0) + amount
+                pns_area["total"] = pns_area.get("total", 0.0) + override.total
+            _add_overrides_to_buckets(buckets, year_overrides)
         for entity, rec in by_area.items():
             rec["emergency"] = float((buckets.get(entity) or {}).get("emergency") or 0)
         hns = grouped.get("HNS", 0.0)
@@ -492,7 +539,13 @@ def _load_plan_funding_buckets(country_id: int, year: int) -> tuple[dict[str, di
     by_item = {row.form_item_id: row for row in _load_entries(aes.id)}
     item = _resolve_funding_year_item(items, 0, PLAN_ITEM_FALLBACKS["funding_y0"])
     cells = _matrix_cells(by_item.get(item.id) if item else None)
-    return _sum_funding_by_bucket(cells), {
+    overrides = _safe_t22_overrides(country_id, assigned.period_name or "", year)
+    if overrides:
+        cells = strip_pns_rows(cells, frozenset(overrides))
+    buckets = _sum_funding_by_bucket(cells)
+    if overrides:
+        _add_overrides_to_buckets(buckets, overrides)
+    return buckets, {
         "aes_id": aes.id,
         "period_name": assigned.period_name,
     }

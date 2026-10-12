@@ -258,7 +258,7 @@
                                     <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-300 hover:text-gray-500 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder')|forceescape }}" draggable="false">
                                         <i class="fas fa-grip-vertical"></i>
                                     </span>
-                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}">
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}" data-enable-variables="true" title="{{ _('Type [ to insert a variable, e.g. [assignment_period]. Saved data uses the resolved value.')|forceescape }}">
                                     <input type="hidden" class="column-name-translations" value="{}">
                                     <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md">
                                         <option value="number_whole">{{ _('Number (Whole)') }}</option>
@@ -378,7 +378,13 @@
                                         </label>
                                     </div>
                                 </div>
-                                <div class="column-calculation-panel hidden mt-2 p-2 bg-gray-50 border border-gray-200 rounded space-y-2 text-xs">
+                                <div class="column-calculation-panel hidden mt-2 p-2 bg-gray-50 border border-gray-200 rounded space-y-2 text-xs"
+                                     data-picker-select="{{ _('Select columns')|forceescape }}"
+                                     data-picker-all="{{ _('All columns')|forceescape }}"
+                                     data-picker-n-selected="{{ _('%(count)s selected')|forceescape }}"
+                                     data-picker-none="{{ _('No other columns')|forceescape }}"
+                                     data-picker-select-all="{{ _('Select all')|forceescape }}"
+                                     data-picker-deselect-all="{{ _('Deselect all')|forceescape }}">
                                     <p class="text-gray-600">{{ _('Calculated for each row from the other columns in that row. The column footer sums those results.') }}</p>
                                     <label class="flex items-center gap-2">
                                         <span class="text-gray-700 whitespace-nowrap">{{ _('Calculation') }}</span>
@@ -402,15 +408,15 @@
                                            data-label-add="{{ _('Columns to add')|forceescape }}">
                                             {{ _('Columns') }}
                                         </p>
-                                        <div class="column-calc-source-list flex flex-wrap gap-2"></div>
+                                        <div class="column-calc-source-list"></div>
                                     </div>
                                     <div class="column-calc-subtrahends hidden">
                                         <p class="text-gray-700 mb-1">{{ _('Subtract') }}</p>
-                                        <div class="column-calc-subtrahend-list flex flex-wrap gap-2"></div>
+                                        <div class="column-calc-subtrahend-list"></div>
                                     </div>
                                     <div class="column-calc-denominators hidden">
                                         <p class="text-gray-700 mb-1">{{ _('Divide by') }}</p>
-                                        <div class="column-calc-denominator-list flex flex-wrap gap-2"></div>
+                                        <div class="column-calc-denominator-list"></div>
                                     </div>
                                     <div class="column-calc-formula-wrap hidden space-y-1">
                                         <label class="block text-gray-700" for="">{{ _('Formula') }}</label>
@@ -487,12 +493,40 @@
                                         <i class="fas fa-grip-vertical text-xs"></i>
                                         <i class="fas fa-layer-group text-xs"></i>
                                     </span>
-                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}">
+                                    <button type="button" class="matrix-group-toggle-btn inline-flex items-center justify-center shrink-0 p-1 min-w-[1.5rem] min-h-[1.5rem] rounded hover:bg-black/10 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400" aria-expanded="true" title="{{ _('Collapse group')|forceescape }}" data-collapse-title="{{ _('Collapse group')|forceescape }}" data-expand-title="{{ _('Expand group')|forceescape }}">
+                                        <i class="fas fa-chevron-down matrix-group-toggle-icon text-xs transition-transform duration-200" aria-hidden="true"></i>
+                                    </button>
+                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}" data-enable-variables="true" title="{{ _('Type [ to insert a variable, e.g. [assignment_period].')|forceescape }}">
                                     <input type="hidden" class="group-label-translations" value="{}">
-                                    <label class="inline-flex items-center gap-1 shrink-0 text-xs text-gray-600" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
-                                        <span>{{ _('Header') }}</span>
-                                        <input type="color" class="group-header-color cursor-pointer rounded border border-gray-300 bg-white" style="width:2rem;height:1.5rem;padding:0;" value="#f3f4f6" aria-label="{{ _('Group header colour')|forceescape }}">
-                                    </label>
+                                    <span class="matrix-group-count hidden shrink-0 text-xs opacity-75 whitespace-nowrap"></span>
+                                    <div class="group-color-control relative shrink-0">
+                                        <button type="button" class="group-color-toggle" aria-expanded="false" aria-haspopup="dialog" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
+                                            <span>{{ _('Header') }}</span>
+                                            <span class="group-color-swatch" style="background-color:#f3f4f6"></span>
+                                        </button>
+                                        <div class="group-color-panel hidden" role="dialog" aria-label="{{ _('Group header colour')|forceescape }}">
+                                            <div class="group-color-sv" role="presentation">
+                                                <span class="group-color-sv-cursor"></span>
+                                            </div>
+                                            <input type="range" class="group-color-hue" min="0" max="360" step="1" value="0" aria-label="{{ _('Hue')|forceescape }}">
+                                            <label class="group-color-hex-label">
+                                                <span>{{ _('Hex') }}</span>
+                                                <input type="text" class="group-header-color-hex" value="#F3F4F6" maxlength="7" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="{{ _('Hex colour')|forceescape }}">
+                                            </label>
+                                            <input type="hidden" class="group-header-color" value="#f3f4f6">
+                                            <label class="group-apply-color-label hidden" title="{{ _('Colour the column titles in this group on the entry form')|forceescape }}">
+                                                <input type="checkbox" class="group-apply-header-color rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Apply group colour to column headers')|forceescape }}">
+                                                <span>{{ _('Headers') }}</span>
+                                            </label>
+                                            <label class="group-apply-color-label hidden" title="{{ _('Colour the data cells in this group on the entry form')|forceescape }}">
+                                                <input type="checkbox" class="group-apply-cell-color rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Apply group colour to cells')|forceescape }}">
+                                                <span>{{ _('Cells') }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="duplicate-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Duplicate Group')|forceescape }}" aria-label="{{ _('Duplicate Group')|forceescape }}">
+                                        <i class="fas fa-copy w-4 h-4"></i>
+                                    </button>
                                     <button type="button" class="remove-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Group')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
@@ -500,10 +534,15 @@
                                 <div class="matrix-group-columns space-y-2 px-2 pt-2 pb-1 border-l-2 border-indigo-200 ml-2">
                                     {# grouped .matrix-column items inserted here #}
                                 </div>
-                                <div class="px-2 pb-2 pt-1">
+                                <div class="matrix-group-footer flex items-center gap-4 px-2 pb-2 pt-1">
                                     <button type="button" class="add-column-to-group-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
                                         <i class="fas fa-plus w-3 h-3 mr-1"></i>
                                         {{ _('Add Column inside Group') }}
+                                    </button>
+                                    {# Hidden by JS for groups that are already nested: only two levels are supported. #}
+                                    <button type="button" class="add-subgroup-to-group-btn text-xs font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
+                                        <i class="fas fa-layer-group w-3 h-3 mr-1"></i>
+                                        {{ _('Add Subgroup') }}
                                     </button>
                                 </div>
                             </div>

@@ -121,46 +121,34 @@ class UprExcelImportService:
         return {"success": True, "pending": True, "file_id": session.get(cls.SESSION_ID_KEY)}
 
     @classmethod
-    def preview(
-        cls,
-        *,
-        template_ids: List[int],
-        rounds: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+    def plan(cls) -> Dict[str, Any]:
+        """Verify every legal (template, round) target against the workbook and live data."""
         path = cls.stored_path()
         if not path:
             return {"success": False, "message": "No uploaded file in session."}
         _ensure_scripts_in_path()
-        from import_upr_excel_data import prepare_upr_transform, summarize_warnings
+        from upr_import_targets import build_import_plan_from_db
 
         try:
-            import_rows, ctx, from_cache = prepare_upr_transform(
-                path,
-                template_ids,
-                rounds=rounds,
-                use_row_cache=True,
-                use_transform_cache=True,
-                save_transform_cache=True,
-            )
-            by_item: Dict[str, int] = {}
-            by_iso3: Dict[str, int] = {}
-            for row in import_rows:
-                item = row.get("item_id") or row.get("form_item_id")
-                iso3 = row.get("_debug_iso3") or ""
-                if item:
-                    by_item[str(item)] = by_item.get(str(item), 0) + 1
-                if iso3:
-                    by_iso3[iso3] = by_iso3.get(iso3, 0) + 1
-            warning_summary = summarize_warnings(ctx.warnings)
-            return {
-                "success": True,
-                "transformed_rows": len(import_rows),
-                "dynamic_rows": len(ctx.dynamic_indicator_entries),
-                "by_item": by_item,
-                "countries": len(by_iso3),
-                "from_transform_cache": from_cache,
-                **warning_summary,
-            }
+            plan = build_import_plan_from_db(path)
+        except Exception as exc:
+            current_app.logger.error("UPR import plan failed: %s", exc, exc_info=True)
+            return {"success": False, "message": str(exc)}
+        plan["file_id"] = session.get(cls.SESSION_ID_KEY)
+        return plan
+
+    @classmethod
+    def preview(cls, *, targets: List[Any]) -> Dict[str, Any]:
+        path = cls.stored_path()
+        if not path:
+            return {"success": False, "message": "No uploaded file in session."}
+        _ensure_scripts_in_path()
+        from upr_import_targets import ImportTargetError, preview_targets
+
+        try:
+            return preview_targets(path, targets)
+        except ImportTargetError as exc:
+            return {"success": False, "message": str(exc), "errors": exc.errors}
         except Exception as exc:
             current_app.logger.error("UPR preview failed: %s", exc, exc_info=True)
             return {"success": False, "message": str(exc)}
@@ -170,14 +158,13 @@ class UprExcelImportService:
         cls,
         *,
         file_path: Optional[str] = None,
-        template_ids: List[int],
-        rounds: Optional[List[str]] = None,
+        targets: List[Any],
         dry_run: bool = False,
         batch_size: int = 1000,
-        ensure_staff_matrix: bool = True,  # kept for API backward compat, no longer used
         progress_cb=None,
         cancel_check=None,
         change_recorder=None,
+        user_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         path = file_path or cls.stored_path()
         if not path:
@@ -190,23 +177,22 @@ class UprExcelImportService:
             preview_path = tmp.name
 
         _ensure_scripts_in_path()
-        from import_upr_excel_data import run_upr_import
+        from upr_import_targets import run_import_targets
 
-        stats = run_upr_import(
+        stats = run_import_targets(
             path,
-            template_ids=template_ids,
-            rounds=rounds,
+            targets,
             dry_run=dry_run,
             batch_size=batch_size,
             preview_excel_path=preview_path,
             progress_cb=progress_cb,
             cancel_check=cancel_check,
-            ensure_staff_matrix=ensure_staff_matrix,  # backward compat, ignored
             use_row_cache=True,
             use_transform_cache=True,
             change_recorder=change_recorder,
+            user_id=user_id,
         )
         stats["success"] = stats.get("errors", 0) == 0
-        if preview_path:
+        if preview_path and stats.get("preview_path"):
             stats["preview_path"] = preview_path
         return stats

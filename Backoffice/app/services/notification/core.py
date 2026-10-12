@@ -459,6 +459,116 @@ def log_entity_activity(
         return None
 
 
+def log_entity_activities_bulk(entries: List[Dict[str, Any]]) -> int:
+    """Log several entity activities in a single commit (batch/bulk imports).
+
+    Each dict in ``entries`` accepts the same keys as ``log_entity_activity``'s
+    arguments: ``entity_type``, ``entity_id``, ``activity_type``,
+    ``activity_description``, and ``summary_key`` are required; ``summary_params``,
+    ``related_object_type``, ``related_object_id``, ``assignment_id``,
+    ``related_url``, ``activity_category``, ``icon``, and ``user_id`` are optional
+    (``user_id`` falls back to the current authenticated user, same as
+    ``log_entity_activity``).
+
+    Entries missing a resolvable ``entity_type``/``entity_id``/``user_id``/
+    ``summary_key`` are skipped individually (logged as a warning) rather than
+    failing the whole batch. Never raises — exactly like ``log_entity_activity``,
+    a notification failure must never fail the caller's larger operation (e.g. a
+    bulk import).
+
+    Does one bulk lookup for non-country entities' ``country_id`` and one
+    ``db.session.commit()`` for the whole batch, so this is safe to call with
+    hundreds of entries without hundreds of round-trips.
+
+    Returns the number of activity rows actually logged (0 on total failure).
+    """
+    if not entries:
+        return 0
+
+    try:
+        from app.services.organization.entity_service import EntityService
+
+        prepared: List[Dict[str, Any]] = []
+        lookup_needed: set = set()
+        for entry in entries:
+            entity_type = entry.get("entity_type")
+            entity_id = entry.get("entity_id")
+            summary_key = entry.get("summary_key")
+            user_id = entry.get("user_id")
+            if not user_id:
+                try:
+                    if current_user and current_user.is_authenticated:
+                        user_id = current_user.id
+                except Exception:
+                    user_id = None
+            if not entity_type or entity_id is None or not summary_key or not user_id:
+                current_app.logger.warning(
+                    "Skipping bulk entity activity (missing entity_type/entity_id/"
+                    "summary_key/user_id): %r",
+                    entry,
+                )
+                continue
+            row = dict(entry)
+            row["entity_id"] = int(entity_id)
+            row["user_id"] = user_id
+            if entity_type != "country":
+                lookup_needed.add((entity_type, row["entity_id"]))
+            prepared.append(row)
+
+        if not prepared:
+            return 0
+
+        country_ids: Dict[Any, Optional[int]] = {}
+        for entity_type, entity_id in lookup_needed:
+            try:
+                country = EntityService.get_country_for_entity(entity_type, entity_id)
+                country_ids[(entity_type, entity_id)] = country.id if country else None
+            except Exception:
+                country_ids[(entity_type, entity_id)] = None
+
+        logs = []
+        for row in prepared:
+            entity_type = row["entity_type"]
+            entity_id = row["entity_id"]
+            country_id = entity_id if entity_type == "country" else country_ids.get((entity_type, entity_id))
+            activity_category = row.get("activity_category") or "general"
+            icon = row.get("icon") or get_default_icon_for_activity_category(activity_category)
+            logs.append(
+                EntityActivityLog(
+                    user_id=row["user_id"],
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    country_id=country_id,
+                    activity_type=row.get("activity_type") or "general",
+                    activity_description=row.get("activity_description") or "",
+                    summary_key=row["summary_key"],
+                    summary_params=row.get("summary_params") or {},
+                    related_object_type=row.get("related_object_type"),
+                    related_object_id=row.get("related_object_id"),
+                    assignment_id=row.get("assignment_id"),
+                    related_url=row.get("related_url"),
+                    activity_category=activity_category,
+                    icon=icon,
+                )
+            )
+
+        try:
+            db.session.add_all(logs)
+            db.session.commit()
+            return len(logs)
+        except Exception as commit_error:
+            current_app.logger.error(
+                f"Error committing bulk entity activity log: {str(commit_error)}", exc_info=True
+            )
+            db.session.rollback()
+            return 0
+    except Exception as e:
+        current_app.logger.error(f"Error logging bulk entity activity: {str(e)}", exc_info=True)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return 0
 
 
 def _notification_retention_days(days: Optional[int] = None) -> int:

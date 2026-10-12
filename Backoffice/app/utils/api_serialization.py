@@ -561,6 +561,10 @@ def _parse_matrix_cell_key(key, matrix_config=None):
             total_suffix = f'_{MATRIX_ROW_TOTAL_COLUMN}'
             if key.endswith(total_suffix) and len(key) > len(total_suffix):
                 return key[:-len(total_suffix)], MATRIX_ROW_TOTAL_COLUMN
+        if any('[' in col['name'] for col in column_defs):
+            # Unresolved [variable] column codes cannot be matched by suffix. Split on
+            # the first underscore instead of dropping the cell.
+            return parse_matrix_disagg_key(key)
         return None, None
     return parse_matrix_disagg_key(key)
 
@@ -582,7 +586,13 @@ def prune_stale_matrix_cell_keys(matrix_data, matrix_config):
     """
     if not isinstance(matrix_data, dict) or not matrix_data:
         return matrix_data
-    if not _matrix_column_defs(matrix_config):
+    column_defs = _matrix_column_defs(matrix_config)
+    if not column_defs:
+        return matrix_data
+    # A column name that still carries a [variable] placeholder is a template, not the
+    # name its cells were saved under. Callers should pass the config resolved for the
+    # assignment; if they could not, keep everything rather than drop valid cells.
+    if any('[' in col['name'] for col in column_defs):
         return matrix_data
 
     pruned = {}
@@ -846,6 +856,27 @@ def parse_matrix_disagg_key(key):
     return key[:idx], key[idx + 1:]
 
 
+def _resolve_matrix_config_for_submission(matrix_config, submission_type, submission_id):
+    """Resolve ``[variable]`` placeholders in matrix column codes for one assigned submission.
+
+    Cell keys are saved under the resolved column code (``"2026 Planned"`` for
+    ``"[assignment_period] Planned"``), so each submission has to be read with its own
+    resolved config. Best effort: returns the config unchanged when nothing needs
+    resolving or the submission cannot be resolved.
+    """
+    if submission_id is None or submission_type not in (None, 'assigned'):
+        return matrix_config
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+    if not VariableResolutionService.matrix_config_has_placeholders(matrix_config):
+        return matrix_config
+    try:
+        from app.models import AssignmentEntityStatus
+        aes = AssignmentEntityStatus.query.get(int(submission_id))
+        return VariableResolutionService.resolve_matrix_config_for_assignment(matrix_config, aes) or matrix_config
+    except Exception:
+        return matrix_config
+
+
 def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip=False):
     """
     Flatten matrix disaggregation payloads into join-friendly rows.
@@ -896,7 +927,10 @@ def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip
             values = disagg.get('values') or {}
             if not isinstance(values, dict):
                 continue
-            for cell in _build_matrix_long_rows_from_values(values, join_meta):
+            cell_config = _resolve_matrix_config_for_submission(
+                join_meta, row.get('submission_type'), row.get('submission_id')
+            )
+            for cell in _build_matrix_long_rows_from_values(values, cell_config):
                 cells.append({
                     **base,
                     'row_entity_id': cell.get('row_entity_id'),
@@ -2346,7 +2380,10 @@ def format_fact_submission_value_row(flat_row):
 format_fact_form_value_row = format_fact_submission_value_row
 
 
-def format_matrix_disagg_as_long_rows(disagg, *, form_item_id=None, form_items_index=None):
+def format_matrix_disagg_as_long_rows(
+    disagg, *, form_item_id=None, form_items_index=None,
+    submission_type=None, submission_id=None,
+):
     """
     Convert wide matrix disaggregation payloads to a Power Query-friendly long array.
 
@@ -2367,7 +2404,9 @@ def format_matrix_disagg_as_long_rows(disagg, *, form_item_id=None, form_items_i
     if not isinstance(values, dict) or not values:
         return []
     form_item = (form_items_index or {}).get(form_item_id) or {}
-    matrix_config = form_item.get('matrix_config') or {}
+    matrix_config = _resolve_matrix_config_for_submission(
+        form_item.get('matrix_config') or {}, submission_type, submission_id
+    )
     return _build_matrix_long_rows_from_values(values, matrix_config)
 
 
@@ -2381,6 +2420,8 @@ def _apply_star_schema_disagg_format(fact_row, *, form_items_index=None):
             fact_row.get(field),
             form_item_id=form_item_id,
             form_items_index=form_items_index,
+            submission_type=fact_row.get('submission_type'),
+            submission_id=fact_row.get('submission_id'),
         )
     return fact_row
 
@@ -2393,6 +2434,8 @@ def format_bridge_disagg_rows(
     form_item_id=None,
     form_items_index=None,
     assigned_form_id=None,
+    submission_type=None,
+    submission_id=None,
 ):
     """
     Flatten a normalized disaggregation payload into bridge rows.
@@ -2418,7 +2461,9 @@ def format_bridge_disagg_rows(
 
     if mode == 'matrix':
         form_item = (form_items_index or {}).get(form_item_id) or {}
-        matrix_config = form_item.get('matrix_config') or {}
+        matrix_config = _resolve_matrix_config_for_submission(
+            form_item.get('matrix_config') or {}, submission_type, submission_id
+        )
         rows = []
         for cell in _build_matrix_long_rows_from_values(values, matrix_config):
             rows.append({
@@ -2473,6 +2518,8 @@ def build_bridge_disagg_from_flat_rows(data_rows, *, form_items_index=None):
                     form_data_id, row.get(field), source=source,
                     form_item_id=form_item_id, form_items_index=form_items_index,
                     assigned_form_id=row.get('assigned_form_id'),
+                    submission_type=row.get('submission_type'),
+                    submission_id=row.get('submission_id'),
                 )
             )
     return bridge

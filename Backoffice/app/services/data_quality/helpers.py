@@ -338,6 +338,17 @@ def compute_income_sources_ratio(
     reconciliation = min(1.0, matrix_sum / total_income) if total_income > 0 else 0.0
 
     matrix_config = (matrix_item.config or {}).get("matrix_config") or {}
+    # Saved cell keys use resolved column codes, so match them against the resolved config.
+    try:
+        from app.models import AssignmentEntityStatus
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+
+        if VariableResolutionService.matrix_config_has_placeholders(matrix_config):
+            matrix_config = VariableResolutionService.resolve_matrix_config_for_assignment(
+                matrix_config, AssignmentEntityStatus.query.get(aes_id)
+            ) or matrix_config
+    except Exception:
+        pass
     rows = matrix_config.get("rows") or []
     columns = [c.get("name") for c in (matrix_config.get("columns") or []) if c.get("name")]
     if not rows or not columns:

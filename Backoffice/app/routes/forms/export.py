@@ -336,7 +336,10 @@ def _convert_entry_data_to_export_format(entry_data):
 
 def _load_existing_data_for_pdf_export(assignment_entity_status, form_template):
     """Load assignment data with prefilled/imputed/carry-forward metadata for PDF export."""
-    from app.routes.forms.helpers import _load_existing_data_for_assignment
+    from app.routes.forms.helpers import (
+        _load_existing_data_for_assignment,
+        apply_carry_forward_suggestions,
+    )
 
     entry_data = _load_existing_data_for_assignment(assignment_entity_status, form_template)
 
@@ -348,31 +351,10 @@ def _load_existing_data_for_pdf_export(assignment_entity_status, form_template):
                 cf_items.append(form_item)
 
     if cf_items:
-        from app.services.forms.carry_forward_service import CarryForwardService
-
         try:
-            cf_results = CarryForwardService.resolve_for_aes(assignment_entity_status, cf_items)
-            for item_id, result in cf_results.items():
-                field_key = f'field_value[{item_id}]'
-                if field_key in entry_data:
-                    continue
-                entry_data[field_key] = (
-                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
-                )
-                entry_data[f'{field_key}_is_prefilled'] = True
-                entry_data[f'{field_key}_is_carry_forward'] = True
-
-            cf_refs = CarryForwardService.resolve_references_for_aes(
-                assignment_entity_status, cf_items
+            apply_carry_forward_suggestions(
+                entry_data, assignment_entity_status, cf_items
             )
-            for item_id, result in cf_refs.items():
-                ref_data = (
-                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
-                )
-                if ref_data is None:
-                    continue
-                entry_data[f'field_value[{item_id}]_carry_forward_ref'] = ref_data
-                entry_data[f'field_value[{item_id}]_is_carry_forward'] = True
         except Exception as e:
             current_app.logger.warning(
                 "Carry-forward resolution failed for PDF export (AES %s): %s",
@@ -1683,6 +1665,10 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         html[dir="ltr"] .matrix-table thead th.cell-tick,
         html[dir="ltr"] .matrix-table tbody td.cell-tick {
             text-align: center;
+        }
+        .matrix-table thead th.cell-calculated,
+        .matrix-table tbody td.cell-calculated {
+            font-weight: 700;
         }
         html[dir="ltr"] .matrix-table tbody td.matrix-col-data,
         html[dir="ltr"] .matrix-table tbody td.matrix-column-total-cell,

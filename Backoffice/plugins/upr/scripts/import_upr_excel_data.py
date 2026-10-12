@@ -14,12 +14,15 @@ Reporting templates:
 
 UPR Master never writes later rounds (P27+, AR26+, MYR26+).
 
+Scope is always explicit: every import is a list of (template, round) targets and
+each target maps to exactly one assigned form (template + period). There is no
+"empty = everything" mode. Legal pairs: P* -> 24, 22; AR* -> 33, 23; MYR* -> 33.
+
 Usage (from Backoffice/):
-    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
-    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
-    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
-    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR25 --templates 33
-    python plugins/upr/scripts/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
+    python plugins/upr/scripts/import_upr_excel_data.py --input f.xlsx --plan
+    python plugins/upr/scripts/import_upr_excel_data.py --input f.xlsx --targets 24:P26,22:P26 --dry-run
+    python plugins/upr/scripts/import_upr_excel_data.py --input f.xlsx --targets 33:AR25,23:AR25,33:MYR25
+    python plugins/upr/scripts/import_upr_excel_data.py --input f.xlsx --rounds P25,P26 --templates 24,22
 """
 
 from __future__ import annotations
@@ -87,9 +90,10 @@ UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     22: {
         "name": "Annual Planning - International Bilateral Support",
         "round_prefixes": ("P",),
-        # Staff rows are filtered here; PNS Funding is written from the Funding section
-        # when template 22 is included alongside template 24.
-        "sections": frozenset({"Staff"}),
+        # Staff rows plus the PNS-reported Funding rows (Funding Requirement / Confirmed
+        # Funding). Funding must be listed here so template 22 imports correctly on its
+        # own — it must never depend on template 24 also being selected.
+        "sections": frozenset({"Staff", "Funding"}),
     },
     # ── Reporting ─────────────────────────────────────────────────────────────
     33: {
@@ -128,6 +132,59 @@ UPR_MASTER_ALLOWED_ROUNDS = frozenset(
 
 def is_upr_master_importable_round(round_code: Any) -> bool:
     return str(round_code or "").strip().upper() in UPR_MASTER_ALLOWED_ROUNDS
+
+
+def round_prefix(round_code: Any) -> str:
+    """Alphabetic prefix of a UPR round code: ``P26`` → ``P``, ``MYR25`` → ``MYR``."""
+    match = re.match(r"[A-Z]+", str(round_code or "").strip().upper())
+    return match.group(0) if match else ""
+
+
+def template_accepts_round(template_id: int, round_code: Any) -> bool:
+    """True when ``template_id`` is a configured UPR template that imports this round type."""
+    profile = UPR_TEMPLATE_PROFILES.get(int(template_id))
+    if not profile:
+        return False
+    prefix = round_prefix(round_code)
+    return bool(prefix) and prefix in tuple(profile.get("round_prefixes") or ())
+
+
+def assert_import_scope(template_ids: List[int], rounds: Optional[Set[str]]) -> None:
+    """Refuse ambiguous or illegal import scopes before anything touches the database.
+
+    * ``rounds`` must be explicit — "empty = everything" is not a valid scope.
+    * every round must be on the closed allowlist;
+    * every (template, round) pair must be legal (e.g. template 23 never takes MYR*);
+    * every round must be written by at least one selected template.
+    """
+    errors: List[str] = []
+    if not rounds:
+        raise ValueError(
+            "Import rounds are required (explicit list, e.g. P26 or AR25). "
+            "An empty selection no longer means 'all rounds'."
+        )
+    for tid in template_ids:
+        if tid not in UPR_TEMPLATE_PROFILES:
+            errors.append(f"Template {tid} is not configured for UPR Excel import")
+    for rnd in sorted(rounds):
+        if not is_upr_master_importable_round(rnd):
+            errors.append(
+                f"Round {rnd} is outside the closed UPR Master set "
+                f"({', '.join(sorted(UPR_MASTER_ALLOWED_ROUNDS))})"
+            )
+            continue
+        accepting = [t for t in template_ids if template_accepts_round(t, rnd)]
+        if not accepting:
+            errors.append(f"No selected template imports round {rnd}")
+        for tid in template_ids:
+            if tid in UPR_TEMPLATE_PROFILES and tid not in accepting:
+                errors.append(
+                    f"Template {tid} does not import round {rnd} "
+                    f"(accepts {', '.join(UPR_TEMPLATE_PROFILES[tid]['round_prefixes'])} rounds only); "
+                    "import mixed selections as separate (template, round) targets"
+                )
+    if errors:
+        raise ValueError("; ".join(errors))
 
 
 STAFF_INDICATOR_COLUMNS: Dict[str, str] = {
@@ -534,7 +591,7 @@ def _build_pns_reported_yes_sets(
             pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
             if pns_aes:
                 t22_yes.add((pns_aes, iso3))
-        elif (rnd.startswith("AR") or rnd.startswith("MYR")) and 23 in template_ids:
+        elif rnd.startswith("AR") and 23 in template_ids:  # T23 has no mid-year assignments
             if not is_pns_data_source(row):
                 continue
             pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
@@ -2574,6 +2631,36 @@ def _load_assignment_map(template_ids: List[int]) -> Dict[int, Dict[Tuple[str, s
     return by_template
 
 
+def target_aes_ids(
+    ctx: "UprImportContext",
+    template_ids: List[int],
+    rounds: Optional[Set[str]],
+) -> Set[int]:
+    """AES ids of the assigned forms addressed by the selected (template, round) pairs.
+
+    Raw primitive — does **not** validate ``(template, round)`` legality itself
+    (an illegal pair simply yields no matching periods, not an error). Callers
+    writing to the database must gate on ``assert_import_scope`` first (as
+    ``run_upr_import`` does) or otherwise guarantee every pair is already legal
+    (as ``build_import_plan``'s per-round, per-template iteration does before
+    ``upr_import_targets._compute_pns_clear`` calls this). See
+    ``TestTargetAesIds`` in ``test_upr_import_targets.py`` for the contract.
+    """
+    _ensure_canonical_assignment_keys(ctx)
+    out: Set[int] = set()
+    for tid in template_ids:
+        periods = {
+            round_to_period(r)
+            for r in (rounds or ())
+            if template_accepts_round(tid, r)
+        }
+        periods.discard(None)
+        for (period, _iso3), aes_id in ctx.assignment_by_template.get(int(tid), {}).items():
+            if period in periods:
+                out.add(int(aes_id))
+    return out
+
+
 def _matrix_column_name_from_form_item(item) -> Optional[str]:
     """Return the first matrix column ``name`` from a FormItem config, if defined."""
     names = _form_item_matrix_column_names(item)
@@ -3866,24 +3953,23 @@ def _filter_rows(
     template_ids: List[int],
     rounds: Optional[Set[str]] = None,
 ) -> List[Dict[str, Any]]:
-    allowed_sections: Set[str] = set()
-    allowed_prefixes: Set[str] = set()
-    for tid in template_ids:
-        prof = UPR_TEMPLATE_PROFILES.get(tid)
-        if not prof:
-            continue
-        allowed_sections.update(prof.get("sections", frozenset()))
-        allowed_prefixes.update(prof.get("round_prefixes", ()))
+    # A row is kept only when some selected template imports BOTH its section and its
+    # round type (per-template, not the union of all sections x all prefixes).
+    profiles = [
+        UPR_TEMPLATE_PROFILES[tid] for tid in template_ids if tid in UPR_TEMPLATE_PROFILES
+    ]
 
     out = []
     for row in rows:
         sec = str(row.get("Section") or "").strip()
         rnd = str(row.get("Round") or "").strip().upper()
-        if sec not in allowed_sections:
-            continue
         if not is_upr_master_importable_round(rnd):
             continue
-        if allowed_prefixes and not any(rnd.startswith(p) for p in allowed_prefixes):
+        prefix = round_prefix(rnd)
+        if not any(
+            sec in prof.get("sections", frozenset()) and prefix in tuple(prof.get("round_prefixes") or ())
+            for prof in profiles
+        ):
             continue
         if rounds and rnd not in rounds:
             continue
@@ -4621,7 +4707,7 @@ def transform_to_import_rows(
             # ── T23: PNS self-report Funding / Expenditure / Transferred ──
             # Reporting is PNS-only: Source=PNS Data, amount is ValueNum (not Country/PNS Value).
             # AES is keyed by PNS home country ISO3; row is the host country's NS id.
-            if 23 in tids and ent_upper == "PNS" and is_pns_data_source(row):
+            if 23 in tids and rnd.startswith("AR") and ent_upper == "PNS" and is_pns_data_source(row):
                 if not ctx.pns_funding_item_id:
                     skip_msg = (
                         "Skipping template 23 funding rows: published PNS funding matrix was not resolved"
@@ -4826,6 +4912,74 @@ def upsert_upr_discussion_comments(
     return stats
 
 
+def _log_bulk_import_activity(
+    touched_aes_ids: Set[int],
+    aes_row_counts: Dict[int, int],
+    template_ids: List[int],
+    *,
+    user_id: Optional[int] = None,
+) -> int:
+    """Best-effort entity-activity-log entries for a bulk UPR import.
+
+    One entry per assignment actually written to — ``touched_aes_ids`` is every
+    AES id the upsert's ``change_recorder`` saw at least one changed row for.
+    Mirrors the "Imported ... Excel: N values staged" activity the
+    per-assignment importer already writes (``assignment_routes.py``); the admin
+    bulk runner never wrote this (see
+    ``docs/investigations/2026-09-18-bilateral-matrix-overwrite.md``, "Still
+    open" — the import never populated a focal point's activity feed). This
+    closes that gap for the bulk path.
+
+    No-op without ``user_id``: ``EntityActivityLog.user_id`` is required, and a
+    CLI/background run has no focal-point user to attribute the activity to —
+    that is an accepted, silent no-op, not an error. Never raises; a
+    notification failure must never fail the import itself.
+    """
+    if not touched_aes_ids or not user_id:
+        return 0
+    try:
+        from app.models.assignments import AssignmentEntityStatus
+        from app.services.notification.core import log_entity_activities_bulk
+
+        template_names = ", ".join(
+            UPR_TEMPLATE_PROFILES[t]["name"]
+            for t in sorted(set(template_ids))
+            if t in UPR_TEMPLATE_PROFILES
+        )
+        rows = (
+            AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(touched_aes_ids))
+            .with_entities(
+                AssignmentEntityStatus.id,
+                AssignmentEntityStatus.entity_type,
+                AssignmentEntityStatus.entity_id,
+            )
+            .all()
+        )
+        entries = []
+        for aes_id, entity_type, entity_id in rows:
+            count = aes_row_counts.get(int(aes_id), 0)
+            entries.append(
+                {
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                    "activity_type": "excel_import",
+                    "activity_description": (
+                        f"UPR Master Excel import: {count} values updated for {template_names}"
+                    ),
+                    "summary_key": "activity.upr_excel_import",
+                    "summary_params": {"template": template_names, "count": count},
+                    "assignment_id": int(aes_id),
+                    "activity_category": "form",
+                    "icon": "fas fa-file-excel",
+                    "user_id": user_id,
+                }
+            )
+        return log_entity_activities_bulk(entries)
+    except Exception:
+        logger.warning("Entity activity logging failed for bulk UPR import", exc_info=True)
+        return 0
+
+
 def run_upr_import(
     input_path: str,
     *,
@@ -4840,15 +4994,31 @@ def run_upr_import(
     use_row_cache: bool = True,
     use_transform_cache: bool = False,
     change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
+    collect_preview_rows: Optional[List[Dict[str, str]]] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Load UPR Excel, transform, and upsert into form_data."""
+    """Load UPR Excel, transform, and upsert into form_data.
+
+    ``template_ids`` and ``rounds`` are both required and must form legal
+    (template, round) pairs — see ``assert_import_scope``. Use
+    ``upr_import_targets.run_import_targets`` for mixed selections.
+
+    When ``collect_preview_rows`` is a list the transformed rows are appended to it
+    instead of writing ``preview_excel_path`` (the caller writes one combined file).
+
+    ``user_id`` attributes the resulting ``entity_activity_log`` rows (one per
+    assignment actually written to, skipped entirely when ``None`` or
+    ``dry_run``) — pass the acting user explicitly; a background worker thread
+    has no reliable Flask-Login ``current_user``.
+    """
     from app.extensions import db
     from contextlib import nullcontext
 
-    tids = template_ids or list(UPR_TEMPLATE_PROFILES.keys())
-    for tid in tids:
-        if tid not in UPR_TEMPLATE_PROFILES:
-            raise ValueError(f"Template {tid} is not configured for UPR Excel import")
+    if not template_ids:
+        raise ValueError("Import templates are required (explicit list of template ids).")
+    tids = [int(t) for t in template_ids]
+    round_set = _normalize_round_set(rounds)
+    assert_import_scope(tids, round_set)
 
     def _progress(stage: str, message: str, percent: float, **extra: Any) -> None:
         if not progress_cb:
@@ -4874,7 +5044,7 @@ def run_upr_import(
         import_rows, ctx, from_transform_cache = prepare_upr_transform(
             input_path,
             tids,
-            rounds=rounds,
+            rounds=sorted(round_set),
             use_row_cache=use_row_cache,
             use_transform_cache=use_transform_cache,
             save_transform_cache=False,
@@ -4888,7 +5058,9 @@ def run_upr_import(
         stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)
         stats["emergency_slots_staged"] = len(ctx.emergency_slot_meta)
 
-        if preview_excel_path and import_rows:
+        if collect_preview_rows is not None:
+            collect_preview_rows.extend(import_rows)
+        elif preview_excel_path and import_rows:
             write_rows_to_excel(import_rows, preview_excel_path)
 
         valid_item_ids: Optional[Set[int]] = None
@@ -4897,9 +5069,9 @@ def run_upr_import(
 
             valid_item_ids = published_form_item_id_set_for_templates(tids)
 
-        valid_aes_ids: Set[int] = set()
-        for tpl_map in ctx.assignment_by_template.values():
-            valid_aes_ids.update(int(v) for v in tpl_map.values())
+        # Writes are confined to the assigned forms of the selected (template, round)
+        # targets — never to every assignment of the template.
+        valid_aes_ids = target_aes_ids(ctx, tids, round_set)
 
         def _emit(payload: Dict[str, Any]) -> None:
             if cancel_check and cancel_check():
@@ -4907,6 +5079,21 @@ def run_upr_import(
                 raise UprImportCancelled()
             if progress_cb:
                 progress_cb(payload)
+
+        # Observe the same change stream the undo/audit change_recorder sees so a
+        # bulk run can also write entity_activity_log entries (one per assignment
+        # actually touched) without changing upsert_form_data_rows itself.
+        touched_aes_ids: Set[int] = set()
+        aes_row_counts: Dict[int, int] = {}
+
+        def _track_and_record(entry: Dict[str, Any]) -> None:
+            aes_id = entry.get("aes_id")
+            if aes_id:
+                aid = int(aes_id)
+                touched_aes_ids.add(aid)
+                aes_row_counts[aid] = aes_row_counts.get(aid, 0) + 1
+            if change_recorder:
+                change_recorder(entry)
 
         upsert_stats = upsert_form_data_rows(
             import_rows,
@@ -4919,7 +5106,7 @@ def run_upr_import(
             progress_start_pct=25.0,
             progress_end_pct=85.0,
             stats=stats,
-            change_recorder=change_recorder,
+            change_recorder=_track_and_record,
         )
         discussion_stats = upsert_upr_discussion_comments(
             ctx.discussion_comment_entries,
@@ -4965,7 +5152,7 @@ def run_upr_import(
             pns_sync_stats = sync_non_reported_pns_assignments(
                 ctx,
                 tids,
-                rounds=_normalize_round_set(rounds),
+                rounds=round_set,
                 dry_run=dry_run,
             )
             upsert_stats.update(pns_sync_stats)
@@ -4974,6 +5161,10 @@ def run_upr_import(
         upsert_stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)
         if preview_excel_path:
             upsert_stats["preview_path"] = preview_excel_path
+        if not dry_run and touched_aes_ids:
+            upsert_stats["activity_logged"] = _log_bulk_import_activity(
+                touched_aes_ids, aes_row_counts, tids, user_id=user_id
+            )
         _progress("complete", "UPR import completed.", 100.0, stats=upsert_stats)
         return upsert_stats
 
@@ -4983,11 +5174,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Import UPR Master Excel into form data")
     parser.add_argument("--input", required=True, help="Path to UPR Master.xlsx")
     parser.add_argument(
-        "--templates",
-        default=",".join(str(t) for t in UPR_TEMPLATE_PROFILES),
-        help="Comma-separated template IDs (default: 24,22)",
+        "--targets",
+        default="",
+        help="Explicit (template:round) targets, e.g. 24:P26,22:P26,33:AR25,23:AR25,33:MYR25",
     )
-    parser.add_argument("--rounds", default="", help="Comma-separated round codes (e.g. P26, AR25, MYR25). Default: all allowed rounds matching the selected templates (P23–P26, AR21–AR25, MYR23–MYR25).")
+    parser.add_argument(
+        "--templates",
+        default="",
+        help="Shorthand with --rounds: comma-separated template ids (legal pairs only).",
+    )
+    parser.add_argument(
+        "--rounds",
+        default="",
+        help="Shorthand with --templates: comma-separated rounds (required, e.g. P26,AR25).",
+    )
+    parser.add_argument("--plan", action="store_true", help="Print the verified import plan and exit")
     parser.add_argument("--dry-run", action="store_true", help="Preview only, no DB writes")
     parser.add_argument("--batch-size", type=int, default=1000)
     parser.add_argument("--preview-excel", default="", help="Write ready-to-import preview Excel")
@@ -5003,24 +5204,61 @@ def main() -> int:
         print(json.dumps(summary, indent=2))
         return 0
 
-    template_ids = [int(x.strip()) for x in args.templates.split(",") if x.strip()]
-    rounds = [x.strip() for x in args.rounds.split(",") if x.strip()] or None
+    from upr_import_targets import (
+        ImportTargetError,
+        build_import_plan_from_db,
+        normalize_targets,
+        run_import_targets,
+        targets_from_templates_and_rounds,
+    )
+
+    def _run_in_app_context(fn):
+        from app import create_app
+
+        with create_app().app_context():
+            return fn()
+
+    if args.plan:
+        plan = _run_in_app_context(lambda: build_import_plan_from_db(args.input))
+        print(json.dumps(plan, indent=2, default=str))
+        return 0
+
+    try:
+        if args.targets.strip():
+            targets = normalize_targets([x.strip() for x in args.targets.split(",") if x.strip()])
+        else:
+            template_ids = [int(x.strip()) for x in args.templates.split(",") if x.strip()]
+            rounds = [x.strip() for x in args.rounds.split(",") if x.strip()]
+            targets = targets_from_templates_and_rounds(template_ids, rounds)
+    except ImportTargetError as exc:
+        logger.error("%s", exc)
+        for err in exc.errors:
+            logger.error("  - %s", err)
+        logger.error("Pass --targets 24:P26,... (or --templates with --rounds). Use --plan to list options.")
+        return 1
+
     preview = args.preview_excel or None
 
     try:
-        stats = run_upr_import(
-            args.input,
-            template_ids=template_ids,
-            rounds=rounds,
-            dry_run=args.dry_run,
-            batch_size=args.batch_size,
-            preview_excel_path=preview,
+        stats = _run_in_app_context(
+            lambda: run_import_targets(
+                args.input,
+                targets,
+                dry_run=args.dry_run,
+                batch_size=args.batch_size,
+                preview_excel_path=preview,
+            )
         )
+    except ImportTargetError as exc:
+        logger.error("%s", exc)
+        for err in exc.errors:
+            logger.error("  - %s", err)
+        return 1
     except UprImportCancelled:
         logger.warning("Import cancelled")
         return 2
 
-    print(json.dumps(stats, indent=2))
+    print(json.dumps(stats, indent=2, default=str))
     return 0 if stats.get("errors", 0) == 0 else 1
 
 

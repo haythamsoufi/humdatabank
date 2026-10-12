@@ -21,6 +21,7 @@ from app.routes.admin.shared import (admin_required, admin_permission_required, 
 from app.utils.request_utils import is_json_request, get_request_data, _is_json_body
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.services.platform.user_analytics_service import log_admin_action
+from app.services.forms.matrix_column_migration_service import column_codes
 from app.services.templates.excel_service import TemplateExcelService
 from app.services.imports.kobo_xls_import_service import KoboXlsImportService
 from app.utils.error_handling import handle_view_exception, handle_json_view_exception
@@ -2309,6 +2310,33 @@ def manage_template_variables(template_id):
         except Exception as e:
             return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
+def _variable_option_form_item(item):
+    """Form-item option for the variable modal, including matrix column codes."""
+    payload = {
+        'id': item.id,
+        'label': item.label,
+        'item_type': item.item_type,
+        'section_id': item.section_id,
+    }
+    if item.item_type not in ('matrix', 'matrix_table'):
+        return payload
+
+    config = item.config if isinstance(item.config, dict) else {}
+    matrix_config = config.get('matrix_config')
+    if not isinstance(matrix_config, dict):
+        matrix_config = {}
+
+    payload['matrix_columns'] = column_codes(matrix_config.get('columns'))
+    # Omitted flag matches the form builder: row totals are on unless explicitly off.
+    payload['show_row_totals'] = matrix_config.get('show_row_totals') is not False
+    position = matrix_config.get('row_total_position')
+    if isinstance(position, str) and position.strip().lstrip('-').isdigit():
+        position = int(position)
+    if isinstance(position, int) and not isinstance(position, bool):
+        payload['row_total_position'] = position
+    return payload
+
+
 @bp.route("/templates/<int:template_id>/variables/options", methods=["GET"])
 @permission_required('admin.templates.edit')
 def get_variable_options(template_id):
@@ -2356,15 +2384,7 @@ def get_variable_options(template_id):
                     version_id=source_version_id,
                     archived=False
                 ).order_by(FormItem.order).all()
-                form_items_list = [
-                    {
-                        'id': item.id,
-                        'label': item.label,
-                        'item_type': item.item_type,
-                        'section_id': item.section_id
-                    }
-                    for item in form_items
-                ]
+                form_items_list = [_variable_option_form_item(item) for item in form_items]
 
         return json_ok(
             templates=templates_list,

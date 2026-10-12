@@ -20,6 +20,9 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import (json_forbidden, json_bad_request, json_ok,
     json_server_error, json_form_errors)
 from app.services.forms.item_duplication_service import ItemDuplicationService
+from app.services.forms.matrix_column_validation import validate_matrix_config
+from app.services.forms.matrix_column_migration_service import (
+    MatrixColumnMigrationService, column_codes, validate_renames, rewrite_matrix_config_refs)
 from .helpers import (_create_form_item, _update_indicator_fields, _update_question_fields,
     _update_document_field_fields, _update_matrix_fields, _update_image_fields, _update_plugin_fields,
     _update_item_config, _update_version_timestamp, _ensure_template_access_or_redirect,
@@ -115,6 +118,57 @@ def _form_item_audit_snapshot(form_item):
     }
 
 
+def _requested_column_renames(data):
+    """Column renames reported by the form builder, as a list of ``{from, to}`` dicts."""
+    raw = data.get('matrix_column_renames') if 'matrix_column_renames' in data else data.get('renames')
+    if isinstance(raw, (list, tuple)) and raw and all(isinstance(r, str) for r in raw):
+        raw = coerce_single_text(raw)
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+    return raw if isinstance(raw, list) else []
+
+
+def _stored_matrix_column_codes(config):
+    matrix_config = (config or {}).get('matrix_config') if isinstance(config, dict) else None
+    return column_codes((matrix_config or {}).get('columns') if isinstance(matrix_config, dict) else None)
+
+
+def _matrix_column_code_error_response(errors, is_ajax, template_id, version_id):
+    """Reject a matrix save whose column codes are invalid (duplicates, reserved, ...)."""
+    message = ' '.join(errors)
+    if is_ajax:
+        return json_bad_request(message, success=False, errors={'matrix_config': list(errors)})
+    flash(message, 'danger')
+    return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=version_id))
+
+
+@bp.route("/items/<int:item_id>/matrix-column-rename-preview", methods=["POST"])
+@permission_required('admin.templates.edit')
+def matrix_column_rename_preview(item_id):
+    """How much saved data would move if these matrix column codes were renamed."""
+    data = get_request_data()
+    form_item = FormItem.query.get_or_404(item_id)
+    version_ctx = data.get('version_id') or form_item.version_id
+    if _ensure_template_access_or_redirect(form_item.template_id, version_ctx):
+        return json_forbidden('Access denied', success=False)
+    if form_item.item_type != 'matrix':
+        return json_bad_request('Only matrix items have column codes.', success=False)
+
+    requested = _requested_column_renames(data)
+    old_codes = _stored_matrix_column_codes(form_item.config)
+    targets = [r.get('to') for r in requested if isinstance(r, dict) and isinstance(r.get('to'), str)]
+    renames = validate_renames(requested, old_codes, [t.strip() for t in targets])
+    try:
+        stats = MatrixColumnMigrationService.preview(form_item.id, renames, old_codes)
+    except Exception as exc:
+        current_app.logger.error("matrix column rename preview failed for item %s: %s", item_id, exc, exc_info=True)
+        return json_server_error(GENERIC_ERROR_MESSAGE, success=False)
+    return json_ok(preview=stats)
+
+
 @bp.route("/templates/<int:template_id>/sections/<int:section_id>/items/new", methods=["POST"])
 @permission_required('admin.templates.edit')
 def new_section_item(template_id, section_id):
@@ -168,6 +222,15 @@ def new_section_item(template_id, section_id):
         if is_ajax:
             return json_bad_request("Item type is required", success=False, errors={'item_type': ["Item type is required"]}, redirect_url=redirect_url)
         return redirect(redirect_url)
+
+    if item_type == 'matrix':
+        code_errors = validate_matrix_config(
+            coerce_single_text(data.get('matrix_config')) or coerce_single_text(data.get('config'))
+        )
+        if code_errors:
+            return _matrix_column_code_error_response(
+                code_errors, is_ajax, template_id, data.get('version_id') or section.version_id
+            )
 
     try:
         form_item = _create_form_item(template, section, data, item_type)
@@ -410,6 +473,13 @@ def edit_item(item_id):
         elif 'config' in data:
             form.image_config.data = data['config']
 
+    if submitted_item_type == 'matrix':
+        code_errors = validate_matrix_config(form.matrix_config.data)
+        if code_errors:
+            return _matrix_column_code_error_response(
+                code_errors, is_ajax, template_id, data.get('version_id') or form_item.version_id
+            )
+
     if form.validate_on_submit():
         current_app.logger.info(f"Edit {form_item.item_type.title()} Form validated. Processed form data: {form.data}")
 
@@ -450,6 +520,24 @@ def edit_item(item_id):
                 _update_plugin_fields(form_item, form, data)
 
             _update_item_config(form_item, form, data)
+
+            matrix_migration = None
+            if submitted_item_type == 'matrix' and isinstance(form_item.config, dict):
+                old_codes = _stored_matrix_column_codes((old_values_snapshot or {}).get('config'))
+                renames = validate_renames(
+                    _requested_column_renames(data),
+                    old_codes,
+                    _stored_matrix_column_codes(form_item.config),
+                )
+                if renames:
+                    # Custom formulas still name the old codes; keep them working either way.
+                    rewrite_matrix_config_refs(
+                        form_item.config.get('matrix_config'), dict(renames)
+                    )
+                    if coerce_single_text(data.get('migrate_matrix_columns')) in ('true', 'on', '1'):
+                        matrix_migration = MatrixColumnMigrationService.apply(
+                            form_item.id, renames, old_codes
+                        )
 
             if isinstance(form_item.config, dict):
                 if submitted_item_type == 'image':
@@ -528,7 +616,23 @@ def edit_item(item_id):
                 risk_level='low'
             )
 
+            if matrix_migration:
+                log_admin_action(
+                    action_type='matrix_column_migration',
+                    description=f"Migrated saved data for renamed matrix column codes of '{item_label}'",
+                    target_type='form_item',
+                    target_id=item_id,
+                    target_description=f"Template ID: {template_id}, Item ID: {item_id}",
+                    new_values=matrix_migration,
+                    risk_level='medium'
+                )
+
             flash_message = f"{form_item.item_type.title()} '{item_label}' updated successfully."
+            if matrix_migration:
+                flash_message += (
+                    f" Migrated {matrix_migration['cells']} saved cell(s) "
+                    f"in {matrix_migration['assignments']} assignment(s) to the new column codes."
+                )
             if _completion_refresh_queued:
                 flash_message += " Completion rates are being recalculated in the background."
             target_version_id = data.get('version_id') or form_item.version_id

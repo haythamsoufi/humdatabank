@@ -152,6 +152,17 @@
             </div>
         </div>
         {% endif %}
+        {% if is_new_user_form and form.send_welcome_email is defined %}
+        <div class="mb-4 p-3 rounded border border-gray-200 bg-gray-50 text-gray-800 text-sm">
+            <label for="send_welcome_email" class="flex items-start gap-2 cursor-pointer">
+                {{ form.send_welcome_email(id="send_welcome_email", class="mt-0.5 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                <span>
+                    <strong><i class="fas fa-envelope mr-1"></i>{{ _('Send a welcome email to this user') }}</strong>
+                    <span class="block text-gray-600">{{ _('When checked, the user receives a welcome email at the address above as soon as you save, with a link to the platform and how to get started. Uncheck it to create the account silently.') }}</span>
+                </span>
+            </label>
+        </div>
+        {% endif %}
 
             {# User Details Tab #}
             <div class="user-form-panel" id="panel-user-details" role="tabpanel" aria-labelledby="user-details-tab">

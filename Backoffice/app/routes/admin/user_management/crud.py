@@ -1,6 +1,6 @@
 """HTML / form-based user CRUD routes and access-request management."""
 
-from app.utils.transactions import request_transaction_rollback
+from app.utils.transactions import request_transaction_rollback, safe_rollback
 from app.utils.datetime_helpers import utcnow
 from collections import defaultdict
 import re
@@ -922,17 +922,36 @@ def new_user():
                         risk_level='medium'
                     )
 
-                    db.session.flush()
+                    # Commit before emailing: the email helpers commit/roll back the session
+                    # themselves, and the user must never be emailed about an account that
+                    # later rolls back.
+                    db.session.commit()
+                    new_user_email = new_user.email
 
-                    # Send welcome email
+                    send_welcome = bool(getattr(getattr(form, "send_welcome_email", None), "data", True))
+                    if not send_welcome:
+                        flash(f"User {new_user_email} created successfully. No welcome email was sent.", "success")
+                        return redirect(url_for("user_management.manage_users"))
+
+                    welcome_sent = False
                     try:
                         from app.services.email.service import send_welcome_email
-                        send_welcome_email(new_user)
+                        welcome_sent = bool(send_welcome_email(new_user))
                     except Exception as e:
-                        current_app.logger.error(f"Failed to send welcome email to {new_user.email}: {e}", exc_info=True)
-                        # Don't fail user creation if email fails
+                        current_app.logger.error(f"Failed to send welcome email to {new_user_email}: {e}", exc_info=True)
+                    if not welcome_sent:
+                        # Clear any failed session state so the request's auto-commit doesn't 500.
+                        safe_rollback(reason="welcome_email_failed")
 
-                    flash(f"User {new_user.email} created successfully.", "success")
+                    if welcome_sent:
+                        flash(f"User {new_user_email} created successfully. A welcome email has been sent.", "success")
+                    else:
+                        flash(f"User {new_user_email} created successfully.", "success")
+                        flash(
+                            "The welcome email could not be sent. You can retry it from the "
+                            "Communication Center's email delivery log.",
+                            "warning",
+                        )
                     return redirect(url_for("user_management.manage_users"))
 
     # Fetch countries and group by region for the template

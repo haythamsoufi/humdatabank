@@ -9,6 +9,8 @@ Covers:
   - POST /admin/users/delete/<id>    — delete (system manager only, self-delete guard)
   - GET  /admin/access-requests      — access request list
 """
+import re
+
 import pytest
 from unittest.mock import patch, MagicMock
 from tests.helpers import login_session
@@ -194,6 +196,114 @@ class TestCreateUserRoute:
             )
         assert resp.status_code == 200
         assert b"already exists" in resp.data
+
+
+# ===========================================================================
+# POST /admin/users/new — welcome email opt-out
+# ===========================================================================
+
+class TestCreateUserWelcomeEmail:
+    """The new-user form has a "Send welcome email" checkbox (checked by default)."""
+
+    @staticmethod
+    def _role_id(app):
+        with app.app_context():
+            from app.models.rbac import RbacRole
+            role = RbacRole.query.first()
+            return role.id if role else None
+
+    def _pre_add(self, client, app, email, send_welcome):
+        role_id = self._role_id(app)
+        data = {
+            "email": email,
+            "name": "Welcome Test",
+            "password": "",
+            "title": "",
+            "countries": [],
+            "rbac_roles": [str(role_id)] if role_id else [],
+        }
+        if send_welcome:
+            data["send_welcome_email"] = "y"
+        with patch("app.routes.admin.user_management.crud.is_azure_b2c_configured", return_value=True), \
+             patch("app.routes.admin.user_management.crud._is_azure_sso_enabled", return_value=True):
+            return client.post("/admin/users/new", data=data, follow_redirects=False)
+
+    @staticmethod
+    def _flashes(client):
+        with client.session_transaction() as sess:
+            return [msg for _cat, msg in sess.get("_flashes", [])]
+
+    def test_new_user_form_renders_checkbox_checked_by_default(self, logged_in_sm_client, db_session):
+        with patch("app.routes.admin.user_management.crud.is_azure_b2c_configured", return_value=True):
+            resp = logged_in_sm_client.get("/admin/users/new")
+        assert resp.status_code == 200
+        tag = re.search(r'<input[^>]*id="send_welcome_email"[^>]*>', resp.data.decode())
+        assert tag is not None
+        assert "checked" in tag.group(0)
+
+    def test_checked_sends_real_email_to_new_user(
+        self, logged_in_sm_client, system_manager_user, db_session, app, monkeypatch
+    ):
+        """Runs the real send_welcome_email/send_email path; only the outbound HTTP call is stubbed."""
+        monkeypatch.setitem(app.config, "MAIL_DEFAULT_SENDER", "noreply@example.com")
+        monkeypatch.setitem(app.config, "ALLOWED_EMAIL_RECIPIENTS_DEV", [])
+        with patch("app.services.email.client._send_via_ifrc", return_value=True) as transport:
+            resp = self._pre_add(logged_in_sm_client, app, "welcome.yes@example.com", send_welcome=True)
+
+        assert resp.status_code == 302
+        transport.assert_called_once()
+        kwargs = transport.call_args.kwargs
+        assert kwargs["recipients"] == ["welcome.yes@example.com"]
+        assert "Welcome" in kwargs["subject"]
+        assert "Welcome Test" in kwargs["html"]
+
+        with app.app_context():
+            from app.models import User, EmailDeliveryLog
+            user = User.query.filter_by(email="welcome.yes@example.com").first()
+            assert user is not None
+            log = EmailDeliveryLog.query.filter_by(user_id=user.id).one()
+            status = log.status.value if hasattr(log.status, "value") else str(log.status)
+            assert status == "sent"
+        assert any("welcome email has been sent" in m for m in self._flashes(logged_in_sm_client))
+
+    def test_unchecked_creates_user_without_email(
+        self, logged_in_sm_client, system_manager_user, db_session, app
+    ):
+        with patch("app.services.email.service.send_welcome_email") as send:
+            resp = self._pre_add(logged_in_sm_client, app, "welcome.no@example.com", send_welcome=False)
+
+        assert resp.status_code == 302
+        send.assert_not_called()
+        with app.app_context():
+            from app.models import User
+            assert User.query.filter_by(email="welcome.no@example.com").first() is not None
+        assert any("No welcome email was sent" in m for m in self._flashes(logged_in_sm_client))
+
+    def test_send_failure_keeps_user_and_warns(
+        self, logged_in_sm_client, system_manager_user, db_session, app
+    ):
+        with patch("app.services.email.service.send_welcome_email", side_effect=RuntimeError("boom")):
+            resp = self._pre_add(logged_in_sm_client, app, "welcome.fail@example.com", send_welcome=True)
+
+        assert resp.status_code == 302
+        with app.app_context():
+            from app.models import User
+            assert User.query.filter_by(email="welcome.fail@example.com").first() is not None
+        assert any("could not be sent" in m for m in self._flashes(logged_in_sm_client))
+
+    def test_user_is_committed_before_email_is_sent(
+        self, logged_in_sm_client, system_manager_user, db_session, app
+    ):
+        seen = {}
+
+        def _check_committed(user):
+            from app.extensions import db
+            seen["persistent"] = user.id is not None and not db.session.new and not db.session.dirty
+            return True
+
+        with patch("app.services.email.service.send_welcome_email", side_effect=_check_committed):
+            self._pre_add(logged_in_sm_client, app, "welcome.order@example.com", send_welcome=True)
+        assert seen.get("persistent") is True
 
 
 # ===========================================================================

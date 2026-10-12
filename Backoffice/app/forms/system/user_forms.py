@@ -8,7 +8,7 @@ from flask_babel import _
 
 logger = logging.getLogger(__name__)
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SelectMultipleField, SubmitField
+from wtforms import BooleanField, StringField, PasswordField, SelectMultipleField, SubmitField
 from wtforms.validators import DataRequired, Email, Optional, ValidationError, Regexp
 from wtforms.widgets import ListWidget, CheckboxInput
 from app.models import Country, User
@@ -53,6 +53,8 @@ class UserForm(BaseForm):
         widget=ListWidget(prefix_label=False),
         validators=[Optional()]
     )
+    # Only rendered/used when creating a user; edit_user ignores it.
+    send_welcome_email = BooleanField("Send welcome email", default=True)
     submit = SubmitField("Save User")
 
     def __init__(self, *args, **kwargs):

@@ -28,6 +28,11 @@ function _validGroupColor(value) {
     return /^#[0-9a-f]{6}$/.test(raw) && raw !== DEFAULT_GROUP_HEADER_COLOR ? raw : '';
 }
 
+function _validGroupTextColor(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(raw) ? raw : '';
+}
+
 function _groupColorFlagOn(value) {
     return value === true || value === 1 || value === 'true';
 }
@@ -44,21 +49,36 @@ function _groupAppliesColor(meta, target) {
     return _groupColorFlagOn(meta.apply_color_to_columns);
 }
 
-/** Hex to paint on column headers or cells, or ''. A subgroup that opted in wins over its parent. */
-export function matrixColumnFillColor(columns, columnGroups, index, target = 'cells') {
+/**
+ * Fill and text from the group that opted in. A subgroup with a fill or a text
+ * colour wins over its parent. Text is '' when that group left it automatic.
+ */
+function _columnGroupColors(columns, columnGroups, index, target) {
     const { group, subgroup } = _columnGroupNames(columns?.[index]);
     const groups = columnGroups && typeof columnGroups === 'object' ? columnGroups : {};
+    const picked = (meta) => {
+        if (!_groupAppliesColor(meta, target)) return null;
+        const fill = _validGroupColor(meta?.header_color);
+        const text = _validGroupTextColor(meta?.header_text_color);
+        if (!fill && !text) return null;
+        return { fill, text };
+    };
     if (subgroup) {
-        const sub = groups[`${group}::${subgroup}`];
-        if (_groupAppliesColor(sub, target)) {
-            const color = _validGroupColor(sub.header_color);
-            if (color) return color;
-        }
+        const sub = picked(groups[`${group}::${subgroup}`]);
+        if (sub) return sub;
     }
-    if (!group) return '';
-    const meta = groups[group];
-    if (!_groupAppliesColor(meta, target)) return '';
-    return _validGroupColor(meta.header_color);
+    if (!group) return null;
+    return picked(groups[group]);
+}
+
+/** Hex to paint on column headers or cells, or ''. A subgroup that opted in wins over its parent. */
+export function matrixColumnFillColor(columns, columnGroups, index, target = 'cells') {
+    return _columnGroupColors(columns, columnGroups, index, target)?.fill || '';
+}
+
+/** Custom text hex for column headers or cells, or '' when text was left automatic. */
+export function matrixColumnTextColor(columns, columnGroups, index, target = 'cells') {
+    return _columnGroupColors(columns, columnGroups, index, target)?.text || '';
 }
 
 /** Left or right boundary class for one data column. Empty when the edge is not a group break. */
@@ -86,9 +106,11 @@ export function applyMatrixColumnGroupChrome(cell, columns, columnGroups, index)
     if (start) cell.classList.add(start);
     if (end) cell.classList.add(end);
     const fill = matrixColumnFillColor(columns, columnGroups, index, 'cells');
-    if (!fill) return;
+    const text = matrixColumnTextColor(columns, columnGroups, index, 'cells');
+    if (!fill && !text) return;
     cell.classList.add('matrix-group-colored');
-    cell.style.setProperty('--matrix-group-color', fill);
+    if (fill) cell.style.setProperty('--matrix-group-color', fill);
+    if (text) cell.style.setProperty('--matrix-group-text-color', text);
 }
 
 export const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);

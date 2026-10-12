@@ -7,6 +7,8 @@ import { checkFormulaSyntax, compileCalculation } from '../../../forms/modules/m
 /** Same grey as a normal matrix column header (Tailwind bg-gray-100). */
 const DEFAULT_MATRIX_GROUP_HEADER_COLOR = '#f3f4f6';
 const GROUP_HEADER_COLOR_KEY = 'header_color';
+/** Omitted when it matches the automatic contrast for the background. */
+const GROUP_HEADER_TEXT_COLOR_KEY = 'header_text_color';
 /** Older configs used one flag for headers and cells. Still read, no longer written. */
 const GROUP_APPLY_COLOR_KEY = 'apply_color_to_columns';
 const GROUP_APPLY_HEADER_COLOR_KEY = 'apply_color_to_headers';
@@ -94,14 +96,27 @@ function hsvToHex(h, s, v) {
     return `#${channel(r)}${channel(g)}${channel(b)}`;
 }
 
-/** Dark header fills use white text; light fills use the same grey as other columns. */
-function matrixGroupHeaderTextColor(value) {
+function hexLuminance(value) {
     const raw = normalizeMatrixGroupHeaderColor(value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
     const r = parseInt(raw.slice(1, 3), 16);
     const g = parseInt(raw.slice(3, 5), 16);
     const b = parseInt(raw.slice(5, 7), 16);
-    const luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-    return luminance >= 160 ? '#4b5563' : '#ffffff';
+    return (r * 0.299) + (g * 0.587) + (b * 0.114);
+}
+
+/** Dark header fills use white text; light fills use the same grey as other columns. */
+function matrixGroupHeaderTextColor(value) {
+    return hexLuminance(value) >= 160 ? '#4b5563' : '#ffffff';
+}
+
+/**
+ * Text colour to persist. Empty when unset or equal to the automatic contrast,
+ * so changing the background still updates the text until someone picks a colour.
+ */
+function customMatrixGroupHeaderTextColor(background, value) {
+    const normalized = normalizeMatrixGroupHeaderColor(value);
+    if (!normalized || normalized === matrixGroupHeaderTextColor(background)) return '';
+    return normalized;
 }
 
 const truthyMatrixValues = TRUTHY_CONFIG_STRINGS;
@@ -340,6 +355,7 @@ export const MatrixItem = {
                 e.target.classList.contains('column-text') ||
                 e.target.classList.contains('group-label-text') ||
                 e.target.classList.contains('group-header-color') ||
+                e.target.classList.contains('group-header-text-color') ||
                 e.target.classList.contains('group-header-color-hex') ||
                 e.target.classList.contains('group-apply-header-color') ||
                 e.target.classList.contains('group-apply-cell-color') ||
@@ -469,7 +485,7 @@ export const MatrixItem = {
                         this.handleColumnHeaderListSelection(modalElement, columnDiv, e.target.value);
                     }
                 }
-                if (e.target.classList.contains('group-header-color')) {
+                if (e.target.classList.contains('group-header-color') || e.target.classList.contains('group-header-text-color')) {
                     this._paintGroupHeader(e.target.closest('.matrix-group'));
                 }
                 if (e.target.classList.contains('group-header-color-hex')) {
@@ -513,6 +529,25 @@ export const MatrixItem = {
                     hex?.focus();
                     hex?.select();
                 }
+                return;
+            }
+            const colorTab = e.target.closest?.('.group-color-tab');
+            if (colorTab && modalElement.contains(colorTab)) {
+                e.preventDefault();
+                const panel = colorTab.closest('.group-color-panel');
+                const groupEl = colorTab.closest('.matrix-group');
+                if (!panel || !groupEl) return;
+                const nextTarget = colorTab.dataset.colorTarget === 'text' ? 'text' : 'background';
+                panel.dataset.colorTarget = nextTarget;
+                panel.querySelectorAll('.group-color-tab').forEach(tab => {
+                    const selected = tab === colorTab;
+                    tab.classList.toggle('is-active', selected);
+                    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+                });
+                this._syncGroupColorPanel(groupEl);
+                const hex = panel.querySelector('.group-header-color-hex');
+                hex?.focus();
+                hex?.select();
                 return;
             }
 
@@ -626,6 +661,14 @@ export const MatrixItem = {
                 });
                 this._syncCalculationPickerSummary(target.closest('.calc-column-picker'));
                 this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-calc-bold')) {
+                e.preventDefault();
+                const columnDiv = target.closest('.matrix-column');
+                const on = target.getAttribute('aria-pressed') === 'false';
+                target.classList.toggle('is-on', on);
+                target.setAttribute('aria-pressed', on ? 'true' : 'false');
+                this.updateColumnCalculationVisibility(columnDiv);
+                this.updateConfig(modalElement);
             } else if (target.classList.contains('column-selectable-header-toggle')) {
                 e.preventDefault();
                 const columnDiv = target.closest('.matrix-column');
@@ -640,7 +683,7 @@ export const MatrixItem = {
         document.addEventListener('change', modalElement._matrixChangeHandler);
         modalElement._matrixColumnCodeHandler = (e) => {
             if (!modalElement.contains(e.target)) return;
-            if (e.target.classList?.contains('group-header-color')) {
+            if (e.target.classList?.contains('group-header-color') || e.target.classList?.contains('group-header-text-color')) {
                 this._paintGroupHeader(e.target.closest('.matrix-group'));
                 this.updateConfig(modalElement);
                 return;
@@ -818,6 +861,13 @@ export const MatrixItem = {
         return 'number_whole';
     },
 
+    /** The B control defaults to on. Only an explicit off turns bold off. */
+    _calculationBoldOn(columnDiv) {
+        const button = columnDiv?.querySelector('.column-calc-bold');
+        if (!button) return true;
+        return button.getAttribute('aria-pressed') !== 'false';
+    },
+
     updateColumnCalculationVisibility(columnDiv) {
         if (!columnDiv) return;
         const type = columnDiv.querySelector('.column-type')?.value;
@@ -826,9 +876,6 @@ export const MatrixItem = {
         const selectable = columnDiv.querySelector('.column-selectable-header-wrapper');
         const variableOptions = columnDiv.querySelector('.column-variable-options');
         const includeCheckbox = columnDiv.querySelector('.column-include-in-row-total');
-        // A calculated column can stand in for a total, so its code reads in bold.
-        columnDiv.classList.toggle('is-calculated-column', isCalculated);
-        columnDiv.querySelector('.column-text')?.classList.toggle('font-bold', isCalculated);
         panel?.classList.toggle('hidden', !isCalculated);
         selectable?.classList.toggle('hidden', isCalculated);
         if (isCalculated) {
@@ -1079,8 +1126,17 @@ export const MatrixItem = {
         }
         const calcReadonly = columnDiv.querySelector('.column-calc-readonly');
         const calcSaveValue = columnDiv.querySelector('.column-calc-save-value');
+        const boldButton = columnDiv.querySelector('.column-calc-bold');
         const readonlyFlag = calculationOptions ? calculationOptions.readonly : undefined;
         const saveFlag = calculationOptions ? calculationOptions.saveValue : undefined;
+        const boldFlag = calculationOptions ? calculationOptions.bold : undefined;
+        if (boldButton) {
+            const boldOn = boldFlag === undefined || boldFlag === null
+                ? true
+                : boldFlag !== false && boldFlag !== 'false';
+            boldButton.classList.toggle('is-on', boldOn);
+            boldButton.setAttribute('aria-pressed', boldOn ? 'true' : 'false');
+        }
         if (calcReadonly) {
             calcReadonly.checked = readonlyFlag === undefined || readonlyFlag === null
                 ? true
@@ -1322,15 +1378,18 @@ export const MatrixItem = {
         const labelInput = clone.querySelector('.group-label-text');
         const labelTranslationsInput = clone.querySelector('.group-label-translations');
         const colorInput = clone.querySelector('.group-header-color');
+        const textColorInput = clone.querySelector('.group-header-text-color');
         const applyHeaderInput = clone.querySelector('.group-apply-header-color');
         const applyCellInput = clone.querySelector('.group-apply-cell-color');
         const translations = (labelTranslations && typeof labelTranslations === 'object' && !Array.isArray(labelTranslations))
             ? { ...labelTranslations }
             : {};
         const storedColor = headerColor || translations[GROUP_HEADER_COLOR_KEY] || '';
+        const storedTextColor = translations[GROUP_HEADER_TEXT_COLOR_KEY] || '';
         const applyHeaders = savedGroupColorFlag(translations, GROUP_APPLY_HEADER_COLOR_KEY);
         const applyCells = savedGroupColorFlag(translations, GROUP_APPLY_CELL_COLOR_KEY);
         delete translations[GROUP_HEADER_COLOR_KEY];
+        delete translations[GROUP_HEADER_TEXT_COLOR_KEY];
         delete translations[GROUP_APPLY_COLOR_KEY];
         delete translations[GROUP_APPLY_HEADER_COLOR_KEY];
         delete translations[GROUP_APPLY_CELL_COLOR_KEY];
@@ -1345,7 +1404,11 @@ export const MatrixItem = {
         if (colorInput) {
             colorInput.value = normalizeMatrixGroupHeaderColor(storedColor) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
         }
-        const customColor = !!customMatrixGroupHeaderColor(storedColor);
+        if (textColorInput) {
+            textColorInput.value = customMatrixGroupHeaderTextColor(storedColor, storedTextColor);
+        }
+        const customColor = !!customMatrixGroupHeaderColor(storedColor)
+            || !!customMatrixGroupHeaderTextColor(storedColor, storedTextColor);
         if (applyHeaderInput) applyHeaderInput.checked = applyHeaders && customColor;
         if (applyCellInput) applyCellInput.checked = applyCells && customColor;
         this._paintGroupHeader(groupEl);
@@ -1385,18 +1448,25 @@ export const MatrixItem = {
             labelTranslations = {};
         }
         delete labelTranslations[GROUP_HEADER_COLOR_KEY];
+        delete labelTranslations[GROUP_HEADER_TEXT_COLOR_KEY];
         delete labelTranslations[GROUP_APPLY_COLOR_KEY];
         delete labelTranslations[GROUP_APPLY_HEADER_COLOR_KEY];
         delete labelTranslations[GROUP_APPLY_CELL_COLOR_KEY];
+        const header = groupEl.querySelector(':scope > .matrix-group-header');
         // The default grey is not stored, so groups look like other columns.
-        const headerColor = customMatrixGroupHeaderColor(
-            groupEl.querySelector(':scope > .matrix-group-header .group-header-color')?.value
+        const backgroundValue = header?.querySelector('.group-header-color')?.value;
+        const headerColor = customMatrixGroupHeaderColor(backgroundValue);
+        const textColor = customMatrixGroupHeaderTextColor(
+            backgroundValue,
+            header?.querySelector('.group-header-text-color')?.value
         );
         if (headerColor) labelTranslations[GROUP_HEADER_COLOR_KEY] = headerColor;
-        const applyHeaders = groupEl.querySelector(':scope > .matrix-group-header .group-apply-header-color')?.checked;
-        const applyCells = groupEl.querySelector(':scope > .matrix-group-header .group-apply-cell-color')?.checked;
-        if (headerColor && applyHeaders) labelTranslations[GROUP_APPLY_HEADER_COLOR_KEY] = true;
-        if (headerColor && applyCells) labelTranslations[GROUP_APPLY_CELL_COLOR_KEY] = true;
+        if (textColor) labelTranslations[GROUP_HEADER_TEXT_COLOR_KEY] = textColor;
+        const applyHeaders = header?.querySelector('.group-apply-header-color')?.checked;
+        const applyCells = header?.querySelector('.group-apply-cell-color')?.checked;
+        const tinted = !!(headerColor || textColor);
+        if (tinted && applyHeaders) labelTranslations[GROUP_APPLY_HEADER_COLOR_KEY] = true;
+        if (tinted && applyCells) labelTranslations[GROUP_APPLY_CELL_COLOR_KEY] = true;
         return labelTranslations;
     },
 
@@ -1424,40 +1494,52 @@ export const MatrixItem = {
         return result;
     },
 
+    /** Which colour the open picker is editing: background or text. */
+    _groupColorTarget(groupEl) {
+        const panel = groupEl?.querySelector(':scope > .matrix-group-header .group-color-panel');
+        return panel?.dataset.colorTarget === 'text' ? 'text' : 'background';
+    },
+
+    _groupHeaderColors(groupEl) {
+        const header = groupEl?.querySelector(':scope > .matrix-group-header');
+        const background = normalizeMatrixGroupHeaderColor(header?.querySelector('.group-header-color')?.value)
+            || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
+        const storedText = header?.querySelector('.group-header-text-color')?.value;
+        const text = normalizeMatrixGroupHeaderColor(storedText) || matrixGroupHeaderTextColor(background);
+        return { header, background, text };
+    },
+
     /**
-     * Preview the saved group-header colour on the builder group bar.
-     * Default grey matches a normal matrix column header. Dark fills use white text.
+     * Preview the group colours on the builder group bar.
+     * Default grey matches a normal matrix column header. Text follows the
+     * saved text colour, or white/grey contrast when that was left automatic.
      */
     _paintGroupHeader(groupEl) {
-        const header = groupEl?.querySelector('.matrix-group-header');
-        const input = groupEl?.querySelector('.group-header-color');
-        if (!header || !input) return;
-        const background = normalizeMatrixGroupHeaderColor(input.value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
-        const text = matrixGroupHeaderTextColor(background);
-        const dark = text === '#ffffff';
+        const { header, background, text } = this._groupHeaderColors(groupEl);
+        if (!header) return;
+        const lightText = hexLuminance(text) >= 160;
         header.style.backgroundColor = background;
         header.style.color = text;
         const labelInput = header.querySelector('.group-label-text');
         if (labelInput) {
             labelInput.style.color = text;
-            labelInput.style.backgroundColor = dark ? 'transparent' : '';
-            labelInput.style.borderColor = dark ? 'rgba(255,255,255,0.45)' : '';
+            labelInput.style.backgroundColor = lightText ? 'transparent' : '';
+            labelInput.style.borderColor = lightText ? 'rgba(255,255,255,0.45)' : '';
         }
         header.querySelectorAll(':scope > label').forEach(caption => {
             caption.style.color = text;
         });
         const handle = header.querySelector('.matrix-drag-handle');
-        if (handle) handle.style.color = dark ? text : '';
+        if (handle) handle.style.color = lightText ? text : '';
         this._syncGroupColorPanel(groupEl);
     },
 
-    /** Keep the swatch, hex field, and spectrum aligned with the stored colour. */
+    /** Keep the swatch, hex field, and spectrum aligned with the colour being edited. */
     _syncGroupColorPanel(groupEl) {
-        const header = groupEl?.querySelector(':scope > .matrix-group-header');
-        const input = header?.querySelector('.group-header-color');
-        if (!header || !input) return;
-        const hex = normalizeMatrixGroupHeaderColor(input.value) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
-        const { h, s, v } = hexToHsv(hex);
+        const { header, background, text } = this._groupHeaderColors(groupEl);
+        if (!header) return;
+        const active = this._groupColorTarget(groupEl) === 'text' ? text : background;
+        const { h, s, v } = hexToHsv(active);
         const sv = header.querySelector('.group-color-sv');
         if (sv) {
             sv.dataset.s = String(s);
@@ -1472,9 +1554,13 @@ export const MatrixItem = {
         const hue = header.querySelector('.group-color-hue');
         if (hue && document.activeElement !== hue) hue.value = String(Math.round(h));
         const swatch = header.querySelector('.group-color-swatch');
-        if (swatch) swatch.style.backgroundColor = hex;
+        if (swatch) {
+            swatch.style.backgroundColor = background;
+            const letter = swatch.querySelector('.group-color-swatch-text');
+            if (letter) letter.style.color = text;
+        }
         const hexInput = header.querySelector('.group-header-color-hex');
-        if (hexInput && document.activeElement !== hexInput) hexInput.value = hex.toUpperCase();
+        if (hexInput && document.activeElement !== hexInput) hexInput.value = active.toUpperCase();
         this._syncApplyColorOption(groupEl);
     },
 
@@ -1492,7 +1578,7 @@ export const MatrixItem = {
         panel.style.top = `${top}px`;
     },
 
-    /** Write a #rrggbb onto the group and refresh the builder preview. */
+    /** Write a background #rrggbb onto the group and refresh the builder preview. */
     _setGroupHeaderColor(groupEl, hex) {
         const input = groupEl?.querySelector(':scope > .matrix-group-header .group-header-color');
         const next = normalizeMatrixGroupHeaderColor(hex) || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
@@ -1505,19 +1591,41 @@ export const MatrixItem = {
         input.dispatchEvent(new Event('input', { bubbles: true }));
     },
 
+    /**
+     * Write a text colour. The automatic contrast colour is stored as empty so
+     * later background changes keep choosing the text colour.
+     */
+    _setGroupHeaderTextColor(groupEl, hex) {
+        const header = groupEl?.querySelector(':scope > .matrix-group-header');
+        const input = header?.querySelector('.group-header-text-color');
+        if (!input) return;
+        const next = customMatrixGroupHeaderTextColor(header.querySelector('.group-header-color')?.value, hex);
+        if (input.value === next) {
+            this._paintGroupHeader(groupEl);
+            return;
+        }
+        input.value = next;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+
+    _setActiveGroupColor(groupEl, hex) {
+        if (this._groupColorTarget(groupEl) === 'text') this._setGroupHeaderTextColor(groupEl, hex);
+        else this._setGroupHeaderColor(groupEl, hex);
+    },
+
     _commitGroupHexInput(hexInput, { restoreInvalid = false } = {}) {
         const groupEl = hexInput?.closest('.matrix-group');
         if (!groupEl) return;
         const normalized = expandHexColor(hexInput.value);
         if (!normalized) {
             if (restoreInvalid) {
-                const current = groupEl.querySelector(':scope > .matrix-group-header .group-header-color')?.value
-                    || DEFAULT_MATRIX_GROUP_HEADER_COLOR;
+                const { background, text } = this._groupHeaderColors(groupEl);
+                const current = this._groupColorTarget(groupEl) === 'text' ? text : background;
                 hexInput.value = current.toUpperCase();
             }
             return;
         }
-        this._setGroupHeaderColor(groupEl, normalized);
+        this._setActiveGroupColor(groupEl, normalized);
     },
 
     _commitGroupColorFromControls(groupEl) {
@@ -1527,7 +1635,7 @@ export const MatrixItem = {
         const sv = header.querySelector('.group-color-sv');
         const s = Number(sv?.dataset.s);
         const v = Number(sv?.dataset.v);
-        this._setGroupHeaderColor(groupEl, hsvToHex(
+        this._setActiveGroupColor(groupEl, hsvToHex(
             hue,
             Number.isFinite(s) ? clamp01(s) : 0,
             Number.isFinite(v) ? clamp01(v) : 1,
@@ -1542,13 +1650,15 @@ export const MatrixItem = {
         this._commitGroupColorFromControls(sv.closest('.matrix-group'));
     },
 
-    /** Header and cell tints only apply once the header colour is not the default grey. */
+    /** Header and cell tints apply once the background or the text colour is custom. */
     _syncApplyColorOption(groupEl) {
         const header = groupEl?.querySelector(':scope > .matrix-group-header');
         const input = header?.querySelector('.group-header-color');
+        const textInput = header?.querySelector('.group-header-text-color');
         const options = header?.querySelectorAll('.group-apply-color-label');
         if (!options?.length) return;
-        const custom = !!customMatrixGroupHeaderColor(input?.value);
+        const custom = !!customMatrixGroupHeaderColor(input?.value)
+            || !!customMatrixGroupHeaderTextColor(input?.value, textInput?.value);
         options.forEach(option => {
             option.classList.toggle('hidden', !custom);
             if (!custom) {
@@ -1599,7 +1709,7 @@ export const MatrixItem = {
             colData.name_translations || {}, targetContainer, colData.decimals,
             colData.header_type ? colData : null, colData.calculation || null,
             colData.include_in_row_total,
-            { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value }
+            { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold }
         );
         const columnDiv = targetContainer?.lastElementChild;
         // The copy is a new column: it was never saved under this code, so it is not a rename.
@@ -1887,6 +1997,7 @@ export const MatrixItem = {
             const calcSaveValue = columnDiv.querySelector('.column-calc-save-value');
             if (calcReadonly && !calcReadonly.checked) columnConfig.calculation_readonly = false;
             if (calcSaveValue?.checked) columnConfig.calculation_save_value = true;
+            if (!this._calculationBoldOn(columnDiv)) columnConfig.calculation_bold = false;
             if (includeInRowTotal?.checked) columnConfig.include_in_row_total = true;
         } else if (includeInRowTotal && !includeInRowTotal.checked) {
             columnConfig.include_in_row_total = false;
@@ -3701,7 +3812,7 @@ export const MatrixItem = {
                                 }
                                 lastSubgroupLabel = subgroupLabel;
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, targetColumns, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value });
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, targetColumns, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold });
                             });
                         } else {
                             const colData = item.data;
@@ -3709,7 +3820,7 @@ export const MatrixItem = {
                                 this.addColumn(modalElement, colData, 'number_whole');
                             } else if (colData && typeof colData === 'object' && (colData.name || colData.is_variable || colData.type === 'variable')) {
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value });
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold });
                             }
                         }
                     });

@@ -36,6 +36,11 @@ export function calculationIsReadonly(column) {
     return column.calculation_readonly !== false;
 }
 
+/** Missing calculation_bold stays bold, matching columns saved before the toggle existed. */
+export function calculationIsBold(column) {
+    return !(column && typeof column === 'object' && column.calculation_bold === false);
+}
+
 export function calculationSavesValue(column) {
     return !!(column && typeof column === 'object' && column.type === 'calculated' && column.calculation_save_value === true);
 }

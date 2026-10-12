@@ -730,6 +730,7 @@ function attachMatrixColumnHeadersModal() {
           }
           if (translations && typeof translations === 'object') {
             delete translations.header_color;
+            delete translations.header_text_color;
             delete translations.apply_color_to_columns;
             delete translations.apply_color_to_headers;
             delete translations.apply_color_to_cells;
@@ -813,6 +814,7 @@ function attachMatrixColumnHeadersModal() {
               }
               if (subTranslations && typeof subTranslations === 'object') {
                 delete subTranslations.header_color;
+                delete subTranslations.header_text_color;
                 delete subTranslations.apply_color_to_columns;
                 delete subTranslations.apply_color_to_headers;
                 delete subTranslations.apply_color_to_cells;

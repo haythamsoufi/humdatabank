@@ -1,28 +1,26 @@
+{# 1 when a calculated column should render bold. Unset stays bold. #}
+{% macro matrix_calc_bold(column) -%}
+{%- if column is mapping and column.get('type') == 'calculated' and column.get('calculation_bold') is not sameas false -%}1{%- endif -%}
+{%- endmacro %}
+
 {# Inline style for a matrix column-group header.
-   Empty when unset or the default grey (#f3f4f6), so the header keeps the
-   same classes as a normal column. Custom colours set background and a
-   contrasting text colour. Only #rrggbb values are emitted. #}
+   Empty when the background is unset or the default grey (#f3f4f6) and no
+   custom text colour is stored. A custom background still picks contrasting
+   text unless header_text_color is set. Only #rrggbb values are emitted. #}
 {% macro matrix_group_header_style(group_meta) -%}
-{%- set ns = namespace(raw='', valid=false) -%}
-{%- if group_meta is mapping -%}
-  {%- set candidate = group_meta.get('header_color') -%}
-  {%- if candidate is string -%}
-    {%- set ns.raw = candidate|trim|lower -%}
+{%- set bg = _matrix_group_hex(group_meta)|trim -%}
+{%- set custom_text = _matrix_group_text_hex(group_meta)|trim -%}
+{%- if bg or custom_text -%}
+  {%- set style_ns = namespace(auto_text='#4b5563') -%}
+  {%- if bg -%}
+    {%- set r = bg[1:3]|int(base=16) -%}
+    {%- set g = bg[3:5]|int(base=16) -%}
+    {%- set b = bg[5:7]|int(base=16) -%}
+    {%- set lum = (r * 0.299) + (g * 0.587) + (b * 0.114) -%}
+    {%- set style_ns.auto_text = '#4b5563' if lum >= 160 else '#ffffff' -%}
   {%- endif -%}
-{%- endif -%}
-{%- set ns.valid = (ns.raw|length == 7 and ns.raw[0] == '#') -%}
-{%- if ns.valid -%}
-  {%- for ch in ns.raw[1:] -%}
-    {%- if ch not in '0123456789abcdef' -%}{%- set ns.valid = false -%}{%- endif -%}
-  {%- endfor -%}
-{%- endif -%}
-{%- if ns.valid and ns.raw != '#f3f4f6' -%}
-  {%- set r = ns.raw[1:3]|int(base=16) -%}
-  {%- set g = ns.raw[3:5]|int(base=16) -%}
-  {%- set b = ns.raw[5:7]|int(base=16) -%}
-  {%- set lum = (r * 0.299) + (g * 0.587) + (b * 0.114) -%}
-  {%- set text = '#4b5563' if lum >= 160 else '#ffffff' -%}
- style="background-color: {{ ns.raw }}; color: {{ text }};"
+  {%- set color = custom_text if custom_text else style_ns.auto_text -%}
+{{- ' ' -}}style="{% if bg %}background-color: {{ bg }}; {% endif %}color: {{ color }};"
 {%- endif -%}
 {%- endmacro %}
 
@@ -44,6 +42,24 @@
 {%- if ns.valid and ns.raw != '#f3f4f6' -%}{{ ns.raw }}{%- endif -%}
 {%- endmacro %}
 
+{# Custom text #rrggbb, or empty when unset. Any valid hex is kept, including white. #}
+{% macro _matrix_group_text_hex(group_meta) -%}
+{%- set ns = namespace(raw='', valid=false) -%}
+{%- if group_meta is mapping -%}
+  {%- set candidate = group_meta.get('header_text_color') -%}
+  {%- if candidate is string -%}
+    {%- set ns.raw = candidate|trim|lower -%}
+  {%- endif -%}
+{%- endif -%}
+{%- set ns.valid = (ns.raw|length == 7 and ns.raw[0] == '#') -%}
+{%- if ns.valid -%}
+  {%- for ch in ns.raw[1:] -%}
+    {%- if ch not in '0123456789abcdef' -%}{%- set ns.valid = false -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- if ns.valid -%}{{ ns.raw }}{%- endif -%}
+{%- endmacro %}
+
 {# target is "headers" or "cells". A missing specific flag still honours the older combined flag. #}
 {% macro _matrix_group_applies_color(group_meta, target) -%}
 {%- set ns = namespace(flag=none) -%}
@@ -58,9 +74,10 @@
 {%- if ns.flag is sameas true or ns.flag == 'true' or ns.flag == 1 -%}1{%- endif -%}
 {%- endmacro %}
 
-{# Column fill for headers or cells. A subgroup that opted in wins; otherwise the parent group. #}
+{# Column fill for headers or cells. A subgroup that opted in with a fill or a
+   text colour wins; otherwise the parent group. Text-only still blocks the parent fill. #}
 {% macro matrix_column_fill(columns, column_groups, index, target) -%}
-{%- set ns = namespace(color='') -%}
+{%- set ns = namespace(color='', decided=false) -%}
 {%- set groups = column_groups if column_groups is mapping else {} -%}
 {%- set col = columns[index] if columns is sequence and index is number and index >= 0 and index < (columns|length) else none -%}
 {%- set group = col.get('group', '') if col is mapping else '' -%}
@@ -68,13 +85,54 @@
 {%- if subgroup -%}
   {%- set sub_meta = groups.get(group ~ '::' ~ subgroup, {}) -%}
   {%- if _matrix_group_applies_color(sub_meta, target)|trim -%}
-    {%- set ns.color = _matrix_group_hex(sub_meta)|trim -%}
+    {%- set sub_fill = _matrix_group_hex(sub_meta)|trim -%}
+    {%- set sub_text = _matrix_group_text_hex(sub_meta)|trim -%}
+    {%- if sub_fill or sub_text -%}
+      {%- set ns.color = sub_fill -%}
+      {%- set ns.decided = true -%}
+    {%- endif -%}
   {%- endif -%}
 {%- endif -%}
-{%- if not ns.color and group -%}
+{%- if not ns.decided and group -%}
   {%- set group_meta = groups.get(group, {}) -%}
   {%- if _matrix_group_applies_color(group_meta, target)|trim -%}
-    {%- set ns.color = _matrix_group_hex(group_meta)|trim -%}
+    {%- set group_fill = _matrix_group_hex(group_meta)|trim -%}
+    {%- set group_text = _matrix_group_text_hex(group_meta)|trim -%}
+    {%- if group_fill or group_text -%}
+      {%- set ns.color = group_fill -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
+{{ ns.color }}
+{%- endmacro %}
+
+{# Text colour for headers or cells. The group that supplies the fill also supplies
+   the text. A text-only colour still applies when that group opted in. #}
+{% macro matrix_column_text(columns, column_groups, index, target) -%}
+{%- set ns = namespace(color='', decided=false) -%}
+{%- set groups = column_groups if column_groups is mapping else {} -%}
+{%- set col = columns[index] if columns is sequence and index is number and index >= 0 and index < (columns|length) else none -%}
+{%- set group = col.get('group', '') if col is mapping else '' -%}
+{%- set subgroup = col.get('subgroup', '') if col is mapping else '' -%}
+{%- if subgroup -%}
+  {%- set sub_meta = groups.get(group ~ '::' ~ subgroup, {}) -%}
+  {%- if _matrix_group_applies_color(sub_meta, target)|trim -%}
+    {%- set sub_fill = _matrix_group_hex(sub_meta)|trim -%}
+    {%- set sub_text = _matrix_group_text_hex(sub_meta)|trim -%}
+    {%- if sub_fill or sub_text -%}
+      {%- set ns.color = sub_text -%}
+      {%- set ns.decided = true -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if not ns.decided and group -%}
+  {%- set group_meta = groups.get(group, {}) -%}
+  {%- if _matrix_group_applies_color(group_meta, target)|trim -%}
+    {%- set group_fill = _matrix_group_hex(group_meta)|trim -%}
+    {%- set group_text = _matrix_group_text_hex(group_meta)|trim -%}
+    {%- if group_fill or group_text -%}
+      {%- set ns.color = group_text -%}
+    {%- endif -%}
   {%- endif -%}
 {%- endif -%}
 {{ ns.color }}
@@ -106,10 +164,11 @@
 {%- endmacro %}
 
 {% macro matrix_column_color_class(columns, column_groups, index, target) -%}
-{%- if matrix_column_fill(columns, column_groups, index, target)|trim %} matrix-group-colored{% endif -%}
+{%- if matrix_column_fill(columns, column_groups, index, target)|trim or matrix_column_text(columns, column_groups, index, target)|trim %} matrix-group-colored{% endif -%}
 {%- endmacro %}
 
 {% macro matrix_column_color_style(columns, column_groups, index, target) -%}
 {%- set fill = matrix_column_fill(columns, column_groups, index, target)|trim -%}
-{%- if fill %} style="--matrix-group-color: {{ fill }};"{% endif -%}
+{%- set text = matrix_column_text(columns, column_groups, index, target)|trim -%}
+{%- if fill or text %} style="{% if fill %}--matrix-group-color: {{ fill }};{% endif %}{% if fill and text %} {% endif %}{% if text %}--matrix-group-text-color: {{ text }};{% endif %}"{% endif -%}
 {%- endmacro %}

@@ -424,6 +424,7 @@
                                         <p class="text-gray-500">{{ _('Write the column code directly, for example income + grant. Codes cannot contain spaces. Functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, ABS, ROUND, IF, BLANK. Operators: + − × ÷ and comparisons. Blank numbers are skipped by SUM and AVERAGE. Ticks are 0 or 1. Division by zero is blank.') }}</p>
                                     </div>
                                     <div class="flex items-center gap-4 flex-wrap">
+                                        <button type="button" class="column-calc-bold is-on" aria-pressed="true" title="{{ _('Bold')|forceescape }}" aria-label="{{ _('Bold')|forceescape }}">B</button>
                                         <label class="flex items-center text-gray-600">
                                             <span class="mr-1">{{ _('Decimals') }}</span>
                                             <input type="number" class="column-calc-decimals shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-14 sm:text-sm border-gray-300 rounded-md" min="0" max="6" step="1" value="0">
@@ -500,11 +501,14 @@
                                     <input type="hidden" class="group-label-translations" value="{}">
                                     <span class="matrix-group-count hidden shrink-0 text-xs opacity-75 whitespace-nowrap"></span>
                                     <div class="group-color-control relative shrink-0">
-                                        <button type="button" class="group-color-toggle" aria-expanded="false" aria-haspopup="dialog" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
-                                            <span>{{ _('Header') }}</span>
-                                            <span class="group-color-swatch" style="background-color:#f3f4f6"></span>
+                                        <button type="button" class="group-color-toggle" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ _('Background and text colour of this group')|forceescape }}" title="{{ _('Background and text colour of this group. Grey matches the other column headers.')|forceescape }}">
+                                            <span class="group-color-swatch" style="background-color:#f3f4f6"><span class="group-color-swatch-text" style="color:#4b5563">A</span></span>
                                         </button>
-                                        <div class="group-color-panel hidden" role="dialog" aria-label="{{ _('Group header colour')|forceescape }}">
+                                        <div class="group-color-panel hidden" role="dialog" data-color-target="background" aria-label="{{ _('Group header colour')|forceescape }}">
+                                            <div class="group-color-tabs" role="tablist">
+                                                <button type="button" class="group-color-tab is-active" role="tab" aria-selected="true" data-color-target="background">{{ _('Background') }}</button>
+                                                <button type="button" class="group-color-tab" role="tab" aria-selected="false" data-color-target="text">{{ _('Text') }}</button>
+                                            </div>
                                             <div class="group-color-sv" role="presentation">
                                                 <span class="group-color-sv-cursor"></span>
                                             </div>
@@ -514,11 +518,12 @@
                                                 <input type="text" class="group-header-color-hex" value="#F3F4F6" maxlength="7" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="{{ _('Hex colour')|forceescape }}">
                                             </label>
                                             <input type="hidden" class="group-header-color" value="#f3f4f6">
-                                            <label class="group-apply-color-label hidden" title="{{ _('Colour the column titles in this group on the entry form')|forceescape }}">
+                                            <input type="hidden" class="group-header-text-color" value="">
+                                            <label class="group-apply-color-label hidden" title="{{ _('Use this background and text colour on the column titles in this group')|forceescape }}">
                                                 <input type="checkbox" class="group-apply-header-color rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Apply group colour to column headers')|forceescape }}">
                                                 <span>{{ _('Headers') }}</span>
                                             </label>
-                                            <label class="group-apply-color-label hidden" title="{{ _('Colour the data cells in this group on the entry form')|forceescape }}">
+                                            <label class="group-apply-color-label hidden" title="{{ _('Use this background and text colour on the data cells in this group')|forceescape }}">
                                                 <input type="checkbox" class="group-apply-cell-color rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Apply group colour to cells')|forceescape }}">
                                                 <span>{{ _('Cells') }}</span>
                                             </label>

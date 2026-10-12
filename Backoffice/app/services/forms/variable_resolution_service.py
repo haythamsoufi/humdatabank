@@ -27,9 +27,15 @@ logger = logging.getLogger(__name__)
 # ── Short-TTL per-request-equivalent cache for resolve_variables ───────────────
 # Each Gunicorn worker resolves the same variables for the same AES/version on
 # every cold form load (~2-4 DB queries per variable, no cross-request cache).
-# A 60-second TTL is safe: form saves invalidate the cache naturally via TTL,
-# and the window is short enough that stale values never persist across a user
-# save+reload cycle. Max 100 entries prevents unbounded growth.
+# The cache is per process, so with several workers two requests for the same
+# form can see different snapshots for up to the TTL. To keep that window from
+# surfacing as an empty or inconsistent form:
+#   * results that hit a resolution error are never cached (a transient failure
+#     must not be replayed for the whole TTL),
+#   * preview contexts (no AES id) are never cached (the key would collide
+#     across entities/periods),
+#   * entries are copied on the way in and out so callers can mutate the result.
+# Max 100 entries prevents unbounded growth.
 #
 # Cache key: (aes_id, version_id, row_entity_id)
 # Cache value: (resolved_dict, expires_at)
@@ -50,7 +56,7 @@ def _var_cache_get(key: Tuple) -> Optional[Dict]:
         with _var_cache_lock:
             _var_cache.pop(key, None)
         return None
-    return resolved
+    return dict(resolved)
 
 
 def _var_cache_set(key: Tuple, resolved: Dict) -> None:
@@ -60,7 +66,7 @@ def _var_cache_set(key: Tuple, resolved: Dict) -> None:
             # Evict the oldest (insertion-order) entry.
             oldest = next(iter(_var_cache))
             _var_cache.pop(oldest, None)
-        _var_cache[key] = (resolved, expires_at)
+        _var_cache[key] = (dict(resolved), expires_at)
 
 
 class VariableResolutionService:
@@ -811,7 +817,8 @@ class VariableResolutionService:
         aes_id = getattr(assignment_entity_status, 'id', None)
         version_id = getattr(template_version, 'id', None) if template_version else None
         _cache_key = (aes_id, version_id, row_entity_id)
-        _cached = _var_cache_get(_cache_key)
+        _cacheable = aes_id is not None
+        _cached = _var_cache_get(_cache_key) if _cacheable else None
         if _cached is not None:
             return _cached
 
@@ -826,6 +833,7 @@ class VariableResolutionService:
 
         resolved = {}
         variables = template_version.variables
+        had_error = False
 
         for variable_name, variable_config in variables.items():
             # EO1, EO2, EO3 are plugin label variables; they are replaced client-side from
@@ -871,6 +879,7 @@ class VariableResolutionService:
 
                 resolved[variable_name] = value
             except Exception as e:
+                had_error = True
                 logger.error(
                     f"Error resolving variable '{variable_name}': {e}",
                     exc_info=True
@@ -883,7 +892,8 @@ class VariableResolutionService:
         for name, value in (builtin_resolved or {}).items():
             resolved.setdefault(name, value)
 
-        _var_cache_set(_cache_key, resolved)
+        if _cacheable and not had_error:
+            _var_cache_set(_cache_key, resolved)
         return resolved
 
     @classmethod

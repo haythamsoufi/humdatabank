@@ -1269,6 +1269,9 @@ def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assig
             if eid is not None and etype:
                 entity_map[int(eid)] = {'entity_id': int(eid), 'entity_type': etype}
 
+    if has_reverse and assignment_level_resolved is None:
+        return None
+
     tick_var_names = []
     if has_reverse and assignment_level_resolved is not None:
         # Reverse lookup: parse auto_load_format JSON blobs from the (already computed,
@@ -1282,13 +1285,16 @@ def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assig
                 continue
             raw = assignment_level_resolved.get(vname)
             if not raw:
-                continue
+                # No value: either no entity references this one, or the variable failed to
+                # resolve. Bootstrap cannot tell which, and the client treats a bootstrap
+                # entry as authoritative (never re-fetches), so defer to the live endpoints.
+                return None
             try:
                 parsed = json.loads(raw) if isinstance(raw, str) else raw
             except (TypeError, ValueError, json.JSONDecodeError):
-                continue
+                return None
             if not isinstance(parsed, dict) or not isinstance(parsed.get('entities'), list):
-                continue
+                return None
             if parsed.get('entity_type') and not entity_type:
                 entity_type = parsed['entity_type']
             for ent in parsed['entities']:
@@ -1422,6 +1428,11 @@ def api_assignment_entry_bootstrap(aes_id):
             resolved_variables,
         )
 
+        if batch is None:
+            # The tick filter could not be evaluated. Omit these matrices so the client
+            # falls back to the live endpoints instead of showing an empty table.
+            pending_tick_filters = []
+
         for item_id_str, candidates in pending_tick_filters:
             filtered = {}
             for eid, ent in candidates['entity_map'].items():
@@ -1438,7 +1449,9 @@ def api_assignment_entry_bootstrap(aes_id):
             auto_load=auto_load,
             resolved_variables=resolved_variables,
         )
-        response.headers['Cache-Control'] = 'private, max-age=30'
+        # Row values and auto-load entities depend on data other users can change, so a
+        # reload must never be served a stale browser-cached copy.
+        response.headers['Cache-Control'] = 'private, no-store'
         return response
     except Exception as e:
         return handle_json_view_exception(e, 'Failed to build entry bootstrap', status_code=500)

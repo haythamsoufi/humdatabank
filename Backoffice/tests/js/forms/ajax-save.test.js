@@ -85,6 +85,64 @@ describe('ajax-save', () => {
     expect(refreshVisibleCompletionRate).not.toHaveBeenCalled();
   });
 
+  describe('auto-filled matrix variable cells', () => {
+    afterEach(() => {
+      delete window.matrixHandler;
+    });
+
+    function stubMatrixHandler() {
+      const snapshot = new Map([['1', new Map([['10_A', '"5"']])]]);
+      window.matrixHandler = {
+        collectMatrixData: vi.fn(),
+        snapshotAutoFilledVariableCells: vi.fn(() => snapshot),
+        commitSavedVariableCells: vi.fn(),
+      };
+      return snapshot;
+    }
+
+    it('commits the snapshot taken before sending after a successful save', async () => {
+      const snapshot = stubMatrixHandler();
+      fetch.mockResolvedValue(mockFetchResponse({
+        ok: true, status: 200, body: { success: true, completion_rate: 1 },
+      }));
+
+      const mod = await loadAjaxSave();
+      mod.initAjaxSave();
+      await mod.saveFormBeforeSubmit({ toast: false, buttonState: false });
+
+      expect(window.matrixHandler.snapshotAutoFilledVariableCells).toHaveBeenCalledTimes(1);
+      expect(window.matrixHandler.commitSavedVariableCells).toHaveBeenCalledWith(snapshot);
+    });
+
+    it('does not commit when the save fails', async () => {
+      stubMatrixHandler();
+      fetch.mockResolvedValue(mockFetchResponse({
+        ok: false, status: 500, body: { success: false, message: 'boom' },
+      }));
+
+      const mod = await loadAjaxSave();
+      mod.initAjaxSave();
+      await expect(
+        mod.saveFormBeforeSubmit({ toast: false, buttonState: false }),
+      ).rejects.toThrow();
+
+      expect(window.matrixHandler.commitSavedVariableCells).not.toHaveBeenCalled();
+    });
+
+    it('does not commit when the save only reached the local draft', async () => {
+      stubMatrixHandler();
+      fetch.mockResolvedValue(mockFetchResponse({
+        ok: true, status: 200, body: { success: true, offline: true, completion_rate: 1 },
+      }));
+
+      const mod = await loadAjaxSave();
+      mod.initAjaxSave();
+      await mod.saveFormBeforeSubmit({ toast: false, buttonState: false });
+
+      expect(window.matrixHandler.commitSavedVariableCells).not.toHaveBeenCalled();
+    });
+  });
+
   it('refetches completion rate when the save response omits it', async () => {
     document.body.innerHTML += '<button id="completion-gap-btn" data-aes-id="9"></button>';
     fetch.mockResolvedValue(mockFetchResponse({

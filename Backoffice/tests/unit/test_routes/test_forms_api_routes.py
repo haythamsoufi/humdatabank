@@ -334,10 +334,12 @@ class TestApiAddDynamicIndicator:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
+        mock_aes.assigned_form.template.published_version_id = None
         mock_section = MagicMock()
         mock_section.section_type = "static"
 
         with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.require_aes_write_lock", return_value=None), \
              patch("app.routes.forms_api.FormSection") as MockSection:
             MockSection.query.get_or_404.return_value = mock_section
             resp = _json_post(
@@ -351,6 +353,7 @@ class TestApiAddDynamicIndicator:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
+        mock_aes.assigned_form.template.published_version_id = None
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
         mock_section.template_id = mock_aes.assigned_form.template_id
@@ -358,6 +361,7 @@ class TestApiAddDynamicIndicator:
         mock_existing = MagicMock()
 
         with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.require_aes_write_lock", return_value=None), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID:
@@ -375,6 +379,7 @@ class TestApiAddDynamicIndicator:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
+        mock_aes.assigned_form.template.published_version_id = None
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
         mock_section.template_id = mock_aes.assigned_form.template_id
@@ -385,6 +390,7 @@ class TestApiAddDynamicIndicator:
         mock_indicator.definition = "Test def"
 
         with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.require_aes_write_lock", return_value=None), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \
@@ -1261,11 +1267,11 @@ class TestEntryBootstrapMatrixCandidates:
         # Non-empty tick_var_names signals "filter me" to the caller.
         assert result['tick_var_names'] == ['rev_var']
 
-    def test_reverse_lookup_without_assignment_level_resolved_skips_reverse_parse(self):
-        """If the caller hasn't computed assignment_level_resolved yet (e.g. no
-        variable_configs at all — which can't happen for this matrix specifically,
-        but is defensively handled), the reverse branch must be skipped rather than
-        resolving again itself (that would defeat the HIGH #3 dedup)."""
+    def test_reverse_lookup_without_assignment_level_resolved_defers_to_live_endpoints(self):
+        """If the assignment-level resolve is unavailable (it failed), the reverse
+        branch must not resolve again itself (that would defeat the HIGH #3 dedup)
+        and must not report an authoritative empty entity list: the client never
+        re-fetches a bootstrap entry, so this would leave the table empty."""
         from app.routes.forms_api import _entry_bootstrap_matrix_candidates
 
         item = self._item(columns=[
@@ -1282,9 +1288,28 @@ class TestEntryBootstrapMatrixCandidates:
             )
 
         mock_resolve.assert_not_called()
-        assert result is not None
-        assert result['entity_map'] == {}
-        assert result['tick_var_names'] == []
+        assert result is None
+
+    @pytest.mark.parametrize('resolved', [
+        {'rev_var': None},
+        {'rev_var': ''},
+        {},
+        {'rev_var': 'not json'},
+        {'rev_var': json.dumps({'entities': 'oops'})},
+    ])
+    def test_reverse_lookup_without_usable_value_defers_to_live_endpoints(self, resolved):
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'tick_col', 'is_variable': True, 'variable': 'rev_var', 'type': 'tick'},
+        ])
+        result = _entry_bootstrap_matrix_candidates(
+            aes=MagicMock(), matrix_item=item,
+            variable_configs={'rev_var': {'entity_scope': 'entities_containing'}},
+            assignment_level_resolved=resolved,
+        )
+
+        assert result is None
 
 
 class TestDiscussionCommentsApi:

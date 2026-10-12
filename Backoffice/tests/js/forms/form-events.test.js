@@ -104,7 +104,7 @@ describe('initFormEvents', () => {
     const event = dispatchFormSubmit(form, submitBtn, { forcePresave: true });
 
     expect(event.defaultPrevented).toBe(true);
-    expect(saveFormBeforeSubmit).toHaveBeenCalledWith({ toast: false });
+    expect(saveFormBeforeSubmit).toHaveBeenCalledWith({ toast: false, action: 'save' });
     expect(collectHidden).toHaveBeenCalled();
     expect(window.showFlashMessage).toHaveBeenCalledWith('Saving your latest changes…', 'info');
 

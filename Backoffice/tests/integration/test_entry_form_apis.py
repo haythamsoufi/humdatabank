@@ -861,3 +861,96 @@ class TestEntryFormFormsApiEntryBootstrap:
             assert mock_batch.call_count == 1
             batch_call_entity_ids = set(mock_batch.call_args.args[2])
             assert batch_call_entity_ids == {7, 8}
+
+    def _make_reverse_tick_matrix(self, db_session, template, aes):
+        version_id = template.published_version_id
+
+        from app.models import FormTemplateVersion
+        version = db_session.get(FormTemplateVersion, version_id)
+        version.variables = {'rev_var': {'entity_scope': 'entities_containing'}}
+        db_session.commit()
+
+        section = FormSection(
+            template_id=template.id, version_id=version_id, name="Matrix Section", order=1,
+        )
+        db_session.add(section)
+        db_session.flush()
+        matrix_item = FormItem(
+            section_id=section.id,
+            version_id=version_id,
+            template_id=template.id,
+            item_type='matrix',
+            label='Reverse auto-load matrix',
+            order=1,
+            config={
+                'matrix_config': {
+                    'auto_load_entities': True,
+                    'row_mode': 'list_library',
+                    'columns': [
+                        {'name': 'tick_col', 'is_variable': True, 'variable': 'rev_var', 'type': 'tick'},
+                    ],
+                }
+            },
+        )
+        db_session.add(matrix_item)
+        db_session.commit()
+        return matrix_item.id
+
+    def test_failed_batch_resolve_does_not_report_an_empty_auto_load(self, client, db_session, app):
+        """If the batch resolve fails, the tick filter was never evaluated. The matrix must
+        be left out of `auto_load` (so the client falls back to the live endpoints) rather
+        than reported as authoritatively empty, which the client would never re-fetch."""
+        with app.app_context():
+            user = create_test_user(db_session, role="system_manager")
+            _login(client, user.id)
+            template, aes = self._make_assignment(db_session)
+            matrix_item_id = self._make_reverse_tick_matrix(db_session, template, aes)
+
+            assignment_level_resolved = {
+                'rev_var': json.dumps({
+                    'entity_type': 'country',
+                    'entities': [{'entity_id': 7, 'entity_type': 'country'}],
+                }),
+            }
+            with patch(
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables",
+                return_value=assignment_level_resolved,
+            ), patch(
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables_batch",
+                side_effect=RuntimeError("transient db error"),
+            ):
+                resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert str(matrix_item_id) not in data["auto_load"]
+            assert "7" not in data["resolved_variables"]
+
+    def test_failed_assignment_level_resolve_does_not_report_an_empty_auto_load(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="system_manager")
+            _login(client, user.id)
+            template, aes = self._make_assignment(db_session)
+            matrix_item_id = self._make_reverse_tick_matrix(db_session, template, aes)
+
+            with patch(
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables",
+                side_effect=RuntimeError("transient db error"),
+            ):
+                resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+
+            assert resp.status_code == 200
+            assert str(matrix_item_id) not in resp.get_json()["auto_load"]
+
+    def test_response_is_never_browser_cached(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="system_manager")
+            _login(client, user.id)
+            _, aes = self._make_assignment(db_session)
+
+            resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+
+            assert resp.status_code == 200
+            cache_control = resp.headers.get("Cache-Control", "")
+            assert "no-store" in cache_control
+            assert "max-age" not in cache_control

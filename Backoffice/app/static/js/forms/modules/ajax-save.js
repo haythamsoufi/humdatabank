@@ -190,6 +190,7 @@ async function saveFormOnce(options = {}) {
     // into multiple WAF-safe-length arguments after FormData has snapshotted
     // them (see matrix-field-chunking.js).
     let restoreChunkedMatrixFields = null;
+    let autoFilledSnapshot = null;
 
     try {
         debugLog(MODULE_NAME, '💾 Saving form...');
@@ -198,6 +199,9 @@ async function saveFormOnce(options = {}) {
         if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
             window.matrixHandler.collectMatrixData();
             debugLog(MODULE_NAME, '✅ Matrix data collected');
+        }
+        if (window.matrixHandler && typeof window.matrixHandler.snapshotAutoFilledVariableCells === 'function') {
+            autoFilledSnapshot = window.matrixHandler.snapshotAutoFilledVariableCells();
         }
 
         // Base64-wrap free-text / emergency JSON / emergency select values
@@ -340,6 +344,10 @@ async function saveFormOnce(options = {}) {
 
         if (result.success) {
             debugLog(MODULE_NAME, 'Form saved successfully');
+            if (autoFilledSnapshot && !result.offline
+                && window.matrixHandler && typeof window.matrixHandler.commitSavedVariableCells === 'function') {
+                window.matrixHandler.commitSavedVariableCells(autoFilledSnapshot);
+            }
             const toastOpt = (options && Object.prototype.hasOwnProperty.call(options, 'toast')) ? options.toast : undefined;
             const toastEnabled = (toastOpt === undefined) ? true : !!toastOpt;
             if (toastEnabled) {

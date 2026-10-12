@@ -5,7 +5,7 @@ import {
     normalizeChartPayload,
     normalizeBarChartPayload,
     normalizePieChartPayload
-} from '../../../app/static/js/reports/chart-payload-normalize.js';
+} from '../../app/static/js/reports/chart-payload-normalize.js';
 
 describe('ReportChartNormalize', () => {
     test('normalizeChartPayload accepts line series', () => {

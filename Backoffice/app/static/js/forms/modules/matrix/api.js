@@ -3,12 +3,14 @@
 import { debugLog, debugError, debugWarn } from '../debug.js';
 import { _t } from './shared.js';
 import {
+    __deserializeMatrixData,
     __formatLookupValueForInput,
     __formatSavedScalarForInput,
     __getSavedMatrixCellScalar,
     __persistVariableCellScalar,
     __readMatrixMaxDecimals,
     __savedVariableCellIsStaleLookupMirror,
+    __serializeMatrixData,
     __setMatrixNumericCellDisplay,
     __variableCellDiffersFromLookup,
 } from './formatting.js';
@@ -591,6 +593,11 @@ async resolveVariablesForAllRows(fieldId) {
         return;
     }
 
+    if (!this._variableResolveIssued) this._variableResolveIssued = new Map();
+    if (!this._variableResolveApplied) this._variableResolveApplied = new Map();
+    const resolveSeq = (this._variableResolveIssued.get(fieldId) || 0) + 1;
+    this._variableResolveIssued.set(fieldId, resolveSeq);
+
     try {
         const rowEntityIds = rowsToResolve.map(r => r.entityId);
 
@@ -636,6 +643,14 @@ async resolveVariablesForAllRows(fieldId) {
             });
             batchResults = data.results || {};
         }
+
+        // Overlapping resolves (restore, auto-load, row adds) can finish out of order.
+        // A response older than one already applied must not overwrite newer values.
+        if ((this._variableResolveApplied.get(fieldId) || 0) > resolveSeq) {
+            debugLog('matrix-handler', '[BATCH VARIABLE RESOLUTION] Dropping superseded response', { fieldId, resolveSeq });
+            return;
+        }
+        this._variableResolveApplied.set(fieldId, resolveSeq);
 
         // Process results for each row
         rowsToResolve.forEach(rowInfo => {
@@ -703,7 +718,15 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
             return;
         }
 
-        const hasSaved = cellKey && matrix.data && matrix.data[cellKey] !== undefined;
+        if (!matrix.autoFilledVariableCells) matrix.autoFilledVariableCells = new Set();
+        const autoFilled = matrix.autoFilledVariableCells;
+        const hasStoredCell = cellKey && matrix.data && matrix.data[cellKey] !== undefined;
+        // A value this handler copied from the lookup is not a saved value: it keeps
+        // following the lookup until the user edits it, so a later resolve that returns
+        // something different cannot flag the whole table as "modified".
+        const followsLookup = hasStoredCell && autoFilled.has(cellKey) && input.dataset.userEdited !== '1';
+        const hasSaved = hasStoredCell && !followsLookup;
+        if (hasSaved && cellKey) autoFilled.delete(cellKey);
         const savedRaw = hasSaved ? matrix.data[cellKey] : undefined;
         let savedScalar = hasSaved
             ? __getSavedMatrixCellScalar(savedRaw)
@@ -739,11 +762,93 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
                 );
                 if (persisted !== '') {
                     matrix.data[cellKey] = persisted;
+                    autoFilled.add(cellKey);
+                } else if (followsLookup) {
+                    delete matrix.data[cellKey];
+                    autoFilled.delete(cellKey);
                 }
             }
         }
 
         this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
+    });
+},
+
+/**
+ * Run `fn` while every matrix hidden field omits auto-filled variable cells the user has
+ * not edited. Local drafts use this view: values the page copied from a lookup are not
+ * the user's work, so opening a form must not leave a draft behind (and a later restore
+ * must not pin those values as if they had been entered). Hidden fields are restored
+ * before returning.
+ */
+withAutoFilledCellsStripped(fn) {
+    const restores = [];
+    this.matrices.forEach((matrix) => {
+        const autoFilled = matrix.autoFilledVariableCells;
+        const hidden = matrix.hiddenField;
+        if (!autoFilled || autoFilled.size === 0 || !hidden || !matrix.container) return;
+        const data = __deserializeMatrixData(hidden.value);
+        if (!data) return;
+        const edited = new Set();
+        matrix.container.querySelectorAll('input[data-cell-key]').forEach((input) => {
+            if (input.dataset.userEdited === '1') edited.add(input.dataset.cellKey);
+        });
+        let changed = false;
+        autoFilled.forEach((cellKey) => {
+            if (!edited.has(cellKey) && Object.prototype.hasOwnProperty.call(data, cellKey)) {
+                delete data[cellKey];
+                changed = true;
+            }
+        });
+        if (!changed) return;
+        const previous = hidden.value;
+        hidden.value = __serializeMatrixData(data);
+        restores.push(() => { hidden.value = previous; });
+    });
+    try {
+        return fn();
+    } finally {
+        restores.forEach((restore) => restore());
+    }
+},
+
+/**
+ * Capture which auto-filled variable cells are about to be sent to the server,
+ * together with the value being sent. Pair with commitSavedVariableCells.
+ * @returns {Map<string, Map<string, string>>}
+ */
+snapshotAutoFilledVariableCells() {
+    const snapshot = new Map();
+    this.matrices.forEach((matrix, fieldId) => {
+        const autoFilled = matrix.autoFilledVariableCells;
+        if (!autoFilled || autoFilled.size === 0) return;
+        const cells = new Map();
+        autoFilled.forEach((cellKey) => {
+            if (matrix.data && matrix.data[cellKey] !== undefined) {
+                cells.set(cellKey, JSON.stringify(matrix.data[cellKey]));
+            }
+        });
+        if (cells.size > 0) snapshot.set(fieldId, cells);
+    });
+    return snapshot;
+},
+
+/**
+ * After a successful save, auto-filled cells whose value was persisted are real
+ * saved values: later lookup differences are legitimate modifications. Cells that
+ * changed while the request was in flight stay auto-filled.
+ */
+commitSavedVariableCells(snapshot) {
+    if (!snapshot || typeof snapshot.forEach !== 'function') return;
+    snapshot.forEach((cells, fieldId) => {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix || !matrix.autoFilledVariableCells) return;
+        cells.forEach((sentJson, cellKey) => {
+            if (!matrix.autoFilledVariableCells.has(cellKey)) return;
+            if (JSON.stringify(matrix.data?.[cellKey]) === sentJson) {
+                matrix.autoFilledVariableCells.delete(cellKey);
+            }
+        });
     });
 },
 

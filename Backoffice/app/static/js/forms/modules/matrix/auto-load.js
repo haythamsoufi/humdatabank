@@ -10,6 +10,18 @@ export const matrixAutoLoadMixin = {
  * Auto-load entities from saved matrix data based on variable configurations
  */
 async autoLoadEntities(fieldId) {
+    // The flag blocks scheduled variable resolution while rows are being loaded. Every
+    // early return in the implementation must release it, otherwise rows added later
+    // are never resolved and their variable cells stay empty.
+    this.batchOperationsInProgress.add(fieldId);
+    try {
+        return await this._autoLoadEntitiesImpl(fieldId);
+    } finally {
+        this.batchOperationsInProgress.delete(fieldId);
+    }
+},
+
+async _autoLoadEntitiesImpl(fieldId) {
     // Mark that we're in a batch operation to prevent scheduled resolutions
     this.batchOperationsInProgress.add(fieldId);
 

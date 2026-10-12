@@ -266,9 +266,12 @@ describe('assignment /1593 returning visitor after ajax-save.js deploy', () => {
   });
 
   describe('upload script rewrites JS/CSS headers every deploy', () => {
-    it('lists local js/css for Cache-Control even when AzCopy dry-run is empty', () => {
-      expect(UPLOAD_SCRIPT).toMatch(/_list_local_js_css/);
-      expect(UPLOAD_SCRIPT).toMatch(/Always rewrite JS\/CSS Cache-Control/);
+    it('copies js/css with the revalidate header and overwrites even when bytes match', () => {
+      const jsCssPass = UPLOAD_SCRIPT.match(
+        /azcopy copy[^\n]*\\\n(?:[^\n]*\\\n)*?[^\n]*--include-pattern="\*\.js;\*\.css"[^\n]*\\\n(?:[^\n]*\\\n)*?[^\n]*--cache-control="\$\{CACHE_CONTROL_REVALIDATE\}"/,
+      );
+      expect(jsCssPass).not.toBeNull();
+      expect(UPLOAD_SCRIPT).toMatch(/--overwrite=true/);
       expect(UPLOAD_SCRIPT).not.toMatch(/skipping sync and Cache-Control pass/);
     });
   });

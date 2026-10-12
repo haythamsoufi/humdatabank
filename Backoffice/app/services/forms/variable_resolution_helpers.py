@@ -36,7 +36,7 @@ def resolve_assignment_level_variables(
         resolved_variables[''] = assignment_level_resolved or {}
         resolved_variables['assignment'] = assignment_level_resolved or {}
     except Exception as exc:
-        logger.debug('assignment-level variable resolve failed: %s', exc)
+        logger.warning('assignment-level variable resolve failed: %s', exc, exc_info=True)
 
     return resolved_variables, assignment_level_resolved
 
@@ -46,11 +46,13 @@ def merge_batch_resolved_variables(
     assignment_entity_status,
     row_entity_ids: Iterable[int],
     resolved_variables: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> Dict[Any, Dict[str, Any]]:
+) -> Optional[Dict[Any, Dict[str, Any]]]:
     """
     Batch-resolve variables for matrix row entities and merge into ``resolved_variables``.
 
     Returns the raw batch mapping from ``VariableResolutionService.resolve_variables_batch``.
+    Returns ``None`` when the batch resolve failed, so callers can tell "nothing to resolve"
+    (``{}``) apart from "could not resolve" and avoid reporting an empty result as authoritative.
     """
     from app.services.forms.variable_resolution_service import VariableResolutionService
 
@@ -66,8 +68,8 @@ def merge_batch_resolved_variables(
             entity_ids,
         ) or {}
     except Exception as exc:
-        logger.debug('batch variable resolve failed: %s', exc)
-        return {}
+        logger.warning('batch variable resolve failed: %s', exc, exc_info=True)
+        return None
 
     for rid, vals in batch.items():
         target[str(rid)] = vals

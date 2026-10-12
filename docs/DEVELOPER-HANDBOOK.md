@@ -396,6 +396,17 @@ python scripts/ai/seed_low_quality_review.py
 python scripts/ai/seed_low_quality_review.py --trace-id 99999999 --create-trace-if-missing
 ```
 
+### Entry-form browser test (opt-in)
+`Backoffice/tests/e2e_browser/` drives the real entry form in Chrome against the app served from the pytest process (editable variable matrix cells: repeated reloads, overlapping resolves, failing endpoints, save). It is skipped unless `E2E_BROWSER=1`, and needs Node, `playwright-core` (`npm i --no-save playwright-core` in `Backoffice/`) and a Chrome/Chromium binary (`CHROME_PATH` to override):
+```bash
+cd Backoffice && E2E_BROWSER=1 python -m pytest tests/e2e_browser -s
+```
+
+### Matrix variable cells: saved vs auto-filled
+Editable variable cells that the client fills from a lookup are tracked in `matrix.autoFilledVariableCells`; only a value that was loaded from the server, edited by the user, or successfully saved counts as "saved" (and can be highlighted when it differs from the lookup). A disabled input is never treated as user-cleared — only `data-user-edited="1"` is — otherwise leaving the page stores a draft of blank values that turns every cell empty and green on the next load.
+
+Local drafts (`auth-drafts.js`) are captured through `matrixHandler.withAutoFilledCellsStripped()`, which hides auto-filled, non-edited cells from the baseline and the draft diff. Opening an assignment page therefore never creates a draft; a real edit still does, and restoring it keeps the existing auto-loaded rows (rows are de-duplicated by `data-row-id`).
+
 ### AI review queue scripts (Backoffice)
 - `scripts/ai/trigger_automated_trace_review.py` – exports pending/in-review trace packets from `ai_trace_reviews`/`ai_reasoning_traces` for automated terminal processing (`text` or `jsonl`), with paging and optional `--claim-in-review`.
 - `scripts/ai/seed_low_quality_review.py` – marks a trace as low-quality (`llm_needs_review=True`) and creates/resets a pending review row; use for deterministic end-to-end testing of review queue workflows.

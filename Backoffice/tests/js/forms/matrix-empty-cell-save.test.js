@@ -9,6 +9,11 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
   debugWarn: vi.fn(),
 }));
 
+function decodeHiddenPayload(value) {
+  if (!value.startsWith('b64:')) return value;
+  return decodeURIComponent(escape(atob(value.slice(4))));
+}
+
 describe('matrixHandler.updateMatrixData empty numeric cells', () => {
   let matrixHandler;
 
@@ -48,6 +53,7 @@ describe('matrixHandler.updateMatrixData empty numeric cells', () => {
     matrix.data['row1_Amount'] = 42;
 
     input.value = '';
+    input.dataset.userEdited = '1';
     matrixHandler.updateMatrixData('99', input);
 
     expect(matrix.data).not.toHaveProperty('row1_Amount');
@@ -62,7 +68,7 @@ describe('matrixHandler.updateMatrixData empty numeric cells', () => {
 
     const matrix = matrixHandler.matrices.get('99');
     expect(matrix.data['row1_Amount']).toBe(0);
-    expect(JSON.parse(matrix.hiddenField.value)).toEqual({ row1_Amount: 0 });
+    expect(JSON.parse(decodeHiddenPayload(matrix.hiddenField.value))).toEqual({ row1_Amount: 0 });
   });
 
   it('does not add a key for a cell that was never filled', () => {

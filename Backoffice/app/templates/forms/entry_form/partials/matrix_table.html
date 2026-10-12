@@ -105,6 +105,7 @@
                    data-row-id="{{ row_id }}"
                    data-column="Total"
                    data-cell-key="{{ total_cell_key }}"
+                   autocomplete="off"
                    data-is-row-total="true"
                    data-row-total-validation="{{ row_total_validation }}"
                    value="{{ _total_prefill.display }}"
@@ -524,6 +525,7 @@
                                                data-row-id="{{ row_id }}"
                                                data-column="{{ column_name }}"
                                                data-cell-key="{{ cell_key }}"
+                                               autocomplete="off"
                                                data-column-type="calculated"
                                                data-calculated="true"
                                                data-max-decimals="{{ calc_decimals }}"
@@ -546,6 +548,7 @@
                                                    data-row-id="{{ row_id }}"
                                                    data-column="{{ column_name }}"
                                                    data-cell-key="{{ cell_key }}"
+                                                   autocomplete="off"
                                                    data-column-type="variable"
                                                    data-variable-name="{{ column_variable }}"
                                                    data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
@@ -564,6 +567,7 @@
                                                    data-row-id="{{ row_id }}"
                                                    data-column="{{ column_name }}"
                                                    data-cell-key="{{ cell_key }}"
+                                                   autocomplete="off"
                                                    data-column-type="variable"
                                                    data-variable-name="{{ column_variable }}"
                                                    data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
@@ -584,6 +588,7 @@
                                                data-row-id="{{ row_id }}"
                                                data-column="{{ column_name }}"
                                                data-cell-key="{{ cell_key }}"
+                                               autocomplete="off"
                                                data-column-type="tick"
                                                value="1"
                                                {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
@@ -597,6 +602,7 @@
                                                data-row-id="{{ row_id }}"
                                                data-column="{{ column_name }}"
                                                data-cell-key="{{ cell_key }}"
+                                               autocomplete="off"
                                                data-column-type="number"
                                                value="{{ cell_value }}"
                                                {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
@@ -661,6 +667,7 @@
     <input type="hidden"
            name="field_value[{{ field.id }}]"
            id="matrix-data-{{ field.id }}"
+           autocomplete="off"
            value='{{ existing_matrix_data | tojson if existing_matrix_data else "" }}'>
 </div>
 

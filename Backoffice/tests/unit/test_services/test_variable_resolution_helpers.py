@@ -43,3 +43,21 @@ def test_merge_batch_resolved_variables_merges_into_target():
     assert result == batch
     assert target['42'] == {'row_var': 'yes'}
     assert target['assignment'] == {'x': 1}
+
+
+def test_merge_batch_resolved_variables_returns_none_when_batch_fails():
+    """None (not {}) lets callers tell "could not resolve" from "nothing to resolve"."""
+    target = {'assignment': {'x': 1}}
+
+    with patch(
+        'app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables_batch',
+        side_effect=RuntimeError('db down'),
+    ):
+        result = merge_batch_resolved_variables(MagicMock(), MagicMock(), [42], target)
+
+    assert result is None
+    assert target == {'assignment': {'x': 1}}
+
+
+def test_merge_batch_resolved_variables_returns_empty_when_nothing_to_resolve():
+    assert merge_batch_resolved_variables(MagicMock(), MagicMock(), []) == {}

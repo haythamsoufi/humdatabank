@@ -10,33 +10,6 @@ String formatOfflineCopySize(int bytes) {
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
-/// Saved copies of one form template (one per assignment/entity).
-class OfflineTemplateGroup {
-  OfflineTemplateGroup({required this.templateId, required this.title});
-
-  final int? templateId;
-  final String title;
-  final List<OfflineCopySummary> copies = [];
-
-  int get sizeBytes => copies.fold(0, (sum, c) => sum + c.sizeBytes);
-}
-
-/// Groups copies by template (copies without a known template stand alone).
-List<OfflineTemplateGroup> groupOfflineCopies(List<OfflineCopySummary> copies) {
-  final groups = <String, OfflineTemplateGroup>{};
-  for (final c in copies) {
-    final key = c.templateId != null ? 't${c.templateId}' : 'a${c.assignmentId}';
-    final title = (c.title != null && c.title!.isNotEmpty)
-        ? c.title!
-        : '#${c.assignmentId}';
-    groups.putIfAbsent(
-      key,
-      () => OfflineTemplateGroup(templateId: c.templateId, title: title),
-    ).copies.add(c);
-  }
-  return groups.values.toList();
-}
-
 /// Lists the forms saved for offline use and lets the user free the space.
 Future<void> showOfflineStorageSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -56,7 +29,7 @@ class _OfflineStorageSheet extends StatefulWidget {
 
 class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
   final _service = AssignmentOfflineBundleService();
-  List<OfflineCopySummary>? _copies;
+  List<OfflinePackageSummary>? _packages;
   bool _autoDownload = false;
 
   @override
@@ -69,19 +42,12 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
   }
 
   Future<void> _reload() async {
-    final copies = await _service.listSavedCopies();
-    if (mounted) setState(() => _copies = copies);
+    final packages = await _service.listPackages();
+    if (mounted) setState(() => _packages = packages);
   }
 
-  Future<void> _remove(OfflineTemplateGroup group) async {
-    final id = group.templateId;
-    if (id != null) {
-      await _service.deleteBundlesForTemplate(id);
-    } else {
-      for (final c in group.copies) {
-        await _service.deleteBundle(c.assignmentId);
-      }
-    }
+  Future<void> _remove(OfflinePackageSummary package) async {
+    await _service.removePackage(package);
     await _reload();
   }
 
@@ -120,9 +86,8 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final copies = _copies;
-    final total = copies?.fold<int>(0, (sum, c) => sum + c.sizeBytes) ?? 0;
-    final groups = groupOfflineCopies(copies ?? const []);
+    final packages = _packages;
+    final total = packages?.fold<int>(0, (sum, c) => sum + c.sizeBytes) ?? 0;
 
     return SafeArea(
       child: ConstrainedBox(
@@ -146,7 +111,7 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                           style: GroupedSheetStyle.title(context),
                         ),
                         Text(
-                          copies == null || copies.isEmpty
+                          packages == null || packages.isEmpty
                               ? loc.offlineStorageSubtitle
                               : '${loc.offlineStorageSubtitle} · ${formatOfflineCopySize(total)}',
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -156,7 +121,7 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                       ],
                     ),
                   ),
-                  if (copies != null && copies.isNotEmpty)
+                  if (packages != null && packages.isNotEmpty)
                     TextButton(
                       onPressed: _removeAll,
                       child: Text(loc.offlineStorageRemoveAll),
@@ -171,12 +136,12 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
               subtitle: Text(loc.offlineStorageAutoDownloadHint),
             ),
             Divider(height: 1, color: GroupedSheetStyle.hairline(context)),
-            if (copies == null)
+            if (packages == null)
               const Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (copies.isEmpty)
+            else if (packages.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(child: Text(loc.offlineStorageEmpty)),
@@ -186,17 +151,11 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  itemCount: groups.length,
+                  itemCount: packages.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
-                    final g = groups[i];
-                    final newest = g.copies
-                        .map((c) => c.savedAt)
-                        .whereType<DateTime>()
-                        .fold<DateTime?>(
-                          null,
-                          (a, b) => a == null || b.isAfter(a) ? b : a,
-                        );
+                    final g = packages[i];
+                    final newest = g.savedAt;
                     return Material(
                       color: GroupedSheetStyle.card(context),
                       shape: RoundedRectangleBorder(
@@ -210,7 +169,9 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                       clipBehavior: Clip.antiAlias,
                       child: ListTile(
                         title: Text(
-                          g.title,
+                          (g.title != null && g.title!.isNotEmpty)
+                              ? g.title!
+                              : '#${g.assignmentIds.isEmpty ? g.key : g.assignmentIds.first}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyLarge?.copyWith(
@@ -220,7 +181,7 @@ class _OfflineStorageSheetState extends State<_OfflineStorageSheet> {
                         ),
                         subtitle: Text(
                           [
-                            '${loc.offlineStorageCopies}: ${g.copies.length}',
+                            '${loc.offlineStorageCopies}: ${g.assignmentIds.length}',
                             formatOfflineCopySize(g.sizeBytes),
                             if (newest != null) _dateLabel(newest),
                           ].join(' · '),

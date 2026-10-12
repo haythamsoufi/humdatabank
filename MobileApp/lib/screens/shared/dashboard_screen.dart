@@ -11,7 +11,6 @@ import '../../providers/shared/language_provider.dart';
 import '../../providers/shared/offline_provider.dart';
 import '../../widgets/dashboard_grouped_assignment_card.dart';
 import '../../config/routes.dart';
-import '../../config/app_config.dart';
 import '../../theme/grouped_dashboard_palette.dart';
 import '../../theme/grouped_sheet_style.dart';
 import '../../widgets/sheets/native_modal_sheet.dart';
@@ -19,7 +18,6 @@ import '../../utils/constants.dart';
 import '../../utils/ios_constants.dart';
 import '../../models/shared/assignment.dart';
 import '../../l10n/app_localizations.dart';
-import '../../services/client_diagnostics_service.dart';
 import '../../utils/debug_logger.dart';
 import '../../widgets/app_bar.dart';
 import '../../widgets/loading_indicator.dart';
@@ -28,11 +26,8 @@ import '../../widgets/app_fade_in_up.dart';
 import '../../widgets/dashboard_focal_points_section.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
 import '../../services/assignment_offline_bundle_service.dart';
-import '../../services/connectivity_service.dart';
-import '../../services/offline_api_recorder.dart';
-import '../../services/storage_service.dart';
+import '../../services/offline/offline_forms_controller.dart';
 import '../../utils/network_availability.dart';
-import '../../di/service_locator.dart';
 import '../public/webview_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -61,17 +56,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   // Track if we've completed at least one load to avoid showing empty state prematurely
   bool _hasLoadedOnce = false;
 
-  final Set<int> _offlineBundleAssignmentIds = {};
-  final Set<int> _downloadingOfflineAssignmentIds = {};
-  final Set<int> _staleOfflineBundleAssignmentIds = {};
-  String? _dismissedStaleBundleSignature;
+  final OfflineFormsController _offlineForms = OfflineFormsController();
+  bool _staleBannerDismissed = false;
+  bool _wasOnline = true;
   OfflineProvider? _offlineProviderListenerRef;
-  bool _offlineStaleAutoRefreshInProgress = false;
-  bool _templatePrefetchInProgress = false;
-  /// Assignments whose background preparation failed, with the time of failure;
-  /// retried after [_templatePrefetchRetryAfter].
-  final Map<int, DateTime> _templatePrefetchFailedAt = {};
-  static const Duration _templatePrefetchRetryAfter = Duration(minutes: 10);
   DashboardProvider? _dashboardProviderListenerRef;
   String _lastAssignmentSetSignature = '';
 
@@ -117,10 +105,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         listen: false,
       );
       _dashboardProviderListenerRef!.addListener(_onDashboardProviderChanged);
-      AssignmentOfflineBundleService.savedCopiesChanged
-          .addListener(_onSavedCopiesChanged);
-      AssignmentOfflineBundleService.autoDownloadChanged
-          .addListener(_onAutoDownloadChanged);
+      _wasOnline = _offlineProviderListenerRef!.isOnline;
+      _offlineForms.addListener(_onOfflineFormsChanged);
+      AssignmentOfflineBundleService.autoDownloadChanged.addListener(
+        _onAutoDownloadChanged,
+      );
     });
   }
 
@@ -128,10 +117,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   void dispose() {
     _offlineProviderListenerRef?.removeListener(_onOfflineProviderChanged);
     _dashboardProviderListenerRef?.removeListener(_onDashboardProviderChanged);
-    AssignmentOfflineBundleService.savedCopiesChanged
-        .removeListener(_onSavedCopiesChanged);
-    AssignmentOfflineBundleService.autoDownloadChanged
-        .removeListener(_onAutoDownloadChanged);
+    _offlineForms.removeListener(_onOfflineFormsChanged);
+    AssignmentOfflineBundleService.autoDownloadChanged.removeListener(
+      _onAutoDownloadChanged,
+    );
     _scrollController.removeListener(_onDashboardScroll);
     _scrollController.dispose();
     _animationController.dispose();
@@ -164,31 +153,29 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  void _onOfflineFormsChanged() {
+    if (!mounted) return;
+    if (!_offlineForms.hasOutdatedPackages) _staleBannerDismissed = false;
+    setState(() {});
+  }
+
+  /// A connection that comes back is the moment to catch up on saved forms.
   void _onOfflineProviderChanged() {
     if (!mounted) return;
-    unawaited(_tryAutoRefreshStaleOfflineCopies());
+    final online = _offlineProviderListenerRef?.isOnline ?? true;
+    final regained = online && !_wasOnline;
+    _wasOnline = online;
+    if (regained) unawaited(_reconcileOfflineForms(clearFailures: true));
   }
 
   void _onAutoDownloadChanged() {
     if (!mounted) return;
-    _templatePrefetchFailedAt.clear();
-    unawaited(_prepareAssignmentsForSavedTemplates());
+    unawaited(_reconcileOfflineForms(clearFailures: true));
   }
 
-  void _onSavedCopiesChanged() {
-    if (!mounted) return;
-    final provider = _dashboardProviderListenerRef;
-    if (provider == null) return;
-    unawaited(
-      _syncOfflineBundleAndStaleState(
-        provider.currentAssignments,
-        provider.pastAssignments,
-      ),
-    );
-  }
-
-  /// The assignment list changes when another entity is selected; offline copy
-  /// state is keyed by assignment id, so it has to be recomputed for the new list.
+  /// The assignment list changes when another entity is selected. Offline state
+  /// belongs to the template, so this only refreshes what is shown and adds the
+  /// new entity's pages; it never downloads a saved template again.
   void _onDashboardProviderChanged() {
     if (!mounted) return;
     final provider = _dashboardProviderListenerRef;
@@ -200,150 +187,38 @@ class _DashboardScreenState extends State<DashboardScreen>
     ].join(',');
     if (signature == _lastAssignmentSetSignature) return;
     _lastAssignmentSetSignature = signature;
-    unawaited(() async {
-      await _syncOfflineBundleAndStaleState(
-        provider.currentAssignments,
-        provider.pastAssignments,
-      );
-      await _prepareAssignmentsForSavedTemplates();
-    }());
+    unawaited(_reconcileOfflineForms());
   }
 
-  /// Offline forms are saved per template, not per entity. Assignments (for the
-  /// current entity) that use a template already saved on this device get their
-  /// own copy prepared automatically; shared static files are reused locally.
-  Future<void> _prepareAssignmentsForSavedTemplates() async {
-    if (!mounted || _templatePrefetchInProgress || shouldDeferRemoteFetch) {
-      return;
-    }
+  OfflineFormsEnvironment _offlineEnvironment() {
     final offline = Provider.of<OfflineProvider>(context, listen: false);
-    if (!offline.isOnline) return;
-    if (!await ConnectivityService().isOnUnmeteredNetwork()) return;
-    if (!mounted) return;
+    return OfflineFormsEnvironment(
+      language: Provider.of<LanguageProvider>(
+        context,
+        listen: false,
+      ).currentLanguage,
+      submitBlockedMessage: AppLocalizations.of(
+        context,
+      )!.offlineSubmitRequiresConnection,
+      online: offline.isOnline && !shouldDeferRemoteFetch,
+    );
+  }
 
-    final dashboardProvider = Provider.of<DashboardProvider>(
-      context,
-      listen: false,
-    );
-    final languageProvider = Provider.of<LanguageProvider>(
-      context,
-      listen: false,
-    );
+  Future<void> _reconcileOfflineForms({bool clearFailures = false}) async {
+    if (!mounted) return;
+    final provider = Provider.of<DashboardProvider>(context, listen: false);
     final role = Provider.of<AuthProvider>(context, listen: false).user?.role;
-
-    _templatePrefetchInProgress = true;
     try {
-      final svc = AssignmentOfflineBundleService();
-      final savedTemplateIds = await svc.templateIdsWithBundles();
-      final prepareAll = await svc.isAutoDownloadEnabled();
-      if (savedTemplateIds.isEmpty && !prepareAll) return;
-      final pending = dashboardProvider.currentAssignments.where((a) {
-        final templateId = a.templateId;
-        return (prepareAll ||
-                (templateId != null && savedTemplateIds.contains(templateId))) &&
-            !_offlineBundleAssignmentIds.contains(a.id) &&
-            !_downloadingOfflineAssignmentIds.contains(a.id) &&
-            !_prefetchRecentlyFailed(a.id) &&
-            _shouldShowEnterDataButton(role, a);
-      }).toList();
-      for (final assignment in pending) {
-        if (!mounted || shouldDeferRemoteFetch) break;
-        final ok = await _downloadOfflineBundle(
-          context,
-          assignment,
-          languageProvider,
-          silent: true,
-        );
-        if (ok) {
-          _templatePrefetchFailedAt.remove(assignment.id);
-        } else {
-          _templatePrefetchFailedAt[assignment.id] = DateTime.now();
-        }
-      }
-    } finally {
-      _templatePrefetchInProgress = false;
-    }
-  }
-
-  bool _prefetchRecentlyFailed(int id) {
-    final at = _templatePrefetchFailedAt[id];
-    return at != null &&
-        DateTime.now().difference(at) < _templatePrefetchRetryAfter;
-  }
-
-  String _staleBundleSignature() {
-    final ids = _staleOfflineBundleAssignmentIds.toList()..sort();
-    return ids.join(',');
-  }
-
-  Future<void> _tryAutoRefreshStaleOfflineCopies() async {
-    if (!mounted || _offlineStaleAutoRefreshInProgress) return;
-    if (shouldDeferRemoteFetch || _staleOfflineBundleAssignmentIds.isEmpty) {
-      return;
-    }
-    final offline = Provider.of<OfflineProvider>(context, listen: false);
-    if (!offline.isOnline) return;
-    if (!await ConnectivityService().isOnUnmeteredNetwork()) return;
-    if (!mounted) return;
-
-    _offlineStaleAutoRefreshInProgress = true;
-    final loc = AppLocalizations.of(context)!;
-    final languageProvider = Provider.of<LanguageProvider>(
-      context,
-      listen: false,
-    );
-    final dashboardProvider = Provider.of<DashboardProvider>(
-      context,
-      listen: false,
-    );
-
-    var anyOk = false;
-    var anyFail = false;
-    try {
-      final ids = List<int>.from(_staleOfflineBundleAssignmentIds);
-      final byId = {
-        for (final a in [
-          ...dashboardProvider.currentAssignments,
-          ...dashboardProvider.pastAssignments,
-        ])
-          a.id: a,
-      };
-      for (final id in ids) {
-        if (!mounted) break;
-        if (shouldDeferRemoteFetch) break;
-        if (!_staleOfflineBundleAssignmentIds.contains(id)) continue;
-        final assignment = byId[id];
-        if (assignment == null) continue;
-        final ok = await _downloadOfflineBundle(
-          context,
-          assignment,
-          languageProvider,
-          silent: true,
-        );
-        if (ok) {
-          anyOk = true;
-        } else {
-          anyFail = true;
-        }
-      }
-      if (mounted && anyOk) {
-        await _syncOfflineBundleAndStaleState(
-          dashboardProvider.currentAssignments,
-          dashboardProvider.pastAssignments,
-        );
-      }
-      if (!mounted) return;
-      if (anyOk && !anyFail) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.offlineStaleBundleUpdatesSnackbar)),
-        );
-      } else if (anyFail) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.offlineStaleBundlePartialRefresh)),
-        );
-      }
-    } finally {
-      _offlineStaleAutoRefreshInProgress = false;
+      await _offlineForms.reconcile(
+        all: [...provider.currentAssignments, ...provider.pastAssignments],
+        eligible: provider.currentAssignments.where(
+          (a) => _shouldShowEnterDataButton(role, a),
+        ),
+        env: _offlineEnvironment(),
+        clearFailures: clearFailures,
+      );
+    } catch (e) {
+      DebugLogger.logWarn('OFFLINE_BUNDLE', 'Reconcile failed: $e');
     }
   }
 
@@ -365,10 +240,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (offline.isOffline || shouldDeferRemoteFetch) {
       await authProvider.checkAuthStatus(forceRevalidate: false);
       await dashboardProvider.refreshFromDiskOnly(allowStale: true);
-      await _syncOfflineBundleAndStaleState(
-        dashboardProvider.currentAssignments,
-        dashboardProvider.pastAssignments,
-      );
+      await _offlineForms.refresh([
+        ...dashboardProvider.currentAssignments,
+        ...dashboardProvider.pastAssignments,
+      ], language: _offlineEnvironment().language);
       if (mounted) {
         setState(() {
           _hasLoadedOnce = true;
@@ -392,13 +267,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       forceRefresh: isAuthenticated || forceRefresh,
     );
 
-    await _pruneOfflineBundles(
-      dashboardProvider.currentAssignments,
-      dashboardProvider.pastAssignments,
-    );
-    await _syncOfflineBundleAndStaleState(
-      dashboardProvider.currentAssignments,
-      dashboardProvider.pastAssignments,
+    await _offlineForms.prune(
+      current: dashboardProvider.currentAssignments,
+      past: dashboardProvider.pastAssignments,
     );
 
     // Mark that we've completed at least one load
@@ -409,9 +280,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     if (mounted) {
-      unawaited(_tryAutoRefreshStaleOfflineCopies());
-      if (forceRefresh) _templatePrefetchFailedAt.clear();
-      unawaited(_prepareAssignmentsForSavedTemplates());
+      unawaited(_reconcileOfflineForms(clearFailures: forceRefresh));
     }
 
     // [checkAuthStatus(forceRevalidate: true)] already validated the session and
@@ -424,78 +293,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  /// Frees storage held by copies that are old or belong to closed assignments.
-  /// Only runs after a successful online load so an empty or failed response
-  /// can never be mistaken for "everything is closed".
-  Future<void> _pruneOfflineBundles(
-    List<Assignment> current,
-    List<Assignment> past,
-  ) async {
-    if (current.isEmpty && past.isEmpty) return;
-    try {
-      await AssignmentOfflineBundleService().pruneBundles(
-        closedAssignmentIds: {
-          ...past.map((a) => a.id),
-          ...current.where((a) => a.isEffectivelyClosed).map((a) => a.id),
-        },
-      );
-    } catch (_) {}
-  }
-
-  /// Resolves which assignment IDs have a saved offline bundle on disk and
-  /// which bundles are older than the server's published form definition.
-  ///
-  /// When the dashboard API fails (e.g. device just went offline), provider
-  /// lists can be empty briefly or for an entire load; we must **not** clear
-  /// [_offlineBundleAssignmentIds] in that case or the "downloaded for offline"
-  /// indicator disappears even though files still exist.
-  Future<void> _syncOfflineBundleAndStaleState(
-    List<Assignment> current,
-    List<Assignment> past,
-  ) async {
-    final ids = <int>{...current.map((a) => a.id), ...past.map((a) => a.id)};
-    if (ids.isEmpty) {
-      return;
-    }
-    final byId = {
-      for (final a in [...current, ...past]) a.id: a,
-    };
-    final svc = AssignmentOfflineBundleService();
-    final language = Provider.of<LanguageProvider>(
-      context,
-      listen: false,
-    ).currentLanguage;
-    final bundles = <int>{};
-    final stale = <int>{};
-    for (final id in ids) {
-      if (!await svc.hasOfflineBundle(id)) continue;
-      bundles.add(id);
-      final assignment = byId[id];
-      if (assignment == null) continue;
-      final meta = await svc.readBundleMeta(id);
-      final templateId = assignment.templateId;
-      if (templateId != null && meta != null && meta.templateId == null) {
-        await svc.backfillTemplateId(id, templateId);
-      }
-      if (isAssignmentOfflineBundleStale(assignment, meta,
-          language: language)) {
-        stale.add(id);
-      }
-    }
-    if (!mounted) return;
-    setState(() {
-      _offlineBundleAssignmentIds
-        ..clear()
-        ..addAll(bundles);
-      _staleOfflineBundleAssignmentIds
-        ..clear()
-        ..addAll(stale);
-      if (_staleOfflineBundleAssignmentIds.isEmpty) {
-        _dismissedStaleBundleSignature = null;
-      }
-    });
-  }
-
   Future<void> _openAssignmentForm(
     BuildContext context,
     Assignment assignment,
@@ -506,8 +303,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Use saved assignment bundle when connectivity or backend reachability says
     // we should not rely on the live server (see [shouldDeferRemoteFetch]).
     if (shouldDeferRemoteFetch) {
-      final svc = AssignmentOfflineBundleService();
-      if (await svc.hasOfflineBundle(assignment.id)) {
+      if (await AssignmentOfflineBundleService().hasOfflineForm(
+        assignment.id,
+      )) {
         if (!context.mounted) return;
         Navigator.of(context).pushNamed(
           AppRoutes.webview,
@@ -530,136 +328,48 @@ class _DashboardScreenState extends State<DashboardScreen>
     Navigator.of(context).pushNamed(AppRoutes.webview, arguments: path);
   }
 
-  /// Returns whether the download succeeded.
-  Future<bool> _downloadOfflineBundle(
-    BuildContext context,
-    Assignment assignment,
-    LanguageProvider languageProvider, {
-    bool silent = false,
-  }) async {
-    final offline = Provider.of<OfflineProvider>(context, listen: false);
+  /// Saves the assignment's form for offline use (the template's shared files
+  /// are only downloaded when the device does not have them yet).
+  Future<void> _saveForOffline(Assignment assignment) async {
     final loc = AppLocalizations.of(context)!;
-
-    if (!offline.isOnline) {
-      if (!context.mounted) return false;
-      if (!silent) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.offlineDownloadRequiresConnection)),
-        );
-      }
-      return false;
+    final messenger = ScaffoldMessenger.of(context);
+    final env = _offlineEnvironment();
+    if (!env.online) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.offlineDownloadRequiresConnection)),
+      );
+      return;
     }
-
-    setState(() {
-      _downloadingOfflineAssignmentIds.add(assignment.id);
-    });
-
-    final cookie = await sl<StorageService>().getSecure(
-      AppConfig.sessionCookieKey,
+    final result = await _offlineForms.save(assignment, env);
+    if (!mounted) return;
+    if (result.ok) {
+      messenger.showSnackBar(SnackBar(content: Text(loc.offlineFormSaved)));
+      return;
+    }
+    final error = result.error;
+    final detail = error is AssignmentOfflineBundleException
+        ? error.message
+        : error.runtimeType.toString();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${loc.offlineFormSaveFailed}\n($detail)'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
     );
-
-    try {
-      await AssignmentOfflineBundleService().downloadAndSave(
-        assignmentId: assignment.id,
-        formPath: AppRoutes.formEntry(assignment.id),
-        language: languageProvider.currentLanguage,
-        sessionCookieHeader: cookie,
-        formDefinitionUpdatedAtIso: assignment.formDefinitionUpdatedAt
-            ?.toUtc()
-            .toIso8601String(),
-        templateId: assignment.templateId,
-        staticVersion: assignment.staticVersion,
-        dataVersion: assignment.dataVersion,
-        title: assignment.templateName ?? assignment.name,
-        submitBlockedMessage: loc.offlineSubmitRequiresConnection,
-        recordApiResponses: (formUrl) => OfflineApiRecorder.recordFormLoad(
-          formUrl: formUrl,
-          language: languageProvider.currentLanguage,
-        ),
-      );
-      if (!context.mounted) return false;
-      setState(() {
-        _downloadingOfflineAssignmentIds.remove(assignment.id);
-        _offlineBundleAssignmentIds.add(assignment.id);
-        _staleOfflineBundleAssignmentIds.remove(assignment.id);
-      });
-      if (!silent && context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(loc.offlineFormSaved)));
-      }
-      return true;
-    } catch (e, st) {
-      DebugLogger.logWarn(
-        'OFFLINE_BUNDLE',
-        'Download failed for assignment ${assignment.id}: $e\n$st',
-      );
-      unawaited(
-        ClientDiagnosticsService.report(
-          category: ClientDiagnosticsService.categoryOfflineDownload,
-          error: e,
-          stackTrace: st,
-          assignmentId: assignment.id,
-          templateId: assignment.templateId,
-          language: languageProvider.currentLanguage,
-          trace: AssignmentOfflineBundleService().traceFor(assignment.id),
-          extraDetails: {'silent': silent},
-        ),
-      );
-      if (!context.mounted) return false;
-      setState(() {
-        _downloadingOfflineAssignmentIds.remove(assignment.id);
-      });
-      if (!silent) {
-        final detail = e is AssignmentOfflineBundleException
-            ? e.message
-            : e.runtimeType.toString();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${loc.offlineFormSaveFailed}\n($detail)'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-      return false;
-    }
   }
 
-  Future<void> _removeOfflineBundle(
-    BuildContext context,
-    Assignment assignment,
-  ) async {
+  Future<void> _removeOfflineBundle(Assignment assignment) async {
     final loc = AppLocalizations.of(context)!;
-    final dashboardProvider = Provider.of<DashboardProvider>(
-      context,
-      listen: false,
-    );
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
     try {
-      final svc = AssignmentOfflineBundleService();
-      final templateId = assignment.templateId;
-      if (templateId != null) {
-        await svc.deleteBundlesForTemplate(
-          templateId,
-          alsoAssignmentId: assignment.id,
-        );
-      } else {
-        await svc.deleteBundle(assignment.id);
-      }
-      if (!context.mounted) return;
-      await _syncOfflineBundleAndStaleState(
-        dashboardProvider.currentAssignments,
-        dashboardProvider.pastAssignments,
-      );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(loc.offlineFormRemoved)));
+      await _offlineForms.remove(assignment);
+      messenger.showSnackBar(SnackBar(content: Text(loc.offlineFormRemoved)));
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(loc.accessRequestsActionFailed),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: errorColor,
         ),
       );
     }
@@ -695,21 +405,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final meta = await AssignmentOfflineBundleService().readBundleMeta(
-      assignment.id,
-    );
-    if (!context.mounted) return;
-
-    final isStale = isAssignmentOfflineBundleStale(
-      assignment,
-      meta,
-      language: Provider.of<LanguageProvider>(
-        context,
-        listen: false,
-      ).currentLanguage,
-    );
-    final offline = Provider.of<OfflineProvider>(context, listen: false);
-    final canUpdateNow = offline.isOnline && !shouldDeferRemoteFetch && isStale;
+    final status = _offlineForms.statusFor(assignment.id);
+    final index = _offlineForms.index;
+    final page = index.pages[assignment.id];
+    final package = page == null ? null : index.packages[page.packageKey];
+    final isStale = status.outdated;
+    final canUpdateNow = _offlineEnvironment().online && isStale;
 
     final titleText =
         assignment.periodName != null && assignment.periodName!.isNotEmpty
@@ -723,114 +424,117 @@ class _DashboardScreenState extends State<DashboardScreen>
         return Theme(
           data: GroupedSheetStyle.controlsTheme(sheetContext),
           child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              IOSSpacing.lg,
-              8,
-              IOSSpacing.lg,
-              IOSSpacing.lg,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  loc.offlineCopySheetTitle,
-                  style: GroupedSheetStyle.title(sheetContext),
-                ),
-                SizedBox(height: IOSSpacing.smOf(sheetContext)),
-                Text(
-                  titleText,
-                  style: IOSTextStyle.subheadline(sheetContext).copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.85),
-                    height: 1.3,
-                  ),
-                ),
-                if (meta?.savedAtUtc != null) ...[
-                  SizedBox(height: IOSSpacing.mdOf(sheetContext)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                IOSSpacing.lg,
+                8,
+                IOSSpacing.lg,
+                IOSSpacing.lg,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Text(
-                    loc.offlineCopySavedOnLabel,
-                    style: IOSTextStyle.caption1(sheetContext).copyWith(
-                      color: scheme.onSurface.withValues(alpha: 0.55),
-                      fontWeight: FontWeight.w600,
+                    loc.offlineCopySheetTitle,
+                    style: GroupedSheetStyle.title(sheetContext),
+                  ),
+                  SizedBox(height: IOSSpacing.smOf(sheetContext)),
+                  Text(
+                    titleText,
+                    style: IOSTextStyle.subheadline(sheetContext).copyWith(
+                      color: scheme.onSurface.withValues(alpha: 0.85),
+                      height: 1.3,
                     ),
                   ),
-                  SizedBox(height: IOSSpacing.xsOf(sheetContext)),
-                  Text(
-                    _formatOfflineBundleSavedAt(
-                      sheetContext,
-                      meta!.savedAtUtc!,
-                    ),
-                    style: IOSTextStyle.body(
-                      sheetContext,
-                    ).copyWith(fontWeight: FontWeight.w500),
-                  ),
-                ],
-                SizedBox(height: IOSSpacing.mdOf(sheetContext)),
-                Text(
-                  loc.offlineCopyFilesCached(meta?.assetCount ?? 0),
-                  style: IOSTextStyle.footnote(
-                    sheetContext,
-                  ).copyWith(color: scheme.onSurface.withValues(alpha: 0.7)),
-                ),
-                if (isStale) ...[
-                  SizedBox(height: IOSSpacing.mdOf(sheetContext)),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        size: 20,
-                        color: Color(AppConstants.warningColor),
+                  if (page?.savedAtUtc != null) ...[
+                    SizedBox(height: IOSSpacing.mdOf(sheetContext)),
+                    Text(
+                      loc.offlineCopySavedOnLabel,
+                      style: IOSTextStyle.caption1(sheetContext).copyWith(
+                        color: scheme.onSurface.withValues(alpha: 0.55),
+                        fontWeight: FontWeight.w600,
                       ),
-                      SizedBox(width: IOSSpacing.smOf(sheetContext)),
-                      Expanded(
-                        child: Text(
-                          loc.offlineStaleBundleSheetNotice,
-                          style: IOSTextStyle.subheadline(sheetContext)
-                              .copyWith(
-                                color: scheme.onSurface.withValues(alpha: 0.88),
-                                height: 1.35,
-                              ),
+                    ),
+                    SizedBox(height: IOSSpacing.xsOf(sheetContext)),
+                    Text(
+                      _formatOfflineBundleSavedAt(
+                        sheetContext,
+                        page!.savedAtUtc!,
+                      ),
+                      style: IOSTextStyle.body(
+                        sheetContext,
+                      ).copyWith(fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                  SizedBox(height: IOSSpacing.mdOf(sheetContext)),
+                  Text(
+                    loc.offlineCopyFilesCached(package?.assetCount ?? 0),
+                    style: IOSTextStyle.footnote(
+                      sheetContext,
+                    ).copyWith(color: scheme.onSurface.withValues(alpha: 0.7)),
+                  ),
+                  if (isStale) ...[
+                    SizedBox(height: IOSSpacing.mdOf(sheetContext)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          size: 20,
+                          color: Color(AppConstants.warningColor),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (canUpdateNow) ...[
-                  SizedBox(height: IOSSpacing.mdOf(sheetContext)),
-                  FilledButton.icon(
-                    onPressed: () async {
+                        SizedBox(width: IOSSpacing.smOf(sheetContext)),
+                        Expanded(
+                          child: Text(
+                            loc.offlineStaleBundleSheetNotice,
+                            style: IOSTextStyle.subheadline(sheetContext)
+                                .copyWith(
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.88,
+                                  ),
+                                  height: 1.35,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (canUpdateNow) ...[
+                    SizedBox(height: IOSSpacing.mdOf(sheetContext)),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _saveForOffline(assignment);
+                      },
+                      icon: const Icon(Icons.sync_rounded, size: 20),
+                      label: Text(loc.offlineStaleBundleUpdateNow),
+                    ),
+                  ],
+                  SizedBox(height: IOSSpacing.lgOf(sheetContext)),
+                  OutlinedButton.icon(
+                    onPressed: () {
                       Navigator.of(sheetContext).pop();
-                      final lang = Provider.of<LanguageProvider>(
-                        context,
-                        listen: false,
-                      );
-                      await _downloadOfflineBundle(context, assignment, lang);
+                      unawaited(_removeOfflineBundle(assignment));
                     },
-                    icon: const Icon(Icons.sync_rounded, size: 20),
-                    label: Text(loc.offlineStaleBundleUpdateNow),
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: scheme.error,
+                    ),
+                    label: Text(loc.removeOfflineCopy),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: scheme.error,
+                      side: BorderSide(
+                        color: scheme.error.withValues(alpha: 0.45),
+                      ),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ],
-                SizedBox(height: IOSSpacing.lgOf(sheetContext)),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    unawaited(_removeOfflineBundle(context, assignment));
-                  },
-                  icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
-                  label: Text(loc.removeOfflineCopy),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: scheme.error,
-                    side: BorderSide(color: scheme.error.withValues(alpha: 0.45)),
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
         );
       },
     );
@@ -940,7 +644,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
             onPressed: () {
               setState(() {
-                _dismissedStaleBundleSignature = _staleBundleSignature();
+                _staleBannerDismissed = true;
               });
             },
           ),
@@ -981,9 +685,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 authProvider.user?.role,
                 assignment,
               );
-              final hasBundle = _offlineBundleAssignmentIds.contains(
-                assignment.id,
-              );
+              final offlineStatus = _offlineForms.statusFor(assignment.id);
+              final hasBundle = offlineStatus.available;
               return AppFadeInUp(
                 staggerIndex: index,
                 child: DashboardGroupedAssignmentCard(
@@ -1002,11 +705,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       showEnter &&
                           offlineProvider.isOnline &&
                           !shouldDeferRemoteFetch
-                      ? () => _downloadOfflineBundle(
-                          context,
-                          assignment,
-                          languageProvider,
-                        )
+                      ? () => _saveForOffline(assignment)
                       : null,
                   onOfflineBundleDetails: hasBundle
                       ? () {
@@ -1017,10 +716,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                         }
                       : null,
                   hasOfflineFormSnapshot: hasBundle,
-                  offlineBundleOutdated: _staleOfflineBundleAssignmentIds
-                      .contains(assignment.id),
-                  isDownloadingOfflineForm: _downloadingOfflineAssignmentIds
-                      .contains(assignment.id),
+                  offlineBundleOutdated: offlineStatus.outdated,
+                  isDownloadingOfflineForm: _offlineForms.isBusy(assignment.id),
                 ),
               );
             }).toList(),
@@ -1462,10 +1159,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                     entity.displayLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: IOSTextStyle.footnote(context).copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: titleColor,
-                    ),
+                    style: IOSTextStyle.footnote(
+                      context,
+                    ).copyWith(fontWeight: FontWeight.w600, color: titleColor),
                   ),
                 ),
                 if (hasMultipleEntities) ...[
@@ -1538,9 +1234,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         final canPop = Navigator.of(context).canPop();
         final groupedBackground = IOSColors.getGroupedBackground(context);
         return Scaffold(
-          appBar: canPop
-              ? const AppAppBar(title: '')
-              : null,
+          appBar: canPop ? const AppAppBar(title: '') : null,
           backgroundColor: groupedBackground,
           body: SafeArea(
             bottom: false,
@@ -1609,9 +1303,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             children: [
                               _buildPageHeader(provider, localizations),
 
-                              if (_staleOfflineBundleAssignmentIds.isNotEmpty &&
-                                  _dismissedStaleBundleSignature !=
-                                      _staleBundleSignature())
+                              if (_offlineForms.hasOutdatedPackages &&
+                                  !_staleBannerDismissed)
                                 _buildOfflineStaleBundleBanner(
                                   loc: localizations,
                                   offline: offlineProvider,

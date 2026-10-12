@@ -16,6 +16,11 @@ vi.mock('../../../app/static/js/forms/modules/matrix/shared.js', () => ({
   __canEditMatrixContainer: (container) => container?.getAttribute('data-can-edit') !== 'false',
 }));
 
+function decodeHiddenPayload(value) {
+  if (!value.startsWith('b64:')) return value;
+  return decodeURIComponent(escape(atob(value.slice(4))));
+}
+
 describe('__matrixCellIsHeaderGated', () => {
   it('is false for columns that are not selectable-header, regardless of data', async () => {
     const { __matrixCellIsHeaderGated } = await import(
@@ -301,7 +306,7 @@ describe('matrixSelectableHeadersMixin gating helpers', () => {
     handler._saveHeaderValue('1', 'SP1', 'Region A');
 
     expect(matrix.data['col_header|SP1']).toBe('Region A');
-    expect(hiddenField.value).toContain('Region A');
+    expect(decodeHiddenPayload(hiddenField.value)).toContain('Region A');
     expect(handler._applyMatrixInputEditability).toHaveBeenCalledTimes(1);
 
     handler._applyMatrixInputEditability.mockClear();

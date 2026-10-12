@@ -493,10 +493,34 @@
                                     <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}" data-enable-variables="true" title="{{ _('Type [ to insert a variable, e.g. [assignment_period].')|forceescape }}">
                                     <input type="hidden" class="group-label-translations" value="{}">
                                     <span class="matrix-group-count hidden shrink-0 text-xs opacity-75 whitespace-nowrap"></span>
-                                    <label class="inline-flex items-center gap-1 shrink-0 text-xs text-gray-600" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
-                                        <span>{{ _('Header') }}</span>
-                                        <input type="color" class="group-header-color cursor-pointer rounded border border-gray-300 bg-white" style="width:2rem;height:1.5rem;padding:0;" value="#f3f4f6" aria-label="{{ _('Group header colour')|forceescape }}">
-                                    </label>
+                                    <div class="group-color-control relative shrink-0">
+                                        <button type="button" class="group-color-toggle" aria-expanded="false" aria-haspopup="dialog" title="{{ _('Colour of this group header in the matrix. Grey matches the other column headers.')|forceescape }}">
+                                            <span>{{ _('Header') }}</span>
+                                            <span class="group-color-swatch" style="background-color:#f3f4f6"></span>
+                                        </button>
+                                        <div class="group-color-panel hidden" role="dialog" aria-label="{{ _('Group header colour')|forceescape }}">
+                                            <div class="group-color-sv" role="presentation">
+                                                <span class="group-color-sv-cursor"></span>
+                                            </div>
+                                            <input type="range" class="group-color-hue" min="0" max="360" step="1" value="0" aria-label="{{ _('Hue')|forceescape }}">
+                                            <label class="group-color-hex-label">
+                                                <span>{{ _('Hex') }}</span>
+                                                <input type="text" class="group-header-color-hex" value="#F3F4F6" maxlength="7" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="{{ _('Hex colour')|forceescape }}">
+                                            </label>
+                                            <input type="hidden" class="group-header-color" value="#f3f4f6">
+                                            <label class="group-apply-color-label hidden" title="{{ _('Colour the column titles in this group on the entry form')|forceescape }}">
+                                                <input type="checkbox" class="group-apply-header-color rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Apply group colour to column headers')|forceescape }}">
+                                                <span>{{ _('Headers') }}</span>
+                                            </label>
+                                            <label class="group-apply-color-label hidden" title="{{ _('Colour the data cells in this group on the entry form')|forceescape }}">
+                                                <input type="checkbox" class="group-apply-cell-color rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" aria-label="{{ _('Apply group colour to cells')|forceescape }}">
+                                                <span>{{ _('Cells') }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="duplicate-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Duplicate Group')|forceescape }}" aria-label="{{ _('Duplicate Group')|forceescape }}">
+                                        <i class="fas fa-copy w-4 h-4"></i>
+                                    </button>
                                     <button type="button" class="remove-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Group')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>

@@ -30,7 +30,7 @@ describe('getUnifiedFieldValue', () => {
       <div class="form-item-block" data-item-id="question_10">
         <input id="field-question_10" type="number" name="field_value[10]" value="0">
       </div>`;
-    window.existingData = { 'field_value[question_10]': 99 };
+    window.existingData = { 'field_value[10]': 99 };
     const { getUnifiedFieldValue } = await loadUtils();
 
     expect(getUnifiedFieldValue('question_10', 'total', true)).toBe(0);
@@ -41,7 +41,7 @@ describe('getUnifiedFieldValue', () => {
       <div class="form-item-block" data-item-id="question_10">
         <input id="field-question_10" type="number" name="field_value[10]" value="">
       </div>`;
-    window.existingData = { 'field_value[question_10]': 0 };
+    window.existingData = { 'field_value[10]': 0 };
     const { getUnifiedFieldValue } = await loadUtils();
 
     expect(getUnifiedFieldValue('question_10', 'total', true)).toBe(0);

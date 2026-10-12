@@ -2144,7 +2144,9 @@ class VariableResolutionService:
             # Remove any whitespace
             formula = formula.strip()
 
-            # Validate formula contains only safe characters (numbers, +, -, *, /, ., spaces, parentheses)
+            # Validate formula contains only safe characters (numbers, +, -, *, /, ., spaces,
+            # parentheses) once the [variable] placeholder is substituted.
+            formula = formula.replace('[variable]', str(num_value))
             if not re.match(r'^[\d+\-*/.()\s]+$', formula):
                 logger.warning(f"_evaluate_formula: Formula '{formula}' contains unsafe characters")
                 return variable_value
@@ -2160,12 +2162,9 @@ class VariableResolutionService:
             # Replace any placeholder or evaluate directly
             expression = formula_clean
 
-            # If formula starts with an operator, prepend the value
+            # A formula that starts with an operator applies to the value itself
             if expression.startswith(('+', '-', '*', '/')):
                 expression = str(num_value) + expression
-            else:
-                # If it's a full expression, try to replace a placeholder
-                expression = expression.replace('[variable]', str(num_value))
 
             # Evaluate the expression using the restricted AST evaluator
             result = cls._safe_eval_expression(expression)
@@ -2481,6 +2480,14 @@ class VariableResolutionService:
         # First, handle formulas like [[variable_name]+1], [[variable_name]*2], etc.
         # Pattern: [[variable_name] followed by operator and expression, then closing bracket]
         # This matches: [[period]+1], [[period]*2], [[period]-5], [[period]/2]
+        # Formulas that cannot be evaluated are kept verbatim. They are swapped for a
+        # sentinel so the simple-variable pass below does not rewrite the [name] inside.
+        unresolved_formulas: List[str] = []
+
+        def keep_formula(full_match: str) -> str:
+            unresolved_formulas.append(full_match)
+            return f"\x00FORMULA{len(unresolved_formulas) - 1}\x00"
+
         def replace_formula(match):
             variable_name = match.group(1)
             formula_expr = match.group(2)  # e.g., '+1', '*2', '-5'
@@ -2488,7 +2495,7 @@ class VariableResolutionService:
 
             if variable_name not in resolved_variables:
                 logger.warning(f"replace_variables_in_text: Variable '{variable_name}' in formula not found in resolved variables")
-                return full_match  # Return original if variable not resolved
+                return keep_formula(full_match)  # Return original if variable not resolved
 
             value = resolved_variables[variable_name]
 
@@ -2500,9 +2507,9 @@ class VariableResolutionService:
                     try:
                         value = float(default_value)
                     except (ValueError, TypeError):
-                        return full_match  # Can't evaluate formula with non-numeric default
+                        return keep_formula(full_match)  # Can't evaluate formula with non-numeric default
                 else:
-                    return full_match  # No value to evaluate
+                    return keep_formula(full_match)  # No value to evaluate
 
             # Evaluate the formula
             try:
@@ -2519,7 +2526,7 @@ class VariableResolutionService:
                 return formatted_value
             except Exception as e:
                 logger.warning(f"replace_variables_in_text: Error evaluating formula {full_match}: {e}")
-                return full_match  # Return original on error
+                return keep_formula(full_match)  # Return original on error
 
         # Replace formulas first
         result = cls._FORMULA_PATTERN.sub(replace_formula, result)
@@ -2563,6 +2570,9 @@ class VariableResolutionService:
             return str(value)
 
         result = cls._VAR_PATTERN.sub(replace_simple, result)
+
+        for index, formula_text in enumerate(unresolved_formulas):
+            result = result.replace(f"\x00FORMULA{index}\x00", formula_text)
 
         if result != original_text:
             logger.debug(f"replace_variables_in_text: Text changed from '{original_text}' to '{result}'")

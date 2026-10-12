@@ -591,6 +591,18 @@ class TestReplaceVariablesInText:
         )
         assert result == "[[period]+1]"
 
+    def test_unresolved_formula_does_not_leak_into_simple_replacement(self):
+        result = VariableResolutionService.replace_variables_in_text(
+            "[a] then [[period]+1] then [b]", {"a": 1, "b": 2, "period": None}
+        )
+        assert result == "1 then [[period]+1] then 2"
+
+    def test_resolved_and_unresolved_formulas_in_same_text(self):
+        result = VariableResolutionService.replace_variables_in_text(
+            "[[a]+1] / [[b]+1]", {"a": 4, "b": None}
+        )
+        assert result == "5 / [[b]+1]"
+
     def test_value_with_thousands_formatting(self):
         configs = {"amount": {"format_thousands_separator": True}}
         result = VariableResolutionService.replace_variables_in_text(

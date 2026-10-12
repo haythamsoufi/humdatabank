@@ -334,10 +334,12 @@ class TestApiAddDynamicIndicator:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
+        mock_aes.assigned_form.template.published_version_id = None
         mock_section = MagicMock()
         mock_section.section_type = "static"
 
         with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.require_aes_write_lock", return_value=None), \
              patch("app.routes.forms_api.FormSection") as MockSection:
             MockSection.query.get_or_404.return_value = mock_section
             resp = _json_post(
@@ -351,6 +353,7 @@ class TestApiAddDynamicIndicator:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
+        mock_aes.assigned_form.template.published_version_id = None
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
         mock_section.template_id = mock_aes.assigned_form.template_id
@@ -358,6 +361,7 @@ class TestApiAddDynamicIndicator:
         mock_existing = MagicMock()
 
         with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.require_aes_write_lock", return_value=None), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID:
@@ -375,6 +379,7 @@ class TestApiAddDynamicIndicator:
         client = _make_logged_in_client(client, admin_user.id)
         mock_aes = MagicMock()
         mock_aes.id = 1
+        mock_aes.assigned_form.template.published_version_id = None
         mock_section = MagicMock()
         mock_section.section_type = "dynamic_indicators"
         mock_section.template_id = mock_aes.assigned_form.template_id
@@ -385,6 +390,7 @@ class TestApiAddDynamicIndicator:
         mock_indicator.definition = "Test def"
 
         with patch("app.routes.forms_api.authorize_aes_json", side_effect=_allow_aes(mock_aes)), \
+             patch("app.routes.forms_api.require_aes_write_lock", return_value=None), \
              patch("app.routes.forms_api.FormSection") as MockSection, \
              patch("app.routes.forms_api.IndicatorBank") as MockIB, \
              patch("app.routes.forms_api.DynamicIndicatorData") as MockDID, \

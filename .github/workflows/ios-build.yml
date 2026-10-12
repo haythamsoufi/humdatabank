@@ -6,8 +6,9 @@ concurrency:
   group: ios-build-${{ github.repository }}
   cancel-in-progress: false
 
+# Simulator builds are always JIT debug (Flutter has no release/profile for iphonesimulator).
 run-name: >-
-  ${{ format('iOS Build — {0} | {1} ({2})', inputs.build_target || 'device', inputs.organization_config || 'ifrc', inputs.backend_url) }}
+  ${{ format('iOS Build — {0} | {1} | {2} ({3})', inputs.build_target || 'device', inputs.build_target == 'simulator' && 'debug' || inputs.build_mode || 'release', inputs.organization_config || 'ifrc', inputs.backend_url) }}
 
 on:
   workflow_dispatch:

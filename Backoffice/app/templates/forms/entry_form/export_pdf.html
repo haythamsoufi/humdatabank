@@ -310,7 +310,7 @@
                                 <div class="matrix-legend">
                                     <div class="matrix-legend-item">
                                         <span class="matrix-legend-swatch" aria-hidden="true"></span>
-                                        <span>{{ _('Carried forward value') if (field_is_carry_forward or matrix_has_carry_forward_ref) else _('Prefilled value') }}</span>
+                                        <span>{{ _('Carried forward value') if field_is_carry_forward else (_('Unchanged carried forward value') if matrix_has_carry_forward_ref else _('Prefilled value')) }}</span>
                                     </div>
                                 </div>
                                 {% endif %}

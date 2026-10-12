@@ -1,5 +1,5 @@
 {% from "components/_status_label.html" import status_label_for_data_flag %}
-{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style %}
+{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style, matrix_column_edges, matrix_span_edges, matrix_column_color_class, matrix_column_color_style %}
 {# ── Macro: renders the content of a column <th> ──────────────────────────────
    For columns with header_type="selectable" it renders a custom header picker
    (multiline label + dropdown menu) and an optional Other text-input; for all
@@ -291,7 +291,7 @@
                                     {# Resolve translated group label from column_groups config #}
                                     {% set _grp_translations = matrix_column_groups.get(_col_group, {}) %}
                                     {% set _grp_display = _grp_translations.get(translation_key) or _grp_translations.get('en') or _col_group %}
-                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_span_edges(matrix_columns, loop.index0, _span.value) }}"
                                         role="columnheader"
                                         scope="colgroup"
                                         colspan="{{ _span.value }}"
@@ -335,7 +335,7 @@
                                     {% endfor %}
                                     {% set _sub_translations = matrix_column_groups.get(_col_group ~ '::' ~ _col_subgroup, {}) %}
                                     {% set _sub_display = _sub_translations.get(translation_key) or _sub_translations.get('en') or _col_subgroup %}
-                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_span_edges(matrix_columns, loop.index0, _sub_span.value) }}"
                                         role="columnheader"
                                         scope="colgroup"
                                         colspan="{{ _sub_span.value }}"
@@ -351,11 +351,12 @@
                                     {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                 {% endif %}
                                 {# Without subgroups this is the last header row; otherwise it spans the subgroup row too #}
-                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_column_edges(matrix_columns, loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}"
                                     role="columnheader"
                                     scope="col"
                                     {% if _has_groups.subgroups %}rowspan="2"{% endif %}
-                                    data-column-type="{{ column.type if column.type else 'number' }}">
+                                    data-column-type="{{ column.type if column.type else 'number' }}"
+                                    {{- matrix_column_color_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>
                                     {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                                 </th>
                             {% endif %}
@@ -373,10 +374,11 @@
                                     {% set _cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
                                     {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                 {% endif %}
-                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_column_edges(matrix_columns, loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}"
                                     role="columnheader"
                                     scope="col"
-                                    data-column-type="{{ column.type if column.type else 'number' }}">
+                                    data-column-type="{{ column.type if column.type else 'number' }}"
+                                    {{- matrix_column_color_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>
                                     {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                                 </th>
                             {% endif %}
@@ -424,7 +426,7 @@
                                 {{ matrix_row_total_grand_cell(field.id, _matrix_label) }}
                             {% endif %}
                             {% set column_name = column.name if column.name else column %}
-                            <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
+                            <td class="border border-gray-300 px-2 py-1 bg-gray-100{{ matrix_column_edges(matrix_columns, loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, loop.index0, 'cells') }} role="gridcell">
                                 <span class="matrix-column-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
                                       data-column="{{ column_name }}"
                                       data-column-type="{{ column.type if column.type else 'number' }}"
@@ -504,7 +506,7 @@
                                         {% set _cell_prefill.has_value = true %}
                                     {% endif %}
                                 {% endif %}
-                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}" role="gridcell">
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}{{ matrix_column_edges(matrix_columns, outer_loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }} role="gridcell">
                                     {% if calc_readonly %}
                                         <span class="matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-medium text-gray-700"
                                               data-row="{{ row_id }}"

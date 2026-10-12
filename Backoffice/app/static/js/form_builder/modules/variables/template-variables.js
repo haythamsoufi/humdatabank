@@ -5,6 +5,12 @@
 
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
+const _flash = (message, category) => {
+    if (typeof window.showFlashMessage === 'function') {
+        window.showFlashMessage(message, category);
+    }
+};
+
 const _fetchJson = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
 
 export class TemplateVariablesManager {
@@ -15,6 +21,8 @@ export class TemplateVariablesManager {
         this.allTemplates = [];
         this.assignmentsByTemplate = {};
         this.formItemsByTemplate = {};
+        this._sortKey = null;
+        this._sortDir = 'asc';
 
         // Make variables globally available for use in item modal and matrix
         window.templateVariables = this.variables;
@@ -100,13 +108,46 @@ export class TemplateVariablesManager {
             td.textContent = 'No variables defined. Click "Add Variable" to create one.';
             tr.appendChild(td);
             container.appendChild(tr);
+            this._syncSortHeaders();
             return;
         }
 
-        for (const [varName, varConfig] of Object.entries(this.variables)) {
-            const row = this.createVariableRow(varName, varConfig);
-            container.appendChild(row);
+        const rows = Object.entries(this.variables).map(([varName, varConfig]) => this.createVariableRow(varName, varConfig));
+        const sortIndex = { name: 0, display: 1, source: 2, period: 3, scope: 4 }[this._sortKey];
+        if (sortIndex !== undefined) {
+            const dir = this._sortDir === 'desc' ? -1 : 1;
+            rows.sort((a, b) => {
+                const av = a.children[sortIndex]?.dataset.sortValue || '';
+                const bv = b.children[sortIndex]?.dataset.sortValue || '';
+                return av.localeCompare(bv, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+            });
         }
+        rows.forEach(row => container.appendChild(row));
+        this._syncSortHeaders();
+    }
+
+    /**
+     * Mark the active sort column and point its icon up or down.
+     */
+    _syncSortHeaders() {
+        document.querySelectorAll('#template-variables-modal .variable-sort-btn').forEach(btn => {
+            const th = btn.closest('th');
+            const icon = btn.querySelector('.variable-sort-icon');
+            const active = btn.dataset.sortKey === this._sortKey;
+            if (th) {
+                if (active) th.setAttribute('aria-sort', this._sortDir === 'desc' ? 'descending' : 'ascending');
+                else th.removeAttribute('aria-sort');
+            }
+            if (!icon) return;
+            icon.classList.remove('fa-sort', 'fa-sort-up', 'fa-sort-down', 'text-gray-400', 'text-gray-700');
+            if (!active) {
+                icon.classList.add('fa-sort', 'text-gray-400');
+            } else if (this._sortDir === 'desc') {
+                icon.classList.add('fa-sort-down', 'text-gray-700');
+            } else {
+                icon.classList.add('fa-sort-up', 'text-gray-700');
+            }
+        });
     }
 
     /**
@@ -159,7 +200,7 @@ export class TemplateVariablesManager {
         }
         if (varConfig.matrix_column_name) {
             additionalInfo.push(varConfig.matrix_column_name === '_row_total'
-                ? 'Matrix: Row total (sum of all columns)'
+                ? 'Matrix Column: Total'
                 : `Matrix Column: ${varConfig.matrix_column_name}`);
         }
         if (varConfig.format_thousands_separator || varConfig.format_decimal_places) {
@@ -187,6 +228,7 @@ export class TemplateVariablesManager {
         const vType = document.createElement('div');
         vType.className = 'text-xs text-gray-500 mt-1';
         vType.textContent = `Type: ${typeDisplay}`;
+        td1.dataset.sortValue = varName;
         td1.append(vName, vType);
         if (additionalInfo.length > 0) {
             const info = document.createElement('div');
@@ -201,6 +243,7 @@ export class TemplateVariablesManager {
             const div = document.createElement('div');
             div.className = 'text-sm text-gray-900';
             div.textContent = String(varConfig.display_name || varName);
+            td2.dataset.sortValue = String(varConfig.display_name || varName);
             td2.appendChild(div);
         }
 
@@ -210,6 +253,7 @@ export class TemplateVariablesManager {
             const div = document.createElement('div');
             div.className = 'text-sm text-gray-900';
             div.textContent = String(sourceInfo || '');
+            td3.dataset.sortValue = String(sourceInfo || '');
             td3.appendChild(div);
         }
 
@@ -229,6 +273,7 @@ export class TemplateVariablesManager {
             const div = document.createElement('div');
             div.className = 'text-sm text-gray-900';
             div.textContent = String(periodDisplay);
+            td4.dataset.sortValue = String(periodDisplay);
             td4.appendChild(div);
         }
 
@@ -237,7 +282,9 @@ export class TemplateVariablesManager {
         {
             const div = document.createElement('div');
             div.className = 'text-sm text-gray-900';
-            div.textContent = String(variableType === 'metadata' ? 'N/A' : entityScopeDisplay);
+            const scopeText = String(variableType === 'metadata' ? 'N/A' : entityScopeDisplay);
+            div.textContent = scopeText;
+            td5.dataset.sortValue = scopeText;
             td5.appendChild(div);
         }
 
@@ -398,30 +445,47 @@ export class TemplateVariablesManager {
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Source Form Item *</label>
-                            <select name="source_form_item_id" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="source-form-item-select">
-                                <option value="">Select form item...</option>
-                            </select>
-                            <label class="flex items-center mt-2 text-sm text-gray-700">
-                                <input type="checkbox"
-                                       name="match_by_indicator_bank"
-                                       id="match-by-indicator-bank-checkbox"
-                                       ${existingVar?.match_by_indicator_bank ? 'checked' : ''}
-                                       class="mr-2">
-                                <span>
-                                    Match by indicator bank (auto-map the source item)
-                                    <span class="custom-info-tooltip cursor-help w-5 h-5 inline-flex items-center justify-center ml-1">
-                                        <i class="fas fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">
-                                            When enabled, you do not need to select a specific Source Form Item.
-                                            If you use this variable inside an indicator in the current template, the system will read that indicator’s Indicator Bank ID,
-                                            find the matching indicator (same Indicator Bank ID) in the source template, and lookup its value.
-                                            If used outside an indicator, the variable will resolve to blank/default.
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Source Form Item *</label>
+                                <select name="source_form_item_id" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="source-form-item-select">
+                                    <option value="">Select form item...</option>
+                                </select>
+                                <label class="flex items-center mt-2 text-sm text-gray-700">
+                                    <input type="checkbox"
+                                           name="match_by_indicator_bank"
+                                           id="match-by-indicator-bank-checkbox"
+                                           ${existingVar?.match_by_indicator_bank ? 'checked' : ''}
+                                           class="mr-2">
+                                    <span>
+                                        Match by indicator bank (auto-map the source item)
+                                        <span class="custom-info-tooltip cursor-help w-5 h-5 inline-flex items-center justify-center ml-1">
+                                            <i class="fas fa-info-circle text-gray-400"></i>
+                                            <span class="tooltip-text">
+                                                When enabled, you do not need to select a specific Source Form Item.
+                                                If you use this variable inside an indicator in the current template, the system will read that indicator’s Indicator Bank ID,
+                                                find the matching indicator (same Indicator Bank ID) in the source template, and lookup its value.
+                                                If used outside an indicator, the variable will resolve to blank/default.
+                                            </span>
                                         </span>
                                     </span>
-                                </span>
-                            </label>
+                                </label>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Matrix Column (for matrix lookups)
+                                    <span class="custom-info-tooltip cursor-help w-5 h-5 inline-flex items-center justify-center ml-1" id="matrix-column-help-icon">
+                                        <i class="fas fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text" id="matrix-column-tooltip-text">Optional: If the source form item is a matrix, choose which column code to look up (for example Planned, stored as 61_Planned). When that matrix shows a row total column, Total is included.</span>
+                                    </span>
+                                </label>
+                                <select name="matrix_column_name" id="matrix-column-name-input"
+                                        class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md opacity-60 cursor-not-allowed"
+                                        disabled>
+                                    <option value="">Select a matrix item...</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div>
@@ -456,26 +520,6 @@ export class TemplateVariablesManager {
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    Matrix Column (for matrix lookups)
-                                    <span class="custom-info-tooltip cursor-help w-5 h-5 inline-flex items-center justify-center ml-1" id="matrix-column-help-icon">
-                                        <i class="fas fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text" id="matrix-column-tooltip-text">Optional: If the source form item is a matrix, specify which column to lookup (e.g., 'Planned' for '61_Planned'), or use Row total to read the sum of all columns for each row.</span>
-                                    </span>
-                                </label>
-                                <label class="flex items-center mb-2">
-                                    <input type="checkbox" name="use_row_total" id="use-row-total-checkbox"
-                                           ${existingVar?.matrix_column_name === '_row_total' ? 'checked' : ''}
-                                           class="mr-2">
-                                    <span class="text-sm text-gray-700">Use row total (sum of all columns for each row)</span>
-                                </label>
-                                <input type="text" name="matrix_column_name" value="${escAttr(existingVar?.matrix_column_name && existingVar.matrix_column_name !== '_row_total' ? existingVar.matrix_column_name : '')}"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md"
-                                       placeholder="e.g., Planned, Supported (or use Row total above)"
-                                       id="matrix-column-name-input">
-                            </div>
-
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
                                     Default Value
@@ -660,7 +704,10 @@ export class TemplateVariablesManager {
             }
         };
         if (matchByIndicatorBankCheckbox) {
-            matchByIndicatorBankCheckbox.addEventListener('change', updateSourceItemMappingUi);
+            matchByIndicatorBankCheckbox.addEventListener('change', () => {
+                updateSourceItemMappingUi();
+                refreshMatrixColumnSelect();
+            });
         }
 
         // Show/hide fields based on lookup type (standard vs reverse)
@@ -708,12 +755,7 @@ export class TemplateVariablesManager {
             if (existingVar?.source_template_id) {
                 sourceTemplateSelect.dispatchEvent(new Event('change'));
             }
-            if (typeof updateMatrixColumnValidation === 'function') {
-                updateMatrixColumnValidation();
-            }
-            if (useRowTotalCheckbox) {
-                updateRowTotalUI();
-            }
+            refreshMatrixColumnSelect();
         }, 0);
 
         // Update assignments when template changes
@@ -762,16 +804,22 @@ export class TemplateVariablesManager {
                     option.value = item.id;
                     option.textContent = `${item.id}: ${item.label} (${item.item_type})`;
                     option.dataset.itemType = item.item_type || '';
+                    if (Array.isArray(item.matrix_columns)) {
+                        option.dataset.matrixColumns = JSON.stringify(item.matrix_columns);
+                        option.dataset.showRowTotals = item.show_row_totals ? '1' : '0';
+                        if (item.row_total_position != null && item.row_total_position !== '') {
+                            option.dataset.rowTotalPosition = String(item.row_total_position);
+                        }
+                    }
                     if (existingVar?.source_form_item_id == item.id) {
                         option.selected = true;
                     }
                     sourceFormItemSelect.appendChild(option);
                 });
 
-                // Check if selected form item is a matrix when matrix column is set (after matrixColumnInput is defined)
-                if (typeof updateMatrixColumnValidation === 'function') {
-                    updateMatrixColumnValidation();
-                }
+                refreshMatrixColumnSelect();
+            } else {
+                refreshMatrixColumnSelect();
             }
         });
 
@@ -882,120 +930,145 @@ export class TemplateVariablesManager {
         // Initialize entity scope UI (triggers if editing with specific or entities_containing scope)
         updateEntityScopeUI();
 
-        // Update help text based on matrix column name
-        const matrixColumnInput = modal.querySelector('#matrix-column-name-input');
+        // Column-code dropdown for the selected source matrix.
+        const matrixColumnSelect = modal.querySelector('#matrix-column-name-input');
         const matrixColumnHelpIcon = modal.querySelector('#matrix-column-help-icon');
-        const useRowTotalCheckbox = modal.querySelector('#use-row-total-checkbox');
+        const ROW_TOTAL_COLUMN_CODE = 'Total';
+        const ROW_TOTAL_LOOKUP = '_row_total';
 
-        // Define updateMatrixHelpText first (used by updateRowTotalUI and updateMatrixColumnValidation)
-        const updateMatrixHelpText = () => {
-            const useRowTotal = useRowTotalCheckbox && useRowTotalCheckbox.checked;
-            const hasMatrixColumn = useRowTotal || (matrixColumnInput && matrixColumnInput.value.trim() !== '');
-            const currentScope = entityScopeSelect.value;
+        function selectedMatrixColumnMeta() {
             const selectedOption = sourceFormItemSelect.options[sourceFormItemSelect.selectedIndex];
-            const itemType = selectedOption ? selectedOption.dataset.itemType : '';
+            if (!selectedOption || !selectedOption.value) return null;
+            const itemType = selectedOption.dataset.itemType || '';
             const isMatrix = itemType === 'matrix' || itemType === 'matrix_table';
+            let columns = [];
+            try {
+                columns = JSON.parse(selectedOption.dataset.matrixColumns || '[]');
+            } catch (_e) {
+                columns = [];
+            }
+            if (!Array.isArray(columns)) columns = [];
+            const showRowTotals = selectedOption.dataset.showRowTotals === '1';
+            const rawPosition = selectedOption.dataset.rowTotalPosition;
+            const position = rawPosition === undefined || rawPosition === '' ? null : Number(rawPosition);
+            return {
+                isMatrix,
+                columns: columns.filter(code => typeof code === 'string' && code.trim() !== '').map(code => code.trim()),
+                showRowTotals,
+                position: Number.isFinite(position) ? position : null,
+            };
+        }
+
+        function matrixColumnLookupCode() {
+            if (!matrixColumnSelect || !matrixColumnSelect.value) return '';
+            return matrixColumnSelect.value === ROW_TOTAL_LOOKUP ? ROW_TOTAL_COLUMN_CODE : matrixColumnSelect.value;
+        }
+
+        function updateMatrixHelpText() {
+            const lookupCode = matrixColumnLookupCode();
+            const hasMatrixColumn = lookupCode !== '';
+            const currentScope = entityScopeSelect.value;
+            const meta = selectedMatrixColumnMeta();
+            const isMatrix = !!(meta && meta.isMatrix);
 
             if (!matrixColumnHelpIcon) return;
-
             const tooltipTextSpan = matrixColumnHelpIcon.querySelector('.tooltip-text');
             if (!tooltipTextSpan) return;
 
-            let tooltipText = 'Optional: If the source form item is a matrix, specify which column to lookup (e.g., "Planned" for "61_Planned"), or use Row total to read the sum of all columns for each row.';
+            let tooltipText = 'Optional: If the source form item is a matrix, choose which column code to look up (for example Planned, stored as 61_Planned). When that matrix shows a row total column, Total is included.';
 
-            if (useRowTotal) {
-                tooltipText = 'Row total: The variable will return the sum of all column values for each row in the source matrix (same as the row total when row totals are enabled).';
+            if (lookupCode === ROW_TOTAL_COLUMN_CODE) {
+                tooltipText = 'Total: The variable will return the row total for each row in the source matrix (the sum of columns that count toward the row total, or a saved manual total when one exists).';
             } else if (hasMatrixColumn) {
                 let scopeGuidance = '';
                 let warningText = '';
 
                 if (currentScope === 'same') {
-                    scopeGuidance = 'Same Entity: The source matrix is stored in the same entity\'s submission (most common for matrix lookups). Example: If your matrix row is for Country B (ID: 61), and entity_scope is same, it will lookup 61_' + matrixColumnInput.value + ' in Country B\'s previous submission. The row_entity_id (61) from your current matrix row is used to find the specific cell in the source matrix.';
+                    scopeGuidance = 'Same Entity: The source matrix is stored in the same entity\'s submission (most common for matrix lookups). Example: If your matrix row is for Country B (ID: 61), and entity_scope is same, it will lookup 61_' + lookupCode + ' in Country B\'s previous submission. The row_entity_id (61) from your current matrix row is used to find the specific cell in the source matrix.';
                 } else if (currentScope === 'any') {
-                    scopeGuidance = 'Any Entity: The source matrix is from a central/aggregated submission containing data about multiple entities. The variable will lookup values from any entity\'s row in the source matrix. Example: If your matrix row is for Country B (ID: 61), it will lookup 61_' + matrixColumnInput.value + ' in the source matrix from any entity\'s submission. The row_entity_id (61) from your current matrix row is used to find the specific cell.';
+                    scopeGuidance = 'Any Entity: The source matrix is from a central/aggregated submission containing data about multiple entities. The variable will lookup values from any entity\'s row in the source matrix. Example: If your matrix row is for Country B (ID: 61), it will lookup 61_' + lookupCode + ' in the source matrix from any entity\'s submission. The row_entity_id (61) from your current matrix row is used to find the specific cell.';
                     warningText = ' ⚠️ WARNING: When using Any Entity scope with matrix lookups, ensure the source matrix contains rows for all entities that appear in your current matrix. If a row_entity_id doesn\'t exist in the source matrix, the lookup will fail.';
                 } else if (currentScope === 'specific') {
-                    scopeGuidance = 'Specific Entity: The source matrix is from a specific entity\'s submission. Important: For matrix lookups with specific scope, the variable uses the specific entity\'s ID (not the current row\'s entity ID) to find the cell. Example: If configured for Country C (ID: 62), and your current matrix row is for Country B (ID: 61), it will lookup 62_' + matrixColumnInput.value + ' (using Country C\'s ID) in Country C\'s submission, not 61_' + matrixColumnInput.value + '. This means all rows in your current matrix will get the same value from the specific entity\'s row.';
+                    scopeGuidance = 'Specific Entity: The source matrix is from a specific entity\'s submission. Important: For matrix lookups with specific scope, the variable uses the specific entity\'s ID (not the current row\'s entity ID) to find the cell. Example: If configured for Country C (ID: 62), and your current matrix row is for Country B (ID: 61), it will lookup 62_' + lookupCode + ' (using Country C\'s ID) in Country C\'s submission, not 61_' + lookupCode + '. This means all rows in your current matrix will get the same value from the specific entity\'s row.';
                 }
 
-                tooltipText = 'Matrix lookup configured. The variable will lookup values from the "' + matrixColumnInput.value + '" column in the source matrix. How it works: entity_scope determines which entity\'s submission contains the source matrix. row_entity_id (from the current matrix row) is used to find the specific cell (e.g., "61_' + matrixColumnInput.value + '"). Entity Scope for matrix lookups: ' + scopeGuidance + (warningText || '');
-            } else if (isMatrix && selectedOption && selectedOption.value) {
-                tooltipText = 'Matrix Column Code: Since the selected form item is a matrix, you can optionally specify a column code to lookup specific values per row. If the source column code contains [variables] (e.g. "[assignment_period] Planned"), enter it as written or in its resolved form; it is resolved for the source assignment. Example: If you enter "Planned", the variable will lookup values like "61_Planned", "62_Planned" etc., where the number is the row entity ID from your current matrix row. Leave empty if you want to lookup the entire matrix row data or if this is not a matrix lookup.';
+                tooltipText = 'Matrix lookup configured. The variable will lookup values from the "' + lookupCode + '" column in the source matrix. How it works: entity_scope determines which entity\'s submission contains the source matrix. row_entity_id (from the current matrix row) is used to find the specific cell (e.g., "61_' + lookupCode + '"). Entity Scope for matrix lookups: ' + scopeGuidance + (warningText || '');
+            } else if (isMatrix) {
+                tooltipText = 'Choose a column code from this matrix. Codes that contain [variables] (for example SP1_[assignment_year]) are stored as written and resolved for the source assignment. Example: Planned looks up values like 61_Planned, where the number is the row entity ID from the current matrix row. Leave unset to skip a column lookup. Total is listed when this matrix has its row total column enabled.';
             }
 
             tooltipTextSpan.textContent = tooltipText;
-        };
-
-        // Validate matrix column name against selected form item type; show/hide row total option for matrix
-        const updateMatrixColumnValidation = () => {
-            const selectedOption = sourceFormItemSelect.options[sourceFormItemSelect.selectedIndex];
-            const itemType = selectedOption ? selectedOption.dataset.itemType : '';
-            const isMatrix = itemType === 'matrix' || itemType === 'matrix_table';
-            const useRowTotal = useRowTotalCheckbox && useRowTotalCheckbox.checked;
-            const matrixColumnName = (useRowTotal ? '_row_total' : (matrixColumnInput ? matrixColumnInput.value.trim() : ''));
-
-            // Show/hide "Use row total" option only when source form item is a matrix
-            const rowTotalLabel = useRowTotalCheckbox && useRowTotalCheckbox.closest('label');
-            if (rowTotalLabel) {
-                rowTotalLabel.style.display = isMatrix && selectedOption && selectedOption.value ? '' : 'none';
-            }
-
-            if (matrixColumnName && !isMatrix && selectedOption && selectedOption.value) {
-                // Update tooltip to include warning
-                if (matrixColumnHelpIcon) {
-                    const tooltipTextSpan = matrixColumnHelpIcon.querySelector('.tooltip-text');
-                    if (tooltipTextSpan) {
-                        const currentText = tooltipTextSpan.textContent || '';
-                        const warningText = ' ⚠️ WARNING: Matrix column name is set, but the selected form item is not a matrix type. Matrix column names only work with matrix form items.';
-                        if (!currentText.includes('WARNING')) {
-                            tooltipTextSpan.textContent = currentText + warningText;
-                            const icon = matrixColumnHelpIcon.querySelector('i');
-                            if (icon) icon.classList.add('text-yellow-600');
-                        }
-                    }
-                }
-            } else {
-                // Remove warning from tooltip
-                if (matrixColumnHelpIcon) {
-                    const tooltipTextSpan = matrixColumnHelpIcon.querySelector('.tooltip-text');
-                    if (tooltipTextSpan) {
-                        let text = tooltipTextSpan.textContent || '';
-                        text = text.replace(/ ⚠️ WARNING:.*$/, '');
-                        tooltipTextSpan.textContent = text;
-                        const icon = matrixColumnHelpIcon.querySelector('i');
-                        if (icon) icon.classList.remove('text-yellow-600');
-                    }
-                }
-            }
-        };
-
-        // Toggle matrix column input vs row total: when "Use row total" is checked, disable text input
-        const updateRowTotalUI = () => {
-            if (!useRowTotalCheckbox || !matrixColumnInput) return;
-            const useRowTotal = useRowTotalCheckbox.checked;
-            matrixColumnInput.disabled = useRowTotal;
-            if (useRowTotal) {
-                matrixColumnInput.value = '';
-                matrixColumnInput.placeholder = 'Using row total (sum of all columns)';
-            } else {
-                matrixColumnInput.placeholder = 'e.g., Planned, Supported (or use Row total above)';
-            }
-            updateMatrixHelpText();
-        };
-        if (useRowTotalCheckbox) {
-            useRowTotalCheckbox.addEventListener('change', updateRowTotalUI);
-            updateRowTotalUI(); // Initial state when opening modal
         }
 
-        // Listen for form item changes to validate matrix column
-        sourceFormItemSelect.addEventListener('change', updateMatrixColumnValidation);
+        // Rebuild the column dropdown from the selected matrix. Row total is the code "Total"
+        // and is stored as the lookup sentinel _row_total.
+        function refreshMatrixColumnSelect() {
+            if (!matrixColumnSelect) return;
+            const previous = matrixColumnSelect.value;
+            const meta = selectedMatrixColumnMeta();
+            const savedForThisItem = (
+                existingVar
+                && sourceFormItemSelect.value
+                && String(existingVar.source_form_item_id) === String(sourceFormItemSelect.value)
+            ) ? (existingVar.matrix_column_name || '') : '';
 
-        if (matrixColumnInput) {
-            matrixColumnInput.addEventListener('input', () => {
+            matrixColumnSelect.replaceChildren();
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+
+            const canChoose = !!(meta && meta.isMatrix);
+            if (!canChoose) {
+                placeholder.textContent = 'Select a matrix item...';
+                matrixColumnSelect.appendChild(placeholder);
+                matrixColumnSelect.disabled = true;
+                matrixColumnSelect.classList.add('opacity-60', 'cursor-not-allowed');
                 updateMatrixHelpText();
-                updateMatrixColumnValidation();
+                return;
+            }
+
+            placeholder.textContent = 'Select column...';
+            matrixColumnSelect.appendChild(placeholder);
+            matrixColumnSelect.disabled = false;
+            matrixColumnSelect.classList.remove('opacity-60', 'cursor-not-allowed');
+
+            const entries = meta.columns.map(code => ({ value: code, label: code }));
+            if (meta.showRowTotals) {
+                const insertAt = meta.position == null
+                    ? entries.length
+                    : Math.max(0, Math.min(entries.length, meta.position));
+                entries.splice(insertAt, 0, { value: ROW_TOTAL_LOOKUP, label: ROW_TOTAL_COLUMN_CODE });
+            }
+
+            const known = new Set(entries.map(entry => entry.value));
+            // Keep a saved code this matrix no longer lists, so reopening the modal does not drop it.
+            const keepSaved = savedForThisItem && !known.has(savedForThisItem)
+                && (!previous || previous === savedForThisItem);
+            if (keepSaved) {
+                entries.push({
+                    value: savedForThisItem,
+                    label: savedForThisItem === ROW_TOTAL_LOOKUP ? ROW_TOTAL_COLUMN_CODE : savedForThisItem,
+                });
+                known.add(savedForThisItem);
+            }
+
+            entries.forEach(entry => {
+                const option = document.createElement('option');
+                option.value = entry.value;
+                option.textContent = entry.label;
+                matrixColumnSelect.appendChild(option);
             });
-            // Also update when entity scope changes
+
+            const preferred = (previous && known.has(previous))
+                ? previous
+                : ((savedForThisItem && known.has(savedForThisItem)) ? savedForThisItem : '');
+            matrixColumnSelect.value = preferred;
+            updateMatrixHelpText();
+        }
+
+        sourceFormItemSelect.addEventListener('change', refreshMatrixColumnSelect);
+
+        if (matrixColumnSelect) {
+            matrixColumnSelect.addEventListener('change', updateMatrixHelpText);
             entityScopeSelect.addEventListener('change', updateMatrixHelpText);
             updateMatrixHelpText();
         }
@@ -1035,7 +1108,7 @@ export class TemplateVariablesManager {
             if (variableType === 'metadata') {
                 const metadataType = formData.get('metadata_type');
                 if (!metadataType) {
-                    window.showAlert(_t('Please select a metadata type.'), 'warning');
+                    _flash(_t('Please select a metadata type.'), 'warning');
                     const metadataTypeSelect = modal.querySelector('#metadata-type-select');
                     if (metadataTypeSelect) {
                         metadataTypeSelect.focus();
@@ -1051,11 +1124,11 @@ export class TemplateVariablesManager {
                 const sourceAssignmentPeriod = formData.get('source_assignment_period');
                 const sourceFormItemId = formData.get('source_form_item_id');
                 const matchByBank = formData.get('match_by_indicator_bank') === 'on';
-                const useRowTotal = formData.get('use_row_total') === 'on';
-                const matrixColumnName = useRowTotal ? '_row_total' : (formData.get('matrix_column_name') || '').trim();
+                const matrixColumnName = (formData.get('matrix_column_name') || '').trim();
+                const useRowTotal = matrixColumnName === '_row_total';
 
                 if (!sourceTemplateId || !sourceAssignmentPeriod || (!matchByBank && !sourceFormItemId)) {
-                    window.showAlert(_t('Please fill in all required lookup fields (Source Template, Source Assignment Period, and Source Form Item — or enable indicator bank matching).'), 'warning');
+                    _flash(_t('Please fill in all required lookup fields (Source Template, Source Assignment Period, and Source Form Item — or enable indicator bank matching).'), 'warning');
                     return;
                 }
 
@@ -1088,7 +1161,7 @@ export class TemplateVariablesManager {
                 const specificEntityId = formData.get('specific_entity_id');
 
                 if (!specificEntityType || !specificEntityId) {
-                    window.showAlert(_t('Please specify both Entity Type and Entity ID when using "Specific Entity" scope.'), 'warning');
+                    _flash(_t('Please specify both Entity Type and Entity ID when using "Specific Entity" scope.'), 'warning');
                     // Highlight missing fields
                     if (!specificEntityType && specificEntityTypeSelect) {
                         specificEntityTypeSelect.focus();
@@ -1104,7 +1177,7 @@ export class TemplateVariablesManager {
                 // Validate entity ID is a positive integer
                 const entityIdNum = parseInt(specificEntityId);
                 if (isNaN(entityIdNum) || entityIdNum <= 0 || !Number.isInteger(parseFloat(specificEntityId))) {
-                    window.showAlert(_t('Entity ID must be a positive whole number (integer).'), 'warning');
+                    _flash(_t('Entity ID must be a positive whole number (integer).'), 'warning');
                     if (specificEntityIdInput) {
                         specificEntityIdInput.focus();
                         specificEntityIdInput.classList.add('border-red-500');
@@ -1117,7 +1190,7 @@ export class TemplateVariablesManager {
             if (variableType === 'lookup' && lookupType === 'reverse') {
                 const returnFormat = formData.get('return_format');
                 if (!returnFormat) {
-                    window.showAlert(_t('Please select a return format for reverse lookup.'), 'warning');
+                    _flash(_t('Please select a return format for reverse lookup.'), 'warning');
                     const returnFormatSelect = modal.querySelector('#return-format-select');
                     if (returnFormatSelect) {
                         returnFormatSelect.focus();
@@ -1187,10 +1260,14 @@ export class TemplateVariablesManager {
                 variableConfig.specific_entity_id = formData.get('specific_entity_id') ? parseInt(formData.get('specific_entity_id')) : null;
                 // lookup_entity_id is not stored - it's automatically set from assignment context at resolution time
                 variableConfig.return_format = formData.get('return_format') || (entityScope === 'entities_containing' ? 'auto_load_format' : null);
-                // Use row total: reserved value _row_total so variable reads sum of all columns for each row
-                variableConfig.matrix_column_name = (formData.get('use_row_total') === 'on')
-                    ? '_row_total'
-                    : (formData.get('matrix_column_name') || null);
+                // Disabled when no matrix is selected (omitted from FormData). Keep a saved
+                // column for indicator-bank matching, which has no specific source item.
+                const submittedColumn = (formData.get('matrix_column_name') || '').trim();
+                if (matrixColumnSelect && matrixColumnSelect.disabled && variableConfig.match_by_indicator_bank) {
+                    variableConfig.matrix_column_name = existingVar?.matrix_column_name || null;
+                } else {
+                    variableConfig.matrix_column_name = submittedColumn || null;
+                }
                 variableConfig.format_thousands_separator = formData.get('format_thousands_separator') === 'on';
                 variableConfig.format_decimal_places = formData.get('format_decimal_places') || 'auto';
             }
@@ -1262,18 +1339,13 @@ export class TemplateVariablesManager {
                     return r.json();
                 })();
             if (data.success) {
-                // Show success message
-                const alert = document.createElement('div');
-                alert.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
-                alert.textContent = _t('Variables saved successfully');
-                document.body.appendChild(alert);
-                setTimeout(() => alert.remove(), 3000);
+                _flash(_t('Variables saved successfully'), 'success');
             } else {
-                window.showAlert(_t('Error saving variables: ') + (data.message || _t('Unknown error')), 'error');
+                _flash(_t('Error saving variables: ') + (data.message || _t('Unknown error')), 'danger');
             }
         } catch (error) {
             console.error('Error saving variables:', error);
-            window.showAlert(_t('Error saving variables: ') + error.message, 'error');
+            _flash(_t('Error saving variables: ') + error.message, 'danger');
         }
     }
 
@@ -1349,6 +1421,20 @@ export class TemplateVariablesManager {
         // Add variable button (inside modal)
         document.getElementById('add-variable-btn')?.addEventListener('click', () => {
             this.showVariableForm();
+        });
+
+        document.querySelector('#template-variables-modal thead')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.variable-sort-btn');
+            if (!btn) return;
+            const key = btn.dataset.sortKey;
+            if (!key) return;
+            if (this._sortKey === key) {
+                this._sortDir = this._sortDir === 'desc' ? 'asc' : 'desc';
+            } else {
+                this._sortKey = key;
+                this._sortDir = 'asc';
+            }
+            this.renderVariablesList();
         });
 
         // Edit/Duplicate/Delete buttons (delegated)

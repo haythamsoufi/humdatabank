@@ -1019,6 +1019,59 @@ class TestGetVariableOptions:
         )
         assert resp.status_code == 200
 
+    def test_matrix_item_lists_column_codes_and_row_total_flag(self, logged_in_client, db_session, admin_user, app):
+        """Matrix options include column codes and whether the row-total column is on."""
+        template = _make_template(db_session, admin_user)
+        section = create_test_section(db_session, template)
+        matrix = create_test_item(
+            db_session, section, template,
+            item_type='matrix',
+            label='Funding',
+            config={
+                'matrix_config': {
+                    'columns': [
+                        {'name': 'SP1'},
+                        {'name': '  '},
+                        {'name': 'SP2_[assignment_year]'},
+                    ],
+                    'show_row_totals': True,
+                    'row_total_position': 1,
+                }
+            },
+        )
+        no_total = create_test_item(
+            db_session, section, template,
+            item_type='matrix',
+            label='No totals',
+            order=2,
+            config={
+                'matrix_config': {
+                    'columns': [{'name': 'Planned'}],
+                    'show_row_totals': False,
+                }
+            },
+        )
+        question = create_test_item(
+            db_session, section, template,
+            item_type='question',
+            label='Notes',
+            order=3,
+        )
+
+        resp = logged_in_client.get(
+            f'/admin/templates/{template.id}/variables/options?source_template_id={template.id}'
+        )
+        assert resp.status_code == 200
+        items = {item['id']: item for item in resp.get_json()['form_items']}
+
+        assert items[matrix.id]['matrix_columns'] == ['SP1', 'SP2_[assignment_year]']
+        assert items[matrix.id]['show_row_totals'] is True
+        assert items[matrix.id]['row_total_position'] == 1
+        assert items[no_total.id]['matrix_columns'] == ['Planned']
+        assert items[no_total.id]['show_row_totals'] is False
+        assert 'row_total_position' not in items[no_total.id]
+        assert 'matrix_columns' not in items[question.id]
+
     def test_access_denied(self, logged_in_client, db_session, admin_user, app):
         """GET returns 403 when access denied."""
         template = _make_template(db_session, admin_user)

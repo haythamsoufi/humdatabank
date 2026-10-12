@@ -21,6 +21,76 @@ export function __rowTotalColumnIndex(config, columnCount) {
     return index;
 }
 
+const DEFAULT_GROUP_HEADER_COLOR = '#f3f4f6';
+
+function _validGroupColor(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(raw) && raw !== DEFAULT_GROUP_HEADER_COLOR ? raw : '';
+}
+
+function _groupColorFlagOn(value) {
+    return value === true || value === 1 || value === 'true';
+}
+
+function _columnGroupNames(column) {
+    if (!column || typeof column !== 'object') return { group: '', subgroup: '' };
+    return { group: column.group || '', subgroup: column.subgroup || '' };
+}
+
+function _groupAppliesColor(meta, target) {
+    if (!meta || typeof meta !== 'object') return false;
+    const key = target === 'headers' ? 'apply_color_to_headers' : 'apply_color_to_cells';
+    if (Object.prototype.hasOwnProperty.call(meta, key)) return _groupColorFlagOn(meta[key]);
+    return _groupColorFlagOn(meta.apply_color_to_columns);
+}
+
+/** Hex to paint on column headers or cells, or ''. A subgroup that opted in wins over its parent. */
+export function matrixColumnFillColor(columns, columnGroups, index, target = 'cells') {
+    const { group, subgroup } = _columnGroupNames(columns?.[index]);
+    const groups = columnGroups && typeof columnGroups === 'object' ? columnGroups : {};
+    if (subgroup) {
+        const sub = groups[`${group}::${subgroup}`];
+        if (_groupAppliesColor(sub, target)) {
+            const color = _validGroupColor(sub.header_color);
+            if (color) return color;
+        }
+    }
+    if (!group) return '';
+    const meta = groups[group];
+    if (!_groupAppliesColor(meta, target)) return '';
+    return _validGroupColor(meta.header_color);
+}
+
+/** Left or right boundary class for one data column. Empty when the edge is not a group break. */
+export function matrixColumnEdgeClass(columns, index, edge) {
+    const { group, subgroup } = _columnGroupNames(columns?.[index]);
+    const otherIndex = edge === 'start' ? index - 1 : index + 1;
+    const other = Array.isArray(columns) && otherIndex >= 0 && otherIndex < columns.length
+        ? columns[otherIndex]
+        : null;
+    const otherNames = _columnGroupNames(other);
+    if (group && group !== otherNames.group) {
+        return edge === 'start' ? 'matrix-group-boundary-start' : 'matrix-group-boundary';
+    }
+    if (subgroup && subgroup !== otherNames.subgroup) {
+        return edge === 'start' ? 'matrix-subgroup-boundary-start' : 'matrix-subgroup-boundary';
+    }
+    return '';
+}
+
+/** Thick group lines, and an optional column tint, on a data cell. */
+export function applyMatrixColumnGroupChrome(cell, columns, columnGroups, index) {
+    if (!cell || !Array.isArray(columns)) return;
+    const start = matrixColumnEdgeClass(columns, index, 'start');
+    const end = matrixColumnEdgeClass(columns, index, 'end');
+    if (start) cell.classList.add(start);
+    if (end) cell.classList.add(end);
+    const fill = matrixColumnFillColor(columns, columnGroups, index, 'cells');
+    if (!fill) return;
+    cell.classList.add('matrix-group-colored');
+    cell.style.setProperty('--matrix-group-color', fill);
+}
+
 export const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
 /** Whether matrix cell values may be edited (mirrors server can_edit / entry form POST availability). */

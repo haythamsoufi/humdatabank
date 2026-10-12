@@ -694,6 +694,8 @@ class TestResolveMatrixDisplayHeaders:
                 'Funding': {
                     'en': 'Funding [assignment_period]',
                     'header_color': '#dbeafe',
+                    'apply_color_to_headers': True,
+                    'apply_color_to_cells': True,
                 },
             },
         }
@@ -703,6 +705,8 @@ class TestResolveMatrixDisplayHeaders:
         )
         assert resolved_groups['Funding']['en'] == 'Funding 2026'
         assert resolved_groups['Funding']['header_color'] == '#dbeafe'
+        assert resolved_groups['Funding']['apply_color_to_headers'] is True
+        assert resolved_groups['Funding']['apply_color_to_cells'] is True
 
     def test_resolve_matrix_display_headers_leaves_color_only_groups_unchanged(self):
         original = {'Funding': {'fr': 'Financement', 'header_color': '#dbeafe'}}

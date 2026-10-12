@@ -1576,6 +1576,7 @@ class MatrixHandler {
             if (!container || !container.isConnected) return;
             const existingData = this.parseExistingData(container);
             matrix.data = existingData && typeof existingData === 'object' ? existingData : {};
+            matrix.autoFilledVariableCells = new Set();
             const config = matrix.config || {};
             if (config.row_mode === 'list_library' || config.row_mode === 'hybrid') {
                 if (config.row_mode === 'hybrid') {

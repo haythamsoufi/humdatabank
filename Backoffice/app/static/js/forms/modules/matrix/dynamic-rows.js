@@ -705,6 +705,7 @@ restoreRowData(fieldId, rowId, rowInfo) {
             if (isVariable) {
                 displayValue = __getSavedMatrixCellScalar(value);
                 updatedMatrix.data[cellKey] = value;
+                updatedMatrix.autoFilledVariableCells?.delete(cellKey);
             } else {
                 updatedMatrix.data[cellKey] = value;
             }
@@ -791,6 +792,7 @@ restoreStaticMatrixValues(fieldId) {
             if (isVariable) {
                 displayValue = __getSavedMatrixCellScalar(value);
                 data[cellKey] = displayValue;
+                matrix.autoFilledVariableCells?.delete(cellKey);
             }
 
             const input = container.querySelector(`input[data-cell-key="${cellKey}"]`);

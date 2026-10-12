@@ -591,6 +591,11 @@ async resolveVariablesForAllRows(fieldId) {
         return;
     }
 
+    if (!this._variableResolveIssued) this._variableResolveIssued = new Map();
+    if (!this._variableResolveApplied) this._variableResolveApplied = new Map();
+    const resolveSeq = (this._variableResolveIssued.get(fieldId) || 0) + 1;
+    this._variableResolveIssued.set(fieldId, resolveSeq);
+
     try {
         const rowEntityIds = rowsToResolve.map(r => r.entityId);
 
@@ -636,6 +641,14 @@ async resolveVariablesForAllRows(fieldId) {
             });
             batchResults = data.results || {};
         }
+
+        // Overlapping resolves (restore, auto-load, row adds) can finish out of order.
+        // A response older than one already applied must not overwrite newer values.
+        if ((this._variableResolveApplied.get(fieldId) || 0) > resolveSeq) {
+            debugLog('matrix-handler', '[BATCH VARIABLE RESOLUTION] Dropping superseded response', { fieldId, resolveSeq });
+            return;
+        }
+        this._variableResolveApplied.set(fieldId, resolveSeq);
 
         // Process results for each row
         rowsToResolve.forEach(rowInfo => {
@@ -703,7 +716,15 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
             return;
         }
 
-        const hasSaved = cellKey && matrix.data && matrix.data[cellKey] !== undefined;
+        if (!matrix.autoFilledVariableCells) matrix.autoFilledVariableCells = new Set();
+        const autoFilled = matrix.autoFilledVariableCells;
+        const hasStoredCell = cellKey && matrix.data && matrix.data[cellKey] !== undefined;
+        // A value this handler copied from the lookup is not a saved value: it keeps
+        // following the lookup until the user edits it, so a later resolve that returns
+        // something different cannot flag the whole table as "modified".
+        const followsLookup = hasStoredCell && autoFilled.has(cellKey) && input.dataset.userEdited !== '1';
+        const hasSaved = hasStoredCell && !followsLookup;
+        if (hasSaved && cellKey) autoFilled.delete(cellKey);
         const savedRaw = hasSaved ? matrix.data[cellKey] : undefined;
         let savedScalar = hasSaved
             ? __getSavedMatrixCellScalar(savedRaw)
@@ -739,6 +760,10 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
                 );
                 if (persisted !== '') {
                     matrix.data[cellKey] = persisted;
+                    autoFilled.add(cellKey);
+                } else if (followsLookup) {
+                    delete matrix.data[cellKey];
+                    autoFilled.delete(cellKey);
                 }
             }
         }

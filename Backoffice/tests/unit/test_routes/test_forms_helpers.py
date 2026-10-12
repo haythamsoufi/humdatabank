@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from app.routes.forms.helpers import (
+    apply_carry_forward_suggestions,
     assignment_shows_suggested_values,
     build_entry_form_features,
     calculate_section_completion_status,
@@ -86,6 +87,38 @@ class TestAssignmentShowsSuggestedValues:
     def test_sent_for_review_hides_suggestions(self):
         aes = SimpleNamespace(status="sent_for_review")
         assert assignment_shows_suggested_values(aes) is False
+
+
+class TestApplyCarryForwardSuggestions:
+    def test_saved_assignment_does_not_resolve_prior_round(self):
+        aes = SimpleNamespace(status="approved")
+        existing = {"field_value[12]": "42"}
+
+        with patch("app.services.forms.carry_forward_service.CarryForwardService") as service:
+            result = apply_carry_forward_suggestions(existing, aes, [SimpleNamespace(id=12)])
+
+        service.resolve_for_aes.assert_not_called()
+        service.resolve_references_for_aes.assert_not_called()
+        assert result == {"field_value[12]": "42"}
+        assert "field_value[12]_is_carry_forward" not in result
+
+    def test_pending_assignment_still_resolves_prior_round(self):
+        aes = SimpleNamespace(status="pending")
+        item = SimpleNamespace(id=12)
+
+        with patch("app.services.forms.carry_forward_service.CarryForwardService") as service:
+            service.resolve_for_aes.return_value = {
+                12: {"value": "9", "disagg_data": None, "is_matrix": False},
+            }
+            service.resolve_references_for_aes.return_value = {
+                12: {"value": "9", "disagg_data": None, "is_matrix": False},
+            }
+            result = apply_carry_forward_suggestions({}, aes, [item])
+
+        service.resolve_for_aes.assert_called_once_with(aes, [item])
+        assert result["field_value[12]"] == "9"
+        assert result["field_value[12]_is_carry_forward"] is True
+        assert result["field_value[12]_carry_forward_ref"] == "9"
 
 
 # ---------------------------------------------------------------------------

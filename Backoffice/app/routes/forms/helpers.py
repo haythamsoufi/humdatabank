@@ -37,7 +37,8 @@ from app.utils.form_localization import (
 from config import Config as AppConfig
 
 # After the first save, the entry form shows reported values only — not
-# unused prefilled payloads or field-config defaults.
+# unused prefilled payloads, field-config defaults, or prior-round
+# carry-forward suggestions.
 _STATUSES_WITH_SAVED_DATA = frozenset({
     AssignmentEntityStatusValue.in_progress.value,
     AssignmentEntityStatusValue.requires_revision.value,
@@ -60,6 +61,45 @@ def assignment_shows_suggested_values(assignment_entity_status) -> bool:
     if value is None:
         return True
     return str(value).strip() not in _STATUSES_WITH_SAVED_DATA
+
+
+def apply_carry_forward_suggestions(existing_data, assignment_entity_status, carry_forward_items):
+    """Overlay prior-round values onto an assignment that has not been saved yet.
+
+    Carry-forward is a suggestion for a blank assignment. Once data has been
+    saved, submitted, or approved, the stored values are the submission and
+    prior-round sources are not resolved again. Resolving them would flag those
+    saved fields as carry-forward and show the review notice.
+    """
+    if existing_data is None:
+        existing_data = {}
+    if not carry_forward_items or not assignment_shows_suggested_values(assignment_entity_status):
+        return existing_data
+
+    from app.services.forms.carry_forward_service import CarryForwardService
+
+    cf_results = CarryForwardService.resolve_for_aes(assignment_entity_status, carry_forward_items)
+    for item_id, result in cf_results.items():
+        field_key = f'field_value[{item_id}]'
+        if field_key in existing_data:
+            continue
+        existing_data[field_key] = (
+            result['disagg_data'] if result.get('is_matrix') else result.get('value')
+        )
+        existing_data[f'{field_key}_is_prefilled'] = True
+        existing_data[f'{field_key}_is_carry_forward'] = True
+
+    cf_refs = CarryForwardService.resolve_references_for_aes(
+        assignment_entity_status, carry_forward_items
+    )
+    for item_id, result in cf_refs.items():
+        ref_data = result['disagg_data'] if result.get('is_matrix') else result.get('value')
+        if ref_data is None:
+            continue
+        existing_data[f'field_value[{item_id}]_carry_forward_ref'] = ref_data
+        existing_data[f'field_value[{item_id}]_is_carry_forward'] = True
+
+    return existing_data
 
 
 def debug_numeric_value(logger, context, field_id, field_type, value, processed_value):

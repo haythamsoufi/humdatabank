@@ -1,5 +1,7 @@
 # Handover: Bilateral Support matrix overwrite, 18 September 2026
 
+The same form was wiped again around 8 October 2026 (item 1433 deleted, not collapsed) and restored from DBeaver on 12 October. Current code, deploy hold, and remaining annual-period checks are in [the 12 Oct handoff](../handovers/2026-10-12-upr-import-pns-matrix-data-loss.md). This note stays the write-up of the 18 Sep collapse.
+
 Investigation date: 5 October 2026. Source: five custom-format Postgres dumps in the repo root (`PGDMP`, not plain SQL). Read them with `pg_restore -a -t <table> -f -`, not a text search.
 
 Dumps compared:

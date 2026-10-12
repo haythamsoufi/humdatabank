@@ -2,7 +2,7 @@
 import { debugLog, debugError, debugWarn } from '../debug.js';
 import { calculationIsReadonly, calculationSavesValue } from './calculation.js';
 import { compareMatrixRowLabels } from './row-order.js';
-import { _t, __canEditMatrixContainer, __rowTotalColumnIndex, ROW_TOTAL_COLUMN_NAME } from './shared.js';
+import { _t, __canEditMatrixContainer, __rowTotalColumnIndex, applyMatrixColumnGroupChrome, ROW_TOTAL_COLUMN_NAME } from './shared.js';
 import {
     __configFlag,
     __getSavedMatrixCellScalar,
@@ -172,10 +172,11 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
         const cell = document.createElement('td');
         cell.className = `border border-gray-300 px-2 py-1${columnType === 'tick' || columnType === 'calculated' ? ' text-center' : ''}${isReadonlyVariable || isReadonlyCalculated ? ' bg-gray-100' : ''}`;
         cell.setAttribute('role', 'gridcell');
+        applyMatrixColumnGroupChrome(cell, columns, matrixInfo.config?.column_groups, columnIndex);
 
         if (columnType === 'calculated' && calculationIsReadonly(column)) {
             const span = document.createElement('span');
-            span.className = 'matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-medium text-gray-700';
+            span.className = 'matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-bold text-gray-700';
             span.setAttribute('data-row', rowLabel);
             span.setAttribute('data-row-id', finalRowId);
             span.setAttribute('data-column', columnName);
@@ -190,7 +191,7 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
             const calcInput = document.createElement('input');
             calcInput.type = 'text';
             calcInput.setAttribute('data-numeric', 'true');
-            calcInput.className = 'w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center';
+            calcInput.className = 'w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-sm font-bold';
             calcInput.setAttribute('data-row', rowLabel);
             calcInput.setAttribute('data-row-id', finalRowId);
             calcInput.setAttribute('data-column', columnName);

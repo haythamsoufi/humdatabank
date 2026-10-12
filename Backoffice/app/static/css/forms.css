@@ -656,6 +656,43 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     table-layout: auto !important;
 }
 
+/* Column-group edges. The wider border wins under border-collapse, so a
+   subgroup edge that is also the parent group's edge uses only the 3px class. */
+.matrix-container .matrix-group-boundary-start {
+    border-left-width: 3px;
+    border-left-color: #9ca3af;
+}
+.matrix-container .matrix-group-boundary {
+    border-right-width: 3px;
+    border-right-color: #9ca3af;
+}
+.matrix-container .matrix-subgroup-boundary-start {
+    border-left-width: 2px;
+    border-left-color: #d1d5db;
+}
+.matrix-container .matrix-subgroup-boundary {
+    border-right-width: 2px;
+    border-right-color: #d1d5db;
+}
+/* Wash of the group colour on column headers and cells. Error, prefill, and
+   locked-header states keep their own backgrounds. */
+.matrix-container td.matrix-group-colored:not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) {
+    background-color: color-mix(in srgb, var(--matrix-group-color) 22%, #fff);
+}
+.matrix-container th.matrix-group-colored {
+    background-color: color-mix(in srgb, var(--matrix-group-color) 48%, #fff);
+}
+.matrix-container td.matrix-group-colored:not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) input.bg-gray-100 {
+    background-color: transparent;
+}
+/* Calculated columns are often used as a total. Bold the heading and the values. */
+.matrix-container th[data-column-type="calculated"],
+.matrix-container .matrix-calculated-value,
+.matrix-container input[data-calculated="true"],
+.matrix-container .matrix-column-total[data-column-type="calculated"] {
+    font-weight: 700;
+}
+
 /* Selectable-header columns: cells stay locked until the column header has a value */
 .matrix-container td.matrix-cell-header-gated {
     background-color: #f3f4f6;

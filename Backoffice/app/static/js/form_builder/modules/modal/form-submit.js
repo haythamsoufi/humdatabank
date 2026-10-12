@@ -7,6 +7,34 @@ import { PluginItem } from '../items/plugin.js';
 import { serializeCarryForwardSources } from './carry-forward.js';
 import { clearDisabledDescriptions } from './description-hint-ui.js';
 import { serializeConfigCheckboxes } from './config-checkbox-serializer.js';
+import {
+    fetchMatrixColumnMigrationPreview,
+    hasMigratableData,
+    confirmMatrixColumnMigration,
+} from './matrix-column-migration.js';
+
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
+/**
+ * Put the item modal's submit button into a loading state (disabled + spinner + label).
+ * Returns a function that restores it.
+ */
+function setSubmitButtonBusy(form, label) {
+    const btn = form && form.querySelector ? form.querySelector('#item-modal-submit-btn') : null;
+    if (!btn) return () => {};
+    const originalNodes = Array.from(btn.childNodes).map((n) => n.cloneNode(true));
+    const wasDisabled = btn.disabled;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-spinner fa-spin mr-2';
+    btn.replaceChildren(icon, document.createTextNode(label));
+    return () => {
+        btn.replaceChildren(...originalNodes);
+        btn.disabled = wasDisabled;
+        btn.removeAttribute('aria-busy');
+    };
+}
 
 export const FormSubmitMixin = {
     /**
@@ -116,6 +144,13 @@ export const FormSubmitMixin = {
         try {
             if (this.currentItemType === 'matrix') {
                 MatrixItem.updateConfig(this.modalElement);
+                // Renamed column codes (edit only). The migrate flag is decided per save in
+                // resolveMatrixColumnMigration, so it never carries over from a previous one.
+                const renames = this.currentMode === 'edit'
+                    ? MatrixItem.collectColumnRenames(this.modalElement)
+                    : [];
+                setHiddenField(form, 'matrix_column_renames', renames.length ? JSON.stringify(renames) : '');
+                setHiddenField(form, 'migrate_matrix_columns', '');
             }
         } catch (_e) {}
 
@@ -162,6 +197,54 @@ export const FormSubmitMixin = {
         try {
             this.prepareAddFormAction(form);
         } catch (_e) {}
+    },
+
+    /**
+     * Client-side check before an item save. For matrix items, column codes must be
+     * unique and not reserved. Highlights the offenders, reveals the first one and
+     * returns a message, or null when everything is valid.
+     */
+    validateBeforeSave: function() {
+        if (this.currentItemType !== 'matrix' || !this.modalElement) return null;
+        const issues = MatrixItem.markColumnCodeIssues(this.modalElement);
+        if (!issues.length) return null;
+        MatrixItem.revealColumnInput(issues[0].input);
+        return Array.from(new Set(issues.map((i) => i.message))).slice(0, 3).join(' ');
+    },
+
+    /**
+     * Before an item save: if matrix column codes were renamed and saved data exists under
+     * the old codes, ask whether to migrate it. Called by FormSubmitUI with the FormData
+     * snapshot. Resolves to 'none' (nothing to ask), 'migrate', 'skip' or 'cancel'.
+     */
+    resolveMatrixColumnMigration: async function(snapshot, formEl) {
+        if (this.currentItemType !== 'matrix' || this.currentMode !== 'edit' || !this.currentItemId) {
+            return 'none';
+        }
+        const entry = (snapshot || []).find(([key]) => key === 'matrix_column_renames');
+        let renames = [];
+        try {
+            renames = JSON.parse((entry && entry[1]) || '[]');
+        } catch (_e) {
+            renames = [];
+        }
+        if (!Array.isArray(renames) || !renames.length) return 'none';
+
+        let preview = null;
+        // The preview is a server round trip; show progress on the save button meanwhile.
+        const endBusy = setSubmitButtonBusy(formEl || this.formElement, _t('Checking saved data…'));
+        try {
+            const versionId = document.getElementById('item-modal-version-id')?.value || null;
+            preview = await fetchMatrixColumnMigrationPreview(this.currentItemId, renames, versionId);
+        } catch (e) {
+            // Without a preview we cannot tell whether data exists; save as before.
+            console.warn('[ItemModal] matrix column migration preview failed', e);
+            return 'none';
+        } finally {
+            endBusy();
+        }
+        if (!hasMigratableData(preview)) return 'none';
+        return confirmMatrixColumnMigration(preview);
     },
 
     populateEditFormFields: function() {

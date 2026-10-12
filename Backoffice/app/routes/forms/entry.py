@@ -56,6 +56,7 @@ from config import Config
 
 from .helpers import (
     _load_existing_data_for_assignment,
+    apply_carry_forward_suggestions,
     assignment_shows_suggested_values,
     build_entry_form_features,
     build_submitted_documents_dict,
@@ -226,25 +227,22 @@ def handle_assignment_form(aes_id):
                                                                 names.update(placeholder_pattern.findall(str(v)))
                                                     elif isinstance(row, str) and '[' in row:
                                                         names.update(placeholder_pattern.findall(row))
-                                            columns = matrix_config.get('columns', [])
-                                            if isinstance(columns, list):
-                                                for col in columns:
-                                                    if not isinstance(col, dict):
-                                                        continue
-                                                    name_translations = col.get('name_translations')
-                                                    if isinstance(name_translations, dict):
-                                                        for v in name_translations.values():
-                                                            if v and '[' in str(v):
-                                                                names.update(placeholder_pattern.findall(str(v)))
-                                            column_groups = matrix_config.get('column_groups', {})
-                                            if isinstance(column_groups, dict):
-                                                for group_translations in column_groups.values():
-                                                    if isinstance(group_translations, dict):
-                                                        for key, v in group_translations.items():
-                                                            if key == 'header_color':
-                                                                continue
-                                                            if v and '[' in str(v):
-                                                                names.update(placeholder_pattern.findall(str(v)))
+                                        # Column codes, group / subgroup labels and their translations can
+                                        # carry placeholders in every row mode (saved keys use the resolved code).
+                                        def _collect_matrix_header_placeholders(node):
+                                            if isinstance(node, str):
+                                                if '[' in node:
+                                                    names.update(placeholder_pattern.findall(node))
+                                            elif isinstance(node, list):
+                                                for child in node:
+                                                    _collect_matrix_header_placeholders(child)
+                                            elif isinstance(node, dict):
+                                                for key, child in node.items():
+                                                    _collect_matrix_header_placeholders(key)
+                                                    _collect_matrix_header_placeholders(child)
+
+                                        _collect_matrix_header_placeholders(matrix_config.get('columns', []))
+                                        _collect_matrix_header_placeholders(matrix_config.get('column_groups', {}))
                                 except Exception as e:
                                     current_app.logger.debug("Placeholder extraction from row failed: %s", e)
                     return names
@@ -494,33 +492,16 @@ def handle_assignment_form(aes_id):
     )
     _entry_lap("existing_data_load")
 
+    # Blank fields are filled from the prior round only before the first save.
+    # Saved forms still receive the reference so unchanged matrix cells stay highlighted.
     from app.services.forms.carry_forward_service import CarryForwardService
 
     cf_items = CarryForwardService.iter_carry_forward_items(all_sections)
     if cf_items:
         try:
-            cf_results = CarryForwardService.resolve_for_aes(assignment_entity_status, cf_items)
-            for item_id, result in cf_results.items():
-                field_key = f'field_value[{item_id}]'
-                if field_key in existing_data_processed:
-                    continue
-                existing_data_processed[field_key] = (
-                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
-                )
-                existing_data_processed[f'{field_key}_is_prefilled'] = True
-                existing_data_processed[f'{field_key}_is_carry_forward'] = True
-
-            cf_refs = CarryForwardService.resolve_references_for_aes(
-                assignment_entity_status, cf_items
+            apply_carry_forward_suggestions(
+                existing_data_processed, assignment_entity_status, cf_items
             )
-            for item_id, result in cf_refs.items():
-                ref_data = (
-                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
-                )
-                if ref_data is None:
-                    continue
-                existing_data_processed[f'field_value[{item_id}]_carry_forward_ref'] = ref_data
-                existing_data_processed[f'field_value[{item_id}]_is_carry_forward'] = True
         except Exception as e:
             current_app.logger.warning("Carry-forward resolution failed for AES %s: %s", aes_id, e)
     _entry_lap("carry_forward")

@@ -1,6 +1,6 @@
 # UPR Excel Import — Design, Implementation & Handover Guide
 
-> **Status:** Active  
+> **Status:** Active design doc. Production hold and the uncommitted precise-target rework are in [the 12 Oct data-loss handoff](../../docs/handovers/2026-10-12-upr-import-pns-matrix-data-loss.md). Do not run a template 23 import on production until that rework is deployed.  
 > **Last updated:** October 2026  
 > **Primary files:** `Backoffice/plugins/upr/scripts/import_upr_excel_data.py` · `Backoffice/plugins/upr/excel/excel_import_service.py` · `Backoffice/plugins/upr/excel/import_routes.py` · `Backoffice/plugins/upr/templates/admin/_upr_excel_import_panel.html`  
 > **Reviews:** [UPR Excel import review](upr-excel-import-review.md) — whenever an import review is requested, review published **template variables** as well as form items and the script.
@@ -102,7 +102,7 @@ UPR_TEMPLATE_PROFILES = {
          "sections": frozenset({"Reach", "NS Data", "Funding", "Comments", "Support"})},
     22: {"name": "Annual Planning - International Bilateral Support",
          "round_prefixes": ("P",),
-         "sections": frozenset({"Staff"})},  # PNS Funding handled inside Funding section when 22 ∈ tids
+         "sections": frozenset({"Staff", "Funding"})},  # self-sufficient — never pair with 24 just for this
     33: {"name": "Reporting - Country",
          "round_prefixes": ("AR", "MYR"),
          "sections": frozenset({"NS Data", "Funding", "Core indicators", "Other indicators", "Support"})},
@@ -614,7 +614,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 | # | Item | Notes |
 |---|------|-------|
 | 1 | **Multi-year PNS Funding in template 22** | T22 form (item 1303) has only one Funding Requirements matrix with SP1–SP5/EFs columns — no year+1/+2 equivalents exist. Adding year+1/+2 support requires new form items before the import can write them. |
-| 2 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
+| 2 | **~~Template 22-only import skipped PNS funding~~ — resolved** | `UPR_TEMPLATE_PROFILES[22]["sections"]` used to list only `Staff`, so `_filter_rows()`'s old union-of-all-selected-templates logic dropped every `Funding` row when template 22 was selected without 24 — forcing operators to pair 24+22 just to avoid silently losing PNS funding (or run 24 unintentionally alongside 22). `sections` now includes `Funding` directly, and `_filter_rows()` was rewritten to match per-template (not a union), so template 22 alone is a complete, self-sufficient `(22, P*)` target. Regression guard: `test_template_22_alone_keeps_planning_funding_rows` in `test_upr_import_targets.py`. |
 | 3 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
 | 4 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
 | 5 | **Legacy Funding `Area` codes (`E1`, `EO`, …)** | UPR Master still has ~360 Funding rows using pre-SP1/EFs codes (`E1`, `E2`, `E3`, `EO`). These remain **skipped** (`EO` is typically the EA1+EA2+EA3 roll-up). **`EA1`–`EA3` are covered** on the current-year hybrid matrix when it defines those columns (see §6.2). Year+1/+2 matrices without EA columns skip those rows. |

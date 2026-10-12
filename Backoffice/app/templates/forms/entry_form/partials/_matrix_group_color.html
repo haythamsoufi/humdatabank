@@ -25,3 +25,91 @@
  style="background-color: {{ ns.raw }}; color: {{ text }};"
 {%- endif -%}
 {%- endmacro %}
+
+{# Custom #rrggbb from a group dict, or empty. Default grey counts as unset. #}
+{% macro _matrix_group_hex(group_meta) -%}
+{%- set ns = namespace(raw='', valid=false) -%}
+{%- if group_meta is mapping -%}
+  {%- set candidate = group_meta.get('header_color') -%}
+  {%- if candidate is string -%}
+    {%- set ns.raw = candidate|trim|lower -%}
+  {%- endif -%}
+{%- endif -%}
+{%- set ns.valid = (ns.raw|length == 7 and ns.raw[0] == '#') -%}
+{%- if ns.valid -%}
+  {%- for ch in ns.raw[1:] -%}
+    {%- if ch not in '0123456789abcdef' -%}{%- set ns.valid = false -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- if ns.valid and ns.raw != '#f3f4f6' -%}{{ ns.raw }}{%- endif -%}
+{%- endmacro %}
+
+{# target is "headers" or "cells". A missing specific flag still honours the older combined flag. #}
+{% macro _matrix_group_applies_color(group_meta, target) -%}
+{%- set ns = namespace(flag=none) -%}
+{%- if group_meta is mapping -%}
+  {%- set key = 'apply_color_to_headers' if target == 'headers' else 'apply_color_to_cells' -%}
+  {%- if key in group_meta -%}
+    {%- set ns.flag = group_meta.get(key) -%}
+  {%- else -%}
+    {%- set ns.flag = group_meta.get('apply_color_to_columns') -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if ns.flag is sameas true or ns.flag == 'true' or ns.flag == 1 -%}1{%- endif -%}
+{%- endmacro %}
+
+{# Column fill for headers or cells. A subgroup that opted in wins; otherwise the parent group. #}
+{% macro matrix_column_fill(columns, column_groups, index, target) -%}
+{%- set ns = namespace(color='') -%}
+{%- set groups = column_groups if column_groups is mapping else {} -%}
+{%- set col = columns[index] if columns is sequence and index is number and index >= 0 and index < (columns|length) else none -%}
+{%- set group = col.get('group', '') if col is mapping else '' -%}
+{%- set subgroup = col.get('subgroup', '') if col is mapping else '' -%}
+{%- if subgroup -%}
+  {%- set sub_meta = groups.get(group ~ '::' ~ subgroup, {}) -%}
+  {%- if _matrix_group_applies_color(sub_meta, target)|trim -%}
+    {%- set ns.color = _matrix_group_hex(sub_meta)|trim -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if not ns.color and group -%}
+  {%- set group_meta = groups.get(group, {}) -%}
+  {%- if _matrix_group_applies_color(group_meta, target)|trim -%}
+    {%- set ns.color = _matrix_group_hex(group_meta)|trim -%}
+  {%- endif -%}
+{%- endif -%}
+{{ ns.color }}
+{%- endmacro %}
+
+{# Leading space + class, or empty. edge is "start" (left) or "end" (right).
+   A subgroup edge that is also the parent group's edge uses the thicker group class. #}
+{% macro matrix_column_edge(columns, index, edge) -%}
+{%- set col = columns[index] if columns is sequence and index is number and index >= 0 and index < (columns|length) else none -%}
+{%- set group = col.get('group', '') if col is mapping else '' -%}
+{%- set subgroup = col.get('subgroup', '') if col is mapping else '' -%}
+{%- set other_index = (index - 1) if edge == 'start' else (index + 1) -%}
+{%- set other = columns[other_index] if columns is sequence and other_index >= 0 and other_index < (columns|length) else none -%}
+{%- set other_group = other.get('group', '') if other is mapping else '' -%}
+{%- set other_sub = other.get('subgroup', '') if other is mapping else '' -%}
+{%- if group and group != other_group -%}
+{% if edge == 'start' %} matrix-group-boundary-start{% else %} matrix-group-boundary{% endif -%}
+{%- elif subgroup and subgroup != other_sub -%}
+{% if edge == 'start' %} matrix-subgroup-boundary-start{% else %} matrix-subgroup-boundary{% endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro matrix_column_edges(columns, index) -%}
+{{ matrix_column_edge(columns, index, 'start') }}{{ matrix_column_edge(columns, index, 'end') }}
+{%- endmacro %}
+
+{% macro matrix_span_edges(columns, start_index, span) -%}
+{{ matrix_column_edge(columns, start_index, 'start') }}{{ matrix_column_edge(columns, start_index + span - 1, 'end') }}
+{%- endmacro %}
+
+{% macro matrix_column_color_class(columns, column_groups, index, target) -%}
+{%- if matrix_column_fill(columns, column_groups, index, target)|trim %} matrix-group-colored{% endif -%}
+{%- endmacro %}
+
+{% macro matrix_column_color_style(columns, column_groups, index, target) -%}
+{%- set fill = matrix_column_fill(columns, column_groups, index, target)|trim -%}
+{%- if fill %} style="--matrix-group-color: {{ fill }};"{% endif -%}
+{%- endmacro %}

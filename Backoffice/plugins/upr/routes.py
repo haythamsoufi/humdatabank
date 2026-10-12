@@ -227,7 +227,7 @@ def settings_page():
 def upr_tools():
     """UPR tools hub: data sync & imputation, plus Excel import."""
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
-    from plugins.upr.catalog import PLAN_TEMPLATE_ID, UPR_TEMPLATE_CHOICES
+    from plugins.upr.catalog import PLAN_TEMPLATE_ID
 
     return render_data_sync_imputation_page(
         PLAN_TEMPLATE_ID,
@@ -260,7 +260,6 @@ def upr_tools():
             "plugins/upr/admin/_upr_excel_import_script.html",
             "plugins/upr/admin/_upr_guidance_script.html",
         ],
-        extra_context={"upr_template_choices": list(UPR_TEMPLATE_CHOICES)},
     )
 
 

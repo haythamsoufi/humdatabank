@@ -40,6 +40,7 @@ from app.utils.api_serialization import (
     _wrap_disagg_dict,
     _resolve_matrix_cell,
     prune_stale_matrix_cell_keys,
+    _build_matrix_long_rows_from_values,
     _lookup_matrix_column_label,
     resolve_matrix_join_metadata,
     resolve_assignment_year_placeholders,
@@ -1445,6 +1446,24 @@ class TestPruneStaleMatrixCellKeys:
     def test_empty_or_non_dict_input_returned_unchanged(self):
         assert prune_stale_matrix_cell_keys({}, self.FUNDING_CONFIG) == {}
         assert prune_stale_matrix_cell_keys(None, self.FUNDING_CONFIG) is None
+
+    def test_unresolved_variable_column_codes_never_prune(self):
+        """A '[variable]' column code is a template, so its saved keys can't be verified."""
+        config = {'columns': [{'name': '[assignment_period] Planned'}]}
+        data = {'Row_2026 Planned': 1, 'Row_other': 2}
+        assert prune_stale_matrix_cell_keys(data, config) == data
+
+    def test_resolved_variable_column_codes_prune_normally(self):
+        config = {'columns': [{'name': '2026 Planned'}]}
+        data = {'Row_2026 Planned': 1, 'Row_2025 Planned': 2}
+        assert prune_stale_matrix_cell_keys(data, config) == {'Row_2026 Planned': 1}
+
+    def test_unresolved_variable_column_codes_still_parse_cells(self):
+        """Cells are not dropped from the API when a template cannot be resolved."""
+        config = {'columns': [{'name': '[assignment_period] Planned'}], 'show_row_totals': False}
+        rows = _build_matrix_long_rows_from_values({'42_2026 Planned': 7}, config)
+        assert rows[0]['row_entity_id'] == 42
+        assert rows[0]['column_key'] == '2026 Planned'
 
 
 # ---------------------------------------------------------------------------

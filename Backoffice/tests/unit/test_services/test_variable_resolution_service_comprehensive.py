@@ -694,6 +694,8 @@ class TestResolveMatrixDisplayHeaders:
                 'Funding': {
                     'en': 'Funding [assignment_period]',
                     'header_color': '#dbeafe',
+                    'apply_color_to_headers': True,
+                    'apply_color_to_cells': True,
                 },
             },
         }
@@ -703,6 +705,8 @@ class TestResolveMatrixDisplayHeaders:
         )
         assert resolved_groups['Funding']['en'] == 'Funding 2026'
         assert resolved_groups['Funding']['header_color'] == '#dbeafe'
+        assert resolved_groups['Funding']['apply_color_to_headers'] is True
+        assert resolved_groups['Funding']['apply_color_to_cells'] is True
 
     def test_resolve_matrix_display_headers_leaves_color_only_groups_unchanged(self):
         original = {'Funding': {'fr': 'Financement', 'header_color': '#dbeafe'}}
@@ -712,6 +716,57 @@ class TestResolveMatrixDisplayHeaders:
             {'assignment_period': '2026'},
         )
         assert resolved_groups is None
+
+    def test_resolve_matrix_display_headers_resolves_column_codes_and_groups(self):
+        matrix_config = {
+            'columns': [
+                {
+                    'name': '[assignment_period] Planned',
+                    'group': '[assignment_period] Funding',
+                    'subgroup': 'Male',
+                },
+                {
+                    'name': 'total',
+                    'type': 'calculated',
+                    'calculation': {
+                        'operation': 'sum',
+                        'sources': ['[assignment_period] Planned'],
+                        'formula': 'SUM({[assignment_period] Planned})',
+                    },
+                },
+            ],
+            'column_groups': {
+                '[assignment_period] Funding': {'en': 'Funding [assignment_period]', 'header_color': '#dbeafe'},
+                '[assignment_period] Funding::Male': {},
+            },
+        }
+        resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+            matrix_config,
+            {'assignment_period': '2026'},
+        )
+        assert resolved_columns[0]['name'] == '2026 Planned'
+        assert resolved_columns[0]['group'] == '2026 Funding'
+        assert resolved_columns[0]['subgroup'] == 'Male'
+        assert resolved_columns[1]['calculation']['sources'] == ['2026 Planned']
+        assert resolved_columns[1]['calculation']['formula'] == 'SUM({2026 Planned})'
+        # Group keys follow the resolved column.group so lookups still match.
+        assert set(resolved_groups) == {'2026 Funding', '2026 Funding::Male'}
+        assert resolved_groups['2026 Funding']['en'] == 'Funding 2026'
+        assert resolved_groups['2026 Funding']['header_color'] == '#dbeafe'
+        # The stored config is not mutated.
+        assert matrix_config['columns'][0]['name'] == '[assignment_period] Planned'
+
+    def test_matrix_config_has_placeholders(self):
+        assert VariableResolutionService.matrix_config_has_placeholders(
+            {'columns': [{'name': '[assignment_period] Planned'}]}
+        )
+        assert VariableResolutionService.matrix_config_has_placeholders(
+            {'columns': [{'name': 'a'}], 'column_groups': {'[assignment_period]': {}}}
+        )
+        assert not VariableResolutionService.matrix_config_has_placeholders(
+            {'columns': [{'name': 'a', 'name_translations': {'en': 'A'}}], 'column_groups': {'G': {}}}
+        )
+        assert not VariableResolutionService.matrix_config_has_placeholders(None)
 
     def test_resolve_matrix_display_rows_for_text_and_translations(self):
         matrix_config = {
@@ -730,6 +785,90 @@ class TestResolveMatrixDisplayHeaders:
         assert resolved_rows[0]['text'] == 'Baseline 2026'
         assert resolved_rows[0]['name_translations']['fr'] == 'Référence 2026'
         assert resolved_rows[1] == 'Legacy 2026'
+
+
+class TestMatrixLookupColumnCodes:
+    """Lookup variables read the source matrix by (resolved) column code, with fallbacks."""
+
+    @staticmethod
+    def _entry(columns):
+        return SimpleNamespace(
+            form_item=SimpleNamespace(config={'matrix_config': {'columns': columns}}),
+            assignment_entity_status=MagicMock(),
+        )
+
+    @staticmethod
+    def _lookup(entry, name, resolved=None):
+        with patch.object(
+            VariableResolutionService,
+            'resolve_for_assignment_display',
+            return_value=(resolved or {}, {}),
+        ):
+            return VariableResolutionService._matrix_lookup_columns_and_code(entry, name)
+
+    def test_plain_static_code_is_unchanged(self):
+        columns = [{'name': 'Planned', 'label': 'Planned'}, {'name': 'Supported'}]
+        resolved_columns, code = self._lookup(self._entry(columns), 'Planned', {'assignment_period': '2026'})
+        assert code == 'Planned'
+        assert resolved_columns is columns
+
+    def test_static_code_wins_over_a_label_that_matches_another_column(self):
+        columns = [{'name': 'A', 'label': 'B'}, {'name': 'B', 'label': 'A'}]
+        assert self._lookup(self._entry(columns), 'A')[1] == 'A'
+
+    def test_templated_code_resolves_for_source_assignment(self):
+        columns = [{'name': '[assignment_period] Planned'}]
+        resolved_columns, code = self._lookup(
+            self._entry(columns), '2026 Planned', {'assignment_period': '2026'}
+        )
+        assert code == '2026 Planned'
+        assert resolved_columns[0]['name'] == '2026 Planned'
+
+    def test_raw_template_code_maps_to_resolved_code(self):
+        columns = [{'name': '[assignment_period] Planned'}]
+        _, code = self._lookup(
+            self._entry(columns), '[assignment_period] Planned', {'assignment_period': '2026'}
+        )
+        assert code == '2026 Planned'
+
+    def test_placeholder_in_configured_name_is_resolved(self):
+        columns = [{'name': '[assignment_period] Planned'}]
+        _, code = self._lookup(
+            self._entry(columns), '[assignment_period] Planned', {'assignment_period': '2026'}
+        )
+        assert code == '2026 Planned'
+
+    def test_unique_label_or_translation_falls_back_to_code(self):
+        columns = [
+            {'name': 'col_a', 'label': 'People reached', 'name_translations': {'fr': 'Personnes'}},
+            {'name': 'col_b', 'label': 'Budget'},
+        ]
+        assert self._lookup(self._entry(columns), 'people reached')[1] == 'col_a'
+        assert self._lookup(self._entry(columns), 'Personnes')[1] == 'col_a'
+
+    def test_ambiguous_or_unknown_name_is_returned_unchanged(self):
+        columns = [{'name': 'a', 'label': 'Same'}, {'name': 'b', 'label': 'Same'}]
+        assert self._lookup(self._entry(columns), 'Same')[1] == 'Same'
+        assert self._lookup(self._entry(columns), 'missing')[1] == 'missing'
+
+    def test_row_total_and_missing_columns_pass_through(self):
+        columns = [{'name': 'a'}]
+        total = VariableResolutionService.MATRIX_COLUMN_ROW_TOTAL
+        assert self._lookup(self._entry(columns), total)[1] == total
+        entry = SimpleNamespace(form_item=SimpleNamespace(config={}), assignment_entity_status=None)
+        assert VariableResolutionService._matrix_lookup_columns_and_code(entry, 'x') == (None, 'x')
+
+    def test_resolution_failure_falls_back_to_raw_columns(self):
+        columns = [{'name': '[assignment_period] Planned'}]
+        entry = self._entry(columns)
+        with patch.object(
+            VariableResolutionService, 'resolve_for_assignment_display', side_effect=RuntimeError('boom')
+        ):
+            resolved_columns, code = VariableResolutionService._matrix_lookup_columns_and_code(
+                entry, 'Planned'
+            )
+        assert resolved_columns is columns
+        assert code == 'Planned'
 
 
 # ---------------------------------------------------------------------------

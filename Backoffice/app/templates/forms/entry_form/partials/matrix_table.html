@@ -1,5 +1,5 @@
 {% from "components/_status_label.html" import status_label_for_data_flag %}
-{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style %}
+{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style, matrix_column_edges, matrix_span_edges, matrix_column_color_class, matrix_column_color_style %}
 {# ── Macro: renders the content of a column <th> ──────────────────────────────
    For columns with header_type="selectable" it renders a custom header picker
    (multiline label + dropdown menu) and an optional Other text-input; for all
@@ -146,6 +146,12 @@
 {% set matrix_rows = field._display_matrix_rows if hasattr(field, '_display_matrix_rows') and field._display_matrix_rows else matrix_config.get('rows', []) %}
 {% set matrix_columns = field._display_matrix_columns if hasattr(field, '_display_matrix_columns') and field._display_matrix_columns else matrix_config.get('columns', []) %}
 {% set matrix_column_groups = field._display_matrix_column_groups if hasattr(field, '_display_matrix_column_groups') and field._display_matrix_column_groups else matrix_config.get('column_groups', {}) %}
+{# Column codes and group labels may contain [variables]. Saved cell keys use the resolved codes, so the
+   client-side config must carry the resolved columns/groups, not the raw ones. #}
+{% set matrix_config_client = matrix_config %}
+{% if (hasattr(field, '_display_matrix_columns') and field._display_matrix_columns) or (hasattr(field, '_display_matrix_column_groups') and field._display_matrix_column_groups) %}
+    {% set matrix_config_client = dict(matrix_config, columns=matrix_columns, column_groups=matrix_column_groups) %}
+{% endif %}
 {# translation_key is provided by the parent entry form; fallback to session language if not present #}
 {% set _tk = (translation_key if translation_key is defined else (session.get('language','en') or 'en')) %}
 {% if _tk is string %}
@@ -170,7 +176,7 @@
 <div class="matrix-container disaggregation-inputs{% if matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
      data-field-id="{{ field.id }}"
      data-can-edit="{{ 'true' if _matrix_can_edit else 'false' }}"
-     data-matrix-config='{{ matrix_config | tojson }}'
+     data-matrix-config='{{ matrix_config_client | tojson }}'
      {% if matrix_highlight_prefilled_cells %}data-highlight-prefilled-cells="true"{% endif %}
      {% if matrix_is_carry_forward or matrix_has_carry_forward_ref %}data-carry-forward="true"{% endif %}
      {% if matrix_has_carry_forward_ref %}data-carry-forward-ref='{{ matrix_carry_forward_ref | tojson }}'{% endif %}
@@ -221,25 +227,30 @@
                aria-label="{{ _('Data matrix for')|forceescape }} {{ field.display_label or field.label }}">
             <thead>
                 {# Detect whether any column belongs to a group #}
-                {% set _has_groups = namespace(value=false) %}
+                {% set _has_groups = namespace(value=false, subgroups=false) %}
                 {% for _c in matrix_columns %}
                     {% if _c is mapping and _c.get('group') %}
                         {% set _has_groups.value = true %}
+                        {% if _c.get('subgroup') %}
+                            {% set _has_groups.subgroups = true %}
+                        {% endif %}
                     {% endif %}
                 {% endfor %}
+                {# Group > subgroup > column needs a third header row. Subgroup translations live in column_groups under "<group>::<subgroup>". #}
+                {% set _header_rows = 3 if _has_groups.subgroups else 2 %}
 
                 {% if _has_groups.value %}
-                    {# ── Two-row header: row 1 = group spans, row 2 = individual column labels ── #}
+                    {# ── Multi-row header: row 1 = group spans, row 2 = subgroup spans / column labels, row 3 = subgroup column labels ── #}
                     <tr role="row">
-                        {# Corner cell spans both header rows #}
+                        {# Corner cell spans all header rows #}
                         <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-left font-medium text-gray-600"
                             role="columnheader"
                             scope="col"
-                            rowspan="2"
+                            rowspan="{{ _header_rows }}"
                             style="min-width: 80px; max-width: 400px;"></th>
                         {% for column in matrix_columns %}
                             {% if show_row_totals and loop.index0 == row_total_ns.index %}
-                                {{ matrix_row_total_header(2) }}
+                                {{ matrix_row_total_header(_header_rows) }}
                             {% endif %}
                             {% set _col_group = column.get('group', '') if column is mapping else '' %}
                             {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
@@ -249,11 +260,11 @@
                                 {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                             {% endif %}
                             {% if not _col_group %}
-                                {# Ungrouped column occupies both header rows #}
+                                {# Ungrouped column occupies every header row #}
                                 <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
                                     role="columnheader"
                                     scope="col"
-                                    rowspan="2"
+                                    rowspan="{{ _header_rows }}"
                                     data-column-type="{{ column.type if column.type else 'number' }}">
                                     {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                                 </th>
@@ -280,7 +291,7 @@
                                     {# Resolve translated group label from column_groups config #}
                                     {% set _grp_translations = matrix_column_groups.get(_col_group, {}) %}
                                     {% set _grp_display = _grp_translations.get(translation_key) or _grp_translations.get('en') or _col_group %}
-                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_span_edges(matrix_columns, loop.index0, _span.value) }}"
                                         role="columnheader"
                                         scope="colgroup"
                                         colspan="{{ _span.value }}"
@@ -291,30 +302,89 @@
                                 {# Continuation columns within the same group are covered by colspan — skip #}
                             {% endif %}
                             {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
-                                {{ matrix_row_total_header(2) }}
+                                {{ matrix_row_total_header(_header_rows) }}
                             {% endif %}
                         {% endfor %}
                     </tr>
                     <tr role="row">
-                        {# Second row: individual column labels only for grouped columns #}
+                        {# Second row: subgroup spans, plus column labels for grouped columns that are not in a subgroup #}
                         {% for column in matrix_columns %}
                             {% set _col_group = column.get('group', '') if column is mapping else '' %}
-                            {% if _col_group %}
+                            {% set _col_subgroup = column.get('subgroup', '') if column is mapping else '' %}
+                            {% if _col_group and _col_subgroup %}
+                                {# Subgroup header at the start of each run of the same group + subgroup #}
+                                {% set _prev_group = '' %}
+                                {% set _prev_subgroup = '' %}
+                                {% if loop.index0 > 0 %}
+                                    {% set _prev_col = matrix_columns[loop.index0 - 1] %}
+                                    {% set _prev_group = _prev_col.get('group', '') if _prev_col is mapping else '' %}
+                                    {% set _prev_subgroup = _prev_col.get('subgroup', '') if _prev_col is mapping else '' %}
+                                {% endif %}
+                                {% if _col_group != _prev_group or _col_subgroup != _prev_subgroup %}
+                                    {% set _sub_span = namespace(value=0, done=false) %}
+                                    {% for _la in matrix_columns[loop.index0:] %}
+                                        {% if not _sub_span.done %}
+                                            {% set _la_group = _la.get('group', '') if _la is mapping else '' %}
+                                            {% set _la_subgroup = _la.get('subgroup', '') if _la is mapping else '' %}
+                                            {% if _la_group == _col_group and _la_subgroup == _col_subgroup %}
+                                                {% set _sub_span.value = _sub_span.value + 1 %}
+                                            {% else %}
+                                                {% set _sub_span.done = true %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% set _sub_translations = matrix_column_groups.get(_col_group ~ '::' ~ _col_subgroup, {}) %}
+                                    {% set _sub_display = _sub_translations.get(translation_key) or _sub_translations.get('en') or _col_subgroup %}
+                                    <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_span_edges(matrix_columns, loop.index0, _sub_span.value) }}"
+                                        role="columnheader"
+                                        scope="colgroup"
+                                        colspan="{{ _sub_span.value }}"
+                                        {{- matrix_group_header_style(_sub_translations) }}>
+                                        {{ _sub_display }}
+                                    </th>
+                                {% endif %}
+                            {% elif _col_group %}
                                 {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
                                 {% set _col_display = _col_key %}
                                 {% if column is mapping and column.name_translations %}
                                     {% set _cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
                                     {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                 {% endif %}
-                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600"
+                                {# Without subgroups this is the last header row; otherwise it spans the subgroup row too #}
+                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_column_edges(matrix_columns, loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}"
                                     role="columnheader"
                                     scope="col"
-                                    data-column-type="{{ column.type if column.type else 'number' }}">
+                                    {% if _has_groups.subgroups %}rowspan="2"{% endif %}
+                                    data-column-type="{{ column.type if column.type else 'number' }}"
+                                    {{- matrix_column_color_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>
                                     {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                                 </th>
                             {% endif %}
                         {% endfor %}
                     </tr>
+                    {% if _has_groups.subgroups %}
+                    <tr role="row">
+                        {# Third row: column labels for columns inside a subgroup #}
+                        {% for column in matrix_columns %}
+                            {% set _col_group = column.get('group', '') if column is mapping else '' %}
+                            {% if _col_group and column.get('subgroup') %}
+                                {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
+                                {% set _col_display = _col_key %}
+                                {% if column.name_translations %}
+                                    {% set _cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
+                                    {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
+                                {% endif %}
+                                <th class="border border-gray-300 px-2 py-1 bg-gray-100 text-center font-medium text-gray-600{{ matrix_column_edges(matrix_columns, loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}"
+                                    role="columnheader"
+                                    scope="col"
+                                    data-column-type="{{ column.type if column.type else 'number' }}"
+                                    {{- matrix_column_color_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>
+                                    {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
+                                </th>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endif %}
                 {% else %}
                     {# ── Original single-row header (no groups defined) ── #}
                     <tr role="row">
@@ -356,7 +426,7 @@
                                 {{ matrix_row_total_grand_cell(field.id, _matrix_label) }}
                             {% endif %}
                             {% set column_name = column.name if column.name else column %}
-                            <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
+                            <td class="border border-gray-300 px-2 py-1 bg-gray-100{{ matrix_column_edges(matrix_columns, loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, loop.index0, 'cells') }} role="gridcell">
                                 <span class="matrix-column-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
                                       data-column="{{ column_name }}"
                                       data-column-type="{{ column.type if column.type else 'number' }}"
@@ -436,9 +506,9 @@
                                         {% set _cell_prefill.has_value = true %}
                                     {% endif %}
                                 {% endif %}
-                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}" role="gridcell">
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}{{ matrix_column_edges(matrix_columns, outer_loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }} role="gridcell">
                                     {% if calc_readonly %}
-                                        <span class="matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-medium text-gray-700"
+                                        <span class="matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-bold text-gray-700"
                                               data-row="{{ row_id }}"
                                               data-row-id="{{ row_id }}"
                                               data-column="{{ column_name }}"
@@ -459,7 +529,7 @@
                                                data-max-decimals="{{ calc_decimals }}"
                                                {% if calc_saved is not none %}data-user-edited="1"{% endif %}
                                                value="{{ calc_saved if calc_saved is not none else (matrix_formula_display(matrix_columns, existing_matrix_data, row_id, column) or '') }}"
-                                               class="flex-1 min-w-0 w-full px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-0"
+                                               class="flex-1 min-w-0 w-full px-2 py-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-0"
                                                aria-label="{{ _('Calculated value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                inputmode="decimal"
                                                {% if not can_edit or _col_header_gated %}disabled{% endif %}>

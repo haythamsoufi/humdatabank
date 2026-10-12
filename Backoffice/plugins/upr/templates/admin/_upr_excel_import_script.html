@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
   var uploadUrl  = {{ url_for('upr_excel_import.upload') | tojson }};
   var analyzeUrl = {{ url_for('upr_excel_import.analyze') | tojson }};
+  var planUrl    = {{ url_for('upr_excel_import.plan') | tojson }};
   var previewUrl = {{ url_for('upr_excel_import.preview') | tojson }};
   var runUrl     = {{ url_for('upr_excel_import.run_import') | tojson }};
   var statusUrlTpl = {{ url_for('upr_excel_import.job_status', job_id='__JOB__') | tojson }};
@@ -17,6 +18,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var previewStale = false;
   var activeJobId   = null;
   var pollTimer     = null;
+  var planData      = null;      // verified plan from /plan
+  var planLoading   = false;
+  var selectedKeys  = {};        // "24:P26" -> true
 
   var panels    = document.querySelectorAll('#upr-excel-import-root .upr-excel-wizard-panel');
   var stepEls   = document.querySelectorAll('#upr-excel-wizard-steps .upr-excel-wizard-step');
@@ -30,7 +34,15 @@ document.addEventListener('DOMContentLoaded', function () {
   var previewLoadingEl = document.getElementById('upr-excel-preview-loading');
   var previewSummaryEl = document.getElementById('upr-excel-preview-summary');
   var previewStaleHintEl = document.getElementById('upr-excel-preview-stale-hint');
-  var roundsInput = document.getElementById('upr-rounds');
+  var planLoadingEl = document.getElementById('upr-excel-plan-loading');
+  var planErrorEl = document.getElementById('upr-excel-plan-error');
+  var planRootEl = document.getElementById('upr-excel-plan-root');
+  var planSummaryEl = document.getElementById('upr-excel-plan-summary');
+  var planGroupsEl = document.getElementById('upr-excel-plan-groups');
+  var planNotesEl = document.getElementById('upr-excel-plan-notes');
+  var selectionSummaryEl = document.getElementById('upr-excel-selection-summary');
+  var ackWrapEl = document.getElementById('upr-excel-ack-wrap');
+  var ackInput = document.getElementById('upr-excel-ack');
   var batchSizeInput = document.getElementById('upr-batch-size');
   var dryRunInput = document.getElementById('upr-dry-run');
 
@@ -81,19 +93,31 @@ document.addEventListener('DOMContentLoaded', function () {
     }).then(function (r) { return r.json(); });
   }
 
-  function selectedTemplateIds() {
-    return Array.from(document.querySelectorAll('.upr-excel-template-checkbox:checked'))
-      .map(function (el) { return parseInt(el.value, 10); });
+  // ── Verified targets (template + round -> one assigned form) ─────────────
+
+  function planItems() {
+    return (planData && planData.targets) || [];
   }
 
-  function selectedRounds() {
-    var raw = (document.getElementById('upr-rounds').value || '').trim();
-    if (!raw) return [];
-    return raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  function selectedItems() {
+    return planItems().filter(function (it) { return selectedKeys[it.key] && it.selectable; });
+  }
+
+  function selectedTargets() {
+    return selectedItems().map(function (it) {
+      return { template_id: it.template_id, round: it.round };
+    });
+  }
+
+  function selectedHaveWarnings() {
+    return selectedItems().some(function (it) { return it.status === 'warning'; });
   }
 
   function canRunImport() {
-    return selectedTemplateIds().length > 0;
+    if (planLoading || !planData || !selectedItems().length) return false;
+    var dry = document.getElementById('upr-dry-run');
+    if (selectedHaveWarnings() && !(dry && dry.checked) && !(ackInput && ackInput.checked)) return false;
+    return true;
   }
 
   function markPreviewStale() {
@@ -119,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Navigation ───────────────────────────────────────────────────────────
 
   function updateNavButtons() {
-    var busy = step === 2 && previewLoading;
+    var busy = step === 2 && (previewLoading || planLoading);
     btnBack.disabled = busy;
     btnNext.disabled = !analyzeLoaded;
     if (btnPreview) btnPreview.disabled = busy || !canRunImport();
@@ -156,12 +180,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (step === 1 && analyzeLoaded) {
       resetConfigureStep();
       showStep(2);
+      loadPlan();
     }
   });
   btnBack.addEventListener('click', function () { if (step > 1) showStep(step - 1); });
 
   function loadPreview() {
-    if (previewLoading || !canRunImport()) return;
+    if (previewLoading || planLoading || !selectedItems().length) return;
     previewLoading = true;
     previewSummaryEl.classList.add('hidden');
     previewSummaryEl.replaceChildren();
@@ -169,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
     previewLoadingEl.classList.remove('hidden');
     updateNavButtons();
 
-    postJSON(previewUrl, { template_ids: selectedTemplateIds(), rounds: selectedRounds() })
+    postJSON(previewUrl, { targets: selectedTargets() })
       .then(function (data) {
         previewLoaded = !!data.success;
         previewStale = false;
@@ -194,15 +219,282 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (btnPreview) btnPreview.addEventListener('click', loadPreview);
 
-  document.querySelectorAll('.upr-excel-template-checkbox').forEach(function (el) {
-    el.addEventListener('change', function () {
-      markPreviewStale();
-      updateNavButtons();
-    });
-  });
-  if (roundsInput) roundsInput.addEventListener('input', markPreviewStale);
   if (batchSizeInput) batchSizeInput.addEventListener('input', markPreviewStale);
-  if (dryRunInput) dryRunInput.addEventListener('change', markPreviewStale);
+  if (dryRunInput) dryRunInput.addEventListener('change', function () {
+    markPreviewStale();
+    updateNavButtons();
+  });
+  if (ackInput) ackInput.addEventListener('change', updateNavButtons);
+
+  // ── Target plan: load, render, select ────────────────────────────────────
+
+  var STATUS_BADGE = {
+    ok:      { cls: 'bg-green-100 text-green-800',  label: {{ _("Ready")|tojson|safe }} },
+    warning: { cls: 'bg-amber-100 text-amber-800',  label: {{ _("Review")|tojson|safe }} },
+    blocked: { cls: 'bg-red-100 text-red-800',      label: {{ _("Blocked")|tojson|safe }} },
+    empty:   { cls: 'bg-gray-100 text-gray-600',    label: {{ _("No data")|tojson|safe }} }
+  };
+  var ISSUE_CLASS = {
+    error:   'text-red-700',
+    warning: 'text-amber-700',
+    info:    'text-gray-500'
+  };
+  var KIND_ORDER = ['Planning', 'Annual report', 'Mid-year report'];
+
+  function badge(status) {
+    var b = STATUS_BADGE[status] || STATUS_BADGE.empty;
+    return el('span', 'inline-block px-2 py-0.5 rounded-full text-xs font-medium ' + b.cls, b.label);
+  }
+
+  // One row per round; columns: Country template | PNS template.
+  var COLUMN_OF_TEMPLATE = { 24: 'country', 33: 'country', 22: 'pns', 23: 'pns' };
+
+  function targetCell(it) {
+    var td = el('td', 'px-3 py-2 align-top');
+    if (!it) {
+      td.appendChild(el('span', 'text-gray-300', '—'));
+      return td;
+    }
+    var line = el('label', 'flex items-center gap-2' + (it.selectable ? ' cursor-pointer' : ' text-gray-400'));
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'h-4 w-4';
+    cb.checked = !!selectedKeys[it.key] && it.selectable;
+    cb.disabled = !it.selectable;
+    cb.setAttribute('aria-label', it.template_name + ' ' + it.round);
+    cb.addEventListener('change', function () {
+      if (cb.checked) selectedKeys[it.key] = true; else delete selectedKeys[it.key];
+      onSelectionChanged();
+    });
+    line.appendChild(cb);
+    var af = it.assigned_form_id ? '#' + it.assigned_form_id : (it.assigned_forms && it.assigned_forms.length ? '#?' : '—');
+    line.appendChild(el('span', 'font-medium', af));
+    var b = badge(it.status);
+    var firstError = (it.issues || []).filter(function (i) { return i.level === 'error'; })[0];
+    if (firstError) b.title = firstError.message;
+    line.appendChild(b);
+    td.appendChild(line);
+    return td;
+  }
+
+  function renderPlan() {
+    planSummaryEl.replaceChildren();
+    planGroupsEl.replaceChildren();
+    planNotesEl.replaceChildren();
+    if (!planData) return;
+    var s = planData.summary || {};
+    ['ok', 'warning', 'blocked', 'empty'].forEach(function (key) {
+      if (!s[key]) return;
+      var chip = badge(key);
+      chip.textContent = s[key] + ' ' + STATUS_BADGE[key].label.toLowerCase();
+      planSummaryEl.appendChild(chip);
+    });
+
+    // round -> { kind, period, country: item, pns: item }
+    var rounds = [];
+    var byRound = {};
+    planItems().forEach(function (it) {
+      var row = byRound[it.round];
+      if (!row) {
+        row = byRound[it.round] = { round: it.round, kind: it.kind, period: it.period };
+        rounds.push(row);
+      }
+      row[COLUMN_OF_TEMPLATE[it.template_id] || 'country'] = it;
+    });
+
+    var wrap = el('div', 'overflow-x-auto border border-gray-200 rounded-md');
+    var table = el('table', 'min-w-full text-sm');
+    var thead = el('thead', 'bg-gray-50 text-xs text-gray-600');
+    var hr = el('tr', '');
+    [{{ _("Round")|tojson|safe }}, {{ _("Country")|tojson|safe }}, {{ _("PNS")|tojson|safe }}, '']
+      .forEach(function (h) { hr.appendChild(el('th', 'px-3 py-2 text-left font-medium', h)); });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el('tbody', '');
+
+    var lastKind = null;
+    rounds.forEach(function (row) {
+      if (row.kind !== lastKind) {
+        lastKind = row.kind;
+        var gh = el('tr', 'bg-gray-50');
+        var gtd = el('td', 'px-3 py-1 text-xs font-semibold text-gray-700', row.kind);
+        gtd.colSpan = 4;
+        gh.appendChild(gtd);
+        tbody.appendChild(gh);
+      }
+      var tr = el('tr', 'border-t border-gray-100');
+      tr.appendChild(el('td', 'px-3 py-2 align-top font-medium whitespace-nowrap', row.round + ' → ' + row.period));
+      tr.appendChild(targetCell(row.country));
+      tr.appendChild(targetCell(row.pns));
+
+      // Warnings / info stay collapsed behind a small toggle.
+      var notes = [];
+      [['Country', row.country], ['PNS', row.pns]].forEach(function (pair) {
+        var it = pair[1];
+        if (!it) return;
+        (it.issues || []).forEach(function (i) { notes.push({ who: pair[0], issue: i, item: it }); });
+      });
+      var toggleTd = el('td', 'px-3 py-2 align-top text-right whitespace-nowrap');
+      tr.appendChild(toggleTd);
+      tbody.appendChild(tr);
+      if (!notes.length) return;
+
+      var detailsTr = el('tr', 'hidden');
+      var dtd = el('td', 'px-3 pb-2 text-xs');
+      dtd.colSpan = 4;
+      var ul = el('ul', 'space-y-0.5');
+      notes.forEach(function (n) {
+        var li = el('li', ISSUE_CLASS[n.issue.level] || '',
+          n.who + ' (' + n.item.template_name + ', #' + (n.item.assigned_form_id || '?') + '): ' + n.issue.message);
+        if (n.issue.items && n.issue.items.length) li.title = n.issue.items.join(', ');
+        ul.appendChild(li);
+      });
+      dtd.appendChild(ul);
+      detailsTr.appendChild(dtd);
+      tbody.appendChild(detailsTr);
+
+      var toggle = el('button', 'text-xs text-purple-700 underline', {{ _("Details")|tojson|safe }} + ' (' + notes.length + ')');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.addEventListener('click', function () {
+        var open = detailsTr.classList.toggle('hidden') === false;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      toggleTd.appendChild(toggle);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    planGroupsEl.appendChild(wrap);
+
+    // Workbook-level notes, collapsed.
+    var lines = [];
+    var notImportable = planData.not_importable_rounds || [];
+    if (notImportable.length) {
+      lines.push({{ _("In the workbook but never imported (live or later rounds): ")|tojson|safe }}
+        + notImportable.map(function (r) { return r.round; }).join(', '));
+    }
+    var unrecognised = planData.unrecognised_rounds || [];
+    if (unrecognised.length) {
+      lines.push({{ _("Unrecognised round codes ignored: ")|tojson|safe }} + unrecognised.join(', '));
+    }
+    var missing = planData.allowlisted_rounds_missing || [];
+    if (missing.length) {
+      lines.push({{ _("Importable rounds absent from this workbook: ")|tojson|safe }} + missing.join(', '));
+    }
+    (planData.templates || []).filter(function (t) { return !t.ready; }).forEach(function (t) {
+      lines.push({{ _("Template ")|tojson|safe }} + t.template_id + ' (' + (t.name || '') + '): '
+        + {{ _("published form items not resolved — ")|tojson|safe }} + (t.missing || []).join(', '));
+    });
+    if (lines.length) {
+      var det = document.createElement('details');
+      det.className = 'text-gray-600';
+      det.appendChild(el('summary', 'cursor-pointer text-xs text-gray-600', {{ _("Workbook notes")|tojson|safe }} + ' (' + lines.length + ')'));
+      var nul = el('ul', 'mt-1 space-y-0.5 list-disc ml-5');
+      lines.forEach(function (t) { nul.appendChild(el('li', '', t)); });
+      det.appendChild(nul);
+      planNotesEl.appendChild(det);
+    }
+  }
+  function onSelectionChanged() {
+    var items = selectedItems();
+    if (!items.length) {
+      selectionSummaryEl.classList.add('hidden');
+      selectionSummaryEl.replaceChildren();
+    } else {
+      var forms = {};
+      items.forEach(function (it) { if (it.assigned_form_id) forms[it.assigned_form_id] = true; });
+      var rows = items.reduce(function (n, it) { return n + (it.workbook_rows || 0); }, 0);
+      var p = el('p', '');
+      p.appendChild(el('strong', '', items.length + ' ' + {{ _("target(s)")|tojson|safe }}));
+      appendText(p, ' → ' + Object.keys(forms).length + ' ' + {{ _("assigned form(s)")|tojson|safe }}
+        + ' (' + Object.keys(forms).map(function (id) { return '#' + id; }).join(', ') + '), '
+        + rows + ' ' + {{ _("workbook rows")|tojson|safe }} + ': '
+        + items.map(function (it) { return it.key; }).join(', '));
+      selectionSummaryEl.replaceChildren(p);
+      selectionSummaryEl.classList.remove('hidden');
+    }
+    var needsAck = selectedHaveWarnings();
+    ackWrapEl.classList.toggle('hidden', !needsAck);
+    if (!needsAck && ackInput) ackInput.checked = false;
+    markPreviewStale();
+    updateNavButtons();
+  }
+
+  function loadPlan() {
+    if (planLoading) return;
+    planLoading = true;
+    planData = null;
+    selectedKeys = {};
+    setSelectHint('');
+    planErrorEl.classList.add('hidden');
+    planRootEl.classList.add('hidden');
+    planLoadingEl.classList.remove('hidden');
+    onSelectionChanged();
+    postJSON(planUrl, {})
+      .then(function (data) {
+        if (!data || !data.success) {
+          planErrorEl.textContent = (data && data.message) || {{ _("Could not verify import targets")|tojson|safe }};
+          planErrorEl.classList.remove('hidden');
+          return;
+        }
+        planData = data;
+        renderPlan();
+        planRootEl.classList.remove('hidden');
+      })
+      .catch(function (err) {
+        planErrorEl.textContent = (err && err.message) || {{ _("Could not verify import targets")|tojson|safe }};
+        planErrorEl.classList.remove('hidden');
+      })
+      .finally(function () {
+        planLoading = false;
+        planLoadingEl.classList.add('hidden');
+        onSelectionChanged();
+      });
+  }
+
+  var selectHintEl = document.getElementById('upr-excel-select-hint');
+
+  function setSelectHint(text) {
+    if (!selectHintEl) return;
+    selectHintEl.textContent = text || '';
+    selectHintEl.classList.toggle('hidden', !text);
+  }
+
+  // Bulk-select every plan item accepted by `predicate`, then redraw the table.
+  function bulkSelect(predicate, emptyMessage) {
+    var added = 0;
+    planItems().forEach(function (it) {
+      if (it.selectable && predicate(it)) {
+        selectedKeys[it.key] = true;
+        added += 1;
+      }
+    });
+    renderPlan();
+    onSelectionChanged();
+    setSelectHint(added ? '' : emptyMessage);
+  }
+
+  var selectReadyBtn = document.getElementById('upr-excel-select-ready');
+  if (selectReadyBtn) selectReadyBtn.addEventListener('click', function () {
+    bulkSelect(
+      function (it) { return it.status === 'ok'; },
+      {{ _("No target is fully ready: every importable target carries a warning (existing progress, skipped entities, cleared PNS data…). Use “Select all applicable” and review the warnings.")|tojson|safe }}
+    );
+  });
+  var selectImportableBtn = document.getElementById('upr-excel-select-importable');
+  if (selectImportableBtn) selectImportableBtn.addEventListener('click', function () {
+    bulkSelect(
+      function () { return true; },
+      {{ _("No target can be imported: all are blocked or have no workbook data.")|tojson|safe }}
+    );
+  });
+  document.getElementById('upr-excel-select-none').addEventListener('click', function () {
+    selectedKeys = {};
+    renderPlan();
+    onSelectionChanged();
+    setSelectHint('');
+  });
+  document.getElementById('upr-excel-reverify').addEventListener('click', loadPlan);
 
   // ── Configure preview ────────────────────────────────────────────────────
 
@@ -218,6 +510,23 @@ document.addEventListener('DOMContentLoaded', function () {
       labeledParagraph({{ _("Transformed form_data rows")|tojson|safe }}, data.transformed_rows),
       labeledParagraph({{ _("Countries with data")|tojson|safe }}, data.countries)
     ];
+    if (data.targets && data.targets.length) {
+      var tl = el('ul', 'list-disc ml-5 mt-1 space-y-0.5 text-sm');
+      data.targets.forEach(function (t) {
+        var text = t.key + ' (' + t.template_name + ', ' + t.round + ' → ' + t.period + ') → '
+          + {{ _("assigned form")|tojson|safe }} + ' #' + t.assigned_form_id;
+        if (t.pns_clear && t.pns_clear.aes_to_clear) {
+          text += ' — ' + {{ _("clears")|tojson|safe }} + ' ' + t.pns_clear.aes_to_clear + ' '
+            + {{ _("non-reported PNS assignment(s)")|tojson|safe }} + ' (' + t.pns_clear.aes_with_data + ' '
+            + {{ _("with data")|tojson|safe }} + ')';
+        }
+        tl.appendChild(el('li', '', text));
+      });
+      var tw = el('div', '');
+      tw.appendChild(el('strong', '', {{ _("Targets written")|tojson|safe }} + ':'));
+      tw.appendChild(tl);
+      nodes.splice(1, 0, tw);
+    }
     if (data.warning_count) {
       var warnLabel = String(data.warning_count);
       if (data.warning_unique_count && data.warning_unique_count !== data.warning_count) {
@@ -239,12 +548,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
   btnRun.addEventListener('click', function () {
     if (!canRunImport() || previewLoading) return;
+    var chosen = selectedItems();
+    var isDry = document.getElementById('upr-dry-run').checked;
+    if (!isDry) {
+      var forms = {};
+      chosen.forEach(function (it) { if (it.assigned_form_id) forms[it.assigned_form_id] = true; });
+      var msg = {{ _("Import into the database now?")|tojson|safe }} + '\n\n'
+        + chosen.map(function (it) {
+            return it.key + ' → ' + {{ _("assigned form")|tojson|safe }} + ' #' + it.assigned_form_id
+              + ' (' + it.template_name + ', ' + it.period + ')';
+          }).join('\n');
+      if (!window.confirm(msg)) return;
+    }
     showStep(3);
     document.getElementById('upr-excel-import-progress').classList.remove('hidden');
     postJSON(runUrl, {
-      template_ids:         selectedTemplateIds(),
-      rounds:               selectedRounds(),
-      dry_run:              document.getElementById('upr-dry-run').checked,
+      targets:              selectedTargets(),
+      dry_run:              isDry,
       batch_size:           parseInt(document.getElementById('upr-batch-size').value, 10) || 1000,
       async:                true
     }).then(function (data) {
@@ -259,6 +579,13 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       activeJobId = data.job_id;
       pollStatus();
+    }).catch(function (err) {
+      setParagraph(
+        document.getElementById('upr-excel-import-result'),
+        'text-red-700',
+        (err && err.message) || {{ _("Import failed")|tojson|safe }}
+      );
+      doneActions.classList.remove('hidden');
     });
   });
 
@@ -271,7 +598,16 @@ document.addEventListener('DOMContentLoaded', function () {
     fetch(statusUrlTpl.replace('__JOB__', encodeURIComponent(activeJobId)))
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        var job  = data.job || {};
+        if (!data || !data.success || !data.job) {
+          setParagraph(
+            document.getElementById('upr-excel-import-result'),
+            'text-red-700',
+            (data && data.message) || {{ _("Import job not found")|tojson|safe }}
+          );
+          doneActions.classList.remove('hidden');
+          return;
+        }
+        var job  = data.job;
         var pct  = job.percent || 0;
         document.getElementById('upr-excel-import-stage').textContent        = job.message || job.stage || '-';
         document.getElementById('upr-excel-import-progress-bar').style.width = pct + '%';
@@ -285,7 +621,8 @@ document.addEventListener('DOMContentLoaded', function () {
             + ', Inserted: ' + (stats.inserted || 0)
             + ', Updated: ' + (stats.updated || 0)
             + ', Skipped: ' + (stats.skipped || 0)
-            + ', Errors: ' + (stats.errors || 0));
+            + ', Errors: ' + (stats.errors || 0)
+            + (stats.targets && stats.targets.length ? ' — Targets: ' + stats.targets.join(', ') : ''));
           if (job.download_ready && job.download_url) {
             appendText(p, ' ');
             appendTextLink(p, job.download_url, {{ _("Download preview Excel")|tojson|safe }});
@@ -310,6 +647,10 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
         pollTimer = setTimeout(pollStatus, 1000);
+      })
+      .catch(function () {
+        // Transient network error: keep polling; the job runs server-side regardless.
+        pollTimer = setTimeout(pollStatus, 2000);
       });
   }
 

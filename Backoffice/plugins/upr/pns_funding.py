@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
+from app.models.enums import AssignmentEntityStatusValue
 from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.models.organization import NationalSociety
@@ -163,6 +165,109 @@ def _load_t22_funding_by_pns(host_country_id: int, period_name: str, year: int |
         return {}
     pns_ns_by_aes = _pns_ns_id_by_aes([aes for _entry, aes in rows])
     return t22_host_funding_by_pns([entry for entry, _aes in rows], host_country_id, pns_ns_by_aes)
+
+
+@dataclass(frozen=True)
+class PnsPlanOverride:
+    """A PNS's own T22 figure for one host country (takes priority over the host's T24 entry).
+
+    ``total`` is the PNS row ``Total`` (else the sum of its SP/EF cells). It is ``0`` when the
+    PNS submitted its form but left this host country blank. ``areas`` holds the non-zero
+    SP1-SP5 / EFs amounts the PNS entered.
+    """
+
+    total: float = 0.0
+    areas: dict[str, float] = field(default_factory=dict)
+
+
+# A PNS counts as having self-reported once its T22 assignment is submitted or approved.
+T22_SELF_REPORTED_STATUSES = (
+    AssignmentEntityStatusValue.submitted,
+    AssignmentEntityStatusValue.approved,
+)
+
+
+def t22_host_plan_override(cells: dict[str, Any], host_country_id: int) -> PnsPlanOverride:
+    """Read this host country's row from a PNS's T22 funding matrix (blank row -> zeros)."""
+    prefix = f"{int(host_country_id)}_"
+    total = 0.0
+    areas: dict[str, float] = {}
+    for key, raw in cells.items():
+        if not str(key).startswith(prefix):
+            continue
+        row, col = _split_cell_key(str(key))
+        if str(row) != str(host_country_id):
+            continue
+        number = to_number(_resolve_matrix_cell(raw))
+        if not number:
+            continue
+        bucket = _funding_column_bucket(col)
+        if bucket == "row_total" or (col or "").strip().lower() == "total":
+            total += number
+            continue
+        code = _funding_area_code(col)
+        if code:
+            areas[code] = areas.get(code, 0.0) + number
+    return PnsPlanOverride(total=total or sum(areas.values()), areas=areas)
+
+
+def load_t22_pns_overrides(
+    host_country_id: int,
+    period_name: str,
+    year: int | None,
+) -> dict[int, PnsPlanOverride]:
+    """Per-PNS (``NationalSociety.id``) T22 figures for hosts whose PNS has self-reported.
+
+    Every PNS whose T22 assignment for the period is submitted/approved is authoritative for
+    *this* host country, even when its row is empty (that yields a zero override). PNSs that
+    have not submitted are absent, so the host's own T24 figure still applies to them.
+    """
+    item_id = _pns_plan_funding_item_id()
+    names = _period_names(period_name, year)
+    if not item_id or not names:
+        return {}
+    aes_rows = (
+        AssignmentEntityStatus.query.join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+        .filter(AssignedForm.template_id == PNS_PLAN_TEMPLATE_ID)
+        .filter(AssignedForm.period_name.in_(names))
+        .filter(AssignmentEntityStatus.entity_type == "country")
+        .filter(AssignmentEntityStatus.entity_id != int(host_country_id))
+        .filter(AssignmentEntityStatus.status.in_(T22_SELF_REPORTED_STATUSES))
+        .all()
+    )
+    if not aes_rows:
+        return {}
+    entries = {
+        int(entry.assignment_entity_status_id): entry
+        for entry in db.session.query(FormData)
+        .filter(FormData.assignment_entity_status_id.in_([aes.id for aes in aes_rows]))
+        .filter(FormData.form_item_id == int(item_id))
+        .all()
+    }
+    pns_ns_by_aes = _pns_ns_id_by_aes(aes_rows)
+    overrides: dict[int, PnsPlanOverride] = {}
+    for aes in aes_rows:
+        ns_id = pns_ns_by_aes.get(int(aes.id))
+        if not ns_id:
+            continue
+        override = t22_host_plan_override(_matrix_cells(entries.get(int(aes.id))), host_country_id)
+        previous = overrides.get(int(ns_id))
+        if previous is None or (override.total and not previous.total):
+            overrides[int(ns_id)] = override
+    return overrides
+
+
+def strip_pns_rows(cells: dict[str, Any], ns_ids: set[int] | frozenset[int]) -> dict[str, Any]:
+    """Drop T24 funding cells whose row is one of *ns_ids* (numeric National Society rows)."""
+    if not ns_ids:
+        return cells
+    kept: dict[str, Any] = {}
+    for key, raw in cells.items():
+        row, _col = _split_cell_key(str(key))
+        if row.isdigit() and int(row) in ns_ids:
+            continue
+        kept[key] = raw
+    return kept
 
 
 def _period_names(period_name: str, year: int | None) -> list[str]:

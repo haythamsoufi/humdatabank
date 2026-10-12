@@ -1815,6 +1815,15 @@ class FormDataService(
             if matrix_data:
                 from app.utils.api_serialization import prune_stale_matrix_cell_keys
                 matrix_config = (matrix.config or {}).get('matrix_config') or {}
+                # Cell keys are built from the resolved column codes ("[assignment_period] Planned"
+                # -> "2026 Planned"), so match them against the config resolved for this assignment.
+                try:
+                    from app.services.forms.variable_resolution_service import VariableResolutionService
+                    matrix_config = VariableResolutionService.resolve_matrix_config_for_assignment(
+                        matrix_config, assignment_entity_status
+                    ) or matrix_config
+                except Exception as e:
+                    logger.warning(f"Matrix field {matrix.id}: could not resolve column placeholders: {e}")
                 pruned_matrix_data = prune_stale_matrix_cell_keys(matrix_data, matrix_config)
                 if len(pruned_matrix_data) != len(matrix_data):
                     dropped_keys = sorted(set(matrix_data) - set(pruned_matrix_data))

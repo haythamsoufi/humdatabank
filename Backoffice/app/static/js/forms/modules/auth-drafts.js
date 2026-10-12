@@ -480,15 +480,29 @@ async function loadDraft(key) {
 /**
  * Show a custom confirmation dialog (uses centralized confirm-dialogs.js)
  * @param {string} message - The confirmation message to display
- * @returns {Promise<boolean>} - Promise that resolves to true if confirmed, false if cancelled
+ * @returns {Promise<'restore'|'discard'|'dismiss'>} - 'discard' only when the Discard button is clicked;
+ *   Escape / backdrop / close resolve to 'dismiss' so the draft is kept.
  */
 function showCustomConfirm(message) {
   return new Promise((resolve) => {
     if (typeof window.showConfirmation === 'function') {
-      window.showConfirmation(message, () => resolve(true), () => resolve(false), _t('Restore'), _t('Cancel'), _t('Restore Draft?'));
+      let discardClicked = false;
+      window.showConfirmation(
+        message,
+        () => resolve('restore'),
+        () => resolve(discardClicked ? 'discard' : 'dismiss'),
+        _t('Restore'),
+        _t('Discard'),
+        _t('Restore Draft?')
+      );
+      const cancelBtns = document.querySelectorAll('#confirm-cancel');
+      const discardBtn = cancelBtns[cancelBtns.length - 1];
+      if (discardBtn) {
+        discardBtn.addEventListener('click', () => { discardClicked = true; }, true);
+      }
     } else {
       authDraftLog('confirm', { ok: false, err: 'showConfirmation not available' });
-      resolve(false);
+      resolve('dismiss');
     }
   });
 }
@@ -912,8 +926,14 @@ export function initAuthDrafts() {
       }
       const persistedContext = getPersistedSectionContext();
       await waitForInitialSectionScroll(persistedContext?.sectionId);
-      const shouldRestore = isOffline || await showCustomConfirm(_t('A local draft is available for this form. Restore it?'));
-      if (!shouldRestore) {
+      const choice = isOffline ? 'restore' : await showCustomConfirm(_t('A local draft is available for this form. Restore it?'));
+      if (choice === 'discard') {
+        await deleteDraft(key);
+        updateDraftButtonVisibility();
+        authDraftLog('restore_skip', { ok: true, reason: 'user_discarded' });
+        return;
+      }
+      if (choice !== 'restore') {
         authDraftLog('restore_skip', { ok: true, reason: 'user_declined' });
         return;
       }

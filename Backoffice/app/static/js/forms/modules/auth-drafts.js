@@ -805,9 +805,21 @@ export function initAuthDrafts() {
     } catch (_) { /* no-op */ }
   }
 
+  /**
+   * Draft view of the form: matrix cells the page auto-filled from a lookup (and the user
+   * never edited) are left out, so merely opening a form never produces a draft.
+   */
+  function collectFormDataForDraft() {
+    const handler = window.matrixHandler;
+    if (handler && typeof handler.withAutoFilledCellsStripped === 'function') {
+      return handler.withAutoFilledCellsStripped(() => collectFormData(form));
+    }
+    return collectFormData(form);
+  }
+
   function captureBaseline(reason) {
     runMatrixCollect();
-    baselineSnapshot = collectFormData(form);
+    baselineSnapshot = collectFormDataForDraft();
     authDraftLog('baseline', { ok: true, reason, fieldCount: Object.keys(baselineSnapshot).length });
   }
 
@@ -819,7 +831,7 @@ export function initAuthDrafts() {
   function collectDraftData() {
     if (!baselineSnapshot) return null;
     runMatrixCollect();
-    return diffAgainstBaseline(collectFormData(form), baselineSnapshot);
+    return diffAgainstBaseline(collectFormDataForDraft(), baselineSnapshot);
   }
 
   /**

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-10 22:53+0000\n"
+"POT-Creation-Date: 2026-10-12 19:16+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -123,6 +123,11 @@ msgstr ""
 #: app/templates/admin/translations/quality_dashboard.html:296
 #, python-format
 msgid "%(count)s pending"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:384
+#, python-format
+msgid "%(count)s selected"
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:1359
@@ -499,11 +504,11 @@ msgstr ""
 msgid "3. Response Compression"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:558
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:597
 msgid "50%"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:557
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:596
 msgid "75%"
 msgstr ""
 
@@ -893,7 +898,7 @@ msgid ""
 "endpoints do not. Choose Anonymous when prompted."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:354
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:695
 msgid "AR"
 msgstr ""
 
@@ -996,7 +1001,7 @@ msgstr ""
 msgid "Access auto-resolved"
 msgstr ""
 
-#: app/routes/forms/entry.py:1328 app/routes/forms/entry.py:1331
+#: app/routes/forms/entry.py:1309 app/routes/forms/entry.py:1312
 #: app/routes/main/documents.py:45
 msgid "Access denied."
 msgstr ""
@@ -1173,7 +1178,7 @@ msgstr ""
 #: app/templates/forms/form_builder/field_mapping.html:330
 #: app/templates/forms/form_builder/field_mapping.html:351
 #: app/templates/forms/form_builder/partials/_sections_container.html:4
-#: app/templates/forms/form_builder/partials/_variables_modal.html:17
+#: app/templates/forms/form_builder/partials/_variables_modal.html:42
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:57
 msgid "Actions"
 msgstr ""
@@ -1375,7 +1380,7 @@ msgstr ""
 msgid "Add Column"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:506
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:540
 msgid "Add Column inside Group"
 msgstr ""
 
@@ -1491,7 +1496,7 @@ msgstr ""
 msgid "Add New Version"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:464
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:470
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:210
 msgid "Add Option"
 msgstr ""
@@ -1523,6 +1528,10 @@ msgstr ""
 msgid "Add Selected"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:545
+msgid "Add Subgroup"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_sections_container.html:152
 msgid "Add Subsection"
 msgstr ""
@@ -1539,8 +1548,8 @@ msgstr ""
 msgid "Add Validation Rule"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_variables_modal.html:27
-#: app/templates/forms/form_builder/partials/_variables_modal.html:29
+#: app/templates/forms/form_builder/partials/_variables_modal.html:52
+#: app/templates/forms/form_builder/partials/_variables_modal.html:54
 msgid "Add Variable"
 msgstr ""
 
@@ -1680,8 +1689,8 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:146
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:212
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:222
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:519
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:533
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:558
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:572
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:28
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:54
 #: app/templates/forms/form_builder/partials/_section_modal.html:34
@@ -1912,7 +1921,7 @@ msgstr ""
 #: app/templates/admin/communication/center.html:513
 #: app/templates/components/_sidebar_nav_categories.html:20
 #: app/templates/components/_sidebar_nav_categories.html:22
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:127
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:144
 msgid "Admin Dashboard"
 msgstr ""
 
@@ -2059,7 +2068,7 @@ msgstr ""
 msgid "Alerts"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:546
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:585
 msgid "Alignment"
 msgstr ""
 
@@ -2229,6 +2238,10 @@ msgstr ""
 
 #: app/templates/core/dashboard/_assignments_tab.html:396
 msgid "All clear! No active assignments for"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:383
+msgid "All columns"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:308
@@ -2545,7 +2558,7 @@ msgstr ""
 msgid "Analysis complete · reviewing…"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:469
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:810
 msgid "Analysis failed. Check that the file contains the UPR Data sheet."
 msgstr ""
 
@@ -2604,7 +2617,7 @@ msgstr ""
 msgid "Analyzing matrix shares across all countries…"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:450
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:791
 msgid "Analyzing workbook… this can take a minute on first upload"
 msgstr ""
 
@@ -2695,7 +2708,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1887
 #: app/templates/forms/entry_form/entry_form.html:2604
 #: app/templates/forms/entry_form/entry_form.html:2619
-#: app/templates/forms/entry_form/partials/matrix_table.html:616
+#: app/templates/forms/entry_form/partials/matrix_table.html:693
 msgid "Applicable but data not available"
 msgstr ""
 
@@ -2764,6 +2777,14 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:73
 msgid "Apply colour"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:522
+msgid "Apply group colour to cells"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:518
+msgid "Apply group colour to column headers"
 msgstr ""
 
 #: app/templates/forms/form_builder/field_mapping.html:91
@@ -3096,7 +3117,7 @@ msgstr ""
 msgid "Are you sure you want to delete this submission?"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:292
+#: app/routes/admin/form_builder/templates.py:293
 #: app/templates/admin/templates/templates.html:136
 msgid "Are you sure you want to delete this template?"
 msgstr ""
@@ -3299,7 +3320,7 @@ msgstr ""
 #: app/templates/admin/data_exploration/explore_data.html:87
 #: app/templates/admin/data_exploration/explore_data.html:1249
 #: app/templates/forms/form_builder/form_builder.html:1087
-#: app/templates/forms/form_builder/partials/_variables_modal.html:15
+#: app/templates/forms/form_builder/partials/_variables_modal.html:32
 msgid "Assignment Period"
 msgstr ""
 
@@ -3421,7 +3442,7 @@ msgstr ""
 msgid "Assignment sections"
 msgstr ""
 
-#: app/routes/forms/entry.py:1011 app/routes/forms/entry.py:1015
+#: app/routes/forms/entry.py:992 app/routes/forms/entry.py:996
 msgid "Assignment sent for review successfully."
 msgstr ""
 
@@ -3438,7 +3459,7 @@ msgstr ""
 msgid "Assignment status ID:"
 msgstr ""
 
-#: app/routes/forms/entry.py:129
+#: app/routes/forms/entry.py:130
 #, python-format
 msgid ""
 "Assignment status for this country not found (ID: %(id)d). Please check "
@@ -3457,7 +3478,7 @@ msgstr ""
 msgid "Assignment submission"
 msgstr ""
 
-#: app/routes/forms/entry.py:1022 app/routes/forms/entry.py:1027
+#: app/routes/forms/entry.py:1003 app/routes/forms/entry.py:1008
 msgid "Assignment submitted successfully!"
 msgstr ""
 
@@ -3636,7 +3657,7 @@ msgid "Author"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:180
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:559
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:598
 msgid "Auto"
 msgstr ""
 
@@ -3854,7 +3875,7 @@ msgstr ""
 msgid "Available User Types"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:387
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:393
 msgid "Average"
 msgstr ""
 
@@ -3917,7 +3938,7 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:555
 #: app/templates/forms/entry_form/entry_form.html:602
 #: app/templates/tours/tours.html:13
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:118
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:135
 msgid "Back"
 msgstr ""
 
@@ -4027,7 +4048,7 @@ msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:60
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:573
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:74
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:91
 msgid "Batch size"
 msgstr ""
 
@@ -4057,6 +4078,10 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:48
 msgid "Blank template"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:234
+msgid "Blocked"
 msgstr ""
 
 #: app/templates/admin/translations/manage_translations.html:722
@@ -4182,7 +4207,7 @@ msgstr ""
 msgid "Build interactive reports from form data and Indicator Bank rules."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:94
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:111
 msgid "Building import preview…"
 msgstr ""
 
@@ -4219,7 +4244,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1640
 #: app/templates/forms/entry_form/entry_form.html:2328
 #: app/templates/forms/entry_form/entry_form.html:2478
-#: app/templates/forms/entry_form/export_pdf.html:584
+#: app/templates/forms/entry_form/export_pdf.html:632
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:206
 msgid "By Age:"
 msgstr ""
@@ -4239,7 +4264,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1644
 #: app/templates/forms/entry_form/entry_form.html:2351
 #: app/templates/forms/entry_form/entry_form.html:2482
-#: app/templates/forms/entry_form/export_pdf.html:603
+#: app/templates/forms/entry_form/export_pdf.html:651
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:210
 msgid "By Sex and Age:"
 msgstr ""
@@ -4249,7 +4274,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1636
 #: app/templates/forms/entry_form/entry_form.html:2306
 #: app/templates/forms/entry_form/entry_form.html:2474
-#: app/templates/forms/entry_form/export_pdf.html:565
+#: app/templates/forms/entry_form/export_pdf.html:613
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:202
 msgid "By Sex:"
 msgstr ""
@@ -4316,17 +4341,17 @@ msgstr ""
 msgid "Calculated"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:382
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:388
 msgid ""
 "Calculated for each row from the other columns in that row. The column "
 "footer sums those results."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:446
+#: app/templates/forms/entry_form/partials/matrix_table.html:517
 msgid "Calculated from other columns in this row"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:463
+#: app/templates/forms/entry_form/partials/matrix_table.html:535
 msgid "Calculated value for"
 msgstr ""
 
@@ -4346,7 +4371,7 @@ msgstr ""
 msgid "Calculating..."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:384
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:390
 msgid "Calculation"
 msgstr ""
 
@@ -4567,11 +4592,11 @@ msgstr ""
 msgid "Caption"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:518
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:557
 msgid "Caption (optional)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:523
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:562
 msgid "Caption shown below the image"
 msgstr ""
 
@@ -4584,7 +4609,7 @@ msgid "Cards"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:313
-#: app/templates/forms/entry_form/partials/matrix_table.html:180
+#: app/templates/forms/entry_form/partials/matrix_table.html:187
 msgid "Carried forward value"
 msgstr ""
 
@@ -4622,7 +4647,11 @@ msgstr ""
 msgid "Category Name"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:549
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:523
+msgid "Cells"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:588
 msgid "Center"
 msgstr ""
 
@@ -4868,7 +4897,7 @@ msgstr ""
 msgid "Choose an option:"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:446
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:452
 msgid "Choose columns or enter a formula"
 msgstr ""
 
@@ -5088,6 +5117,7 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:248
 #: app/templates/admin/templates/new_template.html:249
 #: app/templates/admin/templates/new_template.html:448
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:75
 msgid "Clear selection"
 msgstr ""
 
@@ -5319,7 +5349,7 @@ msgstr ""
 #: app/templates/core/dashboard/_access_request_modal.html:15
 #: app/templates/forms/entry_form/validation_summary_progress.html:289
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:44
-#: app/templates/forms/form_builder/partials/_variables_modal.html:31
+#: app/templates/forms/form_builder/partials/_variables_modal.html:56
 #: app/templates/forms/form_builder/partials/_versions_modal.html:139
 #: app/templates/macros/modal_shell.html:35 app/templates/tours/tours.html:486
 msgid "Close"
@@ -5439,6 +5469,10 @@ msgstr ""
 msgid "Collapse editors list"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:496
+msgid "Collapse group"
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:591
 msgid "Collapse navigation panel"
 msgstr ""
@@ -5476,10 +5510,18 @@ msgstr ""
 msgid "Colour"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:492
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:503
 msgid ""
 "Colour of this group header in the matrix. Grey matches the other column "
 "headers."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:517
+msgid "Colour the column titles in this group on the entry form"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:521
+msgid "Colour the data cells in this group on the entry form"
 msgstr ""
 
 #: app/templates/components/ag_grid_i18n_js.html:6
@@ -5496,12 +5538,12 @@ msgstr ""
 
 #. Do not place Jinja comments inside the {{ { ... } }} expression below.
 #: app/templates/components/ag_grid_i18n_js.html:4
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:400
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:403
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:406
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:409
 msgid "Columns"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:402
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:408
 msgid "Columns to add"
 msgstr ""
 
@@ -5880,12 +5922,6 @@ msgid ""
 "set age groups for demographic disaggregation, configure sex categories "
 "for data analysis, and customize organization branding. Changes here "
 "affect the entire system and all forms."
-msgstr ""
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:85
-msgid ""
-"Configure templates and rounds above, then use Preview import below for "
-"row counts and warnings. You can run the import without preview."
 msgstr ""
 
 #: app/templates/admin/reports/partials/_filter_panel.html:11
@@ -6381,7 +6417,7 @@ msgstr ""
 msgid "Could not prepare the email body."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:402
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:743
 msgid "Could not reach the server. Please try again."
 msgstr ""
 
@@ -6446,6 +6482,11 @@ msgstr ""
 msgid "Could not validate the file. Please try again."
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:436
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:445
+msgid "Could not verify import targets"
+msgstr ""
+
 #: app/services/ai/runtime/step_ux.py:293
 #, python-format
 msgid "Couldn't complete this step — %(detail)s"
@@ -6460,7 +6501,7 @@ msgstr ""
 msgid "Count"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:391
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:397
 msgid "Count filled cells"
 msgstr ""
 
@@ -6468,7 +6509,7 @@ msgstr ""
 msgid "Count inactive"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:390
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:396
 msgid "Count numbers"
 msgstr ""
 
@@ -6525,7 +6566,7 @@ msgstr ""
 msgid "Countries with a focal point"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:219
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:511
 msgid "Countries with data"
 msgstr ""
 
@@ -6571,6 +6612,7 @@ msgstr ""
 #: app/templates/components/entity_dropdown.html:154
 #: app/templates/public_submission_export_pdf.html:17
 #: plugins/fdrs/templates/compliance/tab_panel.html:315
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:309
 #: plugins/upr/templates/upr/_manage_tools.html:37
 msgid "Country"
 msgstr ""
@@ -7068,7 +7110,7 @@ msgstr ""
 msgid "Custom field type from a plugin."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:395
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:401
 msgid "Custom formula"
 msgstr ""
 
@@ -7260,7 +7302,7 @@ msgstr ""
 msgid "Data Values"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:606
+#: app/templates/forms/entry_form/partials/matrix_table.html:683
 msgid "Data availability options"
 msgstr ""
 
@@ -7298,7 +7340,7 @@ msgstr ""
 msgid "Data governance sections"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:221
+#: app/templates/forms/entry_form/partials/matrix_table.html:228
 msgid "Data matrix for"
 msgstr ""
 
@@ -7464,7 +7506,7 @@ msgid "Dec"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:270
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:422
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:428
 msgid "Decimals"
 msgstr ""
 
@@ -7941,7 +7983,7 @@ msgstr ""
 msgid "Deploy this version? This will publish it as the live version."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:314
+#: app/routes/admin/form_builder/templates.py:315
 #: app/templates/admin/templates/new_template.html:283
 #: app/templates/admin/templates/templates.html:107
 #: app/templates/components/ag_grid_i18n_js.html:33
@@ -7975,7 +8017,7 @@ msgid ""
 "template"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:538
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:577
 msgid "Describe the image for screen readers"
 msgstr ""
 
@@ -8035,7 +8077,7 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal.html:104
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:30
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:19
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:531
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:570
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:50
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:52
 #: app/templates/forms/form_builder/partials/_sections_container.html:493
@@ -8062,6 +8104,10 @@ msgstr ""
 msgid "Deselect All"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:387
+msgid "Deselect all"
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:379
 msgid "Designated FDS member"
 msgstr ""
@@ -8086,6 +8132,7 @@ msgstr ""
 #: app/templates/admin/ai/_trace_card.html:92
 #: app/templates/admin/ai/conversation_traces.html:103
 #: app/templates/forms/entry_form/entry_form.html:2765
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:356
 msgid "Details"
 msgstr ""
 
@@ -8146,7 +8193,7 @@ msgstr ""
 msgid "Diagnostics"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:392
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:398
 msgid "Difference"
 msgstr ""
 
@@ -8296,7 +8343,7 @@ msgstr ""
 msgid "Discussion Item Translations"
 msgstr ""
 
-#: app/routes/admin/form_builder/items.py:156
+#: app/routes/admin/form_builder/items.py:210
 msgid ""
 "Discussion is configured as a section type. Add a Discussion section "
 "instead of a form item."
@@ -8419,7 +8466,7 @@ msgstr ""
 msgid "Display Flags"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_variables_modal.html:13
+#: app/templates/forms/form_builder/partials/_variables_modal.html:20
 msgid "Display Name"
 msgstr ""
 
@@ -8484,7 +8531,7 @@ msgstr ""
 msgid "Distribution by Sex"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:412
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:418
 msgid "Divide by"
 msgstr ""
 
@@ -8838,7 +8885,7 @@ msgstr ""
 msgid "Download document"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:291
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:628
 msgid "Download preview Excel"
 msgstr ""
 
@@ -8889,7 +8936,7 @@ msgstr ""
 msgid "Downloadable"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:314
+#: app/routes/admin/form_builder/templates.py:315
 #: app/services/communication/insights_service.py:101
 #: app/templates/admin/templates/templates.html:107
 #: app/templates/components/ag_grid_i18n_js.html:34
@@ -8942,15 +8989,15 @@ msgid "Drag to move"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:258
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:473
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:479
 msgid "Drag to reorder"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:486
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:492
 msgid "Drag to reorder group"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:478
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:484
 msgid "Drag to reorder. New columns are added at the end of this list."
 msgstr ""
 
@@ -8997,7 +9044,7 @@ msgstr ""
 msgid "Dry run"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:79
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:96
 msgid "Dry run (preview counts + Excel, no DB write)"
 msgstr ""
 
@@ -9035,6 +9082,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:724
 msgid "Duplicate Document Field"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:527
+msgid "Duplicate Group"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:790
@@ -9118,7 +9169,7 @@ msgid ""
 " of its items."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:326
+#: app/routes/admin/form_builder/templates.py:327
 #: app/templates/admin/templates/templates.html:137
 msgid "Duplicate this template?"
 msgstr ""
@@ -9194,6 +9245,15 @@ msgid ""
 "feature flags and each user’s own preferences. High and urgent priorities"
 " can trigger immediate email and stronger styling even when the user "
 "prefers digests."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:58
+msgid ""
+"Each row is one target: a template plus a round, written to exactly one "
+"assigned form (template + period). Only the rows you tick are imported, "
+"and nothing else is touched. Every target is verified against the "
+"workbook and the live assignments; anything unmapped or ambiguous is "
+"flagged and cannot be selected."
 msgstr ""
 
 #: app/templates/tours/tours.html:58
@@ -9901,7 +9961,7 @@ msgstr ""
 msgid "Enter new value…"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:454
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:460
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:200
 msgid "Enter option text"
 msgstr ""
@@ -9994,7 +10054,7 @@ msgstr ""
 msgid "Entity Permissions"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_variables_modal.html:16
+#: app/templates/forms/form_builder/partials/_variables_modal.html:38
 msgid "Entity Scope"
 msgstr ""
 
@@ -10554,6 +10614,10 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:3188
 msgid "Expand editors list"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:496
+msgid "Expand group"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:227
@@ -11329,7 +11393,7 @@ msgstr ""
 msgid "File is too large (max 50 MB)"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:400
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:741
 msgid "File is too large (max 80 MB)"
 msgstr ""
 
@@ -11826,7 +11890,7 @@ msgstr ""
 msgid "Form item ID"
 msgstr ""
 
-#: app/routes/admin/form_builder/items.py:146
+#: app/routes/admin/form_builder/items.py:200
 msgid "Form items cannot be added to a discussion section."
 msgstr ""
 
@@ -11895,7 +11959,7 @@ msgstr ""
 msgid "Forms"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:416
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:422
 msgid "Formula"
 msgstr ""
 
@@ -12018,7 +12082,7 @@ msgstr ""
 msgid "Full quality_debug payload"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:556
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:595
 msgid "Full width"
 msgstr ""
 
@@ -12289,7 +12353,7 @@ msgstr ""
 msgid "Grey"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:331
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:672
 msgid "Grey rounds are in the workbook and are not imported."
 msgstr ""
 
@@ -12349,7 +12413,7 @@ msgstr ""
 msgid "Group dropdown options"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:494
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:507
 msgid "Group header colour"
 msgstr ""
 
@@ -12357,7 +12421,7 @@ msgstr ""
 msgid "Group into sections"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:490
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:499
 msgid "Group label, e.g. Male"
 msgstr ""
 
@@ -12462,8 +12526,12 @@ msgstr ""
 msgid "Has usage"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:493
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:504
 msgid "Header"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:519
+msgid "Headers"
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:805
@@ -12483,14 +12551,22 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:272
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:293
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:302
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:432
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:440
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:438
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:446
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:260
 msgid "Help"
 msgstr ""
 
 #: app/templates/components/_profile_completion_modal.html:21
 msgid "Help your colleagues know who you are."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:513
+msgid "Hex"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:514
+msgid "Hex colour"
 msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:349
@@ -12705,6 +12781,10 @@ msgstr ""
 msgid "How would you like to start?"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:511
+msgid "Hue"
+msgstr ""
+
 #: app/templates/admin/translations/quality_dashboard.html:147
 #: app/templates/admin/translations/quality_dashboard.html:264
 msgid "Human"
@@ -12744,6 +12824,12 @@ msgstr ""
 
 #: app/services/ai/runtime/step_ux.py:239
 msgid "I know how to answer this — fetching data…"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:86
+msgid ""
+"I reviewed the warnings on the selected targets (overwrites, unmatched "
+"entities, cleared PNS data)."
 msgstr ""
 
 #: app/templates/components/_ai_policy_modal.html:45
@@ -12880,11 +12966,11 @@ msgstr ""
 msgid "Image Item Translations"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:587
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:626
 msgid "Image URL or site path"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:582
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:621
 msgid "Image file"
 msgstr ""
 
@@ -12898,7 +12984,7 @@ msgstr ""
 msgid "Image files only (PNG, JPG, etc.) up to 10MB"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:564
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:603
 msgid "Image source by language"
 msgstr ""
 
@@ -13020,10 +13106,10 @@ msgstr ""
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:26
 msgid ""
 "Import data from UPR Master.xlsx (sheet \"UPR Data\") into planning and "
-"reporting templates. Allowed rounds: planning P23–P26 (templates 24 and "
-"22); annual reports AR21–AR25 (templates 33 and 23); mid-year MYR23–MYR25"
-" (template 33). Later rounds such as P27, AR26, and MYR26 are not "
-"imported."
+"reporting forms. Importable rounds are a closed historical set: planning "
+"P23–P26 (templates 24 and 22), annual reports AR21–AR25 (templates 33 and"
+" 23), mid-year MYR23–MYR25 (template 33). Live or later rounds such as "
+"P27, AR26, and MYR26 are never imported."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:377
@@ -13033,6 +13119,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/validation_questions.html:266
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:586
 msgid "Import failed"
 msgstr ""
 
@@ -13079,8 +13166,16 @@ msgstr ""
 msgid "Import into existing draft (Version %(num)s)"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:556
+msgid "Import into the database now?"
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:721
 msgid "Import is in progress. Are you sure you want to leave?"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:605
+msgid "Import job not found"
 msgstr ""
 
 #: app/templates/admin/translations/manage_translations.html:264
@@ -13099,16 +13194,12 @@ msgid ""
 "import."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:83
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:100
 msgid "Import preview (optional)"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:101
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:118
 msgid "Import progress"
-msgstr ""
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:56
-msgid "Import settings"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:275
@@ -13130,6 +13221,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_excel_modal.html:8
 msgid "Import target"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:56
+msgid "Import targets"
 msgstr ""
 
 #: app/templates/admin/validation_questions.html:50
@@ -13158,6 +13253,10 @@ msgstr ""
 
 #: app/templates/admin/translations/manage_translations.html:184
 msgid "Import/Export"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:382
+msgid "Importable rounds absent from this workbook: "
 msgstr ""
 
 #: app/templates/admin/api_keys/create.html:79
@@ -13270,6 +13369,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:301
 msgid "In row total"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:373
+msgid "In the workbook but never imported (live or later rounds): "
 msgstr ""
 
 #: app/templates/tours/tours.html:501
@@ -13755,8 +13858,8 @@ msgstr ""
 msgid "Invalid file type dropped"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:368
-#: app/routes/admin/form_builder/templates.py:396
+#: app/routes/admin/form_builder/templates.py:369
+#: app/routes/admin/form_builder/templates.py:397
 msgid "Invalid file type."
 msgstr ""
 
@@ -13766,19 +13869,19 @@ msgid ""
 "file."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:395
-#: app/routes/admin/form_builder/templates.py:425
+#: app/routes/admin/form_builder/templates.py:396
+#: app/routes/admin/form_builder/templates.py:426
 msgid ""
 "Invalid file type. Please upload an Excel file (.xlsx or .xls) in Kobo "
 "XLSForm format."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:366
-#: app/routes/admin/form_builder/templates.py:684
+#: app/routes/admin/form_builder/templates.py:367
+#: app/routes/admin/form_builder/templates.py:685
 msgid "Invalid file type. Please upload an Excel file (.xlsx)."
 msgstr ""
 
-#: app/routes/forms/entry.py:87
+#: app/routes/forms/entry.py:88
 msgid "Invalid form type."
 msgstr ""
 
@@ -14077,7 +14180,7 @@ msgstr ""
 msgid "Keep the data entries but archive the"
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:537
+#: app/templates/forms/entry_form/export_pdf.html:585
 #: plugins/pb_progress/templates/pb_progress/manage.html:194
 msgid "Key"
 msgstr ""
@@ -14122,11 +14225,11 @@ msgstr ""
 msgid "Known issues"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:441
+#: app/routes/admin/form_builder/templates.py:442
 msgid "Kobo import failed."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:445
+#: app/routes/admin/form_builder/templates.py:446
 #, python-format
 msgid "Kobo import failed: %(message)s"
 msgstr ""
@@ -14456,7 +14559,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:85
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:548
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:587
 msgid "Left"
 msgstr ""
 
@@ -15539,6 +15642,10 @@ msgstr ""
 msgid "Matching source"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:64
+msgid "Matching workbook rounds to assigned forms and published form items."
+msgstr ""
+
 #: app/templates/admin/templates/partials/imputation_badges.html:18
 #: app/templates/components/_builder_items.html:100
 #: app/templates/forms/form_builder/partials/_sections_container.html:508
@@ -15575,7 +15682,7 @@ msgstr ""
 msgid "Matrix Title"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:575
+#: app/templates/forms/entry_form/partials/matrix_table.html:651
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr ""
 
@@ -15608,11 +15715,11 @@ msgstr ""
 msgid "Max indicators: %(current)s/%(max)s"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:554
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:593
 msgid "Max width"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:389
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:395
 msgid "Maximum"
 msgstr ""
 
@@ -15849,7 +15956,7 @@ msgstr ""
 msgid "Minimize — translation keeps running in background"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:388
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:394
 msgid "Minimum"
 msgstr ""
 
@@ -15991,14 +16098,14 @@ msgid "Most Active Users (30 days)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:245
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:458
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:464
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:204
 #: app/templates/forms/form_builder/partials/_template_details.html:358
 msgid "Move Down"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:242
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:455
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:461
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:201
 #: app/templates/forms/form_builder/partials/_template_details.html:357
 msgid "Move Up"
@@ -16482,7 +16589,7 @@ msgstr ""
 msgid "New here? You can create your account in the same step."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:131
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:148
 msgid "New import"
 msgstr ""
 
@@ -16521,7 +16628,7 @@ msgstr ""
 #: app/templates/core/dashboard/_assignments_tab.html:634
 #: app/templates/core/dashboard/_assignments_tab.html:653
 #: app/templates/tours/tours.html:12
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:122
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:139
 msgid "Next"
 msgstr ""
 
@@ -16594,11 +16701,11 @@ msgstr ""
 msgid "No Documents Found"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:672
+#: app/routes/admin/form_builder/templates.py:673
 msgid "No Excel file provided for import."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:678
+#: app/routes/admin/form_builder/templates.py:679
 msgid "No Excel file selected for import."
 msgstr ""
 
@@ -16849,6 +16956,10 @@ msgstr ""
 msgid "No dashboards available for this assignment."
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:235
+msgid "No data"
+msgstr ""
+
 #: app/services/ai/runtime/step_ux.py:362
 msgid "No data available for this selection."
 msgstr ""
@@ -17013,11 +17124,11 @@ msgstr ""
 msgid "No field types"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:415
+#: app/routes/admin/form_builder/templates.py:416
 msgid "No file provided for Kobo import."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:357
+#: app/routes/admin/form_builder/templates.py:358
 msgid "No file provided."
 msgstr ""
 
@@ -17025,12 +17136,12 @@ msgstr ""
 msgid "No file selected"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:420
+#: app/routes/admin/form_builder/templates.py:421
 msgid "No file selected for Kobo import."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:361
-#: app/routes/admin/form_builder/templates.py:389
+#: app/routes/admin/form_builder/templates.py:362
+#: app/routes/admin/form_builder/templates.py:390
 #: app/routes/admin/utilities/translations.py:742
 msgid "No file selected."
 msgstr ""
@@ -17096,7 +17207,7 @@ msgstr ""
 msgid "No indicator suggestion has been pending for more than 30 days."
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:667
+#: app/templates/forms/entry_form/export_pdf.html:715
 #: app/templates/forms/entry_form/validation_summary_pdf.html:165
 msgid "No indicators added."
 msgstr ""
@@ -17228,6 +17339,10 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1220
 msgid "No options available"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:385
+msgid "No other columns"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:18
@@ -17370,7 +17485,7 @@ msgid ""
 "summary)."
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:423
+#: app/templates/forms/entry_form/export_pdf.html:471
 msgid "No rows added"
 msgstr ""
 
@@ -17480,6 +17595,17 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:215
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:352
 msgid "No sub-sectors yet."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:488
+msgid "No target can be imported: all are blocked or have no workbook data."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:481
+msgid ""
+"No target is fully ready: every importable target carries a warning "
+"(existing progress, skipped entities, cleared PNS data…). Use “Select all"
+" applicable” and review the warnings."
 msgstr ""
 
 #: app/templates/admin/translations/quality_dashboard.html:135
@@ -17676,8 +17802,8 @@ msgid "Not Processed"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:206
-#: app/templates/forms/entry_form/export_pdf.html:552
-#: app/templates/forms/entry_form/export_pdf.html:647
+#: app/templates/forms/entry_form/export_pdf.html:600
+#: app/templates/forms/entry_form/export_pdf.html:695
 #: app/templates/forms/entry_form/validation_summary_pdf.html:119
 #: app/templates/forms/entry_form/validation_summary_pdf.html:126
 msgid "Not Reported"
@@ -17702,7 +17828,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2610
 #: app/templates/forms/entry_form/entry_form.html:2625
 #: app/templates/forms/entry_form/export_pdf.html:202
-#: app/templates/forms/entry_form/partials/matrix_table.html:628
+#: app/templates/forms/entry_form/partials/matrix_table.html:705
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
 msgid "Not applicable"
 msgstr ""
@@ -17752,7 +17878,7 @@ msgstr ""
 msgid "Not generated"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:330
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:671
 #: plugins/upr/templates/admin/_upr_guidance_script.html:16
 msgid "Not imported"
 msgstr ""
@@ -18030,7 +18156,7 @@ msgid ""
 "period."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:401
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:407
 msgid "Numerator"
 msgstr ""
 
@@ -18790,6 +18916,10 @@ msgstr ""
 msgid "PNG, JPG, GIF, or WEBP. Used in the SP/EF catalog and reports."
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:309
+msgid "PNS"
+msgstr ""
+
 #: plugins/upr/templates/upr/_excel_modals.html:79
 #: plugins/upr/templates/upr/_excel_modals.html:83
 msgid "PNS Planning"
@@ -18840,7 +18970,7 @@ msgstr ""
 msgid "PO write locking is not active"
 msgstr ""
 
-#: app/routes/forms/export.py:1737 app/routes/forms/validation_summary.py:829
+#: app/routes/forms/export.py:1723 app/routes/forms/validation_summary.py:829
 #: app/routes/forms/validation_summary.py:863
 #: app/routes/forms/validation_summary.py:1835
 #: app/services/documentation/pdf_service.py:121
@@ -18931,7 +19061,7 @@ msgstr ""
 msgid "Page returned for revision. Other submitted pages remain locked."
 msgstr ""
 
-#: app/routes/forms/entry.py:1033 app/routes/forms/entry.py:1042
+#: app/routes/forms/entry.py:1014 app/routes/forms/entry.py:1023
 msgid "Page submitted successfully."
 msgstr ""
 
@@ -19070,11 +19200,11 @@ msgstr ""
 msgid "Past due, not yet submitted"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:580
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:619
 msgid "Paste"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:578
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:617
 msgid "Paste a screenshot from the clipboard (Ctrl+V)"
 msgstr ""
 
@@ -19082,7 +19212,7 @@ msgstr ""
 msgid "Paste an API key created in API Key Management"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:578
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:617
 msgid "Paste image"
 msgstr ""
 
@@ -19220,7 +19350,7 @@ msgid "Percent"
 msgstr ""
 
 #: app/templates/admin/templates/data_sync_imputation.html:183
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:393
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:399
 #: app/utils/form_localization.py:78 app/utils/form_localization.py:79
 msgid "Percentage"
 msgstr ""
@@ -19377,7 +19507,7 @@ msgid "Plan"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:58
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:353
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:694
 msgid "Planning"
 msgstr ""
 
@@ -19540,7 +19670,7 @@ msgid "Please upload a supported guidance file"
 msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1158
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:399
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:740
 msgid "Please upload a valid Excel file (.xlsx or .xls)"
 msgstr ""
 
@@ -19726,7 +19856,7 @@ msgid "Prefilled Values Notice"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:313
-#: app/templates/forms/entry_form/partials/matrix_table.html:182
+#: app/templates/forms/entry_form/partials/matrix_table.html:189
 msgid "Prefilled value"
 msgstr ""
 
@@ -19777,7 +19907,7 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:49
 #: app/templates/forms/form_builder/form_builder.html:22
 #: app/templates/forms/form_builder/form_builder.html:499
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:590
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:629
 #: app/templates/forms/form_builder/partials/_versions_modal.html:38
 #: plugins/upr/templates/upr/_manage_tools.html:12
 msgid "Preview"
@@ -19808,8 +19938,8 @@ msgstr ""
 msgid "Preview email"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:180
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:186
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:205
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:211
 msgid "Preview failed"
 msgstr ""
 
@@ -19817,7 +19947,7 @@ msgstr ""
 msgid "Preview failed."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:121
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:138
 msgid "Preview import"
 msgstr ""
 
@@ -19865,7 +19995,7 @@ msgstr ""
 msgid "Preview:"
 msgstr ""
 
-#: app/routes/forms/entry.py:1681
+#: app/routes/forms/entry.py:1662
 #, python-format
 msgid "Preview: %(name)s"
 msgstr ""
@@ -20037,7 +20167,7 @@ msgstr ""
 msgid "Processing..."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:394
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:400
 msgid "Product"
 msgstr ""
 
@@ -20354,7 +20484,7 @@ msgstr ""
 msgid "Query sent to agent"
 msgstr ""
 
-#: app/services/ai/data/form_retrieval.py:148
+#: app/services/ai/data/form_retrieval.py:150
 msgid "Querying form data…"
 msgstr ""
 
@@ -20506,6 +20636,10 @@ msgid ""
 " (no re-chunk)"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:76
+msgid "Re-verify"
+msgstr ""
+
 #: app/templates/admin/validation_dashboard.html:288
 msgid "Reach"
 msgstr ""
@@ -20530,7 +20664,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:305
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:288
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:431
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:437
 msgid "Read-only"
 msgstr ""
 
@@ -20674,6 +20808,10 @@ msgstr ""
 
 #: app/services/ai/chat/engine.py:1064
 msgid "Reading your request…"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:232
+msgid "Ready"
 msgstr ""
 
 #: app/templates/forms/form_builder/field_mapping.html:73
@@ -21104,7 +21242,7 @@ msgstr ""
 msgid "Remove Document Field"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:496
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:530
 msgid "Remove Group"
 msgstr ""
 
@@ -21120,7 +21258,7 @@ msgstr ""
 msgid "Remove Matrix"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:461
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:467
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:207
 msgid "Remove Option"
 msgstr ""
@@ -21900,6 +22038,7 @@ msgstr ""
 
 #: app/templates/admin/ai/_trace_card.html:215
 #: app/templates/admin/ai/review_queue.html:115
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:233
 msgid "Review"
 msgstr ""
 
@@ -22048,7 +22187,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:121
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:550
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:589
 msgid "Right"
 msgstr ""
 
@@ -22144,6 +22283,7 @@ msgid "Rotate the key regularly or immediately if compromise is suspected."
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:279
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:309
 msgid "Round"
 msgstr ""
 
@@ -22153,12 +22293,6 @@ msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:56
 msgid "Rounds"
-msgstr ""
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:69
-msgid ""
-"Rounds (comma-separated, e.g. P26, AR25, MYR25 — empty = all allowed "
-"rounds matching selected templates: P23–P26, AR21–AR25, MYR23–MYR25)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:42
@@ -22174,7 +22308,7 @@ msgstr ""
 msgid "Row Label Column"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:477
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:483
 msgid "Row total"
 msgstr ""
 
@@ -22227,7 +22361,7 @@ msgstr ""
 msgid "Run again"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:123
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:140
 msgid "Run import"
 msgstr ""
 
@@ -22432,7 +22566,7 @@ msgid "Save failed."
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:292
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:439
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:445
 msgid "Save value"
 msgstr ""
 
@@ -22981,7 +23115,7 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:69
 #: app/templates/forms/form_builder/field_mapping.html:306
 #: app/templates/forms/form_builder/form_builder.html:1164
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:378
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:719
 msgid "Sections"
 msgstr ""
 
@@ -23095,7 +23229,7 @@ msgstr ""
 msgid "Security token not found. Please refresh the page and try again."
 msgstr ""
 
-#: app/templates/forms/entry_form/export_pdf.html:655
+#: app/templates/forms/entry_form/export_pdf.html:703
 msgid "See documents in the web interface"
 msgstr ""
 
@@ -23312,7 +23446,7 @@ msgstr ""
 msgid "Select a user…"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:140
+#: app/templates/forms/entry_form/partials/matrix_table.html:141
 msgid "Select a value in the column header to enable this cell"
 msgstr ""
 
@@ -23329,13 +23463,22 @@ msgstr ""
 #: app/templates/admin/user_management/user_form.html:1163
 #: app/templates/admin/user_management/user_form.html:1171
 #: app/templates/admin/validation_dashboard.html:305
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:386
 #: plugins/upr/templates/upr/_manage_tools.html:55
 #: plugins/upr/templates/upr/_manage_tools.html:77
 msgid "Select all"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:74
+msgid "Select all applicable"
+msgstr ""
+
 #: app/templates/admin/user_management/user_form.html:927
 msgid "Select all countries"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:72
+msgid "Select all ready"
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:447
@@ -23418,6 +23561,10 @@ msgstr ""
 msgid "Select colour"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:382
+msgid "Select columns"
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:852
 msgid ""
 "Select countries to add to this assignment. Already assigned countries "
@@ -23467,6 +23614,12 @@ msgid ""
 "apply them."
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:74
+msgid ""
+"Select every target that can be imported, including those marked “Review”"
+" (you must acknowledge the warnings)."
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:315
 msgid "Select files to upload"
 msgstr ""
@@ -23500,6 +23653,10 @@ msgstr ""
 msgid "Select one or more records to run AI validation"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:72
+msgid "Select only targets with no warnings (green “Ready”)."
+msgstr ""
+
 #: app/templates/forms/entry_form/partials/_question_multiple_choice.html:26
 msgid "Select options..."
 msgstr ""
@@ -23528,6 +23685,13 @@ msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1159
 msgid "Select status"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:102
+msgid ""
+"Select targets above, then use Preview import for row counts, warnings, "
+"and the exact assigned form each target writes to. You can run the import"
+" without preview."
 msgstr ""
 
 #: app/templates/admin/reports/partials/_filter_panel.html:27
@@ -23635,8 +23799,8 @@ msgstr ""
 msgid "Selected Indicators"
 msgstr ""
 
-#: app/services/ai/data/form_retrieval.py:112
-#: app/services/ai/data/form_retrieval.py:1642
+#: app/services/ai/data/form_retrieval.py:114
+#: app/services/ai/data/form_retrieval.py:1644
 #, python-format
 msgid "Selected indicator: %(name)s"
 msgstr ""
@@ -24013,7 +24177,7 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:89
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:106
 msgid ""
 "Settings changed since the last preview — click Preview import for "
 "updated counts."
@@ -24052,7 +24216,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1645
 #: app/templates/forms/entry_form/entry_form.html:2355
 #: app/templates/forms/entry_form/entry_form.html:2483
-#: app/templates/forms/entry_form/export_pdf.html:607
+#: app/templates/forms/entry_form/export_pdf.html:655
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:211
 msgid "Sex"
 msgstr ""
@@ -24659,7 +24823,7 @@ msgstr ""
 msgid "Source Period"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_variables_modal.html:14
+#: app/templates/forms/form_builder/partials/_variables_modal.html:26
 msgid "Source Template"
 msgstr ""
 
@@ -24929,7 +25093,7 @@ msgstr ""
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:131
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:248
 #: plugins/pb_progress/templates/pb_progress/manage.html:175
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:104
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:121
 msgid "Status"
 msgstr ""
 
@@ -25284,7 +25448,7 @@ msgstr ""
 msgid "Subsectors created:"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:408
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:414
 msgid "Subtract"
 msgstr ""
 
@@ -25376,7 +25540,7 @@ msgstr ""
 msgid "Suggestions"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:386
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:392
 msgid "Sum"
 msgstr ""
 
@@ -25733,6 +25897,10 @@ msgstr ""
 msgid "Target term is required"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:526
+msgid "Targets written"
+msgstr ""
+
 #: app/utils/form_localization.py:142
 msgid "Teachers"
 msgstr ""
@@ -25784,19 +25952,23 @@ msgstr ""
 msgid "Template"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:385
+msgid "Template "
+msgstr ""
+
 #: app/services/platform/governance_program.py:513
 #, python-format
 msgid "Template %(id)s"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:746
+#: app/routes/admin/form_builder/templates.py:747
 #, python-format
 msgid ""
 "Template '%(name)s' created and Excel import completed: %(pages)d pages, "
 "%(sections)d sections, and %(items)d items imported."
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:460
+#: app/routes/admin/form_builder/templates.py:461
 #, python-format
 msgid ""
 "Template '%(name)s' created with %(sections)d sections and %(items)d "
@@ -25924,7 +26096,7 @@ msgstr ""
 msgid "Template created"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:743
+#: app/routes/admin/form_builder/templates.py:744
 #, python-format
 msgid ""
 "Template created and Excel import completed with %(pages)d pages, "
@@ -25932,7 +26104,7 @@ msgid ""
 "%(errors)s"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:756
+#: app/routes/admin/form_builder/templates.py:757
 #, python-format
 msgid "Template created but Excel import failed: %(error)s"
 msgstr ""
@@ -25986,10 +26158,6 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:261
 msgid "Templates to clone"
-msgstr ""
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:59
-msgid "Templates to sync"
 msgstr ""
 
 #: app/templates/admin/common_words/manage_common_words.html:744
@@ -26378,7 +26546,7 @@ msgid ""
 "governance accountability."
 msgstr ""
 
-#: app/routes/forms/entry.py:779
+#: app/routes/forms/entry.py:760
 #, python-format
 msgid ""
 "This assignment for %(entity)s is in '%(status)s' status and cannot be "
@@ -26400,7 +26568,7 @@ msgstr ""
 msgid "This assignment is closed and no further changes are expected."
 msgstr ""
 
-#: app/routes/forms/entry.py:138
+#: app/routes/forms/entry.py:139
 msgid "This assignment is currently inactive."
 msgstr ""
 
@@ -26408,7 +26576,7 @@ msgstr ""
 msgid "This assignment was cancelled and is no longer required for submission."
 msgstr ""
 
-#: app/routes/forms/entry.py:801 app/routes/forms/entry.py:804
+#: app/routes/forms/entry.py:782 app/routes/forms/entry.py:785
 msgid "This assignment was changed by someone else and can no longer be edited."
 msgstr ""
 
@@ -26442,8 +26610,8 @@ msgstr ""
 msgid "This column cannot be unpinned"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:505
-#: app/templates/forms/entry_form/partials/matrix_table.html:535
+#: app/templates/forms/entry_form/partials/matrix_table.html:579
+#: app/templates/forms/entry_form/partials/matrix_table.html:611
 msgid "This column requires a whole number. Please correct the decimal value."
 msgstr ""
 
@@ -26501,7 +26669,7 @@ msgstr ""
 msgid "This form is read-only. You can review the data but cannot make changes."
 msgstr ""
 
-#: app/routes/forms/entry.py:788 app/routes/forms/submission.py:57
+#: app/routes/forms/entry.py:769 app/routes/forms/submission.py:57
 msgid ""
 "This form was updated while you were working on it. Reload the page to "
 "get the latest version; your unsaved changes on this page could not be "
@@ -26563,7 +26731,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2398
 #: app/templates/forms/entry_form/entry_form.html:2421
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
-#: app/templates/forms/entry_form/partials/matrix_table.html:139
+#: app/templates/forms/entry_form/partials/matrix_table.html:140
 msgid "This is a prefilled value"
 msgstr ""
 
@@ -26656,7 +26824,7 @@ msgid ""
 "pick another language tab."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:192
+#: app/templates/forms/entry_form/partials/matrix_table.html:199
 msgid "This matrix is imputed"
 msgstr ""
 
@@ -26798,7 +26966,7 @@ msgid ""
 "deleted. Continue?"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:286
+#: app/routes/admin/form_builder/templates.py:287
 #, python-format
 msgid ""
 "This template has %(count)s saved data entry that will be permanently "
@@ -26934,7 +27102,7 @@ msgstr ""
 msgid "Tick boxes"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:521
+#: app/templates/forms/entry_form/partials/matrix_table.html:596
 msgid "Tick for"
 msgstr ""
 
@@ -27151,14 +27319,14 @@ msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:74
 #: app/templates/admin/governance/dashboard.html:599
-#: app/templates/forms/entry_form/export_pdf.html:337
-#: app/templates/forms/entry_form/export_pdf.html:373
-#: app/templates/forms/entry_form/export_pdf.html:397
-#: app/templates/forms/entry_form/export_pdf.html:414
-#: app/templates/forms/entry_form/export_pdf.html:516
+#: app/templates/forms/entry_form/export_pdf.html:342
+#: app/templates/forms/entry_form/export_pdf.html:378
+#: app/templates/forms/entry_form/export_pdf.html:445
+#: app/templates/forms/entry_form/export_pdf.html:462
+#: app/templates/forms/entry_form/export_pdf.html:564
 #: app/templates/forms/entry_form/partials/matrix_table.html:78
-#: app/templates/forms/entry_form/partials/matrix_table.html:353
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:476
+#: app/templates/forms/entry_form/partials/matrix_table.html:424
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:482
 #: app/templates/notifications/center.html:61
 msgid "Total"
 msgstr ""
@@ -27273,12 +27441,12 @@ msgstr ""
 msgid "Total expenditure"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:363
+#: app/templates/forms/entry_form/partials/matrix_table.html:434
 msgid "Total for column"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:113
-#: app/templates/forms/entry_form/partials/matrix_table.html:125
+#: app/templates/forms/entry_form/partials/matrix_table.html:114
+#: app/templates/forms/entry_form/partials/matrix_table.html:126
 msgid "Total for row"
 msgstr ""
 
@@ -27400,11 +27568,11 @@ msgstr ""
 msgid "Trainings"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:218
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:510
 msgid "Transformed form_data rows"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:95
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:112
 msgid "Transforming rows and matching assignments."
 msgstr ""
 
@@ -27728,7 +27896,7 @@ msgstr ""
 msgid "Translations saved."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:427
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:433
 msgid "Treat blanks as zero in + − × ÷"
 msgstr ""
 
@@ -27827,6 +27995,16 @@ msgstr ""
 msgid "Type"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:499
+msgid "Type [ to insert a variable, e.g. [assignment_period]."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:261
+msgid ""
+"Type [ to insert a variable, e.g. [assignment_period]. Saved data uses "
+"the resolved value."
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:1422
 msgid "Type at least 2 characters to search."
 msgstr ""
@@ -27848,7 +28026,7 @@ msgstr ""
 msgid "Type not set on this item"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:585
+#: app/templates/forms/entry_form/partials/matrix_table.html:661
 msgid "Type to search for rows to add..."
 msgstr ""
 
@@ -27879,7 +28057,7 @@ msgstr ""
 msgid "UPR"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:355
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:696
 #: plugins/upr/templates/upr/_excel_modals.html:5
 #: plugins/upr/templates/upr/_excel_modals.html:12
 msgid "UPR Country Reporting"
@@ -27912,7 +28090,7 @@ msgstr ""
 msgid "UPR tools"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:574
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:613
 msgid "URL / path"
 msgstr ""
 
@@ -28204,7 +28382,7 @@ msgstr ""
 msgid "Unknown error"
 msgstr ""
 
-#: app/routes/admin/form_builder/templates.py:755
+#: app/routes/admin/form_builder/templates.py:756
 msgid "Unknown error during Excel import"
 msgstr ""
 
@@ -28233,6 +28411,10 @@ msgstr ""
 #: app/templates/notifications/center.html:49
 #: app/templates/notifications/center.html:74
 msgid "Unread"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:378
+msgid "Unrecognised round codes ignored: "
 msgstr ""
 
 #: app/templates/admin/dashboard.html:155
@@ -28342,7 +28524,7 @@ msgstr ""
 #: app/templates/admin/settings/manage_settings.html:524
 #: app/templates/admin/settings/manage_settings.html:569
 #: app/templates/forms/entry_form/entry_form.html:3142
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:570
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:609
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:29
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:33
 #: plugins/upr/templates/macros/unified_country_plan_excel_instructions.html:24
@@ -28437,8 +28619,8 @@ msgstr ""
 msgid "Upload complete!"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:444
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:483
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:785
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:824
 #: plugins/upr/templates/admin/_upr_guidance_script.html:11
 msgid "Upload failed"
 msgstr ""
@@ -28541,7 +28723,7 @@ msgstr ""
 msgid "Uploading..."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:434
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:775
 msgid "Uploading…"
 msgstr ""
 
@@ -28980,7 +29162,7 @@ msgstr ""
 msgid "Valid KoBo data export"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:386
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:727
 msgid "Valid UPR workbook"
 msgstr ""
 
@@ -29073,11 +29255,11 @@ msgstr ""
 msgid "Validation details"
 msgstr ""
 
-#: app/routes/admin/form_builder/items.py:555
+#: app/routes/admin/form_builder/items.py:659
 msgid "Validation failed. Please check the form."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:401
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:742
 msgid "Validation failed. Please choose a different file."
 msgstr ""
 
@@ -29129,12 +29311,12 @@ msgid "Validation summary"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:239
-#: app/templates/forms/entry_form/export_pdf.html:537
+#: app/templates/forms/entry_form/export_pdf.html:585
 #: app/templates/forms/entry_form/validation_summary_progress.html:321
 msgid "Value"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:534
+#: app/templates/forms/entry_form/partials/matrix_table.html:610
 msgid "Value for"
 msgstr ""
 
@@ -29150,7 +29332,7 @@ msgid ""
 "[Multilingual] will display in the user's selected language."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_variables_modal.html:12
+#: app/templates/forms/form_builder/partials/_variables_modal.html:14
 msgid "Variable Name"
 msgstr ""
 
@@ -29158,11 +29340,11 @@ msgstr ""
 msgid "Variable column tooltip labels"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:486
+#: app/templates/forms/entry_form/partials/matrix_table.html:559
 msgid "Variable tick for"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:504
+#: app/templates/forms/entry_form/partials/matrix_table.html:578
 msgid "Variable value for"
 msgstr ""
 
@@ -29225,6 +29407,10 @@ msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:322
 msgid "Verification sheets"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_panel.html:63
+msgid "Verifying targets…"
 msgstr ""
 
 #: app/templates/admin/plugin_management.html:127
@@ -29414,7 +29600,7 @@ msgid "View assignments on timeline"
 msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:704
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:298
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:635
 msgid "View change log"
 msgstr ""
 
@@ -29597,7 +29783,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:66
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:226
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:535
 msgid "Warnings"
 msgstr ""
 
@@ -29740,13 +29926,13 @@ msgid ""
 "system managers and admins — add them explicitly)."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:434
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:440
 msgid ""
 "When checked, people filling the form cannot type over this result. "
 "Uncheck to let them replace the calculated number."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:442
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:448
 msgid ""
 "When checked, the calculated value is saved with the form and restored "
 "when the form is reopened. When unchecked, the value is always "
@@ -29922,8 +30108,12 @@ msgid ""
 "pass."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:458
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:799
 msgid "Workbook analysis timed out. Please try uploading again."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:391
+msgid "Workbook notes"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:232
@@ -29966,7 +30156,7 @@ msgstr ""
 msgid "World map coloured by FDRS submission status"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:418
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:424
 msgid ""
 "Write the column code directly, for example income + grant. Codes cannot "
 "contain spaces. Functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, ABS, "
@@ -30115,7 +30305,7 @@ msgstr ""
 msgid "You are editing a draft version"
 msgstr ""
 
-#: app/routes/forms/entry.py:153
+#: app/routes/forms/entry.py:154
 #, python-format
 msgid "You are not authorized to access this assignment for %(entity)s."
 msgstr ""
@@ -30447,11 +30637,11 @@ msgstr ""
 
 #: app/templates/admin/api_management.html:625
 #: app/templates/admin/api_management.html:626
-#: app/templates/forms/entry_form/partials/matrix_table.html:463
-#: app/templates/forms/entry_form/partials/matrix_table.html:486
-#: app/templates/forms/entry_form/partials/matrix_table.html:504
-#: app/templates/forms/entry_form/partials/matrix_table.html:521
-#: app/templates/forms/entry_form/partials/matrix_table.html:534
+#: app/templates/forms/entry_form/partials/matrix_table.html:535
+#: app/templates/forms/entry_form/partials/matrix_table.html:559
+#: app/templates/forms/entry_form/partials/matrix_table.html:578
+#: app/templates/forms/entry_form/partials/matrix_table.html:596
+#: app/templates/forms/entry_form/partials/matrix_table.html:610
 #: plugins/fdrs/templates/compliance/tab_panel.html:586
 msgid "and"
 msgstr ""
@@ -30475,6 +30665,15 @@ msgstr ""
 
 #: app/templates/admin/api_management.html:626
 msgid "are ignored."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:517
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:558
+msgid "assigned form"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:409
+msgid "assigned form(s)"
 msgstr ""
 
 #: app/templates/core/dashboard/_assignments_tab.html:91
@@ -30537,6 +30736,10 @@ msgstr ""
 msgid "campaigns"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:519
+msgid "clears"
+msgstr ""
+
 #: app/routes/admin/assignment_management.py:215
 msgid "closed"
 msgstr ""
@@ -30572,7 +30775,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:2861
 #: app/templates/admin/user_management/users.html:379
 #: app/templates/admin/validation_questions.html:274
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:346
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:687
 msgid "countries"
 msgstr ""
 
@@ -31065,6 +31268,10 @@ msgstr ""
 msgid "non-compliant countries have compliance documents pending validation."
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:520
+msgid "non-reported PNS assignment(s)"
+msgstr ""
+
 #: app/templates/auth/login.html:767
 msgid "not registered"
 msgstr ""
@@ -31210,6 +31417,10 @@ msgstr ""
 msgid "public 403s unexpected"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:386
+msgid "published form items not resolved — "
+msgstr ""
+
 #: app/templates/admin/communication/_insights.html:74
 msgid "read"
 msgstr ""
@@ -31264,7 +31475,7 @@ msgstr ""
 msgid "results"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:362
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:703
 msgid "rounds"
 msgstr ""
 
@@ -31278,7 +31489,7 @@ msgstr ""
 #: app/templates/admin/templates/kobo_data_import.html:1160
 #: app/templates/components/_builder_items.html:100
 #: app/templates/forms/form_builder/partials/_sections_container.html:509
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:345
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:686
 msgid "rows"
 msgstr ""
 
@@ -31418,6 +31629,10 @@ msgstr ""
 msgid "suspicious"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:408
+msgid "target(s)"
+msgstr ""
+
 #: app/templates/admin/templates/new_template.html:794
 msgid "template"
 msgstr ""
@@ -31506,7 +31721,7 @@ msgstr ""
 msgid "undocumented"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:224
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:533
 msgid "unique"
 msgstr ""
 
@@ -31565,6 +31780,14 @@ msgstr ""
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:121
 msgid "with a service-income figure"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:521
+msgid "with data"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:411
+msgid "workbook rows"
 msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:399

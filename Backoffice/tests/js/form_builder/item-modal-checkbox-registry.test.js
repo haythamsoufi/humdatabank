@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
@@ -18,6 +18,15 @@ const itemModalPath = path.join(
     backofficeRoot,
     'app/templates/forms/form_builder/partials/_item_modal.html',
 );
+
+/** The modal is split across _item_modal*.html partials; ids can live in any of them. */
+function readAllItemModalHtml() {
+    const dir = path.dirname(itemModalPath);
+    return readdirSync(dir)
+        .filter((name) => /^_item_modal.*\.html$/.test(name))
+        .map((name) => readFileSync(path.join(dir, name), 'utf-8'))
+        .join('\n');
+}
 
 const PROPERTIES_START = 'id="item-properties-section"';
 const PROPERTIES_END = 'class="item-modal-actions';
@@ -66,6 +75,7 @@ function checkboxNamesInPropertiesSection(html) {
 
 describe('item modal checkbox registry guardrail', () => {
     const html = readFileSync(itemModalPath, 'utf-8');
+    const allModalHtml = readAllItemModalHtml();
     const registryKeys = new Set(CONFIG_CHECKBOXES.map((entry) => entry.key));
     const registrySelectors = new Set(CONFIG_CHECKBOXES.map((entry) => entry.selector));
 
@@ -85,7 +95,7 @@ describe('item modal checkbox registry guardrail', () => {
                 // Injected at runtime by properties.js, not in the static template.
                 return;
             }
-            expect(html).toContain(`id="${expectedId}"`);
+            expect(allModalHtml).toContain(`id="${expectedId}"`);
         });
     });
 
@@ -100,7 +110,7 @@ describe('item modal checkbox registry guardrail', () => {
     });
 
     it('allow_other is serialized even though it lives in question fields, not properties', () => {
-        expect(html).toContain('id="item-question-allow-other"');
+        expect(allModalHtml).toContain('id="item-question-allow-other"');
         expect(registrySelectors.has('#item-question-allow-other')).toBe(true);
     });
 

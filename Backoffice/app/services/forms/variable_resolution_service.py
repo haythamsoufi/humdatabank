@@ -27,9 +27,15 @@ logger = logging.getLogger(__name__)
 # ── Short-TTL per-request-equivalent cache for resolve_variables ───────────────
 # Each Gunicorn worker resolves the same variables for the same AES/version on
 # every cold form load (~2-4 DB queries per variable, no cross-request cache).
-# A 60-second TTL is safe: form saves invalidate the cache naturally via TTL,
-# and the window is short enough that stale values never persist across a user
-# save+reload cycle. Max 100 entries prevents unbounded growth.
+# The cache is per process, so with several workers two requests for the same
+# form can see different snapshots for up to the TTL. To keep that window from
+# surfacing as an empty or inconsistent form:
+#   * results that hit a resolution error are never cached (a transient failure
+#     must not be replayed for the whole TTL),
+#   * preview contexts (no AES id) are never cached (the key would collide
+#     across entities/periods),
+#   * entries are copied on the way in and out so callers can mutate the result.
+# Max 100 entries prevents unbounded growth.
 #
 # Cache key: (aes_id, version_id, row_entity_id)
 # Cache value: (resolved_dict, expires_at)
@@ -50,7 +56,7 @@ def _var_cache_get(key: Tuple) -> Optional[Dict]:
         with _var_cache_lock:
             _var_cache.pop(key, None)
         return None
-    return resolved
+    return dict(resolved)
 
 
 def _var_cache_set(key: Tuple, resolved: Dict) -> None:
@@ -60,7 +66,7 @@ def _var_cache_set(key: Tuple, resolved: Dict) -> None:
             # Evict the oldest (insertion-order) entry.
             oldest = next(iter(_var_cache))
             _var_cache.pop(oldest, None)
-        _var_cache[key] = (resolved, expires_at)
+        _var_cache[key] = (dict(resolved), expires_at)
 
 
 class VariableResolutionService:
@@ -811,7 +817,8 @@ class VariableResolutionService:
         aes_id = getattr(assignment_entity_status, 'id', None)
         version_id = getattr(template_version, 'id', None) if template_version else None
         _cache_key = (aes_id, version_id, row_entity_id)
-        _cached = _var_cache_get(_cache_key)
+        _cacheable = aes_id is not None
+        _cached = _var_cache_get(_cache_key) if _cacheable else None
         if _cached is not None:
             return _cached
 
@@ -826,6 +833,7 @@ class VariableResolutionService:
 
         resolved = {}
         variables = template_version.variables
+        had_error = False
 
         for variable_name, variable_config in variables.items():
             # EO1, EO2, EO3 are plugin label variables; they are replaced client-side from
@@ -871,6 +879,7 @@ class VariableResolutionService:
 
                 resolved[variable_name] = value
             except Exception as e:
+                had_error = True
                 logger.error(
                     f"Error resolving variable '{variable_name}': {e}",
                     exc_info=True
@@ -883,7 +892,8 @@ class VariableResolutionService:
         for name, value in (builtin_resolved or {}).items():
             resolved.setdefault(name, value)
 
-        _var_cache_set(_cache_key, resolved)
+        if _cacheable and not had_error:
+            _var_cache_set(_cache_key, resolved)
         return resolved
 
     @classmethod
@@ -2134,7 +2144,9 @@ class VariableResolutionService:
             # Remove any whitespace
             formula = formula.strip()
 
-            # Validate formula contains only safe characters (numbers, +, -, *, /, ., spaces, parentheses)
+            # Validate formula contains only safe characters (numbers, +, -, *, /, ., spaces,
+            # parentheses) once the [variable] placeholder is substituted.
+            formula = formula.replace('[variable]', str(num_value))
             if not re.match(r'^[\d+\-*/.()\s]+$', formula):
                 logger.warning(f"_evaluate_formula: Formula '{formula}' contains unsafe characters")
                 return variable_value
@@ -2150,12 +2162,9 @@ class VariableResolutionService:
             # Replace any placeholder or evaluate directly
             expression = formula_clean
 
-            # If formula starts with an operator, prepend the value
+            # A formula that starts with an operator applies to the value itself
             if expression.startswith(('+', '-', '*', '/')):
                 expression = str(num_value) + expression
-            else:
-                # If it's a full expression, try to replace a placeholder
-                expression = expression.replace('[variable]', str(num_value))
 
             # Evaluate the expression using the restricted AST evaluator
             result = cls._safe_eval_expression(expression)
@@ -2471,6 +2480,14 @@ class VariableResolutionService:
         # First, handle formulas like [[variable_name]+1], [[variable_name]*2], etc.
         # Pattern: [[variable_name] followed by operator and expression, then closing bracket]
         # This matches: [[period]+1], [[period]*2], [[period]-5], [[period]/2]
+        # Formulas that cannot be evaluated are kept verbatim. They are swapped for a
+        # sentinel so the simple-variable pass below does not rewrite the [name] inside.
+        unresolved_formulas: List[str] = []
+
+        def keep_formula(full_match: str) -> str:
+            unresolved_formulas.append(full_match)
+            return f"\x00FORMULA{len(unresolved_formulas) - 1}\x00"
+
         def replace_formula(match):
             variable_name = match.group(1)
             formula_expr = match.group(2)  # e.g., '+1', '*2', '-5'
@@ -2478,7 +2495,7 @@ class VariableResolutionService:
 
             if variable_name not in resolved_variables:
                 logger.warning(f"replace_variables_in_text: Variable '{variable_name}' in formula not found in resolved variables")
-                return full_match  # Return original if variable not resolved
+                return keep_formula(full_match)  # Return original if variable not resolved
 
             value = resolved_variables[variable_name]
 
@@ -2490,9 +2507,9 @@ class VariableResolutionService:
                     try:
                         value = float(default_value)
                     except (ValueError, TypeError):
-                        return full_match  # Can't evaluate formula with non-numeric default
+                        return keep_formula(full_match)  # Can't evaluate formula with non-numeric default
                 else:
-                    return full_match  # No value to evaluate
+                    return keep_formula(full_match)  # No value to evaluate
 
             # Evaluate the formula
             try:
@@ -2509,7 +2526,7 @@ class VariableResolutionService:
                 return formatted_value
             except Exception as e:
                 logger.warning(f"replace_variables_in_text: Error evaluating formula {full_match}: {e}")
-                return full_match  # Return original on error
+                return keep_formula(full_match)  # Return original on error
 
         # Replace formulas first
         result = cls._FORMULA_PATTERN.sub(replace_formula, result)
@@ -2553,6 +2570,9 @@ class VariableResolutionService:
             return str(value)
 
         result = cls._VAR_PATTERN.sub(replace_simple, result)
+
+        for index, formula_text in enumerate(unresolved_formulas):
+            result = result.replace(f"\x00FORMULA{index}\x00", formula_text)
 
         if result != original_text:
             logger.debug(f"replace_variables_in_text: Text changed from '{original_text}' to '{result}'")

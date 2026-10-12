@@ -591,6 +591,18 @@ class TestReplaceVariablesInText:
         )
         assert result == "[[period]+1]"
 
+    def test_unresolved_formula_does_not_leak_into_simple_replacement(self):
+        result = VariableResolutionService.replace_variables_in_text(
+            "[a] then [[period]+1] then [b]", {"a": 1, "b": 2, "period": None}
+        )
+        assert result == "1 then [[period]+1] then 2"
+
+    def test_resolved_and_unresolved_formulas_in_same_text(self):
+        result = VariableResolutionService.replace_variables_in_text(
+            "[[a]+1] / [[b]+1]", {"a": 4, "b": None}
+        )
+        assert result == "5 / [[b]+1]"
+
     def test_value_with_thousands_formatting(self):
         configs = {"amount": {"format_thousands_separator": True}}
         result = VariableResolutionService.replace_variables_in_text(
@@ -2107,6 +2119,85 @@ class TestResolveVariables:
             result = VariableResolutionService.resolve_variables(tv, aes)
         assert result['entity_id'] == 'user_val'   # user-defined wins
         assert result['entity_name'] == 'France'    # builtin added
+
+
+class TestResolveVariablesCache:
+    """The per-process resolve cache must never replay a failure or leak shared state."""
+
+    LOOKUP_CFG = {'source_template_id': 1, 'source_assignment_period': '2023', 'source_form_item_id': 5}
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        from app.services.forms import variable_resolution_service as vrs
+        vrs._var_cache.clear()
+        yield
+        vrs._var_cache.clear()
+
+    def _aes(self, aes_id=11):
+        aes = MagicMock()
+        aes.id = aes_id
+        aes.entity_type = 'country'
+        aes.entity_id = 1
+        return aes
+
+    def _tv(self, version_id=3):
+        tv = MagicMock()
+        tv.id = version_id
+        tv.variables = {'my_var': dict(self.LOOKUP_CFG)}
+        return tv
+
+    def _resolve(self, aes, tv, **kwargs):
+        with patch.object(VariableResolutionService, '_resolve_builtin_metadata_variables', return_value={}):
+            return VariableResolutionService.resolve_variables(tv, aes, **kwargs)
+
+    def test_successful_result_is_cached(self):
+        aes, tv = self._aes(), self._tv()
+        with patch.object(VariableResolutionService, '_resolve_single_variable', return_value=42) as mock_resolve:
+            first = self._resolve(aes, tv)
+            second = self._resolve(aes, tv)
+        assert first == second == {'my_var': 42}
+        assert mock_resolve.call_count == 1
+
+    def test_failed_resolution_is_not_cached(self):
+        """A transient error must not blank the variable for the whole TTL."""
+        aes, tv = self._aes(), self._tv()
+        with patch.object(VariableResolutionService, '_resolve_single_variable',
+                          side_effect=[RuntimeError('db blip'), 42]):
+            first = self._resolve(aes, tv)
+            second = self._resolve(aes, tv)
+        assert first['my_var'] is None
+        assert second['my_var'] == 42
+
+    def test_preview_context_without_aes_id_is_not_cached(self):
+        """Preview stubs have no AES id; their key would collide across entities/periods."""
+        tv = self._tv()
+        with patch.object(VariableResolutionService, '_resolve_single_variable', side_effect=[1, 2]) as mock_resolve:
+            first = self._resolve(self._aes(aes_id=None), tv)
+            second = self._resolve(self._aes(aes_id=None), tv)
+        assert first['my_var'] == 1
+        assert second['my_var'] == 2
+        assert mock_resolve.call_count == 2
+
+    def test_cached_dict_is_isolated_from_caller_mutation(self):
+        """entry.py adds keys to the resolved dict; that must not leak into later requests."""
+        aes, tv = self._aes(), self._tv()
+        with patch.object(VariableResolutionService, '_resolve_single_variable', return_value=42):
+            first = self._resolve(aes, tv)
+            first['EO1'] = 'mutated'
+            first['my_var'] = 'mutated'
+            second = self._resolve(aes, tv)
+            third = self._resolve(aes, tv)
+        assert second == {'my_var': 42}
+        third['extra'] = 1
+        assert 'extra' not in self._resolve(aes, tv)
+
+    def test_rows_are_cached_separately(self):
+        aes, tv = self._aes(), self._tv()
+        with patch.object(VariableResolutionService, '_resolve_single_variable', side_effect=[1, 2]):
+            row_a = self._resolve(aes, tv, row_entity_id=7)
+            row_b = self._resolve(aes, tv, row_entity_id=8)
+        assert row_a['my_var'] == 1
+        assert row_b['my_var'] == 2
 
 
 # ---------------------------------------------------------------------------

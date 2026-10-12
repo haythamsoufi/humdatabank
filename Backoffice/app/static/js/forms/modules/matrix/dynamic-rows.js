@@ -89,9 +89,8 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
     });
 
     // Check if row already exists (by ID if available, otherwise by label)
-    const existingRow = finalRowId !== rowLabel
-        ? tbody.querySelector(`tr[data-row-id="${finalRowId}"]`)
-        : tbody.querySelector(`tr[data-row-label="${rowLabel}"]`);
+    const existingRow = (finalRowId && tbody.querySelector(`tr[data-row-id="${finalRowId}"]`))
+        || (finalRowId === rowLabel ? tbody.querySelector(`tr[data-row-label="${rowLabel}"]`) : null);
     if (existingRow) {
         debugLog('matrix-handler', `Row already exists, skipping: ${rowLabel} (ID: ${finalRowId})`);
         return;

@@ -415,6 +415,30 @@ export function __serializeMatrixData(data) {
 }
 
 
+/**
+ * Inverse of __serializeMatrixData: accepts the raw JSON written by the server or the
+ * `b64:`-wrapped form written by the client (and restored from drafts).
+ * @returns {object|null} null when the value is empty or not a JSON object
+ */
+export function __deserializeMatrixData(value) {
+    if (typeof value !== 'string' || value === '') return null;
+    let json = value;
+    if (value.startsWith('b64:')) {
+        try {
+            json = decodeURIComponent(escape(atob(value.slice(4))));
+        } catch (_) {
+            return null;
+        }
+    }
+    try {
+        const parsed = JSON.parse(json);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+
 export function __getMatrixColumnNames(config) {
     const columns = config?.columns || [];
     return columns

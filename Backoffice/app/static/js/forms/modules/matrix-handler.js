@@ -31,6 +31,7 @@ import {
     __variableColumnPersistsValue,
     __resolveMatrixLocalizedLabel,
     __serializeMatrixData,
+    __deserializeMatrixData,
     __getMatrixColumnNames,
     __parseMatrixCellKey,
     __readMatrixMaxDecimals,
@@ -749,19 +750,16 @@ class MatrixHandler {
     parseExistingData(container) {
         const hiddenField = container.querySelector('input[type="hidden"]');
         if (hiddenField && hiddenField.value) {
-            try {
-                const data = JSON.parse(hiddenField.value);
-                // Keep only data keys that represent matrix cells.
-                if (data && typeof data === 'object') {
-                    Object.keys(data).forEach((key) => {
-                        if (String(key).startsWith('_')) delete data[key];
-                    });
-                }
-                return data;
-            } catch (e) {
-                debugError('MatrixHandler: Error parsing existing matrix data', e);
+            const data = __deserializeMatrixData(hiddenField.value);
+            if (!data) {
+                debugError('MatrixHandler: Error parsing existing matrix data', hiddenField.value.slice(0, 80));
                 return {};
             }
+            // Keep only data keys that represent matrix cells.
+            Object.keys(data).forEach((key) => {
+                if (String(key).startsWith('_')) delete data[key];
+            });
+            return data;
         }
         return {};
     }

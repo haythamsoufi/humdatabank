@@ -3,12 +3,14 @@
 import { debugLog, debugError, debugWarn } from '../debug.js';
 import { _t } from './shared.js';
 import {
+    __deserializeMatrixData,
     __formatLookupValueForInput,
     __formatSavedScalarForInput,
     __getSavedMatrixCellScalar,
     __persistVariableCellScalar,
     __readMatrixMaxDecimals,
     __savedVariableCellIsStaleLookupMirror,
+    __serializeMatrixData,
     __setMatrixNumericCellDisplay,
     __variableCellDiffersFromLookup,
 } from './formatting.js';
@@ -770,6 +772,44 @@ _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, r
 
         this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
     });
+},
+
+/**
+ * Run `fn` while every matrix hidden field omits auto-filled variable cells the user has
+ * not edited. Local drafts use this view: values the page copied from a lookup are not
+ * the user's work, so opening a form must not leave a draft behind (and a later restore
+ * must not pin those values as if they had been entered). Hidden fields are restored
+ * before returning.
+ */
+withAutoFilledCellsStripped(fn) {
+    const restores = [];
+    this.matrices.forEach((matrix) => {
+        const autoFilled = matrix.autoFilledVariableCells;
+        const hidden = matrix.hiddenField;
+        if (!autoFilled || autoFilled.size === 0 || !hidden || !matrix.container) return;
+        const data = __deserializeMatrixData(hidden.value);
+        if (!data) return;
+        const edited = new Set();
+        matrix.container.querySelectorAll('input[data-cell-key]').forEach((input) => {
+            if (input.dataset.userEdited === '1') edited.add(input.dataset.cellKey);
+        });
+        let changed = false;
+        autoFilled.forEach((cellKey) => {
+            if (!edited.has(cellKey) && Object.prototype.hasOwnProperty.call(data, cellKey)) {
+                delete data[cellKey];
+                changed = true;
+            }
+        });
+        if (!changed) return;
+        const previous = hidden.value;
+        hidden.value = __serializeMatrixData(data);
+        restores.push(() => { hidden.value = previous; });
+    });
+    try {
+        return fn();
+    } finally {
+        restores.forEach((restore) => restore());
+    }
 },
 
 /**

@@ -45,6 +45,63 @@ const filled = (snap) => snap.map((c) => c.value).sort().join(',') === '10,20,30
 const healthy = (snap) => snap.length === 3 && green(snap).length === 0 && filled(snap);
 const failBootstrap = (page) => page.route('**/entry-bootstrap', (r) => r.fulfill({ status: 500, body: '{}' }));
 
+// Opening the page without touching anything must not leave a local draft behind.
+const draftRecords = (page) => page.evaluate(() => new Promise((resolve) => {
+  const req = indexedDB.open('ifrc_forms');
+  req.onerror = () => resolve([]);
+  req.onsuccess = () => {
+    const db = req.result;
+    const names = [...db.objectStoreNames];
+    if (!names.length) return resolve([]);
+    const found = [];
+    let pending = names.length;
+    names.forEach((name) => {
+      const all = db.transaction(name).objectStore(name).getAll();
+      all.onsuccess = () => {
+        all.result.forEach((rec) => found.push(rec));
+        if (!--pending) resolve(found);
+      };
+    });
+  };
+}));
+
+{
+  const { ctx, page } = await newPage();
+  await load(page);
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await page.waitForTimeout(800);
+  const records = (await draftRecords(page)).filter((r) => r && r.data && Object.keys(r.data).length > 0);
+  check('opening the page without edits stores no draft', records.length === 0, JSON.stringify(records).slice(0, 400));
+  await ctx.close();
+}
+
+// A real edit is still drafted, and the draft restores it.
+{
+  const { ctx, page } = await newPage();
+  await load(page);
+  const input = await page.$('input[data-cell-key$="_Actual"]');
+  if (input) {
+    await input.fill('7');
+    await input.dispatchEvent('change');
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+    await page.waitForTimeout(800);
+    const records = (await draftRecords(page)).filter((r) => r && r.data && Object.keys(r.data).length > 0);
+    check('a real edit is still drafted', records.length === 1, JSON.stringify(records).slice(0, 400));
+    await page.goto(`${base}/assignment/${aesId}`, { waitUntil: 'load' });
+    await page.waitForSelector('input[data-column-type="variable"]', { timeout: 30000 });
+    const restoreButton = page.getByRole('button', { name: 'Restore' });
+    await restoreButton.click({ timeout: 15000 }).catch(() => results.push('  (no restore prompt appeared)'));
+    await page.waitForTimeout(3500);
+    const reloaded = await snapshot(page);
+    const restored = await page.$eval('input[data-cell-key$="_Actual"]', (el) => el.value);
+    check('and restored on the next load without highlighting', healthy(reloaded) && restored === '7',
+      JSON.stringify({ reloaded, restored }));
+  } else {
+    check('Actual column input present', false);
+  }
+  await ctx.close();
+}
+
 // Leaving the page stores an auto-fill draft; every later load restores it.
 {
   const { ctx, page } = await newPage();

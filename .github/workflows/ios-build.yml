@@ -88,10 +88,10 @@ jobs:
       - name: Cache Flutter SDK (hostedtoolcache)
         uses: actions/cache@v5
         with:
-          path: /Users/runner/hostedtoolcache/flutter/stable-3.41.6-arm64
-          key: flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-v2
+          path: /Users/runner/hostedtoolcache/flutter/stable-3.41.9-arm64
+          key: flutter-sdk-3.41.9-stable-${{ runner.os }}-${{ runner.arch }}-v2
           restore-keys: |
-            flutter-sdk-3.41.6-stable-${{ runner.os }}-${{ runner.arch }}-
+            flutter-sdk-3.41.9-stable-${{ runner.os }}-${{ runner.arch }}-
 
       # Speed: avoid re-downloading Dart packages when lockfiles are unchanged (~10–20s per step).
       # hashFiles() only accepts workspace-relative literals; this repo uses MobileApp/ (see Determine path step).
@@ -124,8 +124,10 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.6 stable ships Dart 3.11.4.
-          flutter-version: '3.41.6'
+          # Keep in sync with MobileApp/pubspec.yaml. Flutter 3.41.9 stable ships Dart 3.11.4.
+          # 3.41.7+ skips the broken Xcode 26.4 LLDB JIT breakpoint so a debug
+          # launch on a physical iPhone does not die in the Dart VM at startup.
+          flutter-version: '3.41.9'
           channel: 'stable'
           # Disabled: we cache hostedtoolcache ourselves (see Cache Flutter SDK) to avoid cache key churn
           # and "Unable to reserve cache" when multiple workflows use flutter-action concurrently.

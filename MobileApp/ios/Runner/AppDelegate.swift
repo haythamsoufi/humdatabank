@@ -64,11 +64,17 @@ private final class GlassCapsuleView: UIView {
   private let usesLiquidGlass: Bool
 
   init(frame: CGRect, dark: Bool) {
+    // Keep the iOS 26 type out of this initializer. A direct UIGlassEffect()
+    // call is effectWithStyle:, which is missing on some iOS 26 builds and
+    // aborts the process (debug builds surface that as an instant launch crash
+    // once the tab bar's platform view is created).
+    let glass: UIVisualEffectView?
     if #available(iOS 26.0, *) {
-      // Glass views get a small fixed corner radius unless the shape is set;
-      // layer.cornerRadius is ignored for UIGlassEffect.
-      let glass = UIVisualEffectView(effect: UIGlassEffect())
-      glass.cornerConfiguration = .capsule()
+      glass = LiquidGlassCapsule.make()
+    } else {
+      glass = nil
+    }
+    if let glass {
       effectView = glass
       usesLiquidGlass = true
     } else {
@@ -100,5 +106,26 @@ private final class GlassCapsuleView: UIView {
     if !usesLiquidGlass {
       effectView.layer.cornerRadius = min(bounds.width, bounds.height) / 2
     }
+  }
+}
+
+/// iOS 26 Liquid Glass, isolated so older systems never link the symbol at launch.
+@available(iOS 26.0, *)
+private enum LiquidGlassCapsule {
+  static func make() -> UIVisualEffectView? {
+    guard let glassClass = NSClassFromString("UIGlassEffect") as? NSObject.Type,
+          glassClass.responds(to: Selector(("effectWithStyle:")))
+    else {
+      return nil
+    }
+    // Glass views ignore layer.cornerRadius; the capsule shape has to be set
+    // on the effect view. Skip it when that setter is absent rather than abort.
+    let glass = UIVisualEffectView(effect: UIGlassEffect())
+    let setter = Selector(("setCornerConfiguration:"))
+    guard glass.responds(to: setter) else {
+      return nil
+    }
+    glass.cornerConfiguration = .capsule()
+    return glass
   }
 }

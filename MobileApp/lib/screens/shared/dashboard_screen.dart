@@ -1526,14 +1526,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         if (_previousLanguage != null &&
             _previousLanguage != languageProvider.currentLanguage) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            // Language changed - clear cache and reload data
+            // Keep the previous snapshot until the translated refresh succeeds.
+            // Deleting it here made downloaded assignments inaccessible when the
+            // language changed while the device was offline.
             _previousLanguage = languageProvider.currentLanguage;
-            final dashboardProvider = Provider.of<DashboardProvider>(
-              context,
-              listen: false,
-            );
-            // Clear cache to force fresh API data with new language
-            dashboardProvider.clearCache();
             // Reload data with force refresh to get new language content
             _loadData(forceRefresh: true);
           });

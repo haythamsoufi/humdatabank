@@ -295,6 +295,18 @@ describe('disabled cells are not treated as user-cleared', () => {
     expect(matrixHandler.matrices.get(FIELD_ID).data[CELL_KEY]).toBe('100');
   });
 
+  it('does not persist a blank for a disabled empty variable cell that has no stored value', () => {
+    const { input } = buildMatrix(matrixHandler);
+    input.value = '';
+    input.disabled = true;
+
+    matrixHandler.syncMatrixDataFromInputs(FIELD_ID);
+
+    const matrix = matrixHandler.matrices.get(FIELD_ID);
+    expect(matrix.data).not.toHaveProperty(CELL_KEY);
+    expect(matrix.hiddenField.value).toBe('');
+  });
+
   it('keeps stored data for a disabled empty number cell', () => {
     const { input } = buildMatrix(matrixHandler, { data: { [CELL_KEY]: '7' } });
     input.dataset.columnType = 'number';

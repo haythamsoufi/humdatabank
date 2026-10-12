@@ -90,17 +90,24 @@ class TestAssignmentShowsSuggestedValues:
 
 
 class TestApplyCarryForwardSuggestions:
-    def test_saved_assignment_does_not_resolve_prior_round(self):
+    def test_saved_assignment_keeps_reference_without_notice_flag(self):
         aes = SimpleNamespace(status="approved")
-        existing = {"field_value[12]": "42"}
+        item = SimpleNamespace(id=12)
+        existing = {"field_value[12]": {"61_Planned": 10}}
+        ref = {"61_Planned": 10, "62_Planned": 4}
 
         with patch("app.services.forms.carry_forward_service.CarryForwardService") as service:
-            result = apply_carry_forward_suggestions(existing, aes, [SimpleNamespace(id=12)])
+            service.resolve_references_for_aes.return_value = {
+                12: {"value": None, "disagg_data": ref, "is_matrix": True},
+            }
+            result = apply_carry_forward_suggestions(existing, aes, [item])
 
         service.resolve_for_aes.assert_not_called()
-        service.resolve_references_for_aes.assert_not_called()
-        assert result == {"field_value[12]": "42"}
+        service.resolve_references_for_aes.assert_called_once_with(aes, [item])
+        assert result["field_value[12]"] == {"61_Planned": 10}
+        assert result["field_value[12]_carry_forward_ref"] == ref
         assert "field_value[12]_is_carry_forward" not in result
+        assert "field_value[12]_is_prefilled" not in result
 
     def test_pending_assignment_still_resolves_prior_round(self):
         aes = SimpleNamespace(status="pending")

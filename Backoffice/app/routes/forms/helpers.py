@@ -37,8 +37,8 @@ from app.utils.form_localization import (
 from config import Config as AppConfig
 
 # After the first save, the entry form shows reported values only — not
-# unused prefilled payloads, field-config defaults, or prior-round
-# carry-forward suggestions.
+# unused prefilled payloads or field-config defaults. Prior-round references
+# are still attached so unchanged matrix cells stay highlighted.
 _STATUSES_WITH_SAVED_DATA = frozenset({
     AssignmentEntityStatusValue.in_progress.value,
     AssignmentEntityStatusValue.requires_revision.value,
@@ -64,30 +64,34 @@ def assignment_shows_suggested_values(assignment_entity_status) -> bool:
 
 
 def apply_carry_forward_suggestions(existing_data, assignment_entity_status, carry_forward_items):
-    """Overlay prior-round values onto an assignment that has not been saved yet.
+    """Attach prior-round references, and fill blank fields only before the first save.
 
-    Carry-forward is a suggestion for a blank assignment. Once data has been
-    saved, submitted, or approved, the stored values are the submission and
-    prior-round sources are not resolved again. Resolving them would flag those
-    saved fields as carry-forward and show the review notice.
+    Saved submissions keep their stored values. Prior-round references are still
+    resolved so matrix cells that are unchanged from the source stay highlighted.
+    The review notice is only for an unsaved assignment, so saved forms do not
+    get the ``_is_carry_forward`` flag.
     """
     if existing_data is None:
         existing_data = {}
-    if not carry_forward_items or not assignment_shows_suggested_values(assignment_entity_status):
+    if not carry_forward_items:
         return existing_data
 
     from app.services.forms.carry_forward_service import CarryForwardService
 
-    cf_results = CarryForwardService.resolve_for_aes(assignment_entity_status, carry_forward_items)
-    for item_id, result in cf_results.items():
-        field_key = f'field_value[{item_id}]'
-        if field_key in existing_data:
-            continue
-        existing_data[field_key] = (
-            result['disagg_data'] if result.get('is_matrix') else result.get('value')
+    show_suggestions = assignment_shows_suggested_values(assignment_entity_status)
+    if show_suggestions:
+        cf_results = CarryForwardService.resolve_for_aes(
+            assignment_entity_status, carry_forward_items
         )
-        existing_data[f'{field_key}_is_prefilled'] = True
-        existing_data[f'{field_key}_is_carry_forward'] = True
+        for item_id, result in cf_results.items():
+            field_key = f'field_value[{item_id}]'
+            if field_key in existing_data:
+                continue
+            existing_data[field_key] = (
+                result['disagg_data'] if result.get('is_matrix') else result.get('value')
+            )
+            existing_data[f'{field_key}_is_prefilled'] = True
+            existing_data[f'{field_key}_is_carry_forward'] = True
 
     cf_refs = CarryForwardService.resolve_references_for_aes(
         assignment_entity_status, carry_forward_items
@@ -97,7 +101,8 @@ def apply_carry_forward_suggestions(existing_data, assignment_entity_status, car
         if ref_data is None:
             continue
         existing_data[f'field_value[{item_id}]_carry_forward_ref'] = ref_data
-        existing_data[f'field_value[{item_id}]_is_carry_forward'] = True
+        if show_suggestions:
+            existing_data[f'field_value[{item_id}]_is_carry_forward'] = True
 
     return existing_data
 

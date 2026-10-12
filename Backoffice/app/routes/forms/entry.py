@@ -492,19 +492,18 @@ def handle_assignment_form(aes_id):
     )
     _entry_lap("existing_data_load")
 
-    # Prior-round values are suggestions until the assignment is saved.
-    # Submitted and approved forms already store the reported data.
-    if assignment_shows_suggested_values(assignment_entity_status):
-        from app.services.forms.carry_forward_service import CarryForwardService
+    # Blank fields are filled from the prior round only before the first save.
+    # Saved forms still receive the reference so unchanged matrix cells stay highlighted.
+    from app.services.forms.carry_forward_service import CarryForwardService
 
-        cf_items = CarryForwardService.iter_carry_forward_items(all_sections)
-        if cf_items:
-            try:
-                apply_carry_forward_suggestions(
-                    existing_data_processed, assignment_entity_status, cf_items
-                )
-            except Exception as e:
-                current_app.logger.warning("Carry-forward resolution failed for AES %s: %s", aes_id, e)
+    cf_items = CarryForwardService.iter_carry_forward_items(all_sections)
+    if cf_items:
+        try:
+            apply_carry_forward_suggestions(
+                existing_data_processed, assignment_entity_status, cf_items
+            )
+        except Exception as e:
+            current_app.logger.warning("Carry-forward resolution failed for AES %s: %s", aes_id, e)
     _entry_lap("carry_forward")
 
     # Config default_value is a suggestion for a blank, never-saved assignment.

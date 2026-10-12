@@ -23,7 +23,7 @@
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 <div id="upr-excel-import-root">
   <p class="text-sm text-gray-600 mb-6">
-    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning and reporting templates. Allowed rounds: planning P23–P26 (templates 24 and 22); annual reports AR21–AR25 (templates 33 and 23); mid-year MYR23–MYR25 (template 33). Later rounds such as P27, AR26, and MYR26 are not imported.') }}
+    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning and reporting forms. Importable rounds are a closed historical set: planning P23–P26 (templates 24 and 22), annual reports AR21–AR25 (templates 33 and 23), mid-year MYR23–MYR25 (template 33). Live or later rounds such as P27, AR26, and MYR26 are never imported.') }}
   </p>
 
   {% set step_labels = [_('Upload'), _('Configure'), _('Import')] %}
@@ -53,23 +53,40 @@
     </div>
 
     <div class="upr-excel-wizard-panel hidden" id="upr-excel-panel-2">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Import settings') }}</h3>
-      <div class="space-y-4">
-        <div>
-          <span class="block text-sm font-medium text-gray-700 mb-2">{{ _('Templates to sync') }}</span>
-          {% for t in upr_template_choices|default([]) %}
-          <label class="flex items-center gap-2 text-sm text-gray-800 mb-1">
-            <input type="checkbox" class="upr-excel-template-checkbox h-4 w-4" value="{{ t.id }}" checked>
-            <span>{{ t.name }} (ID {{ t.id }})</span>
-          </label>
-          {% endfor %}
+      <h3 class="text-lg font-medium text-gray-900 mb-2">{{ _('Import targets') }}</h3>
+      <p class="text-sm text-gray-600 mb-4">
+        {{ _('Each row is one target: a template plus a round, written to exactly one assigned form (template + period). Only the rows you tick are imported, and nothing else is touched. Every target is verified against the workbook and the live assignments; anything unmapped or ambiguous is flagged and cannot be selected.') }}
+      </p>
+
+      <div id="upr-excel-plan-loading" class="hidden text-center py-8" role="status" aria-live="polite">
+        <div class="upr-wizard-spinner mx-auto mb-4" aria-hidden="true"></div>
+        <p class="text-sm text-gray-700 font-medium">{{ _('Verifying targets…') }}</p>
+        <p class="text-xs text-gray-500 mt-2">{{ _('Matching workbook rounds to assigned forms and published form items.') }}</p>
+      </div>
+      <div id="upr-excel-plan-error" class="hidden text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-4"></div>
+
+      <div id="upr-excel-plan-root" class="hidden">
+        <div id="upr-excel-plan-summary" class="flex flex-wrap items-center gap-2 mb-3 text-xs"></div>
+        <div class="flex flex-wrap gap-2 mb-3">
+          <button type="button" id="upr-excel-select-ready" class="btn btn-secondary btn-sm"
+                  title="{{ _('Select only targets with no warnings (green “Ready”).') }}">{{ _('Select all ready') }}</button>
+          <button type="button" id="upr-excel-select-importable" class="btn btn-secondary btn-sm"
+                  title="{{ _('Select every target that can be imported, including those marked “Review” (you must acknowledge the warnings).') }}">{{ _('Select all applicable') }}</button>
+          <button type="button" id="upr-excel-select-none" class="btn btn-secondary btn-sm">{{ _('Clear selection') }}</button>
+          <button type="button" id="upr-excel-reverify" class="btn btn-secondary btn-sm">{{ _('Re-verify') }}</button>
         </div>
-        <div>
-          <label for="upr-rounds" class="block text-sm font-medium text-gray-700 mb-1">
-            {{ _('Rounds (comma-separated, e.g. P26, AR25, MYR25 — empty = all allowed rounds matching selected templates: P23–P26, AR21–AR25, MYR23–MYR25)') }}
-          </label>
-          <input type="text" id="upr-rounds" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="P26, AR25, MYR25">
-        </div>
+        <p id="upr-excel-select-hint" class="hidden text-xs text-amber-700 mb-3" role="status" aria-live="polite"></p>
+        <div id="upr-excel-plan-groups" class="space-y-6"></div>
+        <div id="upr-excel-plan-notes" class="mt-4 space-y-2 text-xs"></div>
+      </div>
+
+      <div id="upr-excel-selection-summary" class="mt-4 hidden text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-md px-3 py-2"></div>
+      <label id="upr-excel-ack-wrap" class="hidden mt-3 flex items-start gap-2 text-sm text-amber-900">
+        <input type="checkbox" id="upr-excel-ack" class="h-4 w-4 mt-0.5">
+        <span>{{ _('I reviewed the warnings on the selected targets (overwrites, unmatched entities, cleared PNS data).') }}</span>
+      </label>
+
+      <div class="space-y-4 mt-6 pt-4 border-t border-gray-200">
         <div>
           <label for="upr-batch-size" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Batch size') }}</label>
           <input type="number" id="upr-batch-size" min="100" value="1000" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
@@ -82,7 +99,7 @@
       <div class="mt-6 pt-4 border-t border-gray-200">
         <p class="text-sm font-medium text-gray-900">{{ _('Import preview (optional)') }}</p>
         <p class="text-xs text-gray-500 mt-1">
-          {{ _('Configure templates and rounds above, then use Preview import below for row counts and warnings. You can run the import without preview.') }}
+          {{ _('Select targets above, then use Preview import for row counts, warnings, and the exact assigned form each target writes to. You can run the import without preview.') }}
         </p>
       </div>
       <div id="upr-excel-preview-stale-hint" class="hidden mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">

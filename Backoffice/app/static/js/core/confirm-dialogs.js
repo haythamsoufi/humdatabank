@@ -190,7 +190,8 @@ function createModalShell(title, options = {}) {
  * Internal: show confirmation dialog using createModalShell
  * @param {string} message
  * @param {function} onConfirm
- * @param {function|null} onCancel
+ * @param {function|null} onCancel - Receives a reason: 'cancel' for the Cancel
+ *   button click, 'dismiss' for Escape / backdrop / close.
  * @param {string} confirmText
  * @param {string} cancelText
  * @param {string} title
@@ -206,7 +207,8 @@ function _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText,
         zIndex: 12000,
         onCancel: () => {
             closeModal();
-            if (onCancel) onCancel();
+            // 'dismiss' => Escape key / backdrop / close (not an explicit Cancel click).
+            if (onCancel) onCancel('dismiss');
         }
     });
 
@@ -245,7 +247,8 @@ function _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText,
         e.preventDefault();
         e.stopPropagation();
         doClose();
-        if (onCancel) onCancel();
+        // 'cancel' => the explicit Cancel/second-action button was clicked.
+        if (onCancel) onCancel('cancel');
     });
 
     confirmBtn.addEventListener('click', async (e) => {
@@ -279,7 +282,8 @@ function _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText,
  * Show a custom confirmation dialog
  * @param {string} message - The confirmation message to display
  * @param {function} onConfirm - Callback function to execute when user confirms
- * @param {function} onCancel - Optional callback function to execute when user cancels
+ * @param {function} onCancel - Optional callback run when the user cancels. Receives a
+ *   reason: 'cancel' (Cancel button) or 'dismiss' (Escape / backdrop / close).
  * @param {string} confirmText - Optional text for the confirm button (default: "Confirm")
  * @param {string} cancelText - Optional text for the cancel button (default: "Cancel")
  * @param {string} title - Optional title for the dialog (default: "Confirm Action")

@@ -486,20 +486,16 @@ async function loadDraft(key) {
 function showCustomConfirm(message) {
   return new Promise((resolve) => {
     if (typeof window.showConfirmation === 'function') {
-      let discardClicked = false;
       window.showConfirmation(
         message,
         () => resolve('restore'),
-        () => resolve(discardClicked ? 'discard' : 'dismiss'),
+        // confirm-dialogs passes 'cancel' only for the explicit Discard button;
+        // Escape / backdrop / close pass 'dismiss', which keeps the draft.
+        (reason) => resolve(reason === 'cancel' ? 'discard' : 'dismiss'),
         _t('Restore'),
         _t('Discard'),
         _t('Restore Draft?')
       );
-      const cancelBtns = document.querySelectorAll('#confirm-cancel');
-      const discardBtn = cancelBtns[cancelBtns.length - 1];
-      if (discardBtn) {
-        discardBtn.addEventListener('click', () => { discardClicked = true; }, true);
-      }
     } else {
       authDraftLog('confirm', { ok: false, err: 'showConfirmation not available' });
       resolve('dismiss');
@@ -926,9 +922,12 @@ export function initAuthDrafts() {
         });
         return;
       }
+      // Lock the form only once it is initialized. Locking before waitForFormInitialized
+      // would leave every input disabled for up to its full timeout if form init stalls
+      // (e.g. an unrelated JS error), presenting a dead form on an already-broken page.
+      await waitForFormInitialized();
       restorePending = true;
       setFormRestorePending(form, true);
-      await waitForFormInitialized();
       await baselineReady;
       const { data: restorableData } = resolveDraftPayloadForRestore(record, baselineSnapshot);
       if (!draftHasContent({ data: restorableData })) {

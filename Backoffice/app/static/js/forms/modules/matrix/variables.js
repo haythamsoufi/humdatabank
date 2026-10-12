@@ -37,6 +37,22 @@ getVariableTooltipLabels(config) {
 },
 
 
+/**
+ * Resolve the lookup value and saved scalar used to decide whether a variable
+ * cell differs from its source lookup. Shared by the whole-matrix and
+ * single-input comparison paths so the two can never drift apart.
+ */
+_resolveVariableCompareInputs(matrix, input) {
+    const cellKey = input.getAttribute('data-cell-key');
+    const lookupValue = input.getAttribute('data-lookup-value')
+        ?? (cellKey && matrix.lookupRefs ? matrix.lookupRefs[cellKey] : '')
+        ?? '';
+    const savedScalar = cellKey && matrix.data && matrix.data[cellKey] !== undefined
+        ? __getSavedMatrixCellScalar(matrix.data[cellKey])
+        : __inputValueForMatrixCompare(input);
+    return { lookupValue, savedScalar };
+},
+
 applyVariableLookupComparison(fieldId) {
     const matrix = this.matrices.get(fieldId);
     if (!matrix?.container) return;
@@ -46,17 +62,10 @@ applyVariableLookupComparison(fieldId) {
             this.updateVariableModificationIndicator(input, '', '', labels);
             return;
         }
-        const cellKey = input.getAttribute('data-cell-key');
-        const lookupValue = input.getAttribute('data-lookup-value')
-            ?? (cellKey && matrix.lookupRefs ? matrix.lookupRefs[cellKey] : '')
-            ?? '';
-        const savedScalar = cellKey && matrix.data && matrix.data[cellKey] !== undefined
-            ? __getSavedMatrixCellScalar(matrix.data[cellKey])
-            : __inputValueForMatrixCompare(input);
+        const { lookupValue, savedScalar } = this._resolveVariableCompareInputs(matrix, input);
         this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
     });
 },
-
 
 applyVariableLookupComparisonForInput(fieldId, input) {
     const matrix = this.matrices.get(fieldId);
@@ -66,20 +75,9 @@ applyVariableLookupComparisonForInput(fieldId, input) {
         this.updateVariableModificationIndicator(input, '', '', labels);
         return;
     }
-    const cellKey = input.getAttribute('data-cell-key');
-    const lookupValue = input.getAttribute('data-lookup-value')
-        ?? (cellKey && matrix.lookupRefs ? matrix.lookupRefs[cellKey] : '')
-        ?? '';
-    const savedScalar = cellKey && matrix.data && matrix.data[cellKey] !== undefined
-        ? __getSavedMatrixCellScalar(matrix.data[cellKey])
-        : __inputValueForMatrixCompare(input);
+    const { lookupValue, savedScalar } = this._resolveVariableCompareInputs(matrix, input);
     this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
-}
-
-/**
- * Update visual indicator for modified variable fields
- */,
-
+},
 
 /**
  * Update visual indicator for modified variable fields
@@ -262,7 +260,9 @@ updateVariableModificationIndicator(input, lookupValue, savedValue, labels = nul
                     restoreBtn.type = 'button';
                     restoreBtn.setAttribute('aria-label', `Restore ${resolvedLabels.lookupLabel.toLowerCase()}`);
                     restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
-                    restoreBtn.innerHTML = `↩ Restore ${resolvedLabels.lookupLabel.toLowerCase()}`;
+                    // textContent (not innerHTML): the label comes from admin-controlled
+                    // matrix config, so never parse it as HTML.
+                    restoreBtn.textContent = `↩ Restore ${resolvedLabels.lookupLabel.toLowerCase()}`;
                     restoreBtn.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -444,21 +444,4 @@ updateVariableModificationIndicator(input, lookupValue, savedValue, labels = nul
     }
 }
 
-/**
- * Escape HTML for tooltip display
- */,
-
-
-/**
- * Escape HTML for tooltip display
- */
-escapeHtml(text) {
-    return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-/**
- * Restore cell values for a row
- * Cell keys are already in standardized format (rowId_columnName)
- * Note: Variable columns are restored if variable_save_value is true, otherwise they are resolved fresh
- */,
 };

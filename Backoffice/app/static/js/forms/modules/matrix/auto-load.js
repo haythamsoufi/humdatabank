@@ -495,25 +495,6 @@ async _autoLoadEntitiesImpl(fieldId) {
                         }))
                     });
 
-                    // Special logging for entity 192
-                    if (notFoundEntityIds.includes('192')) {
-                        debugLog('matrix-handler', '[AUTO-LOAD] Entity 192 not found - checking all options', {
-                            lookingFor: '192',
-                            entityIdSetHas192: entityIdSet.has('192'),
-                            totalOptions: data.options.length,
-                            optionsWith192: data.options.filter(opt => {
-                                const optId = String(opt.id || opt.data?.id || opt.data?._id || '');
-                                return optId === '192' || optId.includes('192');
-                            }).map(opt => ({
-                                id: opt.id,
-                                data_id: opt.data?.id,
-                                data__id: opt.data?._id,
-                                value: opt.value,
-                                fullOption: opt
-                            }))
-                        });
-                    }
-
                     // Fetch missing entities individually (they might be beyond pagination limit)
                     if (notFoundEntityIds.length > 0) {
                         debugLog('matrix-handler', '[AUTO-LOAD] Fetching missing entities individually', {

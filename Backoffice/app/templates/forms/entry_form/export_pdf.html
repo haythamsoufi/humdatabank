@@ -350,7 +350,7 @@
                                                     {% endif %}
                                                     {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
                                                     {% if not _col_group %}
-                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
+                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif _hdr_col_type == 'calculated' %} cell-calculated{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
                                                     {% else %}
                                                         {% set _prev_group = '' %}
                                                         {% if loop.index0 > 0 %}
@@ -417,7 +417,7 @@
                                                             {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                                         {% endif %}
                                                         {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
-                                                        <th{% if _has_groups.subgroups %} rowspan="2"{% endif %} class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
+                                                        <th{% if _has_groups.subgroups %} rowspan="2"{% endif %} class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif _hdr_col_type == 'calculated' %} cell-calculated{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
                                                     {% endif %}
                                                 {% endfor %}
                                             </tr>
@@ -432,7 +432,7 @@
                                                             {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                                         {% endif %}
                                                         {% set _hdr_col_type = column.get('type', 'number') %}
-                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
+                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif _hdr_col_type == 'calculated' %} cell-calculated{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
                                                     {% endif %}
                                                 {% endfor %}
                                             </tr>
@@ -457,7 +457,7 @@
                                                     {% set col_display = col_name %}
                                                     {% set col_type = 'number' %}
                                                 {% endif %}
-                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% endif %}">{{ matrix_column_heading(col, col_display, matrix_data) }}</th>
+                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% elif col_type == 'calculated' %} cell-calculated{% endif %}">{{ matrix_column_heading(col, col_display, matrix_data) }}</th>
                                                 {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
                                                     <th class="matrix-col-header">{{ _('Total') }}</th>
                                                 {% endif %}
@@ -544,9 +544,9 @@
                                                         carry_forward_ref=matrix_carry_forward_ref,
                                                         is_variable_readonly=is_variable_col and variable_readonly
                                                     ) %}
-                                                    <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}">
+                                                    <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% elif col_type == 'calculated' %} cell-calculated{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}">
                                                         {% if col_type == 'calculated' %}
-                                                            {{ matrix_formula_display(matrix_columns, matrix_data, row, col) }}
+                                                            <strong>{{ matrix_formula_display(matrix_columns, matrix_data, row, col) }}</strong>
                                                         {% elif col_type == 'tick' %}
                                                             {{ matrix_tick_mark(display_cell in [1, '1', true, 'true', 'True']) }}
                                                         {% else %}

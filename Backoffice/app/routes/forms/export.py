@@ -1666,6 +1666,10 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         html[dir="ltr"] .matrix-table tbody td.cell-tick {
             text-align: center;
         }
+        .matrix-table thead th.cell-calculated,
+        .matrix-table tbody td.cell-calculated {
+            font-weight: 700;
+        }
         html[dir="ltr"] .matrix-table tbody td.matrix-col-data,
         html[dir="ltr"] .matrix-table tbody td.matrix-column-total-cell,
         html[dir="ltr"] .matrix-table tbody td.matrix-row-total-cell,

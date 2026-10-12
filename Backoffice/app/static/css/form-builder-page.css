@@ -1045,3 +1045,111 @@ html[dir="rtl"] #item-modal .item-modal-header-actions {
 .group-apply-color-label.hidden {
     display: none;
 }
+/* Calculated columns can stand in for a total, so the column code is bold. */
+#matrix-columns-container .matrix-column.is-calculated-column .column-text {
+    font-weight: 700;
+}
+
+/* Calculated-column source picker: a closed summary, then tick boxes. */
+.calc-column-picker-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #111827;
+    text-align: left;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    cursor: pointer;
+}
+.calc-column-picker-toggle:disabled {
+    cursor: default;
+    color: #6b7280;
+    background: #f9fafb;
+}
+.calc-column-picker-toggle[aria-expanded="true"] {
+    border-color: #f97316;
+    box-shadow: 0 0 0 1px #f97316;
+}
+.calc-column-picker-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.calc-column-picker-summary.is-placeholder {
+    color: #6b7280;
+}
+.calc-column-picker-chevron {
+    flex-shrink: 0;
+    font-size: 0.625rem;
+    color: #6b7280;
+    transition: transform 0.15s ease;
+}
+.calc-column-picker-toggle[aria-expanded="true"] .calc-column-picker-chevron {
+    transform: rotate(180deg);
+}
+.calc-column-picker-menu {
+    margin-top: 0.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+}
+.calc-column-picker-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    position: sticky;
+    top: 0;
+}
+.calc-column-picker-actions button {
+    color: #c2410c;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+.calc-column-picker-actions button:hover {
+    text-decoration: underline;
+}
+.calc-column-picker-actions button:disabled {
+    color: #9ca3af;
+    cursor: default;
+    text-decoration: none;
+}
+.calc-column-picker-options {
+    max-height: 12rem;
+    overflow: auto;
+    padding: 0.25rem 0;
+}
+.calc-column-picker-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0.3rem 0.5rem;
+    color: #374151;
+    cursor: pointer;
+}
+.calc-column-picker-option:hover {
+    background: #fff7ed;
+}
+.calc-column-picker-option input {
+    accent-color: #ea580c;
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+.calc-column-picker-option span {
+    word-break: break-all;
+}

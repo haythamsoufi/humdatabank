@@ -378,7 +378,13 @@
                                         </label>
                                     </div>
                                 </div>
-                                <div class="column-calculation-panel hidden mt-2 p-2 bg-gray-50 border border-gray-200 rounded space-y-2 text-xs">
+                                <div class="column-calculation-panel hidden mt-2 p-2 bg-gray-50 border border-gray-200 rounded space-y-2 text-xs"
+                                     data-picker-select="{{ _('Select columns')|forceescape }}"
+                                     data-picker-all="{{ _('All columns')|forceescape }}"
+                                     data-picker-n-selected="{{ _('%(count)s selected')|forceescape }}"
+                                     data-picker-none="{{ _('No other columns')|forceescape }}"
+                                     data-picker-select-all="{{ _('Select all')|forceescape }}"
+                                     data-picker-deselect-all="{{ _('Deselect all')|forceescape }}">
                                     <p class="text-gray-600">{{ _('Calculated for each row from the other columns in that row. The column footer sums those results.') }}</p>
                                     <label class="flex items-center gap-2">
                                         <span class="text-gray-700 whitespace-nowrap">{{ _('Calculation') }}</span>
@@ -402,15 +408,15 @@
                                            data-label-add="{{ _('Columns to add')|forceescape }}">
                                             {{ _('Columns') }}
                                         </p>
-                                        <div class="column-calc-source-list flex flex-wrap gap-2"></div>
+                                        <div class="column-calc-source-list"></div>
                                     </div>
                                     <div class="column-calc-subtrahends hidden">
                                         <p class="text-gray-700 mb-1">{{ _('Subtract') }}</p>
-                                        <div class="column-calc-subtrahend-list flex flex-wrap gap-2"></div>
+                                        <div class="column-calc-subtrahend-list"></div>
                                     </div>
                                     <div class="column-calc-denominators hidden">
                                         <p class="text-gray-700 mb-1">{{ _('Divide by') }}</p>
-                                        <div class="column-calc-denominator-list flex flex-wrap gap-2"></div>
+                                        <div class="column-calc-denominator-list"></div>
                                     </div>
                                     <div class="column-calc-formula-wrap hidden space-y-1">
                                         <label class="block text-gray-700" for="">{{ _('Formula') }}</label>

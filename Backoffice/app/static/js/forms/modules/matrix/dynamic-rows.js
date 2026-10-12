@@ -176,7 +176,7 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
 
         if (columnType === 'calculated' && calculationIsReadonly(column)) {
             const span = document.createElement('span');
-            span.className = 'matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-medium text-gray-700';
+            span.className = 'matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-bold text-gray-700';
             span.setAttribute('data-row', rowLabel);
             span.setAttribute('data-row-id', finalRowId);
             span.setAttribute('data-column', columnName);
@@ -191,7 +191,7 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
             const calcInput = document.createElement('input');
             calcInput.type = 'text';
             calcInput.setAttribute('data-numeric', 'true');
-            calcInput.className = 'w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center';
+            calcInput.className = 'w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-sm font-bold';
             calcInput.setAttribute('data-row', rowLabel);
             calcInput.setAttribute('data-row-id', finalRowId);
             calcInput.setAttribute('data-column', columnName);

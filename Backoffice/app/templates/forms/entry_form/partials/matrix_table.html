@@ -508,7 +508,7 @@
                                 {% endif %}
                                 <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}{{ matrix_column_edges(matrix_columns, outer_loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }} role="gridcell">
                                     {% if calc_readonly %}
-                                        <span class="matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-medium text-gray-700"
+                                        <span class="matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm font-bold text-gray-700"
                                               data-row="{{ row_id }}"
                                               data-row-id="{{ row_id }}"
                                               data-column="{{ column_name }}"
@@ -529,7 +529,7 @@
                                                data-max-decimals="{{ calc_decimals }}"
                                                {% if calc_saved is not none %}data-user-edited="1"{% endif %}
                                                value="{{ calc_saved if calc_saved is not none else (matrix_formula_display(matrix_columns, existing_matrix_data, row_id, column) or '') }}"
-                                               class="flex-1 min-w-0 w-full px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-0"
+                                               class="flex-1 min-w-0 w-full px-2 py-1 text-center text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-0"
                                                aria-label="{{ _('Calculated value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                inputmode="decimal"
                                                {% if not can_edit or _col_header_gated %}disabled{% endif %}>

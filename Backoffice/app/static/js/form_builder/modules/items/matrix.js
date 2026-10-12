@@ -482,6 +482,15 @@ export const MatrixItem = {
         modalElement._matrixClickHandler = (e) => {
             const inColorPanel = !!e.target.closest?.('.group-color-panel');
             const colorToggle = e.target.closest?.('.group-color-toggle');
+            const inCalcPicker = !!e.target.closest?.('.calc-column-picker-menu');
+            const calcPickerToggle = e.target.closest?.('.calc-column-picker-toggle');
+            if (!inCalcPicker) {
+                modalElement.querySelectorAll('.calc-column-picker-menu:not(.hidden)').forEach(menu => {
+                    if (calcPickerToggle && menu.parentElement?.contains(calcPickerToggle)) return;
+                    menu.classList.add('hidden');
+                    menu.parentElement?.querySelector('.calc-column-picker-toggle')?.setAttribute('aria-expanded', 'false');
+                });
+            }
             if (!inColorPanel) {
                 modalElement.querySelectorAll('.group-color-panel:not(.hidden)').forEach(panel => {
                     if (colorToggle && panel.parentElement?.contains(colorToggle)) return;
@@ -600,6 +609,23 @@ export const MatrixItem = {
                 const next = optionRow?.nextElementSibling;
                 if (next) next.after(optionRow);
                 this.updateConfig(modalElement);
+            } else if (target.classList.contains('calc-column-picker-toggle')) {
+                e.preventDefault();
+                const picker = target.closest('.calc-column-picker');
+                const menu = picker?.querySelector('.calc-column-picker-menu');
+                if (!menu || target.disabled) return;
+                const willOpen = menu.classList.contains('hidden');
+                menu.classList.toggle('hidden', !willOpen);
+                target.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            } else if (target.classList.contains('calc-column-picker-select-all') || target.classList.contains('calc-column-picker-clear')) {
+                e.preventDefault();
+                const menu = target.closest('.calc-column-picker-menu');
+                const selectAll = target.classList.contains('calc-column-picker-select-all');
+                menu?.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+                    checkbox.checked = selectAll;
+                });
+                this._syncCalculationPickerSummary(target.closest('.calc-column-picker'));
+                this.updateConfig(modalElement);
             } else if (target.classList.contains('column-selectable-header-toggle')) {
                 e.preventDefault();
                 const columnDiv = target.closest('.matrix-column');
@@ -661,11 +687,12 @@ export const MatrixItem = {
         };
         modalElement._matrixColorKeyHandler = (e) => {
             if (e.key !== 'Escape') return;
-            const open = modalElement.querySelectorAll('.group-color-panel:not(.hidden)');
+            const open = modalElement.querySelectorAll('.group-color-panel:not(.hidden), .calc-column-picker-menu:not(.hidden)');
             if (!open.length) return;
             open.forEach(panel => {
                 panel.classList.add('hidden');
-                panel.parentElement?.querySelector('.group-color-toggle')?.setAttribute('aria-expanded', 'false');
+                const toggle = panel.parentElement?.querySelector('.group-color-toggle, .calc-column-picker-toggle');
+                toggle?.setAttribute('aria-expanded', 'false');
             });
         };
         document.addEventListener('pointerdown', modalElement._matrixColorPointerHandler);
@@ -799,6 +826,9 @@ export const MatrixItem = {
         const selectable = columnDiv.querySelector('.column-selectable-header-wrapper');
         const variableOptions = columnDiv.querySelector('.column-variable-options');
         const includeCheckbox = columnDiv.querySelector('.column-include-in-row-total');
+        // A calculated column can stand in for a total, so its code reads in bold.
+        columnDiv.classList.toggle('is-calculated-column', isCalculated);
+        columnDiv.querySelector('.column-text')?.classList.toggle('font-bold', isCalculated);
         panel?.classList.toggle('hidden', !isCalculated);
         selectable?.classList.toggle('hidden', isCalculated);
         if (isCalculated) {
@@ -878,6 +908,94 @@ export const MatrixItem = {
         return checked;
     },
 
+    _pickerText(list, key, fallback) {
+        const panel = list?.closest('.column-calculation-panel');
+        const value = panel?.dataset?.[key];
+        return value || fallback;
+    },
+
+    _syncCalculationPickerSummary(picker) {
+        if (!picker) return;
+        const boxes = Array.from(picker.querySelectorAll('input[type="checkbox"]'));
+        const selected = boxes.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+        const summary = picker.querySelector('.calc-column-picker-summary');
+        const toggle = picker.querySelector('.calc-column-picker-toggle');
+        const selectAll = picker.querySelector('.calc-column-picker-select-all');
+        const clear = picker.querySelector('.calc-column-picker-clear');
+        if (!summary) return;
+        let text;
+        let placeholder = false;
+        if (!boxes.length) {
+            text = this._pickerText(picker, 'pickerNone', 'No other columns');
+            placeholder = true;
+        } else if (!selected.length) {
+            text = this._pickerText(picker, 'pickerSelect', 'Select columns');
+            placeholder = true;
+        } else if (selected.length === boxes.length) {
+            text = this._pickerText(picker, 'pickerAll', 'All columns');
+        } else {
+            text = this._pickerText(picker, 'pickerNSelected', '%(count)s selected')
+                .replace('%(count)s', String(selected.length));
+        }
+        summary.textContent = text;
+        summary.classList.toggle('is-placeholder', placeholder);
+        if (toggle) toggle.title = selected.join(', ');
+        if (selectAll) selectAll.disabled = !boxes.length || selected.length === boxes.length;
+        if (clear) clear.disabled = !selected.length;
+    },
+
+    _renderCalculationColumnPicker(list, inputClass, optionNames, checked, open) {
+        list.classList.add('calc-column-picker');
+        list.replaceChildren();
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'calc-column-picker-toggle';
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.setAttribute('aria-haspopup', 'listbox');
+        toggle.disabled = optionNames.length === 0;
+        const summary = document.createElement('span');
+        summary.className = 'calc-column-picker-summary';
+        const chevron = document.createElement('i');
+        chevron.className = 'fas fa-chevron-down calc-column-picker-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        toggle.append(summary, chevron);
+
+        const menu = document.createElement('div');
+        menu.className = `calc-column-picker-menu${open ? '' : ' hidden'}`;
+        menu.setAttribute('role', 'listbox');
+        const actions = document.createElement('div');
+        actions.className = 'calc-column-picker-actions';
+        const selectAll = document.createElement('button');
+        selectAll.type = 'button';
+        selectAll.className = 'calc-column-picker-select-all';
+        selectAll.textContent = this._pickerText(list, 'pickerSelectAll', 'Select all');
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'calc-column-picker-clear';
+        clear.textContent = this._pickerText(list, 'pickerDeselectAll', 'Deselect all');
+        actions.append(selectAll, clear);
+
+        const options = document.createElement('div');
+        options.className = 'calc-column-picker-options';
+        optionNames.forEach((name) => {
+            const label = document.createElement('label');
+            label.className = 'calc-column-picker-option';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = inputClass;
+            checkbox.value = name;
+            checkbox.checked = checked.has(name);
+            const caption = document.createElement('span');
+            caption.textContent = name;
+            label.append(checkbox, caption);
+            options.appendChild(label);
+        });
+        menu.append(actions, options);
+        list.append(toggle, menu);
+        this._syncCalculationPickerSummary(list);
+    },
+
     refreshCalculationSourceLists(modalElement) {
         if (!modalElement) return;
         const columns = Array.from(modalElement.querySelectorAll('.matrix-column'));
@@ -895,21 +1013,21 @@ export const MatrixItem = {
             lists.forEach(([datasetKey, listSelector, inputClass]) => {
                 const list = columnDiv.querySelector(listSelector);
                 if (!list) return;
+                const optionNames = names.filter((name) => name !== selfName);
                 const checked = this._checkedCalculationNames(columnDiv, datasetKey, `.${inputClass}`, names);
-                list.replaceChildren();
-                names.forEach((name) => {
-                    if (name === selfName) return;
-                    const label = document.createElement('label');
-                    label.className = 'inline-flex items-center text-gray-700';
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.className = `${inputClass} mr-1`;
-                    checkbox.value = name;
-                    checkbox.checked = checked.has(name);
-                    label.appendChild(checkbox);
-                    label.appendChild(document.createTextNode(name));
-                    list.appendChild(label);
-                });
+                const existing = Array.from(list.querySelectorAll(`.${inputClass}`)).map((checkbox) => checkbox.value);
+                const sameOptions = existing.length === optionNames.length
+                    && existing.every((name, index) => name === optionNames[index]);
+                if (sameOptions && list.querySelector('.calc-column-picker-toggle')) {
+                    list.querySelectorAll(`.${inputClass}`).forEach((checkbox) => {
+                        checkbox.checked = checked.has(checkbox.value);
+                    });
+                    this._syncCalculationPickerSummary(list);
+                    return;
+                }
+                const menu = list.querySelector('.calc-column-picker-menu');
+                const wasOpen = !!(menu && !menu.classList.contains('hidden'));
+                this._renderCalculationColumnPicker(list, inputClass, optionNames, checked, wasOpen);
             });
             this._updateCalculationStatus(columnDiv, names.filter((name) => name !== selfName));
         });

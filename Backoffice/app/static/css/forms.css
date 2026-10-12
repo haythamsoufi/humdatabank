@@ -685,6 +685,13 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .matrix-container td.matrix-group-colored:not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) input.bg-gray-100 {
     background-color: transparent;
 }
+/* Calculated columns are often used as a total. Bold the heading and the values. */
+.matrix-container th[data-column-type="calculated"],
+.matrix-container .matrix-calculated-value,
+.matrix-container input[data-calculated="true"],
+.matrix-container .matrix-column-total[data-column-type="calculated"] {
+    font-weight: 700;
+}
 
 /* Selectable-header columns: cells stay locked until the column header has a value */
 .matrix-container td.matrix-cell-header-gated {

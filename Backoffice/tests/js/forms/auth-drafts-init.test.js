@@ -200,6 +200,34 @@ describe('initAuthDrafts restore flow', () => {
     expect(await mod.loadDraft('auth:42:100')).not.toBeNull();
   });
 
+  it('does not recreate a discarded draft when the form initializes after initAuthDrafts', async () => {
+    let discard;
+    window.showConfirmation = (_msg, _onConfirm, onCancel) => {
+      discard = () => onCancel('cancel');
+    };
+    delete document.body.dataset.formInitialized;
+    const mod = await prepareAuthDraftsTestEnv();
+    await mod.saveDraft('auth:42:100', { indicator_1: 'draft-value' }, true);
+    // Form init finishes right as the draft load resolves: the restore chain sees it
+    // immediately while the baseline poller only notices on its next interval tick.
+    window.__ifrcAuthDraftsDartLog = (raw) => {
+      if (JSON.parse(raw).phase === 'load') document.body.dataset.formInitialized = 'true';
+    };
+    mod.initAuthDrafts();
+
+    await vi.waitFor(() => expect(discard).toBeTypeOf('function'));
+    await new Promise((r) => setTimeout(r, 150));
+    discard();
+    await vi.waitFor(async () => {
+      expect(await mod.loadDraft('auth:42:100')).toBeNull();
+    });
+
+    expect(window.__ifrcAuthDrafts.getPendingDiff()).toEqual({});
+    await window.__ifrcAuthDrafts.saveNow();
+    expect(await mod.loadDraft('auth:42:100')).toBeNull();
+    delete window.__ifrcAuthDraftsDartLog;
+  });
+
   it('auto-deletes stale legacy snapshot that matches baseline', async () => {
     window.showConfirmation = vi.fn();
     const mod = await prepareAuthDraftsTestEnv();

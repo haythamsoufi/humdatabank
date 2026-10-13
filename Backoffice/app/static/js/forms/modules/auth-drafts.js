@@ -925,10 +925,12 @@ export function initAuthDrafts() {
       // Lock the form only once it is initialized. Locking before waitForFormInitialized
       // would leave every input disabled for up to its full timeout if form init stalls
       // (e.g. an unrelated JS error), presenting a dead form on an already-broken page.
-      await waitForFormInitialized();
+      // The baseline must be captured before locking: collectFormData skips disabled
+      // inputs, so a baseline taken from the locked form is empty and every later save
+      // writes the whole form back as a draft (re-prompting after Discard).
+      await baselineReady;
       restorePending = true;
       setFormRestorePending(form, true);
-      await baselineReady;
       const { data: restorableData } = resolveDraftPayloadForRestore(record, baselineSnapshot);
       if (!draftHasContent({ data: restorableData })) {
         if (baselineSnapshot) void deleteDraft(key);

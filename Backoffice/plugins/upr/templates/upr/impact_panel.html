@@ -1,4 +1,7 @@
+{% set L = upr_analysis_text() %}
 <link rel="stylesheet" href="{{ upr_static_url('css/upr-impact.css') }}">
+<link rel="stylesheet" href="{{ upr_static_url('css/upr-analysis-export.css') }}">
+<link rel="stylesheet" id="upri-report-print-css" href="{{ upr_static_url('css/upr-analysis-print.css') }}" media="not all">
 
 <div id="panel-upr-impact"
      class="explore-panel{% if explore_first_tab != 'upr-impact' %} hidden{% endif %}"
@@ -7,10 +10,8 @@
      data-impact-url="{{ url_for('upr.impact_data') }}">
 
     <div class="upri-intro">
-        <h3 class="upri-intro__title">{{ _('Analysis of Unified Plans and Reports') }}</h3>
-        <p class="upri-intro__lead">
-            {{ _('How the Unified Planning and Reporting process is growing across the IFRC network — rising participation, funding ambition, people reached, and partners engaged.') }}
-        </p>
+        <h3 class="upri-intro__title">{{ L.intro_title }}</h3>
+        <p class="upri-intro__lead">{{ L.intro_lead }}</p>
     </div>
 
     <div class="upri-toolbar">
@@ -23,6 +24,14 @@
         <button type="button" id="upri-refresh" class="upri-btn" aria-label="{{ _('Refresh') }}">
             <i class="fas fa-rotate-right" aria-hidden="true"></i><span>{{ _('Refresh') }}</span>
         </button>
+        <div class="upri-toolbar__export">
+            <button type="button" class="upri-btn" data-upri-export="present" data-go-label="{{ _('Start presentation')|forceescape }}">
+                <i class="fas fa-display" aria-hidden="true"></i><span>{{ _('Presentation') }}</span>
+            </button>
+            <button type="button" class="upri-btn" data-upri-export="report" data-go-label="{{ _('Open report')|forceescape }}">
+                <i class="fas fa-file-pdf" aria-hidden="true"></i><span>{{ _('A4 report (PDF)') }}</span>
+            </button>
+        </div>
     </div>
 
     <div id="upri-loading" class="upri-state" hidden>
@@ -40,88 +49,15 @@
 
     <div id="upri-content" hidden>
         <div class="upri-kpis" id="upri-kpis"></div>
-
-        <div class="upri-grid">
-            <section class="upri-card upri-card--wide" aria-labelledby="upri-coverage-h">
-                <div class="upri-card__head">
-                    <div class="upri-card__text">
-                        <h4 id="upri-coverage-h" class="upri-card__title">{{ _('Participation (coverage)') }}</h4>
-                        <p class="upri-card__hint">{{ _('National Societies completing a plan or report each year (reports: annual, or mid-year where the annual is not yet available).') }}</p>
-                    </div>
-                    <button type="button" class="upri-table-btn" data-upri-table="coverage" title="{{ _('View as table') }}" aria-label="{{ _('View participation as a table') }}">
-                        <i class="fas fa-table" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div id="upri-chart-coverage" class="upri-chart"></div>
-            </section>
-
-            <section class="upri-card" aria-labelledby="upri-funding-h">
-                <div class="upri-card__head">
-                    <div class="upri-card__text">
-                        <h4 id="upri-funding-h" class="upri-card__title">{{ _('Funding ambition &amp; delivery') }}</h4>
-                        <p class="upri-card__hint">{{ _('Same mix as the Financial Overview network, CHF. Planned requirement is the country plan (host National Society + IFRC Secretariat + PNS lines on the plan). Reported funding adds PNS self-reports, other sources, and IFRC Secretariat actuals. Reported expenditure adds PNS self-reports and IFRC Secretariat actuals.') }}</p>
-                    </div>
-                    <button type="button" class="upri-table-btn" data-upri-table="funding" title="{{ _('View as table') }}" aria-label="{{ _('View funding as a table') }}">
-                        <i class="fas fa-table" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div id="upri-chart-funding" class="upri-chart"></div>
-            </section>
-
-            <section class="upri-card" aria-labelledby="upri-reach-h">
-                <div class="upri-card__head">
-                    <div class="upri-card__text">
-                        <h4 id="upri-reach-h" class="upri-card__title">{{ _('People to be reached') }}</h4>
-                        <p class="upri-card__hint">{{ _('People the network plans to reach, by plan year.') }}</p>
-                    </div>
-                    <button type="button" class="upri-table-btn" data-upri-table="reach" title="{{ _('View as table') }}" aria-label="{{ _('View reach as a table') }}">
-                        <i class="fas fa-table" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div id="upri-chart-reach" class="upri-chart"></div>
-            </section>
-
-            <section class="upri-card" aria-labelledby="upri-partners-h">
-                <div class="upri-card__head">
-                    <div class="upri-card__text">
-                        <h4 id="upri-partners-h" class="upri-card__title">{{ _('Partners engaged') }}</h4>
-                        <p class="upri-card__hint">{{ _('Participating National Societies providing bilateral support, and the funding they self-report (PNS data, CHF).') }}</p>
-                    </div>
-                    <button type="button" class="upri-table-btn" data-upri-table="partners" title="{{ _('View as table') }}" aria-label="{{ _('View partners as a table') }}">
-                        <i class="fas fa-table" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div id="upri-chart-partners" class="upri-chart"></div>
-            </section>
-
-            <section class="upri-card upri-card--wide" aria-labelledby="upri-capacity-h">
-                <div class="upri-card__head">
-                    <div class="upri-card__text">
-                        <h4 id="upri-capacity-h" class="upri-card__title">{{ _('National Society capacity') }}</h4>
-                        <p class="upri-card__hint">{{ _('Volunteers, staff, branches and local units reported by host National Societies.') }}</p>
-                    </div>
-                    <button type="button" class="upri-table-btn" data-upri-table="capacity" title="{{ _('View as table') }}" aria-label="{{ _('View capacity as a table') }}">
-                        <i class="fas fa-table" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div id="upri-chart-capacity" class="upri-chart"></div>
-            </section>
-        </div>
-
-        <p id="upri-inprogress-note" class="upri-footnote" hidden></p>
-
-        <p class="upri-footnote">
-            {{ _('Indicative network totals summed from Unified Plans and Reports currently in the database. The trend spans the rounds that have submissions; it is not a historical back-fill.') }}
-        </p>
+        <div class="upri-grid" id="upri-grid"></div>
+        <div id="upri-notes" hidden></div>
     </div>
 
     <section id="upri-narrative" class="upri-narr" aria-labelledby="upri-narr-h" data-narrative-url="{{ url_for('upr.impact_narrative') }}">
         <div class="upri-narr__head">
             <div class="upri-card__text">
-                <h3 id="upri-narr-h" class="upri-intro__title">{{ _('Participation: data and narrative') }}</h3>
-                <p class="upri-intro__lead">
-                    {{ _('A National Society takes part in a round when it submits its data form or hands in its narrative. The internal narrative is the document sent to the Secretariat (IFRC GO, internal); the public narrative is the one published on the public site. Counting data alone misses countries that only take part through the narrative.') }}
-                </p>
+                <h3 id="upri-narr-h" class="upri-intro__title">{{ L.narr_title }}</h3>
+                <p class="upri-intro__lead">{{ L.narr_lead }}</p>
             </div>
             <div class="upri-seg" role="group" aria-label="{{ _('Round type') }}" id="upri-narr-tracks">
                 <button type="button" class="upri-seg__btn is-active" data-upri-track="ALL" aria-pressed="true">{{ _('Overview') }}</button>
@@ -143,74 +79,8 @@
         <div id="upri-narr-content" hidden>
             <p id="upri-narr-warning" class="upri-warning" hidden></p>
             <div class="upri-kpis" id="upri-narr-kpis"></div>
-
-            <div class="upri-grid">
-                <section class="upri-card upri-card--wide" aria-labelledby="upri-narr-part-h">
-                    <div class="upri-card__head">
-                        <div class="upri-card__text">
-                            <h4 id="upri-narr-part-h" class="upri-card__title">{{ _('Participation by stage') }}</h4>
-                            <p class="upri-card__hint">{{ _('National Societies in each round at each stage. “Either” is the real participation: data submitted or internal narrative handed in.') }}</p>
-                        </div>
-                        <button type="button" class="upri-table-btn" data-upri-table="narr_stage" title="{{ _('View as table') }}" aria-label="{{ _('View participation by stage as a table') }}">
-                            <i class="fas fa-table" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <div id="upri-chart-narr-stage" class="upri-chart"></div>
-                </section>
-
-                <section class="upri-card" aria-labelledby="upri-narr-mix-h">
-                    <div class="upri-card__head">
-                        <div class="upri-card__text">
-                            <h4 id="upri-narr-mix-h" class="upri-card__title">{{ _('How countries take part') }}</h4>
-                            <p class="upri-card__hint">{{ _('Both data and narrative, narrative only, or data only. Blank where the databank holds no data for that round.') }}</p>
-                        </div>
-                        <button type="button" class="upri-table-btn" data-upri-table="narr_mix" title="{{ _('View as table') }}" aria-label="{{ _('View participation mix as a table') }}">
-                            <i class="fas fa-table" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <div id="upri-chart-narr-mix" class="upri-chart"></div>
-                </section>
-
-                <section class="upri-card" aria-labelledby="upri-narr-pub-h">
-                    <div class="upri-card__head">
-                        <div class="upri-card__text">
-                            <h4 id="upri-narr-pub-h" class="upri-card__title">{{ _('From internal to public') }}</h4>
-                            <p class="upri-card__hint">{{ _('Internal narratives received, and how many of those countries have a public document.') }}</p>
-                        </div>
-                        <button type="button" class="upri-table-btn" data-upri-table="narr_pub" title="{{ _('View as table') }}" aria-label="{{ _('View publication as a table') }}">
-                            <i class="fas fa-table" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <div id="upri-chart-narr-pub" class="upri-chart"></div>
-                </section>
-
-                <section class="upri-card" aria-labelledby="upri-narr-ret-h">
-                    <div class="upri-card__head">
-                        <div class="upri-card__text">
-                            <h4 id="upri-narr-ret-h" class="upri-card__title">{{ _('Retention year on year') }}</h4>
-                            <p id="upri-narr-ret-hint" class="upri-card__hint">{{ _('Participants that carried on, joined, or dropped out compared with the previous year. The first round is shown in grey as the baseline. When the previous round is only partly covered by the sources, joiners are not shown, because countries it simply missed would look new.') }}</p>
-                        </div>
-                        <button type="button" class="upri-table-btn" data-upri-table="narr_ret" title="{{ _('View as table') }}" aria-label="{{ _('View retention as a table') }}">
-                            <i class="fas fa-table" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <div id="upri-chart-narr-ret" class="upri-chart"></div>
-                </section>
-
-                <section class="upri-card" aria-labelledby="upri-narr-gaps-h">
-                    <div class="upri-card__head">
-                        <div class="upri-card__text">
-                            <h4 id="upri-narr-gaps-h" class="upri-card__title">{{ _('Gaps to follow up') }}</h4>
-                            <p id="upri-narr-gaps-hint" class="upri-card__hint"></p>
-                        </div>
-                        <button type="button" class="upri-table-btn" data-upri-table="narr_matrix" title="{{ _('Country by round') }}" aria-label="{{ _('View every country by round') }}">
-                            <i class="fas fa-border-all" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <div id="upri-narr-gaps" class="upri-gaps"></div>
-                </section>
-            </div>
-            <p id="upri-narr-note" class="upri-footnote"></p>
+            <div class="upri-grid" id="upri-narr-grid"></div>
+            <div id="upri-narr-notes" hidden></div>
         </div>
     </section>
 
@@ -233,101 +103,46 @@
             </table>
         </div>
     </dialog>
+
+    <dialog id="upri-export-dialog" class="upri-dialog upri-export" aria-labelledby="upri-export-title">
+        <form id="upri-export-form">
+            <div class="upri-dialog__head">
+                <h3 id="upri-export-title" class="upri-dialog__title"></h3>
+                <button type="button" class="upri-dialog__close" data-upri-close aria-label="{{ _('Close')|forceescape }}">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+            <p class="upri-dialog__note">{{ _('Choose what to include. The presentation and the report use the same charts as this tab.') }}</p>
+            <fieldset class="upri-export__fields" id="upri-export-fields">
+                <legend class="upri-field__label">{{ _('Include') }}</legend>
+                <div id="upri-export-list"></div>
+            </fieldset>
+            <label class="upri-check upri-export__extra" id="upri-export-tables-row">
+                <input type="checkbox" id="upri-export-tables">
+                <span>{{ _('Add the data tables to the report') }}</span>
+            </label>
+            <p class="upri-export__empty" id="upri-export-empty" hidden></p>
+            <div class="upri-export__actions">
+                <button type="button" class="upri-btn" data-upri-close>{{ _('Cancel') }}</button>
+                <button type="submit" class="upri-btn upri-btn--primary" id="upri-export-go"></button>
+            </div>
+        </form>
+    </dialog>
 </div>
 
 <script nonce="{{ csp_nonce() }}">
 window.UprImpactConfig = {
     dataUrl: {{ url_for('upr.impact_data')|tojson }},
-    i18n: {
-        countries: {{ _('National Societies')|tojson }},
-        submitted: {{ _('Submitted')|tojson }},
-        validated: {{ _('Validated')|tojson }},
-        planSubmitted: {{ _('Plans submitted')|tojson }},
-        reportSubmitted: {{ _('Reports submitted')|tojson }},
-        year: {{ _('Year')|tojson }},
-        showCountries: {{ _('Show countries')|tojson }},
-        planRound: {{ _('Plan round')|tojson }},
-        reportRound: {{ _('Report round')|tojson }},
-        planRequirement: {{ _('Planned requirement')|tojson }},
-        reportFunding: {{ _('Reported funding')|tojson }},
-        reportExpenditure: {{ _('Reported expenditure')|tojson }},
-        peopleReached: {{ _('People to be reached')|tojson }},
-        partners: {{ _('Partners (PNS)')|tojson }},
-        partnerFunding: {{ _('Partner funding (CHF)')|tojson }},
-        volunteers: {{ _('Volunteers')|tojson }},
-        staff: {{ _('Staff')|tojson }},
-        branches: {{ _('Branches')|tojson }},
-        localUnits: {{ _('Local units')|tojson }},
-        kpiCoverage: {{ _('Participating National Societies')|tojson }},
-        kpiRequirement: {{ _('Planned funding requirement')|tojson }},
-        kpiFunding: {{ _('Reported funding')|tojson }},
-        kpiReach: {{ _('People to be reached')|tojson }},
-        kpiPartners: {{ _('Partners engaged')|tojson }},
-        kpiPartnerFunding: {{ _('Partner funding')|tojson }},
-        vsPrevious: {{ _('vs {year}')|tojson }},
-        noPrevious: {{ _('first year')|tojson }},
-        inProgressNote: {{ _('* Year still open ({years}) — submissions are still coming in, so the latest point understates the final total. Headline figures use the latest completed year.')|tojson }},
-        midyearNote: {{ _('Reporting figures use the annual report where available, otherwise the mid-year report (years: {years}).')|tojson }},
-        fundingSourceNote: {{ _('Same mix as the Financial Overview network block. Planned requirement is the country plan: host National Society + IFRC Secretariat + PNS lines recorded on that plan. Reported funding is PNS self-reported funding + other sources on the country report + IFRC Secretariat actuals (2025 and 2026 snapshots; earlier years have none). Reported expenditure is PNS self-reported expenditure + those IFRC actuals. Host National Society strategic-priority totals are not added on top. Transfers are not counted as expenditure.')|tojson }},
-        midyearCell: {{ _('Mid-year report — the annual report is not yet available')|tojson }},
-        midyearLegend: {{ _('Mid-year report, shown where the annual report is not yet available')|tojson }},
-        partnersSourceNote: {{ _('Source: Participating National Society self-reports (PNS data). This is separate from the PNS amount a host National Society records in its own plan. Under a country, the partner count is the societies supporting that country; the year total counts each society once.')|tojson }},
-        close: {{ _('Close')|tojson }},
-        loadFailed: {{ _('Could not load analysis data. Try refreshing.')|tojson }},
-        narrativeUrl: {{ url_for('upr.impact_narrative')|tojson }},
-        narrDataSubmitted: {{ _('Data submitted')|tojson }},
-        narrInternal: {{ _('Internal narrative')|tojson }},
-        narrPublic: {{ _('Public narrative')|tojson }},
-        narrEither: {{ _('Either (data or narrative)')|tojson }},
-        narrBoth: {{ _('Data and narrative')|tojson }},
-        narrNarrativeOnly: {{ _('Narrative only')|tojson }},
-        narrDataOnly: {{ _('Data only')|tojson }},
-        narrPublished: {{ _('Internal and public')|tojson }},
-        narrNotPublic: {{ _('Not yet public')|tojson }},
-        narrPublicOnly: {{ _('Public only')|tojson }},
-        narrPublicationRate: {{ _('Share made public')|tojson }},
-        narrBaseline: {{ _('First round (baseline)')|tojson }},
-        narrKpiPlans: {{ _('Plans: participating')|tojson }},
-        narrKpiMidyear: {{ _('Mid-year reports: participating')|tojson }},
-        narrKpiAnnual: {{ _('Annual reports: participating')|tojson }},
-        narrKpiCycle: {{ _('Planned and reported')|tojson }},
-        narrKpiCycleNote: {{ _('{both} of {plan} that planned also reported')|tojson }},
-        narrKpiAlways: {{ _('Took part in every round')|tojson }},
-        narrKpiAlwaysNote: {{ _('of {n} completed rounds')|tojson }},
-        narrEngTitle: {{ _('How consistently countries take part')|tojson }},
-        narrEngHint: {{ _('National Societies by the number of completed rounds (plans, mid-year and annual reports) they took part in. Rounds still open or only partly covered by the sources are left out.')|tojson }},
-        narrEngRounds: {{ _('Completed rounds taken part in')|tojson }},
-        narrEngSeries: {{ _('National Societies')|tojson }},
-        narrRetTitle: {{ _('Retention year on year')|tojson }},
-        narrRetHint: {{ _('Participants that carried on, joined, or dropped out compared with the previous year. The first round is shown in grey as the baseline. When the previous round is only partly covered by the sources, joiners are not shown, because countries it simply missed would look new.')|tojson }},
-        narrGapAlways: {{ _('Took part in every completed round')|tojson }},
-        narrGapIntermittent: {{ _('Took part in some rounds only')|tojson }},
-        narrGapPlannedNotReported: {{ _('Planned but did not report (latest year with both)')|tojson }},
-        narrGapNever: {{ _('Only in open or partly covered rounds')|tojson }},
-        narrGapsHintAll: {{ _('Across {n} completed rounds. Select a list to see the countries.')|tojson }},
-        narrRetained: {{ _('Carried on')|tojson }},
-        narrNew: {{ _('Joined')|tojson }},
-        narrLapsed: {{ _('Dropped out')|tojson }},
-        narrRound: {{ _('Round')|tojson }},
-        narrCountry: {{ _('National Society')|tojson }},
-        narrRegion: {{ _('Region')|tojson }},
-        narrLapsedTitle: {{ _('Participated last year, not this year')|tojson }},
-        narrNone: {{ _('None — nothing to follow up.')|tojson }},
-        narrParticipationPct: {{ _('Participation rate')|tojson }},
-        narrMatrixTitle: {{ _('Country by round')|tojson }},
-        narrMatrixNote: {{ _('D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.')|tojson }},
-        narrGapsHint: {{ _('Latest completed round: {round}. Select a list to see the countries.')|tojson }},
-        narrKpiAny: {{ _('Participating (data or narrative)')|tojson }},
-        narrKpiInternal: {{ _('Internal narratives')|tojson }},
-        narrKpiPublic: {{ _('Public narratives')|tojson }},
-        narrKpiHidden: {{ _('Missed by data alone')|tojson }},
-        narrKpiPublication: {{ _('Internal narratives made public')|tojson }},
-        narrNoteInProgress: {{ _('* Round still open ({years}) — documents and submissions are still coming in.')|tojson }},
-        narrNoteNoData: {{ _('The databank holds no data assignments for {rounds}, so only narrative participation is shown for them.')|tojson }},
-        narrNoteSources: {{ _('Sources: internal narratives {internal}, public narratives {public} (one per country and round, country appeals only).')|tojson }},
-        narrNoteUniverse: {{ _('Participation rate is out of the {n} National Societies seen in any round.')|tojson }}
-    }
+    narrativeUrl: {{ url_for('upr.impact_narrative')|tojson }},
+    logoUrl: {{ url_for('static', filename='IFRC_logo_square.svg')|tojson }},
+    ui: {{ upr_analysis_ui()|tojson }}
 };
 </script>
 <script nonce="{{ csp_nonce() }}" src="{{ url_for('static', filename='libs/apexcharts.min.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-format.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-charts.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-dom.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-pages.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-slides.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-report.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-impact.js') }}"></script>

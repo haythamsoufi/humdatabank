@@ -39,7 +39,20 @@ from typing import Any, Iterable, Mapping
 
 import requests
 
-from plugins.upr.impact import round_sort_key
+from plugins.upr.analysis_common import (
+    MATURE_ROUND_RATIO,
+    ROUND_RE,
+    SUBMITTED_STATUSES,
+    TRACKS,
+    delta_record,
+    iso3s_in_region,
+    load_countries,
+    norm,
+    pct,
+    round_calendar_year,
+    round_prefix,
+    round_sort_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,17 +65,10 @@ PUBLIC_TYPE_PREFIX: dict[int, str] = {1851: "P", 10011: "AR", 10009: "MYR"}
 
 _EXCLUDED_ISO2 = frozenset({"CH"})
 _YEARS = tuple(range(2023, 2031))
-TRACKS = ("P", "MYR", "AR")
 
-_SUBMITTED_STATUSES = frozenset({"submitted", "approved", "validated"})
-# A round is "in progress" when far fewer countries took part than in the
-# fullest round of the same family (plans vs plans, annual vs annual).
-_MATURE_RATIO = 0.6
 
 _CACHE_TTL_SECONDS = 10 * 60
 _FETCH_TIMEOUT_SECONDS = 60
-
-_ROUND_RE = re.compile(r"^(P|MYR|AR)(\d{2})$")
 
 
 class NarrativeSourceUnavailable(Exception):
@@ -188,20 +194,6 @@ def parse_unified_documents(
 # ---------------------------------------------------------------------------
 
 
-def _norm(value: Any) -> str:
-    return str(value or "").strip().lower()
-
-
-def _prefix(code: str) -> str:
-    match = _ROUND_RE.match(code or "")
-    return match.group(1) if match else ""
-
-
-def _year(code: str) -> int | None:
-    match = _ROUND_RE.match(code or "")
-    return 2000 + int(match.group(2)) if match else None
-
-
 def _by_round(rows: Iterable[Mapping[str, Any]]) -> dict[str, set[str]]:
     out: dict[str, set[str]] = {}
     for row in rows:
@@ -224,13 +216,9 @@ def _data_sets(
         if not code or not iso3:
             continue
         assigned.setdefault(code, set()).add(iso3)
-        if _norm(row.get("status")) in _SUBMITTED_STATUSES:
+        if norm(row.get("status")) in SUBMITTED_STATUSES:
             submitted.setdefault(code, set()).add(iso3)
     return assigned, submitted
-
-
-def _pct(part: int, whole: int) -> float | None:
-    return round(part / whole * 100.0, 1) if whole else None
 
 
 def _round_record(
@@ -245,7 +233,7 @@ def _round_record(
     published = public & internal
     return {
         "round": code,
-        "year": _year(code),
+        "year": round_calendar_year(code),
         "internal": len(internal),
         "public": len(public),
         "data_assigned": len(assigned),
@@ -257,8 +245,8 @@ def _round_record(
         "published": len(published),
         "unpublished": len(internal - public),
         "public_only": len(public - internal),
-        "participation_pct": _pct(len(anyone), universe),
-        "publication_pct": _pct(len(published), len(internal)),
+        "participation_pct": pct(len(anyone), universe),
+        "publication_pct": pct(len(published), len(internal)),
     }
 
 
@@ -324,23 +312,6 @@ def _names(iso3s: Iterable[str], countries: Mapping[str, Mapping[str, Any]]) -> 
     return rows
 
 
-def _delta(latest: Mapping[str, Any] | None, previous: Mapping[str, Any] | None, key: str) -> dict[str, Any]:
-    out: dict[str, Any] = {
-        "latest": latest.get(key) if latest else None,
-        "latest_year": latest.get("year") if latest else None,
-        "latest_round": latest.get("round") if latest else None,
-        "previous": previous.get(key) if previous else None,
-        "previous_year": previous.get("year") if previous else None,
-        "change_pct": None,
-    }
-    if latest and previous:
-        prev = previous.get(key) or 0
-        cur = latest.get(key) or 0
-        if prev:
-            out["change_pct"] = round((cur - prev) / prev * 100.0, 1)
-    return out
-
-
 def aggregate_participation(
     *,
     internal: Iterable[Mapping[str, Any]],
@@ -356,10 +327,7 @@ def aggregate_participation(
     :func:`parse_unified_documents` records, ``submissions`` are the UPR
     submission rows and ``countries`` maps ISO3 -> ``{name, region}``.
     """
-    allowed: set[str] | None = None
-    if region:
-        wanted = region.strip().lower()
-        allowed = {iso3 for iso3, c in countries.items() if _norm(c.get("region")) == wanted}
+    allowed = iso3s_in_region(countries, region)
 
     def keep(iso3: str) -> bool:
         return allowed is None or iso3 in allowed
@@ -371,7 +339,7 @@ def aggregate_participation(
     data_by = {c: {i for i in s if keep(i)} for c, s in submitted_raw.items()}
 
     rounds = sorted(
-        {c for d in (internal_by, public_by, assigned_by, data_by) for c in d if _ROUND_RE.match(c)},
+        {c for d in (internal_by, public_by, assigned_by, data_by) for c in d if ROUND_RE.match(c)},
         key=round_sort_key,
     )
     empty: set[str] = set()
@@ -399,7 +367,7 @@ def aggregate_participation(
     in_progress: list[str] = []
     records_low: dict[str, bool] = {}
     for prefix in TRACKS:
-        family = [c for c in rounds if _prefix(c) == prefix]
+        family = [c for c in rounds if round_prefix(c) == prefix]
         if not family:
             tracks[prefix] = []
             continue
@@ -414,7 +382,7 @@ def aggregate_participation(
             # ``low`` = far fewer participants than the fullest round of this
             # family: either a round still collecting (the newest one) or an old
             # round the sources only partly cover. Neither supports churn figures.
-            low = bool(fullest) and rec["any"] / fullest < _MATURE_RATIO
+            low = bool(fullest) and rec["any"] / fullest < MATURE_ROUND_RATIO
             rec["low_participation"] = low
             rec["in_progress"] = low and code == family[-1]
             if rec["in_progress"]:
@@ -468,11 +436,11 @@ def aggregate_participation(
         latest = settled[-1] if settled else None
         previous = settled[-2] if len(settled) >= 2 else None
         headline[prefix] = {
-            "any": _delta(latest, previous, "any"),
-            "internal": _delta(latest, previous, "internal"),
-            "public": _delta(latest, previous, "public"),
-            "narrative_only": _delta(latest, previous, "narrative_only"),
-            "publication_pct": _delta(latest, previous, "publication_pct"),
+            "any": delta_record(latest, previous, "any"),
+            "internal": delta_record(latest, previous, "internal"),
+            "public": delta_record(latest, previous, "public"),
+            "narrative_only": delta_record(latest, previous, "narrative_only"),
+            "publication_pct": delta_record(latest, previous, "publication_pct"),
         }
         if not latest:
             continue
@@ -576,7 +544,7 @@ def _overview(
             "plan": len(plan_set),
             "report": len(report_set),
             "both": len(done),
-            "completion_pct": _pct(len(done), len(plan_set)),
+            "completion_pct": pct(len(done), len(plan_set)),
             "planned_not_reported": _names(plan_set - report_set, countries),
         }
 
@@ -666,17 +634,6 @@ def load_appeals(key: str, url: str) -> list[Any]:
         return payload
 
 
-def _load_countries() -> dict[str, dict[str, Any]]:
-    from app.models import Country
-
-    rows = Country.query.with_entities(Country.iso2, Country.iso3, Country.name, Country.region).all()
-    return {
-        str(iso3).upper(): {"iso2": (iso2 or "").upper() or None, "name": name, "region": region}
-        for iso2, iso3, name, region in rows
-        if iso3
-    }
-
-
 def _load_data_submissions() -> list[dict[str, Any]]:
     """Slim (round, country, status) rows, cached with the other UPR extracts."""
     from plugins.upr.api_cache import get_or_build_upr_payload
@@ -705,7 +662,7 @@ def build_narrative_participation(*, region: str | None = None) -> dict[str, Any
     A failing document feed degrades gracefully: that stage is reported as
     unavailable (see ``sources``) and the rest is still returned.
     """
-    countries = _load_countries()
+    countries = load_countries()
     iso2_to_iso3 = {c["iso2"]: iso3 for iso3, c in countries.items() if c.get("iso2")}
 
     sources: dict[str, dict[str, Any]] = {}

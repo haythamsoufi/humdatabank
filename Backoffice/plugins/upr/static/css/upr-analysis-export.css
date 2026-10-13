@@ -1,0 +1,556 @@
+/* UPR Analysis — presentation and A4 report. The cards, KPIs and tables inside
+ * them keep the look defined in upr-impact.css; this file only adds the frames
+ * around them (slides, pages, toolbars). Print rules live in
+ * upr-analysis-print.css and are switched on only while a report is open. */
+
+body.upri-locked {
+    overflow: hidden;
+}
+
+.upri-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    color: #111827;
+    font-family: inherit;
+}
+.upri-overlay:focus {
+    outline: none;
+}
+.upri-overlay [hidden] {
+    display: none !important;
+}
+.upri-overlay .apexcharts-svg title {
+    display: none;
+}
+.upri-btn--primary {
+    border-color: var(--upri-navy);
+    background: var(--upri-navy);
+    color: #fff;
+}
+.upri-btn--primary:hover {
+    border-color: var(--upri-navy);
+    background: #0b2f5c;
+}
+
+/* Cover (shared by the first slide and the first page) */
+.upri-cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    box-sizing: border-box;
+    color: #fff;
+    background: linear-gradient(135deg, #011e41 0%, #0b2f5c 70%, #12427f 100%);
+}
+.upri-cover__logo {
+    width: 4.5rem;
+    height: 4.5rem;
+    margin-bottom: 2rem;
+    padding: 0.4rem;
+    border-radius: 0.5rem;
+    background: #fff;
+    object-fit: contain;
+}
+.upri-cover__title {
+    margin: 0 0 1.25rem;
+    max-width: 38rem;
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1.12;
+}
+.upri-cover__line {
+    margin: 0 0 0.25rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #dbe5f1;
+}
+.upri-cover__lead {
+    margin: 2rem 0 0;
+    max-width: 36rem;
+    padding-top: 1.25rem;
+    border-top: 3px solid var(--upri-red);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: #b7c6da;
+}
+
+/* Section heading */
+.upri-section-head {
+    padding-left: 0.9rem;
+    border-left: 4px solid var(--upri-red);
+}
+.upri-section-head__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--upri-navy);
+}
+.upri-section-head__lead {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #4b5563;
+}
+
+/* Gaps spelled out (slides and report cannot click through) */
+.upri-gap-lists {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding: 0.6rem 0 0.75rem;
+}
+.upri-gap-list {
+    padding: 0.65rem 0.8rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.upri-gap-list__head {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0 0 0.4rem;
+}
+.upri-gap-list__names {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: #4b5563;
+}
+.upri-gap-list.is-empty .upri-gap__count {
+    color: #9ca3af;
+}
+
+/* Notes and tables blocks */
+.upri-notes-block__title,
+.upri-table-block__title {
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--upri-navy);
+}
+.upri-table-block__heading {
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--upri-navy);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--upri-navy);
+}
+.upri-notes-block .upri-footnote {
+    margin: 0 0 0.45rem;
+    color: #4b5563;
+}
+.upri-notes-block .upri-warning {
+    margin: 0 0 0.6rem;
+}
+.upri-table-static .upri-dialog__note {
+    padding: 0 0 0.5rem;
+}
+.upri-table-static .upri-legend {
+    margin: 0.5rem 0 0;
+}
+.upri-table-static .upri-table {
+    font-size: 0.72rem;
+}
+.upri-table-static .upri-table th {
+    position: static;
+}
+.upri-table-static .upri-table th,
+.upri-table-static .upri-table td {
+    padding: 0.3rem 0.45rem;
+}
+
+/* ------------------------------------------------------------------ Slides */
+
+.upri-deck {
+    background: #0b1220;
+}
+.upri-deck__viewport {
+    position: absolute;
+    inset: 0 0 3.5rem;
+    overflow: hidden;
+}
+.upri-deck__stage {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform-origin: center center;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.upri-slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    padding: 2.6rem 3.5rem 2.2rem;
+    background: #fff;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s;
+}
+.upri-slide.is-active {
+    opacity: 1;
+    visibility: visible;
+}
+.upri-slide__tag {
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.upri-slide--cover,
+.upri-slide--section {
+    justify-content: center;
+}
+.upri-slide--cover {
+    padding: 0;
+}
+.upri-slide--cover .upri-cover {
+    padding: 0 5rem;
+}
+.upri-slide--cover .upri-cover__title {
+    max-width: 48rem;
+    font-size: 3.4rem;
+}
+.upri-slide--cover .upri-cover__line {
+    font-size: 1.3rem;
+}
+.upri-slide--cover .upri-cover__lead {
+    max-width: 44rem;
+    font-size: 1.05rem;
+}
+.upri-slide--section .upri-section-head {
+    padding-left: 1.5rem;
+    border-left-width: 8px;
+}
+.upri-slide--section .upri-section-head__title {
+    font-size: 3rem;
+}
+.upri-slide--section .upri-section-head__lead {
+    max-width: 52rem;
+    font-size: 1.15rem;
+}
+
+.upri-slide--kpis .upri-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin: auto 0;
+}
+.upri-slide--kpis .upri-kpi {
+    padding: 1.5rem 1.6rem;
+}
+.upri-slide--kpis .upri-kpi__label {
+    font-size: 0.9rem;
+}
+.upri-slide--kpis .upri-kpi__value {
+    font-size: 3rem;
+}
+.upri-slide--kpis .upri-kpi__meta {
+    margin-top: 0.7rem;
+    font-size: 0.95rem;
+}
+
+.upri-slide--visual .upri-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border: 0;
+}
+.upri-slide--visual .upri-card__title {
+    font-size: 1.7rem;
+}
+.upri-slide--visual .upri-card__hint {
+    margin-top: 0.35rem;
+    max-width: 62rem;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+.upri-slide--visual .upri-card__head {
+    margin-bottom: 0.6rem;
+}
+.upri-slide--visual .upri-cap-grid {
+    gap: 1.25rem 3rem;
+    margin-top: 0.5rem;
+}
+.upri-slide--visual .upri-cap__name {
+    font-size: 0.85rem;
+}
+.upri-slide--visual .upri-cap__value {
+    font-size: 1.75rem;
+}
+.upri-slide--visual .upri-gap-lists {
+    gap: 1rem;
+}
+.upri-slide--visual .upri-gap-list {
+    padding: 1rem 1.15rem;
+}
+.upri-slide--visual .upri-gap__count {
+    font-size: 2rem;
+}
+.upri-slide--visual .upri-gap__label {
+    font-size: 1rem;
+}
+.upri-slide--visual .upri-gap-list__names {
+    font-size: 0.9rem;
+}
+.upri-deck .apexcharts-xaxis-label,
+.upri-deck .apexcharts-yaxis-label,
+.upri-deck .apexcharts-legend-text {
+    font-size: 13px !important;
+}
+
+.upri-slide--notes .upri-notes-block {
+    max-width: 62rem;
+    margin: auto 0;
+}
+.upri-slide--notes .upri-notes-block__title {
+    font-size: 1.2rem;
+}
+.upri-slide--notes .upri-footnote,
+.upri-slide--notes .upri-warning {
+    font-size: 1.05rem;
+    line-height: 1.5;
+}
+
+.upri-deck__bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 3.5rem;
+    padding: 0 1rem;
+    color: #e5e7eb;
+}
+.upri-deck__nav,
+.upri-deck__tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+.upri-deck__nav {
+    justify-content: center;
+    padding-left: 5.5rem;
+}
+.upri-deck__tools {
+    justify-content: flex-end;
+    max-width: 5.5rem;
+}
+.upri-deck__counter {
+    min-width: 4.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+.upri-deck__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    background: transparent;
+    color: #e5e7eb;
+    cursor: pointer;
+}
+.upri-deck__btn:hover:not(:disabled),
+.upri-deck__btn:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+    outline: none;
+}
+.upri-deck__btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.upri-deck__progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.12);
+}
+.upri-deck__progress span {
+    display: block;
+    height: 100%;
+    background: var(--upri-red);
+    transition: width 0.25s ease;
+}
+
+/* ---------------------------------------------------------------- A4 report */
+
+.upri-report {
+    overflow: auto;
+    background: #4b5563;
+}
+.upri-report__bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 0.7rem 1.25rem;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.upri-report__copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+.upri-report__title {
+    color: var(--upri-navy);
+}
+.upri-report__hint {
+    max-width: 44rem;
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+.upri-report__actions {
+    display: flex;
+    gap: 0.5rem;
+}
+.upri-report__pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem 0 3rem;
+}
+
+.upri-page {
+    position: relative;
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: 210mm;
+    height: 296mm;
+    padding: 14mm 14mm 8mm;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+.upri-page__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-height: 0;
+    overflow: hidden;
+}
+.upri-page__body > * {
+    flex: none;
+    margin: 0;
+}
+.upri-page__body .upri-kpis,
+.upri-page__body .upri-card {
+    margin: 0;
+}
+.upri-keep {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+.upri-page__foot {
+    display: flex;
+    flex: none;
+    justify-content: space-between;
+    padding-top: 0.4rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.65rem;
+    color: #9ca3af;
+}
+.upri-page--cover {
+    padding: 0;
+}
+.upri-page--cover .upri-page__body {
+    gap: 0;
+}
+.upri-page--cover .upri-cover {
+    height: 100%;
+    padding: 0 18mm;
+}
+
+/* ------------------------------------------------- Findings in the slides */
+
+/* Each finding starts hidden behind its number; the space stays reserved so
+ * nothing jumps when it is revealed. */
+.upri-findings--steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 0.9rem;
+}
+.upri-findings--steps .upri-finding {
+    align-items: flex-start;
+    padding: 0.7rem 0.9rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.upri-findings--steps .upri-finding__title {
+    font-size: 1rem;
+}
+.upri-findings--steps .upri-finding__text {
+    font-size: 0.95rem;
+}
+.upri-findings--steps .upri-finding__body {
+    transition: opacity 0.25s ease;
+}
+.upri-findings--steps .upri-finding.is-pending {
+    border-left-color: #d1d5db;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px #e5e7eb;
+}
+.upri-findings--steps .is-pending .upri-finding__body {
+    opacity: 0;
+    pointer-events: none;
+}
+.upri-finding__toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+    cursor: pointer;
+}
+.upri-finding__toggle:hover,
+.upri-finding__toggle:focus-visible {
+    border-color: var(--upri-navy);
+    outline: none;
+}
+.upri-finding.is-revealed .upri-finding__toggle {
+    border-color: var(--upri-navy);
+    background: var(--upri-navy);
+    color: #fff;
+}
+.upri-slide--visual .upri-findings-wrap {
+    margin-top: auto;
+    padding-bottom: 0;
+}
+.upri-slide--visual .upri-findings__heading {
+    font-size: 0.8rem;
+}

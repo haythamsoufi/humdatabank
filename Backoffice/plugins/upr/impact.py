@@ -25,21 +25,27 @@ value and its breakdown are never counted twice.
 
 from __future__ import annotations
 
-import re
 from typing import Any, Iterable
 
+from plugins.upr.analysis_common import (
+    APPROVED_STATUSES,
+    MATURE_ROUND_RATIO,
+    SUBMITTED_STATUSES,
+    delta_record,
+    iso3s_in_region,
+    load_countries,
+    norm,
+    num,
+    ordered_rounds,
+    round_calendar_year,
+    round_kind,
+    round_prefix,
+    round_sort_key,
+)
 from plugins.upr.api_cache import get_or_build_upr_payload
 from plugins.upr.upr_data import build_upr_master, build_upr_submissions
 
-# Round code -> (year, within-year order). Plans open the year, mid-year reports
-# sit in the middle, annual reports close it.
-_ROUND_RE = re.compile(r"^(P|MYR|AR)(\d{2})$")
-_KIND_ORDER = {"P": 0, "MYR": 1, "AR": 2}
-_PLAN_PREFIX = "P"
-_REPORT_PREFIXES = ("MYR", "AR")
-
-_APPROVED_STATUSES = frozenset({"approved", "validated"})
-_SUBMITTED_STATUSES = frozenset({"submitted", "approved", "validated"})
+__all__ = ["aggregate_impact", "build_upr_impact", "round_sort_key"]
 
 # NS Data capacity indicators, matched by substring on the indicator name.
 _CAPACITY_MATCHERS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -51,36 +57,9 @@ _CAPACITY_MATCHERS: tuple[tuple[str, tuple[str, ...]], ...] = (
 _CAPACITY_KEYS = tuple(key for key, _ in _CAPACITY_MATCHERS)
 
 
-def round_sort_key(code: str | None) -> tuple[int, int, str]:
-    """Chronological key for a round code (``P27`` < ``MYR27`` < ``AR27``)."""
-    match = _ROUND_RE.match((code or "").strip().upper())
-    if not match:
-        return (9999, 9, str(code or ""))
-    return (2000 + int(match.group(2)), _KIND_ORDER.get(match.group(1), 5), code or "")
-
-
-def _round_kind(code: str | None) -> str | None:
-    match = _ROUND_RE.match((code or "").strip().upper())
-    if not match:
-        return None
-    return "plan" if match.group(1) == _PLAN_PREFIX else "report"
-
-
-def _round_prefix(code: str | None) -> str:
-    """Exact round family (``P`` / ``MYR`` / ``AR``) for like-for-like comparison."""
-    match = _ROUND_RE.match((code or "").strip().upper())
-    return match.group(1) if match else ""
-
-
-def _year(code: str | None) -> int | None:
-    """Calendar year a round belongs to (``AR25`` -> ``2025``)."""
-    match = _ROUND_RE.match((code or "").strip().upper())
-    return 2000 + int(match.group(2)) if match else None
-
-
 def _plan_year_map(plan_rounds: list[str]) -> dict[int, str]:
     """{year: plan round}. One plan per year."""
-    return {_year(c): c for c in plan_rounds if _year(c) is not None}
+    return {round_calendar_year(c): c for c in plan_rounds if round_calendar_year(c) is not None}
 
 
 def _report_year_map(report_rounds: list[str]) -> dict[int, str]:
@@ -93,7 +72,7 @@ def _report_year_map(report_rounds: list[str]) -> dict[int, str]:
     """
     out: dict[int, str] = {}
     for code in sorted(report_rounds, key=round_sort_key):
-        year = _year(code)
+        year = round_calendar_year(code)
         if year is not None:
             out[year] = code
     return out
@@ -148,30 +127,14 @@ def _remember_country(names: dict[str, str], iso: str, row: dict[str, Any]) -> N
         names[iso] = name
 
 
-def _num(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    return None
-
-
-def _norm(text: Any) -> str:
-    return str(text or "").strip().lower()
-
-
 def _capacity_key(indicator: str) -> str | None:
-    low = _norm(indicator)
+    low = norm(indicator)
     if not low:
         return None
     for key, needles in _CAPACITY_MATCHERS:
         if any(needle in low for needle in needles):
             return key
     return None
-
-
-def _ordered_rounds(codes: Iterable[str]) -> list[str]:
-    return sorted({c for c in codes if c}, key=round_sort_key)
 
 
 def _reduce_single_value(rows: list[dict[str, Any]], attribute_priority: tuple[str, ...]) -> float:
@@ -186,7 +149,7 @@ def _reduce_single_value(rows: list[dict[str, Any]], attribute_priority: tuple[s
     for row in rows:
         entity = str(row.get("Entity") or "")
         attr = str(row.get("Attribute") or "")
-        value = _num(row.get("ValueNum"))
+        value = num(row.get("ValueNum"))
         if value is None:
             continue
         by_entity.setdefault(entity, {})
@@ -225,11 +188,11 @@ def aggregate_impact(
     (``MYR``). Kept free of database access so it can be unit tested with
     synthetic rows.
     """
-    rounds_all = _ordered_rounds(
+    rounds_all = ordered_rounds(
         [r.get("Round") for r in master_rows] + [s.get("Round") for s in submissions]
     )
-    plan_rounds = [c for c in rounds_all if _round_kind(c) == "plan"]
-    report_rounds = [c for c in rounds_all if _round_kind(c) == "report"]
+    plan_rounds = [c for c in rounds_all if round_kind(c) == "plan"]
+    report_rounds = [c for c in rounds_all if round_kind(c) == "report"]
 
     plan_by_year = _plan_year_map(plan_rounds)
     report_by_year = _report_year_map(report_rounds)
@@ -248,10 +211,10 @@ def aggregate_impact(
         if plan_by_year.get(y) in in_progress or report_by_year.get(y) in in_progress
     )
     midyear_fallback_years = sorted(
-        y for y, code in report_by_year.items() if _round_prefix(code) == "MYR"
+        y for y, code in report_by_year.items() if round_prefix(code) == "MYR"
     )
 
-    coverage = _coverage_by_year(coverage_rounds, plan_by_year, report_by_year, years)
+    coverage = _coverage_byround_calendar_year(coverage_rounds, plan_by_year, report_by_year, years)
     funding = {
         "plan_requirement": _collapse_to_years(
             funding_rounds["plan_requirement"], plan_by_year, ("value",)
@@ -291,7 +254,7 @@ def aggregate_impact(
     }
 
 
-def _coverage_by_year(
+def _coverage_byround_calendar_year(
     coverage_rounds: dict[str, Any],
     plan_by_year: dict[int, str],
     report_by_year: dict[int, str],
@@ -362,10 +325,10 @@ def _coverage_series(submissions: list[dict[str, Any]], rounds: list[str]) -> di
             continue
         countries[code].add(iso)
         _remember_country(names[code], iso, row)
-        status = _norm(row.get("status"))
-        if status in _SUBMITTED_STATUSES:
+        status = norm(row.get("status"))
+        if status in SUBMITTED_STATUSES:
             submitted[code].add(iso)
-        if status in _APPROVED_STATUSES or _norm(row.get("fds_validated")) == "validated":
+        if status in APPROVED_STATUSES or norm(row.get("fds_validated")) == "validated":
             validated[code].add(iso)
     return {
         "by_round": [
@@ -438,13 +401,13 @@ def _funding_series(
       not expenditure. IFRC Secretariat actuals are added later from the snapshot
       the Financial Overview visual uses.
     """
-    funding_rows = [r for r in master_rows if _norm(r.get("Section")) == "funding"]
+    funding_rows = [r for r in master_rows if norm(r.get("Section")) == "funding"]
 
     requirement_rows = [
         r
         for r in funding_rows
-        if _norm(r.get("Indicator")) == "funding requirement"
-        and _norm(r.get("Source")) == "country data"
+        if norm(r.get("Indicator")) == "funding requirement"
+        and norm(r.get("Source")) == "country data"
     ]
     report_funding_rows = [r for r in funding_rows if _is_network_reported_funding(r)]
     report_expenditure_rows = [r for r in funding_rows if _is_network_reported_expenditure(r)]
@@ -463,16 +426,16 @@ def _funding_series(
 
 
 def _is_network_reported_funding(row: dict[str, Any]) -> bool:
-    if _norm(row.get("Indicator")) != "funding":
+    if norm(row.get("Indicator")) != "funding":
         return False
-    source = _norm(row.get("Source"))
+    source = norm(row.get("Source"))
     if source == "pns data":
         return True
-    return source == "country data" and _norm(row.get("Entity")) == "other sources"
+    return source == "country data" and norm(row.get("Entity")) == "other sources"
 
 
 def _is_network_reported_expenditure(row: dict[str, Any]) -> bool:
-    return _norm(row.get("Indicator")) == "expenditure" and _norm(row.get("Source")) == "pns data"
+    return norm(row.get("Indicator")) == "expenditure" and norm(row.get("Source")) == "pns data"
 
 
 def _add_ifrc_network_actuals(funding: dict[str, Any], iso3s: set[str] | None) -> None:
@@ -514,8 +477,8 @@ def _reach_series(master_rows: list[dict[str, Any]], plan_rounds: list[str]) -> 
     reach_rows = [
         r
         for r in master_rows
-        if _norm(r.get("Section")) == "reach"
-        and "people to be reached" in _norm(r.get("Indicator"))
+        if norm(r.get("Section")) == "reach"
+        and "people to be reached" in norm(r.get("Indicator"))
     ]
     # Reach has no stored grand total — Area rows are leaves, so sum them all.
     by_round = {code: 0.0 for code in plan_rounds}
@@ -525,7 +488,7 @@ def _reach_series(master_rows: list[dict[str, Any]], plan_rounds: list[str]) -> 
         code = row.get("Round")
         if code not in by_round:
             continue
-        value = _num(row.get("ValueNum"))
+        value = num(row.get("ValueNum"))
         if value is None:
             continue
         by_round[code] += value
@@ -551,13 +514,13 @@ def _partner_series(master_rows: list[dict[str, Any]], report_rounds: list[str])
     support_rows = [
         r
         for r in master_rows
-        if _norm(r.get("Section")) in {"support", "activities"}
-        and _norm(r.get("Entity")) == "pns"
+        if norm(r.get("Section")) in {"support", "activities"}
+        and norm(r.get("Entity")) == "pns"
     ]
     pns_funding_rows = [
         r
         for r in master_rows
-        if _norm(r.get("Source")) == "pns data" and _norm(r.get("Indicator")) == "funding"
+        if norm(r.get("Source")) == "pns data" and norm(r.get("Indicator")) == "funding"
     ]
 
     partners: dict[str, set[str]] = {code: set() for code in report_rounds}
@@ -581,7 +544,7 @@ def _partner_series(master_rows: list[dict[str, Any]], report_rounds: list[str])
         code = row.get("Round")
         if code not in funding:
             continue
-        value = _num(row.get("ValueNum"))
+        value = num(row.get("ValueNum"))
         if value is None:
             continue
         funding[code] += value
@@ -611,7 +574,7 @@ def _partner_series(master_rows: list[dict[str, Any]], report_rounds: list[str])
 
 
 def _capacity_series(master_rows: list[dict[str, Any]], report_rounds: list[str]) -> dict[str, Any]:
-    ns_rows = [r for r in master_rows if _norm(r.get("Section")) == "ns data"]
+    ns_rows = [r for r in master_rows if norm(r.get("Section")) == "ns data"]
     series: dict[str, dict[str, float]] = {key: {c: 0.0 for c in report_rounds} for key in _CAPACITY_KEYS}
     by_country: dict[str, dict[str, dict[str, dict[str, Any]]]] = {
         key: {c: {} for c in report_rounds} for key in _CAPACITY_KEYS
@@ -622,7 +585,7 @@ def _capacity_series(master_rows: list[dict[str, Any]], report_rounds: list[str]
         key = _capacity_key(str(row.get("Indicator") or ""))
         if key is None or code not in series[key]:
             continue
-        value = _num(row.get("ValueNum"))
+        value = num(row.get("ValueNum"))
         if value is None:
             continue
         series[key][code] += value
@@ -645,25 +608,20 @@ def _capacity_series(master_rows: list[dict[str, Any]], report_rounds: list[str]
     }
 
 
-# A round is "in progress" when far fewer countries have submitted than were
-# assigned. Settled rounds historically clear ~0.8; open rounds sit near ~0.4.
-_MATURE_SUBMISSION_RATIO = 0.6
-
-
 def _in_progress_rounds(coverage: dict[str, Any]) -> set[str]:
     open_rounds: set[str] = set()
     for row in coverage.get("by_round", []):
-        countries = _num(row.get("countries")) or 0
-        submitted = _num(row.get("submitted")) or 0
+        countries = num(row.get("countries")) or 0
+        submitted = num(row.get("submitted")) or 0
         if countries <= 0:
             open_rounds.add(row["round"])
             continue
-        if submitted / countries < _MATURE_SUBMISSION_RATIO:
+        if submitted / countries < MATURE_ROUND_RATIO:
             open_rounds.add(row["round"])
     return open_rounds
 
 
-def _delta(
+def _settled_delta(
     points: list[dict[str, Any]],
     value_key: str,
     in_progress_years: list[int] | set[int] | None = None,
@@ -676,22 +634,10 @@ def _delta(
     like-for-like comparison.
     """
     skip = set(in_progress_years or ())
-    usable = [p for p in points if p.get("year") not in skip and _num(p.get(value_key))]
+    usable = [p for p in points if p.get("year") not in skip and num(p.get(value_key))]
     latest = usable[-1] if usable else None
     previous = usable[-2] if len(usable) >= 2 else None
-    out: dict[str, Any] = {
-        "latest": latest.get(value_key) if latest else None,
-        "latest_year": latest.get("year") if latest else None,
-        "previous": previous.get(value_key) if previous else None,
-        "previous_year": previous.get("year") if previous else None,
-        "change_pct": None,
-    }
-    if latest and previous:
-        prev_val = _num(previous.get(value_key)) or 0.0
-        latest_val = _num(latest.get(value_key)) or 0.0
-        if prev_val:
-            out["change_pct"] = round((latest_val - prev_val) / prev_val * 100.0, 1)
-    return out
+    return delta_record(latest, previous, value_key)
 
 
 def _headline(
@@ -702,12 +648,12 @@ def _headline(
     in_progress_years: list[int],
 ) -> dict[str, Any]:
     return {
-        "coverage": _delta(coverage["by_year"], "report_submitted", in_progress_years),
-        "plan_requirement": _delta(funding["plan_requirement"], "value", in_progress_years),
-        "report_funding": _delta(funding["report_funding"], "value", in_progress_years),
-        "reach": _delta(reach["by_year"], "value", in_progress_years),
-        "partners": _delta(partners["by_year"], "partners", in_progress_years),
-        "partner_funding": _delta(partners["by_year"], "funding", in_progress_years),
+        "coverage": _settled_delta(coverage["by_year"], "report_submitted", in_progress_years),
+        "plan_requirement": _settled_delta(funding["plan_requirement"], "value", in_progress_years),
+        "report_funding": _settled_delta(funding["report_funding"], "value", in_progress_years),
+        "reach": _settled_delta(reach["by_year"], "value", in_progress_years),
+        "partners": _settled_delta(partners["by_year"], "partners", in_progress_years),
+        "partner_funding": _settled_delta(partners["by_year"], "funding", in_progress_years),
     }
 
 
@@ -715,24 +661,8 @@ def _region_options(submissions: list[dict[str, Any]]) -> list[str]:
     return sorted({str(s.get("Region")).strip() for s in submissions if s.get("Region")})
 
 
-def _iso3_in_region(submissions: list[dict[str, Any]], region: str) -> set[str]:
-    wanted = region.strip().lower()
-    return {
-        str(s.get("ISO3")).strip().upper()
-        for s in submissions
-        if _norm(s.get("Region")) == wanted and s.get("ISO3")
-    }
-
-
-def _filter_submissions_region(rows: list[dict[str, Any]], region: str | None) -> list[dict[str, Any]]:
-    if not region:
-        return rows
-    wanted = region.strip().lower()
-    return [r for r in rows if _norm(r.get("Region")) == wanted]
-
-
-def _filter_master_iso3(rows: list[dict[str, Any]], iso3s: set[str] | None) -> list[dict[str, Any]]:
-    """Master rows carry no Region, so scope them by the region's ISO3 set."""
+def _filter_iso3(rows: list[dict[str, Any]], iso3s: set[str] | None) -> list[dict[str, Any]]:
+    """Keep rows of the given countries (``None`` keeps everything)."""
     if iso3s is None:
         return rows
     return [r for r in rows if str(r.get("ISO3") or "").strip().upper() in iso3s]
@@ -747,20 +677,16 @@ def build_upr_impact(*, region: str | None = None) -> dict[str, Any]:
     def _loader() -> dict[str, Any]:
         master = build_upr_master()["data"]
         submissions = build_upr_submissions()["data"]
-        regions = _region_options(submissions)
-        iso3s = _iso3_in_region(submissions, region) if region else None
-        payload = aggregate_impact(
-            _filter_master_iso3(master, iso3s),
-            _filter_submissions_region(submissions, region),
-        )
+        iso3s = iso3s_in_region(load_countries(), region)
+        payload = aggregate_impact(_filter_iso3(master, iso3s), _filter_iso3(submissions, iso3s))
         _add_ifrc_network_actuals(payload["funding"], iso3s)
-        payload["regions"] = regions
+        payload["regions"] = _region_options(submissions)
         payload["region"] = region or None
         return payload
 
-    # ``series`` is part of the cache key so a change in the mix cannot reuse
-    # a payload built with an earlier rule.
+    # ``series`` is part of the cache key so a change in the mix or scoping
+    # rules cannot reuse a payload built with an earlier rule.
     payload, _cache_hit = get_or_build_upr_payload(
-        "impact", {"region": region or None, "series": "network-mix-v2"}, _loader
+        "impact", {"region": region or None, "series": "network-mix-v3"}, _loader
     )
     return payload

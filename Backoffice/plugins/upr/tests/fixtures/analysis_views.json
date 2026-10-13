@@ -1,0 +1,3796 @@
+{
+ "impact": {
+  "title": "Analysis of Unified Plans and Reports",
+  "lead": "How the Unified Planning and Reporting process is growing across the IFRC network — rising participation, funding ambition, people reached, and partners engaged.",
+  "kpis": [
+   {
+    "id": "coverage",
+    "label": "National Societies that reported",
+    "value": 2,
+    "format": "int",
+    "year": 2024,
+    "delta": {
+     "direction": "flat",
+     "text": "first year",
+     "context": null,
+     "note": false
+    }
+   },
+   {
+    "id": "plan_requirement",
+    "label": "Planned funding requirement",
+    "value": 1000.0,
+    "format": "money",
+    "year": 2024,
+    "delta": {
+     "direction": "flat",
+     "text": "first year",
+     "context": null,
+     "note": false
+    }
+   },
+   {
+    "id": "reach",
+    "label": "People to be reached",
+    "value": null,
+    "format": "int",
+    "year": null,
+    "delta": null
+   },
+   {
+    "id": "partners",
+    "label": "Partners engaged",
+    "value": 1,
+    "format": "int",
+    "year": 2024,
+    "delta": {
+     "direction": "flat",
+     "text": "first year",
+     "context": null,
+     "note": false
+    }
+   },
+   {
+    "id": "partner_funding",
+    "label": "Partner funding",
+    "value": 800.0,
+    "format": "money",
+    "year": 2024,
+    "delta": {
+     "direction": "flat",
+     "text": "first year",
+     "context": null,
+     "note": false
+    }
+   }
+  ],
+  "visuals": [
+   {
+    "id": "coverage",
+    "title": "Participation (coverage)",
+    "hint": "National Societies completing a plan or report each year (reports: annual, or mid-year where the annual is not yet available).",
+    "wide": true,
+    "kind": "chart",
+    "chart": {
+     "categories": [
+      "2024",
+      "2025 *"
+     ],
+     "series": [
+      {
+       "name": "Plans submitted",
+       "kind": "column",
+       "data": [
+        1,
+        2
+       ],
+       "color": "#011e41",
+       "axis": "primary",
+       "format": "int",
+       "dashed": false
+      },
+      {
+       "name": "Reports submitted",
+       "kind": "column",
+       "data": [
+        2,
+        1
+       ],
+       "color": "#2a9d8f",
+       "axis": "primary",
+       "format": "int",
+       "dashed": false
+      }
+     ],
+     "axes": {
+      "primary": {
+       "format": "int",
+       "opposite": false,
+       "min": null,
+       "max": null,
+       "tick_amount": null
+      }
+     },
+     "stacked": false,
+     "height": 300,
+     "column_width": "60%",
+     "border_radius": 3,
+     "curve": "smooth",
+     "stroke_width": 3,
+     "legend": true,
+     "data_labels": false,
+     "x_title": null,
+     "gradient": null
+    },
+    "panels": null,
+    "gaps": null,
+    "table": {
+     "title": "Participation (coverage)",
+     "note": "",
+     "legend": "",
+     "columns": [
+      "Year",
+      "Plans submitted",
+      "Reports submitted"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "2025 *",
+        2,
+        1
+       ],
+       "countries": [
+        {
+         "cells": [
+          "AAA",
+          1,
+          1
+         ]
+        },
+        {
+         "cells": [
+          "BBB",
+          1,
+          null
+         ]
+        }
+       ]
+      },
+      {
+       "cells": [
+        "2024",
+        1,
+        2
+       ],
+       "countries": [
+        {
+         "cells": [
+          "AAA",
+          1,
+          1
+         ]
+        },
+        {
+         "cells": [
+          "BBB",
+          null,
+          1
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "table_label": null,
+    "findings": []
+   },
+   {
+    "id": "funding",
+    "title": "Funding ambition & delivery",
+    "hint": "Same mix as the Financial Overview network, CHF. Planned requirement is the country plan (host National Society + IFRC Secretariat + PNS lines on the plan). Reported funding adds PNS self-reports, other sources, and IFRC Secretariat actuals. Reported expenditure adds PNS self-reports and IFRC Secretariat actuals.",
+    "wide": false,
+    "kind": "chart",
+    "chart": {
+     "categories": [
+      "2024",
+      "2025 *"
+     ],
+     "series": [
+      {
+       "name": "Planned requirement",
+       "kind": "line",
+       "data": [
+        1000,
+        2000
+       ],
+       "color": "#011e41",
+       "axis": "primary",
+       "format": "money",
+       "dashed": false
+      },
+      {
+       "name": "Reported funding",
+       "kind": "line",
+       "data": [
+        800,
+        300
+       ],
+       "color": "#f39200",
+       "axis": "primary",
+       "format": "money",
+       "dashed": false
+      },
+      {
+       "name": "Reported expenditure",
+       "kind": "line",
+       "data": [
+        0,
+        0
+       ],
+       "color": "#f5333f",
+       "axis": "primary",
+       "format": "money",
+       "dashed": true
+      }
+     ],
+     "axes": {
+      "primary": {
+       "format": "money",
+       "opposite": false,
+       "min": null,
+       "max": null,
+       "tick_amount": null
+      }
+     },
+     "stacked": false,
+     "height": 300,
+     "column_width": "60%",
+     "border_radius": 3,
+     "curve": "smooth",
+     "stroke_width": 3,
+     "legend": true,
+     "data_labels": false,
+     "x_title": null,
+     "gradient": null
+    },
+    "panels": null,
+    "gaps": null,
+    "table": {
+     "title": "Funding ambition & delivery",
+     "note": "Same mix as the Financial Overview network block. Planned requirement is the country plan: host National Society + IFRC Secretariat + PNS lines recorded on that plan. Reported funding is PNS self-reported funding + other sources on the country report + IFRC Secretariat actuals (2025 and 2026 snapshots; earlier years have none). Reported expenditure is PNS self-reported expenditure + those IFRC actuals. Host National Society strategic-priority totals are not added on top. Transfers are not counted as expenditure.",
+     "legend": "Mid-year report, shown where the annual report is not yet available",
+     "columns": [
+      "Year",
+      "Planned requirement",
+      "Reported funding",
+      "Reported expenditure"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "2025 *",
+        2000.0,
+        {
+         "value": 300.0,
+         "midyear": true
+        },
+        {
+         "value": 0.0,
+         "midyear": true
+        }
+       ],
+       "countries": [
+        {
+         "cells": [
+          "Aland",
+          1500.0,
+          {
+           "value": 300.0,
+           "midyear": true
+          },
+          null
+         ]
+        },
+        {
+         "cells": [
+          "Bland",
+          500.0,
+          null,
+          null
+         ]
+        }
+       ]
+      },
+      {
+       "cells": [
+        "2024",
+        1000.0,
+        800.0,
+        0.0
+       ],
+       "countries": [
+        {
+         "cells": [
+          "Aland",
+          1000.0,
+          800.0,
+          null
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "table_label": null,
+    "findings": []
+   },
+   {
+    "id": "reach",
+    "title": "People to be reached",
+    "hint": "People the network plans to reach, by plan year.",
+    "wide": false,
+    "kind": "chart",
+    "chart": {
+     "categories": [
+      "2024",
+      "2025 *"
+     ],
+     "series": [
+      {
+       "name": "People to be reached",
+       "kind": "area",
+       "data": [
+        0,
+        40000
+       ],
+       "color": "#2a9d8f",
+       "axis": "primary",
+       "format": "int",
+       "dashed": false
+      }
+     ],
+     "axes": {
+      "primary": {
+       "format": "money",
+       "opposite": false,
+       "min": null,
+       "max": null,
+       "tick_amount": null
+      }
+     },
+     "stacked": false,
+     "height": 300,
+     "column_width": "60%",
+     "border_radius": 3,
+     "curve": "smooth",
+     "stroke_width": 3,
+     "legend": true,
+     "data_labels": false,
+     "x_title": null,
+     "gradient": [
+      0.4,
+      0.5,
+      0.05
+     ]
+    },
+    "panels": null,
+    "gaps": null,
+    "table": {
+     "title": "People to be reached",
+     "note": "",
+     "legend": "",
+     "columns": [
+      "Year",
+      "Plan round",
+      "People to be reached"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "2025 *",
+        "P25",
+        40000.0
+       ],
+       "countries": [
+        {
+         "cells": [
+          "Aland",
+          null,
+          40000.0
+         ]
+        }
+       ]
+      },
+      {
+       "cells": [
+        "2024",
+        "P24",
+        0.0
+       ],
+       "countries": []
+      }
+     ]
+    },
+    "table_label": null,
+    "findings": []
+   },
+   {
+    "id": "partners",
+    "title": "Partners engaged",
+    "hint": "Participating National Societies providing bilateral support, and the funding they self-report (PNS data, CHF).",
+    "wide": false,
+    "kind": "chart",
+    "chart": {
+     "categories": [
+      "2024",
+      "2025 *"
+     ],
+     "series": [
+      {
+       "name": "Partners (PNS)",
+       "kind": "column",
+       "data": [
+        1,
+        0
+       ],
+       "color": "#8b5a9e",
+       "axis": "primary",
+       "format": "int",
+       "dashed": false
+      },
+      {
+       "name": "Partner funding (CHF)",
+       "kind": "line",
+       "data": [
+        800,
+        300
+       ],
+       "color": "#f39200",
+       "axis": "secondary",
+       "format": "money",
+       "dashed": false
+      }
+     ],
+     "axes": {
+      "primary": {
+       "format": "int",
+       "opposite": false,
+       "min": null,
+       "max": null,
+       "tick_amount": null
+      },
+      "secondary": {
+       "format": "money",
+       "opposite": true,
+       "min": null,
+       "max": null,
+       "tick_amount": null
+      }
+     },
+     "stacked": false,
+     "height": 300,
+     "column_width": "45%",
+     "border_radius": 3,
+     "curve": "smooth",
+     "stroke_width": 3,
+     "legend": true,
+     "data_labels": false,
+     "x_title": null,
+     "gradient": null
+    },
+    "panels": null,
+    "gaps": null,
+    "table": {
+     "title": "Partners engaged",
+     "note": "Source: Participating National Society self-reports (PNS data). This is separate from the PNS amount a host National Society records in its own plan. Under a country, the partner count is the societies supporting that country; the year total counts each society once.",
+     "legend": "",
+     "columns": [
+      "Year",
+      "Report round",
+      "Partners (PNS)",
+      "Partner funding (CHF)"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "2025 *",
+        "MYR25",
+        0,
+        300.0
+       ],
+       "countries": [
+        {
+         "cells": [
+          "Aland",
+          null,
+          null,
+          300.0
+         ]
+        }
+       ]
+      },
+      {
+       "cells": [
+        "2024",
+        "AR24",
+        1,
+        800.0
+       ],
+       "countries": [
+        {
+         "cells": [
+          "Aland",
+          null,
+          1,
+          800.0
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "table_label": null,
+    "findings": []
+   },
+   {
+    "id": "capacity",
+    "title": "National Society capacity",
+    "hint": "Volunteers, staff, branches and local units reported by host National Societies.",
+    "wide": true,
+    "kind": "panels",
+    "chart": null,
+    "panels": [
+     {
+      "id": "volunteers",
+      "name": "Volunteers",
+      "color": "#6ba543",
+      "value": 1200.0,
+      "year": 2024,
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Volunteers",
+         "kind": "area",
+         "data": [
+          1200,
+          null
+         ],
+         "color": "#6ba543",
+         "axis": "primary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": 4
+        }
+       },
+       "stacked": false,
+       "height": 240,
+       "column_width": "60%",
+       "border_radius": 3,
+       "curve": "straight",
+       "stroke_width": 2,
+       "legend": false,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": [
+        0.3,
+        0.35,
+        0.02
+       ]
+      }
+     },
+     {
+      "id": "staff",
+      "name": "Staff",
+      "color": "#f5333f",
+      "value": null,
+      "year": null,
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Staff",
+         "kind": "area",
+         "data": [
+          null,
+          null
+         ],
+         "color": "#f5333f",
+         "axis": "primary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": 4
+        }
+       },
+       "stacked": false,
+       "height": 240,
+       "column_width": "60%",
+       "border_radius": 3,
+       "curve": "straight",
+       "stroke_width": 2,
+       "legend": false,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": [
+        0.3,
+        0.35,
+        0.02
+       ]
+      }
+     },
+     {
+      "id": "branches",
+      "name": "Branches",
+      "color": "#011e41",
+      "value": 30.0,
+      "year": 2024,
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Branches",
+         "kind": "area",
+         "data": [
+          30,
+          null
+         ],
+         "color": "#011e41",
+         "axis": "primary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": 4
+        }
+       },
+       "stacked": false,
+       "height": 240,
+       "column_width": "60%",
+       "border_radius": 3,
+       "curve": "straight",
+       "stroke_width": 2,
+       "legend": false,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": [
+        0.3,
+        0.35,
+        0.02
+       ]
+      }
+     },
+     {
+      "id": "local_units",
+      "name": "Local units",
+      "color": "#3d7edb",
+      "value": null,
+      "year": null,
+      "chart": {
+       "categories": [
+        "2024",
+        "2025 *"
+       ],
+       "series": [
+        {
+         "name": "Local units",
+         "kind": "area",
+         "data": [
+          null,
+          null
+         ],
+         "color": "#3d7edb",
+         "axis": "primary",
+         "format": "int",
+         "dashed": false
+        }
+       ],
+       "axes": {
+        "primary": {
+         "format": "money",
+         "opposite": false,
+         "min": null,
+         "max": null,
+         "tick_amount": 4
+        }
+       },
+       "stacked": false,
+       "height": 240,
+       "column_width": "60%",
+       "border_radius": 3,
+       "curve": "straight",
+       "stroke_width": 2,
+       "legend": false,
+       "data_labels": false,
+       "x_title": null,
+       "gradient": [
+        0.3,
+        0.35,
+        0.02
+       ]
+      }
+     }
+    ],
+    "gaps": null,
+    "table": {
+     "title": "National Society capacity",
+     "note": "",
+     "legend": "",
+     "columns": [
+      "Year",
+      "Report round",
+      "Volunteers",
+      "Staff",
+      "Branches",
+      "Local units"
+     ],
+     "rows": [
+      {
+       "cells": [
+        "2025 *",
+        "MYR25",
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ],
+       "countries": []
+      },
+      {
+       "cells": [
+        "2024",
+        "AR24",
+        1200.0,
+        0.0,
+        30.0,
+        0.0
+       ],
+       "countries": [
+        {
+         "cells": [
+          "Aland",
+          null,
+          1200.0,
+          null,
+          30.0,
+          null
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    "table_label": null,
+    "findings": []
+   }
+  ],
+  "notes": [
+   "* Year still open (2025) — submissions are still coming in, so the latest point understates the final total. Headline figures use the latest completed year.",
+   "Reporting figures use the annual report where available, otherwise the mid-year report (years: 2025).",
+   "Indicative network totals summed from Unified Plans and Reports currently in the database. The trend spans the rounds that have submissions; it is not a historical back-fill."
+  ],
+  "warnings": [],
+  "has_data": true
+ },
+ "narrative": {
+  "ALL": {
+   "track": "ALL",
+   "title": "Participation: data and narrative",
+   "lead": "A National Society takes part in a round when it submits its data form or hands in its narrative. The internal narrative is the document sent to the Secretariat (IFRC GO, internal); the public narrative is the one published on the public site. Counting data alone misses countries that only take part through the narrative.",
+   "kpis": [
+    {
+     "id": "plans",
+     "label": "Plans: participating",
+     "value": 3,
+     "format": "int",
+     "year": 2025,
+     "delta": {
+      "direction": "up",
+      "text": "+50%",
+      "context": "vs 2024",
+      "note": false
+     }
+    },
+    {
+     "id": "midyear",
+     "label": "Mid-year reports: participating",
+     "value": null,
+     "format": "int",
+     "year": null,
+     "delta": null
+    },
+    {
+     "id": "annual",
+     "label": "Annual reports: participating",
+     "value": 2,
+     "format": "int",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "first year",
+      "context": null,
+      "note": false
+     }
+    },
+    {
+     "id": "cycle",
+     "label": "Planned and reported",
+     "value": 100.0,
+     "format": "pct",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "2 of 2 that planned also reported",
+      "context": null,
+      "note": true
+     }
+    },
+    {
+     "id": "always",
+     "label": "Took part in every round",
+     "value": 2,
+     "format": "int",
+     "year": null,
+     "delta": {
+      "direction": "flat",
+      "text": "of 3 completed rounds",
+      "context": null,
+      "note": true
+     }
+    }
+   ],
+   "visuals": [
+    {
+     "id": "narr_stage",
+     "title": "Participation by stage",
+     "hint": "National Societies in each round at each stage. “Either” is the real participation: data submitted or internal narrative handed in.",
+     "wide": true,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "series": [
+       {
+        "name": "Data submitted",
+        "kind": "column",
+        "data": [
+         1,
+         2,
+         2
+        ],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [
+         2,
+         1,
+         3
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Public narrative",
+        "kind": "column",
+        "data": [
+         1,
+         0,
+         1
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Either (data or narrative)",
+        "kind": "line",
+        "data": [
+         2,
+         2,
+         3
+        ],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 320,
+      "column_width": "65%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Participation by stage",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data submitted",
+       "Internal narrative",
+       "Public narrative",
+       "Either (data or narrative)",
+       "Participation rate"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         2,
+         3,
+         1,
+         3,
+         "100%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           1,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           1,
+           null,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           null,
+           1,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         2,
+         1,
+         0,
+         2,
+         "66.7%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           null,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         1,
+         2,
+         1,
+         2,
+         "66.7%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           1,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           1,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_mix",
+     "title": "How countries take part",
+     "hint": "Both data and narrative, narrative only, or data only. Blank where the databank holds no data for that round.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "series": [
+       {
+        "name": "Data and narrative",
+        "kind": "column",
+        "data": [
+         1,
+         1,
+         2
+        ],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Narrative only",
+        "kind": "column",
+        "data": [
+         1,
+         0,
+         1
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Data only",
+        "kind": "column",
+        "data": [
+         0,
+         1,
+         0
+        ],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "How countries take part",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data and narrative",
+       "Narrative only",
+       "Data only"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         2,
+         1,
+         0
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         1,
+         0,
+         1
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           null,
+           1
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         1,
+         1,
+         0
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_pub",
+     "title": "From internal to public",
+     "hint": "Internal narratives received, and how many of those countries have a public document.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "series": [
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [
+         2,
+         1,
+         3
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal and public",
+        "kind": "column",
+        "data": [
+         1,
+         0,
+         1
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Share made public",
+        "kind": "line",
+        "data": [
+         50.0,
+         0.0,
+         33.3
+        ],
+        "color": "#8b5a9e",
+        "axis": "secondary",
+        "format": "pct",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       },
+       "secondary": {
+        "format": "pct",
+        "opposite": true,
+        "min": 0,
+        "max": 100,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 300,
+      "column_width": "60%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "From internal to public",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Internal narrative",
+       "Internal and public",
+       "Not yet public",
+       "Public only",
+       "Share made public"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         3,
+         1,
+         2,
+         0,
+         "33.3%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           null,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         1,
+         0,
+         1,
+         0,
+         "0%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         2,
+         1,
+         1,
+         0,
+         "50%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           null,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_ret",
+     "title": "How consistently countries take part",
+     "hint": "National Societies by the number of completed rounds (plans, mid-year and annual reports) they took part in. Rounds still open or only partly covered by the sources are left out.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "0",
+       "1",
+       "2",
+       "3"
+      ],
+      "series": [
+       {
+        "name": "National Societies",
+        "kind": "column",
+        "data": [
+         0,
+         1,
+         0,
+         2
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 300,
+      "column_width": "60%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": false,
+      "data_labels": true,
+      "x_title": "Completed rounds taken part in",
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "How consistently countries take part",
+      "note": "National Societies by the number of completed rounds (plans, mid-year and annual reports) they took part in. Rounds still open or only partly covered by the sources are left out.",
+      "legend": "",
+      "columns": [
+       "Completed rounds taken part in",
+       "National Societies"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "0",
+         0
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "1",
+         1
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "2",
+         0
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "3",
+         2
+        ],
+        "countries": []
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_gaps",
+     "title": "Gaps to follow up",
+     "hint": "Across 3 completed rounds.",
+     "wide": false,
+     "kind": "gaps",
+     "chart": null,
+     "panels": null,
+     "gaps": [
+      {
+       "id": "always",
+       "label": "Took part in every completed round",
+       "count": 2,
+       "table": {
+        "title": "Took part in every completed round",
+        "note": "",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": [
+         {
+          "cells": [
+           "Aland",
+           "Africa"
+          ],
+          "countries": []
+         },
+         {
+          "cells": [
+           "Bland",
+           "Africa"
+          ],
+          "countries": []
+         }
+        ]
+       }
+      },
+      {
+       "id": "intermittent",
+       "label": "Took part in some rounds only",
+       "count": 1,
+       "table": {
+        "title": "Took part in some rounds only",
+        "note": "",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": [
+         {
+          "cells": [
+           "Cland",
+           "Asia"
+          ],
+          "countries": []
+         }
+        ]
+       }
+      },
+      {
+       "id": "planned_not_reported",
+       "label": "Planned but did not report (latest year with both)",
+       "count": 0,
+       "table": {
+        "title": "Planned but did not report (latest year with both)",
+        "note": "None — nothing to follow up.",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": []
+       }
+      },
+      {
+       "id": "never",
+       "label": "Only in open or partly covered rounds",
+       "count": 0,
+       "table": {
+        "title": "Only in open or partly covered rounds",
+        "note": "None — nothing to follow up.",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": []
+       }
+      }
+     ],
+     "table": {
+      "title": "Country by round",
+      "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
+      "legend": "",
+      "columns": [
+       "National Society",
+       "Region",
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "Aland",
+         "Africa",
+         "DNP",
+         "DN",
+         "DNP"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Bland",
+         "Africa",
+         "N",
+         "D",
+         "DN"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Cland",
+         "Asia",
+         "",
+         "",
+         "N"
+        ],
+        "countries": []
+       }
+      ]
+     },
+     "table_label": "View every country by round",
+     "findings": []
+    }
+   ],
+   "notes": [
+    "Sources: internal narratives 6, public narratives 0 (one per country and round, country appeals only).",
+    "Participation rate is out of the 3 National Societies seen in any round."
+   ],
+   "warnings": [
+    "Public narrative: down"
+   ],
+   "has_data": true
+  },
+  "P": {
+   "track": "P",
+   "title": "Participation: data and narrative",
+   "lead": "A National Society takes part in a round when it submits its data form or hands in its narrative. The internal narrative is the document sent to the Secretariat (IFRC GO, internal); the public narrative is the one published on the public site. Counting data alone misses countries that only take part through the narrative.",
+   "kpis": [
+    {
+     "id": "any",
+     "label": "Participating (data or narrative)",
+     "value": 3,
+     "format": "int",
+     "year": 2025,
+     "delta": {
+      "direction": "up",
+      "text": "+50%",
+      "context": "vs 2024",
+      "note": false
+     }
+    },
+    {
+     "id": "internal",
+     "label": "Internal narratives",
+     "value": 3,
+     "format": "int",
+     "year": 2025,
+     "delta": {
+      "direction": "up",
+      "text": "+50%",
+      "context": "vs 2024",
+      "note": false
+     }
+    },
+    {
+     "id": "public",
+     "label": "Public narratives",
+     "value": 1,
+     "format": "int",
+     "year": 2025,
+     "delta": {
+      "direction": "flat",
+      "text": "0%",
+      "context": "vs 2024",
+      "note": false
+     }
+    },
+    {
+     "id": "hidden",
+     "label": "Missed by data alone",
+     "value": 1,
+     "format": "int",
+     "year": 2025,
+     "delta": {
+      "direction": "flat",
+      "text": "0",
+      "context": "vs 2024",
+      "note": false
+     }
+    },
+    {
+     "id": "publication",
+     "label": "Internal narratives made public",
+     "value": 33.3,
+     "format": "pct",
+     "year": 2025,
+     "delta": {
+      "direction": "down",
+      "text": "-16.7 pts",
+      "context": "vs 2024",
+      "note": false
+     }
+    }
+   ],
+   "visuals": [
+    {
+     "id": "narr_stage",
+     "title": "Participation by stage",
+     "hint": "National Societies in each round at each stage. “Either” is the real participation: data submitted or internal narrative handed in.",
+     "wide": true,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024",
+       "2025"
+      ],
+      "series": [
+       {
+        "name": "Data submitted",
+        "kind": "column",
+        "data": [
+         1,
+         2
+        ],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [
+         2,
+         3
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Public narrative",
+        "kind": "column",
+        "data": [
+         1,
+         1
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Either (data or narrative)",
+        "kind": "line",
+        "data": [
+         2,
+         3
+        ],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 320,
+      "column_width": "65%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Participation by stage",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data submitted",
+       "Internal narrative",
+       "Public narrative",
+       "Either (data or narrative)",
+       "Participation rate"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         2,
+         3,
+         1,
+         3,
+         "100%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           1,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           1,
+           null,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           null,
+           1,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         1,
+         2,
+         1,
+         2,
+         "66.7%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           1,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           1,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_mix",
+     "title": "How countries take part",
+     "hint": "Both data and narrative, narrative only, or data only. Blank where the databank holds no data for that round.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024",
+       "2025"
+      ],
+      "series": [
+       {
+        "name": "Data and narrative",
+        "kind": "column",
+        "data": [
+         1,
+         2
+        ],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Narrative only",
+        "kind": "column",
+        "data": [
+         1,
+         1
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Data only",
+        "kind": "column",
+        "data": [
+         0,
+         0
+        ],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "How countries take part",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data and narrative",
+       "Narrative only",
+       "Data only"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         2,
+         1,
+         0
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         1,
+         1,
+         0
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_pub",
+     "title": "From internal to public",
+     "hint": "Internal narratives received, and how many of those countries have a public document.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024",
+       "2025"
+      ],
+      "series": [
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [
+         2,
+         3
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal and public",
+        "kind": "column",
+        "data": [
+         1,
+         1
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Share made public",
+        "kind": "line",
+        "data": [
+         50.0,
+         33.3
+        ],
+        "color": "#8b5a9e",
+        "axis": "secondary",
+        "format": "pct",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       },
+       "secondary": {
+        "format": "pct",
+        "opposite": true,
+        "min": 0,
+        "max": 100,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 300,
+      "column_width": "60%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "From internal to public",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Internal narrative",
+       "Internal and public",
+       "Not yet public",
+       "Public only",
+       "Share made public"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         3,
+         1,
+         2,
+         0,
+         "33.3%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           null,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         2,
+         1,
+         1,
+         0,
+         "50%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           null,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_ret",
+     "title": "Retention year on year",
+     "hint": "Participants that carried on, joined, or dropped out compared with the previous year. The first round is shown in grey as the baseline. When the previous round is only partly covered by the sources, joiners are not shown, because countries it simply missed would look new.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024",
+       "2025"
+      ],
+      "series": [
+       {
+        "name": "First round (baseline)",
+        "kind": "column",
+        "data": [
+         2,
+         null
+        ],
+        "color": "#58595b",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Carried on",
+        "kind": "column",
+        "data": [
+         null,
+         2
+        ],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Joined",
+        "kind": "column",
+        "data": [
+         null,
+         1
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Dropped out",
+        "kind": "column",
+        "data": [
+         null,
+         0
+        ],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "abs_int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Retention year on year",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "First round (baseline)",
+       "Carried on",
+       "Joined",
+       "Dropped out"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2025",
+         "P25",
+         null,
+         2,
+         1,
+         0
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           null,
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Cland",
+           "",
+           null,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       },
+       {
+        "cells": [
+         "2024",
+         "P24",
+         2,
+         null,
+         null,
+         null
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           null,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_gaps",
+     "title": "Gaps to follow up",
+     "hint": "Latest completed round: P25.",
+     "wide": false,
+     "kind": "gaps",
+     "chart": null,
+     "panels": null,
+     "gaps": [
+      {
+       "id": "narrative_only",
+       "label": "Narrative only",
+       "count": 1,
+       "table": {
+        "title": "Narrative only — P25",
+        "note": "",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": [
+         {
+          "cells": [
+           "Cland",
+           "Asia"
+          ],
+          "countries": []
+         }
+        ]
+       }
+      },
+      {
+       "id": "data_only",
+       "label": "Data only",
+       "count": 0,
+       "table": {
+        "title": "Data only — P25",
+        "note": "None — nothing to follow up.",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": []
+       }
+      },
+      {
+       "id": "unpublished",
+       "label": "Not yet public",
+       "count": 2,
+       "table": {
+        "title": "Not yet public — P25",
+        "note": "",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": [
+         {
+          "cells": [
+           "Bland",
+           "Africa"
+          ],
+          "countries": []
+         },
+         {
+          "cells": [
+           "Cland",
+           "Asia"
+          ],
+          "countries": []
+         }
+        ]
+       }
+      },
+      {
+       "id": "lapsed",
+       "label": "Participated last year, not this year",
+       "count": 0,
+       "table": {
+        "title": "Participated last year, not this year — P25",
+        "note": "None — nothing to follow up.",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": []
+       }
+      }
+     ],
+     "table": {
+      "title": "Country by round",
+      "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
+      "legend": "",
+      "columns": [
+       "National Society",
+       "Region",
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "Aland",
+         "Africa",
+         "DNP",
+         "DN",
+         "DNP"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Bland",
+         "Africa",
+         "N",
+         "D",
+         "DN"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Cland",
+         "Asia",
+         "",
+         "",
+         "N"
+        ],
+        "countries": []
+       }
+      ]
+     },
+     "table_label": "View every country by round",
+     "findings": []
+    }
+   ],
+   "notes": [
+    "Sources: internal narratives 6, public narratives 0 (one per country and round, country appeals only).",
+    "Participation rate is out of the 3 National Societies seen in any round."
+   ],
+   "warnings": [
+    "Public narrative: down"
+   ],
+   "has_data": true
+  },
+  "MYR": {
+   "track": "MYR",
+   "title": "Participation: data and narrative",
+   "lead": "A National Society takes part in a round when it submits its data form or hands in its narrative. The internal narrative is the document sent to the Secretariat (IFRC GO, internal); the public narrative is the one published on the public site. Counting data alone misses countries that only take part through the narrative.",
+   "kpis": [
+    {
+     "id": "any",
+     "label": "Participating (data or narrative)",
+     "value": null,
+     "format": "int",
+     "year": null,
+     "delta": null
+    },
+    {
+     "id": "internal",
+     "label": "Internal narratives",
+     "value": null,
+     "format": "int",
+     "year": null,
+     "delta": null
+    },
+    {
+     "id": "public",
+     "label": "Public narratives",
+     "value": null,
+     "format": "int",
+     "year": null,
+     "delta": null
+    },
+    {
+     "id": "hidden",
+     "label": "Missed by data alone",
+     "value": null,
+     "format": "int",
+     "year": null,
+     "delta": null
+    },
+    {
+     "id": "publication",
+     "label": "Internal narratives made public",
+     "value": null,
+     "format": "pct",
+     "year": null,
+     "delta": null
+    }
+   ],
+   "visuals": [
+    {
+     "id": "narr_stage",
+     "title": "Participation by stage",
+     "hint": "National Societies in each round at each stage. “Either” is the real participation: data submitted or internal narrative handed in.",
+     "wide": true,
+     "kind": "chart",
+     "chart": {
+      "categories": [],
+      "series": [
+       {
+        "name": "Data submitted",
+        "kind": "column",
+        "data": [],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Public narrative",
+        "kind": "column",
+        "data": [],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Either (data or narrative)",
+        "kind": "line",
+        "data": [],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 320,
+      "column_width": "65%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Participation by stage",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data submitted",
+       "Internal narrative",
+       "Public narrative",
+       "Either (data or narrative)",
+       "Participation rate"
+      ],
+      "rows": []
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_mix",
+     "title": "How countries take part",
+     "hint": "Both data and narrative, narrative only, or data only. Blank where the databank holds no data for that round.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [],
+      "series": [
+       {
+        "name": "Data and narrative",
+        "kind": "column",
+        "data": [],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Narrative only",
+        "kind": "column",
+        "data": [],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Data only",
+        "kind": "column",
+        "data": [],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "How countries take part",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data and narrative",
+       "Narrative only",
+       "Data only"
+      ],
+      "rows": []
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_pub",
+     "title": "From internal to public",
+     "hint": "Internal narratives received, and how many of those countries have a public document.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [],
+      "series": [
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal and public",
+        "kind": "column",
+        "data": [],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Share made public",
+        "kind": "line",
+        "data": [],
+        "color": "#8b5a9e",
+        "axis": "secondary",
+        "format": "pct",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       },
+       "secondary": {
+        "format": "pct",
+        "opposite": true,
+        "min": 0,
+        "max": 100,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 300,
+      "column_width": "60%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "From internal to public",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Internal narrative",
+       "Internal and public",
+       "Not yet public",
+       "Public only",
+       "Share made public"
+      ],
+      "rows": []
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_ret",
+     "title": "Retention year on year",
+     "hint": "Participants that carried on, joined, or dropped out compared with the previous year. The first round is shown in grey as the baseline. When the previous round is only partly covered by the sources, joiners are not shown, because countries it simply missed would look new.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [],
+      "series": [
+       {
+        "name": "First round (baseline)",
+        "kind": "column",
+        "data": [],
+        "color": "#58595b",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Carried on",
+        "kind": "column",
+        "data": [],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Joined",
+        "kind": "column",
+        "data": [],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Dropped out",
+        "kind": "column",
+        "data": [],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "abs_int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Retention year on year",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "First round (baseline)",
+       "Carried on",
+       "Joined",
+       "Dropped out"
+      ],
+      "rows": []
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_gaps",
+     "title": "Gaps to follow up",
+     "hint": "",
+     "wide": false,
+     "kind": "gaps",
+     "chart": null,
+     "panels": null,
+     "gaps": [],
+     "table": {
+      "title": "Country by round",
+      "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
+      "legend": "",
+      "columns": [
+       "National Society",
+       "Region",
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "Aland",
+         "Africa",
+         "DNP",
+         "DN",
+         "DNP"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Bland",
+         "Africa",
+         "N",
+         "D",
+         "DN"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Cland",
+         "Asia",
+         "",
+         "",
+         "N"
+        ],
+        "countries": []
+       }
+      ]
+     },
+     "table_label": "View every country by round",
+     "findings": []
+    }
+   ],
+   "notes": [
+    "Sources: internal narratives 6, public narratives 0 (one per country and round, country appeals only).",
+    "Participation rate is out of the 3 National Societies seen in any round."
+   ],
+   "warnings": [
+    "Public narrative: down"
+   ],
+   "has_data": true
+  },
+  "AR": {
+   "track": "AR",
+   "title": "Participation: data and narrative",
+   "lead": "A National Society takes part in a round when it submits its data form or hands in its narrative. The internal narrative is the document sent to the Secretariat (IFRC GO, internal); the public narrative is the one published on the public site. Counting data alone misses countries that only take part through the narrative.",
+   "kpis": [
+    {
+     "id": "any",
+     "label": "Participating (data or narrative)",
+     "value": 2,
+     "format": "int",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "first year",
+      "context": null,
+      "note": false
+     }
+    },
+    {
+     "id": "internal",
+     "label": "Internal narratives",
+     "value": 1,
+     "format": "int",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "first year",
+      "context": null,
+      "note": false
+     }
+    },
+    {
+     "id": "public",
+     "label": "Public narratives",
+     "value": 0,
+     "format": "int",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "first year",
+      "context": null,
+      "note": false
+     }
+    },
+    {
+     "id": "hidden",
+     "label": "Missed by data alone",
+     "value": 0,
+     "format": "int",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "first year",
+      "context": null,
+      "note": false
+     }
+    },
+    {
+     "id": "publication",
+     "label": "Internal narratives made public",
+     "value": 0.0,
+     "format": "pct",
+     "year": 2024,
+     "delta": {
+      "direction": "flat",
+      "text": "first year",
+      "context": null,
+      "note": false
+     }
+    }
+   ],
+   "visuals": [
+    {
+     "id": "narr_stage",
+     "title": "Participation by stage",
+     "hint": "National Societies in each round at each stage. “Either” is the real participation: data submitted or internal narrative handed in.",
+     "wide": true,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024"
+      ],
+      "series": [
+       {
+        "name": "Data submitted",
+        "kind": "column",
+        "data": [
+         2
+        ],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [
+         1
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Public narrative",
+        "kind": "column",
+        "data": [
+         0
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Either (data or narrative)",
+        "kind": "line",
+        "data": [
+         2
+        ],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 320,
+      "column_width": "65%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Participation by stage",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data submitted",
+       "Internal narrative",
+       "Public narrative",
+       "Either (data or narrative)",
+       "Participation rate"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         2,
+         1,
+         0,
+         2,
+         "66.7%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           1,
+           null,
+           1,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           null,
+           1,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_mix",
+     "title": "How countries take part",
+     "hint": "Both data and narrative, narrative only, or data only. Blank where the databank holds no data for that round.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024"
+      ],
+      "series": [
+       {
+        "name": "Data and narrative",
+        "kind": "column",
+        "data": [
+         1
+        ],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Narrative only",
+        "kind": "column",
+        "data": [
+         0
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Data only",
+        "kind": "column",
+        "data": [
+         1
+        ],
+        "color": "#011e41",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "How countries take part",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Data and narrative",
+       "Narrative only",
+       "Data only"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         1,
+         0,
+         1
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           null,
+           null,
+           1
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_pub",
+     "title": "From internal to public",
+     "hint": "Internal narratives received, and how many of those countries have a public document.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024"
+      ],
+      "series": [
+       {
+        "name": "Internal narrative",
+        "kind": "column",
+        "data": [
+         1
+        ],
+        "color": "#f39200",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Internal and public",
+        "kind": "column",
+        "data": [
+         0
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "int",
+        "dashed": false
+       },
+       {
+        "name": "Share made public",
+        "kind": "line",
+        "data": [
+         0.0
+        ],
+        "color": "#8b5a9e",
+        "axis": "secondary",
+        "format": "pct",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       },
+       "secondary": {
+        "format": "pct",
+        "opposite": true,
+        "min": 0,
+        "max": 100,
+        "tick_amount": null
+       }
+      },
+      "stacked": false,
+      "height": 300,
+      "column_width": "60%",
+      "border_radius": 3,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "From internal to public",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "Internal narrative",
+       "Internal and public",
+       "Not yet public",
+       "Public only",
+       "Share made public"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         1,
+         0,
+         1,
+         0,
+         "0%"
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           1,
+           null,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_ret",
+     "title": "Retention year on year",
+     "hint": "Participants that carried on, joined, or dropped out compared with the previous year. The first round is shown in grey as the baseline. When the previous round is only partly covered by the sources, joiners are not shown, because countries it simply missed would look new.",
+     "wide": false,
+     "kind": "chart",
+     "chart": {
+      "categories": [
+       "2024"
+      ],
+      "series": [
+       {
+        "name": "First round (baseline)",
+        "kind": "column",
+        "data": [
+         2
+        ],
+        "color": "#58595b",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Carried on",
+        "kind": "column",
+        "data": [
+         null
+        ],
+        "color": "#6ba543",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Joined",
+        "kind": "column",
+        "data": [
+         null
+        ],
+        "color": "#2a9d8f",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       },
+       {
+        "name": "Dropped out",
+        "kind": "column",
+        "data": [
+         null
+        ],
+        "color": "#f5333f",
+        "axis": "primary",
+        "format": "abs_int",
+        "dashed": false
+       }
+      ],
+      "axes": {
+       "primary": {
+        "format": "abs_int",
+        "opposite": false,
+        "min": null,
+        "max": null,
+        "tick_amount": null
+       }
+      },
+      "stacked": true,
+      "height": 300,
+      "column_width": "55%",
+      "border_radius": 2,
+      "curve": "smooth",
+      "stroke_width": 3,
+      "legend": true,
+      "data_labels": false,
+      "x_title": null,
+      "gradient": null
+     },
+     "panels": null,
+     "gaps": null,
+     "table": {
+      "title": "Retention year on year",
+      "note": "",
+      "legend": "",
+      "columns": [
+       "Year",
+       "Round",
+       "First round (baseline)",
+       "Carried on",
+       "Joined",
+       "Dropped out"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "2024",
+         "AR24",
+         2,
+         null,
+         null,
+         null
+        ],
+        "countries": [
+         {
+          "cells": [
+           "Aland",
+           "",
+           1,
+           null,
+           null,
+           null
+          ]
+         },
+         {
+          "cells": [
+           "Bland",
+           "",
+           1,
+           null,
+           null,
+           null
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     "table_label": null,
+     "findings": []
+    },
+    {
+     "id": "narr_gaps",
+     "title": "Gaps to follow up",
+     "hint": "Latest completed round: AR24.",
+     "wide": false,
+     "kind": "gaps",
+     "chart": null,
+     "panels": null,
+     "gaps": [
+      {
+       "id": "narrative_only",
+       "label": "Narrative only",
+       "count": 0,
+       "table": {
+        "title": "Narrative only — AR24",
+        "note": "None — nothing to follow up.",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": []
+       }
+      },
+      {
+       "id": "data_only",
+       "label": "Data only",
+       "count": 1,
+       "table": {
+        "title": "Data only — AR24",
+        "note": "",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": [
+         {
+          "cells": [
+           "Bland",
+           "Africa"
+          ],
+          "countries": []
+         }
+        ]
+       }
+      },
+      {
+       "id": "unpublished",
+       "label": "Not yet public",
+       "count": 1,
+       "table": {
+        "title": "Not yet public — AR24",
+        "note": "",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": [
+         {
+          "cells": [
+           "Aland",
+           "Africa"
+          ],
+          "countries": []
+         }
+        ]
+       }
+      },
+      {
+       "id": "lapsed",
+       "label": "Participated last year, not this year",
+       "count": 0,
+       "table": {
+        "title": "Participated last year, not this year — AR24",
+        "note": "None — nothing to follow up.",
+        "legend": "",
+        "columns": [
+         "National Society",
+         "Region"
+        ],
+        "rows": []
+       }
+      }
+     ],
+     "table": {
+      "title": "Country by round",
+      "note": "D = data submitted, N = internal narrative, P = public narrative. Blank = no participation recorded.",
+      "legend": "",
+      "columns": [
+       "National Society",
+       "Region",
+       "P24",
+       "AR24",
+       "P25"
+      ],
+      "rows": [
+       {
+        "cells": [
+         "Aland",
+         "Africa",
+         "DNP",
+         "DN",
+         "DNP"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Bland",
+         "Africa",
+         "N",
+         "D",
+         "DN"
+        ],
+        "countries": []
+       },
+       {
+        "cells": [
+         "Cland",
+         "Asia",
+         "",
+         "",
+         "N"
+        ],
+        "countries": []
+       }
+      ]
+     },
+     "table_label": "View every country by round",
+     "findings": []
+    }
+   ],
+   "notes": [
+    "Sources: internal narratives 6, public narratives 0 (one per country and round, country appeals only).",
+    "Participation rate is out of the 3 National Societies seen in any round."
+   ],
+   "warnings": [
+    "Public narrative: down"
+   ],
+   "has_data": true
+  }
+ }
+}

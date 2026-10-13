@@ -1,4 +1,6 @@
 /* Analysis tab — Data Explorer. Plain CSS so it needs no Tailwind rebuild. */
+/* Chart colours come from the view (plugins/upr/analysis_spec.py COLORS); these
+ * variables only style the page chrome around the charts. */
 :root {
     --upri-navy: #011e41;
     --upri-red: #f5333f;
@@ -209,7 +211,7 @@
 .upri-chart {
     min-height: 18rem;
 }
-#upri-chart-capacity.upri-cap-grid {
+.upri-cap-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.5rem 2rem;
@@ -239,7 +241,7 @@
     display: none;
 }
 @media (max-width: 700px) {
-    #upri-chart-capacity.upri-cap-grid {
+    .upri-cap-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -489,4 +491,115 @@
     .upri-card--wide {
         grid-column: auto;
     }
+}
+
+/* Export dialog (presentation / A4 report) */
+.upri-toolbar__export {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+.upri-export {
+    width: min(30rem, calc(100vw - 2rem));
+}
+.upri-export .upri-dialog__note {
+    padding-bottom: 0.25rem;
+}
+.upri-export__fields {
+    margin: 0;
+    padding: 0.6rem 1rem 0;
+    border: 0;
+}
+.upri-export__fields .upri-field__label {
+    padding: 0;
+    margin-bottom: 0.35rem;
+}
+.upri-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.35rem 0;
+    font-size: 0.875rem;
+    color: #111827;
+    cursor: pointer;
+}
+.upri-check input {
+    margin-top: 0.2rem;
+    accent-color: var(--upri-navy);
+}
+.upri-check.is-disabled {
+    color: #9ca3af;
+    cursor: default;
+}
+.upri-check__hint {
+    margin-left: 0.35rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+.upri-export__extra {
+    padding: 0.25rem 1rem 0;
+}
+.upri-export__empty {
+    margin: 0;
+    padding: 0.75rem 1rem 0;
+    font-size: 0.85rem;
+    color: #92400e;
+}
+.upri-export__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+}
+
+/* Findings: what the data says about a visual (listed under its chart) */
+.upri-findings-wrap {
+    margin-top: 0.35rem;
+    padding: 0.6rem 0 0.75rem;
+    border-top: 1px solid #eef0f2;
+}
+.upri-findings__heading {
+    margin: 0 0 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.upri-findings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.upri-finding {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid var(--upri-navy);
+    border-radius: 0.25rem;
+    background: #f8fafc;
+}
+.upri-finding--positive {
+    border-left-color: var(--upri-green);
+}
+.upri-finding--attention {
+    border-left-color: var(--upri-amber);
+}
+.upri-finding__body {
+    min-width: 0;
+}
+.upri-finding__title {
+    margin: 0 0 0.1rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+}
+.upri-finding__text {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #374151;
 }

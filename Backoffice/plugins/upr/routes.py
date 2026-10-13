@@ -78,6 +78,22 @@ def upr_static_url(filename: str) -> str:
     )
 
 
+@bp.app_template_global("upr_analysis_text")
+def upr_analysis_text() -> dict[str, str]:
+    """Analysis display text for templates (same catalogue the views use)."""
+    from plugins.upr.analysis_labels import analysis_labels
+
+    return analysis_labels()
+
+
+@bp.app_template_global("upr_analysis_ui")
+def upr_analysis_ui() -> dict[str, str]:
+    """Interface strings for the Analysis scripts."""
+    from plugins.upr.analysis_labels import analysis_ui_labels
+
+    return analysis_ui_labels()
+
+
 @bp.app_template_global("upr_asset_v")
 def upr_asset_v() -> str:
     return _plugin_asset_version("css/upr.css")
@@ -874,10 +890,11 @@ def manage_page():
 def impact_data():
     """Per-round analysis series for the Analysis tab (coverage, funding, reach, partners, capacity)."""
     try:
-        from plugins.upr.impact import build_upr_impact
+        from plugins.upr.analysis_service import build_impact_analysis
 
         region = (request.args.get("region") or "").strip() or None
-        return json_ok(impact=build_upr_impact(region=region))
+        analysis = build_impact_analysis(region=region)
+        return json_ok(impact=analysis["payload"], view=analysis["view"])
     except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 
@@ -891,10 +908,11 @@ def impact_narrative():
     API, which is slower and can fail independently of the database.
     """
     try:
-        from plugins.upr.narrative import build_narrative_participation
+        from plugins.upr.analysis_service import build_narrative_analysis
 
         region = (request.args.get("region") or "").strip() or None
-        return json_ok(narrative=build_narrative_participation(region=region))
+        analysis = build_narrative_analysis(region=region)
+        return json_ok(narrative=analysis["payload"], views=analysis["views"])
     except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
 

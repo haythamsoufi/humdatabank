@@ -35,6 +35,7 @@ from plugins.upr.financial import (
     _usable_ifrc_actual,
     build_report_network_entities,
     ifrc_secretariat_actuals_for_report,
+    sum_ifrc_secretariat_actuals,
 )
 from plugins.upr.formatters import (
     document_subtitle,

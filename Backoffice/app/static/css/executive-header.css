@@ -835,6 +835,14 @@
     gap: 0.5rem;
 }
 
+/* Header action display beats Tailwind .hidden (one class). Honor .hidden so
+   tab-scoped actions (e.g. Explore Data "Manage report") stay off other tabs. */
+.executive-page-header .action-controls a.hidden,
+.executive-page-header .action-controls button.hidden,
+.professional-action-btn.hidden {
+    display: none;
+}
+
 /* Prevent icons from collapsing and ensure consistent spacing */
 .executive-page-header .action-controls i,
 .executive-page-header .action-controls svg {

@@ -433,6 +433,64 @@ def _ifrc_actuals_source_slug(period_name: str) -> str | None:
     return spec[0] if spec else None
 
 
+def ifrc_secretariat_actuals_by_country(
+    round_code: str, *, iso3s: set[str] | None = None
+) -> list[dict[str, Any]]:
+    """Per-country IFRC Secretariat funding and expenditure for one report round.
+
+    Same snapshot and 1,000 CHF floor as the Financial Overview visual. Years
+    without a shipped snapshot return an empty list. ``iso3s`` limits the rows
+    to one region; ``None`` keeps every country in the snapshot.
+    """
+    spec = _IFRC_ACTUALS_SNAPSHOTS.get((round_code or "").strip().upper())
+    if spec is None:
+        return []
+    catalog = _ifrc_actuals_by_iso2(str(spec[1]))
+    wanted = {code.strip().upper() for code in iso3s} if iso3s is not None else None
+    rows: list[dict[str, Any]] = []
+    for rec in catalog.values():
+        if not isinstance(rec, dict):
+            continue
+        iso = str(rec.get("iso3") or "").strip().upper()
+        if wanted is not None and iso not in wanted:
+            continue
+        funding = 0.0
+        expenditure = 0.0
+        for bucket in ("longer_term", "emergency"):
+            metrics = rec.get(bucket)
+            if not isinstance(metrics, dict):
+                continue
+            fund = _usable_ifrc_actual(metrics.get("funding"))
+            spent = _usable_ifrc_actual(metrics.get("expenditure"))
+            if fund:
+                funding += fund
+            if spent:
+                expenditure += spent
+        if not funding and not expenditure:
+            continue
+        rows.append(
+            {
+                "iso3": iso,
+                "country": str(rec.get("country") or iso),
+                "funding": funding,
+                "expenditure": expenditure,
+            }
+        )
+    rows.sort(key=lambda row: (row["country"].lower(), row["iso3"]))
+    return rows
+
+
+def sum_ifrc_secretariat_actuals(
+    round_code: str, *, iso3s: set[str] | None = None
+) -> tuple[float, float]:
+    """Network IFRC Secretariat funding and expenditure for one report round."""
+    rows = ifrc_secretariat_actuals_by_country(round_code, iso3s=iso3s)
+    return (
+        sum(row["funding"] for row in rows),
+        sum(row["expenditure"] for row in rows),
+    )
+
+
 def ifrc_secretariat_actuals_for_report(
     *,
     period_name: str,

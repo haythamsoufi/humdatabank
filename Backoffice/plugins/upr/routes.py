@@ -291,7 +291,7 @@ def fonts_css():
 
 @bp.route("/assignment/<int:aes_id>/visuals/progress", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_visuals_progress(aes_id: int):
     try:
         _aes_or_404(aes_id)
@@ -319,7 +319,7 @@ def assignment_visuals_progress(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/visuals", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_payload(aes_id: int):
     try:
@@ -357,7 +357,7 @@ def assignment_payload(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/visuals/bundles", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_bundles(aes_id: int):
     """Bundles this assignment can switch to, when another country on the same form shares one."""
     try:
@@ -377,7 +377,7 @@ def assignment_bundles(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/visuals/report", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_report(aes_id: int):
     try:
@@ -653,7 +653,7 @@ def _assignment_png_response(aes_id: int, dashboard_id: str) -> Response:
 
 @bp.route("/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_png(aes_id: int, dashboard_id: str):
     try:
@@ -671,7 +671,7 @@ def assignment_png(aes_id: int, dashboard_id: str):
 
 @bp.route("/assignment/<int:aes_id>/pdf", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_pdf(aes_id: int):
     """Live All visuals PDF. Desktop gets a titled viewer; mobile and ?raw=1 get the file."""
@@ -735,7 +735,7 @@ def assignment_pdf(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/idml", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_idml(aes_id: int):
     try:
@@ -754,7 +754,7 @@ def assignment_idml(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/visuals/narrative", methods=["POST"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_narrative(aes_id: int):
     try:
@@ -804,7 +804,7 @@ def assignment_narrative(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/visuals/narrative/status", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_narrative_status(aes_id: int):
     try:
         _aes_or_404(aes_id)
@@ -828,7 +828,7 @@ def assignment_narrative_status(aes_id: int):
 
 @bp.route("/assignment/<int:aes_id>/visuals/narrative/file/<job_id>", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_narrative_file(aes_id: int, job_id: str):
     try:
         _aes_or_404(aes_id)
@@ -846,7 +846,7 @@ def assignment_narrative_file(aes_id: int, job_id: str):
 
 @bp.route("/assignment/<int:aes_id>/pdf/<dashboard_id>", methods=["GET"])
 @login_required
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_pdf_dashboard(aes_id: int, dashboard_id: str):
     try:
@@ -863,21 +863,51 @@ def assignment_pdf_dashboard(aes_id: int, dashboard_id: str):
 
 
 @bp.route("/admin/data-exploration/upr/manage", methods=["GET"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def manage_page():
     return redirect(url_for("data_exploration.explore_data", tab="upr"))
 
 
+@bp.route("/admin/data-exploration/upr-impact/data", methods=["GET"])
+@permission_required("admin.data_explore.upr_impact")
+def impact_data():
+    """Per-round analysis series for the Analysis tab (coverage, funding, reach, partners, capacity)."""
+    try:
+        from plugins.upr.impact import build_upr_impact
+
+        region = (request.args.get("region") or "").strip() or None
+        return json_ok(impact=build_upr_impact(region=region))
+    except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/admin/data-exploration/upr-impact/narrative", methods=["GET"])
+@permission_required("admin.data_explore.upr_impact")
+def impact_narrative():
+    """Narrative participation (internal + public documents, vs data) for the Analysis tab.
+
+    Kept separate from :func:`impact_data` because it calls the IFRC document
+    API, which is slower and can fail independently of the database.
+    """
+    try:
+        from plugins.upr.narrative import build_narrative_participation
+
+        region = (request.args.get("region") or "").strip() or None
+        return json_ok(narrative=build_narrative_participation(region=region))
+    except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
 @bp.route("/admin/data-exploration/upr/assignments", methods=["GET"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def assignments():
     return json_ok(assignments=list_assigned_forms_for_bulk())
 
 
 @bp.route("/admin/data-exploration/upr/countries", methods=["GET"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def countries():
     try:
@@ -911,7 +941,7 @@ def countries():
 
 
 @bp.route("/admin/data-exploration/upr/generate", methods=["POST"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def generate():
     payload = request.get_json(silent=True) if request.is_json else request.form
@@ -978,7 +1008,7 @@ def generate():
 
 
 @bp.route("/admin/data-exploration/upr/status", methods=["GET"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def status():
     job_id = (request.args.get("job_id") or "").strip() or get_latest_bulk_export_job_id()
@@ -988,7 +1018,7 @@ def status():
 
 
 @bp.route("/admin/data-exploration/upr/cancel", methods=["POST"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def cancel():
     payload = request.get_json(silent=True) or {}
@@ -1000,7 +1030,7 @@ def cancel():
 
 
 @bp.route("/admin/data-exploration/upr/download/<job_id>", methods=["GET"])
-@permission_required("admin.data_explore.upr")
+@permission_required("admin.data_explore.upr_visuals")
 @system_manager_required
 def download(job_id: str):
     try:

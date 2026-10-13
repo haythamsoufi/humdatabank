@@ -31,6 +31,7 @@ from plugins.upr.data import (
     _report_financial,
     _report_support,
     build_report_network_entities,
+    sum_ifrc_secretariat_actuals,
     ifrc_secretariat_actuals_for_report,
     max_people_by_area,
     override_people_reached_area,
@@ -679,6 +680,13 @@ def test_ifrc_secretariat_actuals_for_shipped_rounds():
     assert missing is None
     # Albania emergency funding is negative and expenditure is < 1,000 CHF.
     assert ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso2="AL") is None
+    afg_sum = sum_ifrc_secretariat_actuals("AR25", iso3s={"AFG"})
+    assert afg_sum == (
+        21_221_314 + 13_540_742,
+        18_462_993 + 4_574_407,
+    )
+    assert sum_ifrc_secretariat_actuals("MYR25", iso3s={"AFG"}) == afg_sum
+    assert sum_ifrc_secretariat_actuals("AR24", iso3s={"AFG"}) == (0.0, 0.0)
 
 
 @pytest.mark.unit

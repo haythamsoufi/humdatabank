@@ -43,10 +43,13 @@ def test_fdrs_plugin_owns_fdrs_explorer_tabs():
     assert tabs["pb-progress"].permission == "admin.data_explore.pb_progress"
     assert tabs["pb-progress"].plugin_id == "fdrs"
     assert PBProgressPlugin().get_data_explorer_tab() is None
-    upr = UprPlugin().get_data_explorer_tab()
-    assert upr is not None
-    assert upr.tab_id == "upr"
-    assert upr.plugin_id == "upr"
+    upr_tabs = {tab.tab_id: tab for tab in UprPlugin().get_data_explorer_tabs()}
+    assert list(upr_tabs) == ["upr", "upr-impact"]
+    assert upr_tabs["upr"].plugin_id == "upr"
+    assert upr_tabs["upr"].permission == "admin.data_explore.upr_visuals"
+    assert upr_tabs["upr-impact"].plugin_id == "upr"
+    assert upr_tabs["upr-impact"].permission == "admin.data_explore.upr_impact"
+    assert upr_tabs["upr-impact"].panel_template == "plugins/upr/upr/impact_panel.html"
 
 
 def test_explore_first_tab_returns_lowest_priority_accessible_tab():

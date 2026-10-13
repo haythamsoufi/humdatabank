@@ -609,12 +609,12 @@ class TestSeedRbacPermissionsAndRoles:
         """Plugin seed roles must be inserted even when core roles already exist."""
         from app.models.rbac import RbacRole, RbacPermission
 
-        ext_perm = ("admin.data_explore.upr", "UPR", "Access UPR")
+        ext_perm = ("admin.data_explore.upr_visuals", "UPR Visuals", "Access UPR Visuals")
         ext_role = {
-            "code": "admin_data_explorer_upr",
-            "name": "Admin: Data Explorer (UPR)",
-            "description": "Access UPR.",
-            "permission_codes": ["admin.data_explore.upr"],
+            "code": "admin_data_explorer_upr_visuals",
+            "name": "Admin: Data Explorer (UPR Visuals)",
+            "description": "Access UPR Visuals.",
+            "permission_codes": ["admin.data_explore.upr_visuals"],
         }
         with app.app_context():
             with patch(

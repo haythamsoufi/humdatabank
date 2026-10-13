@@ -654,7 +654,9 @@ def _build_access_context(identity) -> Dict[str, Any]:
         "admin.data_explore.pb_progress": AuthorizationService.has_rbac_permission(
             user, "admin.data_explore.pb_progress"
         ),
-        "admin.data_explore.upr": AuthorizationService.has_rbac_permission(user, "admin.data_explore.upr"),
+        "admin.data_explore.upr_visuals": AuthorizationService.has_rbac_permission(
+            user, "admin.data_explore.upr_visuals"
+        ),
         "admin.validation.dashboard": AuthorizationService.has_rbac_permission(user, "admin.validation.dashboard"),
         "admin.validation.questions": AuthorizationService.has_rbac_permission(user, "admin.validation.questions"),
         "admin.validation.rules": AuthorizationService.has_rbac_permission(user, "admin.validation.rules"),

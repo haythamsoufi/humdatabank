@@ -98,34 +98,57 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
             include_in_help=False,
         )
 
-    def get_data_explorer_tab(self) -> DataExplorerTabConfig:
-        return DataExplorerTabConfig(
-            tab_id="upr",
-            label="UPR",
-            permission="admin.data_explore.upr",
-            priority=45,
-            panel_template="plugins/upr/upr/tab_panel.html",
-            plugin_id=self.plugin_id,
-            icon="fas fa-chart-pie",
-            manage_requires_system_manager=True,
-        )
+    def get_data_explorer_tabs(self) -> list[DataExplorerTabConfig]:
+        return [
+            DataExplorerTabConfig(
+                tab_id="upr",
+                label="UPR Visuals",
+                permission="admin.data_explore.upr_visuals",
+                priority=45,
+                panel_template="plugins/upr/upr/tab_panel.html",
+                plugin_id=self.plugin_id,
+                icon="fas fa-chart-pie",
+                manage_requires_system_manager=True,
+            ),
+            DataExplorerTabConfig(
+                tab_id="upr-impact",
+                label="UPR Analysis",
+                permission="admin.data_explore.upr_impact",
+                priority=46,
+                panel_template="plugins/upr/upr/impact_panel.html",
+                plugin_id=self.plugin_id,
+                icon="fas fa-arrow-trend-up",
+                manage_requires_system_manager=False,
+            ),
+        ]
 
     def get_seed_permissions(self) -> list[SeedPermission]:
         return [
             SeedPermission(
-                code="admin.data_explore.upr",
-                name="Data Explorer: UPR",
-                description="Access Unified Plan and Report visuals in Data Explorer",
+                code="admin.data_explore.upr_visuals",
+                name="Data Explorer: UPR Visuals",
+                description="Access UPR Visuals in Data Explorer",
+            ),
+            SeedPermission(
+                code="admin.data_explore.upr_impact",
+                name="Data Explorer: UPR Analysis",
+                description="View the Analysis of Unified Plans and Reports in Data Explorer",
             ),
         ]
 
     def get_seed_roles(self) -> list[SeedRole]:
         return [
             SeedRole(
-                code="admin_data_explorer_upr",
-                name="Admin: Data Explorer (UPR)",
-                description="Access Unified Plan and Report visuals in Data Explorer.",
-                permission_codes=["admin.data_explore.upr"],
+                code="admin_data_explorer_upr_visuals",
+                name="Admin: Data Explorer (UPR Visuals)",
+                description="Access UPR Visuals in Data Explorer.",
+                permission_codes=["admin.data_explore.upr_visuals"],
+            ),
+            SeedRole(
+                code="admin_data_explorer_upr_impact",
+                name="Admin: Data Explorer (UPR Analysis)",
+                description="View the Analysis of Unified Plans and Reports in Data Explorer.",
+                permission_codes=["admin.data_explore.upr_impact"],
             ),
         ]
 

@@ -162,7 +162,7 @@ Guides: [Manage users](user-guides/admin/manage-users.md), [Add a user](user-gui
 
 **Where:** Admin → **Explore Data** → `/admin/data-exploration`.
 
-**Who:** Any Explore Data tab permission. Each tab has its own code, assigned on the user form under Data Explorer: `admin.data_explore.data_table`, `admin.data_explore.disaggregation`, `admin.data_explore.service_income`, `admin.data_explore.everyone_counts`, `admin.data_explore.compliance`, plus plugin tabs `admin.data_explore.pb_progress` and `admin.data_explore.upr`. A tab stays hidden without its permission.
+**Who:** Any Explore Data tab permission. Each tab has its own code, assigned on the user form under Data Explorer: `admin.data_explore.data_table`, `admin.data_explore.disaggregation`, `admin.data_explore.service_income`, `admin.data_explore.everyone_counts`, `admin.data_explore.compliance`, plus plugin tabs `admin.data_explore.pb_progress` and `admin.data_explore.upr_visuals`. A tab stays hidden without its permission.
 
 **What you get:**
 

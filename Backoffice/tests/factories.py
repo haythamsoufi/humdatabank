@@ -239,7 +239,7 @@ def create_test_admin(db_session, **kwargs):
         _grant(role_id, "admin.data_explore.everyone_counts")
         _grant(role_id, "admin.data_explore.compliance")
         _grant(role_id, "admin.data_explore.pb_progress")
-        _grant(role_id, "admin.data_explore.upr")
+        _grant(role_id, "admin.data_explore.upr_visuals")
     if kwargs.get("can_manage_validation", True):
         _grant(role_id, "admin.validation.dashboard")
         _grant(role_id, "admin.validation.questions")

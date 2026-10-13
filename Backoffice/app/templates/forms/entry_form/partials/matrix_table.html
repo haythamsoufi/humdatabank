@@ -100,7 +100,7 @@
         {% endif %}
         <div class="flex items-center w-full gap-1.5 px-1">
             <input type="number"
-                   class="row-total-input flex-1 min-w-0 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-sm font-medium{% if _total_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
+                   class="row-total-input flex-1 min-w-0 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-sm font-medium{% if _total_prefill.has_value %} bg-yellow-50 border border-yellow-200 rounded-sm{% else %} border-0{% endif %}"
                    data-row="{{ row_id }}"
                    data-row-id="{{ row_id }}"
                    data-column="Total"
@@ -513,7 +513,7 @@
                                         {% set _cell_prefill.has_value = true %}
                                     {% endif %}
                                 {% endif %}
-                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}{{ matrix_column_edges(matrix_columns, outer_loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }} role="gridcell">
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' or column_type == 'calculated' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-50{% elif calc_readonly %} bg-gray-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}{{ matrix_column_edges(matrix_columns, outer_loop.index0) }}{{ matrix_column_color_class(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }}"{{ matrix_column_color_style(matrix_columns, matrix_column_groups, outer_loop.index0, 'cells') }} role="gridcell">
                                     {% if calc_readonly %}
                                         <span class="matrix-calculated-value inline-block w-full px-2 py-1 text-center text-sm{% if matrix_calc_bold(column)|trim %} font-bold{% endif %} text-gray-700"
                                               data-row="{{ row_id }}"
@@ -563,7 +563,7 @@
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="1"
                                                    {% if variable_save_value and (cell_value == '1' or cell_value == 1) %}checked{% endif %}
-                                                   class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
+                                                   class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}{% if _cell_prefill.has_value %} ring-2 ring-yellow-200{% endif %}"
                                                    aria-label="{{ _('Variable tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                    {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                    {% if variable_readonly %}readonly{% endif %}
@@ -582,7 +582,7 @@
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="{% if variable_save_value %}{{ cell_value }}{% endif %}"
                                                    {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
-                                                   class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
+                                                   class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-50 border border-yellow-200 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
                                                    aria-label="{{ _('Variable value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                    {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit and not variable_readonly %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                    min="0"
@@ -600,7 +600,7 @@
                                                data-column-type="tick"
                                                value="1"
                                                {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
-                                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
+                                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto{% if _cell_prefill.has_value %} ring-2 ring-yellow-200{% endif %}"
                                                aria-label="{{ _('Tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                {% if not can_edit or _col_header_gated %}disabled{% endif %}>
@@ -614,7 +614,7 @@
                                                data-column-type="number"
                                                value="{{ cell_value }}"
                                                {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
-                                               class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
+                                               class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-50 border border-yellow-200 rounded-sm{% else %} border-0{% endif %}"
                                                aria-label="{{ _('Value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                min="0"

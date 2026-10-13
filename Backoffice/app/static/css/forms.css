@@ -677,7 +677,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* Wash of the group colour on column headers and cells. Error, prefill, and
    locked-header states keep their own backgrounds. Text colour applies only
    when --matrix-group-text-color is set; an unset variable drops the declaration. */
-.matrix-container td.matrix-group-colored:not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) {
+.matrix-container td.matrix-group-colored:not(.bg-yellow-50):not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) {
     background-color: color-mix(in srgb, var(--matrix-group-color) 22%, #fff);
     color: var(--matrix-group-text-color);
 }
@@ -686,10 +686,10 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     color: var(--matrix-group-text-color);
 }
 .matrix-container th.matrix-group-colored :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
-.matrix-container td.matrix-group-colored:not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .matrix-calculated-value) {
+.matrix-container td.matrix-group-colored:not(.bg-yellow-50):not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .matrix-calculated-value) {
     color: var(--matrix-group-text-color);
 }
-.matrix-container td.matrix-group-colored:not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) input.bg-gray-100 {
+.matrix-container td.matrix-group-colored:not(.bg-yellow-50):not(.bg-yellow-100):not(.bg-red-50):not(.matrix-cell-header-gated) input.bg-gray-100 {
     background-color: transparent;
 }
 /* Calculated columns are bold when the form builder B control is on. */

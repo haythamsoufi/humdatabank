@@ -107,10 +107,10 @@ export function __applyWholeNumberViolationHighlight(input, violated) {
     const titleKey = 'whole-number-violation';
 
     if (violated) {
-        input.classList.remove('border-0', 'bg-transparent', 'bg-yellow-100', 'border-yellow-300', 'ring-yellow-300');
+        input.classList.remove('border-0', 'bg-transparent', 'bg-yellow-50', 'bg-yellow-100', 'border-yellow-200', 'border-yellow-300', 'ring-yellow-200', 'ring-yellow-300');
         input.classList.add(...__WHOLE_NUMBER_VIOLATION_INPUT_CLASSES);
         if (cell) {
-            cell.classList.remove('bg-yellow-100');
+            cell.classList.remove('bg-yellow-50', 'bg-yellow-100');
             cell.classList.add(__WHOLE_NUMBER_VIOLATION_CELL_CLASS);
         }
         input.setAttribute('data-whole-number-violation', 'true');
@@ -133,7 +133,7 @@ export function __applyWholeNumberViolationHighlight(input, violated) {
         delete input.dataset.violationTitleKey;
     }
     if (cell) cell.classList.remove(__WHOLE_NUMBER_VIOLATION_CELL_CLASS);
-    if (!input.classList.contains('bg-yellow-100') && !input.classList.contains('bg-gray-100')) {
+    if (!input.classList.contains('bg-yellow-50') && !input.classList.contains('bg-yellow-100') && !input.classList.contains('bg-gray-100')) {
         input.classList.add('border-0');
     }
 }

@@ -82,11 +82,11 @@ applyPrefilledCellHighlighting(fieldId) {
     const clearPrefilledHighlight = (input) => {
         const cell = input.closest('td');
         if (input.type === 'checkbox') {
-            input.classList.remove('ring-2', 'ring-yellow-300');
-            if (cell) cell.classList.remove('bg-yellow-100');
+            input.classList.remove('ring-2', 'ring-yellow-200', 'ring-yellow-300');
+            if (cell) cell.classList.remove('bg-yellow-50', 'bg-yellow-100');
         } else {
-            input.classList.remove('bg-yellow-100', 'border', 'border-yellow-300', 'rounded-sm');
-            if (cell) cell.classList.remove('bg-yellow-100');
+            input.classList.remove('bg-yellow-50', 'bg-yellow-100', 'border', 'border-yellow-200', 'border-yellow-300', 'rounded-sm');
+            if (cell) cell.classList.remove('bg-yellow-50', 'bg-yellow-100');
             if (!input.classList.contains('border-0')) {
                 input.classList.add('border-0');
             }
@@ -97,12 +97,12 @@ applyPrefilledCellHighlighting(fieldId) {
     const applyPrefilledHighlight = (input) => {
         const cell = input.closest('td');
         if (input.type === 'checkbox') {
-            input.classList.add('ring-2', 'ring-yellow-300');
-            if (cell) cell.classList.add('bg-yellow-100');
+            input.classList.add('ring-2', 'ring-yellow-200');
+            if (cell) cell.classList.add('bg-yellow-50');
         } else {
             input.classList.remove('bg-transparent', 'border-0');
-            input.classList.add('bg-yellow-100', 'border', 'border-yellow-300', 'rounded-sm');
-            if (cell) cell.classList.add('bg-yellow-100');
+            input.classList.add('bg-yellow-50', 'border', 'border-yellow-200', 'rounded-sm');
+            if (cell) cell.classList.add('bg-yellow-50');
         }
         if (!input.disabled && !input.hasAttribute('readonly')) {
             input.setAttribute('title', prefilledTitle);
@@ -159,9 +159,9 @@ _matrixHasPrefilledCellHighlights(container) {
         }
         const cell = input.closest('td');
         return Boolean(
-            cell?.classList.contains('bg-yellow-100')
-            || input.classList.contains('bg-yellow-100')
-            || input.classList.contains('ring-yellow-300')
+            cell?.classList.contains('bg-yellow-50')
+            || input.classList.contains('bg-yellow-50')
+            || input.classList.contains('ring-yellow-200')
         );
     });
 }

@@ -1299,7 +1299,7 @@ updateLegendVisibility(fieldId) {
         legendItem.className = 'flex items-center space-x-2';
 
         const legendColor = document.createElement('div');
-        legendColor.className = 'w-4 h-4 border border-yellow-300 rounded bg-yellow-100';
+        legendColor.className = 'w-4 h-4 border border-yellow-200 rounded bg-yellow-50';
         legendColor.setAttribute('aria-label', 'Yellow highlight color for prefilled values');
 
         const legendTextSpan = document.createElement('span');

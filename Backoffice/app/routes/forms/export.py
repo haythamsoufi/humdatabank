@@ -1307,8 +1307,8 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         .matrix-legend-swatch {
             width: 14px;
             height: 14px;
-            border: 1px solid #fde047;
-            background: #fef9c3;
+            border: 1px solid #fef08a;
+            background: #fefce8;
             border-radius: 2px;
             flex-shrink: 0;
         }
@@ -1317,15 +1317,15 @@ def build_assignment_pdf_bytes(assignment_entity_status):
             border-color: #93c5fd;
         }
         .cell-prefilled {
-            background: #fef9c3 !important;
+            background: #fefce8 !important;
         }
         .cell-imputed {
             background: #eff6ff !important;
         }
         .field-value-prefilled {
             display: inline-block;
-            background: #fef9c3;
-            border: 1px solid #fde047;
+            background: #fefce8;
+            border: 1px solid #fef08a;
             border-radius: 3px;
             padding: 2px 6px;
         }

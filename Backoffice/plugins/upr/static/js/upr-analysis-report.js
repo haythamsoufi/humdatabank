@@ -87,7 +87,33 @@
         return all;
     }
 
-    function addFooters(pages, title, ui) {
+    function startsSection(page) {
+        var first = page.querySelector('.upri-page__body').firstElementChild;
+        return !!first && (first.classList.contains('upri-keep') || first.getAttribute('data-upri-block') === 'section');
+    }
+
+    // Text can re-wrap after pagination (web fonts arrive late), so push whatever
+    // no longer fits onto the next page, opening a new one where needed.
+    function reflow(pagesEl) {
+        var pages = Array.prototype.slice.call(pagesEl.children);
+        for (var i = 0; i < pages.length; i++) {
+            if (pages[i].classList.contains('upri-page--cover')) continue;
+            var body = pages[i].querySelector('.upri-page__body');
+            while (body.children.length > 1 && overflows(body)) {
+                var next = pages[i + 1];
+                if (!next || next.classList.contains('upri-page--cover') || startsSection(next)) {
+                    next = newPage(pagesEl).page;
+                    pagesEl.insertBefore(next, pages[i].nextSibling);
+                    pages.splice(i + 1, 0, next);
+                }
+                var target = next.querySelector('.upri-page__body');
+                target.insertBefore(body.lastElementChild, target.firstChild);
+            }
+        }
+    }
+
+    function addFooters(pagesEl, title, ui) {
+        var pages = Array.prototype.slice.call(pagesEl.children);
         var content = pages.filter(function (page) { return !page.classList.contains('upri-page--cover'); });
         content.forEach(function (page, i) {
             var spans = page.querySelectorAll('.upri-page__foot span');
@@ -151,13 +177,20 @@
         setPrintRules(true);
 
         var items = group(blocks, options);
-        var pages = layout(pagesEl, items);
-        addFooters(pages, options.title || '', ui);
+        layout(pagesEl, items);
+        addFooters(pagesEl, options.title || '', ui);
 
         var plots = [];
         items.forEach(function (item) { plots = plots.concat(item.plots); });
         var charts = root.charts.mountAll(plots, { animate: false });
         overlay.focus();
+
+        function settle() {
+            if (current !== api) return;
+            reflow(pagesEl);
+            addFooters(pagesEl, options.title || '', ui);
+        }
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
 
         function print() {
             global.print();
@@ -176,7 +209,9 @@
 
         var api = {
             print: print,
-            pageCount: pages.length,
+            get pageCount() {
+                return pagesEl.children.length;
+            },
             close: function () {
                 document.removeEventListener('keydown', onKey, true);
                 charts.forEach(function (chart) {

@@ -551,3 +551,55 @@
     gap: 0.5rem;
     padding: 1rem;
 }
+
+/* Findings: what the data says about a visual (listed under its chart) */
+.upri-findings-wrap {
+    margin-top: 0.35rem;
+    padding: 0.6rem 0 0.75rem;
+    border-top: 1px solid #eef0f2;
+}
+.upri-findings__heading {
+    margin: 0 0 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+.upri-findings {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.upri-finding {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid var(--upri-navy);
+    border-radius: 0.25rem;
+    background: #f8fafc;
+}
+.upri-finding--positive {
+    border-left-color: var(--upri-green);
+}
+.upri-finding--attention {
+    border-left-color: var(--upri-amber);
+}
+.upri-finding__body {
+    min-width: 0;
+}
+.upri-finding__title {
+    margin: 0 0 0.1rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+}
+.upri-finding__text {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #374151;
+}

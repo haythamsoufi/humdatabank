@@ -182,7 +182,8 @@
       }
      ]
     },
-    "table_label": null
+    "table_label": null,
+    "findings": []
    },
    {
     "id": "funding",
@@ -321,7 +322,8 @@
       }
      ]
     },
-    "table_label": null
+    "table_label": null,
+    "findings": []
    },
    {
     "id": "reach",
@@ -410,7 +412,8 @@
       }
      ]
     },
-    "table_label": null
+    "table_label": null,
+    "findings": []
    },
    {
     "id": "partners",
@@ -527,7 +530,8 @@
       }
      ]
     },
-    "table_label": null
+    "table_label": null,
+    "findings": []
    },
    {
     "id": "capacity",
@@ -787,7 +791,8 @@
       }
      ]
     },
-    "table_label": null
+    "table_label": null,
+    "findings": []
    }
   ],
   "notes": [
@@ -1086,7 +1091,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_mix",
@@ -1273,7 +1279,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_pub",
@@ -1478,7 +1485,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_ret",
@@ -1570,7 +1578,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_gaps",
@@ -1709,7 +1718,8 @@
        }
       ]
      },
-     "table_label": "View every country by round"
+     "table_label": "View every country by round",
+     "findings": []
     }
    ],
    "notes": [
@@ -1973,7 +1983,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_mix",
@@ -2127,7 +2138,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_pub",
@@ -2304,7 +2316,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_ret",
@@ -2478,7 +2491,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_gaps",
@@ -2617,7 +2631,8 @@
        }
       ]
      },
-     "table_label": "View every country by round"
+     "table_label": "View every country by round",
+     "findings": []
     }
    ],
    "notes": [
@@ -2759,7 +2774,8 @@
       ],
       "rows": []
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_mix",
@@ -2833,7 +2849,8 @@
       ],
       "rows": []
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_pub",
@@ -2916,7 +2933,8 @@
       ],
       "rows": []
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_ret",
@@ -3000,7 +3018,8 @@
       ],
       "rows": []
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_gaps",
@@ -3055,7 +3074,8 @@
        }
       ]
      },
-     "table_label": "View every country by round"
+     "table_label": "View every country by round",
+     "findings": []
     }
    ],
    "notes": [
@@ -3268,7 +3288,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_mix",
@@ -3380,7 +3401,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_pub",
@@ -3496,7 +3518,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_ret",
@@ -3623,7 +3646,8 @@
        }
       ]
      },
-     "table_label": null
+     "table_label": null,
+     "findings": []
     },
     {
      "id": "narr_gaps",
@@ -3755,7 +3779,8 @@
        }
       ]
      },
-     "table_label": "View every country by round"
+     "table_label": "View every country by round",
+     "findings": []
     }
    ],
    "notes": [

@@ -10,6 +10,7 @@ import pytest
 
 from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels, fill
 from plugins.upr.analysis_spec import (
+    FINDING_TONES,
     country_rows,
     delta_view,
     midyear_cell,
@@ -398,3 +399,48 @@ def test_analysis_service_builds_payloads_and_views_for_every_consumer(monkeypat
     assert bundle["impact"]["view"]["has_data"] is True
     assert bundle["narrative"]["payload"] is narrative_payload
     assert set(bundle["narrative"]["views"]) == set(VIEW_TRACKS)
+
+
+# -- findings -----------------------------------------------------------------
+
+
+def test_finding_helper_builds_the_documented_shape():
+    from plugins.upr.analysis_spec import finding
+
+    plain = finding("growth", "Participation doubled.")
+    assert plain == {"id": "growth", "title": None, "text": "Participation doubled.", "tone": "info", "focus": None}
+
+    focused = finding("dip", "Fewer reports.", title="A dip", tone="attention", categories=["2024", 2025])
+    assert focused["focus"] == {"categories": ["2024", "2025"]}
+    assert focused["tone"] == "attention" and focused["title"] == "A dip"
+    json.dumps(focused)
+
+
+def test_finding_helper_rejects_unknown_tones():
+    from plugins.upr.analysis_spec import finding
+
+    with pytest.raises(ValueError):
+        finding("x", "text", tone="shouting")
+
+
+def test_visual_carries_its_findings_and_defaults_to_none():
+    from plugins.upr.analysis_spec import finding, visual
+
+    assert visual("v", "T", "h")["findings"] == []
+    found = finding("a", "text")
+    assert visual("v", "T", "h", findings=[found])["findings"] == [found]
+
+
+def test_every_visual_lists_findings_that_the_renderers_can_place(impact_payload, narrative_payload):
+    # A finding's focus names chart categories; a typo would silently highlight nothing.
+    views = [build_impact_view(impact_payload), *build_narrative_views(narrative_payload).values()]
+    for view in views:
+        for vis in view["visuals"]:
+            assert isinstance(vis["findings"], list)
+            ids = [f["id"] for f in vis["findings"]]
+            assert len(ids) == len(set(ids)), vis["id"]
+            for found in vis["findings"]:
+                assert found["tone"] in FINDING_TONES and found["text"]
+                if found["focus"]:
+                    assert vis["kind"] == "chart", vis["id"]
+                    assert set(found["focus"]["categories"]) <= set(vis["chart"]["categories"]), vis["id"]

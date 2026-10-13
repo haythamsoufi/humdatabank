@@ -489,3 +489,68 @@ body.upri-locked {
     height: 100%;
     padding: 0 18mm;
 }
+
+/* ------------------------------------------------- Findings in the slides */
+
+/* Each finding starts hidden behind its number; the space stays reserved so
+ * nothing jumps when it is revealed. */
+.upri-findings--steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 0.9rem;
+}
+.upri-findings--steps .upri-finding {
+    align-items: flex-start;
+    padding: 0.7rem 0.9rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.upri-findings--steps .upri-finding__title {
+    font-size: 1rem;
+}
+.upri-findings--steps .upri-finding__text {
+    font-size: 0.95rem;
+}
+.upri-findings--steps .upri-finding__body {
+    transition: opacity 0.25s ease;
+}
+.upri-findings--steps .upri-finding.is-pending {
+    border-left-color: #d1d5db;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px #e5e7eb;
+}
+.upri-findings--steps .is-pending .upri-finding__body {
+    opacity: 0;
+    pointer-events: none;
+}
+.upri-finding__toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--upri-navy);
+    cursor: pointer;
+}
+.upri-finding__toggle:hover,
+.upri-finding__toggle:focus-visible {
+    border-color: var(--upri-navy);
+    outline: none;
+}
+.upri-finding.is-revealed .upri-finding__toggle {
+    border-color: var(--upri-navy);
+    background: var(--upri-navy);
+    color: #fff;
+}
+.upri-slide--visual .upri-findings-wrap {
+    margin-top: auto;
+    padding-bottom: 0;
+}
+.upri-slide--visual .upri-findings__heading {
+    font-size: 0.8rem;
+}

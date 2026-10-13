@@ -33,6 +33,7 @@ Defined in the docstring of `analysis_spec.py`. In short, a view is
 ```
 
 - A **visual** has `id`, `title`, `hint`, `kind` (`chart`, `panels` for small multiples, `gaps` for follow-up lists), a declarative **chart**, and a **table** holding the same numbers with country drill-down rows.
+- A **visual** may also carry `findings` (empty today): see *Findings* below.
 - A **chart** is `categories` + `series` (`kind`: `column` / `line` / `area`, `axis`, `format`, `color`) + `axes`. It names no charting library.
 - Values stay **raw**; a `format` name (`int`, `money`, `pct`, `abs_int`) says how to print them. Chart axes, tooltips, KPIs and table cells all share one number.
 
@@ -46,6 +47,39 @@ The data section has one view (`impact_views.build_impact_view`). The participat
 2. Add a function to `impact_views.py` or `narrative_views.py` returning `visual(...)` and register it in the view builder. The tab renders it with no JavaScript change.
 3. If a chart needs a new look, extend the chart spec and `upr-analysis-charts.js` together, with a case in `tests/js/plugins/upr-analysis.test.js`.
 4. Regenerate the contract fixture (below) and run both test suites.
+
+## Findings (explaining a visual)
+
+A visual can carry `findings: [Finding]`, short written takeaways such as "Planned funding doubled between 2024 and 2025". They are **part of the view**, so the tab, the slides and the A4 report show the same words and a translation covers all three. No findings are written yet; every visual's list is empty and nothing renders until one is added.
+
+```python
+from plugins.upr.analysis_spec import finding, visual
+
+visual(
+    "funding", title, hint, chart=chart, table=table,
+    findings=[
+        finding("ambition", fill(labels["finding_funding_ambition"], ...),
+                title=labels["finding_funding_ambition_title"],
+                tone="positive",              # "info" (default) | "positive" | "attention"
+                categories=["2025 *"]),       # chart categories it is about (optional)
+    ],
+)
+```
+
+1. Add the text to `analysis_labels.py` (never hard-code English in a builder) and compute any numbers from the payload, so a finding cannot disagree with the chart beside it.
+2. Pass `findings=[...]` to `visual(...)`. Nothing else changes: no JavaScript, no template.
+3. Regenerate the fixture and run both suites. `test_every_visual_lists_findings_that_the_renderers_can_place` checks that ids are unique, tones are valid and `categories` really are categories of that visual's chart (focus is only supported on single-chart visuals).
+
+How each output shows them:
+
+| Output | Behaviour |
+|---|---|
+| Tab, A4 report | A "Key findings" list under the chart, all visible (`dom.renderFindings(..., 'visible')`) |
+| Presentation | Each finding starts hidden behind a numbered button; the space is reserved so nothing jumps. **Next / Space / Enter / →** reveals the next finding, then moves on; **← ** hides the last one first. Click a number to show or hide that finding, **I** (or the lightbulb) toggles all. The chart highlights the `categories` of every finding currently shown (`charts.focus`). The counter shows `slide / total · shown/findings`. |
+
+Slides with findings draw the chart shorter (`slides.FINDINGS_SIZE`) to leave room. Revealed state is kept while navigating back and forth and resets when the presentation is reopened.
+
+Not built yet, and where it would go: findings on KPIs or on a whole section (add a `findings` list to the KPI / view and a block type in `dom.renderBlock`), highlighting a series rather than a category (extend `focus` in the spec and `charts.focus`), and findings on multi-chart visuals (`panels`).
 
 ## Contract fixture
 

@@ -79,6 +79,46 @@
         container.hidden = !(warnings && warnings.length);
     }
 
+    // -- findings ------------------------------------------------------------
+
+    /** Show or hide one finding of a ``steps`` list (the presentation reveals them). */
+    function setFindingRevealed(item, revealed) {
+        item.classList.toggle('is-revealed', revealed);
+        item.classList.toggle('is-pending', !revealed);
+        var toggle = item.querySelector('.upri-finding__toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', revealed ? 'true' : 'false');
+    }
+
+    /**
+     * What the data says about a visual. ``mode`` is ``visible`` (the tab and the
+     * report: all text shown) or ``steps`` (the presentation: each finding starts
+     * hidden behind a numbered button and is revealed in turn).
+     */
+    function renderFindings(findings, mode, options) {
+        var text = ui(options);
+        var wrap = node('div', 'upri-findings-wrap');
+        wrap.appendChild(node('h5', 'upri-findings__heading', text.findings_title || ''));
+        var list = node('ul', 'upri-findings upri-findings--' + mode);
+        findings.forEach(function (found, i) {
+            var item = node('li', 'upri-finding upri-finding--' + (found.tone || 'info'));
+            item.setAttribute('data-upri-finding', found.id);
+            if (mode === 'steps') {
+                var toggle = node('button', 'upri-finding__toggle', String(i + 1));
+                toggle.type = 'button';
+                toggle.setAttribute('aria-label', root.format.fill(text.export_finding || 'Finding {n}', { n: i + 1 }));
+                item.appendChild(toggle);
+            }
+            var body = node('div', 'upri-finding__body');
+            if (found.title) body.appendChild(node('p', 'upri-finding__title', found.title));
+            body.appendChild(node('p', 'upri-finding__text', found.text));
+            item.appendChild(body);
+            list.appendChild(item);
+            if (mode === 'steps') setFindingRevealed(item, false);
+        });
+        wrap.appendChild(list);
+        return wrap;
+    }
+
     // -- visual cards --------------------------------------------------------
 
     // A chart spec drawn at a fixed size (slides and A4 pages). ApexCharts pads its
@@ -156,7 +196,8 @@
      *
      * ``options.interactive === false`` drops the table button and spells the
      * gaps out; ``options.size`` ({width, height, panelWidth, panelHeight})
-     * draws the charts at a fixed size.
+     * draws the charts at a fixed size; ``options.findings`` is ``visible``
+     * (default) or ``steps`` (see renderFindings).
      */
     function renderCard(visual, options) {
         var text = ui(options);
@@ -204,6 +245,9 @@
                 reserve(host, chart);
                 plots.push({ host: host, chart: chart });
             }
+        }
+        if (visual.findings && visual.findings.length) {
+            section.appendChild(renderFindings(visual.findings, (options && options.findings) || 'visible', options));
         }
         return { element: section, plots: plots };
     }
@@ -384,7 +428,7 @@
                 renderKpis(element, block.kpis);
                 break;
             case 'visual':
-                var card = renderCard(block.visual, { ui: options.ui, interactive: false, size: options.size, maxNames: options.maxNames });
+                var card = renderCard(block.visual, { ui: options.ui, interactive: false, size: options.size, maxNames: options.maxNames, findings: options.findings });
                 element = card.element;
                 plots = card.plots;
                 break;
@@ -408,6 +452,8 @@
         renderNotes: renderNotes,
         renderWarnings: renderWarnings,
         renderCard: renderCard,
+        renderFindings: renderFindings,
+        setFindingRevealed: setFindingRevealed,
         fillTable: fillTable,
         openTable: openTable
     };

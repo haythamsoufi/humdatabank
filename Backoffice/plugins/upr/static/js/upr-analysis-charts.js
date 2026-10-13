@@ -174,5 +174,28 @@
         return charts;
     }
 
-    root.charts = { buildOptions: buildOptions, withBaseStyle: withBaseStyle, mount: mount, mountAll: mountAll };
+    var FOCUS_COLOR = '#f5333f';
+
+    /**
+     * Highlight the chart categories a finding is about (``{categories: [...]}``
+     * from the view), replacing any earlier highlight; a falsy ``spec`` clears it.
+     */
+    function focus(chart, spec) {
+        if (!chart || typeof chart.clearAnnotations !== 'function') return;
+        chart.clearAnnotations();
+        var seen = {};
+        ((spec && spec.categories) || []).forEach(function (category) {
+            if (seen[category]) return;
+            seen[category] = true;
+            chart.addXaxisAnnotation({
+                x: category,
+                borderColor: FOCUS_COLOR,
+                borderWidth: 3,
+                strokeDashArray: 0,
+                opacity: 0.9
+            });
+        });
+    }
+
+    root.charts = { buildOptions: buildOptions, withBaseStyle: withBaseStyle, mount: mount, mountAll: mountAll, focus: focus };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -35,7 +35,23 @@ const UI = {
     track_MYR: 'Mid-year reports',
     track_AR: 'Annual reports',
     close: 'Close',
+    findings_title: 'Key findings',
+    export_findings: 'Show or hide findings',
+    export_finding: 'Finding {n}',
 };
+
+const FINDINGS = [
+    { id: 'a', title: 'Growing', text: 'Requirement doubled.', tone: 'positive', focus: { categories: ['2025 *'] } },
+    { id: 'b', title: null, text: 'Funding fell.', tone: 'attention', focus: { categories: ['2025 *', '2024'] } },
+    { id: 'c', title: null, text: 'No expenditure yet.', tone: 'info', focus: null },
+];
+
+// A copy of the data view whose funding visual carries findings.
+function withFindings() {
+    const impact = JSON.parse(JSON.stringify(fixture.impact));
+    impact.visuals.find((v) => v.id === 'funding').findings = FINDINGS;
+    return impact;
+}
 
 let A;
 let fixture;
@@ -209,6 +225,51 @@ describe('block rendering', () => {
     });
 });
 
+describe('findings', () => {
+    const funding = () => withFindings().visuals.find((v) => v.id === 'funding');
+
+    it('lists them under the chart on the tab, all visible and without controls', () => {
+        const { element } = A.dom.renderCard(funding(), { ui: UI });
+        const items = element.querySelectorAll('.upri-findings .upri-finding');
+        expect(element.querySelector('.upri-findings__heading').textContent).toBe('Key findings');
+        expect([...items].map((li) => li.getAttribute('data-upri-finding'))).toEqual(['a', 'b', 'c']);
+        expect(items[0].classList.contains('upri-finding--positive')).toBe(true);
+        expect(items[0].querySelector('.upri-finding__title').textContent).toBe('Growing');
+        expect(items[1].querySelector('.upri-finding__title')).toBeNull();
+        expect(element.querySelector('.upri-finding__toggle')).toBeNull();
+        expect(element.querySelector('.is-pending')).toBeNull();
+    });
+
+    it('adds nothing to a visual without findings', () => {
+        fixture.impact.visuals.forEach((visual) => {
+            expect(A.dom.renderCard(visual, { ui: UI }).element.querySelector('.upri-findings-wrap')).toBeNull();
+        });
+    });
+
+    it('starts every finding hidden behind a numbered button in steps mode', () => {
+        const list = A.dom.renderFindings(FINDINGS, 'steps', { ui: UI }).querySelector('.upri-findings');
+        const items = [...list.children];
+        expect(items.every((li) => li.classList.contains('is-pending'))).toBe(true);
+        const toggles = list.querySelectorAll('.upri-finding__toggle');
+        expect([...toggles].map((t) => t.textContent)).toEqual(['1', '2', '3']);
+        expect(toggles[1].getAttribute('aria-label')).toBe('Finding 2');
+        expect(toggles[1].getAttribute('aria-expanded')).toBe('false');
+
+        A.dom.setFindingRevealed(items[1], true);
+        expect(items[1].classList.contains('is-revealed')).toBe(true);
+        expect(items[1].classList.contains('is-pending')).toBe(false);
+        expect(toggles[1].getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('outline blocks keep pointing at the visual that carries its findings', () => {
+        const impact = withFindings();
+        const blocks = A.pages.buildOutline({
+            impact, narrative: fixture.narrative, ui: UI, region: '', selected: ['data'],
+        });
+        expect(blocks.find((b) => b.type === 'visual' && b.visual.id === 'funding').visual.findings).toHaveLength(3);
+    });
+});
+
 describe('with a stubbed ApexCharts', () => {
     let instances;
 
@@ -224,6 +285,12 @@ describe('with a stubbed ApexCharts', () => {
             render() {}
             destroy() {
                 this.destroyed = true;
+            }
+            clearAnnotations() {
+                this.annotations = [];
+            }
+            addXaxisAnnotation(annotation) {
+                this.annotations = (this.annotations || []).concat(annotation);
             }
         };
     });
@@ -243,6 +310,136 @@ describe('with a stubbed ApexCharts', () => {
         expect(instances[0].config.chart.animations.enabled).toBe(false);
         A.charts.mount(document.createElement('div'), fixture.impact.visuals[0].chart);
         expect(instances[1].config.chart.animations.enabled).toBe(true);
+    });
+
+    it('highlights each focused category once and clears with no focus', () => {
+        const chart = A.charts.mount(document.createElement('div'), fixture.impact.visuals[0].chart);
+        A.charts.focus(chart, { categories: ['2025 *', '2024', '2025 *'] });
+        expect(chart.annotations.map((a) => a.x)).toEqual(['2025 *', '2024']);
+        A.charts.focus(chart, { categories: ['2024'] });
+        expect(chart.annotations.map((a) => a.x)).toEqual(['2024']);
+        A.charts.focus(chart, null);
+        expect(chart.annotations).toEqual([]);
+        expect(() => A.charts.focus(null, { categories: ['x'] })).not.toThrow();
+        expect(() => A.charts.focus({}, { categories: ['x'] })).not.toThrow();
+    });
+
+    describe('findings in the presentation', () => {
+        const press = (key) => document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+        const deckOpts = { ui: UI, title: 'Deck' };
+        const counter = () => document.querySelector('.upri-deck__counter').textContent;
+        const activeItems = () => [...document.querySelectorAll('.upri-slide.is-active .upri-finding')];
+        const shown = () => activeItems().filter((li) => li.classList.contains('is-revealed')).length;
+        const funded = () => instances.find((c) => c.config.series.some((s) => s.name === 'Planned requirement'));
+
+        function openOnFunding() {
+            const blocks = A.pages.buildOutline({
+                impact: withFindings(), narrative: fixture.narrative, ui: UI, selected: ['data'],
+            });
+            const deck = A.slides.open(blocks, deckOpts);
+            const target = blocks.filter((b) => b.type !== 'table').findIndex((b) => b.type === 'visual' && b.visual.id === 'funding');
+            deck.go(target);
+            return { deck, target };
+        }
+
+        it('reveals one finding per step before moving on, then continues', () => {
+            const { deck, target } = openOnFunding();
+            expect(counter()).toBe(`${target + 1} / ${deck.count} · 0/3`);
+            expect(shown()).toBe(0);
+            press('ArrowRight');
+            press(' ');
+            expect(shown()).toBe(2);
+            expect(counter()).toContain('· 2/3');
+            press('Enter');
+            expect(shown()).toBe(3);
+            expect(counter()).toBe(`${target + 1} / ${deck.count} · 3/3`);
+            press('ArrowRight');
+            expect(counter()).toBe(`${target + 2} / ${deck.count}`);
+        });
+
+        it('steps back through the findings before leaving the slide', () => {
+            const { deck, target } = openOnFunding();
+            press('i');
+            expect(shown()).toBe(3);
+            press('ArrowLeft');
+            expect(shown()).toBe(2);
+            press('ArrowLeft');
+            press('ArrowLeft');
+            expect(shown()).toBe(0);
+            press('ArrowLeft');
+            expect(counter()).toBe(`${target} / ${deck.count}`);
+        });
+
+        it('keeps revealed findings when you come back to the slide', () => {
+            const { deck, target } = openOnFunding();
+            press('ArrowRight');
+            press('ArrowRight');
+            deck.go(0);
+            deck.go(target);
+            expect(shown()).toBe(2);
+            expect(counter()).toContain('· 2/3');
+        });
+
+        it('starts every finding hidden again when the presentation reopens', () => {
+            openOnFunding();
+            press('i');
+            A.slides.close();
+            openOnFunding();
+            expect(shown()).toBe(0);
+        });
+
+        it('shows or hides a single finding with its numbered button, and all with I', () => {
+            openOnFunding();
+            document.querySelectorAll('.upri-slide.is-active .upri-finding__toggle')[1].click();
+            expect(activeItems().map((li) => li.classList.contains('is-revealed'))).toEqual([false, true, false]);
+            document.querySelectorAll('.upri-slide.is-active .upri-finding__toggle')[1].click();
+            expect(shown()).toBe(0);
+            press('i');
+            expect(shown()).toBe(3);
+            press('i');
+            expect(shown()).toBe(0);
+            document.querySelector('.upri-deck__findings').click();
+            expect(shown()).toBe(3);
+        });
+
+        it('highlights the categories of the findings that are showing', () => {
+            openOnFunding();
+            const chart = funded();
+            expect(chart.annotations || []).toEqual([]);
+            press('ArrowRight');
+            expect(chart.annotations.map((a) => a.x)).toEqual(['2025 *']);
+            press('ArrowRight');
+            expect(chart.annotations.map((a) => a.x)).toEqual(['2025 *', '2024']);
+            press('ArrowRight');
+            expect(chart.annotations.map((a) => a.x)).toEqual(['2025 *', '2024']);
+            press('ArrowLeft');
+            press('ArrowLeft');
+            press('ArrowLeft');
+            expect(chart.annotations).toEqual([]);
+        });
+
+        it('only offers the findings control on slides that have findings', () => {
+            const { deck, target } = openOnFunding();
+            const button = document.querySelector('.upri-deck__findings');
+            expect(button.hidden).toBe(false);
+            deck.go(0);
+            expect(button.hidden).toBe(true);
+            press('i');
+            expect(counter()).toBe(`1 / ${deck.count}`);
+            deck.go(target);
+            expect(button.hidden).toBe(false);
+        });
+
+        it('leaves room for the findings under the chart', () => {
+            openOnFunding();
+            const chart = funded();
+            expect(chart.config.chart.height).toBe(A.slides.FINDINGS_SIZE.height);
+            instances.length = 0;
+            A.slides.close();
+            A.slides.open(outline(), deckOpts);
+            const plain = instances.find((c) => c.config.series.some((s) => s.name === 'Planned requirement'));
+            expect(plain.config.chart.height).toBe(A.slides.CHART_SIZE.height);
+        });
     });
 
     describe('presentation', () => {
@@ -389,6 +586,36 @@ describe('with a stubbed ApexCharts', () => {
             expect(feet[0].textContent).toContain(`Page 1 of ${total}`);
             expect(feet[total - 1].textContent).toContain(`Page ${total} of ${total}`);
             expect(document.querySelector('.upri-page--cover .upri-page__foot')).toBeNull();
+        });
+
+        it('re-flows pages when text re-wraps after the fonts load, and renumbers them', async () => {
+            let fontsLoaded;
+            document.fonts = { ready: new Promise((resolve) => { fontsLoaded = resolve; }) };
+            try {
+                const report = A.report.open(outline(), { ui: UI, title: 'Report' });
+                const before = report.pageCount;
+                // Late-loading fonts make every block taller: only one now fits per page.
+                Object.defineProperty(Element.prototype, 'scrollHeight', {
+                    configurable: true,
+                    get() {
+                        return this.classList.contains('upri-page__body') ? this.children.length * 600 : 0;
+                    },
+                });
+                fontsLoaded();
+                await document.fonts.ready;
+                await Promise.resolve();
+                const bodies = [...document.querySelectorAll('.upri-page:not(.upri-page--cover) .upri-page__body')];
+                expect(report.pageCount).toBeGreaterThan(before);
+                bodies.forEach((body) => expect(body.children.length).toBeLessThanOrEqual(1));
+                const feet = [...document.querySelectorAll('.upri-page__foot')];
+                expect(feet.at(-1).textContent).toContain(`Page ${feet.length} of ${feet.length}`);
+                const order = bodies.flatMap((body) => [...body.children].map((c) => c.getAttribute('data-upri-block') || 'keep'));
+                expect(order.filter((b) => b === 'visual')).toHaveLength(
+                    fixture.impact.visuals.length + fixture.narrative.ALL.visuals.length,
+                );
+            } finally {
+                delete document.fonts;
+            }
         });
 
         it('includes the data tables when asked', () => {

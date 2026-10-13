@@ -31,7 +31,17 @@ Visual::
       "gaps":   [{"id", "label", "count", "table": Table}],                   # "gaps"
       "table":  Table | None,          # the same numbers as a drill-down table
       "table_label": str | None,
+      "findings": [Finding, ...],      # what the data says; [] when nobody has written any
     }
+
+Finding (see :func:`finding`)::
+
+    {"id", "title": str | None, "text", "tone": "info" | "positive" | "attention",
+     "focus": {"categories": [str]} | None}    # chart categories the finding is about
+
+Findings explain a visual: the tab and the A4 report list them under the chart,
+the presentation reveals them one by one (and highlights the ``focus``
+categories on the chart).
 
 Chart::
 
@@ -64,6 +74,8 @@ from typing import Any, Iterable, Mapping, Sequence
 from plugins.upr.catalog import IFRC_NAVY, IFRC_RED
 
 FORMATS = ("int", "money", "pct", "abs_int")
+
+FINDING_TONES = ("info", "positive", "attention")
 
 COLORS = {
     "navy": IFRC_NAVY,
@@ -286,6 +298,7 @@ def visual(
     gaps: list[dict[str, Any]] | None = None,
     table: dict[str, Any] | None = None,
     table_label: str | None = None,
+    findings: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     return {
         "id": visual_id,
@@ -298,7 +311,28 @@ def visual(
         "gaps": gaps,
         "table": table,
         "table_label": table_label,
+        "findings": [dict(f) for f in findings or ()],
     }
+
+
+def finding(
+    finding_id: str,
+    text: str,
+    *,
+    title: str | None = None,
+    tone: str = "info",
+    categories: Iterable[str] | None = None,
+) -> dict[str, Any]:
+    """One finding about a visual, as ready-to-show text.
+
+    ``categories`` names the chart categories (x-axis labels, exactly as in the
+    chart) the finding is about; the presentation highlights them when the finding
+    is revealed. Leave it out for a finding about the visual as a whole.
+    """
+    if tone not in FINDING_TONES:
+        raise ValueError(f"unknown finding tone {tone!r}; expected one of {FINDING_TONES}")
+    focus = {"categories": [str(c) for c in categories]} if categories else None
+    return {"id": finding_id, "title": title, "text": text, "tone": tone, "focus": focus}
 
 
 # -- KPI cards ----------------------------------------------------------------

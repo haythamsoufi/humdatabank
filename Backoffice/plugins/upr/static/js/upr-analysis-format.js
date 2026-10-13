@@ -58,7 +58,15 @@
         return String(value);
     }
 
+    /** Fill ``{name}`` placeholders (the server's interface strings use them). */
+    function fill(template, values) {
+        return String(template == null ? '' : template).replace(/\{(\w+)\}/g, function (match, key) {
+            return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
+        });
+    }
+
     root.format = {
+        fill: fill,
         int: int,
         money: money,
         pct: pct,

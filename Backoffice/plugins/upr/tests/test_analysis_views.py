@@ -355,7 +355,28 @@ def test_with_abs_change_reads_rates_as_differences():
 
 def test_ui_labels_expose_the_strings_the_browser_needs():
     ui = analysis_ui_labels()
-    assert {"show_countries", "midyear_cell", "load_failed", "close", "view_table"} <= set(ui)
+    assert {"show_countries", "midyear_cell", "load_failed", "close", "view_table", "gaps_select"} <= set(ui)
+
+
+def test_ui_labels_cover_the_presentation_and_a4_report():
+    ui = analysis_ui_labels()
+    assert {
+        "export_generated", "export_region", "export_all_regions", "export_page", "export_notes",
+        "export_tables_heading", "export_more", "export_print", "export_print_hint", "export_nothing",
+        "export_unavailable", "export_prev", "export_next", "export_fullscreen", "section_data",
+        "track_ALL", "track_P", "track_MYR", "track_AR",
+    } <= set(ui)
+    # The browser fills these placeholders itself (UprAnalysis.format.fill).
+    assert "{date}" in ui["export_generated"] and "{region}" in ui["export_region"]
+    assert "{n}" in ui["export_page"] and "{total}" in ui["export_page"] and "{n}" in ui["export_more"]
+
+
+def test_visual_hints_describe_the_data_and_leave_interaction_hints_to_the_tab(narrative_payload):
+    # The presentation and the printed report reuse these hints; "select a list"
+    # only makes sense on the tab, which adds it from the ui labels.
+    for view in build_narrative_views(narrative_payload).values():
+        for vis in view["visuals"]:
+            assert "select" not in vis["hint"].lower()
 
 
 def test_analysis_service_builds_payloads_and_views_for_every_consumer(monkeypatch, impact_payload, narrative_payload):

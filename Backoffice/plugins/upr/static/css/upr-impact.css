@@ -492,3 +492,62 @@
         grid-column: auto;
     }
 }
+
+/* Export dialog (presentation / A4 report) */
+.upri-toolbar__export {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+.upri-export {
+    width: min(30rem, calc(100vw - 2rem));
+}
+.upri-export .upri-dialog__note {
+    padding-bottom: 0.25rem;
+}
+.upri-export__fields {
+    margin: 0;
+    padding: 0.6rem 1rem 0;
+    border: 0;
+}
+.upri-export__fields .upri-field__label {
+    padding: 0;
+    margin-bottom: 0.35rem;
+}
+.upri-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.35rem 0;
+    font-size: 0.875rem;
+    color: #111827;
+    cursor: pointer;
+}
+.upri-check input {
+    margin-top: 0.2rem;
+    accent-color: var(--upri-navy);
+}
+.upri-check.is-disabled {
+    color: #9ca3af;
+    cursor: default;
+}
+.upri-check__hint {
+    margin-left: 0.35rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+.upri-export__extra {
+    padding: 0.25rem 1rem 0;
+}
+.upri-export__empty {
+    margin: 0;
+    padding: 0.75rem 1rem 0;
+    font-size: 0.85rem;
+    color: #92400e;
+}
+.upri-export__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+}

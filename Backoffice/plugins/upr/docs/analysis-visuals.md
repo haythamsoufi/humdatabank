@@ -1,12 +1,12 @@
 # UPR Analysis visuals — architecture and reuse
 
-The **UPR Analysis** Data Explorer tab, and any export built from it (PDF report, presentation), draw from **one description of the visuals**. Nothing about a chart, KPI, table or footnote is defined twice.
+The **UPR Analysis** Data Explorer tab, the **presentation** and the **A4 report** draw from **one description of the visuals**. Nothing about a chart, KPI, table or footnote is defined twice.
 
 ```
-live data ──► aggregators ──► payload ──► views ──► renderers
-              impact.py       (raw        impact_views.py     tab (upr-analysis-*.js)
-              narrative.py    series)     narrative_views.py  PDF export      (to build)
-                                          analysis_spec.py    presentation    (to build)
+live data ──► aggregators ──► payload ──► views ──► outline ──► renderers
+              impact.py       (raw        impact_views.py   pages.js    tab           (upr-impact.js)
+              narrative.py    series)     narrative_views.py            presentation  (slides.js)
+                                          analysis_spec.py              A4 report     (report.js)
                                           analysis_labels.py
 ```
 
@@ -18,8 +18,11 @@ live data ──► aggregators ──► payload ──► views ──► rend
 | View schema + helpers | `analysis_spec.py` | The JSON structure below, palette, table and KPI helpers |
 | Views | `impact_views.py`, `narrative_views.py` | Which visuals exist, how each series is drawn, what each table shows |
 | Entry points | `analysis_service.py` | `build_impact_analysis`, `build_narrative_analysis`, `build_analysis_bundle` |
-| Browser renderers | `static/js/upr-analysis-{format,charts,dom}.js` | Raw value → text, view chart → ApexCharts options, cards / KPIs / table dialog |
-| The tab | `static/js/upr-impact.js`, `templates/upr/impact_panel.html` | Fetching, loading states, region and round-type controls |
+| Browser renderers | `static/js/upr-analysis-{format,charts,dom}.js` | Raw value → text, view chart → ApexCharts options, cards / KPIs / tables, and `dom.renderBlock` for exports |
+| Export outline | `static/js/upr-analysis-pages.js` | Which blocks (cover, section, KPIs, visuals, tables, notes) an export contains, in order |
+| Presentation | `static/js/upr-analysis-slides.js`, `css/upr-analysis-export.css` | 16:9 slide deck: navigation, scaling, full screen |
+| A4 report | `static/js/upr-analysis-report.js`, `css/upr-analysis-{export,print}.css` | A4 pagination and the print flow |
+| The tab | `static/js/upr-impact.js`, `templates/upr/impact_panel.html` | Fetching, loading states, region and round-type controls, the export dialog |
 
 ## The view
 
@@ -53,15 +56,24 @@ UPR_UPDATE_FIXTURES=1 pytest plugins/upr/tests/test_analysis_views.py   # regene
 npm run test:js -- tests/js/plugins/upr-analysis.test.js                # from Backoffice/
 ```
 
-## Building the PDF export and the presentation
+## Presentation and A4 report
 
-Both should **read a view** from `analysis_service.build_analysis_bundle(region=...)` and must not recompute numbers or re-type titles. Build text inside `flask_babel.force_locale(...)` to export in another language.
+Both are built **in the browser from the views the tab already loaded** (same region, no extra request), because the visuals are ApexCharts drawn by JavaScript. They do not recompute numbers or re-type text.
 
-- **WeasyPrint cannot run JavaScript**, so ApexCharts will not appear in the existing HTML → PDF pipeline (`render.py` / `raster.py`). Pick one:
-  1. **Draw charts server-side from the chart spec** (SVG or `matplotlib`, already in `requirements.txt`). Recommended: no browser, same output for every user, works with `force_locale` and RTL. The spec already carries series, colours, axes and formats.
-  2. **Snapshot in the browser**: mount the chart with `UprAnalysis.charts.mount`, call Apex `chart.dataURI()`, and post the images to the server. Simpler, but depends on a live session and the user's browser.
-- **Presentation in the browser**: reuse `UprAnalysis.dom.renderKpis` / `renderCard` and `UprAnalysis.charts.mount` on slides; the slide deck only adds navigation and layout. A `.pptx` can instead be written server-side (for example with `python-pptx`, not a dependency yet) using native charts built from the same `series` / `categories`.
-- KPI cards, notes, warnings and the drill-down tables are plain data in the view, ready for either route.
+```
+Export dialog (upr-impact.js)  ─ selected sections ─►  pages.buildOutline()  ─ blocks ─►  slides.open()
+                                                                                   └────►  report.open()
+```
+
+- **Outline** (`upr-analysis-pages.js`, pure): `cover`, then per section a `section` heading, `kpis`, one `visual` per visual, optional `table`s and `notes`. A block points at the view's own objects. Sections are `data` and `track:ALL|P|MYR|AR`.
+- **`dom.renderBlock`** turns any block into DOM with the tab's own classes (`upri-kpi`, `upri-card`, …) and reports the charts still to draw, which are mounted with `charts.mountAll(plots, {animate: false})`. Static output has no clicks, so cards drop the table button and spell out the gap lists.
+- **Presentation**: a fixed 1280×720 stage scaled by CSS transform, one slide per block (tables are report-only), arrow keys / Space / Home / End, `F` for full screen, `Esc` to close. ApexCharts cannot measure a scaled container, so every slide chart gets an explicit `width` and `height` (`slides.CHART_SIZE`).
+- **A4 report**: fixed-size 210×297 mm pages, blocks flow onto a page until it is full (the host reserves its chart height up front, so pages are measured before charts exist). The footer is created with the page so its height is always part of the measurement. **Print** uses the browser's print dialog (*Save as PDF*): the live SVG charts stay vector and the text stays selectable, and it looks exactly like the tab. The `@page` / hide-the-app rules live in `upr-analysis-print.css`, linked with `media="not all"` and switched to `print` only while a report is open so printing elsewhere in the Backoffice is untouched.
+- **Chart sizes** for the two outputs are the only layout numbers: `slides.CHART_SIZE` and `report.CHART_SIZE`. If you change the page padding in `upr-analysis-export.css`, adjust the latter.
+
+Adding a visual to the view makes it appear in the tab, the slides and the report with no export code. A new block *type* needs a case in `dom.renderBlock`, a style in `upr-analysis-export.css`, and a test in `tests/js/plugins/upr-analysis-export.test.js`.
+
+**Not built**: a one-click PDF download. That needs either a headless browser on the server (the Backoffice has none) or rasterising the page with html2canvas / jsPDF (neither is vendored; the result would be blurrier and not searchable). A server-drawn PDF would mean re-implementing the charts a second time, which is what this design avoids. A `.pptx` could be written server-side from the same `series` / `categories` (for example with `python-pptx`, not a dependency yet).
 
 ## Conventions kept on purpose
 

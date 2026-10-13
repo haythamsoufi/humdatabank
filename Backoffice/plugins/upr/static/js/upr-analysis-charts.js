@@ -94,6 +94,9 @@
         };
 
         if (spec.stacked) options.chart.stacked = true;
+        // A fixed width lets a chart draw inside a scaled stage (slides) or a
+        // fixed-size page (A4 report), where measuring the container is unreliable.
+        if (spec.width) options.chart.width = spec.width;
 
         if (series.some(function (s) { return s.kind === 'column'; })) {
             options.plotOptions = {
@@ -150,13 +153,26 @@
     }
 
     /** Draw ``spec`` into ``container``; returns the Apex instance (or null when Apex is missing). */
-    function mount(container, spec) {
+    function mount(container, spec, settings) {
         var Apex = global.ApexCharts;
         if (!Apex || !container) return null;
-        var chart = new Apex(container, withBaseStyle(buildOptions(spec)));
+        var config = withBaseStyle(buildOptions(spec));
+        // Exports draw every chart at once and print them, so skip the entrance animation.
+        if (settings && settings.animate === false) config.chart.animations = { enabled: false };
+        var chart = new Apex(container, config);
         chart.render();
         return chart;
     }
 
-    root.charts = { buildOptions: buildOptions, withBaseStyle: withBaseStyle, mount: mount };
+    /** Mount every ``{host, chart}`` pair a renderer reported; returns the Apex instances. */
+    function mountAll(plots, settings) {
+        var charts = [];
+        (plots || []).forEach(function (plot) {
+            var chart = mount(plot.host, plot.chart, settings);
+            if (chart) charts.push(chart);
+        });
+        return charts;
+    }
+
+    root.charts = { buildOptions: buildOptions, withBaseStyle: withBaseStyle, mount: mount, mountAll: mountAll };
 })(typeof window !== 'undefined' ? window : globalThis);

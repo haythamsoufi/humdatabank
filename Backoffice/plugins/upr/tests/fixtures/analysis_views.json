@@ -1575,7 +1575,7 @@
     {
      "id": "narr_gaps",
      "title": "Gaps to follow up",
-     "hint": "Across 3 completed rounds. Select a list to see the countries.",
+     "hint": "Across 3 completed rounds.",
      "wide": false,
      "kind": "gaps",
      "chart": null,
@@ -2483,7 +2483,7 @@
     {
      "id": "narr_gaps",
      "title": "Gaps to follow up",
-     "hint": "Latest completed round: P25. Select a list to see the countries.",
+     "hint": "Latest completed round: P25.",
      "wide": false,
      "kind": "gaps",
      "chart": null,
@@ -3628,7 +3628,7 @@
     {
      "id": "narr_gaps",
      "title": "Gaps to follow up",
-     "hint": "Latest completed round: AR24. Select a list to see the countries.",
+     "hint": "Latest completed round: AR24.",
      "wide": false,
      "kind": "gaps",
      "chart": null,

@@ -1,8 +1,9 @@
 /* UPR Analysis — DOM renderers for a view (plugins/upr/analysis_spec.py):
  * KPI cards, visual cards, notes and the drill-down table dialog. They only
- * read the view they are given, so a browser presentation can reuse the same
- * cards on its slides. Charts are not drawn here: renderCard reports where each
- * one goes ({host, chart}) and the caller mounts it with UprAnalysis.charts. */
+ * read the view they are given, so the presentation and the A4 report reuse the
+ * very same cards (renderBlock). Charts are not drawn here: renderCard reports
+ * where each one goes ({host, chart}) and the caller mounts it with
+ * UprAnalysis.charts. */
 (function (global) {
     'use strict';
 
@@ -80,7 +81,24 @@
 
     // -- visual cards --------------------------------------------------------
 
-    function panelBlock(panel, plots) {
+    // A chart spec drawn at a fixed size (slides and A4 pages). ApexCharts pads its
+    // host to the chart height plus this much, so the host reserves the same up
+    // front and a page can be measured before its charts exist.
+    var APEX_HOST_PADDING = 15;
+
+    function sized(chart, width, height) {
+        if (!chart || (!width && !height)) return chart;
+        var copy = Object.assign({}, chart);
+        if (width) copy.width = width;
+        if (height) copy.height = height;
+        return copy;
+    }
+
+    function reserve(host, chart) {
+        if (chart && chart.height) host.style.minHeight = (chart.height + APEX_HOST_PADDING) + 'px';
+    }
+
+    function panelBlock(panel, plots, size) {
         var block = node('div', 'upri-cap');
         block.appendChild(node('p', 'upri-cap__name', panel.name));
         var figure = node('p', 'upri-cap__value', panel.value != null ? root.format.int(panel.value) : '—');
@@ -91,7 +109,9 @@
         block.appendChild(figure);
         var host = node('div');
         block.appendChild(host);
-        plots.push({ host: host, chart: panel.chart });
+        var chart = sized(panel.chart, size.panelWidth, size.panelHeight);
+        reserve(host, chart);
+        plots.push({ host: host, chart: chart });
         return block;
     }
 
@@ -108,12 +128,40 @@
         return wrap;
     }
 
+    // Printed and projected cards cannot click through to a list, so each gap
+    // is spelled out with the countries it names.
+    function gapLists(gaps, options) {
+        var wrap = node('div', 'upri-gap-lists');
+        var limit = (options && options.maxNames) || 30;
+        (gaps || []).forEach(function (gap) {
+            var box = node('div', 'upri-gap-list' + (gap.count ? '' : ' is-empty'));
+            var head = node('p', 'upri-gap-list__head');
+            head.appendChild(node('span', 'upri-gap__count', root.format.int(gap.count)));
+            head.appendChild(node('span', 'upri-gap__label', gap.label));
+            box.appendChild(head);
+            var rows = (gap.table && gap.table.rows) || [];
+            var names = rows.slice(0, limit).map(function (row) { return root.format.cellText((row.cells || [])[0]); });
+            var more = rows.length - names.length;
+            var text = names.join(', ');
+            if (more > 0) text += ', ' + root.format.fill(ui(options).export_more || 'and {n} more', { n: root.format.int(more) });
+            box.appendChild(node('p', 'upri-gap-list__names', text));
+            wrap.appendChild(box);
+        });
+        return wrap;
+    }
+
     /**
      * One visual as a card. Returns ``{element, plots}`` where ``plots`` lists
      * the ``{host, chart}`` pairs the caller still has to draw.
+     *
+     * ``options.interactive === false`` drops the table button and spells the
+     * gaps out; ``options.size`` ({width, height, panelWidth, panelHeight})
+     * draws the charts at a fixed size.
      */
     function renderCard(visual, options) {
         var text = ui(options);
+        var interactive = !options || options.interactive !== false;
+        var size = (options && options.size) || {};
         var plots = [];
         var section = node('section', 'upri-card' + (visual.wide ? ' upri-card--wide' : ''));
         var headingId = 'upri-vis-' + visual.id + '-h';
@@ -125,10 +173,12 @@
         var title = node('h4', 'upri-card__title', visual.title);
         title.id = headingId;
         copy.appendChild(title);
-        copy.appendChild(node('p', 'upri-card__hint', visual.hint || ''));
+        var hint = visual.hint || '';
+        if (interactive && visual.kind === 'gaps' && text.gaps_select) hint = (hint ? hint + ' ' : '') + text.gaps_select;
+        copy.appendChild(node('p', 'upri-card__hint', hint));
         head.appendChild(copy);
 
-        if (visual.table) {
+        if (visual.table && interactive) {
             var label = visual.table_label || ((text.view_table || 'View as table') + ': ' + visual.title);
             var btn = node('button', 'upri-table-btn');
             btn.type = 'button';
@@ -142,14 +192,18 @@
 
         if (visual.kind === 'panels') {
             var grid = node('div', 'upri-chart upri-cap-grid');
-            (visual.panels || []).forEach(function (panel) { grid.appendChild(panelBlock(panel, plots)); });
+            (visual.panels || []).forEach(function (panel) { grid.appendChild(panelBlock(panel, plots, size)); });
             section.appendChild(grid);
         } else if (visual.kind === 'gaps') {
-            section.appendChild(gapButtons(visual.gaps));
+            section.appendChild(interactive ? gapButtons(visual.gaps) : gapLists(visual.gaps, options));
         } else {
             var host = node('div', 'upri-chart');
             section.appendChild(host);
-            if (visual.chart) plots.push({ host: host, chart: visual.chart });
+            if (visual.chart) {
+                var chart = sized(visual.chart, size.width, size.height);
+                reserve(host, chart);
+                plots.push({ host: host, chart: chart });
+            }
         }
         return { element: section, plots: plots };
     }
@@ -166,7 +220,8 @@
 
     function appendRow(body, row, options) {
         var cells = row.cells || [];
-        var details = row.countries || [];
+        var expandable = !(options && options.static);
+        var details = expandable ? (row.countries || []) : [];
         var tr = document.createElement('tr');
         cells.forEach(function (value, index) {
             var td = document.createElement('td');
@@ -213,6 +268,38 @@
         el.hidden = !text;
     }
 
+    function fillHead(head, columns) {
+        head.textContent = '';
+        var headRow = document.createElement('tr');
+        (columns || []).forEach(function (label) {
+            var th = node('th', null, label);
+            th.scope = 'col';
+            headRow.appendChild(th);
+        });
+        head.appendChild(headRow);
+    }
+
+    /** A view table as a static ``<table>`` (no drill-down) for the printed report. */
+    function renderTable(spec, options) {
+        var wrap = node('div', 'upri-table-static');
+        if (spec.note) wrap.appendChild(node('p', 'upri-dialog__note', spec.note));
+        var table = node('table', 'upri-table');
+        var head = node('thead');
+        var body = node('tbody');
+        fillHead(head, spec.columns);
+        (spec.rows || []).forEach(function (row) { appendRow(body, row, Object.assign({}, options, { static: true })); });
+        table.appendChild(head);
+        table.appendChild(body);
+        wrap.appendChild(table);
+        if (spec.legend) {
+            var legend = node('p', 'upri-legend');
+            legend.appendChild(node('span', 'upri-legend__swatch'));
+            legend.appendChild(node('span', null, spec.legend));
+            wrap.appendChild(legend);
+        }
+        return wrap;
+    }
+
     /** Fill the table dialog with ``spec`` (a view table); does not open it. */
     function fillTable(dialog, spec, options) {
         var title = dialog.querySelector('#upri-table-title');
@@ -226,15 +313,8 @@
             if (legendText) legendText.textContent = spec.legend || '';
             legend.hidden = !spec.legend;
         }
-        if (head) head.textContent = '';
+        if (head) fillHead(head, spec.columns);
         if (body) body.textContent = '';
-        var headRow = document.createElement('tr');
-        (spec.columns || []).forEach(function (label) {
-            var th = node('th', null, label);
-            th.scope = 'col';
-            headRow.appendChild(th);
-        });
-        if (head) head.appendChild(headRow);
         if (body) (spec.rows || []).forEach(function (row) { appendRow(body, row, options); });
     }
 
@@ -244,7 +324,86 @@
         if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
     }
 
+    // -- export blocks (slides and A4 report) --------------------------------
+
+    function coverBlock(block, options) {
+        var el = node('div', 'upri-cover');
+        if (options.logoUrl) {
+            var logo = node('img', 'upri-cover__logo');
+            logo.src = options.logoUrl;
+            logo.alt = '';
+            el.appendChild(logo);
+        }
+        el.appendChild(node('h1', 'upri-cover__title', block.title));
+        (block.lines || []).forEach(function (line) { el.appendChild(node('p', 'upri-cover__line', line)); });
+        if (block.lead) el.appendChild(node('p', 'upri-cover__lead', block.lead));
+        return el;
+    }
+
+    function sectionBlock(block) {
+        var el = node('header', 'upri-section-head');
+        el.appendChild(node('h2', 'upri-section-head__title', block.title));
+        if (block.lead) el.appendChild(node('p', 'upri-section-head__lead', block.lead));
+        return el;
+    }
+
+    function notesBlock(block, options) {
+        var el = node('div', 'upri-notes-block');
+        el.appendChild(node('h4', 'upri-notes-block__title', ui(options).export_notes || ''));
+        (block.warnings || []).forEach(function (text) { el.appendChild(node('p', 'upri-warning', text)); });
+        (block.notes || []).forEach(function (text) { el.appendChild(node('p', 'upri-footnote', text)); });
+        return el;
+    }
+
+    function tableBlock(block, options) {
+        var el = node('div', 'upri-table-block');
+        if (block.first) el.appendChild(node('h3', 'upri-table-block__heading', ui(options).export_tables_heading || ''));
+        el.appendChild(node('h4', 'upri-table-block__title', block.visual.title));
+        el.appendChild(renderTable(block.visual.table, options));
+        return el;
+    }
+
+    /**
+     * One block of an export outline (UprAnalysis.pages) as DOM: ``{element,
+     * plots}``. ``options.size`` sizes its charts; the rest of the look comes
+     * from the same classes the tab uses.
+     */
+    function renderBlock(block, options) {
+        options = options || {};
+        var plots = [];
+        var element;
+        switch (block.type) {
+            case 'cover':
+                element = coverBlock(block, options);
+                break;
+            case 'section':
+                element = sectionBlock(block);
+                break;
+            case 'kpis':
+                element = node('div', 'upri-kpis');
+                renderKpis(element, block.kpis);
+                break;
+            case 'visual':
+                var card = renderCard(block.visual, { ui: options.ui, interactive: false, size: options.size, maxNames: options.maxNames });
+                element = card.element;
+                plots = card.plots;
+                break;
+            case 'notes':
+                element = notesBlock(block, options);
+                break;
+            case 'table':
+                element = tableBlock(block, options);
+                break;
+            default:
+                element = node('div');
+        }
+        element.setAttribute('data-upri-block', block.type);
+        return { element: element, plots: plots };
+    }
+
     root.dom = {
+        renderBlock: renderBlock,
+        renderTable: renderTable,
         renderKpis: renderKpis,
         renderNotes: renderNotes,
         renderWarnings: renderWarnings,

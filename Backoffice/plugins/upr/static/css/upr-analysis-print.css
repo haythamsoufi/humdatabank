@@ -1,0 +1,53 @@
+/* UPR Analysis — A4 report print rules. Linked with media="not all" and switched
+ * to "print" by upr-analysis-report.js only while a report is open, so the global
+ * @page rule never affects printing anywhere else in the Backoffice. */
+
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+html,
+body.upri-report-open {
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+}
+
+body.upri-report-open > *:not(.upri-report) {
+    display: none !important;
+}
+
+.upri-report {
+    position: static;
+    display: block;
+    overflow: visible;
+    background: none;
+}
+.upri-report__bar {
+    display: none !important;
+}
+.upri-report__pages {
+    display: block;
+    padding: 0;
+}
+.upri-page {
+    margin: 0;
+    box-shadow: none;
+    break-after: page;
+    break-inside: avoid;
+}
+.upri-page:last-child {
+    break-after: auto;
+}
+
+.upri-report,
+.upri-report * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}

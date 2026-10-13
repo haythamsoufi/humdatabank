@@ -26,7 +26,16 @@
         errorText: byId('upri-error-text'),
         empty: byId('upri-empty'),
         content: byId('upri-content'),
-        dialog: byId('upri-table-dialog')
+        dialog: byId('upri-table-dialog'),
+        exportDialog: byId('upri-export-dialog'),
+        exportForm: byId('upri-export-form'),
+        exportTitle: byId('upri-export-title'),
+        exportList: byId('upri-export-list'),
+        exportFields: byId('upri-export-fields'),
+        exportTables: byId('upri-export-tables'),
+        exportTablesRow: byId('upri-export-tables-row'),
+        exportEmpty: byId('upri-export-empty'),
+        exportGo: byId('upri-export-go')
     };
 
     // Each section (data / participation) owns its containers, its drawn charts
@@ -122,6 +131,7 @@
     function load(region) {
         setState('loading');
         destroyCharts(data);
+        data.view = null;
         var ticket = ++data.request;
         var url = CFG.dataUrl || panel.getAttribute('data-impact-url');
         fetchJson(url, region)
@@ -161,6 +171,7 @@
         var ticket = ++narr.request;
         setNarrState('loading');
         destroyCharts(narr);
+        narr.views = null;
         fetchJson(url, region)
             .then(function (payload) {
                 if (ticket !== narr.request) return; // a newer request superseded this one
@@ -212,6 +223,81 @@
         if (gap) A.dom.openTable(els.dialog, gap.table, { ui: UI });
     }
 
+    // --- Presentation and A4 report ----------------------------------------
+    // Both are built from the views already on the page (no new request), so they
+    // show exactly what the tab shows for the current region.
+
+    var exporting = { mode: null, selected: ['data', 'track:ALL'] };
+
+    function exportSections() {
+        return A.pages.sections({ impact: data.view, narrative: narr.views }, UI);
+    }
+
+    function sectionCheckbox(entry) {
+        var label = document.createElement('label');
+        label.className = 'upri-check' + (entry.available ? '' : ' is-disabled');
+        var input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = entry.id;
+        input.disabled = !entry.available;
+        input.checked = entry.available && exporting.selected.indexOf(entry.id) !== -1;
+        label.appendChild(input);
+        var text = document.createElement('span');
+        text.textContent = entry.label;
+        if (!entry.available) {
+            var hint = document.createElement('span');
+            hint.className = 'upri-check__hint';
+            hint.textContent = UI.export_unavailable || '';
+            text.appendChild(hint);
+        }
+        label.appendChild(text);
+        return label;
+    }
+
+    function openExport(button) {
+        if (!els.exportDialog || !A.pages) return;
+        exporting.mode = button.getAttribute('data-upri-export');
+        var entries = exportSections();
+        var ready = entries.some(function (entry) { return entry.available; });
+        els.exportList.replaceChildren();
+        entries.forEach(function (entry) { els.exportList.appendChild(sectionCheckbox(entry)); });
+        els.exportTitle.textContent = button.textContent.trim();
+        els.exportGo.textContent = button.getAttribute('data-go-label') || '';
+        els.exportGo.disabled = !ready;
+        els.exportFields.hidden = !ready;
+        els.exportEmpty.textContent = ready ? '' : (UI.export_nothing || '');
+        els.exportEmpty.hidden = ready;
+        els.exportTablesRow.hidden = !ready || exporting.mode !== 'report';
+        els.exportDialog.showModal();
+    }
+
+    function regionName() {
+        var select = els.region;
+        if (!select || !select.value) return '';
+        var chosen = select.options[select.selectedIndex];
+        return chosen ? chosen.textContent : select.value;
+    }
+
+    function runExport() {
+        var boxes = els.exportList.querySelectorAll('input[type="checkbox"]:checked');
+        var selected = Array.prototype.map.call(boxes, function (box) { return box.value; });
+        exporting.selected = selected;
+        var blocks = A.pages.buildOutline({
+            impact: data.view,
+            narrative: narr.views,
+            ui: UI,
+            region: regionName(),
+            generatedAt: new Date(),
+            selected: selected,
+            includeTables: exporting.mode === 'report' && els.exportTables.checked
+        });
+        els.exportDialog.close();
+        if (!blocks.length) return;
+        var options = { ui: UI, logoUrl: CFG.logoUrl, title: blocks[0].title };
+        if (exporting.mode === 'present') A.slides.open(blocks, options);
+        else A.report.open(blocks, options);
+    }
+
     // --- Wiring ----------------------------------------------------------
 
     function reloadAll() {
@@ -238,11 +324,22 @@
         if (gapBtn) openGapTable(gapBtn);
         var tableBtn = target.closest('[data-upri-table]');
         if (tableBtn) openVisualTable(tableBtn);
-        if (target.closest('[data-upri-close]') && els.dialog && els.dialog.open) els.dialog.close();
+        var exportBtn = target.closest('[data-upri-export]');
+        if (exportBtn) openExport(exportBtn);
+        var closer = target.closest('[data-upri-close]');
+        var dialog = closer && closer.closest('dialog');
+        if (dialog && dialog.open) dialog.close();
     });
-    if (els.dialog) {
-        els.dialog.addEventListener('click', function (event) {
-            if (event.target === els.dialog) els.dialog.close();
+    [els.dialog, els.exportDialog].forEach(function (dialog) {
+        if (!dialog) return;
+        dialog.addEventListener('click', function (event) {
+            if (event.target === dialog) dialog.close();
+        });
+    });
+    if (els.exportForm) {
+        els.exportForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            runExport();
         });
     }
 

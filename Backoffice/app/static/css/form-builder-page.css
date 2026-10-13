@@ -180,6 +180,18 @@ html[dir="rtl"] .fb-access-btn__chevron {
         width: 100%;
     }
 
+    /* Properties is hidden and Actions is out of flow; do not let Order
+       inherit the leftover half of the table. Shrink it to the number. */
+    #form-builder-ui .fb-col-order {
+        width: 1%;
+        white-space: nowrap;
+        text-align: center;
+    }
+
+    #form-builder-ui .fb-col-label {
+        width: auto;
+    }
+
     #form-builder-ui table th,
     #form-builder-ui table td {
         padding-left: 0.5rem;
@@ -528,9 +540,13 @@ html[dir="rtl"] .fb-access-btn__chevron {
 /* -------------------------------------------------------------------------- */
 /* Items table: shared order / label layout for items and subsection headers  */
 /* -------------------------------------------------------------------------- */
+#form-builder-ui .fb-col-order {
+    text-align: center;
+}
 #form-builder-ui .fb-table-order-cell {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.25rem;
 }
 #form-builder-ui .fb-table-order-toggle-placeholder {
@@ -538,6 +554,12 @@ html[dir="rtl"] .fb-access-btn__chevron {
     flex-shrink: 0;
     width: 2rem;
     height: 2rem;
+}
+@media (max-width: 768px) {
+    /* After the base spacer rule so the number can sit in the column center. */
+    #form-builder-ui .fb-table-order-toggle-placeholder {
+        display: none;
+    }
 }
 #form-builder-ui .fb-table-order-number {
     font-variant-numeric: tabular-nums;

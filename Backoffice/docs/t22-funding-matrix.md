@@ -24,11 +24,13 @@ Rows are the host country (`row_mode` `list_library`, list `country_map`). Colum
 
 Three column groups. Each has the same eight columns. Codes keep the `[assignment_year]` placeholder; saved cells use the resolved year (`SP1_2026`, `SP1_2027`, `SP1_2028` on a 2026 assignment).
 
-| Offset | Group code | Header (en) | Header colour |
-|---|---|---|---|
-| Assignment year | `year_[assignment_year]` | `[assignment_year]` | none |
-| +1 | `year_[[assignment_year]+1]` | `[[assignment_year]+1]` | `#e8f3c9` on the group, `#fbffeb` on the Funding Requirements subgroup. Both colours apply to headers and cells. |
-| +2 | `year_[[assignment_year]+2]` | `[[assignment_year]+2]` | same as +1 |
+| Offset | Group code | Header (en) | Year header | Table (Funding Requirements) |
+|---|---|---|---|---|
+| Assignment year | `year_[assignment_year]` | `[assignment_year]` | `#5f97c9` | `#b5d4ef` |
+| +1 | `year_[[assignment_year]+1]` | `[[assignment_year]+1]` | `#6aaf58` | `#c3e2b6` |
+| +2 | `year_[[assignment_year]+2]` | `[[assignment_year]+2]` | `#c48a28` | `#f0d08a` |
+
+Both colours apply to headers and cells. The year-group colour is the one on the year header; Funding Requirements columns use the lighter subgroup colour. `confirmedfn` has no subgroup, so it keeps the year-group colour.
 
 Subgroup `fun_req` is labelled "Funding Requirements" (ar, es, fr, ru in the snapshot). `confirmedfn` is in the year group and **not** in `fun_req`.
 

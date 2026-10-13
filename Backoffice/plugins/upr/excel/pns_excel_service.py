@@ -162,16 +162,17 @@ class PnsPlanningExcelService:
     @classmethod
     def build_workbook(cls, aes) -> Tuple[io.BytesIO, str]:
         _ensure_scripts_in_path()
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
         from import_upr_excel_data import build_import_context
         from pns_form_excel import (
+            default_planning_columns,
             prepare_planning_workbook,
             write_planning_funding_rows,
             write_staff_rows,
         )
 
         template_path = cls.get_template_path()
-        wb = load_workbook_safe(template_path, read_only=False, data_only=False)
+        wb = load_workbook_safe(read_workbook_file_bytes(template_path), read_only=False, data_only=False)
         try:
             ns_name, country_name, iso3, year, period = _assignment_identity(aes)
             ctx = build_import_context([22])
@@ -183,11 +184,7 @@ class PnsPlanningExcelService:
             )
             prepare_planning_workbook(wb, ns_name=ns_name, year=year)
             if year is not None and funding_item:
-                from import_upr_excel_data import T22_BREAKDOWN_AREAS, T22_ROW_TOTAL_COLUMN
-
-                columns = _form_columns(_published_item(22, funding_item)) or list(T22_BREAKDOWN_AREAS) + [
-                    T22_ROW_TOTAL_COLUMN
-                ]
+                columns = _form_columns(_published_item(22, funding_item)) or default_planning_columns()
                 write_planning_funding_rows(
                     wb,
                     _matrix_cells(aes.id, funding_item),
@@ -242,11 +239,12 @@ class PnsPlanningExcelService:
         _ensure_scripts_in_path()
         from import_upr_excel_data import (
             STAFF_INDICATOR_COLUMNS,
-            T22_BREAKDOWN_AREAS,
-            T22_ROW_TOTAL_COLUMN,
+            T22_CONFIRMED_FUNDING_COLUMN,
             build_import_context,
         )
         from pns_form_excel import (
+            PLANNING_YEAR_OFFSETS,
+            default_planning_columns,
             names_match,
             planning_funding_cells,
             read_planning_data_rows,
@@ -284,17 +282,19 @@ class PnsPlanningExcelService:
             name_to_country, _name_to_ns, _country_names, _ns_country, _ns_iso = _country_name_maps(
                 wb, country_id_by_iso3, iso3_to_ns_id
             )
+            plan_years = {year + offset for offset in PLANNING_YEAR_OFFSETS}
             data_rows = read_planning_data_rows(wb)
-            source_rows = [row for row in data_rows if names_match(row["ns"], ns_name) and row["year"] == year]
-            if not source_rows:
-                source_rows = [
-                    row
-                    for row in read_planning_grid_overrides(wb)
-                    if not row.get("ns") or names_match(row["ns"], ns_name)
-                ]
-            funding_columns = _form_columns(_published_item(22, ctx.t22_funding_item_id)) or list(
-                T22_BREAKDOWN_AREAS
-            ) + [T22_ROW_TOTAL_COLUMN]
+            source_rows = [row for row in data_rows if names_match(row["ns"], ns_name) and row["year"] in plan_years]
+            grid_rows = [
+                row
+                for row in read_planning_grid_overrides(wb)
+                if not row.get("ns") or names_match(row["ns"], ns_name)
+            ]
+            if source_rows:
+                # FR data drives SP/EF; Confirmed Funding is only typed into the grid.
+                grid_rows = [row for row in grid_rows if row["attribute"] == T22_CONFIRMED_FUNDING_COLUMN]
+            source_rows += grid_rows
+            funding_columns = _form_columns(_published_item(22, ctx.t22_funding_item_id)) or default_planning_columns()
             staff_columns = _form_columns(_published_item(22, ctx.staff_matrix_item_id)) or list(
                 STAFF_INDICATOR_COLUMNS.values()
             )
@@ -350,12 +350,12 @@ class PnsReportingExcelService:
     @classmethod
     def build_workbook(cls, aes) -> Tuple[io.BytesIO, str]:
         _ensure_scripts_in_path()
-        from app.utils.safe_workbook import load_workbook_safe
+        from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
         from import_upr_excel_data import T23_PNS_FUNDING_COLUMNS, build_import_context
         from pns_form_excel import prepare_reporting_workbook, reporting_column_map, write_reporting_funding_rows
 
         template_path = cls.get_template_path()
-        wb = load_workbook_safe(template_path, read_only=False, data_only=False)
+        wb = load_workbook_safe(read_workbook_file_bytes(template_path), read_only=False, data_only=False)
         try:
             ns_name, country_name, iso3, _year, period = _assignment_identity(aes)
             ctx = build_import_context([23])

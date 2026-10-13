@@ -475,14 +475,20 @@
         "en": "[assignment_year]",
         "es": "[assignment_year]",
         "fr": "[assignment_year]",
-        "ru": "[assignment_year]"
+        "ru": "[assignment_year]",
+        "header_color": "#5f97c9",
+        "apply_color_to_headers": true,
+        "apply_color_to_cells": true
       },
       "year_[assignment_year]::fun_req": {
         "ar": "متطلبات التمويل",
         "en": "Funding Requirements",
         "es": "Requisitos de financiación",
         "fr": "Exigences de financement",
-        "ru": "Требования к финансированию"
+        "ru": "Требования к финансированию",
+        "header_color": "#b5d4ef",
+        "apply_color_to_headers": true,
+        "apply_color_to_cells": true
       },
       "year_[[assignment_year]+1]": {
         "ar": "[[assignment_year]+1]",
@@ -490,7 +496,7 @@
         "es": "[[assignment_year]+1]",
         "fr": "[[assignment_year]+1]",
         "ru": "[[assignment_year]+1]",
-        "header_color": "#e8f3c9",
+        "header_color": "#6aaf58",
         "apply_color_to_headers": true,
         "apply_color_to_cells": true
       },
@@ -500,7 +506,7 @@
         "es": "Requisitos de financiación",
         "fr": "Exigences de financement",
         "ru": "Требования к финансированию",
-        "header_color": "#fbffeb",
+        "header_color": "#c3e2b6",
         "apply_color_to_headers": true,
         "apply_color_to_cells": true
       },
@@ -510,7 +516,7 @@
         "es": "[[assignment_year]+2]",
         "fr": "[[assignment_year]+2]",
         "ru": "[[assignment_year]+2]",
-        "header_color": "#e8f3c9",
+        "header_color": "#c48a28",
         "apply_color_to_headers": true,
         "apply_color_to_cells": true
       },
@@ -520,7 +526,7 @@
         "es": "Requisitos de financiación",
         "fr": "Exigences de financement",
         "ru": "Требования к финансированию",
-        "header_color": "#fbffeb",
+        "header_color": "#f0d08a",
         "apply_color_to_headers": true,
         "apply_color_to_cells": true
       }

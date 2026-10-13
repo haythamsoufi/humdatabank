@@ -20,9 +20,12 @@ for _path in (_BACKOFFICE_DIR, _SCRIPT_DIR, _CORE_IMPORTS):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
+from openpyxl.utils import column_index_from_string  # noqa: E402
+
 from import_upr_excel_data import (  # noqa: E402
     STAFF_INDICATOR_COLUMNS,
     T22_BREAKDOWN_AREAS,
+    T22_CONFIRMED_FUNDING_COLUMN,
     T22_ROW_TOTAL_COLUMN,
 )
 
@@ -39,17 +42,17 @@ REPORTING_PLAN_SHEET = "FR"
 PLANNING_NS_CELL = "C3"
 REPORTING_NS_CELL = "D3"
 PLANNING_YEAR_HEADER_CELLS = ("D8", "L8", "T8")
-# First-year block on Funding Requirement. Attribute codes match the SUMIFS
-# literals (column D is SP1 even though its header text says Disasters).
-PLANNING_GRID_COLUMNS = {
-    "D": "SP1",
-    "E": "SP2",
-    "F": "SP3",
-    "G": "SP4",
-    "H": "SP5",
-    "I": "EFs",
-    "J": T22_ROW_TOTAL_COLUMN,
-}
+# Funding Requirement has one block per year (assignment year, +1, +2), starting at
+# D, L and T. Attribute codes match the SUMIFS literals (the first column is SP1 even
+# though its header text says Disasters). Confirmed Funding is typed into the grid;
+# it has no FR data rows.
+PLANNING_YEAR_BLOCK_STARTS = ("D", "L", "T")
+PLANNING_BLOCK_ATTRIBUTES = (*T22_BREAKDOWN_AREAS, T22_ROW_TOTAL_COLUMN, T22_CONFIRMED_FUNDING_COLUMN)
+PLANNING_FIRST_COUNTRY_ROW = 12
+PLANNING_YEAR_OFFSETS = (0, 1, 2)
+_PLANNING_YEAR_TOKENS = ("[assignment_year]", "[[assignment_year]+1]", "[[assignment_year]+2]")
+_YEAR_OFFSET_PLACEHOLDER = re.compile(r"\[\[assignment_year\]\s*\+\s*(\d+)\]")
+_YEAR_SUFFIXED_COLUMN = re.compile(r"^(?P<code>.+?)_(?P<year>\d{4})$")
 
 REPORTING_EXCEL_COLUMNS = {
     "Funding": ("total funding", "funding"),
@@ -219,34 +222,83 @@ def read_planning_data_rows(wb) -> List[Dict[str, Any]]:
     return rows
 
 
+def default_planning_columns() -> List[str]:
+    """T22 funding column codes used when the published matrix cannot be loaded."""
+    return [
+        f"{attribute}_{token}"
+        for token in _PLANNING_YEAR_TOKENS
+        for attribute in (*T22_BREAKDOWN_AREAS, T22_CONFIRMED_FUNDING_COLUMN)
+    ]
+
+
+def planning_column_slots(form_columns: Optional[Sequence[str]], base_year: int) -> Dict[Tuple[str, int], str]:
+    """Map ``(attribute, year)`` to the T22 funding column saved for a ``base_year`` assignment.
+
+    Column codes carry the year (``SP1_[assignment_year]``, ``EFs_[[assignment_year]+1]``) and
+    are saved resolved, so a 2026 assignment stores ``SP1_2026`` / ``EFs_2027``. Codes without a
+    year are legacy single-year columns and belong to ``base_year``. The calculated total
+    (``fr_tot``) is not an input and has no slot.
+    """
+    canonical = {name.lower(): name for name in (*T22_BREAKDOWN_AREAS, T22_CONFIRMED_FUNDING_COLUMN)}
+    slots: Dict[Tuple[str, int], str] = {}
+    for raw in form_columns or default_planning_columns():
+        name = _YEAR_OFFSET_PLACEHOLDER.sub(lambda m: str(base_year + int(m.group(1))), str(raw).strip())
+        name = name.replace("[assignment_year]", str(base_year))
+        match = _YEAR_SUFFIXED_COLUMN.match(name)
+        code, year = (match["code"], int(match["year"])) if match else (name, base_year)
+        attribute = canonical.get(code.lower())
+        if attribute:
+            slots.setdefault((attribute, year), name)
+    return slots
+
+
+def _planning_block_columns(start: str) -> Dict[str, int]:
+    first = column_index_from_string(start)
+    return {attribute: first + index for index, attribute in enumerate(PLANNING_BLOCK_ATTRIBUTES)}
+
+
+def _planning_country_rows(ws) -> Dict[str, int]:
+    rows: Dict[str, int] = {}
+    for row in range(PLANNING_FIRST_COUNTRY_ROW, (ws.max_row or PLANNING_FIRST_COUNTRY_ROW) + 1):
+        value = ws.cell(row, 3).value
+        if value and not _is_formula(value):
+            rows.setdefault(_norm(value), row)
+    return rows
+
+
 def read_planning_grid_overrides(wb) -> List[Dict[str, Any]]:
-    """Numbers typed over the first-year formulas, used when FR data is empty."""
+    """Numbers typed into the Funding Requirement grid, one block per year.
+
+    SP/EF values typed over the formulas are used when FR data is empty; Confirmed Funding
+    is only ever typed here.
+    """
     if PLANNING_FUNDING_SHEET not in wb.sheetnames:
         return []
     ws = wb[PLANNING_FUNDING_SHEET]
     ns_name = str(ws[PLANNING_NS_CELL].value or "").strip()
-    year = _as_int_year(ws["D8"].value)
+    country_rows = _planning_country_rows(ws)
     rows: List[Dict[str, Any]] = []
-    for row in range(12, (ws.max_row or 11) + 1):
-        country = str(ws.cell(row, 3).value or "").strip()
-        if not country or _is_formula(ws.cell(row, 3).value):
+    for start, header in zip(PLANNING_YEAR_BLOCK_STARTS, PLANNING_YEAR_HEADER_CELLS):
+        year = _as_int_year(ws[header].value)
+        if year is None:
             continue
-        for column, attribute in PLANNING_GRID_COLUMNS.items():
-            cell = ws[f"{column}{row}"]
-            if _is_formula(cell.value):
-                continue
-            value = _as_number(cell.value)
-            if value is None:
-                continue
-            rows.append(
-                {
-                    "ns": ns_name,
-                    "country": country,
-                    "year": year,
-                    "attribute": attribute,
-                    "value": value,
-                }
-            )
+        for attribute, col in _planning_block_columns(start).items():
+            for row in country_rows.values():
+                cell = ws.cell(row, col)
+                if _is_formula(cell.value):
+                    continue
+                value = _as_number(cell.value)
+                if value is None:
+                    continue
+                rows.append(
+                    {
+                        "ns": ns_name,
+                        "country": str(ws.cell(row, 3).value).strip(),
+                        "year": year,
+                        "attribute": attribute,
+                        "value": value,
+                    }
+                )
     return rows
 
 
@@ -258,17 +310,17 @@ def planning_funding_cells(
     country_name_to_id: Mapping[str, int],
     form_columns: Optional[Sequence[str]] = None,
 ) -> Tuple[Dict[str, Any], List[str]]:
+    """Matrix cells for a ``year`` assignment from FR data / grid rows of that year, +1 and +2."""
     warnings: List[str] = []
     cells: Dict[str, Any] = {}
-    allowed = {name.strip().lower(): name for name in (form_columns or list(T22_BREAKDOWN_AREAS) + [T22_ROW_TOTAL_COLUMN])}
+    slots = planning_column_slots(form_columns, year)
+    canonical = {name.lower(): name for name in PLANNING_BLOCK_ATTRIBUTES}
     ns_key = _norm(ns_name)
     for row in rows:
         if ns_key and _norm(row.get("ns")) not in {ns_key, ""}:
             continue
-        if row.get("year") != year:
-            continue
-        attribute = str(row.get("attribute") or "").strip()
-        column = allowed.get(attribute.lower())
+        attribute = canonical.get(str(row.get("attribute") or "").strip().lower())
+        column = slots.get((attribute, row.get("year"))) if attribute else None
         if not column:
             continue
         country_id = country_name_to_id.get(_norm(row.get("country")))
@@ -436,7 +488,17 @@ def prepare_planning_workbook(wb, *, ns_name: str, year: Optional[int]) -> None:
             funding["B1"] = updated
         for row in funding.iter_rows(min_row=1, max_row=funding.max_row or 1, max_col=funding.max_column or 1):
             for cell in row:
-                cell.value = rewrite_planning_year_formula(cell.value, year)
+                updated = rewrite_planning_year_formula(cell.value, year)
+                if updated != cell.value:
+                    cell.value = updated
+    block_columns = [col for start in PLANNING_YEAR_BLOCK_STARTS for col in _planning_block_columns(start).values()]
+    _clear_constants(
+        funding,
+        PLANNING_FIRST_COUNTRY_ROW,
+        funding.max_row or PLANNING_FIRST_COUNTRY_ROW,
+        min(block_columns),
+        max(block_columns),
+    )
     data = wb[PLANNING_DATA_SHEET]
     _clear_constants(data, 2, data.max_row or 2, 1, 5)
     if ACTIVITIES_SHEET in wb.sheetnames:
@@ -454,19 +516,38 @@ def write_planning_funding_rows(
     country_id_to_name: Mapping[int, str],
     form_columns: Sequence[str],
 ) -> None:
+    """SP/EF cells become FR data rows; Confirmed Funding goes into its grid column."""
+    slot_by_column = {column.lower(): slot for slot, column in planning_column_slots(form_columns, year).items()}
+    block_start_by_year = {year + offset: start for offset, start in zip(PLANNING_YEAR_OFFSETS, PLANNING_YEAR_BLOCK_STARTS)}
     ws = wb[PLANNING_DATA_SHEET]
+    grid = wb[PLANNING_FUNDING_SHEET]
+    grid_rows = _planning_country_rows(grid)
     row_number = 2
-    for row_id, column, value in _matrix_pairs(cells, form_columns):
-        if column == T22_ROW_TOTAL_COLUMN:
+    for key, raw in cells.items():
+        if not isinstance(key, str) or "_" not in key or key.startswith("_"):
+            continue
+        row_id, column = key.split("_", 1)
+        slot = slot_by_column.get(column.strip().lower())
+        number = _as_number(raw)
+        if not slot or number is None or not row_id.isdigit():
             continue
         country = country_id_to_name.get(int(row_id))
         if not country:
             continue
+        attribute, cell_year = slot
+        if attribute == T22_CONFIRMED_FUNDING_COLUMN:
+            grid_row = grid_rows.get(_norm(country))
+            start = block_start_by_year.get(cell_year)
+            if grid_row and start:
+                target = grid.cell(grid_row, _planning_block_columns(start)[attribute])
+                if not _is_formula(target.value):
+                    target.value = _json_number(number)
+            continue
         ws.cell(row_number, 1).value = ns_name
         ws.cell(row_number, 2).value = country
-        ws.cell(row_number, 3).value = year
-        ws.cell(row_number, 4).value = column
-        ws.cell(row_number, 5).value = _json_number(value)
+        ws.cell(row_number, 3).value = cell_year
+        ws.cell(row_number, 4).value = attribute
+        ws.cell(row_number, 5).value = _json_number(number)
         row_number += 1
 
 

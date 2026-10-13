@@ -81,7 +81,16 @@ function Parse-UploadSpec {
 
 $localScript = Resolve-LocalScriptPath -ScriptPath $Script
 $scriptBaseName = [System.IO.Path]::GetFileName($localScript)
-$remoteScript = if ($UseDeployedScript) { "/app/scripts/$scriptBaseName" } else { "/tmp/$scriptBaseName" }
+$scriptsRoot = (Resolve-Path (Join-Path $backoffice 'scripts')).Path
+$scriptRelDir = ''
+if ($localScript.ToLowerInvariant().StartsWith($scriptsRoot.ToLowerInvariant())) {
+    $scriptRelDir = (Split-Path -Parent $localScript.Substring($scriptsRoot.Length).TrimStart('\', '/')) -replace '\\', '/'
+}
+$remoteScriptDir = if ($scriptRelDir) { "/app/scripts/$scriptRelDir" } else { '/app/scripts' }
+# Uploaded scripts keep their scripts/<category>/ depth so Path(__file__).parents[N] and
+# _bootstrap.setup_cli_paths resolve /app like the deployed copy; the _remote_ prefix keeps
+# them from replacing a file baked into the image.
+$remoteScript = if ($UseDeployedScript) { "$remoteScriptDir/$scriptBaseName" } else { "$remoteScriptDir/_remote_$scriptBaseName" }
 
 $uploadPairs = @()
 foreach ($spec in $Upload) {
@@ -95,6 +104,7 @@ $useDeployed = [bool]$UseDeployedScript
 $uploadList = @($uploadPairs)
 $localScriptPath = $localScript
 $remoteScriptPath = $remoteScript
+$remoteScriptDirPath = $remoteScriptDir
 
 Write-Host ""
 Write-Host "=== $($target.Label) run script ==="
@@ -119,6 +129,7 @@ Use-AzureWebAppTunnel `
 
         if (-not $useDeployed) {
             Write-Host "Uploading $scriptBaseName..."
+            Invoke-AzureWebAppSshCommand -LocalPort $Ctx.Port -RemoteCommand "mkdir -p '$remoteScriptDirPath'"
             Send-AzureWebAppRemoteFile `
                 -LocalPath $localScriptPath `
                 -RemotePath $remoteScriptPath `
@@ -135,6 +146,11 @@ Use-AzureWebAppTunnel `
 
         Write-Host "Running on container..."
         Invoke-AzureWebAppSshCommand -LocalPort $Ctx.Port -RemoteCommand $remoteCmd
+        $runExit = $LASTEXITCODE
+        if (-not $useDeployed) {
+            Invoke-AzureWebAppSshCommand -LocalPort $Ctx.Port -RemoteCommand "rm -f '$remoteScriptPath'"
+        }
+        $global:LASTEXITCODE = $runExit
     }
 
 exit $LASTEXITCODE

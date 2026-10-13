@@ -213,6 +213,11 @@ Omit `--form-item-id` to scan every matrix item at once (still `--dry-run` first
    .\azure-webapp\azure_webapp_run.ps1 -WebApp $t.WebApp -ResourceGroup $t.ResourceGroup -Port $t.Port -Label $t.Label `
        -Command "cd /app && python scripts/ops/prune_stale_matrix_cell_keys.py --form-item-id <ITEM_ID> --force"
    ```
+   For a one-off script that is not in the deployed image yet, use `azure_webapp_run_script.ps1` instead: it uploads `Backoffice/scripts/<category>/<name>.py` to `/app/scripts/<category>/_remote_<name>.py` (same folder depth, so `_bootstrap.setup_cli_paths(__file__)` and `Path(__file__).parents[N]` resolve `/app`), runs it, and deletes it afterwards. Extra input files go to `/tmp` via `-Upload local=remote`.
+   ```powershell
+   .\azure-webapp\azure_webapp_run_script.ps1 -Environment PROD -Script ops/<name>.py `
+       -Upload "C:\path\input.json=/tmp/input.json" -RemoteArgs "--input /tmp/input.json --dry-run"
+   ```
    Use `cd /app` (not `Backoffice/`) — that's the deployed app root inside the container (see `entrypoint.sh`). Omit `--form-item-id` to scan every matrix item. `--force` is preferred over the interactive confirmation prompt here since the SSH tunnel is a one-shot non-interactive command.
 
    Fallback with no local Azure CLI/OpenSSH: Azure Portal → App Service → **Development Tools → SSH** (browser-based Kudu console). The container's sshd is opt-in: set `ENABLE_SSH=true` first and remove it afterwards — see [Container SSH access](container-ssh-access.md) and run the same two commands from `/app`.

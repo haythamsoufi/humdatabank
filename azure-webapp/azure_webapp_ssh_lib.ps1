@@ -22,6 +22,16 @@
 
 $script:AzureWebAppSshPassword = 'Docker!'
 
+# Remote output is UTF-8. Windows PowerShell decodes captured/redirected native output with
+# the OEM code page (cp437/cp850), which mangles non-ASCII labels in logs and backups.
+# ConstrainedLanguage sessions can't assign [Console] properties, so fall back to chcp there.
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {
+    & chcp.com 65001 2>&1 | Out-Null
+}
+
 function Stop-AzureWebAppTunnelPort {
     param([int]$LocalPort)
     try {
@@ -86,36 +96,48 @@ function Get-AzureWebAppAvailableLocalPort {
     throw "Could not find an available, non-Windows-reserved local port starting from $PreferredPort."
 }
 
-function Start-AzureWebAppTunnelJob {
+function Get-AzureWebAppTunnelLogText {
+    param([string]$LogPath)
+    $parts = foreach ($path in @($LogPath, "$LogPath.err")) {
+        if (Test-Path $path) { Get-Content $path -Raw -ErrorAction SilentlyContinue }
+    }
+    return ($parts -join "`n")
+}
+
+function Start-AzureWebAppTunnelProcess {
+    # Start-Process rather than Start-Job: Start-Job refuses to run when the session is in
+    # ConstrainedLanguage mode (Cursor's agent pwsh, AppLocker/WDAC-managed machines).
     param(
         [string]$WebAppName,
         [string]$ResourceGroupName,
         [int]$LocalPort,
         [string]$LogPath
     )
-    if (Test-Path $LogPath) { Remove-Item $LogPath -Force -ErrorAction SilentlyContinue }
+    foreach ($path in @($LogPath, "$LogPath.err")) {
+        if (Test-Path $path) { Remove-Item $path -Force -ErrorAction SilentlyContinue }
+    }
     $azPath = (Get-Command az).Source
-    return Start-Job -Name "AzureWebAppTunnel_$LocalPort" -ScriptBlock {
-        param($AzPath, $WebAppName, $ResourceGroupName, $LocalPort, $LogPath)
-        $ErrorActionPreference = 'Continue'
-        & $AzPath webapp create-remote-connection `
-            --name $WebAppName `
-            --resource-group $ResourceGroupName `
-            --port $LocalPort `
-            --timeout 300 *>> $LogPath
-    } -ArgumentList $azPath, $WebAppName, $ResourceGroupName, $LocalPort, $LogPath
+    $azArgs = @(
+        'webapp', 'create-remote-connection',
+        '--name', $WebAppName,
+        '--resource-group', $ResourceGroupName,
+        '--port', "$LocalPort",
+        '--timeout', '300'
+    )
+    return Start-Process -FilePath $azPath -ArgumentList $azArgs -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $LogPath -RedirectStandardError "$LogPath.err"
 }
 
 function Wait-AzureWebAppTunnelReady {
     param(
-        $Job,
+        $Process,
         [string]$LogPath,
         [int]$LocalPort,
         [int]$TimeoutSec = 90
     )
     for ($elapsed = 0; $elapsed -lt $TimeoutSec; $elapsed += 2) {
-        if ($Job.State -eq 'Failed' -or $Job.State -eq 'Completed') { return $false }
-        $logText = if (Test-Path $LogPath) { Get-Content $LogPath -Raw -ErrorAction SilentlyContinue } else { '' }
+        if ($Process.HasExited) { return $false }
+        $logText = Get-AzureWebAppTunnelLogText -LogPath $LogPath
         $logReady = $logText -match 'Opening tunnel on port|Tunnels are ready|SSH is available'
         if ($logReady -and (Test-AzureWebAppPortListening -LocalPort $LocalPort)) { return $true }
         Start-Sleep -Seconds 2
@@ -123,29 +145,32 @@ function Wait-AzureWebAppTunnelReady {
     return $false
 }
 
-function Stop-AzureWebAppTunnelJob {
-    param($Job, [int]$LocalPort)
-    if ($Job) {
-        Stop-Job $Job -ErrorAction SilentlyContinue
-        Remove-Job $Job -Force -ErrorAction SilentlyContinue
+function Stop-AzureWebAppTunnelProcess {
+    param($Process, [int]$LocalPort)
+    if ($Process -and -not $Process.HasExited) {
+        # az.cmd spawns python.exe; /T kills the whole tree, not just the cmd wrapper.
+        & taskkill.exe /PID $Process.Id /T /F 2>&1 | Out-Null
     }
     Stop-AzureWebAppTunnelPort -LocalPort $LocalPort
 }
 
 function Test-AzureWebAppTunnelAlive {
-    param($Job, [int]$LocalPort)
-    if (-not $Job -or $Job.State -eq 'Failed' -or $Job.State -eq 'Completed') { return $false }
+    param($Process, [int]$LocalPort)
+    if (-not $Process -or $Process.HasExited) { return $false }
     return (Test-AzureWebAppPortListening -LocalPort $LocalPort)
 }
 
 function Show-AzureWebAppTunnelDiagnostics {
-    param([string]$LogPath, $Job)
+    param([string]$LogPath, $Process)
     Write-Host ""
     Write-Host "Tunnel diagnostics:"
-    if ($Job) { Write-Host "  Job state: $($Job.State)" }
+    if ($Process) {
+        $state = if ($Process.HasExited) { "exited ($($Process.ExitCode))" } else { 'running' }
+        Write-Host "  az process: $state"
+    }
     $logText = ''
-    if (Test-Path $LogPath) {
-        $logText = (Get-Content $LogPath -Raw -ErrorAction SilentlyContinue)
+    if ((Test-Path $LogPath) -or (Test-Path "$LogPath.err")) {
+        $logText = Get-AzureWebAppTunnelLogText -LogPath $LogPath
         Write-Host ""
         Write-Host "Tunnel output:"
         if ([string]::IsNullOrWhiteSpace($logText)) {
@@ -291,17 +316,17 @@ function Use-AzureWebAppTunnel {
     Stop-AzureWebAppTunnelPort -LocalPort $Port
 
     Write-Host "Starting tunnel for ${Label} on 127.0.0.1:$Port..."
-    $tunnelJob = Start-AzureWebAppTunnelJob -WebAppName $WebApp -ResourceGroupName $ResourceGroup -LocalPort $Port -LogPath $tunnelLog
-    $tunnelReady = Wait-AzureWebAppTunnelReady -Job $tunnelJob -LogPath $tunnelLog -LocalPort $Port
+    $tunnelProcess = Start-AzureWebAppTunnelProcess -WebAppName $WebApp -ResourceGroupName $ResourceGroup -LocalPort $Port -LogPath $tunnelLog
+    $tunnelReady = Wait-AzureWebAppTunnelReady -Process $tunnelProcess -LogPath $tunnelLog -LocalPort $Port
     if (-not $tunnelReady) {
-        Show-AzureWebAppTunnelDiagnostics -LogPath $tunnelLog -Job $tunnelJob
-        Stop-AzureWebAppTunnelJob -Job $tunnelJob -LocalPort $Port
+        Show-AzureWebAppTunnelDiagnostics -LogPath $tunnelLog -Process $tunnelProcess
+        Stop-AzureWebAppTunnelProcess -Process $tunnelProcess -LocalPort $Port
         throw 'Tunnel did not become ready in time.'
     }
 
     $global:LASTEXITCODE = 1
     try {
-        if (-not (Test-AzureWebAppTunnelAlive -Job $tunnelJob -LocalPort $Port)) {
+        if (-not (Test-AzureWebAppTunnelAlive -Process $tunnelProcess -LocalPort $Port)) {
             throw 'Tunnel closed before SSH could start.'
         }
 
@@ -310,7 +335,7 @@ function Use-AzureWebAppTunnel {
             WebApp    = $WebApp
             Port      = $Port
             Password  = $script:AzureWebAppSshPassword
-            TunnelJob = $tunnelJob
+            TunnelProcess = $tunnelProcess
             TunnelLog = $tunnelLog
         }
 
@@ -322,7 +347,7 @@ function Use-AzureWebAppTunnel {
         $exitCode = 1
     } finally {
         Write-Host 'Closing tunnel...'
-        Stop-AzureWebAppTunnelJob -Job $tunnelJob -LocalPort $Port
+        Stop-AzureWebAppTunnelProcess -Process $tunnelProcess -LocalPort $Port
     }
 
     $global:LASTEXITCODE = $exitCode

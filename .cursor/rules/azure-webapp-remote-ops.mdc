@@ -1,0 +1,37 @@
+---
+description: Running scripts or commands against PROD/STAGING App Service containers (SSH tunnel, azure-webapp/ tooling), and PowerShell pitfalls in the agent shell
+alwaysApply: false
+---
+
+# Remote ops on PROD / STAGING containers
+
+There is no direct DB access; App Service is on private networking. Everything goes through
+`azure-webapp/` (an `az webapp create-remote-connection` tunnel + OpenSSH). Runbook:
+`Backoffice/docs/runbooks/operations/routine-maintenance.md` ("On production").
+
+## One-off Python script (preferred)
+
+1. Put it under `Backoffice/scripts/<category>/` and bootstrap with `_bootstrap.setup_cli_paths(__file__)`
+   like the other `scripts/ops/*.py`. Default to a dry run; write only with `--apply` / `--force`.
+   Print a JSON backup of anything it overwrites before writing.
+2. Dry-run against the **local** DB first (`cd Backoffice; python scripts/ops/<name>.py ...`).
+3. Run on the container — redirect to a log file, then Grep the log:
+
+```powershell
+.\azure-webapp\azure_webapp_run_script.ps1 -Environment PROD -Script ops/<name>.py `
+    -Upload "C:\path\input.json=/tmp/input.json" `
+    -RemoteArgs "--input /tmp/input.json" *> "$env:TEMP\<name>_prod.log"; "exit=$LASTEXITCODE"
+```
+
+- The script lands at `/app/scripts/<category>/_remote_<name>.py` (same depth as the deployed copy) and is removed afterwards. Data files go to `/tmp`.
+- Arbitrary shell command: `azure_webapp_run.ps1 -WebApp ... -Command "cd /app && ..."` (values from `Resolve-AzureWebAppEnvironment`).
+- Requires `az login` on the right subscription. A run takes ~1 minute including tunnel setup — set the Shell `block_until_ms` to 600000 so it isn't backgrounded mid-run.
+- Never pipe or assign the output of `Use-AzureWebAppTunnel` / `Invoke-AzureWebAppSsh*` — it swallows the ssh output. Redirect the whole script with `*>` to a file instead.
+- Never write to PROD without a dry run on PROD first and the user's go-ahead for the scope.
+
+## Agent shell (PowerShell) pitfalls
+
+- Cursor's agent `pwsh` runs in **ConstrainedLanguage** mode: no `Start-Job`, no `Add-Type`, no assigning `[Console]` / .NET static properties. The `azure-webapp/` tooling is written to work there (`Start-Process`, not jobs). If a script still fails with "language mode ... incompatible", run it via `powershell -NoProfile -ExecutionPolicy Bypass -File <script.ps1> ...` (Windows PowerShell 5.1 runs FullLanguage).
+- No heredocs, and `python -c` with nested quotes is fragile: write a temp `.py` to `$env:TEMP` and run it. Set `$env:PYTHONIOENCODING="utf-8"`; for app imports run from `Backoffice/` or set `$env:PYTHONPATH`.
+- `Get-Content` / `Select-String` over large logs is slow in this shell; use the Grep tool on the log file instead.
+- Files in this repo are often CRLF: edit with StrReplace, not PowerShell `-replace` round-trips.

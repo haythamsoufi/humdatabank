@@ -1,11 +1,12 @@
 /* UPR Analysis — A4 report. Lays the export outline (upr-analysis-pages.js) out
- * on A4 pages with the same renderers as the tab (UprAnalysis.dom / .charts), then
- * hands the pages to the browser's print dialog ("Save as PDF").
+ * on A4 pages with the same renderers as the tab (UprAnalysis.dom / .charts).
+ * Download draws those pages into an A4 PDF (html2canvas + jsPDF, already
+ * vendored) and saves the file. No print dialog.
  *
- * Printing the live DOM rather than rasterising it keeps the ApexCharts SVG
- * sharp and the text selectable, and the report looks exactly like the tab. Pages
- * are fixed-size (210x297mm) so the charts get an explicit width, and blocks are
- * moved to a new page as soon as they no longer fit. */
+ * Pages are fixed-size (210x297mm) so the charts get an explicit width, and
+ * blocks move to a new page as soon as they no longer fit. On a narrow screen
+ * the preview is scaled down to the phone. The download captures each page at
+ * full A4 size, so the file does not inherit that shrink. */
 (function (global) {
     'use strict';
 
@@ -151,15 +152,18 @@
         var toolbar = node('div', 'upri-report__bar');
         var copy = node('div', 'upri-report__copy');
         copy.appendChild(node('strong', 'upri-report__title', options.title || ''));
-        copy.appendChild(node('span', 'upri-report__hint', ui.export_print_hint || ''));
+        var hintEl = node('span', 'upri-report__hint', ui.export_print_hint || '');
+        var hintText = hintEl.textContent;
+        copy.appendChild(hintEl);
         toolbar.appendChild(copy);
         var actions = node('div', 'upri-report__actions');
         var printBtn = node('button', 'upri-btn upri-btn--primary');
         printBtn.type = 'button';
-        var printIcon = node('i', 'fas fa-print');
+        var printIcon = node('i', 'fas fa-download');
         printIcon.setAttribute('aria-hidden', 'true');
         printBtn.appendChild(printIcon);
-        printBtn.appendChild(node('span', null, ui.export_print || 'Print'));
+        var label = node('span', null, ui.export_print || 'Download PDF');
+        printBtn.appendChild(label);
         var closeBtn = node('button', 'upri-btn');
         closeBtn.type = 'button';
         closeBtn.appendChild(node('span', null, ui.close || 'Close'));
@@ -168,8 +172,10 @@
         toolbar.appendChild(actions);
         overlay.appendChild(toolbar);
 
+        var frame = node('div', 'upri-report__frame');
         var pagesEl = node('div', 'upri-report__pages');
-        overlay.appendChild(pagesEl);
+        frame.appendChild(pagesEl);
+        overlay.appendChild(frame);
 
         var opener = document.activeElement;
         document.body.appendChild(overlay);
@@ -185,15 +191,137 @@
         var charts = root.charts.mountAll(plots, { animate: false });
         overlay.focus();
 
+        // The pages stay 210mm wide so pagination does not change. A transform
+        // only shrinks the preview; print CSS and beforeprint remove it.
+        var GUTTER = 16;
+
+        function fit() {
+            var page = pagesEl.querySelector('.upri-page');
+            if (!page) return;
+            var natural = page.offsetWidth;
+            var avail = overlay.clientWidth - GUTTER;
+            if (!natural || avail <= 0) return;
+            var scale = Math.min(1, avail / natural);
+            var height = pagesEl.offsetHeight;
+            pagesEl.style.width = natural + 'px';
+            pagesEl.style.transform = 'translateX(-50%) scale(' + scale + ')';
+            frame.style.height = Math.ceil(height * scale) + 'px';
+        }
+
         function settle() {
             if (current !== api) return;
             reflow(pagesEl);
             addFooters(pagesEl, options.title || '', ui);
+            fit();
         }
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
 
-        function print() {
-            global.print();
+        function beforePrint() {
+            pagesEl.style.transform = 'none';
+            frame.style.height = 'auto';
+        }
+
+        var loadingLibs = null;
+
+        function loadScript(src) {
+            return new Promise(function (resolve, reject) {
+                if (!src) { reject(new Error('missing pdf library')); return; }
+                var script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                if (options.pdf && options.pdf.nonce) script.nonce = options.pdf.nonce;
+                script.onload = function () { resolve(); };
+                script.onerror = function () { reject(new Error('pdf library failed')); };
+                document.head.appendChild(script);
+            });
+        }
+
+        // html2canvas and jsPDF ship with the Backoffice. Load them on demand.
+        function ensureLibs() {
+            if (typeof global.html2canvas === 'function' && global.jspdf && global.jspdf.jsPDF) {
+                return Promise.resolve();
+            }
+            if (!loadingLibs) {
+                var urls = options.pdf || {};
+                var jobs = [];
+                if (typeof global.html2canvas !== 'function') jobs.push(loadScript(urls.html2canvas));
+                if (!global.jspdf || !global.jspdf.jsPDF) jobs.push(loadScript(urls.jspdf));
+                loadingLibs = Promise.all(jobs).then(function () {
+                    if (typeof global.html2canvas !== 'function' || !global.jspdf || !global.jspdf.jsPDF) {
+                        throw new Error('pdf library missing');
+                    }
+                });
+            }
+            return loadingLibs;
+        }
+
+        // The on-screen pages may be CSS-scaled to the phone. A clone at the
+        // real 210mm size is what gets drawn, so the PDF stays sharp.
+        function capturePage(pageEl) {
+            var host = node('div');
+            host.setAttribute('aria-hidden', 'true');
+            host.style.cssText = 'position:fixed;left:0;top:0;width:210mm;z-index:-1;pointer-events:none;';
+            var clone = pageEl.cloneNode(true);
+            host.appendChild(clone);
+            document.body.appendChild(host);
+            return global.html2canvas(clone, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                logging: false
+            }).then(function (canvas) {
+                host.remove();
+                return canvas;
+            }, function (error) {
+                host.remove();
+                throw error;
+            });
+        }
+
+        function buildPdf(pages) {
+            var pdf = new global.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+            var index = 0;
+            function next() {
+                if (index >= pages.length) return Promise.resolve(pdf);
+                var pageEl = pages[index];
+                var first = index === 0;
+                index += 1;
+                return capturePage(pageEl).then(function (canvas) {
+                    if (!first) pdf.addPage();
+                    var height = 210 * canvas.height / canvas.width;
+                    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, Math.min(height, 297));
+                    canvas.width = 0;
+                    canvas.height = 0;
+                    return next();
+                });
+            }
+            return next();
+        }
+
+        function fileName() {
+            var raw = (options.title || 'analysis').trim();
+            var safe = raw.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').slice(0, 80).trim();
+            return (safe || 'analysis') + '.pdf';
+        }
+
+        function download() {
+            if (printBtn.disabled) return;
+            printBtn.disabled = true;
+            printBtn.setAttribute('aria-busy', 'true');
+            label.textContent = ui.export_pdf_working || 'Preparing PDF…';
+            if (hintEl) hintEl.textContent = '';
+            var pages = Array.prototype.slice.call(pagesEl.querySelectorAll('.upri-page'));
+            ensureLibs().then(function () {
+                return buildPdf(pages);
+            }).then(function (pdf) {
+                pdf.save(fileName());
+            }).catch(function () {
+                if (hintEl) hintEl.textContent = ui.export_pdf_failed || 'Could not create the PDF. Try again.';
+            }).then(function () {
+                printBtn.disabled = false;
+                printBtn.removeAttribute('aria-busy');
+                label.textContent = ui.export_print || 'Download PDF';
+                if (hintEl && !hintEl.textContent) hintEl.textContent = hintText;
+            });
         }
 
         function onKey(event) {
@@ -203,17 +331,24 @@
             api.close();
         }
 
-        printBtn.addEventListener('click', print);
+        printBtn.addEventListener('click', download);
         closeBtn.addEventListener('click', function () { api.close(); });
         document.addEventListener('keydown', onKey, true);
+        global.addEventListener('resize', fit);
+        global.addEventListener('beforeprint', beforePrint);
+        global.addEventListener('afterprint', fit);
+        fit();
 
         var api = {
-            print: print,
+            download: download,
             get pageCount() {
                 return pagesEl.children.length;
             },
             close: function () {
                 document.removeEventListener('keydown', onKey, true);
+                global.removeEventListener('resize', fit);
+                global.removeEventListener('beforeprint', beforePrint);
+                global.removeEventListener('afterprint', fit);
                 charts.forEach(function (chart) {
                     try { chart.destroy(); } catch (e) { /* noop */ }
                 });

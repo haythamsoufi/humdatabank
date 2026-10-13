@@ -431,7 +431,10 @@ body.upri-locked {
 /* ---------------------------------------------------------------- A4 report */
 
 .upri-report {
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     background: #4b5563;
 }
 .upri-report__bar {
@@ -444,6 +447,9 @@ body.upri-locked {
     justify-content: space-between;
     gap: 0.75rem 1.5rem;
     padding: 0.7rem 1.25rem;
+    padding-top: max(0.7rem, env(safe-area-inset-top));
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
     background: #fff;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
@@ -465,12 +471,49 @@ body.upri-locked {
     display: flex;
     gap: 0.5rem;
 }
+/* Holds the scaled preview. The pages themselves stay 210mm so pagination is
+ * unchanged; report.js shrinks this stack to the screen. */
+.upri-report__frame {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
 .upri-report__pages {
+    position: absolute;
+    left: 50%;
+    top: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 1.5rem;
     padding: 1.5rem 0 3rem;
+    transform-origin: top center;
+}
+@media (max-width: 720px) {
+    .upri-report__bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.55rem;
+        padding: 0.55rem 0.75rem;
+        padding-top: max(0.55rem, env(safe-area-inset-top));
+        padding-left: max(0.75rem, env(safe-area-inset-left));
+        padding-right: max(0.75rem, env(safe-area-inset-right));
+    }
+    .upri-report__title {
+        font-size: 0.95rem;
+    }
+    .upri-report__hint {
+        font-size: 0.7rem;
+        line-height: 1.35;
+    }
+    .upri-report__actions {
+        width: 100%;
+    }
+    .upri-report__actions .upri-btn {
+        flex: 1;
+        justify-content: center;
+        min-height: 2.75rem;
+    }
 }
 
 .upri-page {

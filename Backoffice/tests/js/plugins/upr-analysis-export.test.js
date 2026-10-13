@@ -23,8 +23,10 @@ const UI = {
     export_notes: 'Notes',
     export_tables_heading: 'Data tables',
     export_more: 'and {n} more',
-    export_print: 'Print',
-    export_print_hint: 'Hint',
+    export_print: 'Download PDF',
+    export_print_hint: 'Saves an A4 PDF of these pages.',
+    export_pdf_working: 'Preparing PDF…',
+    export_pdf_failed: 'Could not create the PDF. Try again.',
     export_prev: 'Previous slide',
     export_next: 'Next slide',
     export_fullscreen: 'Full screen',
@@ -626,19 +628,82 @@ describe('with a stubbed ApexCharts', () => {
             expect(document.querySelector('.upri-table-block__heading').textContent).toBe('Data tables');
         });
 
-        it('switches the print rules on while open and prints through the browser', () => {
-            const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+        it('switches the print rules on while a report is open', () => {
             const sheet = document.getElementById('upri-report-print-css');
             const report = A.report.open(outline(), { ui: UI });
             expect(sheet.media).toBe('print');
             expect(document.body.classList.contains('upri-report-open')).toBe(true);
-            document.querySelector('.upri-report__bar .upri-btn--primary').click();
-            expect(print).toHaveBeenCalledTimes(1);
+            expect(document.querySelector('.upri-report__bar .upri-btn--primary').textContent).toContain('Download PDF');
             report.close();
             expect(sheet.media).toBe('not all');
             expect(document.body.classList.contains('upri-report-open')).toBe(false);
             expect(instances.every((c) => c.destroyed)).toBe(true);
-            print.mockRestore();
+        });
+
+        it('downloads one A4 image per page instead of opening the print dialog', async () => {
+            const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+            const saved = [];
+            const images = [];
+            window.html2canvas = () => Promise.resolve({
+                width: 200,
+                height: 282,
+                toDataURL: () => 'data:image/jpeg;base64,xx',
+            });
+            window.jspdf = {
+                jsPDF: class {
+                    addPage() { images.push('page'); }
+                    addImage() { images.push('image'); }
+                    save(name) { saved.push(name); }
+                },
+            };
+            try {
+                A.report.open(outline(), { ui: UI, title: 'Unified Plans' });
+                const count = document.querySelectorAll('.upri-page').length;
+                document.querySelector('.upri-report__bar .upri-btn--primary').click();
+                expect(document.querySelector('.upri-report__bar .upri-btn--primary').textContent).toContain('Preparing PDF…');
+                await vi.waitFor(() => { expect(saved).toEqual(['Unified Plans.pdf']); });
+                expect(print).not.toHaveBeenCalled();
+                expect(images.filter((item) => item === 'image')).toHaveLength(count);
+                expect(images.filter((item) => item === 'page')).toHaveLength(count - 1);
+                expect(document.querySelector('.upri-report__bar .upri-btn--primary').textContent).toContain('Download PDF');
+            } finally {
+                print.mockRestore();
+                delete window.html2canvas;
+                delete window.jspdf;
+            }
+        });
+
+        it('scales the preview to a phone without shrinking the pages themselves', () => {
+            const offsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+            const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+            const clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+            const box = (el) => {
+                if (el.classList.contains('upri-page')) return { w: 794, h: 1123 };
+                if (el.classList.contains('upri-report__pages')) return { w: 794, h: 4000 };
+                return { w: 0, h: 0 };
+            };
+            Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return box(this).w; } });
+            Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return box(this).h; } });
+            Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+                configurable: true,
+                get() { return this.classList.contains('upri-report') ? 390 : 0; },
+            });
+            try {
+                A.report.open(outline(), { ui: UI });
+                const pages = document.querySelector('.upri-report__pages');
+                const frame = document.querySelector('.upri-report__frame');
+                const scale = (390 - 16) / 794;
+                expect(pages.style.width).toBe('794px');
+                expect(Number(pages.style.transform.match(/scale\(([^)]+)\)/)[1])).toBeCloseTo(scale, 4);
+                expect(Number(frame.style.height.replace('px', ''))).toBe(Math.ceil(4000 * scale));
+                expect(document.querySelector('.upri-page').style.width).toBe('');
+                document.querySelector('.upri-report__bar .upri-btn--primary').click();
+                expect(pages.style.transform).toContain(`scale(${scale})`);
+            } finally {
+                if (offsetWidth) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidth);
+                if (offsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
+                if (clientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidth);
+            }
         });
 
         it('closes on Escape and from the toolbar', () => {

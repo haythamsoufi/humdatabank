@@ -25,10 +25,10 @@
             <i class="fas fa-rotate-right" aria-hidden="true"></i><span>{{ _('Refresh') }}</span>
         </button>
         <div class="upri-toolbar__export">
-            <button type="button" class="upri-btn" data-upri-export="present" data-go-label="{{ _('Start presentation') }}">
+            <button type="button" class="upri-btn" data-upri-export="present" data-go-label="{{ _('Start presentation')|forceescape }}">
                 <i class="fas fa-display" aria-hidden="true"></i><span>{{ _('Presentation') }}</span>
             </button>
-            <button type="button" class="upri-btn" data-upri-export="report" data-go-label="{{ _('Open report') }}">
+            <button type="button" class="upri-btn" data-upri-export="report" data-go-label="{{ _('Open report')|forceescape }}">
                 <i class="fas fa-file-pdf" aria-hidden="true"></i><span>{{ _('A4 report (PDF)') }}</span>
             </button>
         </div>
@@ -108,7 +108,7 @@
         <form id="upri-export-form">
             <div class="upri-dialog__head">
                 <h3 id="upri-export-title" class="upri-dialog__title"></h3>
-                <button type="button" class="upri-dialog__close" data-upri-close aria-label="{{ _('Close') }}">
+                <button type="button" class="upri-dialog__close" data-upri-close aria-label="{{ _('Close')|forceescape }}">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>

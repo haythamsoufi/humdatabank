@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-12 19:16+0000\n"
+"POT-Creation-Date: 2026-10-13 18:33+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -423,6 +423,21 @@ msgstr ""
 msgid "(optional)"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:136
+#, python-brace-format
+msgid ""
+"* Round still open ({years}) — documents and submissions are still coming"
+" in."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:84
+#, python-brace-format
+msgid ""
+"* Year still open ({years}) — submissions are still coming in, so the "
+"latest point understates the final total. Headline figures use the latest"
+" completed year."
+msgstr ""
+
 #: app/templates/admin/api_management.html:1365
 #: app/templates/admin/api_management.html:1367
 msgid "-- none --"
@@ -504,11 +519,11 @@ msgstr ""
 msgid "3. Response Compression"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:597
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:602
 msgid "50%"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:596
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:601
 msgid "75%"
 msgstr ""
 
@@ -543,6 +558,15 @@ msgstr ""
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:287
 msgid "?"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:34
+msgid ""
+"A National Society takes part in a round when it submits its data form or"
+" hands in its narrative. The internal narrative is the document sent to "
+"the Secretariat (IFRC GO, internal); the public narrative is the one "
+"published on the public site. Counting data alone misses countries that "
+"only take part through the narrative."
 msgstr ""
 
 #: app/services/platform/governance_program.py:200
@@ -629,6 +653,10 @@ msgstr ""
 
 #: app/routes/admin/utilities/translations.py:331
 msgid "A term with this English source and language already exists."
+msgstr ""
+
+#: plugins/upr/templates/upr/impact_panel.html:32
+msgid "A4 report (PDF)"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:98
@@ -898,7 +926,7 @@ msgid ""
 "endpoints do not. Choose Anonymous when prompted."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:695
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:723
 msgid "AR"
 msgstr ""
 
@@ -1100,6 +1128,11 @@ msgstr ""
 
 #: app/templates/admin/assignments/_assignment_status_overview.html:84
 msgid "Across assigned entities"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:118
+#, python-brace-format
+msgid "Across {n} completed rounds."
 msgstr ""
 
 #: app/templates/auth/login.html:731
@@ -1380,7 +1413,7 @@ msgstr ""
 msgid "Add Column"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:540
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:545
 msgid "Add Column inside Group"
 msgstr ""
 
@@ -1413,7 +1446,7 @@ msgid "Add Group"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:73
-#: app/templates/forms/entry_form/entry_form.html:4046
+#: app/templates/forms/entry_form/entry_form.html:4045
 #: app/templates/forms/entry_form/partials/dynamic_indicators_interface.html:31
 msgid "Add Indicator"
 msgstr ""
@@ -1456,7 +1489,7 @@ msgid "Add New Division"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:331
-#: app/templates/forms/entry_form/entry_form.html:4060
+#: app/templates/forms/entry_form/entry_form.html:4059
 msgid "Add New Indicator"
 msgstr ""
 
@@ -1496,7 +1529,7 @@ msgstr ""
 msgid "Add New Version"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:470
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:471
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:210
 msgid "Add Option"
 msgstr ""
@@ -1528,7 +1561,7 @@ msgstr ""
 msgid "Add Selected"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:545
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:550
 msgid "Add Subgroup"
 msgstr ""
 
@@ -1666,6 +1699,10 @@ msgstr ""
 msgid "Add term"
 msgstr ""
 
+#: plugins/upr/templates/upr/impact_panel.html:122
+msgid "Add the data tables to the report"
+msgstr ""
+
 #: app/templates/admin/validation_rules.html:77
 msgid "Add threshold"
 msgstr ""
@@ -1689,8 +1726,8 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:146
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:212
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:222
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:558
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:572
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:563
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:577
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:28
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:54
 #: app/templates/forms/form_builder/partials/_section_modal.html:34
@@ -1877,7 +1914,7 @@ msgstr ""
 #: app/templates/admin/translations/manage_translations.html:170
 #: app/templates/admin/translations/quality_dashboard.html:21
 #: app/templates/admin/user_management/access_requests.html:167
-#: app/templates/admin/user_management/user_form.html:332
+#: app/templates/admin/user_management/user_form.html:343
 #: app/templates/admin/user_management/users.html:90
 #: app/templates/admin/user_management/users.html:261
 #: app/templates/admin/user_management/users.html:266
@@ -2004,7 +2041,8 @@ msgid "Advanced Options"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:320
-#: app/templates/admin/analytics/import_change_log.html:93
+#: app/templates/admin/analytics/import_change_log.html:113
+#: app/templates/admin/analytics/import_change_log.html:141
 msgid "After"
 msgstr ""
 
@@ -2068,7 +2106,7 @@ msgstr ""
 msgid "Alerts"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:585
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:590
 msgid "Alignment"
 msgstr ""
 
@@ -2078,7 +2116,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
 #: app/templates/admin/validation_dashboard.html:254
 #: app/templates/components/auto_translate_modal_js.html:30
-#: app/templates/forms/entry_form/entry_form.html:4064
+#: app/templates/forms/entry_form/entry_form.html:4063
 #: app/templates/forms/form_builder/field_mapping.html:313
 #: app/templates/notifications/center.html:70
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:40
@@ -2313,6 +2351,11 @@ msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:61
 msgid "All recorded agent traces"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:162
+#: plugins/upr/templates/upr/impact_panel.html:21
+msgid "All regions"
 msgstr ""
 
 #: app/templates/admin/user_management/users.html:104
@@ -2558,7 +2601,7 @@ msgstr ""
 msgid "Analysis complete · reviewing…"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:810
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:838
 msgid "Analysis failed. Check that the file contains the UPR Data sheet."
 msgstr ""
 
@@ -2567,6 +2610,10 @@ msgid ""
 "Analysis is limited to eligible indicators with people-oriented units or "
 "configured disaggregation options. Percentages reflect the current "
 "filters."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:31
+msgid "Analysis of Unified Plans and Reports"
 msgstr ""
 
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:14
@@ -2617,8 +2664,13 @@ msgstr ""
 msgid "Analyzing matrix shares across all countries…"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:791
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:819
 msgid "Analyzing workbook… this can take a minute on first upload"
+msgstr ""
+
+#: app/templates/admin/analytics/import_change_log.html:130
+#, python-format
+msgid "And %(n)s more cells."
 msgstr ""
 
 #: app/templates/admin/governance/dashboard.html:171
@@ -2644,6 +2696,15 @@ msgstr ""
 
 #: app/templates/core/dashboard.html:1259
 msgid "Annual Report and Audited Financial Statement uploads"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:177
+#: plugins/upr/templates/upr/impact_panel.html:66
+msgid "Annual reports"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:103
+msgid "Annual reports: participating"
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:99
@@ -2708,7 +2769,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1887
 #: app/templates/forms/entry_form/entry_form.html:2604
 #: app/templates/forms/entry_form/entry_form.html:2619
-#: app/templates/forms/entry_form/partials/matrix_table.html:693
+#: app/templates/forms/entry_form/partials/matrix_table.html:701
 msgid "Applicable but data not available"
 msgstr ""
 
@@ -2779,11 +2840,11 @@ msgstr ""
 msgid "Apply colour"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:522
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:527
 msgid "Apply group colour to cells"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:518
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:523
 msgid "Apply group colour to column headers"
 msgstr ""
 
@@ -2948,7 +3009,7 @@ msgid ""
 "temporarily disable it but keep all data intact."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:798
+#: app/templates/admin/user_management/user_form.html:809
 msgid ""
 "Are you sure you want to deactivate this user? They will not be able to "
 "log in."
@@ -3038,7 +3099,7 @@ msgid ""
 "undone."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4030
+#: app/templates/forms/entry_form/entry_form.html:4029
 msgid "Are you sure you want to delete this entry?"
 msgstr ""
 
@@ -3136,7 +3197,7 @@ msgid ""
 "on their next request."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:799
+#: app/templates/admin/user_management/user_form.html:810
 msgid "Are you sure you want to reactivate this user?"
 msgstr ""
 
@@ -3245,11 +3306,11 @@ msgstr ""
 msgid "Assign Countries"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:394
+#: app/templates/admin/user_management/user_form.html:405
 msgid "Assign languages this user may edit with the inline translation tool."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:880
+#: app/templates/admin/user_management/user_form.html:891
 msgid ""
 "Assign this user to specific organizational entities. Users will have "
 "access to data at the level they are assigned."
@@ -3332,7 +3393,7 @@ msgstr ""
 msgid "Assignment Returned for Revision"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:342
+#: app/templates/admin/user_management/user_form.html:353
 msgid "Assignment Roles"
 msgstr ""
 
@@ -3657,7 +3718,7 @@ msgid "Author"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:180
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:598
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:603
 msgid "Auto"
 msgstr ""
 
@@ -4005,6 +4066,20 @@ msgstr ""
 msgid "Back-office action"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:509
+msgid "Background"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:504
+msgid "Background and text colour of this group"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:504
+msgid ""
+"Background and text colour of this group. Grey matches the other column "
+"headers."
+msgstr ""
+
 #: app/templates/admin/communication/center.html:56
 #: app/templates/admin/communication/center.html:879
 msgid "Background jobs"
@@ -4064,7 +4139,8 @@ msgid "Becomes the email subject line and in-app notification title."
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:319
-#: app/templates/admin/analytics/import_change_log.html:92
+#: app/templates/admin/analytics/import_change_log.html:112
+#: app/templates/admin/analytics/import_change_log.html:135
 msgid "Before"
 msgstr ""
 
@@ -4098,6 +4174,7 @@ msgstr ""
 msgid "Body text"
 msgstr ""
 
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:427
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:64
 msgid "Bold"
 msgstr ""
@@ -4110,6 +4187,12 @@ msgstr ""
 msgid "Bot detected"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:53
+msgid ""
+"Both data and narrative, narrative only, or data only. Blank where the "
+"databank holds no data for that round."
+msgstr ""
+
 #: app/templates/admin/governance/dashboard.html:314
 msgid "Both types covered"
 msgstr ""
@@ -4120,6 +4203,7 @@ msgid "Branch"
 msgstr ""
 
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:16
+#: plugins/upr/analysis_labels.py:73
 msgid "Branches"
 msgstr ""
 
@@ -4347,11 +4431,11 @@ msgid ""
 "footer sums those results."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:517
+#: app/templates/forms/entry_form/partials/matrix_table.html:524
 msgid "Calculated from other columns in this row"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:535
+#: app/templates/forms/entry_form/partials/matrix_table.html:543
 msgid "Calculated value for"
 msgstr ""
 
@@ -4414,7 +4498,7 @@ msgstr ""
 msgid "Can be limited to templates / countries"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4051
+#: app/templates/forms/entry_form/entry_form.html:4050
 msgid "Can't find an indicator? Propose a new one here"
 msgstr ""
 
@@ -4480,8 +4564,8 @@ msgstr ""
 #: app/templates/admin/translations/manage_translations.html:709
 #: app/templates/admin/translations/quality_dashboard.html:339
 #: app/templates/admin/user_management/access_requests.html:326
-#: app/templates/admin/user_management/user_form.html:796
-#: app/templates/admin/user_management/user_form.html:1430
+#: app/templates/admin/user_management/user_form.html:807
+#: app/templates/admin/user_management/user_form.html:1441
 #: app/templates/admin/validation_questions.html:162
 #: app/templates/admin/validation_questions.html:191
 #: app/templates/admin/validation_rules.html:134
@@ -4519,6 +4603,7 @@ msgstr ""
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:96
 #: plugins/upr/templates/upr/_manage_tools.html:119
 #: plugins/upr/templates/upr/_narrative_modal.html:63
+#: plugins/upr/templates/upr/impact_panel.html:126
 msgid "Cancel"
 msgstr ""
 
@@ -4592,11 +4677,11 @@ msgstr ""
 msgid "Caption"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:557
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:562
 msgid "Caption (optional)"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:562
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:567
 msgid "Caption shown below the image"
 msgstr ""
 
@@ -4609,8 +4694,13 @@ msgid "Cards"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:313
-#: app/templates/forms/entry_form/partials/matrix_table.html:187
+#: app/templates/forms/entry_form/partials/matrix_table.html:145
+#: app/templates/forms/entry_form/partials/matrix_table.html:146
 msgid "Carried forward value"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:119
+msgid "Carried on"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:325
@@ -4647,11 +4737,11 @@ msgstr ""
 msgid "Category Name"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:523
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:528
 msgid "Cells"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:588
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:593
 msgid "Center"
 msgstr ""
 
@@ -4659,6 +4749,8 @@ msgstr ""
 msgid "Centers"
 msgstr ""
 
+#: app/templates/admin/analytics/import_change_log.html:92
+#: app/templates/admin/analytics/import_change_log.html:114
 #: app/templates/admin/templates/new_template.html:243
 #: app/templates/admin/validation_dashboard.html:242
 msgid "Change"
@@ -4897,7 +4989,7 @@ msgstr ""
 msgid "Choose an option:"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:452
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:453
 msgid "Choose columns or enter a formula"
 msgstr ""
 
@@ -4909,11 +5001,11 @@ msgstr ""
 msgid "Choose different file"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1126
+#: app/templates/admin/user_management/user_form.html:1137
 msgid "Choose in-app and email delivery per notification type."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1124
+#: app/templates/admin/user_management/user_form.html:1135
 msgid "Choose in-app, email, and push delivery per notification type."
 msgstr ""
 
@@ -4927,8 +5019,8 @@ msgid ""
 "assignment."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:192
-#: app/templates/admin/user_management/user_form.html:1532
+#: app/templates/admin/user_management/user_form.html:203
+#: app/templates/admin/user_management/user_form.html:1543
 msgid "Choose profile colour"
 msgstr ""
 
@@ -4969,6 +5061,12 @@ msgstr ""
 #: app/templates/admin/translations/manage_translations.html:566
 #: app/templates/macros/translation_modal.html:30
 msgid "Choose translation service"
+msgstr ""
+
+#: plugins/upr/templates/upr/impact_panel.html:115
+msgid ""
+"Choose what to include. The presentation and the report use the same "
+"charts as this tab."
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:536
@@ -5340,7 +5438,7 @@ msgstr ""
 #: app/templates/admin/plugin_management.html:157
 #: app/templates/admin/translations/manage_translations.html:258
 #: app/templates/admin/translations/manage_translations.html:509
-#: app/templates/admin/user_management/user_form.html:1545
+#: app/templates/admin/user_management/user_form.html:1556
 #: app/templates/auth/login.html:802 app/templates/auth/login.html:847
 #: app/templates/components/_flash_messages.html:24
 #: app/templates/components/auto_translate_modal.html:359
@@ -5352,6 +5450,9 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_variables_modal.html:56
 #: app/templates/forms/form_builder/partials/_versions_modal.html:139
 #: app/templates/macros/modal_shell.html:35 app/templates/tours/tours.html:486
+#: plugins/upr/analysis_labels.py:152
+#: plugins/upr/templates/upr/impact_panel.html:90
+#: plugins/upr/templates/upr/impact_panel.html:111
 msgid "Close"
 msgstr ""
 
@@ -5469,7 +5570,7 @@ msgstr ""
 msgid "Collapse editors list"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:496
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:497
 msgid "Collapse group"
 msgstr ""
 
@@ -5510,18 +5611,8 @@ msgstr ""
 msgid "Colour"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:503
-msgid ""
-"Colour of this group header in the matrix. Grey matches the other column "
-"headers."
-msgstr ""
-
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:517
-msgid "Colour the column titles in this group on the entry form"
-msgstr ""
-
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:521
-msgid "Colour the data cells in this group on the entry form"
+#: app/templates/admin/analytics/import_change_log.html:111
+msgid "Column"
 msgstr ""
 
 #: app/templates/components/ag_grid_i18n_js.html:6
@@ -5615,7 +5706,7 @@ msgstr ""
 msgid "Common words"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:587
+#: app/templates/admin/user_management/user_form.html:598
 msgid "Communication"
 msgstr ""
 
@@ -5765,6 +5856,10 @@ msgstr ""
 msgid "Completed"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:110
+msgid "Completed rounds taken part in"
+msgstr ""
+
 #: app/templates/admin/communication/center.html:1550
 msgid "Completed with failures"
 msgstr ""
@@ -5903,7 +5998,7 @@ msgstr ""
 msgid "Configure in-app, email, and push delivery per notification type."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1068
+#: app/templates/admin/user_management/user_form.html:1079
 msgid ""
 "Configure notification preferences for this user. These settings control "
 "how and when the user receives notifications."
@@ -6334,6 +6429,11 @@ msgstr ""
 msgid "Could not fetch sync status."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:151
+#: plugins/upr/templates/upr/impact_panel.html:43
+msgid "Could not load analysis data. Try refreshing."
+msgstr ""
+
 #: app/templates/admin/communication/center.html:1543
 msgid "Could not load background jobs. Please try again."
 msgstr ""
@@ -6362,11 +6462,15 @@ msgstr ""
 msgid "Could not load more communications. Please try again."
 msgstr ""
 
+#: plugins/upr/templates/upr/impact_panel.html:76
+msgid "Could not load narrative participation. Try refreshing."
+msgstr ""
+
 #: app/templates/admin/analytics/sessions.html:177
 msgid "Could not load path breakdown for this session."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:800
+#: app/templates/admin/user_management/user_form.html:811
 msgid "Could not load preview"
 msgstr ""
 
@@ -6417,7 +6521,7 @@ msgstr ""
 msgid "Could not prepare the email body."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:743
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:771
 msgid "Could not reach the server. Please try again."
 msgstr ""
 
@@ -6482,8 +6586,8 @@ msgstr ""
 msgid "Could not validate the file. Please try again."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:436
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:445
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:424
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:433
 msgid "Could not verify import targets"
 msgstr ""
 
@@ -6526,7 +6630,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:48
 #: app/templates/admin/settings/manage_settings.html:167
 #: app/templates/admin/user_management/access_requests.html:1012
-#: app/templates/admin/user_management/user_form.html:893
+#: app/templates/admin/user_management/user_form.html:904
 #: app/templates/admin/validation_dashboard.html:98
 #: app/templates/admin/validation_dashboard.html:297
 #: plugins/upr/templates/upr/_manage_tools.html:65
@@ -6566,7 +6670,7 @@ msgstr ""
 msgid "Countries with a focal point"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:511
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:563
 msgid "Countries with data"
 msgstr ""
 
@@ -6600,7 +6704,7 @@ msgstr ""
 #: app/templates/admin/templates/data_sync_imputation.html:1183
 #: app/templates/admin/user_management/access_requests.html:1192
 #: app/templates/admin/user_management/access_requests.html:1242
-#: app/templates/admin/user_management/user_form.html:975
+#: app/templates/admin/user_management/user_form.html:986
 #: app/templates/admin/validation_dashboard.html:163
 #: app/templates/admin/validation_dashboard.html:234
 #: app/templates/admin/validation_questions.html:79
@@ -6612,7 +6716,7 @@ msgstr ""
 #: app/templates/components/entity_dropdown.html:154
 #: app/templates/public_submission_export_pdf.html:17
 #: plugins/fdrs/templates/compliance/tab_panel.html:315
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:309
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:335
 #: plugins/upr/templates/upr/_manage_tools.html:37
 msgid "Country"
 msgstr ""
@@ -6669,6 +6773,10 @@ msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:136
 msgid "Country assignments"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:128
+msgid "Country by round"
 msgstr ""
 
 #: app/templates/admin/dashboard.html:59
@@ -7134,11 +7242,17 @@ msgid ""
 " form are injected when previewing and sending."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:129
+msgid ""
+"D = data submitted, N = internal narrative, P = public narrative. Blank ="
+" no participation recorded."
+msgstr ""
+
 #: app/templates/notifications/_preferences_form.html:13
 msgid "Daily Digest"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1081
+#: app/templates/admin/user_management/user_form.html:1092
 msgid "Daily digest"
 msgstr ""
 
@@ -7302,7 +7416,11 @@ msgstr ""
 msgid "Data Values"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:683
+#: plugins/upr/analysis_labels.py:93
+msgid "Data and narrative"
+msgstr ""
+
+#: app/templates/forms/entry_form/partials/matrix_table.html:691
 msgid "Data availability options"
 msgstr ""
 
@@ -7340,7 +7458,7 @@ msgstr ""
 msgid "Data governance sections"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:228
+#: app/templates/forms/entry_form/partials/matrix_table.html:234
 msgid "Data matrix for"
 msgstr ""
 
@@ -7350,12 +7468,16 @@ msgid "Data modified"
 msgstr ""
 
 #: app/routes/forms/validation_summary.py:422
-#: app/templates/admin/analytics/import_change_log.html:104
-#: app/templates/admin/analytics/import_change_log.html:109
+#: app/templates/admin/analytics/import_change_log.html:137
+#: app/templates/admin/analytics/import_change_log.html:143
 #: app/templates/components/_form_item_renderer.html:262
 #: app/templates/forms/entry_form/export_pdf.html:200
 #: app/templates/forms/entry_form/validation_summary_pdf.html:122
 msgid "Data not available"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:95
+msgid "Data only"
 msgstr ""
 
 #: app/services/platform/governance_program.py:263
@@ -7406,8 +7528,20 @@ msgstr ""
 msgid "Data stays on archived version"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:89
+msgid "Data submitted"
+msgstr ""
+
 #: app/templates/admin/templates/data_sync_imputation.html:85
 msgid "Data sync, imputation, and related tools"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:171
+msgid "Data tables"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:173
+msgid "Data trends"
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:200
@@ -7456,7 +7590,7 @@ msgstr ""
 msgid "Day of Week"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1093
+#: app/templates/admin/user_management/user_form.html:1104
 msgid "Day of week"
 msgstr ""
 
@@ -7466,12 +7600,12 @@ msgstr ""
 #: app/templates/admin/translations/quality_dashboard.html:230
 #: app/templates/admin/translations/quality_dashboard.html:370
 #: app/templates/admin/user_management/user_form.html:30
-#: app/templates/admin/user_management/user_form.html:795
+#: app/templates/admin/user_management/user_form.html:806
 #: app/templates/components/ag_grid_i18n_js.html:51
 msgid "Deactivate"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:797
+#: app/templates/admin/user_management/user_form.html:808
 msgid "Deactivate User?"
 msgstr ""
 
@@ -7506,7 +7640,7 @@ msgid "Dec"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:270
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:428
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:429
 msgid "Decimals"
 msgstr ""
 
@@ -7663,7 +7797,7 @@ msgstr ""
 #: app/templates/admin/templates/templates.html:276
 #: app/templates/admin/translations/manage_translations.html:739
 #: app/templates/admin/user_management/user_form.html:48
-#: app/templates/admin/user_management/user_form.html:1431
+#: app/templates/admin/user_management/user_form.html:1442
 #: app/templates/admin/validation_rules.html:214
 #: app/templates/components/ag_grid_i18n_js.html:47
 #: app/templates/components/thumbnail_upload.html:35
@@ -7728,7 +7862,7 @@ msgstr ""
 msgid "Delete Template"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1420
+#: app/templates/admin/user_management/user_form.html:1431
 msgid "Delete User"
 msgstr ""
 
@@ -7827,7 +7961,7 @@ msgstr ""
 msgid "Delete this conversation? This cannot be undone."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4029
+#: app/templates/forms/entry_form/entry_form.html:4028
 msgid "Delete this entry"
 msgstr ""
 
@@ -7910,7 +8044,7 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:964
 #: app/templates/admin/resources/edit_resource.html:271
 #: app/templates/admin/resources/edit_resource.html:445
-#: app/templates/admin/user_management/user_form.html:806
+#: app/templates/admin/user_management/user_form.html:817
 #: app/templates/components/thumbnail_upload.html:27
 msgid "Deleting..."
 msgstr ""
@@ -8017,7 +8151,7 @@ msgid ""
 "template"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:577
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:582
 msgid "Describe the image for screen readers"
 msgstr ""
 
@@ -8077,7 +8211,7 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal.html:104
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:30
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:19
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:570
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:575
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:50
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:52
 #: app/templates/forms/form_builder/partials/_sections_container.html:493
@@ -8132,7 +8266,6 @@ msgstr ""
 #: app/templates/admin/ai/_trace_card.html:92
 #: app/templates/admin/ai/conversation_traces.html:103
 #: app/templates/forms/entry_form/entry_form.html:2765
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:356
 msgid "Details"
 msgstr ""
 
@@ -8557,7 +8690,7 @@ msgid "Divisions"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:939
-#: app/templates/admin/user_management/user_form.html:1008
+#: app/templates/admin/user_management/user_form.html:1019
 msgid "Divisions & Departments"
 msgstr ""
 
@@ -8885,7 +9018,7 @@ msgstr ""
 msgid "Download document"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:628
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:656
 msgid "Download preview Excel"
 msgstr ""
 
@@ -8989,15 +9122,15 @@ msgid "Drag to move"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:258
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:479
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:480
 msgid "Drag to reorder"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:492
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:493
 msgid "Drag to reorder group"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:484
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:485
 msgid "Drag to reorder. New columns are added at the end of this list."
 msgstr ""
 
@@ -9037,6 +9170,10 @@ msgstr ""
 #: plugins/upr/templates/upr/_excel_modals.html:105
 #: plugins/upr/templates/upr/_excel_modals.html:139
 msgid "Drop your saved workbook here"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:121
+msgid "Dropped out"
 msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:59
@@ -9084,7 +9221,7 @@ msgstr ""
 msgid "Duplicate Document Field"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:527
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:532
 msgid "Duplicate Group"
 msgstr ""
 
@@ -9504,6 +9641,10 @@ msgstr ""
 msgid "Effect"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:92
+msgid "Either (data or narrative)"
+msgstr ""
+
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:133
 msgid "Eligible indicators"
 msgstr ""
@@ -9519,7 +9660,7 @@ msgstr ""
 #: app/templates/admin/communication/center.html:437
 #: app/templates/admin/communication/center.html:596
 #: app/templates/admin/communication/center.html:1433
-#: app/templates/admin/user_management/user_form.html:1142
+#: app/templates/admin/user_management/user_form.html:1153
 #: app/templates/admin/user_management/users.html:369
 #: app/templates/auth/forgot_password.html:10 app/templates/auth/login.html:806
 #: app/templates/auth/login.html:852 app/templates/auth/register.html:9
@@ -9596,11 +9737,11 @@ msgstr ""
 msgid "Email failure dismissed"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1073
+#: app/templates/admin/user_management/user_form.html:1084
 msgid "Email frequency"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:171
+#: app/templates/admin/user_management/user_form.html:182
 msgid "Email is managed by SSO and cannot be edited here."
 msgstr ""
 
@@ -9728,6 +9869,12 @@ msgstr ""
 #: app/templates/admin/indicator_bank/view_indicator_bank.html:46
 #: app/templates/components/ag_grid_i18n_js.html:42
 msgid "Emergency"
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:502
+msgid ""
+"Emergency appeals that are not in GO were imported with the Excel name "
+"and code."
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:382
@@ -9961,7 +10108,7 @@ msgstr ""
 msgid "Enter new value…"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:460
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:461
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:200
 msgid "Enter option text"
 msgstr ""
@@ -10071,7 +10218,7 @@ msgstr ""
 msgid "Entity added"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:886
+#: app/templates/admin/user_management/user_form.html:897
 msgid "Entity assignment type"
 msgstr ""
 
@@ -10091,7 +10238,7 @@ msgstr ""
 msgid "Entity:"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4028
+#: app/templates/forms/entry_form/entry_form.html:4027
 msgid "Entry"
 msgstr ""
 
@@ -10468,7 +10615,7 @@ msgid "Excel Export"
 msgstr ""
 
 #: app/templates/admin/translations/manage_translations.html:343
-#: app/templates/forms/entry_form/entry_form.html:234 plugins/upr/routes.py:240
+#: app/templates/forms/entry_form/entry_form.html:234 plugins/upr/routes.py:256
 msgid "Excel Import"
 msgstr ""
 
@@ -10616,7 +10763,7 @@ msgstr ""
 msgid "Expand editors list"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:496
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:497
 msgid "Expand group"
 msgstr ""
 
@@ -11031,11 +11178,11 @@ msgstr ""
 msgid "Failed logins"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3766
+#: app/templates/forms/entry_form/entry_form.html:3765
 msgid "Failed modules"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4053
+#: app/templates/forms/entry_form/entry_form.html:4052
 msgid "Failed to add indicator"
 msgstr ""
 
@@ -11062,7 +11209,7 @@ msgstr ""
 msgid "Failed to delete document."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4058
+#: app/templates/forms/entry_form/entry_form.html:4057
 msgid "Failed to delete indicator"
 msgstr ""
 
@@ -11078,7 +11225,7 @@ msgstr ""
 msgid "Failed to install plugin"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:810
+#: app/templates/admin/user_management/user_form.html:821
 msgid "Failed to load analytics."
 msgstr ""
 
@@ -11115,7 +11262,7 @@ msgstr ""
 msgid "Failed to load plugins:"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:805
+#: app/templates/admin/user_management/user_form.html:816
 msgid "Failed to load preview."
 msgstr ""
 
@@ -11393,7 +11540,7 @@ msgstr ""
 msgid "File is too large (max 50 MB)"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:741
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:769
 msgid "File is too large (max 80 MB)"
 msgstr ""
 
@@ -11670,6 +11817,11 @@ msgstr ""
 msgid "Find and complete assigned forms for your country"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:170
+#, python-brace-format
+msgid "Finding {n}"
+msgstr ""
+
 #: app/templates/admin/analytics/import_change_log.html:45
 #: app/templates/admin/communication/center.html:1559
 msgid "Finished"
@@ -11685,6 +11837,10 @@ msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:561
 msgid "First query"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:100
+msgid "First round (baseline)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:68
@@ -11732,7 +11888,7 @@ msgstr ""
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/dashboard.html:280
 #: app/templates/admin/translations/quality_dashboard.html:314
-#: app/templates/admin/user_management/user_form.html:333
+#: app/templates/admin/user_management/user_form.html:344
 #: app/templates/admin/user_management/users.html:257
 #: app/templates/auth/login.html:755 app/templates/tours/tours.html:478
 msgid "Focal Point"
@@ -11878,11 +12034,11 @@ msgid ""
 "modify."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3745
+#: app/templates/forms/entry_form/entry_form.html:3744
 msgid "Form initialization failed"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3645
+#: app/templates/forms/entry_form/entry_form.html:3644
 msgid "Form initialization timeout - some modules may have failed to load"
 msgstr ""
 
@@ -12017,7 +12173,7 @@ msgstr ""
 msgid "French"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1101
+#: app/templates/admin/user_management/user_form.html:1112
 #: app/templates/notifications/_preferences_form.html:36
 msgid "Friday"
 msgstr ""
@@ -12044,6 +12200,10 @@ msgstr ""
 
 #: app/templates/admin/analytics/login_logs.html:55
 msgid "From date"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:54
+msgid "From internal to public"
 msgstr ""
 
 #: app/templates/admin/analytics/_user_detail_partial.html:142
@@ -12082,12 +12242,20 @@ msgstr ""
 msgid "Full quality_debug payload"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:595
+#: plugins/upr/analysis_labels.py:165
+msgid "Full screen"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:600
 msgid "Full width"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/neural_map.html:211
 msgid "Fullscreen"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:39
+msgid "Funding ambition &amp; delivery"
 msgstr ""
 
 #: app/templates/admin/governance/dashboard.html:261
@@ -12102,6 +12270,10 @@ msgstr ""
 
 #: app/templates/admin/governance/dashboard.html:69
 msgid "Gaps still waiting on a fix or a decision"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:56
+msgid "Gaps to follow up"
 msgstr ""
 
 #: app/services/ai/agent/executor.py:1822
@@ -12206,6 +12378,11 @@ msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:248
 msgid "Generated questions, whether they were sent, and focal-point answers."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:160
+#, python-brace-format
+msgid "Generated {date}"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:25
@@ -12353,7 +12530,7 @@ msgstr ""
 msgid "Grey"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:672
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:700
 msgid "Grey rounds are in the workbook and are not imported."
 msgstr ""
 
@@ -12421,7 +12598,7 @@ msgstr ""
 msgid "Group into sections"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:499
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:500
 msgid "Group label, e.g. Male"
 msgstr ""
 
@@ -12433,7 +12610,7 @@ msgstr ""
 msgid "Grouped email"
 msgstr ""
 
-#: plugins/upr/routes.py:245
+#: plugins/upr/routes.py:261
 msgid "Guidance"
 msgstr ""
 
@@ -12526,11 +12703,7 @@ msgstr ""
 msgid "Has usage"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:504
-msgid "Header"
-msgstr ""
-
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:519
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:524
 msgid "Headers"
 msgstr ""
 
@@ -12551,8 +12724,8 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:272
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:293
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:302
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:438
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:446
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:439
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:447
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:260
 msgid "Help"
 msgstr ""
@@ -12561,11 +12734,11 @@ msgstr ""
 msgid "Help your colleagues know who you are."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:513
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:517
 msgid "Hex"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:514
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:518
 msgid "Hex colour"
 msgstr ""
 
@@ -12725,6 +12898,14 @@ msgstr ""
 msgid "How can I help you today?"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:108
+msgid "How consistently countries take part"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:52
+msgid "How countries take part"
+msgstr ""
+
 #: app/templates/admin/indicator_bank/neural_map.html:214
 msgid "How does this work?"
 msgstr ""
@@ -12757,6 +12938,13 @@ msgstr ""
 msgid "How template versions work"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:32
+msgid ""
+"How the Unified Planning and Reporting process is growing across the IFRC"
+" network — rising participation, funding ambition, people reached, and "
+"partners engaged."
+msgstr ""
+
 #: plugins/fdrs/templates/ecr/tab_panel.html:185
 msgid "How these figures are calculated"
 msgstr ""
@@ -12781,7 +12969,7 @@ msgstr ""
 msgid "How would you like to start?"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:511
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:515
 msgid "Hue"
 msgstr ""
 
@@ -12966,11 +13154,11 @@ msgstr ""
 msgid "Image Item Translations"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:626
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:631
 msgid "Image URL or site path"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:621
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:626
 msgid "Image file"
 msgstr ""
 
@@ -12984,7 +13172,7 @@ msgstr ""
 msgid "Image files only (PNG, JPG, etc.) up to 10MB"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:603
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:608
 msgid "Image source by language"
 msgstr ""
 
@@ -13119,7 +13307,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/validation_questions.html:266
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:586
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:614
 msgid "Import failed"
 msgstr ""
 
@@ -13166,7 +13354,7 @@ msgstr ""
 msgid "Import into existing draft (Version %(num)s)"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:556
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:585
 msgid "Import into the database now?"
 msgstr ""
 
@@ -13174,7 +13362,7 @@ msgstr ""
 msgid "Import is in progress. Are you sure you want to leave?"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:605
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:633
 msgid "Import job not found"
 msgstr ""
 
@@ -13255,7 +13443,7 @@ msgstr ""
 msgid "Import/Export"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:382
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:374
 msgid "Importable rounds absent from this workbook: "
 msgstr ""
 
@@ -13371,7 +13559,13 @@ msgstr ""
 msgid "In row total"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:373
+#: plugins/upr/analysis_labels.py:159
+msgid ""
+"In the print dialog choose “Save as PDF”, paper size A4, margins None, "
+"and turn off headers and footers."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:365
 msgid "In the workbook but never imported (live or later rounds): "
 msgstr ""
 
@@ -13380,7 +13574,7 @@ msgid "In this tour you will learn how to:"
 msgstr ""
 
 #: app/templates/admin/communication/center.html:1479
-#: app/templates/admin/user_management/user_form.html:1139
+#: app/templates/admin/user_management/user_form.html:1150
 #: app/templates/notifications/_preferences_form.html:83
 msgid "In-app"
 msgstr ""
@@ -13462,6 +13656,10 @@ msgstr ""
 msgid "Inbox"
 msgstr ""
 
+#: plugins/upr/templates/upr/impact_panel.html:117
+msgid "Include"
+msgstr ""
+
 #: app/templates/admin/communication/center.html:738
 msgid "Include Attachments"
 msgstr ""
@@ -13504,6 +13702,13 @@ msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:158
 msgid "Incorrect"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:46
+msgid ""
+"Indicative network totals summed from Unified Plans and Reports currently"
+" in the database. The trend spans the rounds that have submissions; it is"
+" not a historical back-fill."
 msgstr ""
 
 #: app/services/ai/planning/payload_inference.py:831
@@ -13780,7 +13985,7 @@ msgstr ""
 msgid "Installed Plugins"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1078
+#: app/templates/admin/user_management/user_form.html:1089
 #: app/templates/notifications/_preferences_form.html:10
 msgid "Instant"
 msgstr ""
@@ -13807,10 +14012,32 @@ msgstr ""
 msgid "Integrations"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:96
+msgid "Internal and public"
+msgstr ""
+
 #: plugins/upr/templates/upr/_manage_tools.html:144
 msgid ""
 "Internal covers get a yellow INTERNAL banner. Auto uses the file name and"
 " first pages; if unclear it stays internal."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:90
+msgid "Internal narrative"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:132
+msgid "Internal narratives"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:135
+msgid "Internal narratives made public"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:55
+msgid ""
+"Internal narratives received, and how many of those countries have a "
+"public document."
 msgstr ""
 
 #: plugins/upr/templates/upr/_manage_tools.html:141
@@ -14106,6 +14333,10 @@ msgstr ""
 msgid "Job title is required."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:120
+msgid "Joined"
+msgstr ""
+
 #: app/templates/admin/ai/review_detail.html:131
 msgid "Judge Model"
 msgstr ""
@@ -14205,6 +14436,10 @@ msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:304
 msgid "Key docs uploaded"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:168
+msgid "Key findings"
 msgstr ""
 
 #: app/templates/admin/api_keys/edit.html:37
@@ -14476,6 +14711,11 @@ msgstr ""
 msgid "Latest closed year"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:130
+#, python-brace-format
+msgid "Latest completed round: {round}."
+msgstr ""
+
 #: app/templates/core/dashboard/_assignments_tab.html:159
 msgid "Latest:"
 msgstr ""
@@ -14559,7 +14799,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:85
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:587
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:592
 msgid "Left"
 msgstr ""
 
@@ -14794,8 +15034,12 @@ msgstr ""
 msgid "Loading Secretariat structure..."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:811
-#: app/templates/admin/user_management/user_form.html:1389
+#: plugins/upr/templates/upr/impact_panel.html:39
+msgid "Loading analysis data…"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:822
+#: app/templates/admin/user_management/user_form.html:1400
 msgid "Loading analytics..."
 msgstr ""
 
@@ -14945,6 +15189,10 @@ msgstr ""
 msgid "Loading more…"
 msgstr ""
 
+#: plugins/upr/templates/upr/impact_panel.html:72
+msgid "Loading narrative participation…"
+msgstr ""
+
 #: app/templates/admin/organization/_nss_component.html:40
 msgid "Loading national societies..."
 msgstr ""
@@ -15013,7 +15261,7 @@ msgstr ""
 msgid "Loading rule catalog…"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1032
+#: app/templates/admin/user_management/user_form.html:1043
 msgid "Loading secretariat structure…"
 msgstr ""
 
@@ -15087,7 +15335,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/measurement_lookups.html:66
 #: app/templates/admin/indicator_bank/measurement_lookups.html:79
 #: app/templates/admin/plugin_management.html:196
-#: app/templates/admin/user_management/user_form.html:801
+#: app/templates/admin/user_management/user_form.html:812
 #: app/templates/components/_builder_items.html:135
 #: app/templates/components/_builder_items.html:139
 #: app/templates/components/ag_grid_i18n_js.html:70
@@ -15123,6 +15371,10 @@ msgstr ""
 msgid "Local Units"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:74
+msgid "Local units"
+msgstr ""
+
 #: app/templates/admin/translations/quality_dashboard.html:145
 #: app/templates/admin/translations/quality_dashboard.html:249
 msgid "Locale"
@@ -15155,7 +15407,7 @@ msgstr ""
 msgid "Log Source"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:809
+#: app/templates/admin/user_management/user_form.html:820
 msgid "Log in"
 msgstr ""
 
@@ -15168,7 +15420,7 @@ msgid "Logged In"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:374
-#: app/templates/admin/user_management/user_form.html:1336
+#: app/templates/admin/user_management/user_form.html:1347
 #: app/templates/auth/account_settings.html:409
 msgid "Logged Out"
 msgstr ""
@@ -15510,8 +15762,8 @@ msgid "Manual list"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:75
-#: app/templates/forms/entry_form/entry_form.html:3540
-#: app/templates/forms/entry_form/entry_form.html:3559
+#: app/templates/forms/entry_form/entry_form.html:3539
+#: app/templates/forms/entry_form/entry_form.html:3558
 msgid "Manual save required"
 msgstr ""
 
@@ -15632,6 +15884,10 @@ msgstr ""
 msgid "Matched"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:498
+msgid "Matched to a GO appeal"
+msgstr ""
+
 #: app/templates/admin/reports/partials/_section_properties.html:67
 msgid ""
 "Matches the PB Progress report layout — one section per Strategic "
@@ -15682,16 +15938,16 @@ msgstr ""
 msgid "Matrix Title"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:651
+#: app/templates/forms/entry_form/partials/matrix_table.html:659
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3773
+#: app/templates/forms/entry_form/entry_form.html:3772
 msgid "Matrix functionality unavailable"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3753
-#: app/templates/forms/entry_form/entry_form.html:3757
+#: app/templates/forms/entry_form/entry_form.html:3752
+#: app/templates/forms/entry_form/entry_form.html:3756
 msgid "Matrix handler not initialized"
 msgstr ""
 
@@ -15715,7 +15971,7 @@ msgstr ""
 msgid "Max indicators: %(current)s/%(max)s"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:593
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:598
 msgid "Max width"
 msgstr ""
 
@@ -15926,6 +16182,23 @@ msgstr ""
 msgid "Metric"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:150
+msgid "Mid-year report — the annual report is not yet available"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:87
+msgid "Mid-year report, shown where the annual report is not yet available"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:176
+#: plugins/upr/templates/upr/impact_panel.html:65
+msgid "Mid-year reports"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:102
+msgid "Mid-year reports: participating"
+msgstr ""
+
 #: app/utils/form_localization.py:152
 msgid "Migrants"
 msgstr ""
@@ -15970,6 +16243,10 @@ msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:197
 msgid "Mismatch"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:134
+msgid "Missed by data alone"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:294
@@ -16041,7 +16318,7 @@ msgstr ""
 msgid "Modifying core properties may affect data consistency."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1097
+#: app/templates/admin/user_management/user_form.html:1108
 #: app/templates/notifications/_preferences_form.html:32
 msgid "Monday"
 msgstr ""
@@ -16098,14 +16375,14 @@ msgid "Most Active Users (30 days)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:245
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:464
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:465
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:204
 #: app/templates/forms/form_builder/partials/_template_details.html:358
 msgid "Move Down"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:242
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:461
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:462
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:201
 #: app/templates/forms/form_builder/partials/_template_details.html:357
 msgid "Move Up"
@@ -16220,7 +16497,7 @@ msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:113
 #: app/templates/admin/organization/index.html:83
-#: app/templates/admin/user_management/user_form.html:902
+#: app/templates/admin/user_management/user_form.html:913
 #: app/templates/core/layout.html:417 app/templates/core/layout.html:419
 #: app/templates/core/ns_structure.html:4
 #: app/templates/core/ns_structure.html:18
@@ -16303,6 +16580,10 @@ msgstr ""
 msgid "Narrative files"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:94
+msgid "Narrative only"
+msgstr ""
+
 #: app/templates/admin/templates/new_template.html:367
 msgid ""
 "Narrow the indicator bank by sector, program, SPEF area, type, or "
@@ -16313,7 +16594,31 @@ msgstr ""
 #: app/templates/admin/organization/_nss_component.html:14
 #: app/templates/admin/organization/index.html:68
 #: app/templates/auth/login.html:658 app/templates/public/_site_lock.html:496
+#: plugins/upr/analysis_labels.py:111
 msgid "National Societies"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:109
+msgid ""
+"National Societies by the number of completed rounds (plans, mid-year and"
+" annual reports) they took part in. Rounds still open or only partly "
+"covered by the sources are left out."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:38
+msgid ""
+"National Societies completing a plan or report each year (reports: "
+"annual, or mid-year where the annual is not yet available)."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:51
+msgid ""
+"National Societies in each round at each stage. “Either” is the real "
+"participation: data submitted or internal narrative handed in."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:77
+msgid "National Societies that reported"
 msgstr ""
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:118
@@ -16326,7 +16631,7 @@ msgstr ""
 
 #: app/templates/components/entity_dropdown.html:32
 #: app/templates/components/entity_dropdown.html:157
-#: app/utils/form_localization.py:154
+#: app/utils/form_localization.py:154 plugins/upr/analysis_labels.py:123
 msgid "National Society"
 msgstr ""
 
@@ -16352,6 +16657,10 @@ msgstr ""
 #: app/templates/admin/settings/manage_settings.html:172
 #: app/templates/core/ns_structure.html:14
 msgid "National Society Structure"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:44
+msgid "National Society capacity"
 msgstr ""
 
 #: app/templates/admin/governance/dashboard.html:580
@@ -16633,8 +16942,12 @@ msgid "Next"
 msgstr ""
 
 #: app/templates/components/ag_grid_i18n_js.html:64
-#: app/templates/forms/entry_form/entry_form.html:4023
+#: app/templates/forms/entry_form/entry_form.html:4022
 msgid "Next Page"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:164
+msgid "Next slide"
 msgstr ""
 
 #: app/templates/macros/year_picker.html:26
@@ -17300,7 +17613,7 @@ msgstr ""
 msgid "No metrics available"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4059
+#: app/templates/forms/entry_form/entry_form.html:4058
 msgid "No more indicators available for this section."
 msgstr ""
 
@@ -17432,7 +17745,7 @@ msgstr ""
 msgid "No regional offices found."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:802
+#: app/templates/admin/user_management/user_form.html:813
 msgid "No related deletions detected."
 msgstr ""
 
@@ -17572,7 +17885,7 @@ msgstr ""
 msgid "No sources found."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1050
+#: app/templates/admin/user_management/user_form.html:1061
 msgid "No structure defined yet."
 msgstr ""
 
@@ -17597,11 +17910,17 @@ msgstr ""
 msgid "No sub-sectors yet."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:488
+#: plugins/upr/templates/upr/impact_panel.html:47
+msgid ""
+"No submitted Unified Plans or Reports are available yet for this "
+"selection."
+msgstr ""
+
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:476
 msgid "No target can be imported: all are blocked or have no workbook data."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:481
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:469
 msgid ""
 "No target is fully ready: every importable target carries a warning "
 "(existing progress, skipped entities, cleared PNS data…). Use “Select all"
@@ -17774,6 +18093,10 @@ msgstr ""
 msgid "None"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:126
+msgid "None — nothing to follow up."
+msgstr ""
+
 #: app/services/communication/insights_service.py:110
 #: app/services/communication/insights_service.py:114
 #: app/templates/admin/analytics/admin_actions.html:158
@@ -17818,8 +18141,8 @@ msgid "Not Started"
 msgstr ""
 
 #: app/routes/forms/validation_summary.py:424
-#: app/templates/admin/analytics/import_change_log.html:105
-#: app/templates/admin/analytics/import_change_log.html:110
+#: app/templates/admin/analytics/import_change_log.html:138
+#: app/templates/admin/analytics/import_change_log.html:144
 #: app/templates/admin/governance/dashboard.html:257
 #: app/templates/components/_form_item_renderer.html:271
 #: app/templates/forms/entry_form/entry_form.html:1575
@@ -17828,7 +18151,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2610
 #: app/templates/forms/entry_form/entry_form.html:2625
 #: app/templates/forms/entry_form/export_pdf.html:202
-#: app/templates/forms/entry_form/partials/matrix_table.html:705
+#: app/templates/forms/entry_form/partials/matrix_table.html:713
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
 msgid "Not applicable"
 msgstr ""
@@ -17878,13 +18201,17 @@ msgstr ""
 msgid "Not generated"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:671
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:699
 #: plugins/upr/templates/admin/_upr_guidance_script.html:16
 msgid "Not imported"
 msgstr ""
 
 #: app/routes/admin/analytics.py:197
 msgid "Not in directory (from URL)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:157
+msgid "Not loaded"
 msgstr ""
 
 #: app/templates/admin/analytics/user_detail.html:41
@@ -17951,6 +18278,10 @@ msgstr ""
 msgid "Not stored"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:97
+msgid "Not yet public"
+msgstr ""
+
 #: app/templates/forms/form_builder/partials/_versions_modal.html:15
 msgid "Note"
 msgstr ""
@@ -17972,6 +18303,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:163
+#: plugins/upr/analysis_labels.py:167
 msgid "Notes"
 msgstr ""
 
@@ -17981,6 +18313,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_template_details.html:296
 msgid "Notes visible to all users with access to this assignment."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:156
+msgid "Nothing is ready to export yet. Wait for the analysis to finish loading."
 msgstr ""
 
 #: app/templates/forms/form_builder/field_mapping.html:254
@@ -18043,7 +18379,7 @@ msgstr ""
 msgid "Notification type registry"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1120
+#: app/templates/admin/user_management/user_form.html:1131
 msgid "Notification types"
 msgstr ""
 
@@ -18326,6 +18662,10 @@ msgid ""
 "carried over as they are."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:117
+msgid "Only in open or partly covered rounds"
+msgstr ""
+
 #: app/routes/admin/form_builder/sections.py:154
 msgid "Only one discussion section is allowed per template version."
 msgstr ""
@@ -18445,7 +18785,7 @@ msgstr ""
 msgid "Open in new tab"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4049
+#: app/templates/forms/entry_form/entry_form.html:4048
 msgid "Open indicator bank to propose new indicators or review existing ones"
 msgstr ""
 
@@ -18459,6 +18799,10 @@ msgstr ""
 
 #: app/templates/admin/validation_questions.html:259
 msgid "Open questions"
+msgstr ""
+
+#: plugins/upr/templates/upr/impact_panel.html:31
+msgid "Open report"
 msgstr ""
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:109
@@ -18732,6 +19076,7 @@ msgstr ""
 #: app/utils/audit_trail_labels.py:37 app/utils/form_localization.py:315
 #: app/utils/form_localization.py:327 app/utils/form_localization.py:336
 #: app/utils/form_localization.py:348
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:499
 msgid "Other"
 msgstr ""
 
@@ -18822,6 +19167,8 @@ msgstr ""
 #: app/templates/admin/translations/quality_dashboard.html:57
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:80
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:111
+#: plugins/upr/analysis_labels.py:174
+#: plugins/upr/templates/upr/impact_panel.html:63
 msgid "Overview"
 msgstr ""
 
@@ -18916,7 +19263,7 @@ msgstr ""
 msgid "PNG, JPG, GIF, or WEBP. Used in the SP/EF catalog and reports."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:309
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:335
 msgid "PNS"
 msgstr ""
 
@@ -19083,6 +19430,11 @@ msgstr ""
 msgid "Page views, saves, uploads & more"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:166
+#, python-brace-format
+msgid "Page {n} of {total}"
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:747
 #: app/templates/admin/analytics/login_logs.html:143
 #: app/templates/admin/analytics/sessions.html:179
@@ -19132,7 +19484,7 @@ msgstr ""
 #: app/templates/admin/assignments/manage_assignment.html:763
 #: app/templates/admin/assignments/manage_assignment.html:873
 #: app/templates/admin/governance/dashboard.html:324
-#: app/templates/admin/user_management/user_form.html:930
+#: app/templates/admin/user_management/user_form.html:941
 #: app/templates/components/_form_helpers.html:78
 msgid "Part of:"
 msgstr ""
@@ -19147,6 +19499,65 @@ msgstr ""
 
 #: app/utils/form_localization.py:147
 msgid "Participants"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:113
+msgid ""
+"Participants that carried on, joined, or dropped out compared with the "
+"previous year. The first round is shown in grey as the baseline. When the"
+" previous round is only partly covered by the sources, joiners are not "
+"shown, because countries it simply missed would look new."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:125
+msgid "Participated last year, not this year"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:131
+msgid "Participating (data or narrative)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:43
+msgid ""
+"Participating National Societies providing bilateral support, and the "
+"funding they self-report (PNS data, CHF)."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:37
+msgid "Participation (coverage)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:50
+msgid "Participation by stage"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:127
+msgid "Participation rate"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:139
+#, python-brace-format
+msgid "Participation rate is out of the {n} National Societies seen in any round."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:33
+msgid "Participation: data and narrative"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:81
+msgid "Partner funding"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:70
+msgid "Partner funding (CHF)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:69
+msgid "Partners (PNS)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:42 plugins/upr/analysis_labels.py:80
+msgid "Partners engaged"
 msgstr ""
 
 #: app/templates/admin/embed_content/manage_embed_content.html:142
@@ -19200,11 +19611,11 @@ msgstr ""
 msgid "Past due, not yet submitted"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:619
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:624
 msgid "Paste"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:617
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:622
 msgid "Paste a screenshot from the clipboard (Ctrl+V)"
 msgstr ""
 
@@ -19212,7 +19623,7 @@ msgstr ""
 msgid "Paste an API key created in API Key Management"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:617
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:622
 msgid "Paste image"
 msgstr ""
 
@@ -19310,6 +19721,15 @@ msgstr ""
 
 #: app/templates/core/dashboard.html:1275
 msgid "People reached"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:41
+msgid "People the network plans to reach, by plan year."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:47 plugins/upr/analysis_labels.py:68
+#: plugins/upr/analysis_labels.py:79
+msgid "People to be reached"
 msgstr ""
 
 #: app/templates/admin/validation_rules.html:74
@@ -19506,9 +19926,42 @@ msgstr ""
 msgid "Plan"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:63
+msgid "Plan round"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:104
+msgid "Planned and reported"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:116
+msgid "Planned but did not report (latest year with both)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:78
+msgid "Planned funding requirement"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:65
+msgid "Planned requirement"
+msgstr ""
+
 #: app/templates/admin/validation_dashboard.html:58
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:694
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:722
 msgid "Planning"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:175
+#: plugins/upr/templates/upr/impact_panel.html:64
+msgid "Plans"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:60
+msgid "Plans submitted"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:101
+msgid "Plans: participating"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1403
@@ -19568,7 +20021,7 @@ msgstr ""
 msgid "Please fix these errors before saving."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:808
+#: app/templates/admin/user_management/user_form.html:819
 msgid "Please log in again to reload analytics."
 msgstr ""
 
@@ -19643,7 +20096,7 @@ msgstr ""
 msgid "Please select at least one language to translate."
 msgstr ""
 
-#: app/forms/system/user_forms.py:81
+#: app/forms/system/user_forms.py:83
 msgid "Please select at least one role."
 msgstr ""
 
@@ -19670,7 +20123,7 @@ msgid "Please upload a supported guidance file"
 msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1158
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:740
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:768
 msgid "Please upload a valid Excel file (.xlsx or .xls)"
 msgstr ""
 
@@ -19856,7 +20309,7 @@ msgid "Prefilled Values Notice"
 msgstr ""
 
 #: app/templates/forms/entry_form/export_pdf.html:313
-#: app/templates/forms/entry_form/partials/matrix_table.html:189
+#: app/templates/forms/entry_form/partials/matrix_table.html:149
 msgid "Prefilled value"
 msgstr ""
 
@@ -19877,7 +20330,7 @@ msgstr ""
 msgid "Preparing query…"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4111
+#: app/templates/forms/entry_form/entry_form.html:4110
 msgid "Preparing request..."
 msgstr ""
 
@@ -19890,7 +20343,11 @@ msgstr ""
 msgid "Present"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:440
+#: plugins/upr/templates/upr/impact_panel.html:29
+msgid "Presentation"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:451
 msgid "Presets"
 msgstr ""
 
@@ -19907,7 +20364,7 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:49
 #: app/templates/forms/form_builder/form_builder.html:22
 #: app/templates/forms/form_builder/form_builder.html:499
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:629
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:634
 #: app/templates/forms/form_builder/partials/_versions_modal.html:38
 #: plugins/upr/templates/upr/_manage_tools.html:12
 msgid "Preview"
@@ -19951,7 +20408,7 @@ msgstr ""
 msgid "Preview import"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4052
+#: app/templates/forms/entry_form/entry_form.html:4051
 msgid ""
 "Preview mode: this will not be saved. Assign this template to a country "
 "to test saving dynamic indicators."
@@ -19995,7 +20452,7 @@ msgstr ""
 msgid "Preview:"
 msgstr ""
 
-#: app/routes/forms/entry.py:1662
+#: app/routes/forms/entry.py:1668
 #, python-format
 msgid "Preview: %(name)s"
 msgstr ""
@@ -20015,7 +20472,7 @@ msgid "Previous"
 msgstr ""
 
 #: app/templates/components/ag_grid_i18n_js.html:63
-#: app/templates/forms/entry_form/entry_form.html:4022
+#: app/templates/forms/entry_form/entry_form.html:4021
 msgid "Previous Page"
 msgstr ""
 
@@ -20035,6 +20492,10 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:173
 #: app/templates/admin/validation_questions.html:283
 msgid "Previous question"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:163
+msgid "Previous slide"
 msgstr ""
 
 #: app/templates/macros/year_picker.html:7
@@ -20059,6 +20520,10 @@ msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:130
 msgid "Print"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:158
+msgid "Print or save as PDF"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:129
@@ -20225,11 +20690,11 @@ msgstr ""
 msgid "Properties"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4048
+#: app/templates/forms/entry_form/entry_form.html:4047
 msgid "Propose Changes"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4047
+#: app/templates/forms/entry_form/entry_form.html:4046
 msgid "Propose Indicator"
 msgstr ""
 
@@ -20239,7 +20704,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:1295
 #: app/templates/forms/entry_form/entry_form.html:2242
-#: app/templates/forms/entry_form/entry_form.html:4050
+#: app/templates/forms/entry_form/entry_form.html:4049
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:157
 msgid "Propose changes to this indicator"
 msgstr ""
@@ -20319,6 +20784,18 @@ msgstr ""
 msgid "Public access and notifications for this assignment."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:91
+msgid "Public narrative"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:133
+msgid "Public narratives"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:98
+msgid "Public only"
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:1386
 msgid "Public reporting"
 msgstr ""
@@ -20392,7 +20869,7 @@ msgstr ""
 msgid "Purpose"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1146
+#: app/templates/admin/user_management/user_form.html:1157
 #: app/templates/notifications/_preferences_form.html:90
 msgid "Push"
 msgstr ""
@@ -20581,7 +21058,7 @@ msgstr ""
 msgid "RBAC"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:263
+#: app/templates/admin/user_management/user_form.html:274
 #, python-format
 msgid ""
 "RBAC role data looks incomplete: %(codes)s missing from the database. "
@@ -20664,7 +21141,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:305
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:288
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:437
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:438
 msgid "Read-only"
 msgstr ""
 
@@ -20931,11 +21408,11 @@ msgstr ""
 msgid "Recommended: set an expiry date for keys with sensitive access."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3556
+#: app/templates/forms/entry_form/entry_form.html:3555
 msgid "Reconnected!"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3550
+#: app/templates/forms/entry_form/entry_form.html:3549
 msgid "Reconnecting..."
 msgstr ""
 
@@ -20991,6 +21468,8 @@ msgstr ""
 #: plugins/fdrs/templates/compliance/tab_panel.html:99
 #: plugins/fdrs/templates/ecr/tab_panel.html:224
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:43
+#: plugins/upr/templates/upr/impact_panel.html:24
+#: plugins/upr/templates/upr/impact_panel.html:25
 msgid "Refresh"
 msgstr ""
 
@@ -21045,7 +21524,14 @@ msgid "Regenerate Thumbnail"
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:236
+#: plugins/upr/analysis_labels.py:124
+#: plugins/upr/templates/upr/impact_panel.html:19
 msgid "Region"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:161
+#, python-brace-format
+msgid "Region: {region}"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:781
@@ -21067,7 +21553,7 @@ msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:950
 #: app/templates/admin/organization/index.html:148
-#: app/templates/admin/user_management/user_form.html:1013
+#: app/templates/admin/user_management/user_form.html:1024
 msgid "Regions"
 msgstr ""
 
@@ -21242,7 +21728,7 @@ msgstr ""
 msgid "Remove Document Field"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:530
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:535
 msgid "Remove Group"
 msgstr ""
 
@@ -21258,7 +21744,7 @@ msgstr ""
 msgid "Remove Matrix"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:467
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:468
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:207
 msgid "Remove Option"
 msgstr ""
@@ -21304,7 +21790,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:1303
 #: app/templates/forms/entry_form/entry_form.html:2250
-#: app/templates/forms/entry_form/entry_form.html:4055
+#: app/templates/forms/entry_form/entry_form.html:4054
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:165
 msgid "Remove this indicator"
 msgstr ""
@@ -21494,6 +21980,10 @@ msgstr ""
 msgid "Report languages"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:64
+msgid "Report round"
+msgstr ""
+
 #: app/templates/admin/reports/builder.html:31
 msgid "Report title"
 msgstr ""
@@ -21510,8 +22000,12 @@ msgstr ""
 msgid "Reported NSs"
 msgstr ""
 
-#: app/templates/core/dashboard.html:1280
+#: app/templates/core/dashboard.html:1280 plugins/upr/analysis_labels.py:67
 msgid "Reported expenditure"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:66
+msgid "Reported funding"
 msgstr ""
 
 #: app/templates/core/dashboard.html:1279
@@ -21545,6 +22039,13 @@ msgstr ""
 
 #: app/services/platform/governance_program.py:841
 msgid "Reporting discipline"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:85
+#, python-brace-format
+msgid ""
+"Reporting figures use the annual report where available, otherwise the "
+"mid-year report (years: {years})."
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:92
@@ -21581,6 +22082,10 @@ msgstr ""
 #: app/templates/components/_sidebar_nav_categories.html:128
 #: app/templates/components/_sidebar_nav_categories.html:130
 msgid "Reports"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:61
+msgid "Reports submitted"
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:542
@@ -21951,6 +22456,10 @@ msgstr ""
 msgid "Resuming..."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:112
+msgid "Retention year on year"
+msgstr ""
+
 #: app/templates/core/chat_immersive.html:60
 #: app/templates/forms/form_builder/form_builder.html:262
 #: app/templates/forms/form_builder/form_builder.html:263
@@ -22089,6 +22598,10 @@ msgstr ""
 msgid "Review needed"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:497
+msgid "Review on the form"
+msgstr ""
+
 #: app/templates/admin/validation_questions.html:152
 #: app/templates/admin/validation_questions.html:253
 msgid "Review outcome"
@@ -22187,7 +22700,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/ai/trace_compare.html:121
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:589
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:594
 msgid "Right"
 msgstr ""
 
@@ -22237,7 +22750,7 @@ msgstr ""
 msgid "Role Name"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:325
+#: app/templates/admin/user_management/user_form.html:336
 msgid "Role Type"
 msgstr ""
 
@@ -22283,8 +22796,13 @@ msgid "Rotate the key regularly or immediately if compromise is suspected."
 msgstr ""
 
 #: app/templates/admin/validation_dashboard.html:279
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:309
+#: plugins/upr/analysis_labels.py:122
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:335
 msgid "Round"
+msgstr ""
+
+#: plugins/upr/templates/upr/impact_panel.html:62
+msgid "Round type"
 msgstr ""
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:40
@@ -22293,6 +22811,10 @@ msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:56
 msgid "Rounds"
+msgstr ""
+
+#: app/templates/admin/analytics/import_change_log.html:110
+msgid "Row"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:42
@@ -22308,7 +22830,7 @@ msgstr ""
 msgid "Row Label Column"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:483
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:484
 msgid "Row total"
 msgstr ""
 
@@ -22384,7 +22906,7 @@ msgstr ""
 msgid "Running"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4110
+#: app/templates/forms/entry_form/entry_form.html:4109
 msgid "Running AI opinions..."
 msgstr ""
 
@@ -22454,6 +22976,27 @@ msgstr ""
 msgid "Same as assignment period"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:86
+msgid ""
+"Same mix as the Financial Overview network block. Planned requirement is "
+"the country plan: host National Society + IFRC Secretariat + PNS lines "
+"recorded on that plan. Reported funding is PNS self-reported funding + "
+"other sources on the country report + IFRC Secretariat actuals (2025 and "
+"2026 snapshots; earlier years have none). Reported expenditure is PNS "
+"self-reported expenditure + those IFRC actuals. Host National Society "
+"strategic-priority totals are not added on top. Transfers are not counted"
+" as expenditure."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:40
+msgid ""
+"Same mix as the Financial Overview network, CHF. Planned requirement is "
+"the country plan (host National Society + IFRC Secretariat + PNS lines on"
+" the plan). Reported funding adds PNS self-reports, other sources, and "
+"IFRC Secretariat actuals. Reported expenditure adds PNS self-reports and "
+"IFRC Secretariat actuals."
+msgstr ""
+
 #: app/templates/admin/communication/center.html:1474
 msgid ""
 "Same title for email subject line and push notification. Also shown in "
@@ -22464,7 +23007,7 @@ msgstr ""
 msgid "Satisfy from this entity's document repository"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1102
+#: app/templates/admin/user_management/user_form.html:1113
 #: app/templates/notifications/_preferences_form.html:37
 msgid "Saturday"
 msgstr ""
@@ -22566,7 +23109,7 @@ msgid "Save failed."
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:292
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:445
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:446
 msgid "Save value"
 msgstr ""
 
@@ -22583,7 +23126,7 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4034
+#: app/templates/forms/entry_form/entry_form.html:4033
 msgid ""
 "Saved value is no longer in the current list. It will still be submitted "
 "unless you choose another option."
@@ -22729,7 +23272,7 @@ msgstr ""
 msgid "Search NS local units..."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:968
+#: app/templates/admin/user_management/user_form.html:979
 msgid "Search NS structure"
 msgstr ""
 
@@ -22779,7 +23322,7 @@ msgstr ""
 msgid "Search branches, sub-branches, or local units..."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:972
+#: app/templates/admin/user_management/user_form.html:983
 msgid "Search branches, sub-branches, or local units…"
 msgstr ""
 
@@ -22853,7 +23396,7 @@ msgstr ""
 msgid "Search divisions or departments..."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1026
+#: app/templates/admin/user_management/user_form.html:1037
 msgid "Search divisions or departments…"
 msgstr ""
 
@@ -22904,11 +23447,11 @@ msgstr ""
 msgid "Search regional or cluster offices..."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1044
+#: app/templates/admin/user_management/user_form.html:1055
 msgid "Search regional or cluster offices…"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1040
+#: app/templates/admin/user_management/user_form.html:1051
 msgid "Search regions"
 msgstr ""
 
@@ -22916,7 +23459,7 @@ msgstr ""
 msgid "Search risk levels..."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1022
+#: app/templates/admin/user_management/user_form.html:1033
 msgid "Search secretariat"
 msgstr ""
 
@@ -22994,7 +23537,7 @@ msgstr ""
 
 #: app/templates/admin/organization/index.html:98
 #: app/templates/admin/settings/manage_settings.html:177
-#: app/templates/admin/user_management/user_form.html:911
+#: app/templates/admin/user_management/user_form.html:922
 msgid "Secretariat"
 msgstr ""
 
@@ -23014,7 +23557,7 @@ msgstr ""
 msgid "Secretariat Regional Offices"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1004
+#: app/templates/admin/user_management/user_form.html:1015
 msgid "Secretariat assignment"
 msgstr ""
 
@@ -23115,7 +23658,7 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/_section_nav_list.html:69
 #: app/templates/forms/form_builder/field_mapping.html:306
 #: app/templates/forms/form_builder/form_builder.html:1164
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:719
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:747
 msgid "Sections"
 msgstr ""
 
@@ -23225,7 +23768,7 @@ msgstr ""
 msgid "Security settings configuration UI is not yet implemented in this view."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4057
+#: app/templates/forms/entry_form/entry_form.html:4056
 msgid "Security token not found. Please refresh the page and try again."
 msgstr ""
 
@@ -23296,7 +23839,7 @@ msgstr ""
 msgid "Select Entities"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4061
+#: app/templates/forms/entry_form/entry_form.html:4060
 msgid "Select Indicator"
 msgstr ""
 
@@ -23363,7 +23906,7 @@ msgstr ""
 #: app/templates/admin/assignments/manage_assignment.html:1019
 #: app/templates/admin/documents/documents.html:170
 #: app/templates/admin/organization/_nss_component.html:169
-#: app/templates/admin/user_management/user_form.html:978
+#: app/templates/admin/user_management/user_form.html:989
 #: app/templates/auth/login.html:1200
 #: plugins/upr/templates/upr/_manage_tools.html:41
 #: plugins/upr/templates/upr/tab_panel.html:385
@@ -23380,12 +23923,16 @@ msgid "Select a country to preview."
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1034
-#: app/templates/admin/user_management/user_form.html:993
+#: app/templates/admin/user_management/user_form.html:1004
 msgid "Select a country to view NS structure."
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1417
 msgid "Select a form template and reporting period before previewing the email."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:154
+msgid "Select a list to see the countries."
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:179
@@ -23446,7 +23993,7 @@ msgstr ""
 msgid "Select a user…"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:141
+#: app/templates/forms/entry_form/partials/matrix_table.html:151
 msgid "Select a value in the column header to enable this cell"
 msgstr ""
 
@@ -23459,9 +24006,9 @@ msgid "Select activity types..."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:393
-#: app/templates/admin/user_management/user_form.html:1156
-#: app/templates/admin/user_management/user_form.html:1163
-#: app/templates/admin/user_management/user_form.html:1171
+#: app/templates/admin/user_management/user_form.html:1167
+#: app/templates/admin/user_management/user_form.html:1174
+#: app/templates/admin/user_management/user_form.html:1182
 #: app/templates/admin/validation_dashboard.html:305
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:386
 #: plugins/upr/templates/upr/_manage_tools.html:55
@@ -23473,7 +24020,7 @@ msgstr ""
 msgid "Select all applicable"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:927
+#: app/templates/admin/user_management/user_form.html:938
 msgid "Select all countries"
 msgstr ""
 
@@ -23557,7 +24104,7 @@ msgstr ""
 msgid "Select at least two documents"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1541
+#: app/templates/admin/user_management/user_form.html:1552
 msgid "Select colour"
 msgstr ""
 
@@ -23689,9 +24236,8 @@ msgstr ""
 
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:102
 msgid ""
-"Select targets above, then use Preview import for row counts, warnings, "
-"and the exact assigned form each target writes to. You can run the import"
-" without preview."
+"Select targets above, then use Preview import for row counts and "
+"warnings. You can run the import without preview."
 msgstr ""
 
 #: app/templates/admin/reports/partials/_filter_panel.html:27
@@ -23871,6 +24417,10 @@ msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:1026
 msgid "Send a test email using the current template content."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:160
+msgid "Send a welcome email to this user"
 msgstr ""
 
 #: app/templates/components/_fb_ai_config.html:33
@@ -24238,6 +24788,10 @@ msgstr ""
 msgid "Sex, age, and disability breakdowns where applicable"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:99
+msgid "Share made public"
+msgstr ""
+
 #: app/templates/admin/api_management.html:229
 msgid "Share of live API paths that appear in the endpoint registry"
 msgstr ""
@@ -24402,6 +24956,7 @@ msgid "Show all sessions"
 msgstr ""
 
 #: app/templates/components/entity_dropdown.html:29
+#: plugins/upr/analysis_labels.py:149
 msgid "Show countries"
 msgstr ""
 
@@ -24454,6 +25009,10 @@ msgstr ""
 msgid "Show less"
 msgstr ""
 
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:252
+msgid "Show list"
+msgstr ""
+
 #: app/templates/tours/tours.html:18
 msgid "Show me"
 msgstr ""
@@ -24483,6 +25042,10 @@ msgstr ""
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:38
 msgid "Show only service income that FDRS has published"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:169
+msgid "Show or hide findings"
 msgstr ""
 
 #: app/templates/core/dashboard.html:1300
@@ -24597,6 +25160,14 @@ msgstr ""
 msgid ""
 "Showing the first %(limit)s rows by total views. CSV export includes all "
 "paths."
+msgstr ""
+
+#: app/templates/admin/analytics/import_change_log.html:105
+#, python-format
+msgid ""
+"Showing the start of this matrix (%(before)s cells before, %(after)s "
+"after). The log does not keep the rest, so “…” means that side was cut "
+"off, not that the cell was removed."
 msgstr ""
 
 #: app/templates/admin/ai/knowledge_base.html:802
@@ -24844,10 +25415,25 @@ msgstr ""
 msgid "Source:"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:88
+msgid ""
+"Source: Participating National Society self-reports (PNS data). This is "
+"separate from the PNS amount a host National Society records in its own "
+"plan. Under a country, the partner count is the societies supporting that"
+" country; the year total counts each society once."
+msgstr ""
+
 #: app/templates/admin/ai/knowledge_base.html:191
 #: app/templates/admin/data_exploration/explore_data.html:1085
 #: app/templates/forms/entry_form/validation_summary_pdf.html:71
 msgid "Sources"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:138
+#, python-brace-format
+msgid ""
+"Sources: internal narratives {internal}, public narratives {public} (one "
+"per country and round, country appeals only)."
 msgstr ""
 
 #: app/templates/admin/plugin_management.html:249
@@ -24876,7 +25462,7 @@ msgstr ""
 msgid "Split into SPEF sections (CC / SP / EF)"
 msgstr ""
 
-#: app/utils/form_localization.py:124
+#: app/utils/form_localization.py:124 plugins/upr/analysis_labels.py:72
 msgid "Staff"
 msgstr ""
 
@@ -24964,6 +25550,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_document_fields.html:156
 msgid "Start period"
+msgstr ""
+
+#: plugins/upr/templates/upr/impact_panel.html:28
+msgid "Start presentation"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:1712
@@ -25169,11 +25759,11 @@ msgstr ""
 #: app/templates/components/auto_translate_modal_js.html:62
 #: app/templates/core/chat_immersive.html:52
 #: app/templates/core/chat_immersive.html:262
-#: app/templates/forms/entry_form/entry_form.html:4108
+#: app/templates/forms/entry_form/entry_form.html:4107
 msgid "Stop"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4109
+#: app/templates/forms/entry_form/entry_form.html:4108
 msgid "Stop AI validation"
 msgstr ""
 
@@ -25565,7 +26155,7 @@ msgstr ""
 msgid "Summary table"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1103
+#: app/templates/admin/user_management/user_form.html:1114
 #: app/templates/notifications/_preferences_form.html:38
 msgid "Sunday"
 msgstr ""
@@ -25815,7 +26405,7 @@ msgstr ""
 msgid "System settings"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1129
+#: app/templates/admin/user_management/user_form.html:1140
 #: app/templates/notifications/_preferences_form.html:72
 msgid ""
 "System-only notifications (for example welcome emails and digest "
@@ -25897,10 +26487,6 @@ msgstr ""
 msgid "Target term is required"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:526
-msgid "Targets written"
-msgstr ""
-
 #: app/utils/form_localization.py:142
 msgid "Teachers"
 msgstr ""
@@ -25952,7 +26538,7 @@ msgstr ""
 msgid "Template"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:385
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:377
 msgid "Template "
 msgstr ""
 
@@ -26211,6 +26797,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:1165
 #: app/templates/admin/reports/partials/_widget_palette.html:8
 #: app/templates/admin/templates/data_sync_imputation.html:184
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:510
 #: app/utils/form_localization.py:80 app/utils/form_localization.py:81
 msgid "Text"
 msgstr ""
@@ -26298,6 +26885,13 @@ msgstr ""
 msgid "The code field is locked while this entry is still in use."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:137
+#, python-brace-format
+msgid ""
+"The databank holds no data assignments for {rounds}, so only narrative "
+"participation is shown for them."
+msgstr ""
+
 #: plugins/upr/templates/upr/_excel_modals.html:76
 msgid ""
 "The file is checked for template version, country, and planning period "
@@ -26330,11 +26924,11 @@ msgstr ""
 msgid "The following changes will be applied to the database:"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1423
+#: app/templates/admin/user_management/user_form.html:1434
 msgid "The following related data will be deleted. This action cannot be undone:"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:804
+#: app/templates/admin/user_management/user_form.html:815
 msgid "The following will be unassigned (kept for history):"
 msgstr ""
 
@@ -26427,7 +27021,7 @@ msgstr ""
 msgid "The review date must be in the future."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4070
+#: app/templates/forms/entry_form/entry_form.html:4069
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
 
@@ -26610,8 +27204,8 @@ msgstr ""
 msgid "This column cannot be unpinned"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:579
-#: app/templates/forms/entry_form/partials/matrix_table.html:611
+#: app/templates/forms/entry_form/partials/matrix_table.html:587
+#: app/templates/forms/entry_form/partials/matrix_table.html:619
 msgid "This column requires a whole number. Please correct the decimal value."
 msgstr ""
 
@@ -26696,7 +27290,7 @@ msgstr ""
 msgid "This import will permanently delete existing submission data:"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4071
+#: app/templates/forms/entry_form/entry_form.html:4070
 msgid "This indicator is already added to this section."
 msgstr ""
 
@@ -26731,7 +27325,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2398
 #: app/templates/forms/entry_form/entry_form.html:2421
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
-#: app/templates/forms/entry_form/partials/matrix_table.html:140
+#: app/templates/forms/entry_form/partials/matrix_table.html:148
 msgid "This is a prefilled value"
 msgstr ""
 
@@ -26824,7 +27418,7 @@ msgid ""
 "pick another language tab."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:199
+#: app/templates/forms/entry_form/partials/matrix_table.html:205
 msgid "This matrix is imputed"
 msgstr ""
 
@@ -26989,7 +27583,7 @@ msgstr ""
 msgid "This user is currently inactive."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4126
+#: app/templates/forms/entry_form/entry_form.html:4125
 msgid "This value is prefilled and cannot be modified here."
 msgstr ""
 
@@ -27088,7 +27682,7 @@ msgstr ""
 msgid "Thumbnail generated successfully!"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1100
+#: app/templates/admin/user_management/user_form.html:1111
 #: app/templates/notifications/_preferences_form.html:35
 msgid "Thursday"
 msgstr ""
@@ -27102,7 +27696,7 @@ msgstr ""
 msgid "Tick boxes"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:596
+#: app/templates/forms/entry_form/partials/matrix_table.html:604
 msgid "Tick for"
 msgstr ""
 
@@ -27130,7 +27724,7 @@ msgstr ""
 msgid "Time (Local Time)"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1108
+#: app/templates/admin/user_management/user_form.html:1119
 msgid "Time (local)"
 msgstr ""
 
@@ -27266,6 +27860,18 @@ msgstr ""
 msgid "Too many failed login attempts. Please try again later."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:114
+msgid "Took part in every completed round"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:106
+msgid "Took part in every round"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:115
+msgid "Took part in some rounds only"
+msgstr ""
+
 #: app/templates/admin/ai/_trace_card.html:417
 #: app/templates/admin/ai/conversation_traces.html:220
 msgid "Tool"
@@ -27325,8 +27931,8 @@ msgstr ""
 #: app/templates/forms/entry_form/export_pdf.html:462
 #: app/templates/forms/entry_form/export_pdf.html:564
 #: app/templates/forms/entry_form/partials/matrix_table.html:78
-#: app/templates/forms/entry_form/partials/matrix_table.html:424
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:482
+#: app/templates/forms/entry_form/partials/matrix_table.html:430
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:483
 #: app/templates/notifications/center.html:61
 msgid "Total"
 msgstr ""
@@ -27441,7 +28047,7 @@ msgstr ""
 msgid "Total expenditure"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:434
+#: app/templates/forms/entry_form/partials/matrix_table.html:440
 msgid "Total for column"
 msgstr ""
 
@@ -27568,7 +28174,7 @@ msgstr ""
 msgid "Trainings"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:510
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:562
 msgid "Transformed form_data rows"
 msgstr ""
 
@@ -27687,7 +28293,7 @@ msgstr ""
 msgid "Translation Progress"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:373
+#: app/templates/admin/user_management/user_form.html:384
 msgid "Translation Review"
 msgstr ""
 
@@ -27896,7 +28502,7 @@ msgstr ""
 msgid "Translations saved."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:433
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:434
 msgid "Treat blanks as zero in + − × ÷"
 msgstr ""
 
@@ -27928,7 +28534,7 @@ msgstr ""
 msgid "Try selecting a different template."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1098
+#: app/templates/admin/user_management/user_form.html:1109
 #: app/templates/notifications/_preferences_form.html:33
 msgid "Tuesday"
 msgstr ""
@@ -27968,7 +28574,7 @@ msgstr ""
 #: app/templates/admin/security/event_detail.html:83
 #: app/templates/admin/settings/manage_settings.html:1528
 #: app/templates/admin/templates/data_sync_imputation.html:261
-#: app/templates/admin/user_management/user_form.html:1136
+#: app/templates/admin/user_management/user_form.html:1147
 #: app/templates/components/_builder_items.html:49
 #: app/templates/components/_builder_items.html:72
 #: app/templates/components/_builder_items.html:86
@@ -27995,7 +28601,7 @@ msgstr ""
 msgid "Type"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:499
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:500
 msgid "Type [ to insert a variable, e.g. [assignment_period]."
 msgstr ""
 
@@ -28026,11 +28632,11 @@ msgstr ""
 msgid "Type not set on this item"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:661
+#: app/templates/forms/entry_form/partials/matrix_table.html:669
 msgid "Type to search for rows to add..."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4062
+#: app/templates/forms/entry_form/entry_form.html:4061
 msgid "Type to search indicators..."
 msgstr ""
 
@@ -28057,7 +28663,7 @@ msgstr ""
 msgid "UPR"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:696
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:724
 #: plugins/upr/templates/upr/_excel_modals.html:5
 #: plugins/upr/templates/upr/_excel_modals.html:12
 msgid "UPR Country Reporting"
@@ -28090,7 +28696,7 @@ msgstr ""
 msgid "UPR tools"
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:613
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:618
 msgid "URL / path"
 msgstr ""
 
@@ -28166,6 +28772,12 @@ msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:48
 msgid "Unchanged"
+msgstr ""
+
+#: app/templates/forms/entry_form/export_pdf.html:313
+#: app/templates/forms/entry_form/partials/matrix_table.html:142
+#: app/templates/forms/entry_form/partials/matrix_table.html:143
+msgid "Unchanged carried forward value"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:304
@@ -28343,7 +28955,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:1302
 #: app/templates/forms/entry_form/entry_form.html:2241
 #: app/templates/forms/entry_form/entry_form.html:2249
-#: app/templates/forms/entry_form/entry_form.html:4056
+#: app/templates/forms/entry_form/entry_form.html:4055
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:156
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:164
 #: app/utils/form_localization.py:244 app/utils/form_localization.py:251
@@ -28413,7 +29025,7 @@ msgstr ""
 msgid "Unread"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:378
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:370
 msgid "Unrecognised round codes ignored: "
 msgstr ""
 
@@ -28524,7 +29136,7 @@ msgstr ""
 #: app/templates/admin/settings/manage_settings.html:524
 #: app/templates/admin/settings/manage_settings.html:569
 #: app/templates/forms/entry_form/entry_form.html:3142
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:609
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:614
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:29
 #: plugins/upr/templates/admin/_upr_guidance_panel.html:33
 #: plugins/upr/templates/macros/unified_country_plan_excel_instructions.html:24
@@ -28619,8 +29231,8 @@ msgstr ""
 msgid "Upload complete!"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:785
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:824
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:813
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:852
 #: plugins/upr/templates/admin/_upr_guidance_script.html:11
 msgid "Upload failed"
 msgstr ""
@@ -28723,7 +29335,7 @@ msgstr ""
 msgid "Uploading..."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:775
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:803
 msgid "Uploading…"
 msgstr ""
 
@@ -28857,8 +29469,16 @@ msgid ""
 "evidence from reports and plans."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4045
+#: app/templates/forms/entry_form/entry_form.html:4044
 msgid "Use the button to add indicators to this section."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:522
+msgid "Use this background and text colour on the column titles in this group"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:526
+msgid "Use this background and text colour on the data cells in this group"
 msgstr ""
 
 #: app/templates/tours/tours.html:55
@@ -29162,7 +29782,7 @@ msgstr ""
 msgid "Valid KoBo data export"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:727
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:755
 msgid "Valid UPR workbook"
 msgstr ""
 
@@ -29259,7 +29879,7 @@ msgstr ""
 msgid "Validation failed. Please check the form."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:742
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:770
 msgid "Validation failed. Please choose a different file."
 msgstr ""
 
@@ -29316,7 +29936,7 @@ msgstr ""
 msgid "Value"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:610
+#: app/templates/forms/entry_form/partials/matrix_table.html:618
 msgid "Value for"
 msgstr ""
 
@@ -29340,11 +29960,11 @@ msgstr ""
 msgid "Variable column tooltip labels"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:559
+#: app/templates/forms/entry_form/partials/matrix_table.html:567
 msgid "Variable tick for"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:578
+#: app/templates/forms/entry_form/partials/matrix_table.html:586
 msgid "Variable value for"
 msgstr ""
 
@@ -29595,12 +30215,16 @@ msgstr ""
 msgid "View as"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:153
+msgid "View as table"
+msgstr ""
+
 #: app/templates/admin/assignments/assignments.html:28
 msgid "View assignments on timeline"
 msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:704
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:635
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:663
 msgid "View change log"
 msgstr ""
 
@@ -29617,6 +30241,10 @@ msgstr ""
 #: app/templates/forms/entry_form/partials/discussion_panel.html:37
 #: app/templates/forms/entry_form/partials/discussion_panel.html:95
 msgid "View discussion"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:57
+msgid "View every country by round"
 msgstr ""
 
 #: app/templates/admin/communication/center.html:32
@@ -29720,7 +30348,7 @@ msgid ""
 "published value."
 msgstr ""
 
-#: app/utils/form_localization.py:123
+#: app/utils/form_localization.py:123 plugins/upr/analysis_labels.py:71
 msgid "Volunteers"
 msgstr ""
 
@@ -29730,6 +30358,12 @@ msgstr ""
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:207
 msgid "Volunteers, 3-year mean"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:45
+msgid ""
+"Volunteers, staff, branches and local units reported by host National "
+"Societies."
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:427
@@ -29783,7 +30417,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/import_change_log.html:66
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:535
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:570
 msgid "Warnings"
 msgstr ""
 
@@ -29846,7 +30480,7 @@ msgstr ""
 msgid "Website Management"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1099
+#: app/templates/admin/user_management/user_form.html:1110
 #: app/templates/notifications/_preferences_form.html:34
 msgid "Wednesday"
 msgstr ""
@@ -29855,7 +30489,7 @@ msgstr ""
 msgid "Weekly Digest"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1084
+#: app/templates/admin/user_management/user_form.html:1095
 msgid "Weekly digest"
 msgstr ""
 
@@ -29926,17 +30560,24 @@ msgid ""
 "system managers and admins — add them explicitly)."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:440
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:441
 msgid ""
 "When checked, people filling the form cannot type over this result. "
 "Uncheck to let them replace the calculated number."
 msgstr ""
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:448
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:449
 msgid ""
 "When checked, the calculated value is saved with the form and restored "
 "when the form is reopened. When unchecked, the value is always "
 "recalculated and not stored."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:161
+msgid ""
+"When checked, the user receives a welcome email at the address above as "
+"soon as you save, with a link to the platform and how to get started. "
+"Uncheck it to create the account silently."
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:295
@@ -29985,7 +30626,7 @@ msgid ""
 "Focal points cannot change it."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:1113
+#: app/templates/admin/user_management/user_form.html:1124
 msgid "When to send the digest email."
 msgstr ""
 
@@ -30108,11 +30749,11 @@ msgid ""
 "pass."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:799
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:827
 msgid "Workbook analysis timed out. Please try uploading again."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:391
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:383
 msgid "Workbook notes"
 msgstr ""
 
@@ -30184,6 +30825,7 @@ msgstr ""
 #: app/templates/macros/year_picker.html:24
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:71
 #: plugins/fdrs/templates/service_income/tab_panel.html:72
+#: plugins/upr/analysis_labels.py:62
 msgid "Year"
 msgstr ""
 
@@ -30374,7 +31016,7 @@ msgstr ""
 msgid "You can select multiple countries and submit all requests at once."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:250
+#: app/templates/admin/user_management/user_form.html:261
 msgid "You cannot modify your own roles. Please ask a System Manager."
 msgstr ""
 
@@ -30565,7 +31207,7 @@ msgid ""
 msgstr ""
 
 #: app/routes/auth.py:397
-#: app/templates/admin/user_management/user_form.html:807
+#: app/templates/admin/user_management/user_form.html:818
 msgid "Your session has expired."
 msgstr ""
 
@@ -30637,11 +31279,11 @@ msgstr ""
 
 #: app/templates/admin/api_management.html:625
 #: app/templates/admin/api_management.html:626
-#: app/templates/forms/entry_form/partials/matrix_table.html:535
-#: app/templates/forms/entry_form/partials/matrix_table.html:559
-#: app/templates/forms/entry_form/partials/matrix_table.html:578
-#: app/templates/forms/entry_form/partials/matrix_table.html:596
-#: app/templates/forms/entry_form/partials/matrix_table.html:610
+#: app/templates/forms/entry_form/partials/matrix_table.html:543
+#: app/templates/forms/entry_form/partials/matrix_table.html:567
+#: app/templates/forms/entry_form/partials/matrix_table.html:586
+#: app/templates/forms/entry_form/partials/matrix_table.html:604
+#: app/templates/forms/entry_form/partials/matrix_table.html:618
 #: plugins/fdrs/templates/compliance/tab_panel.html:586
 msgid "and"
 msgstr ""
@@ -30649,6 +31291,11 @@ msgstr ""
 #: app/templates/admin/ai/knowledge_base.html:651
 #, python-brace-format
 msgid "and {count} more"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:172
+#, python-brace-format
+msgid "and {n} more"
 msgstr ""
 
 #: app/templates/admin/user_management/access_requests.html:491
@@ -30667,15 +31314,6 @@ msgstr ""
 msgid "are ignored."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:517
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:558
-msgid "assigned form"
-msgstr ""
-
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:409
-msgid "assigned form(s)"
-msgstr ""
-
 #: app/templates/core/dashboard/_assignments_tab.html:91
 #: app/templates/core/dashboard/_assignments_tab.html:99
 msgid "at"
@@ -30690,11 +31328,11 @@ msgid "at:"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:1518
-#: app/templates/forms/entry_form/entry_form.html:4067
+#: app/templates/forms/entry_form/entry_form.html:4066
 msgid "available"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4068
+#: app/templates/forms/entry_form/entry_form.html:4067
 msgid "available in"
 msgstr ""
 
@@ -30736,10 +31374,6 @@ msgstr ""
 msgid "campaigns"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:519
-msgid "clears"
-msgstr ""
-
 #: app/routes/admin/assignment_management.py:215
 msgid "closed"
 msgstr ""
@@ -30775,7 +31409,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:2861
 #: app/templates/admin/user_management/users.html:379
 #: app/templates/admin/validation_questions.html:274
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:687
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:715
 msgid "countries"
 msgstr ""
 
@@ -31016,13 +31650,17 @@ msgstr ""
 msgid "failed."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4069
+#: app/templates/forms/entry_form/entry_form.html:4068
 msgid "filtered by"
 msgstr ""
 
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:48
 #: app/templates/admin/communication/registry.html:47
 msgid "filtered from"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:83
+msgid "first year"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:1122
@@ -31039,7 +31677,7 @@ msgstr ""
 msgid "form items loaded"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4066
+#: app/templates/forms/entry_form/entry_form.html:4065
 msgid "found"
 msgstr ""
 
@@ -31102,12 +31740,12 @@ msgstr ""
 msgid "indexed"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4065
+#: app/templates/forms/entry_form/entry_form.html:4064
 #: plugins/pb_progress/templates/pb_progress/manage.html:240
 msgid "indicators"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4063
+#: app/templates/forms/entry_form/entry_form.html:4062
 msgid "indicators available"
 msgstr ""
 
@@ -31268,10 +31906,6 @@ msgstr ""
 msgid "non-compliant countries have compliance documents pending validation."
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:520
-msgid "non-reported PNS assignment(s)"
-msgstr ""
-
 #: app/templates/auth/login.html:767
 msgid "not registered"
 msgstr ""
@@ -31291,7 +31925,7 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:68
 #: app/templates/components/pagination.html:59
 #: app/templates/core/dashboard/_assignments_tab.html:640
-#: app/templates/forms/entry_form/entry_form.html:4024
+#: app/templates/forms/entry_form/entry_form.html:4023
 msgid "of"
 msgstr ""
 
@@ -31301,6 +31935,11 @@ msgstr ""
 #: app/templates/admin/ai/knowledge_base.html:97
 #, python-format
 msgid "of %(total)s in knowledge base"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:107
+#, python-brace-format
+msgid "of {n} completed rounds"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:133
@@ -31417,7 +32056,7 @@ msgstr ""
 msgid "public 403s unexpected"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:386
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:378
 msgid "published form items not resolved — "
 msgstr ""
 
@@ -31475,7 +32114,7 @@ msgstr ""
 msgid "results"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:703
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:731
 msgid "rounds"
 msgstr ""
 
@@ -31489,7 +32128,7 @@ msgstr ""
 #: app/templates/admin/templates/kobo_data_import.html:1160
 #: app/templates/components/_builder_items.html:100
 #: app/templates/forms/form_builder/partials/_sections_container.html:509
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:686
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:714
 msgid "rows"
 msgstr ""
 
@@ -31629,7 +32268,7 @@ msgstr ""
 msgid "suspicious"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:408
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:398
 msgid "target(s)"
 msgstr ""
 
@@ -31653,7 +32292,7 @@ msgstr ""
 msgid "to"
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:265
+#: app/templates/admin/user_management/user_form.html:276
 msgid "to fix."
 msgstr ""
 
@@ -31721,11 +32360,11 @@ msgstr ""
 msgid "undocumented"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:533
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:568
 msgid "unique"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:4054
+#: app/templates/forms/entry_form/entry_form.html:4053
 msgid "unlimited"
 msgstr ""
 
@@ -31761,6 +32400,11 @@ msgstr ""
 msgid "validation questions answered"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:82
+#, python-brace-format
+msgid "vs {year}"
+msgstr ""
+
 #: app/templates/components/_builder_items.html:127
 #: app/templates/forms/form_builder/partials/_sections_container.html:581
 msgid "width"
@@ -31774,7 +32418,7 @@ msgstr ""
 msgid "will be translated (overwriting existing translations)."
 msgstr ""
 
-#: app/templates/admin/user_management/user_form.html:803
+#: app/templates/admin/user_management/user_form.html:814
 msgid "will be unassigned"
 msgstr ""
 
@@ -31782,11 +32426,7 @@ msgstr ""
 msgid "with a service-income figure"
 msgstr ""
 
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:521
-msgid "with data"
-msgstr ""
-
-#: plugins/upr/templates/admin/_upr_excel_import_script.html:411
+#: plugins/upr/templates/admin/_upr_excel_import_script.html:399
 msgid "workbook rows"
 msgstr ""
 
@@ -31798,6 +32438,11 @@ msgstr ""
 #: app/templates/core/dashboard/_admin_panel.html:690
 #: app/templates/core/dashboard/_assignments_tab.html:666
 msgid "yet."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:105
+#, python-brace-format
+msgid "{both} of {plan} that planned also reported"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1434

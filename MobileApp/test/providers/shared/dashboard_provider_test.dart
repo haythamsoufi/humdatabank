@@ -85,26 +85,20 @@ DashboardData _dashboardWithAssignment(int id, String name) {
 }
 
 class _FakeDashboardRepository implements DashboardRepository {
-  _FakeDashboardRepository({
-    this.apiData,
-    this.validCache,
-    this.staleCache,
-  });
+  _FakeDashboardRepository({this.staleCache});
 
-  final DashboardData? apiData;
-  final DashboardData? validCache;
   final DashboardData? staleCache;
   final List<bool> cacheRequests = [];
 
   @override
-  Future<DashboardData?> loadDashboardFromApi({Entity? entity}) async => apiData;
+  Future<DashboardData?> loadDashboardFromApi({Entity? entity}) async => null;
 
   @override
   Future<DashboardData?> loadDashboardFromCache({
     bool ignoreExpiry = false,
   }) async {
     cacheRequests.add(ignoreExpiry);
-    return ignoreExpiry ? staleCache ?? validCache : validCache;
+    return ignoreExpiry ? staleCache : null;
   }
 
   @override

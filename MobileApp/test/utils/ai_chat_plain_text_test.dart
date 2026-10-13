@@ -10,7 +10,7 @@ void main() {
           '<summary class="cursor-pointer">Sources</summary>'
           '<div class="chat-response-sources-body mt-2">- '
           '<a href="/api/ai/documents/1156/download" target="_blank">Kenya 2024 Unified Plan - page 1</a>'
-          ": extracted UPR KPI &#39;branches&#39; = 47 (confidence 0.93).</div>"
+          ': extracted UPR KPI &#39;branches&#39; = 47 (confidence 0.93).</div>'
           '</details></strong></p>';
 
       final text = aiChatHtmlToPlainText(html);

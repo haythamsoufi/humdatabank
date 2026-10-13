@@ -5,7 +5,9 @@
  * Printing the live DOM rather than rasterising it keeps the ApexCharts SVG
  * sharp and the text selectable, and the report looks exactly like the tab. Pages
  * are fixed-size (210x297mm) so the charts get an explicit width, and blocks are
- * moved to a new page as soon as they no longer fit. */
+ * moved to a new page as soon as they no longer fit. On a narrow screen the
+ * preview is scaled down to the width of the phone; printing clears that scale
+ * so the PDF stays A4. */
 (function (global) {
     'use strict';
 
@@ -168,8 +170,10 @@
         toolbar.appendChild(actions);
         overlay.appendChild(toolbar);
 
+        var frame = node('div', 'upri-report__frame');
         var pagesEl = node('div', 'upri-report__pages');
-        overlay.appendChild(pagesEl);
+        frame.appendChild(pagesEl);
+        overlay.appendChild(frame);
 
         var opener = document.activeElement;
         document.body.appendChild(overlay);
@@ -185,15 +189,40 @@
         var charts = root.charts.mountAll(plots, { animate: false });
         overlay.focus();
 
+        // The pages stay 210mm wide so pagination does not change. A transform
+        // only shrinks the preview; print CSS and beforeprint remove it.
+        var GUTTER = 16;
+
+        function fit() {
+            var page = pagesEl.querySelector('.upri-page');
+            if (!page) return;
+            var natural = page.offsetWidth;
+            var avail = overlay.clientWidth - GUTTER;
+            if (!natural || avail <= 0) return;
+            var scale = Math.min(1, avail / natural);
+            var height = pagesEl.offsetHeight;
+            pagesEl.style.width = natural + 'px';
+            pagesEl.style.transform = 'translateX(-50%) scale(' + scale + ')';
+            frame.style.height = Math.ceil(height * scale) + 'px';
+        }
+
         function settle() {
             if (current !== api) return;
             reflow(pagesEl);
             addFooters(pagesEl, options.title || '', ui);
+            fit();
         }
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
 
+        function beforePrint() {
+            pagesEl.style.transform = 'none';
+            frame.style.height = 'auto';
+        }
+
         function print() {
+            beforePrint();
             global.print();
+            fit();
         }
 
         function onKey(event) {
@@ -206,6 +235,10 @@
         printBtn.addEventListener('click', print);
         closeBtn.addEventListener('click', function () { api.close(); });
         document.addEventListener('keydown', onKey, true);
+        global.addEventListener('resize', fit);
+        global.addEventListener('beforeprint', beforePrint);
+        global.addEventListener('afterprint', fit);
+        fit();
 
         var api = {
             print: print,
@@ -214,6 +247,9 @@
             },
             close: function () {
                 document.removeEventListener('keydown', onKey, true);
+                global.removeEventListener('resize', fit);
+                global.removeEventListener('beforeprint', beforePrint);
+                global.removeEventListener('afterprint', fit);
                 charts.forEach(function (chart) {
                     try { chart.destroy(); } catch (e) { /* noop */ }
                 });

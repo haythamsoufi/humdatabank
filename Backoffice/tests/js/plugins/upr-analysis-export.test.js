@@ -639,6 +639,41 @@ describe('with a stubbed ApexCharts', () => {
             print.mockRestore();
         });
 
+        it('scales the preview to a phone without shrinking the pages themselves', () => {
+            const offsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+            const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+            const clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+            const box = (el) => {
+                if (el.classList.contains('upri-page')) return { w: 794, h: 1123 };
+                if (el.classList.contains('upri-report__pages')) return { w: 794, h: 4000 };
+                return { w: 0, h: 0 };
+            };
+            Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return box(this).w; } });
+            Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return box(this).h; } });
+            Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+                configurable: true,
+                get() { return this.classList.contains('upri-report') ? 390 : 0; },
+            });
+            const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+            try {
+                A.report.open(outline(), { ui: UI });
+                const pages = document.querySelector('.upri-report__pages');
+                const frame = document.querySelector('.upri-report__frame');
+                const scale = (390 - 16) / 794;
+                expect(pages.style.width).toBe('794px');
+                expect(Number(pages.style.transform.match(/scale\(([^)]+)\)/)[1])).toBeCloseTo(scale, 4);
+                expect(Number(frame.style.height.replace('px', ''))).toBe(Math.ceil(4000 * scale));
+                expect(document.querySelector('.upri-page').style.width).toBe('');
+                document.querySelector('.upri-report__bar .upri-btn--primary').click();
+                expect(pages.style.transform).toContain(`scale(${scale})`);
+            } finally {
+                print.mockRestore();
+                if (offsetWidth) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidth);
+                if (offsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
+                if (clientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidth);
+            }
+        });
+
         it('closes on Escape and from the toolbar', () => {
             A.report.open(outline(), { ui: UI });
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));

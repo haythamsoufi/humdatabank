@@ -135,6 +135,11 @@ window.UprImpactConfig = {
     dataUrl: {{ url_for('upr.impact_data')|tojson }},
     narrativeUrl: {{ url_for('upr.impact_narrative')|tojson }},
     logoUrl: {{ url_for('static', filename='IFRC_logo_square.svg')|tojson }},
+    pdf: {
+        html2canvas: {{ url_for('static', filename='libs/html2canvas.min.js')|tojson }},
+        jspdf: {{ url_for('static', filename='js/forms/lib/jspdf.umd.min.js')|tojson }},
+        nonce: {{ csp_nonce()|tojson }}
+    },
     ui: {{ upr_analysis_ui()|tojson }}
 };
 </script>

@@ -6395,6 +6395,10 @@ msgstr ""
 msgid "Could not create the template. Please try again."
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:161
+msgid "Could not create the PDF. Try again."
+msgstr ""
+
 #: app/routes/admin/system_admin/indicator_lookups.py:370
 msgid "Could not create type."
 msgstr ""
@@ -13559,12 +13563,6 @@ msgstr ""
 msgid "In row total"
 msgstr ""
 
-#: plugins/upr/analysis_labels.py:159
-msgid ""
-"In the print dialog choose “Save as PDF”, paper size A4, margins None, "
-"and turn off headers and footers."
-msgstr ""
-
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:365
 msgid "In the workbook but never imported (live or later rounds): "
 msgstr ""
@@ -20313,6 +20311,10 @@ msgstr ""
 msgid "Prefilled value"
 msgstr ""
 
+#: plugins/upr/analysis_labels.py:160
+msgid "Preparing PDF…"
+msgstr ""
+
 #: app/templates/forms/entry_form/entry_form.html:559
 #: app/templates/forms/form_builder/form_builder.html:237
 msgid "Preparing components. Please wait."
@@ -20520,10 +20522,6 @@ msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:130
 msgid "Print"
-msgstr ""
-
-#: plugins/upr/analysis_labels.py:158
-msgid "Print or save as PDF"
 msgstr ""
 
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:129
@@ -23130,6 +23128,10 @@ msgstr ""
 msgid ""
 "Saved value is no longer in the current list. It will still be submitted "
 "unless you choose another option."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:159
+msgid "Saves an A4 PDF of these pages."
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:221

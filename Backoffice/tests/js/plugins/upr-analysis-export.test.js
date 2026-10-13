@@ -454,6 +454,7 @@ describe('with a stubbed ApexCharts', () => {
             expect(document.querySelector('.upri-deck').getAttribute('aria-label')).toBe('Deck');
             expect(active().classList.contains('upri-slide--cover')).toBe(true);
             expect(document.querySelector('.upri-deck__counter').textContent).toBe(`1 / ${deck.count}`);
+            expect(document.querySelector('.upri-deck').classList.contains('is-on-cover')).toBe(true);
             expect(document.body.classList.contains('upri-locked')).toBe(true);
         });
 
@@ -480,6 +481,7 @@ describe('with a stubbed ApexCharts', () => {
             const next = document.querySelector('.upri-deck__next');
             expect(prev.disabled).toBe(true);
             press('ArrowRight');
+            expect(document.querySelector('.upri-deck').classList.contains('is-on-cover')).toBe(false);
             press(' ');
             expect(document.querySelector('.upri-deck__counter').textContent).toBe(`3 / ${deck.count}`);
             press('ArrowLeft');

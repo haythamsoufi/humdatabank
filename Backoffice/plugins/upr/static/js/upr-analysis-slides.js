@@ -117,12 +117,13 @@
         if (typeof overlay.requestFullscreen === 'function') tools.appendChild(full);
         tools.appendChild(closeBtn);
         bar.appendChild(tools);
-        overlay.appendChild(bar);
+        // Inside the stage, so the controls stay on the slide when it is letterboxed.
+        stage.appendChild(bar);
 
         var progress = node('div', 'upri-deck__progress');
         var progressFill = node('span');
         progress.appendChild(progressFill);
-        overlay.appendChild(progress);
+        stage.appendChild(progress);
 
         var opener = document.activeElement;
         document.body.appendChild(overlay);
@@ -168,6 +169,7 @@
                 slide.element.classList.toggle('is-active', active);
                 slide.element.setAttribute('aria-hidden', active ? 'false' : 'true');
             });
+            overlay.classList.toggle('is-on-cover', slides[index].element.classList.contains('upri-slide--cover'));
             refresh();
         }
 
@@ -208,9 +210,26 @@
             refresh();
         }
 
+        // Scale the 16:9 stage to the whole overlay. When it already matches the
+        // screen, cover a fractional pixel so the dark deck cannot show as a line.
         function fit() {
-            var scale = Math.min(viewport.clientWidth / STAGE.width, viewport.clientHeight / STAGE.height);
+            var w = viewport.clientWidth;
+            var h = viewport.clientHeight;
+            if (!w || !h) return;
+            var scaleX = w / STAGE.width;
+            var scaleY = h / STAGE.height;
+            var scale = Math.min(scaleX, scaleY);
+            if (w - STAGE.width * scale < 2 && h - STAGE.height * scale < 2) scale = Math.max(scaleX, scaleY);
             stage.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+        }
+
+        function syncFullscreen() {
+            var on = document.fullscreenElement === overlay;
+            var icon = full.querySelector('i');
+            if (icon) icon.className = 'fas ' + (on ? 'fa-compress' : 'fa-expand');
+            full.setAttribute('aria-pressed', on ? 'true' : 'false');
+            fit();
+            if (typeof global.requestAnimationFrame === 'function') global.requestAnimationFrame(fit);
         }
 
         function onKey(event) {
@@ -275,7 +294,7 @@
         closeBtn.addEventListener('click', function () { api.close(); });
         document.addEventListener('keydown', onKey, true);
         global.addEventListener('resize', fit);
-        document.addEventListener('fullscreenchange', fit);
+        document.addEventListener('fullscreenchange', syncFullscreen);
 
         fit();
         go(0);
@@ -291,7 +310,7 @@
             close: function () {
                 document.removeEventListener('keydown', onKey, true);
                 global.removeEventListener('resize', fit);
-                document.removeEventListener('fullscreenchange', fit);
+                document.removeEventListener('fullscreenchange', syncFullscreen);
                 charts.forEach(function (chart) {
                     try { chart.destroy(); } catch (e) { /* noop */ }
                 });

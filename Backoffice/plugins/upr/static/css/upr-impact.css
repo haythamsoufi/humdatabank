@@ -1,4 +1,6 @@
 /* Analysis tab — Data Explorer. Plain CSS so it needs no Tailwind rebuild. */
+/* Chart colours come from the view (plugins/upr/analysis_spec.py COLORS); these
+ * variables only style the page chrome around the charts. */
 :root {
     --upri-navy: #011e41;
     --upri-red: #f5333f;
@@ -209,7 +211,7 @@
 .upri-chart {
     min-height: 18rem;
 }
-#upri-chart-capacity.upri-cap-grid {
+.upri-cap-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.5rem 2rem;
@@ -239,7 +241,7 @@
     display: none;
 }
 @media (max-width: 700px) {
-    #upri-chart-capacity.upri-cap-grid {
+    .upri-cap-grid {
         grid-template-columns: 1fr;
     }
 }

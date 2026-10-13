@@ -697,6 +697,90 @@ def upr_pns_import_item_ids(ctx: UprImportContext, template_id: int) -> Set[int]
     return set()
 
 
+def reported_pns_aes_in_scope(
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    rounds: Optional[Set[str]] = None,
+) -> Set[int]:
+    """PNS assignments in this import that received workbook data and should be approved."""
+    out: Set[int] = set()
+    template_reported = (
+        (22, ctx.pns_t22_reported_aes),
+        (23, ctx.pns_t23_reported_aes),
+    )
+    for tpl_id, reported_aes in template_reported:
+        if tpl_id not in template_ids:
+            continue
+        scope = pns_clear_periods_for_template(tpl_id, rounds)
+        for (period, _iso3), aes_id in ctx.assignment_by_template.get(tpl_id, {}).items():
+            if period not in scope:
+                continue
+            if int(aes_id) in reported_aes:
+                out.add(int(aes_id))
+    return out
+
+
+def apply_reported_pns_approvals(
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    rounds: Optional[Set[str]] = None,
+    dry_run: bool = False,
+    user_id: Optional[int] = None,
+) -> Dict[str, int]:
+    """Mark PNS assignments that received imported data as approved."""
+    from app.extensions import db
+    from app.models.assignments import AssignmentEntityStatus
+    from app.models.enums import AssignmentEntityStatusValue
+    from app.services.assignments.workflow_service import apply_entity_status_change
+    from app.utils.datetime_helpers import utcnow
+
+    stats = {"approved": 0, "skipped": 0, "errors": 0}
+    aes_ids = sorted(reported_pns_aes_in_scope(ctx, template_ids, rounds=rounds))
+    if not aes_ids:
+        return stats
+
+    if dry_run:
+        rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
+    else:
+        from app.utils.form_authorization import lock_aes_rows_for_update
+
+        rows = lock_aes_rows_for_update(aes_ids)
+    found = {int(row.id): row for row in rows}
+    stamp = utcnow()
+    for aes_id in aes_ids:
+        aes = found.get(aes_id)
+        if aes is None:
+            stats["skipped"] += 1
+            continue
+        current = aes.status.value if hasattr(aes.status, "value") else str(aes.status)
+        if current in (
+            AssignmentEntityStatusValue.approved.value,
+            AssignmentEntityStatusValue.cancelled.value,
+        ):
+            stats["skipped"] += 1
+            continue
+        if dry_run:
+            stats["approved"] += 1
+            continue
+        try:
+            apply_entity_status_change(
+                aes,
+                AssignmentEntityStatusValue.approved,
+                user_id,
+                now=stamp,
+            )
+            db.session.add(aes)
+            stats["approved"] += 1
+        except Exception as exc:
+            stats["errors"] += 1
+            logger.error("PNS approval failed (aes_id=%s): %s", aes_id, exc)
+    if not dry_run and stats["approved"] > 0:
+        db.session.commit()
+    return stats
+
+
 def plan_pns_assignment_status_updates(
     ctx: UprImportContext,
     template_ids: List[int],
@@ -804,8 +888,9 @@ def sync_non_reported_pns_assignments(
     *,
     rounds: Optional[Set[str]] = None,
     dry_run: bool = False,
+    user_id: Optional[int] = None,
 ) -> Dict[str, int]:
-    """Clear stale form_data and reset workflow status for non-reported PNS assignments."""
+    """Clear non-reported PNS data, and approve the assignments that received workbook data."""
     clear_stats, updated_sources = clear_non_reported_pns_form_data(
         ctx,
         template_ids,
@@ -818,6 +903,13 @@ def sync_non_reported_pns_assignments(
         rounds=rounds,
     )
     status_stats = apply_pns_pending_status_resets(status_plan, dry_run=dry_run)
+    approve_stats = apply_reported_pns_approvals(
+        ctx,
+        template_ids,
+        rounds=rounds,
+        dry_run=dry_run,
+        user_id=user_id,
+    )
     if not dry_run:
         _refresh_completion_for_aes_ids(
             {int(src[0]) for src in updated_sources}
@@ -844,6 +936,9 @@ def sync_non_reported_pns_assignments(
         "assignment_status_skipped": status_stats.get("skipped", 0),
         "assignment_status_errors": status_stats.get("errors", 0),
         "assignment_status_planned": len(status_plan),
+        "pns_approved": approve_stats.get("approved", 0),
+        "pns_approve_skipped": approve_stats.get("skipped", 0),
+        "pns_approve_errors": approve_stats.get("errors", 0),
     }
 
 
@@ -5201,6 +5296,7 @@ def run_upr_import(
                 tids,
                 rounds=round_set,
                 dry_run=dry_run,
+                user_id=user_id,
             )
             upsert_stats.update(pns_sync_stats)
         upsert_stats.update(summarize_warnings(ctx.warnings))

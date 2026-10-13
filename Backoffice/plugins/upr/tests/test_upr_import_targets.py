@@ -185,9 +185,11 @@ class TestRowFiltering:
 class TestWorkbookRoundStats:
     def test_country_and_pns_templates_are_counted_separately(self):
         rows = [
-            {"Round": "P26", "Section": "NS Data", "ISO3": "JOR", "Entity": "NS"},
-            {"Round": "P26", "Section": "Funding", "ISO3": "JOR", "Entity": "PNS", "NS": "Austrian Red Cross"},
-            {"Round": "P26", "Section": "Funding", "ISO3": "JOR", "Entity": "HNS", "NS": "Country"},
+            {"Round": "P26", "Section": "NS Data", "ISO3": "JOR", "Entity": "NS", "Source": "Country Data"},
+            {"Round": "P26", "Section": "Funding", "ISO3": "JOR", "Entity": "PNS", "NS": "Austrian Red Cross",
+             "Source": "PNS Data"},
+            {"Round": "P26", "Section": "Funding", "ISO3": "JOR", "Entity": "HNS", "NS": "Country",
+             "Source": "Country Data"},
             {"Round": "AR25", "Section": "Funding", "ISO3": "SYR", "Entity": "PNS", "NS": "Austrian Red Cross",
              "Source": "PNS Data"},
             {"Round": "AR25", "Section": "Funding", "ISO3": "SYR", "Entity": "PNS", "NS": "Austrian Red Cross",
@@ -196,8 +198,43 @@ class TestWorkbookRoundStats:
         stats = workbook_round_stats(rows, {"austrian red cross": "AUT"})
         assert stats["P26"][24]["rows"] == 3 and stats["P26"][24]["iso3"] == {"JOR"}
         assert stats["P26"][22]["rows"] == 1 and stats["P26"][22]["ns_names"] == {"austrian red cross"}
+        assert stats["P26"][22]["ns_display"]["austrian red cross"] == "Austrian Red Cross"
         assert stats["AR25"][23]["rows"] == 1  # only Source = PNS Data counts for T23
+        assert stats["AR25"][33]["iso3"] == {"SYR"}  # Country Data row keeps the host in scope
         assert 23 not in stats.get("MYR25", {})
+
+    def test_entities_without_country_or_pns_data_are_not_import_targets(self):
+        rows = [
+            # France the host: partner and IFRC figures only. Not a country-form target.
+            {"Round": "AR25", "Section": "Funding", "ISO3": "FRA", "Entity": "PNS",
+             "NS": "Spanish Red Cross", "Source": "PNS Data"},
+            {"Round": "AR25", "Section": "Funding", "ISO3": "FRA", "Entity": "IFRC Secretariat",
+             "NS": "IFRC Secretariat", "Source": "IFRC System"},
+            # Host-reported mention of French Red Cross does not make France a PNS submission.
+            {"Round": "AR25", "Section": "Funding", "ISO3": "COD", "Entity": "PNS",
+             "NS": "French Red Cross", "Source": "Country Data"},
+            # French Red Cross on PNS Data does.
+            {"Round": "AR25", "Section": "Funding", "ISO3": "COM", "Entity": "PNS",
+             "NS": "French Red Cross", "Source": "PNS Data"},
+            {"Round": "AR25", "Section": "NS Data", "ISO3": "JOR", "Entity": "HNS", "Source": "Country Data"},
+        ]
+        stats = workbook_round_stats(rows, {
+            "spanish red cross": "ESP",
+            "french red cross": "FRA",
+        })
+        assert "FRA" not in stats["AR25"].get(33, {}).get("iso3", set())
+        assert stats["AR25"][33]["iso3"] == {"JOR", "COD"}
+        assert stats["AR25"][23]["ns_names"] == {"spanish red cross", "french red cross"}
+        # Planning PNS counts a society only on its own PNS Data row, not a host's Country Data mention.
+        planning = [
+            {"Round": "P26", "Section": "Funding", "ISO3": "COM", "Entity": "PNS",
+             "NS": "French Red Cross", "Source": "Country Data"},
+            {"Round": "P26", "Section": "Funding", "ISO3": "COM", "Entity": "PNS",
+             "NS": "French Red Cross", "Source": "PNS Data"},
+        ]
+        planning_stats = workbook_round_stats(planning, {"french red cross": "FRA"})
+        assert planning_stats["P26"][22]["ns_names"] == {"french red cross"}
+        assert planning_stats["P26"][22]["rows"] == 1
 
 
 class TestBuildImportPlan:
@@ -245,6 +282,43 @@ class TestBuildImportPlan:
         assert item["status"] == "warning" and item["selectable"]
         assert item["entities_unmatched"] == ["SYR"]
 
+    def test_unmatched_entities_are_country_names_and_not_capped(self):
+        isos = [f"X{i:02d}" for i in range(30)]
+        names = {iso: f"Country {iso}" for iso in isos}
+        item = _item(
+            self._plan(
+                round_stats=_stats("P26", 24, rows=30, iso3=set(isos) | {"JOR"}),
+                af_index=[_af(1, 24, "2026", iso3s={"JOR"})],
+                country_names=names,
+            ),
+            "24:P26",
+        )
+        issue = next(i for i in item["issues"] if i["code"] == "unmatched_entities")
+        assert issue["items"] == [f"Country {iso}" for iso in sorted(isos)]
+        assert item["entities_unmatched"] == issue["items"]
+        assert "form #" not in issue["message"]
+        assert "ISO" not in " ".join(issue["items"])
+
+    def test_pns_unmatched_uses_country_name_not_iso_code(self):
+        stats = _stats("AR25", 23, rows=2, ns_names={"austrian red cross", "swiss red cross"})
+        stats["AR25"][23]["ns_display"] = {
+            "austrian red cross": "Austrian Red Cross",
+            "swiss red cross": "Swiss Red Cross",
+        }
+        item = _item(
+            self._plan(
+                round_stats=stats,
+                af_index=[_af(9, 23, "2025", iso3s={"CHE"})],
+                ns_home_iso3={"austrian red cross": "AUT", "swiss red cross": "CHE"},
+                country_names={"AUT": "Austria", "CHE": "Switzerland"},
+                workbook_rounds=["AR25"],
+            ),
+            "23:AR25",
+        )
+        assert item["entities_unmatched"] == ["Austrian Red Cross (Austria)"]
+        issue = next(i for i in item["issues"] if i["code"] == "unmatched_entities")
+        assert issue["message"] == "1 workbook entity has no assignment and will be skipped."
+
     def test_no_matching_entities_blocks(self):
         item = _item(self._plan(af_index=[_af(1, 24, "2026", iso3s={"LBN"})]), "24:P26")
         assert item["status"] == "blocked"
@@ -254,7 +328,8 @@ class TestBuildImportPlan:
         form = _af(1, 24, "2026", iso3s={"JOR", "SYR"}, counts={"pending": 0, "submitted": 2})
         item = _item(self._plan(af_index=[form]), "24:P26")
         assert item["status"] == "warning"
-        assert any(i["code"] == "existing_progress" for i in item["issues"])
+        issue = next(i for i in item["issues"] if i["code"] == "existing_progress")
+        assert "will replace those saved values" in issue["message"]
 
     def test_round_without_workbook_rows_is_empty_not_selectable(self):
         item = _item(self._plan(round_stats={}), "24:P26")
@@ -307,6 +382,19 @@ class TestBuildImportPlan:
         item = _item(plan, "23:AR25")
         assert item["status"] == "warning"
         assert any(i["code"] == "pns_clear" for i in item["issues"])
+
+    def test_reported_pns_assignments_are_described_as_approved(self):
+        plan = self._plan(
+            round_stats=_stats("AR25", 23, rows=3, ns_names={"austrian red cross"}),
+            af_index=[_af(9, 23, "2025", iso3s={"AUT"})],
+            ns_home_iso3={"austrian red cross": "AUT"},
+            workbook_rounds=["AR25"],
+            pns_clear={"23:AR25": {"aes_total": 1, "aes_to_clear": 0, "aes_with_data": 0, "aes_to_approve": 4}},
+        )
+        item = _item(plan, "23:AR25")
+        issue = next(i for i in item["issues"] if i["code"] == "pns_approve")
+        assert "4 PNS assignments" in issue["message"]
+        assert "marked approved" in issue["message"]
 
 
 class TestVerifyTargets:

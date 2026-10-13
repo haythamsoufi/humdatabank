@@ -44,8 +44,6 @@ STATUS_WARNING = "warning"
 STATUS_BLOCKED = "blocked"
 STATUS_EMPTY = "empty"
 
-_MAX_LISTED = 25
-
 
 class ImportTargetError(ValueError):
     """Raised for illegal, unmapped, or ambiguous import targets."""
@@ -219,15 +217,34 @@ def group_targets(targets: Sequence[ImportTarget]) -> List[TargetGroup]:
 # ── Workbook + database inspection ─────────────────────────────────────────
 
 
+def _country_data_entities(rows: Iterable[Dict[str, Any]]) -> Set[Tuple[str, str]]:
+    """``(round, ISO3)`` pairs that have at least one ``Source = Country Data`` row.
+
+    A host country with only PNS Data, Mix Data, or IFRC System rows did not report
+    for the country form and is not an import target.
+    """
+    found: Set[Tuple[str, str]] = set()
+    for row in rows:
+        rnd = str(row.get("Round") or "").strip().upper()
+        iso3 = str(row.get("ISO3") or "").strip().upper()
+        if rnd and iso3 and imp.parse_upr_source(row) == "country data":
+            found.add((rnd, iso3))
+    return found
+
+
 def workbook_round_stats(
     rows: Iterable[Dict[str, Any]],
     ns_home_iso3: Dict[str, str],
 ) -> Dict[str, Dict[int, Dict[str, Any]]]:
     """Per round and template: rows the importer would read plus the entities they address.
 
-    Country templates (24, 33) are addressed by host ISO3. PNS templates (22, 23) are
-    addressed by the *reporting* NS, which maps to the PNS home country's assignment.
+    Country templates (24, 33) are addressed by host ISO3, and only when that country
+    has at least one ``Country Data`` row in the round. PNS templates (22, 23) are
+    addressed by the reporting National Society on a ``PNS Data`` row — France qualifies
+    only when the NS column says French Red Cross, not because FRA appears as a host.
     """
+    rows = list(rows)
+    country_scope = _country_data_entities(rows)
     stats: Dict[str, Dict[int, Dict[str, Any]]] = {}
     for row in rows:
         rnd = str(row.get("Round") or "").strip().upper()
@@ -244,16 +261,20 @@ def workbook_round_stats(
             if sec not in profile.get("sections", frozenset()):
                 continue
             bucket = stats.setdefault(rnd, {}).setdefault(
-                tid, {"rows": 0, "iso3": set(), "ns_names": set()}
+                tid, {"rows": 0, "iso3": set(), "ns_names": set(), "ns_display": {}}
             )
             if tid in (22, 23):
+                # Host-reported "Country Data" rows name the partner but are not the
+                # partner's own submission. Only PNS Data rows qualify the society.
                 if entity != "PNS" or not ns_name or ns_name.lower() == "country":
                     continue
-                if tid == 23 and not imp.is_pns_data_source(row):
+                if not imp.is_pns_data_source(row):
                     continue
-                bucket["ns_names"].add(ns_name.lower())
+                name_key = ns_name.lower()
+                bucket["ns_names"].add(name_key)
+                bucket["ns_display"].setdefault(name_key, ns_name.strip())
             else:
-                if not iso3:
+                if not iso3 or (rnd, iso3) not in country_scope:
                     continue
                 bucket["iso3"].add(iso3)
             bucket["rows"] += 1
@@ -363,9 +384,27 @@ def template_readiness(ctx: "imp.UprImportContext", template_id: int) -> Dict[st
     }
 
 
-def _capped(values: Iterable[str]) -> List[str]:
-    ordered = sorted(set(values))
-    return ordered[:_MAX_LISTED]
+def _country_label(iso: str, country_names: Dict[str, str]) -> str:
+    """Display name for an ISO3 code. Falls back to the code when the name is unknown."""
+    code = str(iso or "").strip().upper()
+    return (country_names.get(code) or "").strip() or code
+
+
+def _pns_skip_label(
+    name: str,
+    iso: Optional[str],
+    *,
+    display: Dict[str, str],
+    country_names: Dict[str, str],
+) -> str:
+    """Label a skipped partner society by its name and home country, never by ISO code."""
+    shown = (display.get(name) or name).strip()
+    if not iso:
+        return f"{shown} (no home country)"
+    country = (country_names.get(str(iso).strip().upper()) or "").strip()
+    if country:
+        return f"{shown} ({country})"
+    return shown
 
 
 def _issue(level: str, code: str, message: str, **extra: Any) -> Dict[str, Any]:
@@ -384,12 +423,18 @@ def build_import_plan(
     ns_home_iso3: Dict[str, str],
     workbook_rounds: Iterable[str],
     pns_clear: Optional[Dict[str, Dict[str, int]]] = None,
+    country_names: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """Verify every legal ``(template, round)`` target. Pure: no database access.
 
     ``pns_clear`` maps target key → ``{"aes_to_clear", "aes_with_data", "aes_total"}``.
     """
     pns_clear = pns_clear or {}
+    country_names = {
+        str(iso or "").strip().upper(): str(name or "").strip()
+        for iso, name in (country_names or {}).items()
+        if str(iso or "").strip() and str(name or "").strip()
+    }
     present_rounds = sorted({str(r).strip().upper() for r in workbook_rounds if str(r).strip()})
 
     allowed_present = [r for r in present_rounds if imp.is_upr_master_importable_round(r)]
@@ -493,8 +538,8 @@ def build_import_plan(
                         _issue(
                             ISSUE_INFO,
                             "period_alias",
-                            f"Assigned form #{af['id']} is named '{af['period_name']}' and is matched "
-                            f"to {rnd} via canonical period '{period}'.",
+                            f"The assigned period is named '{af['period_name']}' and is matched "
+                            f"to {rnd} via '{period}'.",
                         )
                     )
                 if af["aes_total"] == 0:
@@ -502,15 +547,16 @@ def build_import_plan(
                         _issue(
                             ISSUE_ERROR,
                             "no_entities",
-                            f"Assigned form #{af['id']} has no assigned entities.",
+                            "This form has no assigned entities.",
                         )
                     )
                 # A closed assignment is the normal state of historical rounds, so it is not flagged.
                 if not af["is_active"]:
                     issues.append(
-                        _issue(ISSUE_WARNING, "assigned_form_inactive", f"Assigned form #{af['id']} is paused.")
+                        _issue(ISSUE_WARNING, "assigned_form_inactive", "This assigned form is paused.")
                     )
 
+                display = stat.get("ns_display") or {}
                 if tid in (22, 23):
                     homes: Dict[str, str] = {}
                     unresolved: List[str] = []
@@ -523,17 +569,24 @@ def build_import_plan(
                     keys = set(homes.values())
                     matched = keys & af["iso3s"]
                     missing_assignment = [
-                        f"{name} → {iso}" for name, iso in sorted(homes.items()) if iso not in af["iso3s"]
+                        _pns_skip_label(name, iso, display=display, country_names=country_names)
+                        for name, iso in sorted(homes.items())
+                        if iso not in af["iso3s"]
                     ]
-                    unmatched = [f"{name} (no home country)" for name in sorted(unresolved)] + missing_assignment
+                    unmatched = [
+                        _pns_skip_label(name, None, display=display, country_names=country_names)
+                        for name in sorted(unresolved)
+                    ] + missing_assignment
                     item["entities_in_workbook"] = len(keys) + len(unresolved)
                 else:
                     keys = set(stat["iso3"])
                     matched = keys & af["iso3s"]
-                    unmatched = sorted(keys - af["iso3s"])
+                    unmatched = [
+                        _country_label(iso, country_names) for iso in sorted(keys - af["iso3s"])
+                    ]
                     item["entities_in_workbook"] = len(keys)
                 item["entities_matched"] = len(matched)
-                item["entities_unmatched"] = _capped(unmatched)
+                item["entities_unmatched"] = list(unmatched)
                 item["entities_unmatched_total"] = len(unmatched)
 
                 if stat["rows"] and item["entities_in_workbook"] and not matched:
@@ -541,18 +594,21 @@ def build_import_plan(
                         _issue(
                             ISSUE_ERROR,
                             "no_matching_entities",
-                            f"None of the {item['entities_in_workbook']} workbook entities have an "
-                            f"assignment on form #{af['id']}.",
+                            f"None of the {item['entities_in_workbook']} workbook entities have an assignment "
+                            "and will be skipped.",
+                            items=list(unmatched),
                         )
                     )
                 elif unmatched:
+                    skipped = len(unmatched)
+                    entity_word = "workbook entity" if skipped == 1 else "workbook entities"
+                    verb = "has" if skipped == 1 else "have"
                     issues.append(
                         _issue(
                             ISSUE_WARNING,
                             "unmatched_entities",
-                            f"{len(unmatched)} workbook entities have no assignment on form #{af['id']} "
-                            "and will be skipped.",
-                            items=_capped(unmatched),
+                            f"{skipped} {entity_word} {verb} no assignment and will be skipped.",
+                            items=list(unmatched),
                         )
                     )
 
@@ -564,8 +620,9 @@ def build_import_plan(
                         _issue(
                             ISSUE_WARNING,
                             "existing_progress",
-                            f"{touched} of {af['aes_total']} assignments on form #{af['id']} already have "
-                            f"progress ({parts}); imported values overwrite matching cells.",
+                            f"{touched} of {af['aes_total']} assignments already have "
+                            f"saved data ({parts}). The import will replace those saved values "
+                            "in matching cells.",
                         )
                     )
 
@@ -576,12 +633,21 @@ def build_import_plan(
                         _issue(
                             level,
                             "pns_clear",
-                            f"{clear['aes_to_clear']} PNS assignments on form #{af['id']} have no "
+                            f"{clear['aes_to_clear']} PNS assignments have no "
                             "PNS-reported rows in the workbook; their imported funding/staff data is "
                             f"cleared and status reset to pending ({clear.get('aes_with_data', 0)} currently hold data).",
                         )
                     )
                     item["pns_clear"] = clear
+                if clear and clear.get("aes_to_approve"):
+                    issues.append(
+                        _issue(
+                            ISSUE_INFO,
+                            "pns_approve",
+                            f"{clear['aes_to_approve']} PNS assignments that receive workbook data "
+                            "will be marked approved.",
+                        )
+                    )
 
             has_error = any(i["level"] == ISSUE_ERROR for i in issues)
             has_warning = any(i["level"] == ISSUE_WARNING for i in issues)
@@ -654,6 +720,7 @@ def _compute_pns_clear(
             "aes_total": len(aes_ids),
             "aes_to_clear": len(to_clear),
             "aes_with_data": with_data,
+            "aes_to_approve": len(reported_aes & aes_ids),
         }
     return out
 
@@ -671,24 +738,19 @@ def build_import_plan_from_db(path: str, *, use_row_cache: bool = True) -> Dict[
     round_stats = workbook_round_stats(rows, ctx.ns_home_country_iso3)
     workbook_rounds = {str(r.get("Round") or "").strip().upper() for r in rows}
 
-    plan = build_import_plan(
+    plan_kwargs = dict(
         round_stats=round_stats,
         af_index=af_index,
         readiness=readiness,
         ns_home_iso3=ctx.ns_home_country_iso3,
         workbook_rounds=workbook_rounds,
+        country_names=ctx.country_name_by_iso3,
     )
+    plan = build_import_plan(**plan_kwargs)
     # Second pass adds the PNS "will be cleared" counts (needs DB + full context).
     pns_clear = _compute_pns_clear(rows, ctx, plan["targets"])
     if pns_clear:
-        plan = build_import_plan(
-            round_stats=round_stats,
-            af_index=af_index,
-            readiness=readiness,
-            ns_home_iso3=ctx.ns_home_country_iso3,
-            workbook_rounds=workbook_rounds,
-            pns_clear=pns_clear,
-        )
+        plan = build_import_plan(**plan_kwargs, pns_clear=pns_clear)
     plan["total_rows"] = len(rows)
     return plan
 

@@ -249,6 +249,35 @@ document.addEventListener('DOMContentLoaded', function () {
   // One row per round; columns: Country template | PNS template.
   var COLUMN_OF_TEMPLATE = { 24: 'country', 33: 'country', 22: 'pns', 23: 'pns' };
 
+  var showListLabel = {{ _("Show list")|tojson|safe }};
+
+  function issueBlock(it) {
+    var issues = (it && it.issues) || [];
+    if (!issues.length) return null;
+    var ul = el('ul', 'mt-1 space-y-1');
+    issues.forEach(function (issue) {
+      var li = el('li', 'text-xs ' + (ISSUE_CLASS[issue.level] || ''));
+      appendText(li, issue.message || '');
+      var names = issue.items || [];
+      if (names.length) {
+        var det = document.createElement('details');
+        det.className = 'mt-1';
+        var summary = document.createElement('summary');
+        summary.className = 'cursor-pointer underline';
+        summary.textContent = showListLabel + ' (' + names.length + ')';
+        det.appendChild(summary);
+        var namesUl = el('ul', 'mt-1 ml-5 list-disc space-y-0.5 max-h-96 overflow-y-auto');
+        names.forEach(function (name) {
+          namesUl.appendChild(el('li', '', name));
+        });
+        det.appendChild(namesUl);
+        li.appendChild(det);
+      }
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
   function targetCell(it) {
     var td = el('td', 'px-3 py-2 align-top');
     if (!it) {
@@ -267,13 +296,10 @@ document.addEventListener('DOMContentLoaded', function () {
       onSelectionChanged();
     });
     line.appendChild(cb);
-    var af = it.assigned_form_id ? '#' + it.assigned_form_id : (it.assigned_forms && it.assigned_forms.length ? '#?' : '—');
-    line.appendChild(el('span', 'font-medium', af));
-    var b = badge(it.status);
-    var firstError = (it.issues || []).filter(function (i) { return i.level === 'error'; })[0];
-    if (firstError) b.title = firstError.message;
-    line.appendChild(b);
+    line.appendChild(badge(it.status));
     td.appendChild(line);
+    var issues = issueBlock(it);
+    if (issues) td.appendChild(issues);
     return td;
   }
 
@@ -306,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var table = el('table', 'min-w-full text-sm');
     var thead = el('thead', 'bg-gray-50 text-xs text-gray-600');
     var hr = el('tr', '');
-    [{{ _("Round")|tojson|safe }}, {{ _("Country")|tojson|safe }}, {{ _("PNS")|tojson|safe }}, '']
+    [{{ _("Round")|tojson|safe }}, {{ _("Country")|tojson|safe }}, {{ _("PNS")|tojson|safe }}]
       .forEach(function (h) { hr.appendChild(el('th', 'px-3 py-2 text-left font-medium', h)); });
     thead.appendChild(hr);
     table.appendChild(thead);
@@ -318,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
         lastKind = row.kind;
         var gh = el('tr', 'bg-gray-50');
         var gtd = el('td', 'px-3 py-1 text-xs font-semibold text-gray-700', row.kind);
-        gtd.colSpan = 4;
+        gtd.colSpan = 3;
         gh.appendChild(gtd);
         tbody.appendChild(gh);
       }
@@ -326,41 +352,7 @@ document.addEventListener('DOMContentLoaded', function () {
       tr.appendChild(el('td', 'px-3 py-2 align-top font-medium whitespace-nowrap', row.round + ' → ' + row.period));
       tr.appendChild(targetCell(row.country));
       tr.appendChild(targetCell(row.pns));
-
-      // Warnings / info stay collapsed behind a small toggle.
-      var notes = [];
-      [['Country', row.country], ['PNS', row.pns]].forEach(function (pair) {
-        var it = pair[1];
-        if (!it) return;
-        (it.issues || []).forEach(function (i) { notes.push({ who: pair[0], issue: i, item: it }); });
-      });
-      var toggleTd = el('td', 'px-3 py-2 align-top text-right whitespace-nowrap');
-      tr.appendChild(toggleTd);
       tbody.appendChild(tr);
-      if (!notes.length) return;
-
-      var detailsTr = el('tr', 'hidden');
-      var dtd = el('td', 'px-3 pb-2 text-xs');
-      dtd.colSpan = 4;
-      var ul = el('ul', 'space-y-0.5');
-      notes.forEach(function (n) {
-        var li = el('li', ISSUE_CLASS[n.issue.level] || '',
-          n.who + ' (' + n.item.template_name + ', #' + (n.item.assigned_form_id || '?') + '): ' + n.issue.message);
-        if (n.issue.items && n.issue.items.length) li.title = n.issue.items.join(', ');
-        ul.appendChild(li);
-      });
-      dtd.appendChild(ul);
-      detailsTr.appendChild(dtd);
-      tbody.appendChild(detailsTr);
-
-      var toggle = el('button', 'text-xs text-purple-700 underline', {{ _("Details")|tojson|safe }} + ' (' + notes.length + ')');
-      toggle.type = 'button';
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.addEventListener('click', function () {
-        var open = detailsTr.classList.toggle('hidden') === false;
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      });
-      toggleTd.appendChild(toggle);
     });
     table.appendChild(tbody);
     wrap.appendChild(table);
@@ -401,15 +393,11 @@ document.addEventListener('DOMContentLoaded', function () {
       selectionSummaryEl.classList.add('hidden');
       selectionSummaryEl.replaceChildren();
     } else {
-      var forms = {};
-      items.forEach(function (it) { if (it.assigned_form_id) forms[it.assigned_form_id] = true; });
       var rows = items.reduce(function (n, it) { return n + (it.workbook_rows || 0); }, 0);
       var p = el('p', '');
       p.appendChild(el('strong', '', items.length + ' ' + {{ _("target(s)")|tojson|safe }}));
-      appendText(p, ' → ' + Object.keys(forms).length + ' ' + {{ _("assigned form(s)")|tojson|safe }}
-        + ' (' + Object.keys(forms).map(function (id) { return '#' + id; }).join(', ') + '), '
-        + rows + ' ' + {{ _("workbook rows")|tojson|safe }} + ': '
-        + items.map(function (it) { return it.key; }).join(', '));
+      appendText(p, ', ' + rows + ' ' + {{ _("workbook rows")|tojson|safe }} + ': '
+        + items.map(function (it) { return it.template_name + ' ' + it.round; }).join(', '));
       selectionSummaryEl.replaceChildren(p);
       selectionSummaryEl.classList.remove('hidden');
     }
@@ -594,12 +582,9 @@ document.addEventListener('DOMContentLoaded', function () {
     var chosen = selectedItems();
     var isDry = document.getElementById('upr-dry-run').checked;
     if (!isDry) {
-      var forms = {};
-      chosen.forEach(function (it) { if (it.assigned_form_id) forms[it.assigned_form_id] = true; });
       var msg = {{ _("Import into the database now?")|tojson|safe }} + '\n\n'
         + chosen.map(function (it) {
-            return it.key + ' → ' + {{ _("assigned form")|tojson|safe }} + ' #' + it.assigned_form_id
-              + ' (' + it.template_name + ', ' + it.period + ')';
+            return it.template_name + ' · ' + it.round + ' → ' + it.period;
           }).join('\n');
       if (!window.confirm(msg)) return;
     }

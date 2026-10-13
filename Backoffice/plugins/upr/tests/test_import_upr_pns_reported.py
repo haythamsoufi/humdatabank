@@ -29,6 +29,7 @@ from import_upr_excel_data import (  # noqa: E402
     plan_non_reported_pns_aes_by_template,
     pns_clear_periods_for_template,
     plan_pns_assignment_status_updates,
+    reported_pns_aes_in_scope,
     t23_matrix_has_funding_columns,
     transform_to_import_rows,
     upr_pns_import_item_ids,
@@ -348,6 +349,18 @@ class TestNonReportedPnsPlanning:
             assert by_tpl[23] == {4001}
             plan = plan_pns_assignment_status_updates(ctx, [22, 23], rounds=rounds)
             assert {r["assignment_entity_status_id"] for r in plan} == {3208, 4001}
+
+    def test_reported_assignments_are_approved_and_not_reset(self):
+        ctx = UprImportContext(template_ids=[22, 23])
+        ctx.assignment_by_template = {
+            22: {("2026", "NLD"): 3208, ("2026", "FRA"): 3209},
+            23: {("2025", "AUT"): 4001},
+        }
+        ctx.pns_t22_reported_aes = {3208}
+        ctx.pns_t23_reported_aes = {4001}
+        assert reported_pns_aes_in_scope(ctx, [22, 23], rounds={"P26", "AR25"}) == {3208, 4001}
+        plan = plan_pns_assignment_status_updates(ctx, [22, 23], rounds={"P26", "AR25"})
+        assert {r["assignment_entity_status_id"] for r in plan} == {3209}
 
     def test_explicit_live_round_clears_nothing(self):
         ctx = UprImportContext(template_ids=[23])

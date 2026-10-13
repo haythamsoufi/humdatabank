@@ -1463,12 +1463,18 @@ def _preview_template_impl(template_id):
             # Mirror the AssignedForm columns/relationship most commonly read directly
             # (without getattr) elsewhere — e.g. variable_resolution_service's period-year
             # resolution — so preview mode degrades to the intended "derive year from
-            # period_name" fallback instead of AttributeError. Real bounds aren't known
-            # for a preview period label, so these stay None.
+            # period_name" fallback instead of AttributeError.
             mock_assignment.period_start = None
             mock_assignment.period_end = None
             mock_assignment.period_id = None
             mock_assignment.reporting_period = None
+            # "Preview Period" has no year, so [assignment_year] blanks out and
+            # [[assignment_year]+1] stays literal in table group headers. Until the
+            # viewer picks a period, use the current calendar year.
+            from app.services.forms.variable_resolution_service import VariableResolutionService
+            if VariableResolutionService.get_assignment_year(mock_assignment) is None:
+                from datetime import date
+                mock_assignment.period_end = date(date.today().year, 12, 31)
             self.assigned_form = mock_assignment
 
             self._placeholder_country = TemplatePreparationService.create_preview_mock_country()

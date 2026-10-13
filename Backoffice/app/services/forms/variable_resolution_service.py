@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # surfacing as an empty or inconsistent form:
 #   * results that hit a resolution error are never cached (a transient failure
 #     must not be replayed for the whole TTL),
-#   * preview contexts (no AES id) are never cached (the key would collide
-#     across entities/periods),
+#   * preview contexts (no AES id, or the preview stub's id 0) are never cached
+#     (the key would collide across entities/periods),
 #   * entries are copied on the way in and out so callers can mutate the result.
 # Max 100 entries prevents unbounded growth.
 #
@@ -817,7 +817,9 @@ class VariableResolutionService:
         aes_id = getattr(assignment_entity_status, 'id', None)
         version_id = getattr(template_version, 'id', None) if template_version else None
         _cache_key = (aes_id, version_id, row_entity_id)
-        _cacheable = aes_id is not None
+        # Preview's MockACS uses id 0. None and 0 would share one entry across
+        # every period and entity, so those contexts are resolved fresh.
+        _cacheable = bool(aes_id)
         _cached = _var_cache_get(_cache_key) if _cacheable else None
         if _cached is not None:
             return _cached

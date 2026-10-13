@@ -3427,8 +3427,7 @@
                 or ''
             ) | tojson }},
             "assignment_year": {{ (
-                (get_assignment_year_from_period_name(preview_selected_period_name) if is_preview_mode and preview_selected_period_name is defined and preview_selected_period_name and get_assignment_year_from_period_name is defined else None)
-                or (None if is_preview_mode else (get_assignment_year(assignment_status.assigned_form) if assignment_status and assignment_status.assigned_form and get_assignment_year is defined else None))
+                (get_assignment_year(assignment_status.assigned_form) if assignment_status and assignment_status.assigned_form and get_assignment_year is defined else None)
                 or ''
             ) | tojson }},
             "country_iso": {{ (

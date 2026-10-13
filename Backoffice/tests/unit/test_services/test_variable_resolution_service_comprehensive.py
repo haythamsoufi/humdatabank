@@ -2178,6 +2178,16 @@ class TestResolveVariablesCache:
         assert second['my_var'] == 2
         assert mock_resolve.call_count == 2
 
+    def test_preview_stub_id_zero_is_not_cached(self):
+        """Template preview's MockACS uses id 0, which must not pin one period's variables."""
+        tv = self._tv()
+        with patch.object(VariableResolutionService, '_resolve_single_variable', side_effect=[1, 2]) as mock_resolve:
+            first = self._resolve(self._aes(aes_id=0), tv)
+            second = self._resolve(self._aes(aes_id=0), tv)
+        assert first['my_var'] == 1
+        assert second['my_var'] == 2
+        assert mock_resolve.call_count == 2
+
     def test_cached_dict_is_isolated_from_caller_mutation(self):
         """entry.py adds keys to the resolved dict; that must not leak into later requests."""
         aes, tv = self._aes(), self._tv()

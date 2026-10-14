@@ -187,6 +187,123 @@ class TestAssignmentPdfHelpers:
         assert field['matrix_row_labels']['8'] == 'Eight'
         assert 'matrix_skip_row_sort' not in field
 
+    def test_own_matrix_rows_unioned_for_list_library(self):
+        from app.routes.forms.export import apply_matrix_rows_for_pdf_export
+
+        field = {
+            'kind': 'matrix',
+            'matrix_config': {'row_mode': 'list_library', 'lookup_list_id': ''},
+            'matrix_columns': [{'name': 'People'}],
+            'matrix_rows': [],
+        }
+        with patch(
+            'app.routes.api.assignments._resolve_own_matrix_row_entities',
+            return_value={
+                'entities': [
+                    {'entity_id': 8, 'entity_type': 'country'},
+                    {'entity_id': 42, 'entity_type': 'country'},
+                ],
+                'entity_type': 'country',
+            },
+        ), patch(
+            'app.routes.forms.export._resolve_saved_matrix_row_labels',
+            return_value={'8': 'Eight', '42': 'Forty-two'},
+        ):
+            apply_matrix_rows_for_pdf_export(
+                field, {'8_People': 1}, assignment_entity_status=MagicMock()
+            )
+
+        # Saved row 8 stays first; own-form row 42 is appended, 8 is not duplicated.
+        assert field['matrix_rows'] == ['8', '42']
+        assert field['matrix_row_labels']['42'] == 'Forty-two'
+
+    def test_own_matrix_rows_included_when_no_saved_cells(self):
+        from app.routes.forms.export import apply_matrix_rows_for_pdf_export
+
+        field = {
+            'kind': 'matrix',
+            'matrix_config': {'row_mode': 'list_library', 'lookup_list_id': ''},
+            'matrix_columns': [{'name': 'People'}],
+            'matrix_rows': [],
+        }
+        with patch(
+            'app.routes.api.assignments._resolve_own_matrix_row_entities',
+            return_value={'entities': [{'entity_id': 42, 'entity_type': 'country'}], 'entity_type': 'country'},
+        ), patch(
+            'app.routes.forms.export._resolve_saved_matrix_row_labels',
+            return_value={'42': 'Forty-two'},
+        ):
+            apply_matrix_rows_for_pdf_export(field, {}, assignment_entity_status=MagicMock())
+
+        assert field['matrix_rows'] == ['42']
+
+    def test_resolve_matrix_row_groups_from_numeric_lookup(self):
+        from app.routes.forms.export import _resolve_matrix_row_groups
+
+        row_a = MagicMock()
+        row_a.data = {'region': 'Africa'}
+        row_b = MagicMock()
+        row_b.data = {'region': 'Americas'}
+        mapping = {1: row_a, 2: row_b}
+
+        with patch('app.models.LookupListRow') as lookup_cls:
+            lookup_cls.query.get.side_effect = lambda rid: mapping.get(rid)
+            groups = _resolve_matrix_row_groups(
+                ['1', '2', '3'], {'lookup_list_id': '55'}, 'region'
+            )
+
+        assert groups == {'1': 'Africa', '2': 'Americas'}
+
+    def test_list_library_row_grouping_metadata(self):
+        from app.routes.forms.export import apply_matrix_rows_for_pdf_export
+
+        field = {
+            'kind': 'matrix',
+            'matrix_config': {
+                'row_mode': 'list_library',
+                'lookup_list_id': 'country_map',
+                'group_by_column': 'region',
+                'group_totals_enabled': True,
+            },
+            'matrix_columns': [{'name': 'People'}],
+            'matrix_rows': [],
+        }
+        with patch(
+            'app.routes.forms.export._resolve_saved_matrix_row_labels',
+            return_value={'8': 'Benin'},
+        ), patch(
+            'app.routes.forms.export._resolve_matrix_row_groups',
+            return_value={'8': 'Africa'},
+        ):
+            apply_matrix_rows_for_pdf_export(field, {'8_People': 1})
+
+        assert field['matrix_group_enabled'] is True
+        assert field['matrix_group_by'] == 'region'
+        assert field['matrix_group_totals'] is True
+        assert field['matrix_row_groups'] == {'8': 'Africa'}
+
+    def test_row_grouping_disabled_when_group_table_off(self):
+        from app.routes.forms.export import apply_matrix_rows_for_pdf_export
+
+        field = {
+            'kind': 'matrix',
+            'matrix_config': {
+                'row_mode': 'list_library',
+                'lookup_list_id': 'country_map',
+                'group_by_column': 'region',
+                'group_table_enabled': False,
+            },
+            'matrix_columns': [{'name': 'People'}],
+            'matrix_rows': [],
+        }
+        with patch(
+            'app.routes.forms.export._resolve_saved_matrix_row_labels',
+            return_value={'8': 'Benin'},
+        ):
+            apply_matrix_rows_for_pdf_export(field, {'8_People': 1})
+
+        assert 'matrix_group_enabled' not in field
+
     def test_hybrid_fixed_row_display_keeps_cell_key(self):
         from app.routes.forms.export import _resolve_hybrid_fixed_row_displays
 
@@ -294,12 +411,86 @@ class TestAssignmentPdfHelpers:
         from app.routes.forms.export import matrix_pdf_layout_strategy
 
         assert matrix_pdf_layout_strategy(7) == ''
+        assert matrix_pdf_layout_strategy(5, 20) == ''
+        # Five columns with a heading long enough to wrap uses the compact
+        # portrait style instead of filling the page at full size.
+        assert matrix_pdf_layout_strategy(5, 48) == 'portrait-compact'
+        assert matrix_pdf_layout_strategy(7, 90) == 'portrait-compact'
+        assert matrix_pdf_layout_strategy(3, 120) == ''
         assert matrix_pdf_layout_strategy(8) == 'portrait-compact'
         assert matrix_pdf_layout_strategy(10) == 'portrait-compact'
         assert matrix_pdf_layout_strategy(13) == 'portrait-compact'
         assert matrix_pdf_layout_strategy(14) == 'landscape'
         assert matrix_pdf_layout_strategy(16) == 'landscape'
         assert matrix_pdf_layout_strategy(17) == 'landscape-scale'
+
+    def test_matrix_pdf_landscape_flow(self):
+        from app.routes.forms.export import matrix_pdf_landscape_flow
+
+        # Portrait content after a landscape matrix must leave that page.
+        assert 'wide-matrix-break-after' in matrix_pdf_landscape_flow('landscape', '', '')
+        assert 'wide-matrix-break-after' in matrix_pdf_landscape_flow('landscape-scale', '', 'portrait-compact')
+        assert 'wide-matrix-continue' not in matrix_pdf_landscape_flow('landscape', '', '')
+        # The next landscape matrix may stay; it does not start a new page.
+        shared = matrix_pdf_landscape_flow('landscape', 'landscape-scale', 'landscape')
+        assert shared == ' wide-matrix-continue'
+        assert matrix_pdf_landscape_flow('portrait-compact', 'landscape', '') == ''
+        assert matrix_pdf_landscape_flow('', 'landscape', 'landscape') == ''
+
+    def test_matrix_pdf_vertical_header_mm(self):
+        from app.routes.forms.export import matrix_pdf_vertical_header_mm
+
+        # Short labels sit at the minimum one-line measure (14mm) + padding.
+        assert matrix_pdf_vertical_header_mm(0) == 18
+        assert matrix_pdf_vertical_header_mm(5) == 18
+        assert matrix_pdf_vertical_header_mm('nope') == 18
+        # A long label is capped (15mm + padding) so it wraps onto a third line.
+        assert matrix_pdf_vertical_header_mm(40) > matrix_pdf_vertical_header_mm(8)
+        assert matrix_pdf_vertical_header_mm(40) == 19
+        assert matrix_pdf_vertical_header_mm(200) == 19
+
+    def test_matrix_column_pdf_style_washes_opted_in_columns(self):
+        from pathlib import Path
+
+        from jinja2 import Environment, FileSystemLoader
+
+        templates = Path(__file__).resolve().parents[3] / "app" / "templates"
+        env = Environment(loader=FileSystemLoader(str(templates)))
+        rendered = env.from_string(
+            "{% from 'forms/entry_form/partials/_matrix_group_color.html' import matrix_column_pdf_style %}"
+            "{{ matrix_column_pdf_style(columns, groups, 0, 'headers') }}"
+            "||{{ matrix_column_pdf_style(columns, groups, 0, 'cells') }}"
+            "||{{ matrix_column_pdf_style(columns, groups, 1, 'headers') }}"
+            "||{{ matrix_column_pdf_style(columns, groups, 2, 'headers') }}"
+        ).render(
+            columns=[
+                {"name": "Amount", "group": "2027", "subgroup": "req"},
+                {"name": "Note", "group": "2027"},
+                {"name": "Plain"},
+            ],
+            groups={
+                "2027": {
+                    "header_color": "#5f97c9",
+                    "header_text_color": "#1f2937",
+                    "apply_color_to_headers": True,
+                    "apply_color_to_cells": True,
+                },
+                "2027::req": {
+                    "header_color": "#b5d4ef",
+                    "apply_color_to_headers": True,
+                    "apply_color_to_cells": True,
+                },
+            },
+        )
+        header, cell, parent_header, plain = rendered.split("||")
+        # Subgroup that opted in wins. 48% of #b5d4ef over white.
+        assert header.strip() == 'style="background-color: #dbeaf7;"'
+        # Cells use the lighter 22% wash of that same subgroup colour.
+        assert "background-color: #eff6fb;" in cell
+        # No subgroup: parent fill and its custom text colour.
+        assert "background-color: #b2cde5;" in parent_header
+        assert "color: #1f2937;" in parent_header
+        assert plain.strip() == ""
 
     def test_matrix_portrait_column_widths_mm(self):
         from app.routes.forms.export import matrix_portrait_column_widths_mm

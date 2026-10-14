@@ -93,8 +93,8 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
     ):
         return True
 
-    # Internal form matrix helper (session auth, not external API consumption)
-    if path == "/api/v1/matrix/auto-load-entities":
+    # Internal form matrix helpers (session auth, not external API consumption)
+    if path in ("/api/v1/matrix/auto-load-entities", "/api/v1/matrix/own-rows"):
         return True
 
     # Static sector icons served under /api for convenience

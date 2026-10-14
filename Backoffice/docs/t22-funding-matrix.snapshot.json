@@ -548,6 +548,12 @@
       "fr": "Votre valeur",
       "ru": "Ваша ценность"
     },
+    "include_own_matrix_rows": {
+      "enabled": true,
+      "source_template_id": 23,
+      "source_form_item_id": 1433,
+      "source_assignment_period": "__latest__"
+    },
     "lookup_list_id": "country_map",
     "list_display_column": "name",
     "search_placeholder": "Search and select a row to add...",

@@ -27,7 +27,7 @@ import {
 export { ROW_TOTAL_COLUMN_NAME };
 
 export const __ROW_TOTAL_CONFLICT_INDICATOR_BASE =
-    'row-total-conflict shrink-0 flex items-center justify-center mr-1.5 pointer-events-none';
+    'row-total-conflict shrink-0 flex items-center justify-center pointer-events-none';
 
 export const __ROW_TOTAL_INPUT_WRAPPER_CLASS = 'flex items-center w-full gap-1.5 px-1';
 
@@ -85,7 +85,44 @@ export function __rowTotalConflictMessage(manualVal, autoSum) {
 
 export function __rowTotalConflictIndicatorSvg(variant) {
     const colorClass = variant === 'error' ? 'text-red-400' : 'text-amber-400';
-    return `<svg class="row-total-conflict-icon h-5 w-5 ${colorClass}" width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>`;
+    return `<svg class="row-total-conflict-icon ${colorClass}" width="12" height="12" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>`;
+}
+
+
+function __customValueWrap(input) {
+    const wrap = input?.parentElement;
+    if (!wrap) return null;
+    if (wrap.classList.contains('calculated-value-wrap') || wrap.querySelector('.row-total-conflict')) return wrap;
+    return null;
+}
+
+
+function __matrixInputIsActive(input) {
+    return !!input && typeof document !== 'undefined' && document.activeElement === input;
+}
+
+
+function __markCustomValue(input, conflictType) {
+    if (!input) return;
+    const chars = Math.max(String(input.value ?? '').length, 1);
+    input.classList.add('matrix-custom-value');
+    input.classList.toggle('matrix-custom-value-error', conflictType === 'error');
+    // Resizing the control while it is focused drops the caret.
+    if (__matrixInputIsActive(input)) return;
+    input.style.setProperty('--matrix-value-ch', String(chars));
+    const wrap = __customValueWrap(input);
+    if (wrap) wrap.style.minWidth = `calc(${chars}ch + 2.5rem)`;
+}
+
+
+function __clearCustomValue(input) {
+    if (!input) return;
+    if (__matrixInputIsActive(input)) return;
+    input.classList.remove('matrix-custom-value', 'matrix-custom-value-error');
+    input.style.removeProperty('--matrix-value-ch');
+    input.removeAttribute('size');
+    const wrap = __customValueWrap(input);
+    if (wrap) wrap.style.minWidth = '';
 }
 
 
@@ -372,6 +409,18 @@ export function __syncRowTotalCellHighlight(cell, highlighted) {
 
 export function __updateRowTotalConflict(input, autoSum, manualVal, validation, isManuallyModified = false) {
     if (!input) return null;
+    const conflictType = __rowTotalConflictType(autoSum, manualVal, validation);
+    const shouldHighlight = !!isManuallyModified || !!conflictType;
+
+    // The warning mark changes the cell width. Doing that mid-keystroke blurs the input.
+    if (__matrixInputIsActive(input)) {
+        if (shouldHighlight && conflictType) {
+            input.classList.add('matrix-custom-value');
+            input.classList.toggle('matrix-custom-value-error', conflictType === 'error');
+        }
+        return conflictType;
+    }
+
     const cell = input.closest('td') || input.parentElement;
     let indicator = cell?.querySelector('.row-total-conflict');
     if (!indicator && cell) {
@@ -381,10 +430,10 @@ export function __updateRowTotalConflict(input, autoSum, manualVal, validation, 
             wrapper.appendChild(indicator);
         }
     }
-    const conflictType = __rowTotalConflictType(autoSum, manualVal, validation);
-    const shouldHighlight = !!isManuallyModified || !!conflictType;
 
     input.classList.remove('border-orange-400', 'border-red-500', 'ring-1', 'ring-orange-300', 'ring-red-300');
+    if (shouldHighlight && conflictType) __markCustomValue(input, conflictType);
+    else __clearCustomValue(input);
     __syncRowTotalCellHighlight(cell, shouldHighlight);
     cell.classList.toggle('cursor-help', !!conflictType);
     if (conflictType) {
@@ -419,8 +468,10 @@ export function __updateRowTotalConflict(input, autoSum, manualVal, validation, 
 
 function __clearCalculatedOverride(cell, input) {
     if (!cell) return;
+    if (__matrixInputIsActive(input)) return;
     cell.classList.remove('bg-orange-50', 'cursor-help');
     input?.classList.remove('border-orange-400', 'ring-1', 'ring-orange-300');
+    __clearCustomValue(input);
     const indicator = cell.querySelector('.calculated-value-conflict');
     if (indicator) {
         indicator.className = `${__ROW_TOTAL_CONFLICT_INDICATOR_BASE} calculated-value-conflict hidden`;
@@ -433,6 +484,11 @@ function __clearCalculatedOverride(cell, input) {
 
 function __showCalculatedOverride(cell, input, formulaValue, manualValue, decimals) {
     if (!cell || !input) return;
+    if (__matrixInputIsActive(input)) {
+        input.classList.add('matrix-custom-value');
+        input.classList.remove('matrix-custom-value-error');
+        return;
+    }
     let wrapper = input.parentElement;
     if (!wrapper || !wrapper.classList.contains('calculated-value-wrap')) {
         wrapper = document.createElement('div');
@@ -452,6 +508,7 @@ function __showCalculatedOverride(cell, input, formulaValue, manualValue, decima
     indicator.classList.add('calculated-value-conflict');
     cell.classList.add('bg-orange-50', 'cursor-help');
     input.classList.add('border-orange-400', 'ring-1', 'ring-orange-300');
+    __markCustomValue(input, 'warning');
     cell._calculatedOverride = true;
     cell._calculatedDecimals = decimals;
     cell._rowTotalAutoSum = formulaValue;
@@ -556,6 +613,20 @@ export function __effectiveRowTotalValue(data, rowId, columns, rowTotalManual, f
     const manualScalar = __storedRowTotalManualScalar(data[__rowTotalCellKey(rowId)]);
     return manualScalar != null ? manualScalar : computed;
 }
+
+function _formatGroupColumnTotal(column, sum) {
+    const columnType = column && typeof column === 'object' ? (column.type || 'number') : 'number';
+    if (columnType === 'calculated') {
+        const decimals = column.calculation ? column.calculation.decimals : 0;
+        return formatFormulaNumberForDisplay(sum, decimals == null || decimals === '' ? 0 : decimals);
+    }
+    if (columnType === 'number_decimal') {
+        const decimals = column.decimals;
+        return formatFormulaNumberForDisplay(sum, decimals == null || decimals === '' ? 2 : decimals);
+    }
+    return __formatInteger(sum);
+}
+
 
 export const matrixTotalsMixin = {
 /**
@@ -690,10 +761,13 @@ calculateMatrixTotals(fieldId) {
 
                 const totalInput = container.querySelector(`input.row-total-input[data-cell-key="${totalCellKey}"]`);
                 if (totalInput) {
-                    __setMatrixNumericInputValue(
-                        totalInput,
-                        displayVal !== '' && displayVal != null ? displayVal : ''
-                    );
+                    // Rewriting a focused number input (including type="number" → text) blurs it.
+                    if (!__matrixInputIsActive(totalInput)) {
+                        __setMatrixNumericInputValue(
+                            totalInput,
+                            displayVal !== '' && displayVal != null ? displayVal : ''
+                        );
+                    }
                     totalInput.setAttribute('data-original-value', String(rowTotal));
                     const isConflict = manualScalar != null && manualScalar !== rowTotal;
                     __updateRowTotalConflict(
@@ -727,6 +801,11 @@ calculateMatrixTotals(fieldId) {
 
     // Calculate column totals (optimized: build column map once)
     if (showColumnTotals) {
+        const legendFilteredRows = new Set();
+        container.querySelectorAll('tr.matrix-data-row.matrix-row-filtered-out').forEach((row) => {
+            const id = row.getAttribute('data-row-id');
+            if (id) legendFilteredRows.add(String(id));
+        });
         // Build a map of column values for efficient lookup
         const columnValuesMap = new Map();
         Object.keys(data).forEach((key) => {
@@ -737,6 +816,7 @@ calculateMatrixTotals(fieldId) {
 
             const parsed = __parseMatrixCellKey(key, config);
             if (!parsed) return;
+            if (legendFilteredRows.has(String(parsed.rowId))) return;
 
             const { columnName } = parsed;
             const value = data[key] || 0;
@@ -754,6 +834,7 @@ calculateMatrixTotals(fieldId) {
 
             if (columnType === 'calculated') {
                 formulaByRow.forEach((pack, rowId) => {
+                    if (legendFilteredRows.has(String(rowId))) return;
                     if (!calculationIsReadonly(column)) {
                         const edited = data[`${rowId}_${columnName}`];
                         if (edited != null && edited !== '') {
@@ -851,7 +932,69 @@ calculateMatrixTotals(fieldId) {
         }
     }
 
+    this._updateGroupTotals(container, config, data, formulaByRow);
+
     debugLog(`MatrixHandler: Completed totals calculation for matrix ${fieldId}`);
+},
+
+/**
+ * Fill the totals on each group header from the data rows directly under it.
+ * Collapsed rows still count. Display only: these cells are not saved.
+ */
+_updateGroupTotals(container, config, data, formulaByRow) {
+    if (!config || config.group_totals_enabled !== true) return;
+    if (!config.group_by_column || config.group_table_enabled === false) return;
+
+    const columns = config.columns || [];
+    const rowTotalManual = __rowTotalManualEnabled(config);
+    container.querySelectorAll('tr.matrix-group-header-row').forEach((totalRow) => {
+        const members = [];
+        let next = totalRow.nextElementSibling;
+        while (next && next.classList.contains('matrix-data-row')) {
+            if (!next.classList.contains('matrix-row-filtered-out')) members.push(next);
+            next = next.nextElementSibling;
+        }
+        const rowIds = members
+            .map((row) => row.getAttribute('data-row-id'))
+            .filter((id) => id != null && id !== '');
+
+        columns.forEach((column) => {
+            const columnName = typeof column === 'object' ? column.name : column;
+            const columnType = typeof column === 'object' ? (column.type || 'number') : 'number';
+            let sum = 0;
+            rowIds.forEach((rowId) => {
+                if (columnType === 'calculated') {
+                    if (column && typeof column === 'object' && !calculationIsReadonly(column)) {
+                        const edited = data[`${rowId}_${columnName}`];
+                        if (edited != null && edited !== '') {
+                            sum += __cellValueToNumber(edited);
+                            return;
+                        }
+                    }
+                    const pack = formulaByRow.get(String(rowId));
+                    const calculated = pack && pack.values ? pack.values[columnName] : null;
+                    if (typeof calculated === 'number' && isFinite(calculated)) sum += calculated;
+                    return;
+                }
+                sum += __cellValueToNumber(data[`${rowId}_${columnName}`]);
+            });
+
+            const span = Array.from(totalRow.querySelectorAll('.matrix-group-total'))
+                .find((el) => el.getAttribute('data-column') === columnName);
+            if (span) span.textContent = _formatGroupColumnTotal(column, sum);
+        });
+
+        const rowTotalSpan = totalRow.querySelector('.matrix-group-row-total');
+        if (rowTotalSpan) {
+            let groupRowTotal = 0;
+            rowIds.forEach((rowId) => {
+                groupRowTotal += __effectiveRowTotalValue(
+                    data, rowId, columns, rowTotalManual, formulaByRow.get(String(rowId)),
+                );
+            });
+            rowTotalSpan.textContent = __formatInteger(groupRowTotal);
+        }
+    });
 },
 
 
@@ -891,6 +1034,10 @@ clearMatrixTotals(fieldId) {
     if (grandTotal) {
         grandTotal.textContent = '0';
     }
+
+    container.querySelectorAll('.matrix-group-total, .matrix-group-row-total').forEach((total) => {
+        total.textContent = '0';
+    });
 },
 
 /**

@@ -17,6 +17,7 @@
 const ENTRY_FORM_TOOLTIP_SELECTORS = [
   '.indicator-definition-tooltip',
   '.question-unit-tooltip',
+  '.matrix-legend-tooltip',
 ];
 
 const MARGIN     = 8;  // px gap between trigger icon and tooltip box
@@ -124,7 +125,7 @@ function hideTooltip(tooltipContainer) {
   if (_activeContainer === tooltipContainer) _activeContainer = null;
 }
 
-function bindTooltipEvents(container) {
+export function bindTooltipEvents(container) {
   if (container.dataset.tooltipBound === 'true') return;
   container.dataset.tooltipBound = 'true';
 

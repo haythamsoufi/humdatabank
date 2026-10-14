@@ -581,9 +581,9 @@
                     <div id="sidebar-header-nav" class="flex items-center justify-between w-full gap-2">
                         <h2 id="sidebar-title" class="text-xl font-semibold text-gray-700">{{ _('Navigation') }}</h2>
                         <div class="flex items-center gap-1">
-                            {# Close button for mobile/collapsed navigation #}
-                            <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Close navigation')|forceescape }}">
-                                <i class="fas fa-times text-base"></i>
+                            {# Hide button for mobile/collapsed navigation #}
+                            <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Hide navigation')|forceescape }}">
+                                <i class="fas fa-chevron-left text-base" aria-hidden="true"></i>
                             </button>
                             {# Collapse button for large screens (≥1100px) #}
                             <button type="button" id="sidebar-collapse-toggle"

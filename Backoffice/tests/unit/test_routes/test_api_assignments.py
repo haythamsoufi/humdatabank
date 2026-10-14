@@ -4,6 +4,7 @@ Tests for app/routes/api/assignments.py
 Coverage targets:
 - GET  /api/v1/assigned-forms         (API key / session auth, pagination, filters, RBAC)
 - POST /api/v1/matrix/auto-load-entities (login_required, validation, access control, data paths)
+- POST /api/v1/matrix/own-rows (include_own_matrix_rows: access, locked statuses, period options, preview)
 """
 import pytest
 from unittest.mock import patch, MagicMock
@@ -531,3 +532,183 @@ class TestMatrixAutoLoadEntities:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["reason"] == "no_entity_keys_in_data"
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/matrix/own-rows
+# ---------------------------------------------------------------------------
+
+_AES_LOOKUP = "app.services.AssignmentService.get_assignment_entity_status_by_id"
+_CAN_ACCESS = "app.services.organization.authorization_service.AuthorizationService.can_access_assignment"
+_IS_ADMIN = "app.services.organization.authorization_service.AuthorizationService.is_admin"
+_RESOLVE_PERIOD = (
+    "app.services.forms.variable_resolution_service.VariableResolutionService._resolve_effective_period"
+)
+_INNER = "app.routes.api.assignments._resolve_auto_load_entities_inner"
+
+_OWN_ROWS = {
+    "enabled": True,
+    "source_template_id": 23,
+    "source_form_item_id": 1433,
+    "source_assignment_period": "__latest__",
+}
+
+
+class TestMatrixOwnRows:
+    """Tests for POST /api/v1/matrix/own-rows (matrix option include_own_matrix_rows)."""
+
+    def _matrix(self, db_session, own_rows=_OWN_ROWS):
+        from tests.factories import create_test_item, create_test_section
+
+        template = _make_template(db_session)
+        section = create_test_section(db_session, template, name="Funding")
+        matrix_config = {"row_mode": "list_library", "auto_load_entities": True}
+        if own_rows is not None:
+            matrix_config["include_own_matrix_rows"] = dict(own_rows)
+        return create_test_item(
+            db_session, section, template, item_type="matrix", label="Funding",
+            config={"matrix_config": matrix_config},
+        )
+
+    def _aes(self, template_id, status="in_progress"):
+        aes = MagicMock()
+        aes.id = 4751
+        aes.entity_id = 166
+        aes.entity_type = "country"
+        aes.status = status
+        aes.assigned_form.template_id = template_id
+        return aes
+
+    def _post(self, client, payload):
+        return client.post(_api("/matrix/own-rows"), json=payload, content_type="application/json")
+
+    def test_unauthenticated_is_rejected(self, client, db_session):
+        resp = self._post(client, {"form_item_id": 1, "assignment_entity_status_id": 1})
+        assert resp.status_code in (401, 302)
+
+    def test_non_integer_form_item_returns_400(self, logged_in_client, db_session):
+        resp = self._post(logged_in_client, {"form_item_id": "x", "assignment_entity_status_id": 1})
+        assert resp.status_code == 400
+
+    def test_unknown_matrix_returns_404(self, logged_in_client, db_session):
+        resp = self._post(logged_in_client, {"form_item_id": 987654321, "assignment_entity_status_id": 1})
+        assert resp.status_code == 404
+
+    def test_missing_context_returns_400(self, logged_in_client, db_session):
+        item = self._matrix(db_session)
+        resp = self._post(logged_in_client, {"form_item_id": item.id})
+        assert resp.status_code == 400
+
+    def test_access_denied_returns_403(self, logged_in_client, db_session):
+        item = self._matrix(db_session)
+        with patch(_AES_LOOKUP, return_value=self._aes(item.template_id)), \
+             patch(_CAN_ACCESS, return_value=False):
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        assert resp.status_code == 403
+
+    def test_matrix_from_another_template_returns_400(self, logged_in_client, db_session):
+        item = self._matrix(db_session)
+        with patch(_AES_LOOKUP, return_value=self._aes(item.template_id + 1000)), \
+             patch(_CAN_ACCESS, return_value=True), \
+             patch(_INNER) as mock_inner:
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        assert resp.status_code == 400
+        mock_inner.assert_not_called()
+
+    def test_period_sentinel_resolves_against_the_assignment(self, logged_in_client, db_session):
+        item = self._matrix(db_session)
+        aes = self._aes(item.template_id)
+        rows = {"entities": [{"entity_id": 9, "entity_type": "country"}], "entity_type": "country"}
+        with patch(_AES_LOOKUP, return_value=aes), \
+             patch(_CAN_ACCESS, return_value=True), \
+             patch(_RESOLVE_PERIOD, return_value="Jan-Jun 2026") as mock_period, \
+             patch(_INNER, return_value=rows) as mock_inner:
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        assert resp.status_code == 200
+        assert resp.get_json()["entities"] == rows["entities"]
+        assert mock_period.call_args.args == ("__latest__", 23, aes)
+        assert mock_inner.call_args.args == (166, "country", 23, "Jan-Jun 2026", 1433)
+        assert mock_inner.call_args.kwargs["require_tick_value_1"] is False
+
+    def test_fixed_period_is_used_as_is(self, logged_in_client, db_session):
+        item = self._matrix(db_session, own_rows={**_OWN_ROWS, "source_assignment_period": "Jan-Jun 2026"})
+        with patch(_AES_LOOKUP, return_value=self._aes(item.template_id)), \
+             patch(_CAN_ACCESS, return_value=True), \
+             patch(_RESOLVE_PERIOD) as mock_period, \
+             patch(_INNER, return_value={"entities": [], "entity_type": None}) as mock_inner:
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        assert resp.status_code == 200
+        mock_period.assert_not_called()
+        assert mock_inner.call_args.args[3] == "Jan-Jun 2026"
+
+    @pytest.mark.parametrize("status", ["submitted", "approved", "cancelled"])
+    def test_locked_assignment_gets_no_rows(self, logged_in_client, db_session, status):
+        item = self._matrix(db_session)
+        with patch(_AES_LOOKUP, return_value=self._aes(item.template_id, status=status)), \
+             patch(_CAN_ACCESS, return_value=True), \
+             patch(_INNER) as mock_inner:
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        assert resp.status_code == 200
+        assert resp.get_json()["reason"] == "assignment_locked"
+        mock_inner.assert_not_called()
+
+    def test_unresolved_period_returns_reason(self, logged_in_client, db_session):
+        item = self._matrix(db_session)
+        with patch(_AES_LOOKUP, return_value=self._aes(item.template_id)), \
+             patch(_CAN_ACCESS, return_value=True), \
+             patch(_RESOLVE_PERIOD, return_value=None), \
+             patch(_INNER) as mock_inner:
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        data = resp.get_json()
+        assert data["entities"] == []
+        assert data["reason"] == "period_unresolved"
+        mock_inner.assert_not_called()
+
+    @pytest.mark.parametrize("own_rows", [
+        None,
+        {**_OWN_ROWS, "enabled": False},
+        {**_OWN_ROWS, "enabled": "true"},
+        {**_OWN_ROWS, "source_form_item_id": "abc"},
+        {**_OWN_ROWS, "source_assignment_period": "  "},
+    ])
+    def test_option_off_or_incomplete_returns_no_rows(self, logged_in_client, db_session, own_rows):
+        item = self._matrix(db_session, own_rows=own_rows)
+        with patch(_AES_LOOKUP, return_value=self._aes(item.template_id)), \
+             patch(_CAN_ACCESS, return_value=True), \
+             patch(_INNER) as mock_inner:
+            resp = self._post(logged_in_client, {"form_item_id": item.id, "assignment_entity_status_id": 4751})
+        assert resp.get_json()["reason"] == "disabled"
+        mock_inner.assert_not_called()
+
+    def test_preview_requires_admin(self, logged_in_client, db_session):
+        item = self._matrix(db_session)
+        with patch(_IS_ADMIN, return_value=False):
+            resp = self._post(logged_in_client, {
+                "form_item_id": item.id, "preview_entity_id": 166, "preview_entity_type": "country",
+            })
+        assert resp.status_code == 403
+
+    def test_preview_resolves_period_options_without_assignment_dates(self, logged_in_client, db_session):
+        """Preview has no assignment row: ``__previous__`` must not fail, ``__latest__`` still works."""
+        from datetime import date
+
+        source = _make_template(db_session)
+        mid_year = _make_assigned_form(db_session, source.id, period_name="Jan-Jun 2026")
+        mid_year.period_start, mid_year.period_end = date(2026, 1, 1), date(2026, 6, 30)
+        db_session.commit()
+        payload = {"preview_entity_id": 166, "preview_entity_type": "country", "preview_period_name": "2027"}
+
+        previous = self._matrix(db_session, own_rows={
+            **_OWN_ROWS, "source_template_id": source.id, "source_assignment_period": "__previous__",
+        })
+        resp = self._post(logged_in_client, {**payload, "form_item_id": previous.id})
+        assert resp.status_code == 200
+        assert resp.get_json()["reason"] == "period_unresolved"
+
+        latest = self._matrix(db_session, own_rows={**_OWN_ROWS, "source_template_id": source.id})
+        rows = {"entities": [{"entity_id": 9, "entity_type": "country"}], "entity_type": "country"}
+        with patch(_INNER, return_value=rows) as mock_inner:
+            resp = self._post(logged_in_client, {**payload, "form_item_id": latest.id})
+        assert resp.status_code == 200
+        assert resp.get_json()["entities"] == rows["entities"]
+        assert mock_inner.call_args.args == (166, "country", source.id, "Jan-Jun 2026", 1433)

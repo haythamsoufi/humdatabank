@@ -22,6 +22,8 @@ Onto the published version's **variables**, and onto item 1303's **`config.matri
 
 Rows are the host country (`row_mode` `list_library`, list `country_map`). Column totals are on. Row totals are off. Calculated totals are included in the API.
 
+`include_own_matrix_rows` is on (form builder: Display → Auto Load Entities → "Also list rows from another form filled by the same entity"). Auto-load still lists host countries whose Unified Country Plan mentions this partner. It also lists every country row the same partner saved on template 23 item 1433, in the latest template 23 period (`__latest__`, `Jan-Jun 2026` when captured). Cell values still come from the column lookups, so those extra rows show 0 until the partner types a plan, and saving the form stores them. Submitted, approved and cancelled assignments get no extra rows. `apply_t22_multiyear_funding.py` does not write this block: after a restore, turn it on again in the form builder.
+
 Three column groups. Each has the same eight columns. Codes keep the `[assignment_year]` placeholder; saved cells use the resolved year (`SP1_2026`, `SP1_2027`, `SP1_2028` on a 2026 assignment).
 
 | Offset | Group code | Header (en) | Year header | Table (Funding Requirements) |

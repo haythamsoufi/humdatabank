@@ -42,6 +42,8 @@ class _PreviewEntityStatus:
             pass
         af = _AF()
         af.period_name = str(period_name)
+        af.period_start = None
+        af.period_end = None
         self.assigned_form = af
 
         self._country = _UNSET = object()

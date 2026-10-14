@@ -1311,6 +1311,159 @@ class TestEntryBootstrapMatrixCandidates:
 
         assert result is None
 
+    def test_include_own_matrix_rows_unions_same_entity_matrix(self):
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'col_a', 'is_variable': True, 'variable': 'rev_var', 'type': 'number'},
+        ])
+        item.config['matrix_config']['include_own_matrix_rows'] = {
+            'enabled': True,
+            'source_template_id': 23,
+            'source_form_item_id': 1433,
+            'source_assignment_period': '__latest__',
+        }
+        assignment_level_resolved = {
+            'rev_var': json.dumps({
+                'entity_type': 'country',
+                'entities': [{'entity_id': 7, 'entity_type': 'country'}],
+            }),
+        }
+        aes = MagicMock()
+        aes.entity_id = 166
+        aes.entity_type = 'country'
+        aes.id = 4751
+        aes.status = 'in_progress'
+        own_rows = {
+            'entities': [
+                {'entity_id': 9, 'entity_type': 'country'},
+                {'entity_id': 7, 'entity_type': 'country'},
+            ],
+            'entity_type': 'country',
+        }
+        with patch(
+            "app.routes.api.assignments._resolve_auto_load_entities_inner", return_value=own_rows
+        ) as mock_inner, patch(
+            "app.services.forms.variable_resolution_service.VariableResolutionService._resolve_effective_period",
+            return_value='Jan-Jun 2026',
+        ):
+            result = _entry_bootstrap_matrix_candidates(
+                aes=aes, matrix_item=item,
+                variable_configs={'rev_var': {'entity_scope': 'entities_containing'}},
+                assignment_level_resolved=assignment_level_resolved,
+            )
+
+        assert result is not None
+        assert set(result['entity_map']) == {7, 9}
+        assert set(result['keep_entity_ids']) == {7, 9}
+        # 7 is already in the lookup, so only 9 counts as an extra row.
+        assert result['own_only_entity_ids'] == [9]
+        mock_inner.assert_called_once()
+        assert mock_inner.call_args.args[2:5] == (23, 'Jan-Jun 2026', 1433)
+        assert mock_inner.call_args.kwargs['require_tick_value_1'] is False
+
+    def test_include_own_matrix_rows_ignored_when_disabled(self):
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'col_a', 'is_variable': True, 'variable': 'rev_var', 'type': 'number'},
+        ])
+        item.config['matrix_config']['include_own_matrix_rows'] = {
+            'enabled': False,
+            'source_template_id': 23,
+            'source_form_item_id': 1433,
+            'source_assignment_period': 'Jan-Jun 2026',
+        }
+        with patch(
+            "app.routes.api.assignments._resolve_auto_load_entities_inner"
+        ) as mock_inner:
+            result = _entry_bootstrap_matrix_candidates(
+                aes=MagicMock(), matrix_item=item,
+                variable_configs={'rev_var': {'entity_scope': 'entities_containing'}},
+                assignment_level_resolved={
+                    'rev_var': json.dumps({
+                        'entity_type': 'country',
+                        'entities': [{'entity_id': 7, 'entity_type': 'country'}],
+                    }),
+                },
+            )
+
+        mock_inner.assert_not_called()
+        assert set(result['entity_map']) == {7}
+        assert result['keep_entity_ids'] == []
+        assert result['own_only_entity_ids'] == []
+
+    def test_include_own_matrix_rows_skipped_on_approved_assignment(self):
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'col_a', 'is_variable': True, 'variable': 'rev_var', 'type': 'number'},
+        ])
+        item.config['matrix_config']['include_own_matrix_rows'] = {
+            'enabled': True,
+            'source_template_id': 23,
+            'source_form_item_id': 1433,
+            'source_assignment_period': 'Jan-Jun 2026',
+        }
+        aes = MagicMock()
+        aes.status = 'approved'
+        with patch(
+            "app.routes.api.assignments._resolve_auto_load_entities_inner"
+        ) as mock_inner:
+            result = _entry_bootstrap_matrix_candidates(
+                aes=aes, matrix_item=item,
+                variable_configs={'rev_var': {'entity_scope': 'entities_containing'}},
+                assignment_level_resolved={
+                    'rev_var': json.dumps({
+                        'entity_type': 'country',
+                        'entities': [{'entity_id': 7, 'entity_type': 'country'}],
+                    }),
+                },
+            )
+
+        mock_inner.assert_not_called()
+        assert set(result['entity_map']) == {7}
+        assert result['keep_entity_ids'] == []
+        assert result['own_only_entity_ids'] == []
+
+    def test_bootstrap_entry_names_only_the_extra_rows(self):
+        from app.routes.forms_api import _bootstrap_auto_load_entry
+
+        entry = _bootstrap_auto_load_entry(
+            {'entity_type': 'country', 'own_only_entity_ids': [9, 11]},
+            [
+                {'entity_id': 7, 'entity_type': 'country'},
+                {'entity_id': 9, 'entity_type': 'country'},
+            ],
+        )
+        assert entry['own_only_entity_ids'] == [9]
+        assert entry['entity_type'] == 'country'
+
+    def test_bootstrap_entry_omits_own_rows_when_there_are_none(self):
+        from app.routes.forms_api import _bootstrap_auto_load_entry
+
+        entry = _bootstrap_auto_load_entry(
+            {'entity_type': 'country', 'own_only_entity_ids': []},
+            [{'entity_id': 7, 'entity_type': 'country'}],
+        )
+        assert 'own_only_entity_ids' not in entry
+
+    def test_tick_filter_keeps_own_matrix_rows(self):
+        from app.routes.forms_api import _auto_load_entities_after_tick_filter
+
+        filtered = _auto_load_entities_after_tick_filter(
+            {
+                'entity_map': {
+                    7: {'entity_id': 7, 'entity_type': 'country'},
+                    9: {'entity_id': 9, 'entity_type': 'country'},
+                },
+                'tick_var_names': ['rev_var'],
+                'keep_entity_ids': [9],
+            },
+            {7: {'rev_var': 0}, 9: {'rev_var': 0}},
+        )
+        assert set(filtered) == {9}
+
 
 class TestDiscussionCommentsApi:
     def test_get_missing_aes_id_returns_400(self, app, admin_user, db_session, client):

@@ -1,5 +1,5 @@
 {# Print-optimized HTML for assignment PDF export #}
-{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style, matrix_calc_bold %}
+{% from "forms/entry_form/partials/_matrix_group_color.html" import matrix_group_header_style, matrix_calc_bold, matrix_column_pdf_style %}
 <!DOCTYPE html>
 {% set _lang_raw = session.get('language', 'en') %}
 {% set _lang_norm = (_lang_raw|string|lower|replace('-', '_')) %}
@@ -71,6 +71,10 @@
         {{- heading -}}
     {%- endmacro %}
 
+    {% macro matrix_pdf_header_label(text) -%}
+        <span class="matrix-col-header-label">{{ text }}</span>
+    {%- endmacro %}
+
     {% macro render_section(section, level=0, root_heading='h3') %}
         <section class="section {{ 'subsection' if level > 0 else '' }}">
             {% if level == 0 %}
@@ -108,12 +112,33 @@
                 {% set flagged_na = value is mapping and value.get('not_applicable') %}
                 {% set _wide_matrix = false %}
                 {% set _matrix_strategy = '' %}
+                {% set _landscape_flow = '' %}
                 {% if field.kind == 'matrix' %}
                     {% set _layout_cols = field.matrix_columns if field.matrix_columns is defined else [] %}
                     {% set _layout_col_count = _layout_cols|length %}
-                    {% set _matrix_strategy = matrix_pdf_layout_strategy(_layout_col_count) %}
+                    {% set _layout_header_chars = matrix_pdf_longest_header_chars(_layout_cols) if matrix_pdf_longest_header_chars is defined else 0 %}
+                    {% set _matrix_strategy = matrix_pdf_layout_strategy(_layout_col_count, _layout_header_chars) %}
                     {% if _matrix_strategy %}
                         {% set _wide_matrix = true %}
+                    {% endif %}
+                    {% if _matrix_strategy in ['landscape', 'landscape-scale'] and matrix_pdf_landscape_flow is defined %}
+                        {% set _prev_strategy = '' %}
+                        {% set _next_strategy = '' %}
+                        {% if loop.index0 > 0 %}
+                            {% set _pf = section.fields_ordered[loop.index0 - 1] %}
+                            {% if _pf.kind == 'matrix' %}
+                                {% set _prev_cols = _pf.matrix_columns if _pf.matrix_columns is defined else [] %}
+                                {% set _prev_strategy = matrix_pdf_layout_strategy(_prev_cols|length) %}
+                            {% endif %}
+                        {% endif %}
+                        {% if not loop.last %}
+                            {% set _nf = section.fields_ordered[loop.index] %}
+                            {% if _nf.kind == 'matrix' %}
+                                {% set _next_cols = _nf.matrix_columns if _nf.matrix_columns is defined else [] %}
+                                {% set _next_strategy = matrix_pdf_layout_strategy(_next_cols|length) %}
+                            {% endif %}
+                        {% endif %}
+                        {% set _landscape_flow = matrix_pdf_landscape_flow(_matrix_strategy, _prev_strategy, _next_strategy) %}
                     {% endif %}
                 {% endif %}
                 {% set is_empty = false %}
@@ -182,7 +207,7 @@
                 {% set _field_label = field.display_label if field.display_label is defined else (field.label if field.label is defined else '') %}
                 {% set _has_field_label = _field_label and _field_label|string|trim %}
                 {% if _has_field_label %}
-                <div class="field-box {{ 'field-empty-required' if (is_empty and is_required) else ('field-empty-optional' if is_empty else 'field-filled') }}{{ ' field-box-matrix' if field.kind == 'matrix' else '' }}{% if field_is_imputed %} field-box-imputed{% endif %}{% if _wide_matrix %} field-box-matrix-wide wide-matrix-{{ _matrix_strategy }}{% endif %}">
+                <div class="field-box {{ 'field-empty-required' if (is_empty and is_required) else ('field-empty-optional' if is_empty else 'field-filled') }}{{ ' field-box-matrix' if field.kind == 'matrix' else '' }}{% if field_is_imputed %} field-box-imputed{% endif %}{% if _wide_matrix %} field-box-matrix-wide wide-matrix-{{ _matrix_strategy }}{% endif %}{{ _landscape_flow }}">
                     <div class="field-header">
                         <span class="field-label">{{ _field_label }}</span>
                         {% if field_is_imputed and field.kind != 'matrix' %}
@@ -193,7 +218,7 @@
                     </div>
                     <div class="field-content">
                 {% else %}
-                <div class="field-unlabeled{% if field.kind == 'matrix' %} field-box-matrix{% endif %}{% if _wide_matrix %} field-box-matrix-wide wide-matrix-{{ _matrix_strategy }}{% endif %}">
+                <div class="field-unlabeled{% if field.kind == 'matrix' %} field-box-matrix{% endif %}{% if _wide_matrix %} field-box-matrix-wide wide-matrix-{{ _matrix_strategy }}{% endif %}{{ _landscape_flow }}">
                     <div class="field-content field-content-unlabeled">
                 {% endif %}
                         {% if flagged_unavailable %}
@@ -222,6 +247,11 @@
                             {% set row_labels = field.matrix_row_labels if field.matrix_row_labels is defined else {} %}
                             {% set matrix_config = field.matrix_config if field.matrix_config is defined else {} %}
                             {% set matrix_column_groups = field.matrix_column_groups if field.matrix_column_groups is defined else matrix_config.get('column_groups', {}) %}
+                            {# Row grouping (region etc.) mirrors the entry form: group header rows,
+                               rows ordered by group then label, optional per-group subtotals. #}
+                            {% set _row_groups = field.matrix_row_groups if field.matrix_row_groups is defined else {} %}
+                            {% set _group_enabled = (field.matrix_group_enabled if field.matrix_group_enabled is defined else false) and _row_groups %}
+                            {% set _group_totals = field.matrix_group_totals if field.matrix_group_totals is defined else false %}
                             {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
                             {% set row_total_ns = namespace(index=matrix_columns|length) %}
                             {% if show_row_totals %}
@@ -256,12 +286,34 @@
                                     {% set _r_id = r %}
                                     {% set _r_display = row_labels.get(r, r) %}
                                 {% endif %}
-                                {% set _ = ns.rows_for_sort.append({'row_id': _r_id, 'row_display': _r_display, 'sort_label': (_r_display | string | trim | lower)}) %}
+                                {% set _r_group = (_row_groups.get(_r_id|string, '') if _group_enabled else '') %}
+                                {% set _ = ns.rows_for_sort.append({'row_id': _r_id, 'row_display': _r_display, 'sort_label': (_r_display | string | trim | lower), 'group': _r_group}) %}
                             {% endfor %}
                             {% if _preserve_row_order %}
                                 {% set sorted_matrix_rows = ns.rows_for_sort %}
                             {% else %}
                                 {% set sorted_matrix_rows = sort_matrix_display_rows(ns.rows_for_sort) %}
+                            {% endif %}
+                            {% if _group_enabled %}
+                                {# Order groups A–Z with the no-group bucket ("Other") last, then
+                                   keep each row's existing label order within its group. #}
+                                {% set _grp = namespace(named=[], empty=[]) %}
+                                {% for it in sorted_matrix_rows %}
+                                    {% if it.group and it.group|string|trim %}
+                                        {% if it.group not in _grp.named %}{% set _ = _grp.named.append(it.group) %}{% endif %}
+                                    {% else %}
+                                        {% if '' not in _grp.empty %}{% set _ = _grp.empty.append('') %}{% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% set _group_order = (_grp.named | sort(case_sensitive=false)) + _grp.empty %}
+                                {% set _grouped = namespace(rows=[]) %}
+                                {% for g in _group_order %}
+                                    {% for it in sorted_matrix_rows %}
+                                        {% set _it_group = it.group if (it.group and it.group|string|trim) else '' %}
+                                        {% if _it_group == g %}{% set _ = _grouped.rows.append(it) %}{% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                                {% set sorted_matrix_rows = _grouped.rows %}
                             {% endif %}
                             {% if matrix_columns %}
                                 {# Precompute column totals (and grand total) for the totals row, matching matrix-handler.js #}
@@ -298,6 +350,74 @@
                                         {% set ns_ct.grand_total = ns_ct.grand_total + ns.col_total %}
                                     {% endif %}
                                 {% endfor %}
+                                {# Per-group subtotals shown in each group header row (matrix-handler.js
+                                   fills these in the entry form). Keyed by "group::column" / "group". #}
+                                {% set gt = namespace(cols={}, grand={}) %}
+                                {% if _group_enabled and _group_totals %}
+                                    {% for g in _group_order %}
+                                        {% set _g_rows = namespace(list=[]) %}
+                                        {% for it in sorted_matrix_rows %}
+                                            {% set _it_group = it.group if (it.group and it.group|string|trim) else '' %}
+                                            {% if _it_group == g %}{% set _ = _g_rows.list.append(it) %}{% endif %}
+                                        {% endfor %}
+                                        {% set _g_grand = namespace(v=0) %}
+                                        {% for col in matrix_columns %}
+                                            {% set col_name = col.get('name') if col is mapping and col.get('name') else col %}
+                                            {% set col_type = col.get('type') if col is mapping and col.get('type') else 'number' %}
+                                            {% set nsg = namespace(t=0) %}
+                                            {% if col_type == 'calculated' %}
+                                                {% set nsg.t = matrix_formula_column_sum(matrix_columns, matrix_data, _g_rows.list, col_name) %}
+                                            {% else %}
+                                                {% for item in _g_rows.list %}
+                                                    {% set row = item.row_id %}
+                                                    {% set cell_key = row ~ '_' ~ col_name %}
+                                                    {% set cell_value = matrix_data.get(cell_key) if matrix_data else none %}
+                                                    {% if cell_value is mapping and (cell_value.get('modified') is not none or cell_value.get('original') is not none) %}
+                                                        {% set display_cell = cell_value.get('modified') if cell_value.get('modified') is not none else cell_value.get('original') %}
+                                                    {% else %}
+                                                        {% set display_cell = cell_value %}
+                                                    {% endif %}
+                                                    {% if col_type == 'tick' %}
+                                                        {% set add = 1 if display_cell in [1, '1', true, 'true', 'True'] else 0 %}
+                                                    {% else %}
+                                                        {% set add = 0 %}
+                                                        {% if display_cell is not none and display_cell != '' and (display_cell|string|trim) != '' %}
+                                                            {% set add = (display_cell | to_number) | round(0, 'common') %}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                    {% set nsg.t = nsg.t + add %}
+                                                {% endfor %}
+                                            {% endif %}
+                                            {% set _ = gt.cols.update({(g ~ '::' ~ col_name): nsg.t}) %}
+                                            {% if matrix_counts_toward_row_total(col) %}
+                                                {% set _g_grand.v = _g_grand.v + nsg.t %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% set _ = gt.grand.update({g: _g_grand.v}) %}
+                                    {% endfor %}
+                                {% endif %}
+                                {# Landscape pages stand column labels upright, centered in the
+                                   cell, and wrap them on spaces so a long name uses a third line. #}
+                                {% set _vhead = namespace(chars=0, mm=0) %}
+                                {% if _matrix_strategy in ['landscape', 'landscape-scale'] %}
+                                    {% for column in matrix_columns %}
+                                        {% set _vh_key = column.name if column is mapping and column.name else (column if column is string else '') %}
+                                        {% set _vh_display = _vh_key %}
+                                        {% if column is mapping and column.name_translations %}
+                                            {% set _vh_cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
+                                            {% if _vh_cand and _vh_cand|string|trim %}{% set _vh_display = _vh_cand %}{% endif %}
+                                        {% endif %}
+                                        {% set _vh_len = (matrix_column_heading(column, _vh_display, matrix_data)|string|trim)|length %}
+                                        {% if _vh_len > _vhead.chars %}{% set _vhead.chars = _vh_len %}{% endif %}
+                                    {% endfor %}
+                                    {% if show_row_totals %}
+                                        {% set _vh_total = (_('Total')|string)|length %}
+                                        {% if _vh_total > _vhead.chars %}{% set _vhead.chars = _vh_total %}{% endif %}
+                                    {% endif %}
+                                    {% if matrix_pdf_vertical_header_mm is defined %}
+                                        {% set _vhead.mm = matrix_pdf_vertical_header_mm(_vhead.chars) %}
+                                    {% endif %}
+                                {% endif %}
                                 {% if _wide_matrix %}
                                 <div class="wide-matrix-compact">
                                 {% endif %}
@@ -314,7 +434,7 @@
                                     </div>
                                 </div>
                                 {% endif %}
-                                <table class="table matrix-table">
+                                <table class="table matrix-table{% if _group_enabled %} matrix-table-grouped{% endif %}">
                                     {% if _matrix_strategy == 'portrait-compact' %}
                                     <colgroup>
                                         {% for col_name, width_mm in matrix_portrait_column_widths_mm(_layout_col_count, matrix_columns, show_row_totals=show_row_totals, row_total_position=matrix_config.get('row_total_position')) %}
@@ -339,7 +459,7 @@
                                                 <th rowspan="{{ _header_rows }}" class="matrix-row-header"></th>
                                                 {% for column in matrix_columns %}
                                                     {% if show_row_totals and loop.index0 == row_total_ns.index %}
-                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header">{{ _('Total') }}</th>
+                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header">{{ matrix_pdf_header_label(_('Total')) }}</th>
                                                     {% endif %}
                                                     {% set _col_group = column.get('group', '') if column is mapping else '' %}
                                                     {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
@@ -350,7 +470,7 @@
                                                     {% endif %}
                                                     {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
                                                     {% if not _col_group %}
-                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(column)|trim %} cell-calculated{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
+                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(column)|trim %} cell-calculated{% endif %}"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>{{ matrix_pdf_header_label(matrix_column_heading(column, _col_display, matrix_data)) }}</th>
                                                     {% else %}
                                                         {% set _prev_group = '' %}
                                                         {% if loop.index0 > 0 %}
@@ -375,11 +495,11 @@
                                                         {% endif %}
                                                     {% endif %}
                                                     {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
-                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header">{{ _('Total') }}</th>
+                                                        <th rowspan="{{ _header_rows }}" class="matrix-col-header">{{ matrix_pdf_header_label(_('Total')) }}</th>
                                                     {% endif %}
                                                 {% endfor %}
                                             </tr>
-                                            <tr>
+                                            <tr{% if not _has_groups.subgroups and _vhead.mm %} class="matrix-vhead-row" style="height: {{ _vhead.mm }}mm; --matrix-vhead: {{ _vhead.mm - 4 }}mm"{% endif %}>
                                                 {% for column in matrix_columns %}
                                                     {% set _col_group = column.get('group', '') if column is mapping else '' %}
                                                     {% set _col_subgroup = column.get('subgroup', '') if column is mapping else '' %}
@@ -417,12 +537,12 @@
                                                             {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                                         {% endif %}
                                                         {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
-                                                        <th{% if _has_groups.subgroups %} rowspan="2"{% endif %} class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(column)|trim %} cell-calculated{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
+                                                        <th{% if _has_groups.subgroups %} rowspan="2"{% endif %} class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(column)|trim %} cell-calculated{% endif %}"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>{{ matrix_pdf_header_label(matrix_column_heading(column, _col_display, matrix_data)) }}</th>
                                                     {% endif %}
                                                 {% endfor %}
                                             </tr>
                                             {% if _has_groups.subgroups %}
-                                            <tr>
+                                            <tr{% if _vhead.mm %} class="matrix-vhead-row" style="height: {{ _vhead.mm }}mm; --matrix-vhead: {{ _vhead.mm - 4 }}mm"{% endif %}>
                                                 {% for column in matrix_columns %}
                                                     {% if column is mapping and column.get('group') and column.get('subgroup') %}
                                                         {% set _col_key = column.name if column.name else '' %}
@@ -432,17 +552,17 @@
                                                             {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
                                                         {% endif %}
                                                         {% set _hdr_col_type = column.get('type', 'number') %}
-                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(column)|trim %} cell-calculated{% endif %}">{{ matrix_column_heading(column, _col_display, matrix_data) }}</th>
+                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(column)|trim %} cell-calculated{% endif %}"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>{{ matrix_pdf_header_label(matrix_column_heading(column, _col_display, matrix_data)) }}</th>
                                                     {% endif %}
                                                 {% endfor %}
                                             </tr>
                                             {% endif %}
                                         {% else %}
-                                        <tr>
+                                        <tr{% if _vhead.mm %} class="matrix-vhead-row" style="height: {{ _vhead.mm }}mm; --matrix-vhead: {{ _vhead.mm - 4 }}mm"{% endif %}>
                                             <th class="matrix-row-header"></th>
                                             {% for col in matrix_columns %}
                                                 {% if show_row_totals and loop.index0 == row_total_ns.index %}
-                                                    <th class="matrix-col-header">{{ _('Total') }}</th>
+                                                    <th class="matrix-col-header">{{ matrix_pdf_header_label(_('Total')) }}</th>
                                                 {% endif %}
                                                 {% if col is mapping %}
                                                     {% set col_name = col.get('name') if col.get('name') else col %}
@@ -457,9 +577,9 @@
                                                     {% set col_display = col_name %}
                                                     {% set col_type = 'number' %}
                                                 {% endif %}
-                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(col)|trim %} cell-calculated{% endif %}">{{ matrix_column_heading(col, col_display, matrix_data) }}</th>
+                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(col)|trim %} cell-calculated{% endif %}"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'headers') }}>{{ matrix_pdf_header_label(matrix_column_heading(col, col_display, matrix_data)) }}</th>
                                                 {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
-                                                    <th class="matrix-col-header">{{ _('Total') }}</th>
+                                                    <th class="matrix-col-header">{{ matrix_pdf_header_label(_('Total')) }}</th>
                                                 {% endif %}
                                             {% endfor %}
                                         </tr>
@@ -480,7 +600,31 @@
                                                 {% endfor %}
                                             </tr>
                                         {% endif %}
+                                        {% set _grp_colspan = (matrix_columns|length) + 1 + (1 if show_row_totals else 0) %}
+                                        {% set ns_group = namespace(current='__no_group_sentinel__') %}
                                         {% for item in sorted_matrix_rows %}
+                                            {% if _group_enabled and item.group != ns_group.current %}
+                                                {% set ns_group.current = item.group %}
+                                                {% set _g_label = item.group if (item.group and item.group|string|trim) else _('Other') %}
+                                                <tr class="matrix-group-row">
+                                                    {% if not _group_totals %}
+                                                        <td class="matrix-group-label" colspan="{{ _grp_colspan }}"><strong>{{ _g_label }}</strong></td>
+                                                    {% else %}
+                                                        {% set _g_key = item.group if (item.group and item.group|string|trim) else '' %}
+                                                        <td class="matrix-group-label"><strong>{{ _g_label }}</strong></td>
+                                                        {% for col in matrix_columns %}
+                                                            {% if show_row_totals and loop.index0 == row_total_ns.index %}
+                                                                <td class="matrix-group-total-cell"><strong>{{ gt.grand.get(_g_key, 0) | format_number }}</strong></td>
+                                                            {% endif %}
+                                                            {% set _gcol_name = col.get('name') if col is mapping and col.get('name') else col %}
+                                                            <td class="matrix-group-total-cell"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'cells') }}><strong>{{ gt.cols.get(_g_key ~ '::' ~ _gcol_name, 0) | format_number }}</strong></td>
+                                                            {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
+                                                                <td class="matrix-group-total-cell"><strong>{{ gt.grand.get(_g_key, 0) | format_number }}</strong></td>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    {% endif %}
+                                                </tr>
+                                            {% endif %}
                                             {% set row = item.row_id %}
                                             {% set row_display = item.row_display %}
                                             {# Row total: sum of cell values for this row (matching matrix-handler.js) #}
@@ -544,7 +688,7 @@
                                                         carry_forward_ref=matrix_carry_forward_ref,
                                                         is_variable_readonly=is_variable_col and variable_readonly
                                                     ) %}
-                                                    <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(col)|trim %} cell-calculated{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}">
+                                                    <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% elif matrix_calc_bold(col)|trim %} cell-calculated{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'cells') }}>
                                                         {% if col_type == 'calculated' %}
                                                             {% if matrix_calc_bold(col)|trim %}<strong>{{ matrix_formula_display(matrix_columns, matrix_data, row, col) }}</strong>{% else %}{{ matrix_formula_display(matrix_columns, matrix_data, row, col) }}{% endif %}
                                                         {% elif col_type == 'tick' %}
@@ -566,7 +710,7 @@
                                                     {% if show_row_totals and loop.index0 == row_total_ns.index %}
                                                         <td class="matrix-grand-total-cell"><strong>{{ ns_ct.grand_total | format_number }}</strong></td>
                                                     {% endif %}
-                                                    <td class="matrix-column-total-cell"><strong>{{ col_total | format_number }}</strong></td>
+                                                    <td class="matrix-column-total-cell"{{- matrix_column_pdf_style(matrix_columns, matrix_column_groups, loop.index0, 'cells') }}><strong>{{ col_total | format_number }}</strong></td>
                                                     {% if show_row_totals and loop.last and row_total_ns.index >= (matrix_columns|length) %}
                                                         <td class="matrix-grand-total-cell"><strong>{{ ns_ct.grand_total | format_number }}</strong></td>
                                                     {% endif %}

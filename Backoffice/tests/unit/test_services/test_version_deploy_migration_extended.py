@@ -776,6 +776,37 @@ class TestVariableReferencesFollowTheField:
         assert consumer_version.variables['orphan']['source_form_item_id'] == orphan.id
 
 
+class TestMatrixRowSourceFollowsTheField:
+    def _consumer_matrix(self, db_session, admin_user, source_item_id):
+        consumer = create_test_template(db_session, owner_id=admin_user.id)
+        section = create_test_section(db_session, consumer, version=consumer.published_version, name='C')
+        own_rows = {
+            'enabled': True,
+            'source_template_id': 1,
+            'source_form_item_id': source_item_id,
+            'source_assignment_period': '__latest__',
+        }
+        return create_test_item(
+            db_session, section, consumer, item_type='matrix', label='Funding',
+            config={'matrix_config': {'row_mode': 'list_library', 'include_own_matrix_rows': own_rows}},
+        )
+
+    def test_include_own_matrix_rows_source_is_repointed(self, db_session, admin_user):
+        source, published, draft = _versions(db_session, admin_user)
+        _ps, _ds, pub_item, drf_item = _pair(db_session, source, published, draft, item_type='matrix')
+        consumer_item = self._consumer_matrix(db_session, admin_user, pub_item.id)
+        untouched = self._consumer_matrix(db_session, admin_user, 999999)
+
+        summary = _migrate(db_session, source, published, draft)
+        db_session.refresh(consumer_item)
+        db_session.refresh(untouched)
+        spec = consumer_item.config['matrix_config']['include_own_matrix_rows']
+        assert spec['source_form_item_id'] == drf_item.id
+        assert spec['source_assignment_period'] == '__latest__'
+        assert untouched.config['matrix_config']['include_own_matrix_rows']['source_form_item_id'] == 999999
+        assert summary['matrix_row_source_references_remapped'] == 1
+
+
 # ---------------------------------------------------------------------------
 # Mapping review (read-only comparison)
 # ---------------------------------------------------------------------------

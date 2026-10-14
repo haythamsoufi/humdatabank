@@ -1442,7 +1442,8 @@ html[dir="rtl"] #edit-translation-modal .bg-blue-50 .flex.items-start i {
 
 /* Entry form discussion panel — chevrons and sidebar collapse in RTL */
 html[dir="rtl"] .discussion-back-chevron,
-html[dir="rtl"] #sidebar-collapse-toggle .fa-chevron-left {
+html[dir="rtl"] #sidebar-collapse-toggle .fa-chevron-left,
+html[dir="rtl"] #mobile-nav-close-button .fa-chevron-left {
     transform: scaleX(-1);
 }
 

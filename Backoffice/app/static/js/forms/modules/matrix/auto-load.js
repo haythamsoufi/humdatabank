@@ -5,6 +5,74 @@ import { mhFetch, mhFetchJson, mhResponseAsResult, isGatewayClassFailure, gatewa
 
 export const matrixAutoLoadMixin = {
 
+/**
+ * Rows saved by this same entity on another matrix (form-builder option).
+ * Returns [] when the option is off or the request fails. Bootstrap already
+ * unions these rows, so callers skip this when entry-bootstrap was used.
+ */
+async _fetchOwnMatrixRowEntities(fieldId, matrix, _mkVarsBody) {
+    const spec = matrix && matrix.config && matrix.config.include_own_matrix_rows;
+    if (!spec || spec.enabled !== true) return [];
+    const formItemId = parseInt(fieldId, 10);
+    if (!Number.isFinite(formItemId)) return [];
+    try {
+        const result = await mhResponseAsResult(await mhFetch('/api/v1/matrix/own-rows', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.getCsrfToken()
+            },
+            body: JSON.stringify(_mkVarsBody({ form_item_id: formItemId }))
+        }));
+        if (!result.ok) {
+            debugWarn('matrix-handler', `[AUTO-LOAD] Own-matrix rows request failed: ${result.status}`);
+            return [];
+        }
+        const payload = result.data || {};
+        const entityType = payload.entity_type || null;
+        const rows = [];
+        for (const ent of payload.entities || []) {
+            const eid = ent.entity_id != null ? ent.entity_id : ent.id;
+            const etype = ent.entity_type || entityType;
+            if (eid != null && etype) {
+                rows.push({ entity_id: eid, entity_type: etype });
+            }
+        }
+        debugLog('matrix-handler', `[AUTO-LOAD] Own-matrix rows: ${rows.length}`);
+        return rows;
+    } catch (error) {
+        debugWarn('matrix-handler', '[AUTO-LOAD] Own-matrix rows request error', error);
+        return [];
+    }
+},
+
+/**
+ * Stripe row headers so the two sources stay distinct. Own-form rows are the ones
+ * listed only because this entity saved them elsewhere. The lookup rows are the
+ * ones a host reported. Both are marked only while that option is on.
+ */
+_applyOwnRowStripes(fieldId, ownOnlyIds) {
+    const matrix = this.matrices.get(fieldId);
+    if (!matrix || !matrix.container) return;
+    const spec = matrix.config && matrix.config.include_own_matrix_rows;
+    const markHost = !!(spec && spec.enabled === true);
+    matrix.container.querySelectorAll('tr.matrix-data-row').forEach(row => {
+        const isOwn = ownOnlyIds.has(row.getAttribute('data-row-id'));
+        const isHost = markHost && !isOwn && row.getAttribute('data-is-auto-loaded') === 'true';
+        if (isOwn) row.setAttribute('data-row-origin', 'own');
+        else if (isHost) row.setAttribute('data-row-origin', 'host');
+        else row.removeAttribute('data-row-origin');
+        const headerCell = row.querySelector('td[role="rowheader"]');
+        if (headerCell) {
+            headerCell.classList.toggle('matrix-own-row-header', isOwn);
+            headerCell.classList.toggle('matrix-host-row-header', isHost);
+        }
+    });
+    if (typeof this.updateLegendVisibility === 'function') {
+        this.updateLegendVisibility(fieldId);
+    }
+},
+
 
 /**
  * Auto-load entities from saved matrix data based on variable configurations
@@ -180,6 +248,8 @@ async _autoLoadEntitiesImpl(fieldId) {
     // entry with a genuinely empty entities array is NOT treated as "bootstrap had
     // nothing" and re-fetched via the legacy per-endpoint APIs below.
     let usedBootstrap = false;
+    // Row ids listed only because of include_own_matrix_rows (not also by the lookup).
+    let ownOnlyIds = new Set();
 
     // Prefer entry-bootstrap auto_load (one round-trip with completion-rate) when available.
     try {
@@ -193,6 +263,7 @@ async _autoLoadEntitiesImpl(fieldId) {
             entities = bootPayload.entities;
             entityType = bootPayload.entity_type || null;
             usedBootstrap = true;
+            for (const id of bootPayload.own_only_entity_ids || []) ownOnlyIds.add(String(id));
             debugLog('matrix-handler', `[AUTO-LOAD] Using entry-bootstrap entities for field ${fieldId}`, {
                 count: entities.length,
                 entityType,
@@ -315,6 +386,23 @@ async _autoLoadEntitiesImpl(fieldId) {
             debugLog('matrix-handler', `[AUTO-LOAD] Merged ${entities.length} unique entities from ${subRequests.length} sub-request(s) via batch (forward lookup)`);
         }
 
+        // Bootstrap already unioned these rows. The live path has to fetch them itself.
+        let ownEntityIds = new Set();
+        if (!usedBootstrap) {
+            const ownEntities = await this._fetchOwnMatrixRowEntities(fieldId, matrix, _mkVarsBody);
+            const seen = new Set(entities.map(ent => String(ent.entity_id)));
+            for (const ent of ownEntities) {
+                const key = String(ent.entity_id);
+                ownEntityIds.add(key);
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    ownOnlyIds.add(key);
+                    entities.push(ent);
+                    if (!entityType && ent.entity_type) entityType = ent.entity_type;
+                }
+            }
+        }
+
         if (entities.length === 0) {
             return;
         }
@@ -360,6 +448,10 @@ async _autoLoadEntitiesImpl(fieldId) {
 
             const filteredEntities = [];
             for (const entity of entities) {
+                if (ownEntityIds.has(String(entity.entity_id))) {
+                    filteredEntities.push(entity);
+                    continue;
+                }
                 const resolvedVariables = resultsByEntityId[String(entity.entity_id)]
                     || resultsByEntityId[entity.entity_id]
                     || {};
@@ -800,6 +892,9 @@ async _autoLoadEntitiesImpl(fieldId) {
     } catch (error) {
         debugError('matrix-handler', 'Error auto-loading entities:', error);
     } finally {
+        // Runs on the early returns above too, so restored rows are striped even when
+        // no new rows were added.
+        this._applyOwnRowStripes(fieldId, ownOnlyIds);
         // Clear batch operation flag
         this.batchOperationsInProgress.delete(fieldId);
     }

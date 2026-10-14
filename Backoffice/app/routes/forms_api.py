@@ -1181,6 +1181,63 @@ def _matrix_uses_auto_load(matrix_item):
     return bool(mc and mc.get('auto_load_entities') and mc.get('row_mode') == 'list_library')
 
 
+def _merge_own_matrix_row_entities(entity_map, entity_type, aes, matrix_config):
+    """Union rows from the matrix's ``include_own_matrix_rows`` source into ``entity_map``.
+
+    Returns ``(entity_type, keep_ids)``. ``keep_ids`` are exempt from the tick-column
+    filter: those rows were listed because the entity reported them, not because a
+    tick lookup matched.
+    """
+    from app.routes.api.assignments import _own_matrix_rows_spec, _resolve_own_matrix_row_entities
+
+    if aes is None or _own_matrix_rows_spec(matrix_config) is None:
+        return entity_type, []
+    result = _resolve_own_matrix_row_entities(aes, matrix_config)
+    if result.get('entity_type') and not entity_type:
+        entity_type = result.get('entity_type')
+    keep_ids = []
+    for ent in result.get('entities') or []:
+        if not isinstance(ent, dict):
+            continue
+        eid = ent.get('entity_id', ent.get('id'))
+        etype = ent.get('entity_type') or result.get('entity_type') or entity_type
+        if eid is None or not etype:
+            continue
+        try:
+            eid_int = int(eid)
+        except (TypeError, ValueError):
+            continue
+        entity_map[eid_int] = {'entity_id': eid_int, 'entity_type': etype}
+        keep_ids.append(eid_int)
+    return entity_type, keep_ids
+
+
+def _auto_load_entities_after_tick_filter(candidates, batch):
+    """Drop unticked reverse-lookup rows. Rows from ``keep_entity_ids`` stay."""
+    keep = set()
+    for raw_id in candidates.get('keep_entity_ids') or []:
+        try:
+            keep.add(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    names = candidates.get('tick_var_names') or []
+    filtered = {}
+    for eid, ent in (candidates.get('entity_map') or {}).items():
+        try:
+            eid_int = int(eid)
+        except (TypeError, ValueError):
+            continue
+        if eid_int in keep:
+            filtered[eid] = ent
+            continue
+        vals = {}
+        if isinstance(batch, dict):
+            vals = batch.get(eid) or batch.get(eid_int) or {}
+        if any(vals.get(name) in (1, '1', True) for name in names):
+            filtered[eid] = ent
+    return filtered
+
+
 def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assignment_level_resolved):
     """Collect auto-load entity candidates for one matrix FormItem (or None if unused).
 
@@ -1308,11 +1365,42 @@ def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assig
         if entity_map and tick_var_names_all:
             tick_var_names = tick_var_names_all
 
+    # Ids already found by the column lookups. Own rows among them are not "extra".
+    lookup_entity_ids = set(entity_map)
+    entity_type, keep_entity_ids = _merge_own_matrix_row_entities(
+        entity_map, entity_type, aes, mc
+    )
+    own_only_entity_ids = [eid for eid in keep_entity_ids if eid not in lookup_entity_ids]
+
     return {
         'entity_map': entity_map,
         'entity_type': entity_type,
         'tick_var_names': tick_var_names,
+        'keep_entity_ids': keep_entity_ids,
+        'own_only_entity_ids': own_only_entity_ids,
     }
+
+
+def _bootstrap_auto_load_entry(candidates, entities):
+    """Bootstrap ``auto_load`` entry for one matrix.
+
+    ``own_only_entity_ids`` lists rows that appear only because of the matrix's
+    ``include_own_matrix_rows`` option, so the entry form can mark them.
+    """
+    entry = {
+        'entities': entities,
+        'entity_type': candidates['entity_type'],
+    }
+    present = {
+        ent.get('entity_id') for ent in entities
+        if isinstance(ent, dict) and ent.get('entity_id') is not None
+    }
+    own_only = [
+        eid for eid in (candidates.get('own_only_entity_ids') or []) if eid in present
+    ]
+    if own_only:
+        entry['own_only_entity_ids'] = own_only
+    return entry
 
 
 @bp.route('/assignment/<int:aes_id>/entry-bootstrap', methods=['GET'])
@@ -1395,10 +1483,9 @@ def api_assignment_entry_bootstrap(aes_id):
                 # Needs a reverse+tick filter — deferred to the single batch resolve below.
                 pending_tick_filters.append((str(item.id), candidates))
             else:
-                auto_load[str(item.id)] = {
-                    'entities': list(candidates['entity_map'].values()),
-                    'entity_type': candidates['entity_type'],
-                }
+                auto_load[str(item.id)] = _bootstrap_auto_load_entry(
+                    candidates, list(candidates['entity_map'].values())
+                )
             row_entity_ids.update(candidates['entity_map'].keys())
 
         # Also include already-saved matrix row entity ids for variable resolve.
@@ -1434,15 +1521,10 @@ def api_assignment_entry_bootstrap(aes_id):
             pending_tick_filters = []
 
         for item_id_str, candidates in pending_tick_filters:
-            filtered = {}
-            for eid, ent in candidates['entity_map'].items():
-                vals = batch.get(eid) or batch.get(int(eid)) or {}
-                if any(vals.get(vn) in (1, '1', True) for vn in candidates['tick_var_names']):
-                    filtered[eid] = ent
-            auto_load[item_id_str] = {
-                'entities': list(filtered.values()),
-                'entity_type': candidates['entity_type'],
-            }
+            filtered = _auto_load_entities_after_tick_filter(candidates, batch)
+            auto_load[item_id_str] = _bootstrap_auto_load_entry(
+                candidates, list(filtered.values())
+            )
 
         response = json_ok(
             completion_rate=completion_rate,

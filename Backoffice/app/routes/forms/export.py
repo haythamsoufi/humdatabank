@@ -147,22 +147,103 @@ def _normalize_matrix_cell_value(value):
     return text
 
 
-def matrix_pdf_layout_strategy(col_count):
+#: A portrait matrix with fewer than 8 columns still fills the page when a
+#: heading wraps for several lines at full size. Past this length it uses the
+#: compact portrait style instead.
+_PORTRAIT_COMPACT_HEADER_CHARS = 48
+
+
+def matrix_pdf_longest_header_chars(columns):
+    """Longest column label, including translations, used to pick a PDF layout."""
+    longest = 0
+    for column in columns or []:
+        texts = []
+        if isinstance(column, dict):
+            texts.append(str(column.get('name') or ''))
+            translations = column.get('name_translations')
+            if isinstance(translations, dict):
+                texts.extend(str(value) for value in translations.values() if value)
+        else:
+            texts.append(str(column or ''))
+        for text in texts:
+            longest = max(longest, len(text.strip()))
+    return longest
+
+
+def matrix_pdf_layout_strategy(col_count, longest_header_chars=0):
     """Choose PDF layout for wide matrices: portrait squeeze vs landscape page.
 
-    Returns an empty string for normal (≤7 columns) matrices.
+    Returns an empty string for a small matrix. A matrix under 8 columns whose
+    headings are long enough to wrap into a tall block uses ``portrait-compact``
+    so it stays the same density as the other fitted tables.
     """
     try:
         count = int(col_count or 0)
     except (TypeError, ValueError):
         count = 0
+    try:
+        longest = int(longest_header_chars or 0)
+    except (TypeError, ValueError):
+        longest = 0
     if count <= 7:
+        if count >= 4 and longest >= _PORTRAIT_COMPACT_HEADER_CHARS:
+            return 'portrait-compact'
         return ''
     if count <= 13:
         return 'portrait-compact'
     if count <= 16:
         return 'landscape'
     return 'landscape-scale'
+
+
+def matrix_pdf_landscape_flow(strategy, previous_strategy, next_strategy):
+    """Classes controlling what may follow a landscape matrix on the same page.
+
+    Another landscape matrix may stay on this page. Any other field starts
+    the next portrait page. A landscape matrix that follows one does not
+    force a fresh page of its own.
+    """
+    def _is_landscape(value):
+        return value in ('landscape', 'landscape-scale')
+
+    classes = []
+    if _is_landscape(strategy) and not _is_landscape(next_strategy):
+        classes.append('wide-matrix-break-after')
+    if _is_landscape(strategy) and _is_landscape(previous_strategy):
+        classes.append('wide-matrix-continue')
+    if not classes:
+        return ''
+    return ' ' + ' '.join(classes)
+
+
+#: Longest single line of an upright header, in mm, before it wraps. At 6pt
+#: this is about a dozen glyphs, so a long heading wraps onto a third line
+#: instead of one very tall column. ``+ _VHEAD_PADDING_MM`` is the breathing
+#: room above and below the centered label.
+_VHEAD_LINE_CAP_MM = 15.0
+_VHEAD_LINE_MIN_MM = 14.0
+_VHEAD_PADDING_MM = 4
+
+
+def matrix_pdf_vertical_header_mm(char_count):
+    """Height, in mm, of the upright column-label row on a landscape matrix.
+
+    The label is rotated to read bottom-to-top and wraps when it would run
+    past the per-line measure, so a long name uses a third line rather than
+    one tall column. The returned height is that measure plus padding; the
+    measure itself is ``height - _VHEAD_PADDING_MM``.
+    """
+    try:
+        count = int(char_count or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count < 0:
+        count = 0
+    # ~1.35mm per glyph at this font size.
+    label_mm = count * 1.35
+    measure = min(label_mm, _VHEAD_LINE_CAP_MM)
+    measure = max(measure, _VHEAD_LINE_MIN_MM)
+    return int(round(measure + _VHEAD_PADDING_MM))
 
 
 def matrix_row_total_insert_index(column_count, row_total_position=None):
@@ -607,11 +688,136 @@ def _resolve_hybrid_fixed_row_displays(matrix_rows, resolved_variables, variable
     return resolved_rows
 
 
-def apply_matrix_rows_for_pdf_export(field_dict, matrix_data, country_iso=None):
+def _own_matrix_row_ids(assignment_entity_status, matrix_config):
+    """Row ids this entity reported on the ``include_own_matrix_rows`` source matrix.
+
+    These rows may have no saved cells in the current submission (their values come
+    from column lookups/variables), so they are unioned in alongside the saved rows
+    rather than inferred from cell keys. Returns a list of string ids.
+    """
+    if assignment_entity_status is None:
+        return []
+    try:
+        from app.routes.api.assignments import _resolve_own_matrix_row_entities
+        result = _resolve_own_matrix_row_entities(assignment_entity_status, matrix_config)
+    except Exception as exc:  # pragma: no cover - defensive, feature is additive
+        current_app.logger.debug("Own matrix rows unavailable for PDF export: %s", exc)
+        return []
+
+    ids = []
+    seen = set()
+    for ent in (result.get('entities') or []):
+        if not isinstance(ent, dict):
+            continue
+        eid = ent.get('entity_id', ent.get('id'))
+        if eid is None:
+            continue
+        key = str(eid)
+        if key not in seen:
+            seen.add(key)
+            ids.append(key)
+    return ids
+
+
+def _resolve_matrix_row_groups(row_ids, matrix_config, group_by_column, country_iso=None):
+    """Map row ids to their ``group_by_column`` value, mirroring the entry form.
+
+    The entry form sets each row's group from ``rowData[group_by_column]`` where
+    ``rowData`` is the lookup option row (e.g. a country's ``region``). This reads
+    the same source rows so the PDF groups match the on-screen matrix.
+    """
+    groups = {}
+    group_by_column = str(group_by_column or '').strip()
+    if not row_ids or not group_by_column:
+        return groups
+
+    lookup_list_id = ''
+    plugin_config = None
+    if isinstance(matrix_config, dict):
+        lookup_list_id = str(matrix_config.get('lookup_list_id') or '').strip()
+        plugin_config = matrix_config.get('plugin_config') if isinstance(matrix_config.get('plugin_config'), dict) else None
+
+    want = {str(r) for r in row_ids}
+
+    def _store(raw_id, value):
+        key = str(raw_id)
+        if key in want and value is not None and str(value).strip():
+            groups[key] = str(value).strip()
+
+    if lookup_list_id and lookup_list_id.isdigit():
+        from app.models import LookupListRow
+        for rid in row_ids:
+            try:
+                rid_int = int(rid)
+            except (ValueError, TypeError):
+                continue
+            row_obj = LookupListRow.query.get(rid_int)
+            if row_obj and isinstance(row_obj.data, dict):
+                _store(rid, row_obj.data.get(group_by_column))
+        return groups
+
+    try:
+        rows = []
+        if lookup_list_id == 'country_map':
+            from app.routes.forms_api import get_country_map_options
+            rows = _rows_from_lookup_options_response(get_country_map_options())
+        elif lookup_list_id == 'national_society':
+            from app.routes.forms_api import get_national_society_options
+            rows = _rows_from_lookup_options_response(get_national_society_options())
+        elif lookup_list_id == 'indicator_bank':
+            from app.routes.forms_api import get_indicator_bank_options
+            rows = _rows_from_lookup_options_response(get_indicator_bank_options())
+        elif lookup_list_id:
+            from app.routes.forms_api import get_plugin_lookup_list_options
+            rows = _rows_from_lookup_options_response(
+                get_plugin_lookup_list_options(
+                    lookup_list_id, country_iso=country_iso, config=plugin_config
+                )
+            )
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            raw_id = row.get('_id', row.get('id'))
+            if raw_id is None:
+                continue
+            _store(raw_id, row.get(group_by_column))
+    except Exception as exc:
+        current_app.logger.debug(
+            "Matrix row groups unavailable for PDF export (%s): %s", lookup_list_id, exc
+        )
+    return groups
+
+
+def _apply_matrix_row_grouping(field_dict, matrix_config, row_ids, country_iso=None):
+    """Attach row-grouping metadata so the PDF groups rows like the entry form.
+
+    Grouping is active only when a ``group_by_column`` is configured and
+    ``group_table_enabled`` is not explicitly off (matching ``effectiveGroupByColumn``
+    in dynamic-rows.js). Stores ``matrix_group_by``, ``matrix_group_enabled``,
+    ``matrix_group_totals`` and a ``matrix_row_groups`` map on the field dict.
+    """
+    if not isinstance(matrix_config, dict):
+        return
+    group_by_column = str(matrix_config.get('group_by_column') or '').strip()
+    if not group_by_column or matrix_config.get('group_table_enabled') is False:
+        return
+    groups = _resolve_matrix_row_groups(
+        row_ids, matrix_config, group_by_column, country_iso=country_iso
+    )
+    if not groups:
+        return
+    field_dict['matrix_group_by'] = group_by_column
+    field_dict['matrix_group_enabled'] = True
+    field_dict['matrix_group_totals'] = matrix_config.get('group_totals_enabled') is True
+    field_dict['matrix_row_groups'] = groups
+
+
+def apply_matrix_rows_for_pdf_export(field_dict, matrix_data, country_iso=None, assignment_entity_status=None):
     """Fill PDF matrix rows for list-library and hybrid (fixed + list library) items.
 
-    List-library replaces configured rows with the saved entity ids.
-    Hybrid keeps configured rows in config order, then appends saved list-library
+    List-library replaces configured rows with the saved entity ids, unioned with
+    any ``include_own_matrix_rows`` ("From your own form") rows the entity reported.
+    Hybrid keeps configured rows in config order, then appends saved/own list-library
     rows sorted by display label. Selectable header keys are not treated as rows.
     """
     if not isinstance(field_dict, dict) or field_dict.get('kind') != 'matrix':
@@ -625,28 +831,39 @@ def apply_matrix_rows_for_pdf_export(field_dict, matrix_data, country_iso=None):
     if row_mode == 'hybrid':
         field_dict['matrix_skip_row_sort'] = True
 
-    if not isinstance(matrix_data, dict) or not matrix_data:
-        return
-
     column_names = _matrix_export_column_names(field_dict.get('matrix_columns') or [], matrix_config)
     if not column_names:
         return
 
-    saved_ids = _saved_matrix_row_ids(matrix_data, column_names)
-    if not saved_ids:
-        return
+    saved_ids = _saved_matrix_row_ids(matrix_data, column_names) if isinstance(matrix_data, dict) else []
+    own_ids = _own_matrix_row_ids(assignment_entity_status, matrix_config)
 
     if row_mode == 'list_library':
-        field_dict['matrix_rows'] = saved_ids
+        all_ids = list(saved_ids)
+        seen = set(all_ids)
+        for oid in own_ids:
+            if oid not in seen:
+                seen.add(oid)
+                all_ids.append(oid)
+        if not all_ids:
+            return
+        field_dict['matrix_rows'] = all_ids
         field_dict['matrix_row_labels'] = _resolve_saved_matrix_row_labels(
-            saved_ids, matrix_config, country_iso=country_iso
+            all_ids, matrix_config, country_iso=country_iso
         )
+        _apply_matrix_row_grouping(field_dict, matrix_config, all_ids, country_iso=country_iso)
         return
 
     fixed_rows = list(field_dict.get('matrix_rows') or [])
     fixed_ids = {_static_matrix_row_id(row) for row in fixed_rows}
     fixed_ids.discard('')
-    dynamic_ids = [rid for rid in saved_ids if rid not in fixed_ids]
+    dynamic_ids = []
+    seen = set()
+    for rid in list(saved_ids) + list(own_ids):
+        if rid in fixed_ids or rid in seen:
+            continue
+        seen.add(rid)
+        dynamic_ids.append(rid)
     labels = dict(field_dict.get('matrix_row_labels') or {})
     if dynamic_ids:
         labels.update(_resolve_saved_matrix_row_labels(
@@ -1185,6 +1402,7 @@ def build_assignment_pdf_bytes(assignment_entity_status):
                             f,
                             existing_data_processed_for_export.get(item_key),
                             country_iso=export_country_iso,
+                            assignment_entity_status=assignment_entity_status,
                         )
                     except Exception as e:
                         current_app.logger.warning(
@@ -1226,6 +1444,9 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         get_localized_page_name=get_localized_page_name,
         matrix_cell_is_prefilled_highlight=matrix_cell_is_prefilled_highlight,
         matrix_pdf_layout_strategy=matrix_pdf_layout_strategy,
+        matrix_pdf_longest_header_chars=matrix_pdf_longest_header_chars,
+        matrix_pdf_landscape_flow=matrix_pdf_landscape_flow,
+        matrix_pdf_vertical_header_mm=matrix_pdf_vertical_header_mm,
         matrix_portrait_column_widths_mm=matrix_portrait_column_widths_mm,
     )
 
@@ -1444,6 +1665,19 @@ def build_assignment_pdf_bytes(assignment_entity_status):
             page: wide;
             page-break-before: always;
             page-break-inside: auto;
+        }
+        /* Leave the landscape page only when the next field is not another
+           landscape matrix. A following landscape matrix drops the forced
+           break so it can use the room left on this page. */
+        .field-box-matrix-wide.wide-matrix-landscape.wide-matrix-break-after,
+        .field-box-matrix-wide.wide-matrix-landscape-scale.wide-matrix-break-after {
+            break-after: page;
+            page-break-after: always;
+        }
+        .field-box-matrix-wide.wide-matrix-landscape.wide-matrix-continue,
+        .field-box-matrix-wide.wide-matrix-landscape-scale.wide-matrix-continue {
+            break-before: auto;
+            page-break-before: auto;
         }
         .field-box-matrix-wide.wide-matrix-landscape .matrix-table,
         .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
@@ -1670,6 +1904,16 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         .matrix-table tbody td.cell-calculated {
             font-weight: 700;
         }
+        /* Region (group_by_column) grouping rows, mirroring the entry form. */
+        .matrix-table tbody tr.matrix-group-row td {
+            background-color: #f3f4f6;
+            font-weight: 700;
+            color: #374151;
+        }
+        html[dir="ltr"] .matrix-table tbody td.matrix-group-label { text-align: left; }
+        html[dir="rtl"] .matrix-table tbody td.matrix-group-label { text-align: right; }
+        html[dir="ltr"] .matrix-table tbody td.matrix-group-total-cell { text-align: right; }
+        html[dir="rtl"] .matrix-table tbody td.matrix-group-total-cell { text-align: left; }
         html[dir="ltr"] .matrix-table tbody td.matrix-col-data,
         html[dir="ltr"] .matrix-table tbody td.matrix-column-total-cell,
         html[dir="ltr"] .matrix-table tbody td.matrix-row-total-cell,
@@ -1678,6 +1922,13 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         }
         html[dir="ltr"] .matrix-table tbody td.matrix-row-label {
             text-align: left;
+        }
+        /* Member rows sit in from the group label so the two don't share an edge. */
+        html[dir="ltr"] .matrix-table.matrix-table-grouped tbody td.matrix-row-label {
+            padding-left: 4mm;
+        }
+        html[dir="rtl"] .matrix-table.matrix-table-grouped tbody td.matrix-row-label {
+            padding-right: 4mm;
         }
         /* Tick cells also carry matrix-col-data, which is right-aligned above. */
         html[dir="ltr"] .matrix-table tbody td.matrix-col-data.cell-tick,
@@ -1711,6 +1962,59 @@ def build_assignment_pdf_bytes(assignment_entity_status):
         html[dir="rtl"] .matrix-table tbody td.matrix-row-total-cell,
         html[dir="rtl"] .matrix-table tbody td.matrix-grand-total-cell {
             text-align: left;
+        }
+        /* Landscape matrices: stand column labels on end (writing-mode is not
+           laid out by WeasyPrint). The label is centered in the cell, then
+           rotated about its own middle, so every heading — short or wrapped —
+           shares the same centre. The per-line measure (--matrix-vhead) is
+           short enough that a long name wraps onto a third line, and that
+           block stays inside the row so it never meets the group bar. */
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table thead th.matrix-col-header,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table thead th.matrix-col-header {
+            position: relative;
+            overflow: hidden;
+            vertical-align: middle;
+            padding: 0;
+            font-size: 6pt;
+            text-align: center;
+        }
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-col-header-label,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-col-header-label {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: var(--matrix-vhead, 15mm);
+            transform: translate(-50%, -50%) rotate(-90deg);
+            transform-origin: center center;
+            white-space: normal;
+            overflow-wrap: normal;
+            hyphens: none;
+            text-align: center;
+            line-height: 1.15;
+        }
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table td.matrix-col-data,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td.matrix-col-data,
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table td.matrix-column-total-cell,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td.matrix-column-total-cell,
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table td.matrix-row-total-cell,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td.matrix-row-total-cell,
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table td.matrix-grand-total-cell,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td.matrix-grand-total-cell {
+            white-space: nowrap;
+            overflow-wrap: normal;
+            font-size: 6pt;
+            padding: 1px 1px;
+        }
+        /* Row names keep a readable width; data columns share what remains.
+           Wrap on spaces instead of splitting words to squeeze the column. */
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table th.matrix-row-header,
+        .field-box-matrix-wide.wide-matrix-landscape .matrix-table td.matrix-row-label,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table th.matrix-row-header,
+        .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table td.matrix-row-label {
+            width: 36mm;
+            overflow-wrap: normal;
+            hyphens: none;
+            white-space: normal;
         }
         @page wide {
             size: A4 landscape;

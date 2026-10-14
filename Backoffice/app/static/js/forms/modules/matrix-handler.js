@@ -45,6 +45,7 @@ import {
     __parseMatrixNumericValue,
     __isEmptyVariableValue,
 } from './matrix/formatting.js';
+import { pinMatrixColumnHeaders } from './matrix/sticky-header.js';
 import {
     __parseCarryForwardRef,
     __matrixCellValuesMatch,
@@ -737,6 +738,8 @@ class MatrixHandler {
             if (tbody) {
                 this._ensureTotalsRowAtTop(tbody);
             }
+
+            pinMatrixColumnHeaders(container);
 
             debugLog('matrix-handler', `Initialized matrix for field ${fieldId}`, config);
         });

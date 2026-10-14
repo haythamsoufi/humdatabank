@@ -1,5 +1,6 @@
 /** Dynamic matrix rows: add, remove, restore, sort, and legend highlighting. */
 import { debugLog, debugError, debugWarn } from '../debug.js';
+import { bindTooltipEvents } from '../tooltips.js';
 import { calculationIsBold, calculationIsReadonly, calculationSavesValue } from './calculation.js';
 import { compareMatrixRowLabels } from './row-order.js';
 import { _t, __canEditMatrixContainer, __rowTotalColumnIndex, applyMatrixColumnGroupChrome, ROW_TOTAL_COLUMN_NAME } from './shared.js';
@@ -22,6 +23,11 @@ import {
 } from './totals.js';
 
 const ROW_GO_UNMATCHED_PREFIX = 'row_go_unmatched|';
+
+// Kept in sync with the row-header stripe rules in static/css/forms.css.
+const MANUAL_ROW_STRIPE = '#d97706';
+const OWN_ROW_STRIPE = '#0369a1';
+const HOST_ROW_STRIPE = '#059669';
 
 export const matrixDynamicRowsMixin = {
 
@@ -123,12 +129,11 @@ addDynamicRow(fieldId, rowLabel, rowData, rowId = null, isAutoLoaded = false) {
     headerCell.style.whiteSpace = 'normal';
     headerCell.style.verticalAlign = 'middle';
 
-    // Apply beige highlight to row header if this is a manually added row and highlighting is enabled
+    // Stripe the row header when this is a manually added row and marking is enabled.
     const matrix = this.matrices.get(fieldIdStr);
     const autoLoadEnabled = __configFlag(matrix?.config?.auto_load_entities, false);
     const highlightManualRows = __configFlag(matrix?.config?.highlight_manual_rows, autoLoadEnabled);
     if (matrix && matrix.config && highlightManualRows && !isAutoLoaded) {
-        headerCell.style.backgroundColor = '#f5f5dc'; // Beige color
         headerCell.classList.add('matrix-manual-row-header');
     }
 
@@ -1005,6 +1010,73 @@ _applyGoUnmatchedRowHeadersFromData(fieldId) {
 },
 
 /**
+ * The group header. With totals on, the sums sit in this row, one cell per column.
+ * Numbers are filled in by calculateMatrixTotals.
+ */
+_buildGroupRowTotalCell(group) {
+    const cell = document.createElement('td');
+    cell.className = 'border border-gray-300 px-2 py-1 bg-gray-100';
+    cell.setAttribute('role', 'gridcell');
+    const span = document.createElement('span');
+    span.className = 'matrix-group-row-total inline-block w-full px-2 py-1 text-center text-sm font-semibold text-gray-800';
+    span.setAttribute('data-group', group);
+    span.textContent = '0';
+    cell.appendChild(span);
+    return cell;
+},
+
+_buildGroupHeaderRow(matrix, group, withTotals) {
+    const headerRow = document.createElement('tr');
+    headerRow.className = 'matrix-group-header-row bg-gray-100 cursor-pointer';
+    headerRow.dataset.group = group;
+
+    const columns = matrix.config?.columns || [];
+    if (!withTotals) {
+        const td = document.createElement('td');
+        td.colSpan = (columns.length || 1) + 2;
+        td.className = 'px-3 py-2 text-xs font-semibold text-gray-700';
+        td.innerHTML = `<i class="fas fa-chevron-down text-gray-400 mr-2 transition-transform duration-200"></i>${this._escapeHtml(group)}`;
+        headerRow.appendChild(td);
+    } else {
+        const labelCell = document.createElement('td');
+        labelCell.className = 'border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 bg-gray-100';
+        labelCell.setAttribute('role', 'rowheader');
+        labelCell.setAttribute('scope', 'row');
+        labelCell.innerHTML = `<i class="fas fa-chevron-down text-gray-400 mr-2 transition-transform duration-200"></i>${this._escapeHtml(group)}`;
+        headerRow.appendChild(labelCell);
+
+        const totalIndex = __rowTotalColumnIndex(matrix.config, columns.length);
+        columns.forEach((column, columnIndex) => {
+            if (totalIndex === columnIndex) headerRow.appendChild(this._buildGroupRowTotalCell(group));
+            const columnName = typeof column === 'object' ? column.name : column;
+            const cell = document.createElement('td');
+            cell.className = 'border border-gray-300 px-2 py-1 bg-gray-100';
+            cell.setAttribute('role', 'gridcell');
+            const span = document.createElement('span');
+            span.className = 'matrix-group-total inline-block w-full px-2 py-1 text-center text-sm font-semibold text-gray-800';
+            span.setAttribute('data-column', columnName);
+            span.textContent = '0';
+            cell.appendChild(span);
+            headerRow.appendChild(cell);
+        });
+        if (totalIndex != null && totalIndex >= columns.length) {
+            headerRow.appendChild(this._buildGroupRowTotalCell(group));
+        }
+    }
+
+    headerRow.addEventListener('click', () => {
+        const icon = headerRow.querySelector('i');
+        let next = headerRow.nextElementSibling;
+        while (next && next.classList.contains('matrix-data-row') && next.getAttribute('data-group') === group) {
+            next.classList.toggle('hidden');
+            next = next.nextElementSibling;
+        }
+        if (icon) icon.classList.toggle('rotate-180');
+    });
+    return headerRow;
+},
+
+/**
  * Sort matrix rows by the row header: periods in calendar order, other labels A–Z.
  */
 sortMatrixRows(fieldId) {
@@ -1021,8 +1093,8 @@ sortMatrixRows(fieldId) {
         return;
     }
 
-    // Remove any existing group header rows
-    tbody.querySelectorAll('.matrix-group-header-row').forEach(h => h.remove());
+    // Remove any existing group header and subtotal rows before re-sorting.
+    tbody.querySelectorAll('.matrix-group-header-row, .matrix-group-total-row').forEach(h => h.remove());
 
     const dataRows = Array.from(tbody.querySelectorAll('tr.matrix-data-row'));
     if (dataRows.length <= 1 && !matrix.config?.group_by_column) {
@@ -1066,8 +1138,7 @@ sortMatrixRows(fieldId) {
     // Remove all sortable rows (static rows removed too so we can re-insert them at top)
     dataRows.forEach(row => row.remove());
 
-    const colCount = matrix.config?.columns?.length || 1;
-    const totalCols = colCount + 2;
+    const groupTotalsEnabled = matrix.config?.group_totals_enabled === true;
     let lastGroup = null;
 
     // In hybrid mode, put pinned static rows back first (in their original config order)
@@ -1081,23 +1152,7 @@ sortMatrixRows(fieldId) {
             const group = row.getAttribute('data-group') || 'Other';
             if (group !== lastGroup) {
                 lastGroup = group;
-                const headerRow = document.createElement('tr');
-                headerRow.className = 'matrix-group-header-row bg-gray-100 cursor-pointer';
-                headerRow.dataset.group = group;
-                const td = document.createElement('td');
-                td.colSpan = totalCols;
-                td.className = 'px-3 py-2 text-xs font-semibold text-gray-700';
-                td.innerHTML = `<i class="fas fa-chevron-down text-gray-400 mr-2 transition-transform duration-200"></i>${this._escapeHtml(group)}`;
-                headerRow.appendChild(td);
-                headerRow.addEventListener('click', () => {
-                    const icon = headerRow.querySelector('i');
-                    let next = headerRow.nextElementSibling;
-                    while (next && next.classList.contains('matrix-data-row') && next.getAttribute('data-group') === group) {
-                        next.classList.toggle('hidden');
-                        next = next.nextElementSibling;
-                    }
-                    icon.classList.toggle('rotate-180');
-                });
+                const headerRow = this._buildGroupHeaderRow(matrix, group, groupTotalsEnabled);
                 if (insertBefore) tbody.insertBefore(headerRow, insertBefore);
                 else tbody.appendChild(headerRow);
             }
@@ -1108,6 +1163,9 @@ sortMatrixRows(fieldId) {
 
     this._ensureTotalsRowAtTop(tbody);
     this.applyManualRowHighlighting(fieldId);
+    if (groupTotalsEnabled && effectiveGroupByColumn && typeof this.calculateMatrixTotals === 'function') {
+        this.calculateMatrixTotals(fieldId);
+    }
     debugLog('matrix-handler', `Sorted ${sortableRows.length} dynamic rows (+${staticRows.length} pinned) for matrix ${fieldId}${effectiveGroupByColumn ? ' with grouping by ' + effectiveGroupByColumn : ''}`);
 }
 
@@ -1154,29 +1212,13 @@ applyDuplicateEntityHighlighting(fieldId) {
         const headerCell = row.querySelector('td[role="rowheader"]');
 
         if (headerCell && rowId && duplicateRowIds.includes(rowId)) {
-            // Apply light red background (but preserve beige if it's also manually added)
-            const isManual = headerCell.classList.contains('matrix-manual-row-header');
-            if (!isManual) {
-                // Only apply red if not already beige (manual takes precedence visually)
-                headerCell.style.backgroundColor = '#ffcccc'; // Light red
-                headerCell.classList.add('matrix-duplicate-row-header');
-            } else {
-                // If it's both manual and duplicate, keep beige but add duplicate class for tracking
-                headerCell.classList.add('matrix-duplicate-row-header');
-            }
-        } else if (headerCell) {
-            // Remove duplicate highlighting if not a duplicate
-            if (headerCell.classList.contains('matrix-duplicate-row-header') &&
-                !headerCell.classList.contains('matrix-manual-row-header')) {
-                headerCell.style.backgroundColor = '';
-                headerCell.classList.remove('matrix-duplicate-row-header');
-            } else if (headerCell.classList.contains('matrix-duplicate-row-header') &&
-                       headerCell.classList.contains('matrix-manual-row-header')) {
-                // Keep beige but remove duplicate class if no longer duplicate
-                if (!duplicateRowIds.includes(rowId)) {
-                    headerCell.classList.remove('matrix-duplicate-row-header');
-                }
-            }
+            // Light red background. A manual or carried-over row keeps its stripe as well.
+            headerCell.style.backgroundColor = '#ffcccc'; // Light red
+            headerCell.classList.add('matrix-duplicate-row-header');
+        } else if (headerCell && headerCell.classList.contains('matrix-duplicate-row-header')) {
+            // No longer a duplicate: drop the red background. A stripe, if any, stays.
+            headerCell.style.backgroundColor = '';
+            headerCell.classList.remove('matrix-duplicate-row-header');
         }
     });
 
@@ -1194,7 +1236,7 @@ applyDuplicateEntityHighlighting(fieldId) {
 
 
 /**
- * Apply beige highlighting to manually added row headers based on config
+ * Stripe manually added row headers based on config
  */
 applyManualRowHighlighting(fieldId) {
     const matrix = this.matrices.get(fieldId);
@@ -1224,14 +1266,10 @@ applyManualRowHighlighting(fieldId) {
         const headerCell = row.querySelector('td[role="rowheader"]');
         const isAutoLoaded = row.getAttribute('data-is-auto-loaded') === 'true';
         if (headerCell) {
-            if (!isAutoLoaded) {
-                headerCell.style.backgroundColor = '#f5f5dc'; // Beige color
-                headerCell.classList.add('matrix-manual-row-header');
-            } else {
-                // Ensure auto-loaded rows don't have the highlight
-                headerCell.style.backgroundColor = '';
-                headerCell.classList.remove('matrix-manual-row-header');
-            }
+            // Auto-loaded rows are never manual. Clearing the inline background here is
+            // safe: duplicate highlighting re-applies its own right below.
+            headerCell.style.backgroundColor = '';
+            headerCell.classList.toggle('matrix-manual-row-header', !isAutoLoaded);
         }
     });
 
@@ -1250,6 +1288,80 @@ applyManualRowHighlighting(fieldId) {
 
 
 /**
+ * Show only the rows for the legend entry stored on the matrix, or every row
+ * when none is selected. Group headers with nothing left to show are hidden too.
+ * Uses its own class so collapsing a group still works.
+ */
+_appendLegendFilter(container, matrixContainer, filterKey, swatch, text, tooltip) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'matrix-legend-filter';
+    item.setAttribute('data-legend-filter', filterKey);
+    const activeKey = matrixContainer.getAttribute('data-legend-filter') || '';
+    const active = activeKey === filterKey;
+    item.setAttribute('aria-pressed', active ? 'true' : 'false');
+    if (active) item.classList.add('is-active');
+    else if (activeKey) item.classList.add('is-dimmed');
+    item.appendChild(swatch);
+    const span = document.createElement('span');
+    span.className = 'text-gray-700 matrix-legend-text';
+    span.textContent = text;
+    item.appendChild(span);
+
+    if (!tooltip) {
+        container.appendChild(item);
+        return;
+    }
+    const wrap = document.createElement('span');
+    wrap.className = 'matrix-legend-with-help';
+    wrap.appendChild(item);
+    const help = document.createElement('span');
+    help.className = 'matrix-legend-tooltip';
+    help.setAttribute('aria-label', tooltip);
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-question-circle';
+    icon.setAttribute('aria-hidden', 'true');
+    const tip = document.createElement('span');
+    tip.className = 'tooltip-text';
+    tip.textContent = tooltip;
+    help.appendChild(icon);
+    help.appendChild(tip);
+    bindTooltipEvents(help);
+    wrap.appendChild(help);
+    container.appendChild(wrap);
+},
+
+applyLegendRowFilter(fieldId) {
+    const matrix = this.matrices.get(fieldId);
+    if (!matrix || !matrix.container) return;
+    const key = matrix.container.getAttribute('data-legend-filter') || '';
+    const matchClass = {
+        host: 'matrix-host-row-header',
+        own: 'matrix-own-row-header',
+        manual: 'matrix-manual-row-header',
+    }[key] || '';
+
+    matrix.container.querySelectorAll('tr.matrix-data-row').forEach(row => {
+        const header = row.querySelector('td[role="rowheader"]');
+        const hide = !!matchClass && !(header && header.classList.contains(matchClass));
+        row.classList.toggle('matrix-row-filtered-out', hide);
+    });
+
+    matrix.container.querySelectorAll('tr.matrix-group-header-row').forEach(headerRow => {
+        let next = headerRow.nextElementSibling;
+        let anyVisible = false;
+        while (next && next.classList.contains('matrix-data-row')) {
+            if (!next.classList.contains('matrix-row-filtered-out')) anyVisible = true;
+            next = next.nextElementSibling;
+        }
+        headerRow.classList.toggle('matrix-row-filtered-out', !!matchClass && !anyVisible);
+    });
+    if (typeof this.calculateMatrixTotals === 'function') {
+        this.calculateMatrixTotals(fieldId);
+    }
+},
+
+/**
  * Update legend visibility based on whether there are highlighted rows
  */
 updateLegendVisibility(fieldId) {
@@ -1263,16 +1375,31 @@ updateLegendVisibility(fieldId) {
     const legendHide = __configFlag(matrix.config.legend_hide, false);
 
     const highlightedRows = matrix.container.querySelectorAll('tr.matrix-data-row td.matrix-manual-row-header');
+    const ownRows = matrix.container.querySelectorAll('tr.matrix-data-row td.matrix-own-row-header');
+    const hostRows = matrix.container.querySelectorAll('tr.matrix-data-row td.matrix-host-row-header');
     const duplicateRows = matrix.container.querySelectorAll('tr.matrix-data-row td.matrix-duplicate-row-header');
     const hasHighlightedRows = highlightedRows.length > 0;
+    const hasOwnRows = ownRows.length > 0;
+    const hasHostRows = hostRows.length > 0;
     const hasDuplicateRows = duplicateRows.length > 0;
     const hasPrefilledCells = this._matrixHasPrefilledCellHighlights(matrix.container);
     const prefilledLegendEnabled = matrix.container.getAttribute('data-highlight-prefilled-cells') === 'true';
 
     const shouldShowManualLegend = highlightManualRows && !legendHide && hasHighlightedRows;
+    const shouldShowHostLegend = !legendHide && hasHostRows;
+    const shouldShowOwnLegend = !legendHide && hasOwnRows;
     const shouldShowDuplicateLegend = highlightManualRows && !legendHide && hasDuplicateRows;
     const shouldShowPrefilledLegend = prefilledLegendEnabled && hasPrefilledCells;
-    const shouldShowLegend = shouldShowManualLegend || shouldShowDuplicateLegend || shouldShowPrefilledLegend;
+    const shouldShowLegend = shouldShowManualLegend || shouldShowHostLegend || shouldShowOwnLegend || shouldShowDuplicateLegend || shouldShowPrefilledLegend;
+
+    // Small square with the same stripe the row header uses.
+    const stripeSwatch = (color, label) => {
+        const swatch = document.createElement('div');
+        swatch.className = 'w-4 h-4 border border-gray-300 rounded bg-gray-50';
+        swatch.style.boxShadow = `inset 3px 0 0 ${color}`;
+        swatch.setAttribute('aria-label', label);
+        return swatch;
+    };
 
     // Get or create legend element
     let legend = matrix.container.querySelector('.matrix-legend');
@@ -1292,7 +1419,7 @@ updateLegendVisibility(fieldId) {
     legend.replaceChildren();
 
     const legendItemsContainer = document.createElement('div');
-    legendItemsContainer.className = 'flex flex-col gap-2';
+    legendItemsContainer.className = 'matrix-legend-items';
 
     if (shouldShowPrefilledLegend) {
         const legendItem = document.createElement('div');
@@ -1313,29 +1440,41 @@ updateLegendVisibility(fieldId) {
     }
 
     if (shouldShowManualLegend) {
-        const legendItem = document.createElement('div');
-        legendItem.className = 'flex items-center space-x-2';
-
-        const legendColor = document.createElement('div');
-        legendColor.className = 'w-4 h-4 border border-gray-300 rounded';
-        legendColor.style.backgroundColor = '#f5f5dc';
-        legendColor.setAttribute('aria-label', 'Beige highlight color');
-
-        const legendTextSpan = document.createElement('span');
-        legendTextSpan.className = 'text-gray-700 matrix-legend-text';
         let legendText = matrix.config.legend_text || 'Manually added row';
-
         if (matrix.config.legend_text_translations) {
             const currentLanguage = this.getCurrentLanguage();
             if (currentLanguage && matrix.config.legend_text_translations[currentLanguage]) {
                 legendText = matrix.config.legend_text_translations[currentLanguage];
             }
         }
-        legendTextSpan.textContent = legendText;
+        this._appendLegendFilter(
+            legendItemsContainer,
+            matrix.container,
+            'manual',
+            stripeSwatch(MANUAL_ROW_STRIPE, 'Amber stripe for manually added rows'),
+            legendText,
+        );
+    }
 
-        legendItem.appendChild(legendColor);
-        legendItem.appendChild(legendTextSpan);
-        legendItemsContainer.appendChild(legendItem);
+    if (shouldShowHostLegend) {
+        this._appendLegendFilter(
+            legendItemsContainer,
+            matrix.container,
+            'host',
+            stripeSwatch(HOST_ROW_STRIPE, 'Green stripe for rows reported by a host country'),
+            _t('Reported by host country'),
+        );
+    }
+
+    if (shouldShowOwnLegend) {
+        this._appendLegendFilter(
+            legendItemsContainer,
+            matrix.container,
+            'own',
+            stripeSwatch(OWN_ROW_STRIPE, 'Blue stripe for rows from your past reporting'),
+            _t('Your past countries'),
+            _t('Countries from your own past reporting that no host country reported. Listed with no figures, for you to fill in.'),
+        );
     }
 
     if (shouldShowDuplicateLegend) {
@@ -1356,11 +1495,50 @@ updateLegendVisibility(fieldId) {
         legendItemsContainer.appendChild(legendItem);
     }
 
+    if (matrix.container.getAttribute('data-legend-filter')) {
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'matrix-legend-clear';
+        clear.setAttribute('data-legend-clear', '1');
+        clear.setAttribute('aria-label', _t('Clear filter'));
+        clear.title = _t('Clear filter');
+        const filterIcon = document.createElement('i');
+        filterIcon.className = 'fas fa-filter matrix-legend-clear-filter';
+        filterIcon.setAttribute('aria-hidden', 'true');
+        const clearIcon = document.createElement('i');
+        clearIcon.className = 'fas fa-circle-xmark matrix-legend-clear-x';
+        clearIcon.setAttribute('aria-hidden', 'true');
+        clear.appendChild(filterIcon);
+        clear.appendChild(clearIcon);
+        legendItemsContainer.appendChild(clear);
+    }
+
     legend.appendChild(legendItemsContainer);
     legend.style.display = shouldShowLegend ? 'block' : 'none';
+    if (!legend.dataset.filterBound) {
+        legend.dataset.filterBound = '1';
+        legend.addEventListener('click', (event) => {
+            const clear = event.target.closest('[data-legend-clear]');
+            if (clear && legend.contains(clear)) {
+                matrix.container.removeAttribute('data-legend-filter');
+                this.updateLegendVisibility(fieldId);
+                return;
+            }
+            const button = event.target.closest('[data-legend-filter]');
+            if (!button || !legend.contains(button)) return;
+            const key = button.getAttribute('data-legend-filter');
+            const current = matrix.container.getAttribute('data-legend-filter') || '';
+            if (current === key) matrix.container.removeAttribute('data-legend-filter');
+            else matrix.container.setAttribute('data-legend-filter', key);
+            this.updateLegendVisibility(fieldId);
+        });
+    }
+    this.applyLegendRowFilter(fieldId);
 
     debugLog('matrix-handler', `Updated legend visibility for matrix ${fieldId}: ${shouldShowLegend ? 'shown' : 'hidden'}`, {
         hasHighlightedRows,
+        hasHostRows,
+        hasOwnRows,
         hasDuplicateRows,
         hasPrefilledCells,
     });

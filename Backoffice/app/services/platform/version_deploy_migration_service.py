@@ -294,6 +294,7 @@ class VersionDeployMigrationService:
             summary['page_status_conflicts'] = page_conflicts
 
         summary['variable_references_remapped'] = cls._remap_variable_item_references(item_map)
+        summary['matrix_row_source_references_remapped'] = cls._remap_matrix_row_source_references(item_map)
 
         restored_items = restored_sections = 0
         if restore_archived:
@@ -775,6 +776,36 @@ class VersionDeployMigrationService:
                 remapped += 1
             if updated is not None:
                 version.variables = updated
+        return remapped
+
+    @classmethod
+    def _remap_matrix_row_source_references(cls, item_map: Dict[int, int]) -> int:
+        """Repoint a matrix's ``include_own_matrix_rows`` source to the field's new row.
+
+        The setting stores a raw form_item.id of another matrix (often on another template),
+        the same way template variables do.
+        """
+        effective = {old: new for old, new in item_map.items() if old != new}
+        if not effective:
+            return 0
+        remapped = 0
+        for item in FormItem.query.filter(FormItem.item_type == 'matrix').all():
+            config = item.config if isinstance(item.config, dict) else None
+            matrix_config = config.get('matrix_config') if config else None
+            spec = matrix_config.get('include_own_matrix_rows') if isinstance(matrix_config, dict) else None
+            if not isinstance(spec, dict):
+                continue
+            try:
+                old_id = int(spec.get('source_form_item_id'))
+            except (TypeError, ValueError):
+                continue
+            new_id = effective.get(old_id)
+            if new_id is None:
+                continue
+            updated = copy.deepcopy(config)
+            updated['matrix_config']['include_own_matrix_rows']['source_form_item_id'] = new_id
+            item.config = updated
+            remapped += 1
         return remapped
 
     @classmethod

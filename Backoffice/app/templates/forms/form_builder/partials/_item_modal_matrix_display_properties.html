@@ -34,10 +34,42 @@
                 {{ field_help(_('Controls only the API/export output, independent of the on-screen totals above. Disable this to let users see totals while filling in the form but keep row/column/grand totals out of API responses, data exports, and BI feeds for this item — raw cell values are always included either way.')) }}
             </label>
         </div>
-        <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
-            <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
-            <span class="ml-2 text-sm text-gray-700">{{ _('Auto Load Entities') }}</span>
-        </label>
+        <div>
+            <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
+                <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                <span class="ml-2 text-sm text-gray-700">{{ _('Auto Load Entities') }}</span>
+            </label>
+            <div id="matrix-include-own-rows-wrapper" class="ml-6 mt-2 hidden space-y-2 border-l-2 border-orange-200 pl-3">
+                <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" id="matrix-include-own-rows" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                    <span class="text-sm text-gray-700">{{ _('Also list rows from another form filled by the same entity') }}</span>
+                    {{ field_help(_('Adds list rows that this same country or National Society already saved on another matrix, including rows the column lookups do not return. Cell values still come only from the column lookups. Turn this off to list lookup rows only.')) }}
+                </label>
+                <div id="matrix-include-own-rows-options" class="hidden space-y-2">
+                    <div>
+                        <label for="matrix-own-rows-template" class="block text-xs font-medium text-gray-600 mb-1">{{ _('Source template') }}</label>
+                        <select id="matrix-own-rows-template" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <option value="">{{ _('Select a template') }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="matrix-own-rows-item" class="block text-xs font-medium text-gray-600 mb-1">{{ _('Source matrix') }}</label>
+                        <select id="matrix-own-rows-item" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <option value="">{{ _('Select a matrix') }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="matrix-own-rows-period" class="block text-xs font-medium text-gray-600 mb-1">{{ _('Source period') }}</label>
+                        <select id="matrix-own-rows-period" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <option value="__latest__">{{ _('Latest period on the source template') }}</option>
+                            <option value="__previous__">{{ _('Previous period (ended before this assignment starts)') }}</option>
+                            <option value="__same_year__">{{ _('Same calendar year') }}</option>
+                            <option value="__current__">{{ _('Same period name') }}</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
         <label class="inline-flex items-center">
             <input type="checkbox" id="matrix-highlight-manual-rows" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
             <span class="ml-2 text-sm text-gray-700">{{ _('Highlight Manually Added Rows') }}</span>

@@ -1334,9 +1334,9 @@ class TestResolveEntitiesContaining:
 
 class TestResolveEntitiesContainingForMatrixCell:
 
-    def test_empty_entity_statuses_returns_zero(self):
+    def test_empty_entity_statuses_returns_blank(self):
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell([], 5, {})
-        assert result == 0
+        assert result is None
 
     def test_no_current_aes_fallback_match(self):
         aes = MagicMock()
@@ -1372,7 +1372,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         assert result == 1
 
     @patch('app.services.forms.variable_resolution_service.FormData')
-    def test_row_entity_not_in_list_returns_zero(self, mock_fd_cls):
+    def test_row_entity_not_in_list_returns_blank(self, mock_fd_cls):
         aes = MagicMock()
         aes.entity_id = 99
         cur_aes = MagicMock()
@@ -1381,7 +1381,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
             [aes], 5, config, cur_aes
         )
-        assert result == 0
+        assert result is None
 
     @patch('app.services.forms.variable_resolution_service.FormData')
     def test_found_numeric_cell_value(self, mock_fd_cls):
@@ -1402,7 +1402,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         assert result == 1.0
 
     @patch('app.services.forms.variable_resolution_service.FormData')
-    def test_no_form_data_returns_zero(self, mock_fd_cls):
+    def test_no_form_data_returns_blank(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
         aes.entity_id = 5
@@ -1414,10 +1414,10 @@ class TestResolveEntitiesContainingForMatrixCell:
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
             [aes], 5, config, cur_aes
         )
-        assert result == 0
+        assert result is None
 
     @patch('app.services.forms.variable_resolution_service.FormData')
-    def test_no_disagg_data_returns_zero(self, mock_fd_cls):
+    def test_no_disagg_data_returns_blank(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
         aes.entity_id = 5
@@ -1432,10 +1432,10 @@ class TestResolveEntitiesContainingForMatrixCell:
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
             [aes], 5, config, cur_aes
         )
-        assert result == 0
+        assert result is None
 
     @patch('app.services.forms.variable_resolution_service.FormData')
-    def test_key_not_found_in_matrix_returns_zero(self, mock_fd_cls):
+    def test_key_not_found_in_matrix_returns_blank(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
         aes.entity_id = 5
@@ -1450,7 +1450,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
             [aes], 5, config, cur_aes
         )
-        assert result == 0
+        assert result is None
 
     @patch('app.services.forms.variable_resolution_service.FormData')
     def test_row_total_mode(self, mock_fd_cls):
@@ -1471,7 +1471,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         assert result == 8.0
 
     @patch('app.services.forms.variable_resolution_service.FormData')
-    def test_row_total_mode_no_data_returns_zero(self, mock_fd_cls):
+    def test_row_total_mode_no_data_returns_blank(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
         aes.entity_id = 5
@@ -1486,7 +1486,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
             [aes], 5, config, cur_aes
         )
-        assert result == 0
+        assert result is None
 
     @patch('app.services.forms.variable_resolution_service.FormData')
     def test_non_numeric_cell_value_returned(self, mock_fd_cls):
@@ -1507,7 +1507,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         assert result == 'yes'
 
     @patch('app.services.forms.variable_resolution_service.FormData')
-    def test_non_dict_disagg_returns_zero(self, mock_fd_cls):
+    def test_non_dict_disagg_returns_blank(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
         aes.entity_id = 5
@@ -1522,7 +1522,46 @@ class TestResolveEntitiesContainingForMatrixCell:
         result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
             [aes], 5, config, cur_aes
         )
-        assert result == 0
+        assert result is None
+
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    def test_stored_zero_stays_zero(self, mock_fd_cls):
+        aes = MagicMock()
+        aes.id = 1
+        aes.entity_id = 5
+        cur_aes = MagicMock()
+        cur_aes.entity_id = 10
+
+        fd = MagicMock()
+        fd.disagg_data = {'10_SP2': 0}
+        mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = fd
+
+        config = {'matrix_column_name': 'SP2', 'source_form_item_id': 5}
+        result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
+            [aes], 5, config, cur_aes
+        )
+        assert result == 0.0
+
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    def test_calculated_zero_is_blank(self, mock_fd_cls):
+        aes = MagicMock()
+        aes.id = 1
+        aes.entity_id = 5
+        cur_aes = MagicMock()
+        cur_aes.entity_id = 10
+
+        fd = MagicMock()
+        fd.disagg_data = {'_table': 'ns'}
+        mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = fd
+
+        config = {'matrix_column_name': 'SP2', 'source_form_item_id': 5}
+        with patch.object(
+            VariableResolutionService, '_matrix_calculated_lookup', return_value=(True, 0.0)
+        ):
+            result = VariableResolutionService._resolve_entities_containing_for_matrix_cell(
+                [aes], 5, config, cur_aes
+            )
+        assert result is None
 
 
 # ---------------------------------------------------------------------------

@@ -520,6 +520,18 @@ class VariableResolutionService:
         return True, None
 
     @classmethod
+    def _blank_when_zero(cls, value):
+        """A calculated 0 is blank. A variable Default Value can fill that blank later."""
+        if value is None:
+            return None
+        try:
+            if float(value) == 0:
+                return None
+        except (TypeError, ValueError):
+            return value
+        return value
+
+    @classmethod
     def _matrix_row_total(cls, disagg_data: Optional[Dict], row_entity_id: Any, columns: Optional[list] = None) -> Optional[float]:
         """
         Compute the row total (sum of all column values) for a given row in matrix disagg_data.
@@ -1298,7 +1310,7 @@ class VariableResolutionService:
                     entry.disagg_data, row_entity_id, matrix_column_name, columns
                 )
                 if is_calculated:
-                    return calculated_value
+                    return cls._blank_when_zero(calculated_value)
                 lookup_key = f"{row_entity_id}_{matrix_column_name}"
                 matrix_value = entry.disagg_data.get(lookup_key)
                 if matrix_value is not None:
@@ -1564,7 +1576,7 @@ class VariableResolutionService:
                     entry.disagg_data, row_entity_id, matrix_column_name, columns
                 )
                 if is_calculated:
-                    return calculated_value
+                    return cls._blank_when_zero(calculated_value)
                 lookup_key = f"{row_entity_id}_{matrix_column_name}"
                 matrix_value = entry.disagg_data.get(lookup_key)
                 if matrix_value is not None:
@@ -1643,11 +1655,12 @@ class VariableResolutionService:
             current_assignment_entity_status: Current assignment context (needed for lookup_entity_id)
 
         Returns:
-            The actual cell value from matrix data (e.g., 1 for ticked, 0 for unticked), or 0 if not found
+            The actual cell value from matrix data (e.g., 1 for ticked, 0 for unticked),
+            or None when the cell is blank. A variable Default Value fills that blank.
         """
         if not entity_statuses:
-            logger.debug(f"_resolve_entities_containing_for_matrix_cell: No matching entities found, returning 0 for row_entity_id={row_entity_id}")
-            return 0
+            logger.debug(f"_resolve_entities_containing_for_matrix_cell: No matching entities found, returning blank for row_entity_id={row_entity_id}")
+            return None
 
         # Get the lookup entity ID from current assignment (the entity ID we're looking for in matrix data)
         if not current_assignment_entity_status:
@@ -1681,8 +1694,8 @@ class VariableResolutionService:
                 break
 
         if not matching_entity_status:
-            logger.debug(f"_resolve_entities_containing_for_matrix_cell: Row entity {row_entity_id} not found in {len(entity_statuses)} matching entities, returning 0")
-            return 0
+            logger.debug(f"_resolve_entities_containing_for_matrix_cell: Row entity {row_entity_id} not found in {len(entity_statuses)} matching entities, returning blank")
+            return None
 
         # Query FormData for the matching entity to get its matrix data
         form_data_entry = FormData.query.filter_by(
@@ -1691,8 +1704,8 @@ class VariableResolutionService:
         ).order_by(FormData.submitted_at.desc()).first()
 
         if not form_data_entry or not form_data_entry.disagg_data:
-            logger.debug(f"_resolve_entities_containing_for_matrix_cell: No FormData or matrix data found for row_entity_id={row_entity_id}, returning 0")
-            return 0
+            logger.debug(f"_resolve_entities_containing_for_matrix_cell: No FormData or matrix data found for row_entity_id={row_entity_id}, returning blank")
+            return None
 
         # Look up the actual cell value (or row total) using lookup key or row total
         # In entities_containing, the "row" in the source matrix is the current assignment's entity (lookup_entity_id)
@@ -1700,16 +1713,15 @@ class VariableResolutionService:
             columns, matrix_column_name = cls._matrix_lookup_columns_and_code(form_data_entry, matrix_column_name)
             if matrix_column_name == cls.MATRIX_COLUMN_ROW_TOTAL:
                 total = cls._matrix_row_total(form_data_entry.disagg_data, lookup_entity_id, columns)
-                numeric_value = total if total is not None else 0
                 logger.debug(
-                    f"_resolve_entities_containing_for_matrix_cell: Row total for row_entity_id={row_entity_id} = {numeric_value}"
+                    f"_resolve_entities_containing_for_matrix_cell: Row total for row_entity_id={row_entity_id} = {total}"
                 )
-                return numeric_value
+                return total
             is_calculated, calculated_value = cls._matrix_calculated_lookup(
                 form_data_entry.disagg_data, lookup_entity_id, matrix_column_name, columns
             )
             if is_calculated:
-                return calculated_value if calculated_value is not None else 0
+                return cls._blank_when_zero(calculated_value)
             lookup_key = f"{lookup_entity_id}_{matrix_column_name}"
             cell_value = form_data_entry.disagg_data.get(lookup_key)
             if cell_value is not None:
@@ -1735,12 +1747,12 @@ class VariableResolutionService:
                 available_keys = [k for k in form_data_entry.disagg_data.keys() if k != '_table']
                 logger.debug(
                     f"_resolve_entities_containing_for_matrix_cell: Cell key '{lookup_key}' not found in matrix data for row_entity_id={row_entity_id}. "
-                    f"Available keys: {available_keys}. Returning 0"
+                    f"Available keys: {available_keys}. Returning blank"
                 )
-                return 0
+                return None
 
-        logger.debug(f"_resolve_entities_containing_for_matrix_cell: Matrix data is not a dict for row_entity_id={row_entity_id}, returning 0")
-        return 0
+        logger.debug(f"_resolve_entities_containing_for_matrix_cell: Matrix data is not a dict for row_entity_id={row_entity_id}, returning blank")
+        return None
 
     @classmethod
     def _resolve_entities_containing(
@@ -2007,7 +2019,8 @@ class VariableResolutionService:
 
             # Check each entity's matrix data for keys containing the lookup_entity_id.
             # Use "any key starting with lookup_entity_id_" so entities with blanks in some columns
-            # are still included. Per-cell resolution then returns the value or 0 when the key is missing.
+            # are still included. Per-cell resolution then returns the value, or blank when the
+            # key is missing. A variable Default Value fills that blank.
             # (Previously we required the exact matrix_column_name key, which excluded entities with
             # blanks and caused batch resolution to return 0 for all columns due to cached entity list.)
             lookup_prefix = f"{lookup_entity_id}_"

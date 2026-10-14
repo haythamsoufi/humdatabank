@@ -5742,14 +5742,6 @@ msgstr "Color"
 msgid "Colour"
 msgstr "Colour"
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:492
-msgid ""
-"Colour of this group header in the matrix. Grey matches the other column "
-"headers."
-msgstr ""
-"Colour of this group header in the matrix. Grey matches the other column "
-"headers."
-
 #: app/templates/components/ag_grid_i18n_js.html:6
 msgid "Column Visibility"
 msgstr "Column Visibility"
@@ -6168,14 +6160,6 @@ msgstr ""
 "age groups for demographic disaggregation, configure sex categories for data"
 " analysis, and customize organization branding. Changes here affect the "
 "entire system and all forms."
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:85
-msgid ""
-"Configure templates and rounds above, then use Preview import below for row "
-"counts and warnings. You can run the import without preview."
-msgstr ""
-"Configure templates and rounds above, then use Preview import below for row "
-"counts and warnings. You can run the import without preview."
 
 #: app/templates/admin/reports/partials/_filter_panel.html:11
 msgid ""
@@ -13041,10 +13025,6 @@ msgstr "Half (6/12)"
 msgid "Has usage"
 msgstr "Has usage"
 
-#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:493
-msgid "Header"
-msgstr "Header"
-
 #: app/templates/forms/form_builder/form_builder.html:805
 #: app/templates/forms/form_builder/partials/_item_modal_question_fields.html:26
 msgid "Heading"
@@ -13622,18 +13602,6 @@ msgstr "Import change log"
 msgid "Import complete"
 msgstr "Import complete"
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:26
-msgid ""
-"Import data from UPR Master.xlsx (sheet \"UPR Data\") into planning and "
-"reporting templates. Allowed rounds: planning P23–P26 (templates 24 and 22);"
-" annual reports AR21–AR25 (templates 33 and 23); mid-year MYR23–MYR25 "
-"(template 33). Later rounds such as P27, AR26, and MYR26 are not imported."
-msgstr ""
-"Import data from UPR Master.xlsx (sheet \"UPR Data\") into planning and "
-"reporting templates. Allowed rounds: planning P23–P26 (templates 24 and 22);"
-" annual reports AR21–AR25 (templates 33 and 23); mid-year MYR23–MYR25 "
-"(template 33). Later rounds such as P27, AR26, and MYR26 are not imported."
-
 #: app/templates/admin/ai/knowledge_base.html:377
 msgid ""
 "Import documents from the connected external document API. Filter by "
@@ -13717,10 +13685,6 @@ msgstr "Import preview (optional)"
 #: plugins/upr/templates/admin/_upr_excel_import_panel.html:101
 msgid "Import progress"
 msgstr "Import progress"
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:56
-msgid "Import settings"
-msgstr "Import settings"
 
 #: app/templates/admin/ai/knowledge_base.html:275
 msgid "Import source"
@@ -23120,14 +23084,6 @@ msgstr "Rounded, such as 31.8 B"
 msgid "Rounds"
 msgstr "Rounds"
 
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:69
-msgid ""
-"Rounds (comma-separated, e.g. P26, AR25, MYR25 — empty = all allowed rounds "
-"matching selected templates: P23–P26, AR21–AR25, MYR23–MYR25)"
-msgstr ""
-"Rounds (comma-separated, e.g. P26, AR25, MYR25 — empty = all allowed rounds "
-"matching selected templates: P23–P26, AR21–AR25, MYR23–MYR25)"
-
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:42
 msgid "Row Configuration Mode"
 msgstr "Row Configuration Mode"
@@ -27100,10 +27056,6 @@ msgstr "Templates"
 #: app/templates/admin/templates/new_template.html:261
 msgid "Templates to clone"
 msgstr "Templates to clone"
-
-#: plugins/upr/templates/admin/_upr_excel_import_panel.html:59
-msgid "Templates to sync"
-msgstr "Templates to sync"
 
 #: app/templates/admin/common_words/manage_common_words.html:744
 #: app/templates/admin/indicator_bank/_panel_common_words_body.html:60
@@ -33229,385 +33181,3 @@ msgstr "⚠️ Copy this key now - it will not be shown again!"
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1013
 msgid "✓"
 msgstr "✓"
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:1384
-#~ msgid ""
-#~ "Enable per-page save and submit?\n"
-#~ "\n"
-#~ "Pages that do not yet have a status will inherit each entity's current assignment status.\n"
-#~ "Existing submitted pages stay locked.\n"
-#~ "Submitted, sent-for-review, approved, or cancelled entities keep that assignment status unless you reopen them."
-#~ msgstr ""
-#~ "Enable per-page save and submit?\n"
-#~ "\n"
-#~ "Pages that do not yet have a status will inherit each entity's current assignment status.\n"
-#~ "Existing submitted pages stay locked.\n"
-#~ "Submitted, sent-for-review, approved, or cancelled entities keep that assignment status unless you reopen them."
-
-# [Removed] was: app/templates/forms/entry_form/entry_form.html:3001
-#~ msgid ""
-#~ "Leave file selection empty to keep current document, or upload a new file to"
-#~ " replace it."
-#~ msgstr ""
-#~ "Leave file selection empty to keep current document, or upload a new file to"
-#~ " replace it."
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:577
-#~ msgid ""
-#~ "Let focal points save and submit each page independently instead of the "
-#~ "whole form at once. Applies to paginated templates."
-#~ msgstr ""
-#~ "Let focal points save and submit each page independently instead of the "
-#~ "whole form at once. Applies to paginated templates."
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:505
-#~ msgid ""
-#~ "Let focal points save and submit each page independently instead of the "
-#~ "whole form at once. Applies to paginated templates. Turning this off later "
-#~ "returns the assignment to whole-form save and submit; already-submitted "
-#~ "assignment statuses stay as they are, and any pages that were only partly "
-#~ "submitted become editable again."
-#~ msgstr ""
-#~ "Let focal points save and submit each page independently instead of the "
-#~ "whole form at once. Applies to paginated templates. Turning this off later "
-#~ "returns the assignment to whole-form save and submit; already-submitted "
-#~ "assignment statuses stay as they are, and any pages that were only partly "
-#~ "submitted become editable again."
-
-# [Removed] was: app/routes/admin/assignment_management.py:120
-#~ msgid ""
-#~ "Per-page save and submit is off. The assignment now uses whole-form save and"
-#~ " submit."
-#~ msgstr ""
-#~ "Per-page save and submit is off. The assignment now uses whole-form save and"
-#~ " submit."
-
-# [Removed] was: app/routes/admin/assignment_management.py:109
-#~ msgid ""
-#~ "Per-page save and submit is on. %(count)s page status(es) were created or "
-#~ "aligned from each entity's current assignment status. Existing submitted "
-#~ "pages were kept."
-#~ msgstr ""
-#~ "Per-page save and submit is on. %(count)s page status(es) were created or "
-#~ "aligned from each entity's current assignment status. Existing submitted "
-#~ "pages were kept."
-
-# [Removed] was: app/routes/admin/assignment_management.py:115
-#~ msgid ""
-#~ "Per-page save and submit is on. Existing page statuses were kept; new pages "
-#~ "inherit each entity's assignment status when first saved."
-#~ msgstr ""
-#~ "Per-page save and submit is on. Existing page statuses were kept; new pages "
-#~ "inherit each entity's assignment status when first saved."
-
-# [Removed] was:
-# app/templates/forms/entry_form/partials/_nav_scope_actions.html:16
-#~ msgid "Save this page"
-#~ msgstr "Save this page"
-
-# [Removed] was: app/templates/auth/login_continue.html:7
-#~ msgid "Signing you in…"
-#~ msgstr "Signing you in…"
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:1385
-#~ msgid ""
-#~ "Switch this assignment to whole-form save and submit?\n"
-#~ "\n"
-#~ "Entities that are already submitted, sent for review, approved, or cancelled keep that assignment status.\n"
-#~ "Entities still in progress with some pages submitted will be able to edit those pages again.\n"
-#~ "If every page of an in-progress entity is already submitted, that entity will be marked submitted (or sent for review).\n"
-#~ "Page history is kept in case you turn this back on."
-#~ msgstr ""
-#~ "Switch this assignment to whole-form save and submit?\n"
-#~ "\n"
-#~ "Entities that are already submitted, sent for review, approved, or cancelled keep that assignment status.\n"
-#~ "Entities still in progress with some pages submitted will be able to edit those pages again.\n"
-#~ "If every page of an in-progress entity is already submitted, that entity will be marked submitted (or sent for review).\n"
-#~ "Page history is kept in case you turn this back on."
-
-# [Removed] was: app/templates/admin/communication/center.html:32
-#~ msgid ""
-#~ "View every notification and linked email delivery in the system, send email "
-#~ "and mobile push messages to selected users or entities, and manage scheduled"
-#~ " or draft communication campaigns."
-#~ msgstr ""
-#~ "View every notification and linked email delivery in the system, send email "
-#~ "and mobile push messages to selected users or entities, and manage scheduled"
-#~ " or draft communication campaigns."
-
-# [Removed] was: app/templates/admin/api_management.html:730
-#~ msgid ""
-#~ "API key is sent as api_key in the query string. Choose Anonymous when "
-#~ "prompted."
-#~ msgstr ""
-#~ "API key is sent as api_key in the query string. Choose Anonymous when "
-#~ "prompted."
-
-# [Removed] was: app/templates/admin/settings/manage_settings.html:463
-#~ msgid ""
-#~ "Formats: PNG, JPEG, GIF, WebP, and SVG for the logo; favicon also accepts "
-#~ "ICO. Maximum 2 MB per file."
-#~ msgstr ""
-#~ "Formats: PNG, JPEG, GIF, WebP, and SVG for the logo; favicon also accepts "
-#~ "ICO. Maximum 2 MB per file."
-
-# [Removed] was: app/templates/admin/api_management.html:570
-#~ msgid "Full system access with paginated responses. Use"
-#~ msgstr "Full system access with paginated responses. Use"
-
-# [Removed] was: app/templates/admin/api_keys/create_success.html:73
-#~ msgid "Store this key securely - it provides full API access"
-#~ msgstr "Store this key securely - it provides full API access"
-
-# [Removed] was: app/templates/admin/data_exploration/explore_data.html:456
-#~ msgid ""
-#~ "Compliance requires at least one Annual Report AND one Audited Financial "
-#~ "Statement in the past 3 years."
-#~ msgstr ""
-#~ "Compliance requires at least one Annual Report AND one Audited Financial "
-#~ "Statement in the past 3 years."
-
-# [Removed] was: app/templates/admin/data_exploration/explore_data.html:25
-#~ msgid ""
-#~ "Explore and filter form data directly from the database. Use parameters on "
-#~ "the Data Table tab to narrow down data by template and assignment period. "
-#~ "Disaggregation Analysis uses the template selector in its sub-tabs bar "
-#~ "(defaults to FDRS)."
-#~ msgstr ""
-#~ "Explore and filter form data directly from the database. Use parameters on "
-#~ "the Data Table tab to narrow down data by template and assignment period. "
-#~ "Disaggregation Analysis uses the template selector in its sub-tabs bar "
-#~ "(defaults to FDRS)."
-
-# [Removed] was: app/templates/admin/data_exploration/explore_data.html:25
-#~ msgid "View FDRS document compliance by country."
-#~ msgstr "View FDRS document compliance by country."
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:193
-#~ msgid "Active without Owner"
-#~ msgstr "Active without Owner"
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:194
-#~ msgid ""
-#~ "Deactivated users who still hold RBAC roles. Their access should be revoked "
-#~ "to prevent unauthorized data exposure."
-#~ msgstr ""
-#~ "Deactivated users who still hold RBAC roles. Their access should be revoked "
-#~ "to prevent unauthorized data exposure."
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:192
-#~ msgid "Focal Point %%"
-#~ msgstr "Focal Point %%"
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:194
-#~ msgid "Ghost Access"
-#~ msgstr "Ghost Access"
-
-# [Removed] was: app/templates/auth/login.html:696
-#~ msgid ""
-#~ "Sign in without a password to test as a role preset or any active user."
-#~ msgstr ""
-#~ "Sign in without a password to test as a role preset or any active user."
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:195
-#~ msgid "Submission Rate"
-#~ msgstr "Submission Rate"
-
-# [Removed] was:
-# app/templates/forms/form_builder/partials/_item_modal.html:202
-#~ msgid ""
-#~ "Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
-#~ "4.3)"
-#~ msgstr ""
-#~ "Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, "
-#~ "4.3)"
-
-# [Removed] was: plugins/upr/templates/upr/_manage_tools.html:136
-#~ msgid ""
-#~ "The narrative will be translated into {language} after upload, before the "
-#~ "report is generated."
-#~ msgstr ""
-#~ "The narrative will be translated into {language} after upload, before the "
-#~ "report is generated."
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:169
-#~ msgid "Flagged indicators only"
-#~ msgstr "Flagged indicators only"
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:190
-#~ msgid "Indicators & automatic flags"
-#~ msgstr "Indicators & automatic flags"
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:192
-#~ msgid "Loading indicator flags…"
-#~ msgstr "Loading indicator flags…"
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:142
-#~ msgid "Loading tracker data…"
-#~ msgstr "Loading tracker data…"
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:165
-#~ msgid "Show last 3 years"
-#~ msgstr "Show last 3 years"
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:18
-#~ msgid ""
-#~ "Track FDRS submission progress across countries, monitor validation flags, "
-#~ "and generate questions for focal points."
-#~ msgstr ""
-#~ "Track FDRS submission progress across countries, monitor validation flags, "
-#~ "and generate questions for focal points."
-
-# [Removed] was: app/templates/admin/validation_dashboard.html:162
-#~ msgid "View options"
-#~ msgstr "View options"
-
-# [Removed] was: app/services/platform/governance_program.py:321
-#~ msgid "%(n)s countries are missing one or both documents in %(periods)s."
-#~ msgstr "%(n)s countries are missing one or both documents in %(periods)s."
-
-# [Removed] was: app/services/notification/core.py:109
-#~ msgid ""
-#~ "%(submitter_name)s submitted %(assignment_title)s for your entity team."
-#~ msgstr ""
-#~ "%(submitter_name)s submitted %(assignment_title)s for your entity team."
-
-# [Removed] was: app/services/platform/governance_program.py:878
-#~ msgid "Compliance"
-#~ msgstr "Compliance"
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:32
-#~ msgid ""
-#~ "Control register for ownership, access, reporting discipline, document "
-#~ "compliance, the indicator glossary, and public links."
-#~ msgstr ""
-#~ "Control register for ownership, access, reporting discipline, document "
-#~ "compliance, the indicator glossary, and public links."
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:41
-#~ msgid ""
-#~ "Each control is a rule with someone accountable and a live check. A gap "
-#~ "stays open until the check passes, or until a governance manager records a "
-#~ "risk acceptance with a reason and a review date. The acceptance expires on "
-#~ "that date and the gap reopens if it is still there."
-#~ msgstr ""
-#~ "Each control is a rule with someone accountable and a live check. A gap "
-#~ "stays open until the check passes, or until a governance manager records a "
-#~ "risk acceptance with a reason and a review date. The acceptance expires on "
-#~ "that date and the gap reopens if it is still there."
-
-# [Removed] was: app/services/platform/governance_program.py:318
-#~ msgid "Every checked country has both documents in %(periods)s."
-#~ msgstr "Every checked country has both documents in %(periods)s."
-
-# [Removed] was: app/services/platform/governance_program.py:306
-#~ msgid "FDRS document compliance"
-#~ msgstr "FDRS document compliance"
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:262
-#~ msgid "Hide focal point table"
-#~ msgstr "Hide focal point table"
-
-# [Removed] was: plugins/upr/templates/admin/_upr_excel_import_script.html:355
-#~ msgid "Later rounds (not imported)"
-#~ msgstr "Later rounds (not imported)"
-
-# [Removed] was: app/services/platform/governance_program.py:308
-#~ msgid "National Society focal point, with the secretariat"
-#~ msgstr "National Society focal point, with the secretariat"
-
-# [Removed] was: app/services/platform/governance_program.py:314
-#~ msgid ""
-#~ "No FDRS reporting period is assigned, so this control does not apply here."
-#~ msgstr ""
-#~ "No FDRS reporting period is assigned, so this control does not apply here."
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:220
-#~ msgid "Show focal point table"
-#~ msgstr "Show focal point table"
-
-# [Removed] was: app/templates/auth/login.html:696
-#~ msgid ""
-#~ "Sign in without a password as a role preset, a seeded test account, or a "
-#~ "pre-added account that has not signed in yet."
-#~ msgstr ""
-#~ "Sign in without a password as a role preset, a seeded test account, or a "
-#~ "pre-added account that has not signed in yet."
-
-# [Removed] was: app/services/notification/core.py:106
-#~ msgid "Team update: %(assignment_title)s submitted by %(submitter_name)s"
-#~ msgstr "Team update: %(assignment_title)s submitted by %(submitter_name)s"
-
-# [Removed] was: app/services/platform/governance_program.py:307
-#~ msgid ""
-#~ "Where an FDRS cycle exists, each active country has both an Annual Report "
-#~ "and an Audited Financial Statement in at least one of the last three "
-#~ "periods. This control does not apply when FDRS is not in use."
-#~ msgstr ""
-#~ "Where an FDRS cycle exists, each active country has both an Annual Report "
-#~ "and an Audited Financial Statement in at least one of the last three "
-#~ "periods. This control does not apply when FDRS is not in use."
-
-# [Removed] was: app/templates/admin/governance/dashboard.html:73
-#~ msgid "Work the open rows. An accepted row is a decision, not a pass."
-#~ msgstr "Work the open rows. An accepted row is a decision, not a pass."
-
-# [Removed] was: plugins/fdrs/templates/ecr/tab_panel.html:195
-#~ msgid "Income group is the current classification, held fixed across years."
-#~ msgstr "Income group is the current classification, held fixed across years."
-
-# [Removed] was: plugins/fdrs/templates/ecr/tab_panel.html:190
-#~ msgid ""
-#~ "No World Bank snapshot is saved yet. Refresh to download population and "
-#~ "income groups."
-#~ msgstr ""
-#~ "No World Bank snapshot is saved yet. Refresh to download population and "
-#~ "income groups."
-
-# [Removed] was: plugins/fdrs/templates/ecr/tab_panel.html:38
-#~ msgid "Refresh World Bank snapshot"
-#~ msgstr "Refresh World Bank snapshot"
-
-# [Removed] was: plugins/fdrs/templates/ecr/tab_panel.html:194
-#~ msgid "World Bank snapshot"
-#~ msgstr "World Bank snapshot"
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:1392
-#~ msgid ""
-#~ "Assigned entities (focal points) will be notified about this new assignment."
-#~ " Do you want to continue?"
-#~ msgstr ""
-#~ "Assigned entities (focal points) will be notified about this new assignment."
-#~ " Do you want to continue?"
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:467
-#~ msgid ""
-#~ "Focal points will be notified about the new assignment. Uncheck to create "
-#~ "without sending notifications."
-#~ msgstr ""
-#~ "Focal points will be notified about the new assignment. Uncheck to create "
-#~ "without sending notifications."
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:1393
-#~ msgid ""
-#~ "The \"Notify focal points\" checkbox is ticked, but notifications for "
-#~ "assignment_created are currently disabled in platform settings (Admin → "
-#~ "Settings → Notifications). No one will be notified. Do you want to continue "
-#~ "anyway?"
-#~ msgstr ""
-#~ "The \"Notify focal points\" checkbox is ticked, but notifications for "
-#~ "assignment_created are currently disabled in platform settings (Admin → "
-#~ "Settings → Notifications). No one will be notified. Do you want to continue "
-#~ "anyway?"
-
-# [Removed] was: app/templates/admin/assignments/manage_assignment.html:1391
-#~ msgid ""
-#~ "This assignment will be created without sending notifications to assigned "
-#~ "entities. Do you want to continue?"
-#~ msgstr ""
-#~ "This assignment will be created without sending notifications to assigned "
-#~ "entities. Do you want to continue?"
-
-# [Removed] was: app/templates/admin/organization/_nss_component.html:117
-#~ msgid "This will create a new column in the table for this category."
-#~ msgstr "This will create a new column in the table for this category."

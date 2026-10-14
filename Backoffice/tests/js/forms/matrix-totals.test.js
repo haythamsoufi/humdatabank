@@ -19,6 +19,7 @@ import {
   __parseRowTotalManualValue,
   __rowTotalConflictType,
   __rowTotalConflictMessage,
+  __rowTotalConflictIndicatorSvg,
   __storedRowTotalManualScalar,
   __computedRowTotalFromData,
   __effectiveRowTotalValue,
@@ -141,6 +142,17 @@ describe('matrix row-total helpers', () => {
       expect(__rowTotalConflictType(10, 7, 'none')).toBe('warning');
       expect(__rowTotalConflictType(10, 7, undefined)).toBe('warning');
       expect(__rowTotalConflictType(10, 10, 'none')).toBeNull();
+    });
+  });
+
+  describe('__rowTotalConflictIndicatorSvg', () => {
+    it('uses a small mark so it can sit beside the digits', () => {
+      const svg = __rowTotalConflictIndicatorSvg('warning');
+      expect(svg).toContain('width="12"');
+      expect(svg).toContain('height="12"');
+      expect(svg).not.toContain('h-5');
+      expect(svg).toContain('text-amber-400');
+      expect(__rowTotalConflictIndicatorSvg('error')).toContain('text-red-400');
     });
   });
 

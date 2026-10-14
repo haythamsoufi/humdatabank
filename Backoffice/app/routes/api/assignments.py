@@ -18,6 +18,7 @@ from app.utils.sql_utils import safe_ilike_pattern
 # Import models
 from app.models import AssignedForm, Country, FormData, FormItem
 from app.models.assignments import AssignmentEntityStatus
+from app.models.enums import AssignmentEntityStatusValue
 from app.services.organization.authorization_service import AuthorizationService
 from app.utils.auth import api_capability, require_api_key
 from app.services.security.api_key_permissions import SUBMISSIONS_READ
@@ -626,6 +627,143 @@ def _resolve_auto_load_entities_inner(
             'Auto-load only includes rows where at least one of these tick columns is checked.'
         )
     return payload
+
+
+_OWN_ROWS_LOCKED_STATUSES = frozenset({
+    AssignmentEntityStatusValue.submitted.value,
+    AssignmentEntityStatusValue.approved.value,
+    AssignmentEntityStatusValue.cancelled.value,
+})
+
+
+def _own_matrix_rows_spec(matrix_config):
+    """``(template_id, form_item_id, period)`` from ``include_own_matrix_rows``, or None when off."""
+    if not isinstance(matrix_config, dict):
+        return None
+    raw = matrix_config.get('include_own_matrix_rows')
+    if not isinstance(raw, dict) or raw.get('enabled') is not True:
+        return None
+    try:
+        template_id = int(raw.get('source_template_id'))
+        item_id = int(raw.get('source_form_item_id'))
+    except (TypeError, ValueError):
+        return None
+    period = str(raw.get('source_assignment_period') or '').strip()
+    if not period:
+        return None
+    return template_id, item_id, period
+
+
+def _resolve_own_matrix_row_entities(assignment_entity_status, matrix_config):
+    """Rows this entity saved on the matrix named by ``include_own_matrix_rows``.
+
+    Only widens the row list; cell values still come from the column lookups.
+    Submitted, approved and cancelled assignments get no extra rows, so a locked
+    form keeps showing what was saved. Period sentinels resolve against the
+    assignment the same way template variables do.
+    """
+    spec = _own_matrix_rows_spec(matrix_config)
+    if spec is None:
+        return {'entities': [], 'entity_type': None, 'reason': 'disabled'}
+    status = getattr(assignment_entity_status, 'status', None)
+    status = getattr(status, 'value', status)
+    if status in _OWN_ROWS_LOCKED_STATUSES:
+        return {'entities': [], 'entity_type': None, 'reason': 'assignment_locked'}
+
+    template_id, item_id, period = spec
+    if period.startswith('__'):
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+
+        resolved = VariableResolutionService._resolve_effective_period(
+            period, template_id, assignment_entity_status
+        )
+        if not resolved:
+            return {
+                'entities': [],
+                'entity_type': None,
+                'reason': 'period_unresolved',
+                'detail': f'Could not resolve period "{period}" on template {template_id} for this assignment.',
+            }
+        period = resolved
+
+    return _resolve_auto_load_entities_inner(
+        assignment_entity_status.entity_id,
+        assignment_entity_status.entity_type,
+        template_id,
+        period,
+        item_id,
+        require_tick_value_1=False,
+        assignment_entity_status_id=getattr(assignment_entity_status, 'id', None),
+    )
+
+
+@api_bp.route('/matrix/own-rows', methods=['POST'])
+@login_required
+def get_matrix_own_rows():
+    """Rows to add to a matrix from its ``include_own_matrix_rows`` setting.
+
+    Request body: ``form_item_id`` plus either ``assignment_entity_status_id`` or, for
+    template preview (admins only), ``preview_entity_id`` + ``preview_entity_type`` and an
+    optional ``preview_period_name``. The source matrix and period are read from the saved
+    item config, never from the request.
+
+    Response matches ``/matrix/auto-load-entities``: ``entities``, ``entity_type`` and a
+    ``reason`` when no rows are returned.
+    """
+    try:
+        csrf_error = enforce_csrf_json()
+        if csrf_error:
+            return csrf_error
+
+        data = get_json_safe()
+        try:
+            form_item_id = int(data.get('form_item_id'))
+        except (TypeError, ValueError):
+            return api_error('form_item_id must be an integer', 400)
+        form_item = db.session.get(FormItem, form_item_id)
+        if form_item is None or form_item.item_type != 'matrix':
+            return api_error('Matrix not found', 404)
+
+        aes_id = data.get('assignment_entity_status_id')
+        if aes_id:
+            from app.services import AssignmentService
+
+            assignment_entity_status = AssignmentService.get_assignment_entity_status_by_id(aes_id)
+            if not assignment_entity_status:
+                return api_error('Assignment entity status not found', 404)
+            if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
+                return api_error('Access denied', 403)
+            assigned_form = getattr(assignment_entity_status, 'assigned_form', None)
+            if assigned_form is None or assigned_form.template_id != form_item.template_id:
+                return api_error('Matrix does not belong to this assignment', 400)
+        elif data.get('preview_entity_id') and data.get('preview_entity_type'):
+            if not AuthorizationService.is_admin(current_user):
+                return api_error('Admin access required for preview mode', 403)
+            from app.routes.api.variables import _PreviewEntityStatus
+
+            try:
+                assignment_entity_status = _PreviewEntityStatus(
+                    entity_id=data.get('preview_entity_id'),
+                    entity_type=data.get('preview_entity_type'),
+                    period_name=data.get('preview_period_name') or '',
+                )
+            except (TypeError, ValueError):
+                return api_error('preview_entity_id must be an integer', 400)
+        else:
+            return api_error(
+                'Provide assignment_entity_status_id or preview_entity_id + preview_entity_type', 400
+            )
+
+        config = form_item.config if isinstance(form_item.config, dict) else {}
+        matrix_config = config.get('matrix_config') if isinstance(config.get('matrix_config'), dict) else config
+        return json_response(_resolve_own_matrix_row_entities(assignment_entity_status, matrix_config))
+
+    except Exception as e:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            'API Error [ID: %s] matrix own-rows: %s', error_id, e, exc_info=True
+        )
+        return api_error('Could not fetch matrix rows', 500, error_id, None)
 
 
 @api_bp.route('/matrix/auto-load-entities/batch', methods=['POST'])

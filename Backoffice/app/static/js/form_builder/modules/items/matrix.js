@@ -274,6 +274,12 @@ export const MatrixItem = {
         this.updateRowTotalOptionsVisibility(modalElement);
         this.updateIncludeTotalsInApiVisibility(modalElement);
         if (autoLoadCheckbox) autoLoadCheckbox.checked = false;
+        const includeOwnRowsCheckbox = modalElement.querySelector('#matrix-include-own-rows');
+        const includeOwnRowsWrapper = modalElement.querySelector('#matrix-include-own-rows-wrapper');
+        if (includeOwnRowsCheckbox) includeOwnRowsCheckbox.checked = false;
+        if (includeOwnRowsWrapper) delete includeOwnRowsWrapper.dataset.pendingSpec;
+        this._ownRowsLoadToken = (this._ownRowsLoadToken || 0) + 1;
+        this.updateOwnRowsVisibility(modalElement);
         if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = false;
         if (legendTextInput) {
             legendTextInput.value = 'Manually added row';
@@ -2602,10 +2608,52 @@ export const MatrixItem = {
         }
         if (autoLoadCheckbox) {
             if (!autoLoadCheckbox._matrixConfigListenerAdded) {
-                autoLoadCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                autoLoadCheckbox.addEventListener('change', () => {
+                    this.updateOwnRowsVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
                 autoLoadCheckbox._matrixConfigListenerAdded = true;
             }
         }
+        const includeOwnRowsCheckbox = Utils.getElementById('matrix-include-own-rows');
+        const ownRowsTemplateSelect = Utils.getElementById('matrix-own-rows-template');
+        const ownRowsItemSelect = Utils.getElementById('matrix-own-rows-item');
+        const ownRowsPeriodSelect = Utils.getElementById('matrix-own-rows-period');
+        if (includeOwnRowsCheckbox && !includeOwnRowsCheckbox._matrixConfigListenerAdded) {
+            includeOwnRowsCheckbox.addEventListener('change', () => {
+                const wrapper = Utils.getElementById('matrix-include-own-rows-wrapper');
+                if (!includeOwnRowsCheckbox.checked && wrapper) {
+                    delete wrapper.dataset.pendingSpec;
+                }
+                this.updateOwnRowsVisibility(modalElement);
+                if (includeOwnRowsCheckbox.checked) {
+                    const selectedTemplate = Utils.getElementById('matrix-own-rows-template')?.value || '';
+                    this._populateOwnRowsSelects(modalElement, selectedTemplate, '', '');
+                }
+                this.updateConfig(modalElement);
+            });
+            includeOwnRowsCheckbox._matrixConfigListenerAdded = true;
+        }
+        if (ownRowsTemplateSelect && !ownRowsTemplateSelect._matrixConfigListenerAdded) {
+            ownRowsTemplateSelect.addEventListener('change', () => {
+                if (this._ownRowsPopulating) return;
+                const wrapper = Utils.getElementById('matrix-include-own-rows-wrapper');
+                if (wrapper) delete wrapper.dataset.pendingSpec;
+                this._populateOwnRowsSelects(modalElement, ownRowsTemplateSelect.value, '', '');
+            });
+            ownRowsTemplateSelect._matrixConfigListenerAdded = true;
+        }
+        [ownRowsItemSelect, ownRowsPeriodSelect].forEach(select => {
+            if (select && !select._matrixConfigListenerAdded) {
+                select.addEventListener('change', () => {
+                    if (this._ownRowsPopulating) return;
+                    const wrapper = Utils.getElementById('matrix-include-own-rows-wrapper');
+                    if (wrapper) delete wrapper.dataset.pendingSpec;
+                    this.updateConfig(modalElement);
+                });
+                select._matrixConfigListenerAdded = true;
+            }
+        });
         if (highlightManualRowsCheckbox) {
             if (!highlightManualRowsCheckbox._matrixHighlightListenerAdded) {
                 highlightManualRowsCheckbox.addEventListener('change', () => {
@@ -2634,6 +2682,7 @@ export const MatrixItem = {
 
         // Check if any column is a variable and show/hide auto-load checkbox
         this.updateAutoLoadVisibility(modalElement);
+        this.updateOwnRowsVisibility(modalElement);
 
         // Update legend text visibility on initial load
         this.updateLegendTextVisibility(modalElement);
@@ -2831,6 +2880,203 @@ export const MatrixItem = {
                 autoLoadCheckbox.checked = false;
             }
         }
+        this.updateOwnRowsVisibility(modalElement);
+    },
+
+    /**
+     * Show the "rows from another form" options only while auto-load is available and on.
+     */
+    updateOwnRowsVisibility(modalElement) {
+        const autoLoadWrapper = Utils.getElementById('matrix-auto-load-entities-wrapper');
+        const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
+        const wrapper = Utils.getElementById('matrix-include-own-rows-wrapper');
+        const options = Utils.getElementById('matrix-include-own-rows-options');
+        const includeCheckbox = Utils.getElementById('matrix-include-own-rows');
+        if (!wrapper) return;
+
+        const autoLoadAvailable = autoLoadWrapper && !autoLoadWrapper.classList.contains('hidden');
+        const autoLoadOn = autoLoadCheckbox ? autoLoadCheckbox.checked : false;
+        if (autoLoadAvailable && autoLoadOn) {
+            wrapper.classList.remove('hidden');
+        } else {
+            wrapper.classList.add('hidden');
+        }
+        if (options) {
+            const showOptions = autoLoadAvailable && autoLoadOn && includeCheckbox && includeCheckbox.checked;
+            options.classList.toggle('hidden', !showOptions);
+        }
+    },
+
+    _ownRowsOption(value, label) {
+        const option = document.createElement('option');
+        option.value = value == null ? '' : String(value);
+        option.textContent = label;
+        return option;
+    },
+
+    async _ownRowsCatalog(sourceTemplateId) {
+        const mgr = window.templateVariablesManager;
+        const templateId = window.templateId;
+        const versionInput = document.querySelector('input[name="version_id"]');
+        const versionId = versionInput ? versionInput.value : '';
+        if (mgr && Array.isArray(mgr.allTemplates) && mgr.allTemplates.length) {
+            let items = [];
+            if (sourceTemplateId) {
+                items = await mgr.loadFormItemsForTemplate(parseInt(sourceTemplateId, 10));
+            }
+            const assignments = mgr.assignmentsByTemplate || {};
+            const periods = sourceTemplateId
+                ? (assignments[sourceTemplateId] || assignments[String(sourceTemplateId)] || [])
+                : [];
+            return { templates: mgr.allTemplates, items: items || [], periods };
+        }
+        if (!templateId) return { templates: [], items: [], periods: [] };
+        const params = new URLSearchParams();
+        if (versionId) params.set('version_id', versionId);
+        if (sourceTemplateId) params.set('source_template_id', String(sourceTemplateId));
+        const response = await fetch(`/admin/templates/${templateId}/variables/options?${params}`, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return { templates: [], items: [], periods: [] };
+        const data = await response.json();
+        const assignments = data.assignments_by_template || {};
+        const periods = sourceTemplateId
+            ? (assignments[sourceTemplateId] || assignments[String(sourceTemplateId)] || [])
+            : [];
+        return {
+            templates: data.templates || [],
+            items: data.form_items || [],
+            periods,
+        };
+    },
+
+    async _populateOwnRowsSelects(modalElement, selectedTemplateId, selectedItemId, selectedPeriod) {
+        const templateSelect = Utils.getElementById('matrix-own-rows-template');
+        const itemSelect = Utils.getElementById('matrix-own-rows-item');
+        const periodSelect = Utils.getElementById('matrix-own-rows-period');
+        if (!templateSelect || !itemSelect || !periodSelect) return;
+        const token = (this._ownRowsLoadToken || 0) + 1;
+        this._ownRowsLoadToken = token;
+        const templateCatalog = await this._ownRowsCatalog(null);
+        if (token !== this._ownRowsLoadToken) return;
+        const templateId = selectedTemplateId ? String(selectedTemplateId) : '';
+        this._ownRowsPopulating = true;
+        try {
+            templateSelect.replaceChildren(this._ownRowsOption('', 'Select a template'));
+            (templateCatalog.templates || []).forEach(template => {
+                const name = template.name || `Template ${template.id}`;
+                templateSelect.appendChild(this._ownRowsOption(template.id, name));
+            });
+            if (templateId && !Array.from(templateSelect.options).some(option => option.value === templateId)) {
+                templateSelect.appendChild(this._ownRowsOption(templateId, `Template ${templateId}`));
+            }
+            templateSelect.value = templateId;
+
+            itemSelect.replaceChildren(this._ownRowsOption('', 'Select a matrix'));
+            periodSelect.querySelectorAll('option[data-own-rows-period="concrete"]').forEach(option => option.remove());
+            if (templateId) {
+                const sourceCatalog = await this._ownRowsCatalog(templateId);
+                if (token !== this._ownRowsLoadToken) return;
+                (sourceCatalog.items || []).forEach(item => {
+                    if (item.item_type !== 'matrix' && item.item_type !== 'matrix_table') return;
+                    let label = (item.label || '').trim();
+                    if (!label) {
+                        const codes = Array.isArray(item.matrix_columns) ? item.matrix_columns : [];
+                        const preview = codes.slice(0, 3).join(', ') + (codes.length > 3 ? ', …' : '');
+                        label = preview ? `Matrix (${preview})` : 'Matrix';
+                    }
+                    itemSelect.appendChild(this._ownRowsOption(item.id, `${item.id}: ${label}`));
+                });
+                const itemId = selectedItemId ? String(selectedItemId) : '';
+                if (itemId && !Array.from(itemSelect.options).some(option => option.value === itemId)) {
+                    itemSelect.appendChild(this._ownRowsOption(itemId, `${itemId}: not in this template's published version`));
+                }
+                const seenPeriods = new Set(Array.from(periodSelect.options).map(option => option.value));
+                (sourceCatalog.periods || []).forEach(period => {
+                    const name = period.period_name || '';
+                    if (!name || seenPeriods.has(name)) return;
+                    seenPeriods.add(name);
+                    const option = this._ownRowsOption(name, name);
+                    option.dataset.ownRowsPeriod = 'concrete';
+                    periodSelect.appendChild(option);
+                });
+                const period = selectedPeriod ? String(selectedPeriod) : '';
+                if (period && !seenPeriods.has(period)) {
+                    const option = this._ownRowsOption(period, period);
+                    option.dataset.ownRowsPeriod = 'concrete';
+                    periodSelect.appendChild(option);
+                }
+                if (itemId) itemSelect.value = itemId;
+                if (period) periodSelect.value = period;
+            }
+        } finally {
+            this._ownRowsPopulating = false;
+        }
+        if (token === this._ownRowsLoadToken) {
+            this.updateConfig(modalElement);
+        }
+    },
+
+    _readIncludeOwnMatrixRows() {
+        const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
+        const includeCheckbox = Utils.getElementById('matrix-include-own-rows');
+        const wrapper = Utils.getElementById('matrix-include-own-rows-wrapper');
+        if (!autoLoadCheckbox || !autoLoadCheckbox.checked || !includeCheckbox || !includeCheckbox.checked) {
+            return null;
+        }
+        const templateId = Utils.getElementById('matrix-own-rows-template')?.value || '';
+        const itemId = Utils.getElementById('matrix-own-rows-item')?.value || '';
+        const period = Utils.getElementById('matrix-own-rows-period')?.value || '';
+        if (templateId && itemId && period) {
+            const parsedTemplate = parseInt(templateId, 10);
+            const parsedItem = parseInt(itemId, 10);
+            if (!Number.isFinite(parsedTemplate) || !Number.isFinite(parsedItem)) return null;
+            return {
+                enabled: true,
+                source_template_id: parsedTemplate,
+                source_form_item_id: parsedItem,
+                source_assignment_period: period,
+            };
+        }
+        if (wrapper && wrapper.dataset.pendingSpec) {
+            try {
+                const pending = JSON.parse(wrapper.dataset.pendingSpec);
+                if (pending && pending.enabled && pending.source_template_id && pending.source_form_item_id && pending.source_assignment_period) {
+                    return pending;
+                }
+            } catch (_) {}
+        }
+        return null;
+    },
+
+    _restoreIncludeOwnMatrixRows(modalElement, spec) {
+        const includeCheckbox = Utils.getElementById('matrix-include-own-rows');
+        const wrapper = Utils.getElementById('matrix-include-own-rows-wrapper');
+        const enabled = !!spec && spec.enabled === true;
+        if (includeCheckbox) includeCheckbox.checked = enabled;
+        if (wrapper) {
+            if (enabled && spec.source_template_id && spec.source_form_item_id && spec.source_assignment_period) {
+                wrapper.dataset.pendingSpec = JSON.stringify({
+                    enabled: true,
+                    source_template_id: parseInt(spec.source_template_id, 10),
+                    source_form_item_id: parseInt(spec.source_form_item_id, 10),
+                    source_assignment_period: String(spec.source_assignment_period),
+                });
+            } else {
+                delete wrapper.dataset.pendingSpec;
+            }
+        }
+        this.updateOwnRowsVisibility(modalElement);
+        if (!enabled) return;
+        this._populateOwnRowsSelects(
+            modalElement,
+            spec.source_template_id,
+            spec.source_form_item_id,
+            spec.source_assignment_period
+        ).catch(error => {
+            console.warn('Failed to load own-matrix row source options:', error);
+        });
     },
 
     setupRowModeListeners(modalElement) {
@@ -2920,6 +3166,7 @@ export const MatrixItem = {
         const groupBySelect = modalElement.querySelector('#matrix-group-by-column');
         const groupDropdownEnabled = modalElement.querySelector('#matrix-group-dropdown-enabled');
         const groupTableEnabled = modalElement.querySelector('#matrix-group-table-enabled');
+        const groupTotalsEnabled = modalElement.querySelector('#matrix-group-totals-enabled');
         const addFilterBtn = modalElement.querySelector('#matrix-list-add-filter-btn');
         if (listSelect && displayColumnSelect) {
             if (!listSelect._matrixListSelectionListenerAdded) {
@@ -2952,9 +3199,16 @@ export const MatrixItem = {
         }
         if (groupTableEnabled) {
             if (!groupTableEnabled._matrixConfigListenerAdded) {
-                groupTableEnabled.addEventListener('change', () => this.updateConfig(modalElement));
+                groupTableEnabled.addEventListener('change', () => {
+                    this.updateGroupingControlsVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
                 groupTableEnabled._matrixConfigListenerAdded = true;
             }
+        }
+        if (groupTotalsEnabled && !groupTotalsEnabled._matrixConfigListenerAdded) {
+            groupTotalsEnabled.addEventListener('change', () => this.updateConfig(modalElement));
+            groupTotalsEnabled._matrixConfigListenerAdded = true;
         }
         const allowOtherCheckbox = modalElement.querySelector('#matrix-allow-other');
         if (allowOtherCheckbox && !allowOtherCheckbox._matrixConfigListenerAdded) {
@@ -3166,7 +3420,9 @@ export const MatrixItem = {
         const controlsWrapper = modalElement.querySelector('#matrix-group-controls-wrapper');
         const dropdownCheckbox = modalElement.querySelector('#matrix-group-dropdown-enabled');
         const tableCheckbox = modalElement.querySelector('#matrix-group-table-enabled');
+        const totalsCheckbox = modalElement.querySelector('#matrix-group-totals-enabled');
         const hasGroupingColumn = !!groupBySelect?.value;
+        const tableGroupingOn = !tableCheckbox || tableCheckbox.checked;
 
         if (controlsWrapper) {
             if (hasGroupingColumn) {
@@ -3177,6 +3433,7 @@ export const MatrixItem = {
         }
         if (dropdownCheckbox) dropdownCheckbox.disabled = !hasGroupingColumn;
         if (tableCheckbox) tableCheckbox.disabled = !hasGroupingColumn;
+        if (totalsCheckbox) totalsCheckbox.disabled = !hasGroupingColumn || !tableGroupingOn;
     },
 
     /**
@@ -3488,6 +3745,10 @@ export const MatrixItem = {
         const hasVariableColumn = columns.some(col => col.is_variable === true);
         if (hasVariableColumn) {
             config.auto_load_entities = autoLoadEntities;
+            const ownMatrixRows = this._readIncludeOwnMatrixRows();
+            if (ownMatrixRows) {
+                config.include_own_matrix_rows = ownMatrixRows;
+            }
         }
 
         const lookupTooltipLabelInput = Utils.getElementById('matrix-variable-lookup-tooltip-label');
@@ -3563,6 +3824,7 @@ export const MatrixItem = {
                 config.group_by_column = groupByColumnSelect.value;
                 config.group_dropdown_enabled = Utils.getElementById('matrix-group-dropdown-enabled')?.checked !== false;
                 config.group_table_enabled = Utils.getElementById('matrix-group-table-enabled')?.checked !== false;
+                config.group_totals_enabled = Utils.getElementById('matrix-group-totals-enabled')?.checked === true;
             }
             const searchPlaceholderInput = Utils.getElementById('matrix-search-placeholder');
             if (searchPlaceholderInput?.value) {
@@ -3692,11 +3954,15 @@ export const MatrixItem = {
                                 }
                                 const groupDropdownEnabled = Utils.getElementById('matrix-group-dropdown-enabled');
                                 const groupTableEnabled = Utils.getElementById('matrix-group-table-enabled');
+                                const groupTotalsEnabled = Utils.getElementById('matrix-group-totals-enabled');
                                 if (groupDropdownEnabled) {
                                     groupDropdownEnabled.checked = matrixConfig.group_dropdown_enabled !== false;
                                 }
                                 if (groupTableEnabled) {
                                     groupTableEnabled.checked = matrixConfig.group_table_enabled !== false;
+                                }
+                                if (groupTotalsEnabled) {
+                                    groupTotalsEnabled.checked = matrixConfig.group_totals_enabled === true;
                                 }
                                 this.updateGroupingControlsVisibility(modalElement);
 
@@ -3848,6 +4114,7 @@ export const MatrixItem = {
                 if (includeTotalsInApiCheckbox) includeTotalsInApiCheckbox.checked = matrixConfig.include_calculated_totals_in_api !== false;
                 this.updateIncludeTotalsInApiVisibility(modalElement);
                 if (autoLoadCheckbox) autoLoadCheckbox.checked = matrixConfig.auto_load_entities === true;
+                this._restoreIncludeOwnMatrixRows(modalElement, matrixConfig.include_own_matrix_rows);
                 if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = matrixConfig.highlight_manual_rows === true;
                 if (legendTextInput) {
                     legendTextInput.value = matrixConfig.legend_text || 'Manually added row';

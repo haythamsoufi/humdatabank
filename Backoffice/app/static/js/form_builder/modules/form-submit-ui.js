@@ -3,6 +3,19 @@
 // - AJAX submit + partial DOM refresh to avoid full page reloads
 
 import { isActuallyHidden } from './dom-visibility.js';
+import { wrapWafJsonBody } from '../../lib/waf-json-body.js';
+
+/**
+ * Form-builder AJAX body. The whole form (including matrix_config) is base64
+ * so signature rules never see formulas or HTML, then split so no single
+ * argument exceeds the WAF length limit. A funding matrix is tens of KB;
+ * one unchunked payload is what production blocks with 403.
+ * Server: unwrap_waf_json_envelope() / get_request_data().
+ */
+export function encodeFormBuilderAjaxBody(inner) {
+  if (inner == null) return null;
+  return JSON.stringify(wrapWafJsonBody(inner));
+}
 
 // Lazily resolves translations via the server-injected catalog (window.t).
 // Falls back to the English string when the shim is absent.
@@ -470,12 +483,8 @@ export const FormSubmitUI = {
         // form.dataset.loadingText; a save-neutral default covers any form we don't special-case.
         this.showSaving(form.dataset && form.dataset.loadingText ? form.dataset.loadingText : 'Processing…');
         const fetchFn = (window.getFetch && window.getFetch()) || fetch;
-        const jsonBody = window.snapshotToJson ? JSON.stringify(window.snapshotToJson(snapshot)) : null;
-        // Wrap in base64 to avoid WAF false positives on JSON-encoded matrix config strings.
-        // Backend get_request_data() unwraps { payload: b64 } transparently.
-        const sendBody = jsonBody
-          ? JSON.stringify({ payload: btoa(unescape(encodeURIComponent(jsonBody))) })
-          : null;
+        const inner = window.snapshotToJson ? window.snapshotToJson(snapshot) : null;
+        const sendBody = encodeFormBuilderAjaxBody(inner);
         const resp = await fetchFn(action, {
           method,
           body: sendBody || (() => {

@@ -6,15 +6,16 @@
  * data would move and let the user migrate it, save without migrating, or cancel.
  */
 
+import { wrapWafJsonBody } from '../../../lib/waf-json-body.js';
+
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
 /** Ask the server what a rename would touch. Resolves to the preview object or null. */
 export async function fetchMatrixColumnMigrationPreview(itemId, renames, versionId) {
     if (!itemId || !Array.isArray(renames) || !renames.length) return null;
     const fetchFn = (window.getFetch && window.getFetch()) || fetch;
-    const json = JSON.stringify({ renames, version_id: versionId || undefined });
-    // Same base64 envelope as the item save, so codes containing [..] pass the WAF.
-    const body = JSON.stringify({ payload: btoa(unescape(encodeURIComponent(json))) });
+    // Same chunked envelope as the item save, so codes containing [..] pass the WAF.
+    const body = JSON.stringify(wrapWafJsonBody({ renames, version_id: versionId || undefined }));
     const resp = await fetchFn(`/admin/items/${encodeURIComponent(itemId)}/matrix-column-rename-preview`, {
         method: 'POST',
         credentials: 'same-origin',

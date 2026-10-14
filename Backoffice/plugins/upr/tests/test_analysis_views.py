@@ -363,7 +363,8 @@ def test_ui_labels_cover_the_presentation_and_a4_report():
     ui = analysis_ui_labels()
     assert {
         "export_generated", "export_region", "export_all_regions", "export_page", "export_notes",
-        "export_tables_heading", "export_more", "export_print", "export_print_hint", "export_nothing",
+        "export_tables_heading", "export_more", "export_print", "export_print_hint",
+        "export_pdf_working", "export_pdf_failed", "export_nothing",
         "export_unavailable", "export_prev", "export_next", "export_fullscreen", "section_data",
         "track_ALL", "track_P", "track_MYR", "track_AR",
     } <= set(ui)

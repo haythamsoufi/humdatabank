@@ -171,8 +171,17 @@ body.upri-locked {
 }
 .upri-deck__viewport {
     position: absolute;
-    inset: 0 0 3.5rem;
+    inset: 0;
     overflow: hidden;
+}
+/* The fullscreen element must cover the screen itself. A fixed overlay that
+ * keeps its in-flow size leaves a dark strip once the browser expands it. */
+.upri-deck:fullscreen,
+.upri-deck:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: #0b1220;
 }
 .upri-deck__stage {
     position: absolute;
@@ -189,7 +198,7 @@ body.upri-locked {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    padding: 2.6rem 3.5rem 2.2rem;
+    padding: 2.6rem 3.5rem 4.5rem;
     background: #fff;
     opacity: 0;
     visibility: hidden;
@@ -322,35 +331,49 @@ body.upri-locked {
     line-height: 1.5;
 }
 
+/* Controls float on the slide. The bar itself is clear, so the 16:9 stage can
+ * use the whole screen instead of stopping above a dark strip. */
 .upri-deck__bar {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: 0.7rem;
+    z-index: 2;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 3.5rem;
+    justify-content: center;
+    height: auto;
     padding: 0 1rem;
-    color: #e5e7eb;
+    pointer-events: none;
+    background: transparent;
+    color: var(--upri-navy, #011e41);
 }
 .upri-deck__nav,
 .upri-deck__tools {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    flex: 1;
+    gap: 0.15rem;
+    flex: none;
+    pointer-events: auto;
+    padding: 0.2rem;
+    border: 1px solid rgba(1, 30, 65, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 12px rgba(11, 18, 32, 0.16);
 }
 .upri-deck__nav {
     justify-content: center;
-    padding-left: 5.5rem;
 }
 .upri-deck__tools {
+    position: absolute;
+    right: 1rem;
+    bottom: 0;
     justify-content: flex-end;
-    max-width: 5.5rem;
 }
 .upri-deck__counter {
     min-width: 4.5rem;
+    padding: 0 0.35rem;
     text-align: center;
     font-size: 0.85rem;
     font-variant-numeric: tabular-nums;
@@ -359,30 +382,44 @@ body.upri-locked {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    width: 2.15rem;
+    height: 2.15rem;
+    border: 0;
     border-radius: 999px;
     background: transparent;
-    color: #e5e7eb;
+    color: inherit;
     cursor: pointer;
 }
 .upri-deck__btn:hover:not(:disabled),
 .upri-deck__btn:focus-visible {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(1, 30, 65, 0.1);
     outline: none;
 }
 .upri-deck__btn:disabled {
     opacity: 0.35;
     cursor: default;
 }
+/* The cover is navy, so the same glass chips switch to white ink there. */
+.upri-deck.is-on-cover .upri-deck__nav,
+.upri-deck.is-on-cover .upri-deck__tools {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    box-shadow: none;
+}
+.upri-deck.is-on-cover .upri-deck__btn:hover:not(:disabled),
+.upri-deck.is-on-cover .upri-deck__btn:focus-visible {
+    background: rgba(255, 255, 255, 0.18);
+}
 .upri-deck__progress {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
+    z-index: 2;
     height: 3px;
-    background: rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+    background: rgba(1, 30, 65, 0.12);
 }
 .upri-deck__progress span {
     display: block;
@@ -394,7 +431,10 @@ body.upri-locked {
 /* ---------------------------------------------------------------- A4 report */
 
 .upri-report {
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     background: #4b5563;
 }
 .upri-report__bar {
@@ -407,6 +447,9 @@ body.upri-locked {
     justify-content: space-between;
     gap: 0.75rem 1.5rem;
     padding: 0.7rem 1.25rem;
+    padding-top: max(0.7rem, env(safe-area-inset-top));
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
     background: #fff;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
@@ -428,12 +471,49 @@ body.upri-locked {
     display: flex;
     gap: 0.5rem;
 }
+/* Holds the scaled preview. The pages themselves stay 210mm so pagination is
+ * unchanged; report.js shrinks this stack to the screen. */
+.upri-report__frame {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
 .upri-report__pages {
+    position: absolute;
+    left: 50%;
+    top: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 1.5rem;
     padding: 1.5rem 0 3rem;
+    transform-origin: top center;
+}
+@media (max-width: 720px) {
+    .upri-report__bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.55rem;
+        padding: 0.55rem 0.75rem;
+        padding-top: max(0.55rem, env(safe-area-inset-top));
+        padding-left: max(0.75rem, env(safe-area-inset-left));
+        padding-right: max(0.75rem, env(safe-area-inset-right));
+    }
+    .upri-report__title {
+        font-size: 0.95rem;
+    }
+    .upri-report__hint {
+        font-size: 0.7rem;
+        line-height: 1.35;
+    }
+    .upri-report__actions {
+        width: 100%;
+    }
+    .upri-report__actions .upri-btn {
+        flex: 1;
+        justify-content: center;
+        min-height: 2.75rem;
+    }
 }
 
 .upri-page {

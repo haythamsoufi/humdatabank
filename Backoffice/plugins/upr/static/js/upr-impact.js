@@ -293,7 +293,7 @@
         });
         els.exportDialog.close();
         if (!blocks.length) return;
-        var options = { ui: UI, logoUrl: CFG.logoUrl, title: blocks[0].title };
+        var options = { ui: UI, logoUrl: CFG.logoUrl, title: blocks[0].title, pdf: CFG.pdf };
         if (exporting.mode === 'present') A.slides.open(blocks, options);
         else A.report.open(blocks, options);
     }

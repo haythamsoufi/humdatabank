@@ -155,8 +155,10 @@ def analysis_ui_labels() -> dict[str, str]:
         # Presentation and A4 report
         "export_nothing": _("Nothing is ready to export yet. Wait for the analysis to finish loading."),
         "export_unavailable": _("Not loaded"),
-        "export_print": _("Print or save as PDF"),
-        "export_print_hint": _("In the print dialog choose “Save as PDF”, paper size A4, margins None, and turn off headers and footers."),
+        "export_print": _("Download PDF"),
+        "export_print_hint": _("Saves an A4 PDF of these pages."),
+        "export_pdf_working": _("Preparing PDF…"),
+        "export_pdf_failed": _("Could not create the PDF. Try again."),
         "export_generated": _("Generated {date}"),
         "export_region": _("Region: {region}"),
         "export_all_regions": _("All regions"),

@@ -168,6 +168,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Free disk space
+        run: |
+          df -h /
+          # pgvector plus a restored pip cache leave this job tighter than a bare runner.
+          # Same threshold as deploy-to-webapp-target.yml. Do not delete
+          # /opt/hostedtoolcache: setup-python installs Python there.
+          avail_gb="$(df -BG / | tail -1 | awk '{gsub("G","",$4); print $4}')"
+          echo "Available disk on /: ${avail_gb}G"
+          if [ "${avail_gb}" -ge 10 ]; then
+            echo "Skipping cleanup (>=10G free)."
+            exit 0
+          fi
+          echo "Running cleanup (<10G free)."
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -178,7 +194,27 @@ jobs:
         working-directory: Backoffice
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          # A previous run can restore multi-GB CUDA wheels via the pip cache
+          # (hashed filenames, so match on size). Drop that cache before resolving.
+          if [ -d "${HOME}/.cache/pip" ]; then
+            cache_kb="$(du -s "${HOME}/.cache/pip" | awk '{print $1}')"
+            if [ "${cache_kb}" -gt 2500000 ]; then
+              echo "Removing pip cache (${cache_kb} KB) so CUDA wheels are not reused."
+              rm -rf "${HOME}/.cache/pip"
+            fi
+          fi
+          # Same as Backoffice/Dockerfile: CPU wheel first. The PyPI Linux wheel
+          # depends on the CUDA 13 stack (torch + nvidia-* + cuda-toolkit), which
+          # fills ubuntu-latest during extract. Tests do not need a GPU.
+          # The constraint stops the requirements resolve from replacing it.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -c "import importlib.metadata as m; open('/tmp/ci-torch-constraint.txt','w').write('torch=='+m.version('torch')+'\n')"
+          cat /tmp/ci-torch-constraint.txt
+          pip install -r requirements.txt -r requirements-dev.txt \
+            --extra-index-url https://download.pytorch.org/whl/cpu \
+            -c /tmp/ci-torch-constraint.txt
+          python -c "import torch; assert torch.version.cuda is None, torch.__version__; print('torch', torch.__version__)"
+          df -h /
 
       - name: Install P&B render system libraries
         if: needs.select_tests.outputs.needs_render_libs == 'true'

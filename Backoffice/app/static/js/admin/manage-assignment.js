@@ -3152,6 +3152,14 @@
                 setNamedCheckbox('email_attach_pdf', config.email_attach_pdf);
                 setNamedCheckbox('email_attach_excel', config.email_attach_excel);
 
+                const accessControl = document.getElementById('assignment-access-control');
+                if (accessControl && Array.isArray(config.allowed_role_ids)) {
+                    const wantedRoles = new Set(config.allowed_role_ids.map(String));
+                    accessControl.querySelectorAll('input[name="allowed_role_ids"]').forEach(function (cb) {
+                        cb.checked = wantedRoles.has(cb.value);
+                    });
+                }
+
                 if (config.data_owner_id && !setSelectIfPresent(dataOwnerSelect, config.data_owner_id, false)) {
                     notes.push(cfg.t.copyConfigOwnerMissing || '');
                 }
@@ -3514,7 +3522,7 @@
 
                     const msg =
                         `An assignment already exists for this template and period.\n\n` +
-                        `Existing ID: ${a.id}\n` +
+                        (a.id != null ? `Existing ID: ${a.id}\n` : '') +
                         `Template: ${a.template_name || ''}\n` +
                         `Period: ${a.period_name || ''}\n` +
                         `Status: ${statusText}\n\n` +

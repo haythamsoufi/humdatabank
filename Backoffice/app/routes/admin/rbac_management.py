@@ -255,6 +255,19 @@ def delete_role(role_id):
             flash(f"Cannot delete role '{role.name}' - it is assigned to {user_count} user(s). Remove all users first.", "warning")
             return redirect(url_for("rbac_management.manage_roles"))
 
+        from app.models.assignments import assigned_form_allowed_role
+
+        restricted_count = db.session.query(assigned_form_allowed_role.c.assigned_form_id).filter(
+            assigned_form_allowed_role.c.role_id == role.id
+        ).count()
+        if restricted_count > 0:
+            flash(
+                f"Cannot delete role '{role.name}' - it restricts access to {restricted_count} assignment(s). "
+                "Remove it from those assignments first, otherwise they would become visible to everyone.",
+                "warning",
+            )
+            return redirect(url_for("rbac_management.manage_roles"))
+
         role_name = role.name
         role_code = role.code
 

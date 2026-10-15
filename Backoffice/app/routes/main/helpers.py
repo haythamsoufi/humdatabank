@@ -40,7 +40,38 @@ def filter_dashboard_assignment_activities(activities):
         if summary_key == 'activity.assignment_created':
             continue
         filtered.append(activity)
-    return filtered
+    return _drop_inaccessible_assignment_activities(filtered)
+
+
+def _drop_inaccessible_assignment_activities(activities):
+    """Hide activity rows about assignments the current user may not access."""
+    from app.services.assignments.access_service import (
+        filter_accessible_assigned_form_ids,
+        get_access_scope,
+    )
+
+    if not activities or get_access_scope(current_user).unrestricted:
+        return activities
+    aes_ids = {
+        int(a.assignment_id) for a in activities
+        if getattr(a, 'assignment_id', None)
+    }
+    if not aes_ids:
+        return activities
+    rows = (
+        AssignmentEntityStatus.query
+        .filter(AssignmentEntityStatus.id.in_(aes_ids))
+        .with_entities(AssignmentEntityStatus.id, AssignmentEntityStatus.assigned_form_id)
+        .all()
+    )
+    form_id_by_aes = {int(aes_id): int(form_id) for aes_id, form_id in rows}
+    visible_forms = filter_accessible_assigned_form_ids(current_user, form_id_by_aes.values())
+    return [
+        a for a in activities
+        if not getattr(a, 'assignment_id', None)
+        or int(a.assignment_id) not in form_id_by_aes
+        or form_id_by_aes[int(a.assignment_id)] in visible_forms
+    ]
 
 
 def activity_assignment_display_title(assigned_form, fallback_template=None):

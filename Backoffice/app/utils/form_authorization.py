@@ -672,6 +672,11 @@ def _reachable_template_filters(user, template_column) -> list:
                 ),
             )
         )
+        from app.services.assignments.access_service import assignment_access_clause
+
+        access_clause = assignment_access_clause(user, AssignedForm.id)
+        if access_clause is not None:
+            entity_templates = entity_templates.where(access_clause)
         filters.append(template_column.in_(entity_templates))
 
     owned_or_shared = get_user_allowed_template_ids(user.id)

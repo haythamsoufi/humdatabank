@@ -57,6 +57,7 @@ _ASSIGNMENT_FIELD_LABELS: Dict[str, str] = {
     "enable_page_submission": "Per-page submit",
     "submission_review_mode": "Submission review notification",
     "submission_review_recipients": "Submission review recipients",
+    "allowed_roles": "Restricted to roles",
 }
 
 
@@ -208,6 +209,13 @@ def assignment_settings_snapshot(assignment: Any) -> Dict[str, Any]:
         ]
     except Exception:
         recipients = []
+    try:
+        allowed_roles = sorted(
+            (r.name or r.code or f"Role #{r.id}") for r in (assignment.allowed_roles or [])
+        )
+    except Exception:
+        allowed_roles = []
+    allowed_roles = allowed_roles or ["All users"]
     return {
         "template": _template_name(assignment),
         "period_name": (getattr(assignment, "period_name", "") or "").strip() or None,
@@ -226,6 +234,7 @@ def assignment_settings_snapshot(assignment: Any) -> Dict[str, Any]:
             getattr(assignment, "submission_review_recipient_mode", None)
         ),
         "submission_review_recipients": sorted(recipients),
+        "allowed_roles": allowed_roles,
     }
 
 

@@ -65,6 +65,7 @@ from app.services.security.api_authentication import (
     apply_user_template_scoping,
     apply_api_key_data_scoping,
 )
+from app.services.assignments.access_service import assignment_access_clause
 from app.services.security.public_data_access import (
     PUBLIC_DATA_MAX_PER_PAGE,
     public_include_dimensions,
@@ -305,6 +306,7 @@ def _collect_scoped_assignment_status_ids(
     submission_id: Optional[int] = None,
     allowed_template_ids: Optional[Sequence[int]] = None,
     allowed_country_ids: Optional[Sequence[int]] = None,
+    access_user=None,
 ) -> list:
     """
     Return AES ids matching the request scope, including pending rows with no FormData.
@@ -394,6 +396,11 @@ def _collect_scoped_assignment_status_ids(
     if submission_id is not None:
         q = q.filter(AssignmentEntityStatus.id == int(submission_id))
 
+    if access_user is not None:
+        access_clause = assignment_access_clause(access_user, AssignedForm.id)
+        if access_clause is not None:
+            q = q.filter(access_clause)
+
     ids = [
         int(aes_id)
         for (aes_id,) in q.with_entities(AssignmentEntityStatus.id).all()
@@ -426,6 +433,7 @@ def _build_assignment_statuses_table(
     submission_type: Optional[str] = None,
     allowed_template_ids: Optional[Sequence[int]] = None,
     allowed_country_ids: Optional[Sequence[int]] = None,
+    access_user=None,
 ) -> list:
     """Fact-derived AES ids plus scoped AES (including pending with no FormData)."""
     if str(submission_type or '').strip().lower() == 'public':
@@ -441,6 +449,7 @@ def _build_assignment_statuses_table(
             submission_id=submission_id,
             allowed_template_ids=allowed_template_ids,
             allowed_country_ids=allowed_country_ids,
+            access_user=access_user,
         )
     )
     return _load_assignment_statuses_table(sorted(aes_ids))
@@ -807,6 +816,13 @@ def _fetch_extended_data(
 
         if p_q is not None:
             p_q = p_q.filter(AssignedForm.template_id.in_(allowed_tids))
+
+        access_clause = assignment_access_clause(auth_user, AssignedForm.id)
+        if access_clause is not None:
+            if a_q is not None:
+                a_q = a_q.filter(access_clause)
+            if p_q is not None:
+                p_q = p_q.filter(access_clause)
 
         allowed_cids = _get_user_allowed_country_ids(auth_user)
         if allowed_cids is not None:
@@ -1548,6 +1564,7 @@ def get_all_data():
         # Optional allow-lists for assignment_statuses[] (None = unrestricted).
         aes_allowed_template_ids = None
         aes_allowed_country_ids = None
+        aes_access_user = None
 
         def _assignment_statuses_for_scope(*row_lists):
             return _build_assignment_statuses_table(
@@ -1560,6 +1577,7 @@ def get_all_data():
                 submission_type=submission_type,
                 allowed_template_ids=aes_allowed_template_ids,
                 allowed_country_ids=aes_allowed_country_ids,
+                access_user=aes_access_user,
             )
 
         # ---------- RBAC: if user-authenticated, restrict to templates the user owns or that are shared with them ----------
@@ -1588,6 +1606,7 @@ def get_all_data():
                         return api_error('Forbidden: no access to one or more requested templates', 403)
                 aes_allowed_template_ids = allowed_template_ids
                 aes_allowed_country_ids = _get_user_allowed_country_ids(auth_user)
+                aes_access_user = auth_user
 
             # FDRS disaggregation is already limited to that template. Do not also
             # require a template share or country grant.

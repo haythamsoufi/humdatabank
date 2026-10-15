@@ -39,6 +39,10 @@ from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_formatting import format_form_data_response
 from app.utils.api_serialization import format_indicator_details
 from app.services import get_assignments_for_country
+from app.services.assignments.access_service import (
+    assignment_access_clause,
+    user_can_access_assigned_form,
+)
 
 
 @api_bp.route('/submissions', methods=['GET'])
@@ -85,6 +89,7 @@ def get_submissions():
         # Apply RBAC filtering for user auth (template + country scoping)
         allowed_template_ids = None
         allowed_country_ids = None
+        access_user = None
         key_scope = get_api_key_data_scope() if api_key_record is not None else None
         if key_scope is not None:
             if not key_scope['template_ids'] and not key_scope['country_ids']:
@@ -98,6 +103,7 @@ def get_submissions():
             allowed_template_ids = key_scope['template_ids'] or None
             allowed_country_ids = key_scope['country_ids'] or None
         elif not elevated_access and auth_user is not None:
+            access_user = auth_user
             allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
             if not allowed_template_ids:
                 return json_response({
@@ -145,6 +151,10 @@ def get_submissions():
                 assigned_sel = assigned_sel.where(AssignedForm.template_id == template_id)
             if allowed_template_ids is not None:
                 assigned_sel = assigned_sel.where(AssignedForm.template_id.in_(allowed_template_ids))
+            if access_user is not None:
+                access_clause = assignment_access_clause(access_user, AssignedForm.id)
+                if access_clause is not None:
+                    assigned_sel = assigned_sel.where(access_clause)
             if country_id:
                 assigned_sel = assigned_sel.where(AssignmentEntityStatus.entity_id == country_id)
             if allowed_country_ids is not None:
@@ -165,6 +175,10 @@ def get_submissions():
                 public_sel = public_sel.where(AssignedForm.template_id == template_id)
             if allowed_template_ids is not None:
                 public_sel = public_sel.where(AssignedForm.template_id.in_(allowed_template_ids))
+            if access_user is not None:
+                access_clause = assignment_access_clause(access_user, AssignedForm.id)
+                if access_clause is not None:
+                    public_sel = public_sel.where(access_clause)
             if country_id:
                 public_sel = public_sel.where(PublicSubmission.country_id == country_id)
             if allowed_country_ids is not None:
@@ -370,6 +384,8 @@ def get_submission_details(submission_id):
             scope_country_id is not None and scope_country_id in allowed_country_ids
         )
         if not template_ok or not country_ok:
+            return api_error('Submission not found', 404)
+        if not user_can_access_assigned_form(auth_user, submission.assigned_form_id):
             return api_error('Submission not found', 404)
 
     include_contacts = api_key_can_read_personal_data()

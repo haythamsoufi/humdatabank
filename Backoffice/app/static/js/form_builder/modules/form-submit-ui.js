@@ -3,18 +3,19 @@
 // - AJAX submit + partial DOM refresh to avoid full page reloads
 
 import { isActuallyHidden } from './dom-visibility.js';
-import { wrapWafJsonBody } from '../../lib/waf-json-body.js';
+import { wrapWafJsonBodyCompact } from '../../lib/waf-json-body.js';
 
 /**
- * Form-builder AJAX body. The whole form (including matrix_config) is base64
+ * Form-builder AJAX body. The whole form (including matrix_config) is encoded
  * so signature rules never see formulas or HTML, then split so no single
- * argument exceeds the WAF length limit. A funding matrix is tens of KB;
- * one unchunked payload is what production blocks with 403.
+ * argument exceeds the per-value length limit. Large repetitive configs are
+ * gzip+hex (`gz:` prefix) because chunking does not reduce the combined
+ * argument size — a chunked 24KB funding-matrix save was still blocked.
  * Server: unwrap_waf_json_envelope() / get_request_data().
  */
-export function encodeFormBuilderAjaxBody(inner) {
+export async function encodeFormBuilderAjaxBody(inner) {
   if (inner == null) return null;
-  return JSON.stringify(wrapWafJsonBody(inner));
+  return JSON.stringify(await wrapWafJsonBodyCompact(inner));
 }
 
 // Lazily resolves translations via the server-injected catalog (window.t).
@@ -484,7 +485,7 @@ export const FormSubmitUI = {
         this.showSaving(form.dataset && form.dataset.loadingText ? form.dataset.loadingText : 'Processing…');
         const fetchFn = (window.getFetch && window.getFetch()) || fetch;
         const inner = window.snapshotToJson ? window.snapshotToJson(snapshot) : null;
-        const sendBody = encodeFormBuilderAjaxBody(inner);
+        const sendBody = await encodeFormBuilderAjaxBody(inner);
         const resp = await fetchFn(action, {
           method,
           body: sendBody || (() => {

@@ -1,20 +1,56 @@
 /**
  * Form-builder saves must use the chunked WAF envelope.
  * A funding-matrix config is tens of KB; one base64 argument is what
- * production Application Gateway blocks with 403.
+ * production Application Gateway blocks with 403. Chunking does not shrink
+ * the combined size, so large saves switch to gzip+hex (`gz:`).
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { WAF_JSON_MAX_CHUNK } from '../../../app/static/js/lib/waf-json-body.js';
 import { encodeFormBuilderAjaxBody } from '../../../app/static/js/form_builder/modules/form-submit-ui.js';
 import { fetchMatrixColumnMigrationPreview } from '../../../app/static/js/form_builder/modules/modal/matrix-column-migration.js';
 
-function decodeEnvelope(raw) {
+async function decodeEnvelope(raw) {
     const envelope = JSON.parse(raw);
-    let b64 = envelope.payload || '';
+    let wire = envelope.payload || '';
     for (let i = 1; envelope['payload__c' + i]; i += 1) {
-        b64 += envelope['payload__c' + i];
+        wire += envelope['payload__c' + i];
     }
-    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+    if (wire.startsWith('gz:')) {
+        const hex = wire.slice(3);
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < bytes.length; i += 1) {
+            bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+        }
+        const source = new ReadableStream({
+            start(controller) {
+                controller.enqueue(bytes);
+                controller.close();
+            },
+        });
+        const reader = source.pipeThrough(new DecompressionStream('gzip')).getReader();
+        const chunks = [];
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+        }
+        const text = new TextDecoder().decode(
+            chunks.length === 1 ? chunks[0] : concatBytes(chunks)
+        );
+        return JSON.parse(text);
+    }
+    return JSON.parse(decodeURIComponent(escape(atob(wire))));
+}
+
+function concatBytes(chunks) {
+    const total = chunks.reduce((n, c) => n + c.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    chunks.forEach((chunk) => {
+        out.set(chunk, offset);
+        offset += chunk.length;
+    });
+    return out;
 }
 
 function assertChunked(raw) {
@@ -28,20 +64,21 @@ function assertChunked(raw) {
 }
 
 describe('encodeFormBuilderAjaxBody', () => {
-    it('keeps a small save as a single payload argument', () => {
+    it('keeps a small save as a single payload argument', async () => {
         const inner = { item_type: 'question', label: 'Name' };
-        const raw = encodeFormBuilderAjaxBody(inner);
+        const raw = await encodeFormBuilderAjaxBody(inner);
         const envelope = assertChunked(raw);
         expect(envelope.payload__c1).toBeUndefined();
-        expect(decodeEnvelope(raw)).toEqual(inner);
+        expect(envelope.payload.startsWith('gz:')).toBe(false);
+        expect(await decodeEnvelope(raw)).toEqual(inner);
     });
 
-    it('returns null when there is nothing to send', () => {
-        expect(encodeFormBuilderAjaxBody(null)).toBeNull();
-        expect(encodeFormBuilderAjaxBody(undefined)).toBeNull();
+    it('returns null when there is nothing to send', async () => {
+        expect(await encodeFormBuilderAjaxBody(null)).toBeNull();
+        expect(await encodeFormBuilderAjaxBody(undefined)).toBeNull();
     });
 
-    it('splits a funding-matrix save and hides formulas from the WAF', () => {
+    it('gzips a funding-matrix save so the combined arguments stay small', async () => {
         const columns = Array.from({ length: 40 }, (_, i) => ({
             name: `sp${i}`,
             label: `Strategic priority ${i}`,
@@ -67,14 +104,18 @@ describe('encodeFormBuilderAjaxBody', () => {
             }),
         };
 
-        const raw = encodeFormBuilderAjaxBody(inner);
-        expect(raw.length).toBeGreaterThan(5000);
+        const raw = await encodeFormBuilderAjaxBody(inner);
         expect(raw).not.toContain('SUM(');
         expect(raw).not.toContain('<2026>');
         expect(raw).not.toContain('أولوية');
+        expect(raw).not.toMatch(/[+/=]/);
         const envelope = assertChunked(raw);
+        expect(envelope.payload.startsWith('gz:')).toBe(true);
         expect(envelope.payload__c1).toBeTruthy();
-        expect(decodeEnvelope(raw)).toEqual(inner);
+        const combined = Object.values(envelope).reduce((n, value) => n + value.length, 0);
+        // The blocked production save was 24500 bytes of base64 arguments.
+        expect(combined).toBeLessThan(8000);
+        expect(await decodeEnvelope(raw)).toEqual(inner);
     });
 });
 
@@ -104,6 +145,6 @@ describe('fetchMatrixColumnMigrationPreview', () => {
         expect(raw).not.toContain('[assignment_year]');
         const envelope = assertChunked(raw);
         expect(envelope.payload__c1).toBeTruthy();
-        expect(decodeEnvelope(raw)).toEqual({ renames, version_id: 22 });
+        expect(await decodeEnvelope(raw)).toEqual({ renames, version_id: 22 });
     });
 });

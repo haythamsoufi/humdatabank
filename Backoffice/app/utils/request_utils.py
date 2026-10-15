@@ -5,6 +5,7 @@ Centralizes is_json_request to replace ad-hoc X-Requested-With / request.is_json
 """
 import base64
 import json
+import zlib
 
 from flask import request
 
@@ -12,6 +13,8 @@ from app.utils.api_helpers import get_json_safe
 
 # Same bound as form-field chunk reassembly (processors/_common.py).
 _WAF_JSON_MAX_CHUNKS = 256
+# Cap gunzip output so a small ``gz:`` body cannot expand without limit.
+_WAF_JSON_MAX_DECODED_BYTES = 2_000_000
 
 
 class WafJsonUnwrapError(ValueError):
@@ -60,6 +63,26 @@ class _JsonFormProxy:
         return dict(self._data)
 
 
+def _decode_waf_wire(joined: str) -> bytes:
+    """Decode a reassembled envelope wire string to UTF-8 JSON bytes.
+
+    ``gz:`` + lowercase hex is gzip (form-builder saves whose plain base64
+    would be larger). Anything else is standard base64.
+    """
+    if joined.startswith("gz:"):
+        decomp = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        out = decomp.decompress(bytes.fromhex(joined[3:]), _WAF_JSON_MAX_DECODED_BYTES + 1)
+        if len(out) > _WAF_JSON_MAX_DECODED_BYTES or decomp.unconsumed_tail:
+            raise ValueError("decompressed WAF payload exceeds size limit")
+        tail = decomp.flush()
+        if tail:
+            out += tail
+        if len(out) > _WAF_JSON_MAX_DECODED_BYTES:
+            raise ValueError("decompressed WAF payload exceeds size limit")
+        return out
+    return base64.b64decode(joined)
+
+
 def unwrap_waf_json_envelope(data, *, strict=False):
     """Unwrap ``{payload, payload__c1, …}`` / ``payload_b64`` WAF envelopes.
 
@@ -67,6 +90,8 @@ def unwrap_waf_json_envelope(data, *, strict=False):
     clients). ``strict=True`` raises :class:`WafJsonUnwrapError` on a present
     but malformed envelope; ``strict=False`` logs and returns the raw dict
     (``get_request_data`` compatibility).
+
+    A ``gz:`` prefix on the reassembled wire selects gzip+hex instead of base64.
     """
     if not isinstance(data, dict):
         if strict:
@@ -92,14 +117,14 @@ def unwrap_waf_json_envelope(data, *, strict=False):
         parts.append(str(chunk))
 
     try:
-        decoded = json.loads(base64.b64decode("".join(parts)).decode("utf-8"))
+        decoded = json.loads(_decode_waf_wire("".join(parts)).decode("utf-8"))
     except Exception as exc:
         if strict:
             raise WafJsonUnwrapError(f"malformed WAF JSON envelope: {exc}") from exc
         try:
             from flask import current_app
             current_app.logger.warning(
-                "unwrap_waf_json_envelope: failed to decode payload — malformed base64 or JSON: %s",
+                "unwrap_waf_json_envelope: failed to decode payload — malformed envelope or JSON: %s",
                 exc,
             )
         except RuntimeError:

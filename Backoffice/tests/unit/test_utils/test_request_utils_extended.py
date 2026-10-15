@@ -8,6 +8,7 @@ Covers: _JsonFormProxy, get_request_data, get_request_field,
         persist_mobile_app_embed_cookie, clear_mobile_app_embed_cookie
 """
 import base64
+import gzip
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -168,6 +169,25 @@ class TestGetRequestData:
             result = get_request_data()
             assert result.get("alt_key") == "alt_value"
 
+    def test_json_body_with_gzip_hex_payload_reassembled(self, app):
+        from app.utils.request_utils import get_request_data
+        inner = {"item_type": "matrix", "matrix_config": "SUM({SP1_[assignment_year]}) " + ("x" * 4000)}
+        packed = "gz:" + gzip.compress(json.dumps(inner).encode("utf-8")).hex()
+        body = json.dumps({
+            "payload": packed[:350],
+            "payload__c1": packed[350:700],
+            "payload__c2": packed[700:],
+        })
+        with app.test_request_context(
+            "/test",
+            method="POST",
+            content_type="application/json",
+            data=body,
+        ):
+            result = get_request_data()
+            assert result.get("item_type") == "matrix"
+            assert result.get("matrix_config") == inner["matrix_config"]
+
     def test_json_body_with_chunked_payload_reassembled(self, app):
         from app.utils.request_utils import get_request_data
         inner = {"message": "SELECT <script> " + ("x" * 800)}
@@ -198,6 +218,12 @@ class TestUnwrapWafJsonEnvelope:
         from app.utils.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
         with pytest.raises(WafJsonUnwrapError):
             unwrap_waf_json_envelope({"payload": "!!!not-b64!!!"}, strict=True)
+
+    def test_strict_rejects_oversized_gzip(self):
+        from app.utils.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
+        packed = "gz:" + gzip.compress(b'{"k":"' + (b"a" * 2_100_000) + b'"}').hex()
+        with pytest.raises(WafJsonUnwrapError):
+            unwrap_waf_json_envelope({"payload": packed}, strict=True)
 
 
 @pytest.mark.unit

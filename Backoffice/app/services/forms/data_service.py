@@ -962,10 +962,18 @@ class FormDataService(
 
         if has_value or data_not_available or not_applicable:
             if data_entry:
-                # Track old value and data availability flags for change detection
+                # Track old value and data availability flags for change detection.
+                # Emergency-appeal display must be read before the row is overwritten;
+                # reading it afterwards compares the new selection to itself.
                 old_value = data_entry.get_effective_value()
                 old_data_not_available = data_entry.data_not_available
                 old_not_applicable = data_entry.not_applicable
+                is_emergency_choice = cls._is_emergency_operations_choice(question)
+                emergency_metadata = None
+                old_display = None
+                if is_emergency_choice:
+                    emergency_metadata = cls._get_emergency_metadata_from_request(form_item_id=question.id)
+                    old_display = cls._normalize_emergency_operation_from_entry(data_entry)
 
                 # Set data availability flags first
                 data_entry.set_data_availability(data_not_available, not_applicable)
@@ -976,9 +984,7 @@ class FormDataService(
                 db.session.add(data_entry)
 
                 # Determine if there's a meaningful change
-                if cls._is_emergency_operations_choice(question):
-                    emergency_metadata = cls._get_emergency_metadata_from_request(form_item_id=question.id)
-                    old_display = cls._normalize_emergency_operation_from_entry(data_entry)
+                if is_emergency_choice:
                     new_display = cls._normalize_emergency_operation_value(processed_value, emergency_metadata)
                     value_changed = old_display != new_display
                     activity_old_value = old_display

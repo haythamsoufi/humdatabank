@@ -331,10 +331,13 @@ class RepeatGroupProcessorMixin:
                         # Compare values properly - handle dict comparison for disaggregated data
                         values_changed = False
                         if cls._is_emergency_operations_choice(field):
+                            # old_value was snapshotted before _store_repeat_data_entry.
+                            # The live row already holds the new selection, so passing it
+                            # as old_entry compares the new value to itself and drops the
+                            # change from recent activities.
                             values_changed = not cls._emergency_operation_values_equal(
                                 old_value,
                                 processed_value,
-                                old_entry=existing_entry,
                                 new_metadata=emergency_metadata,
                             )
                             activity_old_value = old_value

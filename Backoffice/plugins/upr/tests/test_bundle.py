@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from plugins.upr.bundle import merge_upr_payloads
+from plugins.upr.bundle import bundle_library_id, bundles_from_membership, merge_upr_payloads
 
 
 def _payload(**overrides):
@@ -50,6 +50,24 @@ def _payload(**overrides):
     }
     base.update(overrides)
     return base
+
+
+@pytest.mark.unit
+def test_bundles_from_membership_keeps_groups_of_two_or_more():
+    rows = bundles_from_membership(
+        [
+            (1, "Fiji", "Pacific Islands"),
+            (2, "Samoa", "Pacific Islands"),
+            (3, "Tonga", " pacific islands "),
+            (4, "Kenya", "East Africa"),
+            (5, "France", ""),
+        ]
+    )
+    assert [row["bundle"] for row in rows] == ["Pacific Islands"]
+    assert rows[0]["member_count"] == 3
+    assert rows[0]["library_id"] == bundle_library_id("Pacific Islands")
+    assert rows[0]["aes_id"] == 1
+    assert bundle_library_id("Pacific Islands") == "bundle-pacific-islands"
 
 
 @pytest.mark.unit

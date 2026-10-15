@@ -24,6 +24,44 @@ from plugins.upr.support import support_total_from_rows
 BUNDLE_CATEGORY_KEY = "bundle"
 
 
+def bundle_library_id(name: str) -> str:
+    """Stable storage id for a bundle row. Not a country assignment id."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")[:60]
+    return f"bundle-{slug or 'group'}"
+
+
+def bundles_from_membership(rows: list[tuple[int, str, str]]) -> list[dict[str, Any]]:
+    """Group ``(aes_id, country_name, bundle_value)`` into bundles of two or more countries."""
+    groups: dict[str, list[tuple[int, str]]] = {}
+    labels: dict[str, str] = {}
+    for aes_id, country_name, bundle_value in rows:
+        label = (bundle_value or "").strip()
+        if not label:
+            continue
+        key = label.casefold()
+        labels.setdefault(key, label)
+        groups.setdefault(key, []).append((int(aes_id), (country_name or "").strip()))
+    found: list[dict[str, Any]] = []
+    for key, members in groups.items():
+        if len(members) < 2:
+            continue
+        members.sort(key=lambda item: item[1].lower())
+        name = labels[key]
+        found.append(
+            {
+                "is_bundle": True,
+                "bundle": name,
+                "aes_id": members[0][0],
+                "country_name": name,
+                "iso3": "",
+                "member_count": len(members),
+                "library_id": bundle_library_id(name),
+            }
+        )
+    found.sort(key=lambda row: row["country_name"].lower())
+    return found
+
+
 def bundle_category_name() -> str:
     """Catalog name of the text category that groups countries into bundles."""
     catalog = load_part_of_category_catalog()
@@ -59,6 +97,117 @@ def bundle_options_for_aes(aes: AssignmentEntityStatus) -> list[dict[str, Any]]:
             "countries": names,
         }
     ]
+
+
+def list_bundles_for_bulk(assigned_form_id: int) -> list[dict[str, Any]]:
+    """Bundles on one assignment: two or more countries sharing a Bundle category value."""
+    from app.extensions import db
+    from app.models.core import Country
+    from app.utils.country_utils import is_sandbox_country
+
+    category = bundle_category_name()
+    rows = (
+        db.session.query(AssignmentEntityStatus, Country)
+        .outerjoin(
+            Country,
+            db.and_(
+                AssignmentEntityStatus.entity_type == "country",
+                AssignmentEntityStatus.entity_id == Country.id,
+            ),
+        )
+        .filter(AssignmentEntityStatus.assigned_form_id == int(assigned_form_id))
+        .filter(AssignmentEntityStatus.entity_type == "country")
+        .all()
+    )
+    country_ids = [int(country.id) for _, country in rows if country is not None and not is_sandbox_country(country)]
+    bundle_by_country: dict[int, str] = {}
+    if country_ids:
+        societies = NationalSociety.query.filter(NationalSociety.country_id.in_(country_ids)).all()
+        for society in societies:
+            texts = society.category_text if isinstance(society.category_text, dict) else {}
+            value = str(texts.get(category) or "").strip()
+            if value and society.country_id and int(society.country_id) not in bundle_by_country:
+                bundle_by_country[int(society.country_id)] = value
+    membership: list[tuple[int, str, str]] = []
+    for aes, country in rows:
+        if country is None or is_sandbox_country(country):
+            continue
+        value = bundle_by_country.get(int(country.id), "")
+        if value:
+            membership.append((int(aes.id), country.name or "", value))
+    return bundles_from_membership(membership)
+
+
+def bundle_on_assignment(assigned_form_id: int, bundle_value: str) -> bool:
+    wanted = (bundle_value or "").strip().casefold()
+    if not wanted:
+        return False
+    return any(row["bundle"].casefold() == wanted for row in list_bundles_for_bulk(assigned_form_id))
+
+
+def build_bundle_payload_for_form(
+    assigned_form_id: int,
+    bundle_value: str,
+    *,
+    inline_icons: bool = False,
+) -> dict[str, Any]:
+    """Merged visual for every country in this bundle on the assignment."""
+    label = (bundle_value or "").strip()
+    rows = list_bundles_for_bulk(assigned_form_id)
+    match = next((row for row in rows if row["bundle"].casefold() == label.casefold()), None)
+    if match is None:
+        raise UprError("Choose a bundle on this assignment.")
+    members = _bundle_member_ids(assigned_form_id, match["bundle"])
+    if len(members) < 2:
+        raise UprError("This bundle has no other countries on this assignment.")
+    payloads = [build_payload(aes_id, inline_icons=inline_icons) for aes_id in members]
+    names = [
+        str((payload.get("meta") or {}).get("country_name") or "").strip()
+        for payload in payloads
+    ]
+    return merge_upr_payloads(
+        payloads,
+        bundle_name=match["bundle"],
+        country_names=[name for name in names if name],
+    )
+
+
+def _bundle_member_ids(assigned_form_id: int, bundle_value: str) -> list[int]:
+    from app.extensions import db
+    from app.models.core import Country
+    from app.utils.country_utils import is_sandbox_country
+
+    category = bundle_category_name()
+    wanted = bundle_value.casefold()
+    rows = (
+        db.session.query(AssignmentEntityStatus, Country)
+        .outerjoin(
+            Country,
+            db.and_(
+                AssignmentEntityStatus.entity_type == "country",
+                AssignmentEntityStatus.entity_id == Country.id,
+            ),
+        )
+        .filter(AssignmentEntityStatus.assigned_form_id == int(assigned_form_id))
+        .filter(AssignmentEntityStatus.entity_type == "country")
+        .all()
+    )
+    country_ids = [int(country.id) for _, country in rows if country is not None and not is_sandbox_country(country)]
+    matched_countries: set[int] = set()
+    if country_ids:
+        societies = NationalSociety.query.filter(NationalSociety.country_id.in_(country_ids)).all()
+        for society in societies:
+            texts = society.category_text if isinstance(society.category_text, dict) else {}
+            stored = str(texts.get(category) or "").strip()
+            if stored.casefold() == wanted and society.country_id:
+                matched_countries.add(int(society.country_id))
+    members = [
+        (int(aes.id), (country.name or "") if country else "")
+        for aes, country in rows
+        if country is not None and int(country.id) in matched_countries and not is_sandbox_country(country)
+    ]
+    members.sort(key=lambda item: item[1].lower())
+    return [aes_id for aes_id, _name in members]
 
 
 def build_bundle_payload(aes_id: int, bundle_value: str, *, inline_icons: bool = False) -> dict[str, Any]:

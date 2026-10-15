@@ -336,6 +336,67 @@ class TestRepeatGroupProcessorMixin:
         assert "__other__" not in parsed
 
 
+    def test_repeat_emergency_title_dropdown_change_is_tracked(self, app):
+        """Changing a repeat-entry title dropdown must show up as a field change."""
+        from app.models.forms import RepeatGroupData
+        from app.services.forms.data_service import FormDataService
+
+        section = SimpleNamespace(id=415, entry_label_item_id=1374, sub_sections=[])
+        field = MagicMock()
+        field.id = 1374
+        field.label = "Select Emergency appeal"
+        field.is_indicator = False
+        field.is_question = True
+        field.is_document_field = False
+        field.item_type = "question"
+        field.question_type = SimpleNamespace(value="single_choice")
+        field.lookup_list_id = "emergency_operations"
+        field.config = {"use_as_repeat_entry_title": True}
+
+        existing = RepeatGroupData()
+        existing.form_item_id = 1374
+        existing.value = "MDRAF018 Afghanistan: Population Movement, 2025"
+        existing.disagg_type = "emergency_operation"
+        existing.disagg_data = {
+            "name": "Afghanistan: Population Movement, 2025",
+            "code": "MDRAF018",
+        }
+        existing.data_not_available = False
+        existing.not_applicable = False
+        instance = SimpleNamespace(id=5, instance_number=1, instance_label="old")
+        aes = SimpleNamespace(id=1641)
+        new_value = "MDRAF019 Afghanistan - Earthquake"
+
+        with app.test_request_context("/test", method="POST", data={
+            "repeat_415_1_field_0": new_value,
+            "repeat_415_1_field_0_emergency_metadata": json.dumps({
+                "name": "Afghanistan - Earthquake",
+                "code": "MDRAF019",
+            }),
+        }):
+            with patch(
+                "app.services.forms.processors.repeat_group.get_form_items_for_section",
+                return_value=[field],
+            ), patch(
+                "app.services.forms.processors.repeat_group.RepeatGroupInstance"
+            ) as mock_instance, patch(
+                "app.services.forms.processors.repeat_group.RepeatGroupData"
+            ) as mock_data, patch(
+                "app.services.forms.processors.repeat_group.db.session.add"
+            ):
+                mock_instance.query.filter_by.return_value.first.return_value = instance
+                mock_instance.query.filter_by.return_value.all.return_value = [instance]
+                mock_data.query.filter_by.return_value.first.return_value = existing
+
+                changes = FormDataService._process_repeat_groups(section, aes, [])
+
+        assert len(changes) == 1
+        assert changes[0]["form_item_id"] == 1374
+        assert changes[0]["old_value"] == "MDRAF018 Afghanistan: Population Movement, 2025"
+        assert changes[0]["new_value"] == new_value
+        assert "Entry 1" in changes[0]["field_name"]
+
+
 class TestPluginProcessorMixin:
     def test_save_plugin_field_data_none_value_is_noop(self):
         from app.services.forms.data_service import FormDataService

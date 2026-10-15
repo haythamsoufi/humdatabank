@@ -366,3 +366,21 @@ class TestValidationDashboardDispatchPreview:
         # Verify entity_type was passed through
         call_kwargs = mock_pd.call_args[1]
         assert call_kwargs.get("entity_type") == "branch"
+
+
+class TestValidationDashboardCapacityApi:
+    def test_returns_capacity_comparison(self, logged_in_client, db_session, app):
+        payload = {
+            "rows": [],
+            "years": [2025],
+            "measures": [{"key": "volunteers", "label": "Volunteers"}],
+            "summary": {"attention_rows": 0},
+        }
+        with _perm_patch(), \
+             patch("plugins.upr.capacity_comparison.load_capacity_comparison", return_value=payload):
+            resp = logged_in_client.get("/admin/validation-dashboard/api/capacity")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["years"] == [2025]
+        assert data["summary"]["attention_rows"] == 0
+

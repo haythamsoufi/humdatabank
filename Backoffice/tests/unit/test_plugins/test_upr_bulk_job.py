@@ -130,7 +130,7 @@ class TestCancelAndActive:
         db_session.commit()
         assert request_bulk_export_cancel(job_id) == "completed"
 
-    def test_get_active_returns_running_then_completed_zip(self, db_session, admin_user, assigned_form, app):
+    def test_get_active_ignores_completed_zip(self, db_session, admin_user, assigned_form, app):
         with app.app_context():
             job_id = _create_job(admin_user)
         active = get_active_bulk_export_job()
@@ -139,8 +139,7 @@ class TestCancelAndActive:
         job.status = "completed"
         job.meta = dict(job.meta or {}, zip_key="exports/x/upr.zip")
         db_session.commit()
-        active = get_active_bulk_export_job()
-        assert active and active["zip_key"] == "exports/x/upr.zip"
+        assert get_active_bulk_export_job() is None
 
 
 class TestRenderLoop:

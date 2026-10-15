@@ -92,7 +92,19 @@
         var hidden = el('vd-template');
         if (hidden) hidden.value = matched ? target : '';
         syncUprSubtabs(matched ? target : '');
+        syncCapacityTab(matched ? target : '');
         return matched || !target;
+    }
+
+    function syncCapacityTab(templateId) {
+        var tab = document.querySelector('#vd-main-tabs [data-tab="capacity"]');
+        if (!tab) return;
+        var show = templateId === '24' || templateId === '33';
+        tab.classList.toggle('hidden', !show);
+        if (!show && tab.getAttribute('aria-selected') === 'true') {
+            var tracker = document.getElementById('tab-vd-tracker');
+            if (tracker) tracker.click();
+        }
     }
 
     function showFeedback(message, type) {
@@ -755,6 +767,7 @@
     setActionButtonsEnabled(false);
 
     async function restoreSavedScope() {
+        syncCapacityTab(getTemplateId());
         var saved = readSavedScope();
         if (saved) {
             if (LAYOUTS.indexOf(saved.layout) !== -1) state.layout = saved.layout;

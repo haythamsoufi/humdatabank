@@ -754,3 +754,96 @@
 #validationTrackerGrid.ag-theme-alpine .ag-header-cell.compliance-header-center .ag-header-cell-label {
     justify-content: center !important;
 }
+
+.vd-cap-intro {
+    max-width: 52rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: rgb(75 85 99);
+}
+
+.vd-cap-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.vd-cap-stat {
+    flex: 1 1 10rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.5rem;
+    background: rgb(255 255 255);
+}
+
+.vd-cap-stat-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: rgb(1 30 65);
+}
+
+.vd-cap-stat.is-attention .vd-cap-stat-value {
+    color: rgb(185 28 28);
+}
+
+.vd-cap-stat-label {
+    display: block;
+    font-size: 0.75rem;
+    color: rgb(75 85 99);
+}
+
+.vd-cap-stat-sub {
+    display: block;
+    min-height: 1rem;
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+    color: rgb(180 83 9);
+}
+
+.vd-cap-year-field {
+    width: 9.5rem;
+    flex-shrink: 0;
+}
+
+.vd-table-scroll-tall {
+    max-height: 36rem;
+}
+
+.vd-cap-flags {
+    margin: 0.35rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vd-cap-flags li + li {
+    margin-top: 0.25rem;
+}
+
+.vd-cap-num-hot {
+    font-weight: 600;
+    color: rgb(153 27 27);
+}
+
+.vd-cap-num-review {
+    font-weight: 600;
+    color: rgb(146 64 14);
+}
+
+.vd-table tbody tr.vd-row-review td {
+    background: rgb(255 251 235);
+}
+
+.vd-table tbody tr.vd-row-review:hover td {
+    background: rgb(254 243 199);
+}
+
+.vd-table tbody tr.vd-row-review td.vd-sticky {
+    background: rgb(255 251 235);
+}
+
+.vd-table tbody tr.vd-row-review:hover td.vd-sticky {
+    background: rgb(254 243 199);
+}

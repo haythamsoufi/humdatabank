@@ -82,6 +82,11 @@
                     class="settings-tab {{ admin_underline_tab_btn_classes(false) }}">
                 <i class="fas fa-flag mr-1.5" aria-hidden="true"></i>{{ _('Country Validation') }}
             </button>
+            <button type="button" role="tab" id="tab-vd-capacity" data-tab="capacity"
+                    aria-selected="false"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(false) }} hidden">
+                <i class="fas fa-users mr-1.5" aria-hidden="true"></i>{{ _('NS capacity') }}
+            </button>
         {% endcall %}
 
         {# ——— Tracker (default) ——— #}
@@ -218,6 +223,75 @@
                 <p id="vd-indicators-empty" class="vd-table-empty">{{ _('Select a country to compare indicators.') }}</p>
             </div>
         </div>
+
+        {# ——— NS capacity: planning (24) vs reporting (33) ——— #}
+        <div id="panel-capacity" class="vd-panel hidden p-6">
+            <p class="vd-cap-intro">
+                {{ _('Planning and country reporting both collect volunteers, staff, branches, and local units. A figure needs attention when the two forms disagree by 25 percent or more for the same year, when it moves by 50 percent or more from the previous year, or when a submitted form left it blank after the other reported a number. Smaller gaps, and blanks on forms still in progress, are listed as variations.') }}
+            </p>
+            <div class="vd-cap-stats" aria-live="polite">
+                <div class="vd-cap-stat is-attention">
+                    <span id="vd-cap-attention" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Need attention') }}</span>
+                    <span id="vd-cap-attention-sub" class="vd-cap-stat-sub"></span>
+                </div>
+                <div class="vd-cap-stat">
+                    <span id="vd-cap-discrepancies" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Discrepancies') }}</span>
+                </div>
+                <div class="vd-cap-stat">
+                    <span id="vd-cap-variations" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Year-to-year changes') }}</span>
+                </div>
+                <div class="vd-cap-stat">
+                    <span id="vd-cap-missing" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Missing figures') }}</span>
+                </div>
+            </div>
+            <div class="vd-toolbar mb-4">
+                <div class="vd-toolbar-row">
+                    <div class="vd-field vd-cap-year-field">
+                        <label for="vd-cap-year" class="vd-field-label">{{ _('Year') }}</label>
+                        <select id="vd-cap-year" class="vd-select">
+                            <option value="">{{ _('All years') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-field vd-field-country">
+                        <label for="vd-cap-measure" class="vd-field-label">{{ _('Figure') }}</label>
+                        <select id="vd-cap-measure" class="vd-select">
+                            <option value="">{{ _('All figures') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-field vd-field-country">
+                        <label for="vd-cap-search" class="vd-field-label">{{ _('Country') }}</label>
+                        <input type="search" id="vd-cap-search" class="vd-select" placeholder="{{ _('Search countries')|forceescape }}">
+                    </div>
+                    <div class="vd-toolbar-options">
+                        <label class="vd-toggle">
+                            <input type="checkbox" id="vd-cap-flagged" checked>
+                            <span>{{ _('Flagged only') }}</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="vd-table-scroll vd-table-scroll-tall">
+                <table class="vd-table" id="vd-cap-table">
+                    <thead>
+                        <tr>
+                            <th class="vd-sticky">{{ _('Country') }}</th>
+                            <th>{{ _('Figure') }}</th>
+                            <th class="vd-num">{{ _('Year') }}</th>
+                            <th class="vd-num">{{ _('Planning') }}</th>
+                            <th class="vd-num">{{ _('Annual report') }}</th>
+                            <th class="vd-num">{{ _('Mid-year') }}</th>
+                            <th>{{ _('What needs attention') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <p id="vd-cap-empty" class="vd-table-empty">{{ _('Open this tab to compare planning and country reporting.') }}</p>
+        </div>
     </div>
 </div>
 
@@ -228,6 +302,7 @@
     'previewUrl': url_for('admin.validation_dashboard_preview_api'),
     'runChecksUrl': url_for('admin.validation_dashboard_run_checks'),
     'trackerUrl': url_for('admin.validation_dashboard_tracker_api'),
+    'capacityUrl': url_for('admin.validation_dashboard_capacity_api'),
     'mapboxAccessToken': mapbox_access_token,
     'mapboxStyleId': mapbox_style_id,
     'translations': {
@@ -312,6 +387,21 @@
         'regionOther': _('Other'),
         'legendSections': _('Section progress'),
         'legendDocuments': _('Documents'),
+        'capacityAllYears': _('All years'),
+        'capacityAllFigures': _('All figures'),
+        'capacityEmpty': _('No volunteers, staff, branches, or local units have been reported on planning or country reporting.'),
+        'capacityEmptyFilter': _('No figures need attention for this filter.'),
+        'capacityNoMatch': _('No figures match this filter.'),
+        'capacityLoadFailed': _('Failed to load the capacity comparison'),
+        'capacityReviewMore': _('more to review'),
+        'capacityNeedsAttention': _('Needs attention'),
+        'capacityReview': _('Variation'),
+        'capacityAligned': _('Aligned'),
+        'capacitySingle': _('One source'),
+        'volunteers': _('Volunteers'),
+        'staff': _('Staff'),
+        'branches': _('Branches'),
+        'localUnits': _('Local units'),
     }
 } %}
 {{ ag_grid_page_config('validationDashboardConfig', 'VD_GRID_TRANSLATIONS', vd_grid_bootstrap) }}
@@ -327,4 +417,5 @@
 <script src="{{ static_url('js/admin/validation-scope-loader.js') }}"></script>
 <script src="{{ static_url('js/admin/validation-dashboard-tracker.js') }}"></script>
 <script src="{{ static_url('js/admin/validation-dashboard.js') }}"></script>
+<script src="{{ static_url('js/admin/validation-dashboard-capacity.js') }}"></script>
 {% endblock %}

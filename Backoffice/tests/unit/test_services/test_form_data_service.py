@@ -699,6 +699,52 @@ class TestEmergencyOperationsMetadata:
                 new_metadata={'name': 'Cuba - Hurricane', 'code': 'MDRCU013'},
             )
 
+    def test_process_question_data_logs_emergency_appeal_change(self, app):
+        """A changed emergency-appeal dropdown must be a field change.
+
+        The stored row is overwritten before change detection. Reading the
+        display from that row afterwards hides the update from recent activities.
+        """
+        from app.models.forms import FormData
+        from app.services.forms.data_service import FormDataService
+
+        question = self._make_emergency_question()
+        question.label = "Select Emergency appeal"
+        question.type = "single_choice"
+        question.is_indicator = False
+        question.is_document_field = False
+        question.indirect_reach = False
+        aes = _make_mock_oes()
+        entry = FormData()
+        entry.value = "MDRAF018 Afghanistan: Population Movement, 2025"
+        entry.disagg_type = "emergency_operation"
+        entry.disagg_data = {
+            "name": "Afghanistan: Population Movement, 2025",
+            "code": "MDRAF018",
+        }
+        entry.data_not_available = False
+        entry.not_applicable = False
+        new_value = "MDRAF019 Afghanistan - Earthquake"
+        metadata = json.dumps({"name": "Afghanistan - Earthquake", "code": "MDRAF019"})
+
+        with app.test_request_context("/test", method="POST", data={
+            f"field_value[{question.id}]": new_value,
+            f"field_disagg_metadata[{question.id}]": metadata,
+        }):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                changes = FormDataService._process_question_data(question, aes, [])
+
+        assert len(changes) == 1
+        assert changes[0]["old_value"] == "MDRAF018 Afghanistan: Population Movement, 2025"
+        assert changes[0]["new_value"] == new_value
+
     def test_store_scalar_question_value_applies_emergency_disagg(self, app):
         from app.models.forms import FormData
         from app.services.forms.data_service import FormDataService

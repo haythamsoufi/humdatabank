@@ -43,6 +43,7 @@ from plugins.upr.data import build_payload, filename_from_visual_title
 from plugins.upr.i18n import export_locale, parse_export_language
 from plugins.upr.render import render_dashboard_html
 from app.utils.pg_advisory_lock import acquire_transaction_advisory_lock
+from plugins.upr.library import store_rendered_country
 from plugins.upr.service import STORAGE_CATEGORY, UprVisualsService
 
 # Transaction advisory lock for the one-at-a-time bulk queue (clear of digest/RBAC/AI-job ids).
@@ -144,6 +145,8 @@ def create_bulk_export_job(
     assigned_form_id: int,
     dashboard_ids: list[str],
     aes_ids: list[int] | None = None,
+    bundles: list[str] | None = None,
+    only_selected: bool = False,
     export_format: str = "png",
     include_narrative: bool = False,
     narrative_files: dict[str, bytes] | None = None,
@@ -171,6 +174,17 @@ def create_bulk_export_job(
     selected = [did for did in dashboard_ids if did in allowed] or ["combined"]
     if export_format == "idml" or include_narrative:
         selected = ["combined"]
+    from plugins.upr.bundle import list_bundles_for_bulk
+
+    known_bundles = {row["bundle"].casefold(): row["bundle"] for row in list_bundles_for_bulk(assigned.id)}
+    selected_bundles: list[str] = []
+    for raw_name in bundles or []:
+        label = str(raw_name or "").strip()
+        match = known_bundles.get(label.casefold())
+        if not match:
+            raise UprError("Choose a bundle on this assignment.")
+        if match not in selected_bundles:
+            selected_bundles.append(match)
     lang = parse_export_language(lang)
     job_id = str(uuid.uuid4())
     narrative_paths = _write_narrative_files(job_id, narrative_files)
@@ -181,6 +195,8 @@ def create_bulk_export_job(
         "period_name": assigned.period_name,
         "dashboard_ids": selected,
         "aes_ids": [int(i) for i in (aes_ids or [])],
+        "bundles": selected_bundles,
+        "only_selected": bool(only_selected),
         "export_format": export_format,
         "include_narrative": include_narrative,
         "lang": lang,
@@ -197,6 +213,8 @@ def create_bulk_export_job(
         "period_name": assigned.period_name,
         "dashboard_ids": selected,
         "aes_ids": [int(i) for i in (aes_ids or [])],
+        "bundles": selected_bundles,
+        "only_selected": bool(only_selected),
         "export_format": export_format,
         "include_narrative": include_narrative,
         "narrative_paths": narrative_paths,
@@ -305,6 +323,7 @@ def get_latest_bulk_export_job_id() -> str | None:
 
 
 def get_active_bulk_export_job() -> dict[str, Any] | None:
+    """In-flight export only. A finished run must not reopen the progress banner."""
     job = (
         AIJob.query.filter(
             AIJob.job_type == BULK_EXPORT_JOB_TYPE,
@@ -313,19 +332,9 @@ def get_active_bulk_export_job() -> dict[str, Any] | None:
         .order_by(AIJob.created_at.desc())
         .first()
     )
-    if job:
-        return build_bulk_export_status_payload(str(job.id))
-    latest = (
-        AIJob.query.filter(AIJob.job_type == BULK_EXPORT_JOB_TYPE)
-        .order_by(AIJob.created_at.desc())
-        .first()
-    )
-    if not latest or _status_str(latest.status) != "completed":
+    if not job:
         return None
-    payload = build_bulk_export_status_payload(str(latest.id))
-    if payload and payload.get("zip_key"):
-        return payload
-    return None
+    return build_bulk_export_status_payload(str(job.id))
 
 
 def serve_bulk_export_zip(job_id: str):
@@ -434,6 +443,42 @@ def _update_job_progress(job_id: str, item_id: int | None = None, *, force: bool
         logger.exception("Failed to persist UPR job progress %s", job_id)
 
 
+def _persist_country_files(
+    *,
+    assigned_form_id: int,
+    export_format: str,
+    lang: str,
+    aes_id: int,
+    package_filename: str,
+    files: list[tuple[str, Path, str]],
+    library_id: str | None = None,
+) -> str | None:
+    """Store finished dashboards for the Generate table. Returns an error note."""
+    if not files:
+        return None
+    try:
+        store_rendered_country(
+            assigned_form_id=assigned_form_id,
+            export_format=export_format,
+            lang=lang,
+            aes_id=aes_id,
+            files=list(files),
+            package_filename=package_filename,
+            library_id=library_id,
+        )
+        return None
+    except Exception:
+        logger.exception("UPR library store failed for aes %s", aes_id)
+        return f"aes {aes_id}: could not store visuals"
+    finally:
+        for _, tmp, _ in files:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        files.clear()
+
+
 def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
     work_root = Path(app.instance_path) / "upr_tmp"
     job_dir = work_root / str(job_id)
@@ -457,10 +502,30 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
             _update_job_progress(job_id, item_id, force=True, message="Loading assignments…")
             from plugins.upr.data import list_countries_for_bulk
 
+            from plugins.upr.bundle import bundle_library_id
+
             assignments = list_countries_for_bulk(int(payload["assigned_form_id"]))
-            wanted = set(int(i) for i in (payload.get("aes_ids") or []))
-            if wanted:
+            raw_ids = payload.get("aes_ids") or []
+            if payload.get("only_selected"):
+                wanted = {int(i) for i in raw_ids}
                 assignments = [row for row in assignments if row["aes_id"] in wanted]
+            else:
+                wanted = {int(i) for i in raw_ids}
+                if wanted:
+                    assignments = [row for row in assignments if row["aes_id"] in wanted]
+            for bundle_name in payload.get("bundles") or []:
+                label = str(bundle_name or "").strip()
+                if not label:
+                    continue
+                assignments.append(
+                    {
+                        "aes_id": 0,
+                        "bundle": label,
+                        "library_id": bundle_library_id(label),
+                        "country_name": label,
+                        "iso3": "",
+                    }
+                )
             dashboards = payload.get("dashboard_ids") or ["combined"]
             export_format = normalize_export_format(payload.get("export_format") or "png")
             include_narrative = bool(payload.get("include_narrative")) and export_format in {"pdf", "idml"}
@@ -480,7 +545,16 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                         db.session.commit()
                         return
                     try:
-                        country_payload = build_payload(row["aes_id"], inline_icons=True)
+                        if row.get("bundle"):
+                            from plugins.upr.bundle import build_bundle_payload_for_form
+
+                            country_payload = build_bundle_payload_for_form(
+                                int(payload["assigned_form_id"]),
+                                str(row["bundle"]),
+                                inline_icons=True,
+                            )
+                        else:
+                            country_payload = build_payload(row["aes_id"], inline_icons=True)
                     except Exception as exc:
                         logger.warning("UPR skip aes %s: %s", row["aes_id"], exc)
                         errors.append(f"aes {row['aes_id']}: could not build visuals")
@@ -502,7 +576,7 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                             payload.get("narrative_paths") or {},
                             iso3=str(iso3),
                             country_name=str(meta.get("country_name") or row.get("country_name") or ""),
-                            aes_id=row["aes_id"],
+                            aes_id=None if row.get("bundle") else row["aes_id"],
                         )
                         if word_path is None or not word_path.is_file():
                             errors.append(f"aes {row['aes_id']}: no matching narrative file; exporting visuals only")
@@ -516,8 +590,20 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                                     data=word_path.read_bytes(),
                                 ),
                             )
+                    rendered_files: list[tuple[str, Path, str]] = []
                     for dashboard_id in dashboards:
                         if job_cancel_requested(job_id):
+                            note = _persist_country_files(
+                                assigned_form_id=int(payload["assigned_form_id"]),
+                                export_format=export_format,
+                                lang=lang,
+                                aes_id=int(row["aes_id"]),
+                                package_filename=f"{folder}.zip",
+                                files=rendered_files,
+                                library_id=row.get("library_id"),
+                            )
+                            if note:
+                                errors.append(note)
                             item.status = "cancelled"
                             item.error = None
                             _update_job_progress(job_id, item_id, force=True, message="Cancelled")
@@ -527,6 +613,7 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                             done += 1
                             _update_job_progress(job_id, item_id, progress=done)
                             continue
+                        tmp = None
                         try:
                             html = render_dashboard_html(country_payload, dashboard_id)
                             logger.info(
@@ -547,13 +634,9 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                                 lang=lang,
                                 word_path=word_path,
                             )
-                            try:
-                                zf.write(tmp, arcname=arcname)
-                            finally:
-                                try:
-                                    tmp.unlink()
-                                except OSError:
-                                    pass
+                            zf.write(tmp, arcname=arcname)
+                            rendered_files.append((str(dashboard_id), tmp, Path(arcname).name))
+                            tmp = None
                         except TimeoutError:
                             logger.warning(
                                 "UPR render timed out for aes %s dashboard %s",
@@ -570,6 +653,11 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                             )
                             errors.append(f"aes {row['aes_id']} {dashboard_id}: render failed")
                         finally:
+                            if tmp is not None:
+                                try:
+                                    tmp.unlink()
+                                except OSError:
+                                    pass
                             gc.collect()
                         done += 1
                         _update_job_progress(
@@ -578,6 +666,17 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                             progress=done,
                             message=f"{iso3} · {dashboard_id}",
                         )
+                    note = _persist_country_files(
+                        assigned_form_id=int(payload["assigned_form_id"]),
+                        export_format=export_format,
+                        lang=lang,
+                        aes_id=int(row["aes_id"]),
+                        package_filename=f"{folder}.zip",
+                        files=rendered_files,
+                        library_id=row.get("library_id"),
+                    )
+                    if note:
+                        errors.append(note)
             zip_key = f"exports/{job_id}/upr.zip"
             storage_service.upload(STORAGE_CATEGORY, zip_key, zip_path.read_bytes())
             error_note = "; ".join(errors) if errors else None

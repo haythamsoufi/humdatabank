@@ -1,4 +1,6 @@
 {# Bulk export — Data Explorer UPR tab. #}
+{% from "macros/modal_shell.html" import modal_shell %}
+{% from "components/_floating_progress_banner.html" import floating_progress_banner %}
 <div id="upr-admin" class="space-y-5">
     <div class="upr-vis-toolbar">
         <nav id="upr-vis-mode-tabs" class="upr-vis-toolbar__tabs" role="tablist" aria-label="{{ _('UPR tools') }}">
@@ -44,85 +46,51 @@
     </div>
 
     <div id="upr-vis-pane-generate" class="space-y-5" role="tabpanel" aria-labelledby="upr-vis-tab-generate" hidden>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <section class="upr-vis-card" id="upr-vis-dashboards-card" aria-labelledby="upr-vis-dashboards-heading">
-                <div class="upr-vis-card__header">
-                    <h4 id="upr-vis-dashboards-heading" class="text-sm font-semibold text-gray-900">{{ _('Dashboards') }}</h4>
-                    <span id="upr-vis-dash-count" class="text-xs text-gray-500"></span>
+        <div class="upr-vis-command">
+            <div class="upr-vis-command__actions">
+                {% include "plugins/upr/upr/_language_select.html" %}
+                <div id="upr-vis-format" class="upr-vis-format" role="group" aria-label="{{ _('Export type') }}">
+                    <button type="button" data-format="png" aria-pressed="true">{{ _('PNG') }}</button>
+                    <button type="button" data-format="pdf" aria-pressed="false">{{ _('PDF') }}</button>
                 </div>
-                <div class="upr-vis-card__toolbar">
-                    <div class="upr-vis-card__links">
-                        <button type="button" id="upr-vis-dash-select-all" class="upr-vis-link" disabled>{{ _('Select all') }}</button>
-                        <span class="text-gray-300" aria-hidden="true">·</span>
-                        <button type="button" id="upr-vis-dash-select-none" class="upr-vis-link" disabled>{{ _('Clear') }}</button>
-                    </div>
-                </div>
-                <div id="upr-vis-dashboards" class="upr-vis-card__body upr-vis-dashboards"></div>
-            </section>
-
-            <section class="upr-vis-card" aria-labelledby="upr-vis-countries-heading">
-                <div class="upr-vis-card__header">
-                    <h4 id="upr-vis-countries-heading" class="text-sm font-semibold text-gray-900">{{ _('Countries') }}</h4>
-                    <span id="upr-vis-country-count" class="text-xs text-gray-500"></span>
-                </div>
-                <div class="upr-vis-card__toolbar">
-                    <label class="sr-only" for="upr-vis-country-search">{{ _('Search countries') }}</label>
-                    <input id="upr-vis-country-search"
-                           type="search"
-                           class="upr-vis-search"
-                           placeholder="{{ _('Search countries') }}"
-                           autocomplete="off"
-                           disabled>
-                    <div class="upr-vis-card__links">
-                        <button type="button" id="upr-vis-select-all" class="upr-vis-link" disabled>{{ _('Select all') }}</button>
-                        <span class="text-gray-300" aria-hidden="true">·</span>
-                        <button type="button" id="upr-vis-select-none" class="upr-vis-link" disabled>{{ _('Clear') }}</button>
-                    </div>
-                </div>
-                <div id="upr-vis-countries" class="upr-vis-card__list"></div>
-            </section>
-        </div>
-
-        <div class="upr-vis-generate-actions">
-            {% include "plugins/upr/upr/_language_select.html" %}
-            <div class="btn-group upr-vis-generate-split" id="upr-vis-generate-split">
-                <button type="button" id="upr-vis-generate" class="btn btn-primary btn-sm" disabled data-label-png="{{ _('Generate PNGs')|forceescape }}" data-label-pdf="{{ _('Generate PDFs')|forceescape }}" data-label-idml="{{ _('Generate InDesign')|forceescape }}">
+                <button type="button" id="upr-vis-generate" class="btn btn-primary btn-sm" disabled data-label-png="{{ _('Generate PNGs')|forceescape }}" data-label-pdf="{{ _('Generate PDFs')|forceescape }}">
                     <i class="fas fa-play" aria-hidden="true"></i><span data-upr-generate-label>{{ _('Generate PNGs') }}</span>
                 </button>
-                <button type="button"
-                        id="upr-vis-format-toggle"
-                        class="btn btn-primary btn-sm"
-                        title="{{ _('Export type')|forceescape }}"
-                        aria-label="{{ _('Export type')|forceescape }}"
-                        aria-haspopup="menu"
-                        aria-expanded="false"
-                        aria-controls="upr-vis-formats">
-                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                <label class="upr-vis-narrative-check" id="upr-vis-narrative-panel" for="upr-vis-include-narrative" hidden>
+                    <input type="checkbox" id="upr-vis-include-narrative">
+                    <span>{{ _('Include narrative (Word or PDF)') }}</span>
+                </label>
+                <button type="button" id="upr-vis-generate-idml" class="btn btn-secondary btn-sm upr-vis-idml-btn" disabled title="{{ _('InDesign exports the full report only, not each dashboard.')|forceescape }}">
+                    <i class="fas fa-file-archive" aria-hidden="true"></i>
+                    <span class="upr-vis-idml-btn__text">
+                        <span>{{ _('Generate InDesign') }}</span>
+                        <span class="upr-vis-idml-btn__hint">{{ _('Full report only') }}</span>
+                    </span>
                 </button>
-                <div id="upr-vis-formats" class="upr-vis-generate-menu" role="menu" aria-label="{{ _('Export type')|forceescape }}">
-                    <button type="button" role="menuitemradio" aria-checked="true" data-format="png">
-                        <span>{{ _('PNG') }}</span><i class="fas fa-check" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" role="menuitemradio" aria-checked="false" data-format="pdf">
-                        <span>{{ _('PDF') }}</span><i class="fas fa-check" aria-hidden="true"></i>
-                    </button>
-                    <button type="button" role="menuitemradio" aria-checked="false" data-format="idml">
-                        <span>{{ _('InDesign') }}</span><i class="fas fa-check" aria-hidden="true"></i>
-                    </button>
-                </div>
             </div>
-            <label class="upr-vis-narrative-check" id="upr-vis-narrative-panel" for="upr-vis-include-narrative" hidden>
-                <input type="checkbox" id="upr-vis-include-narrative">
-                <span>{{ _('Include narrative (Word or PDF)') }}</span>
-            </label>
-            <button type="button" id="upr-vis-cancel" class="btn btn-secondary btn-sm hidden">
-                <i class="fas fa-stop mr-1"></i>{{ _('Cancel') }}
-            </button>
-            <a id="upr-vis-download" class="btn btn-primary btn-sm hidden" href="#">
-                <i class="fas fa-download mr-1"></i>{{ _('Download ZIP') }}
+            <a id="upr-vis-download-all"
+               class="btn btn-secondary btn-sm upr-vis-full-zip is-disabled"
+               href="#"
+               aria-disabled="true"
+               title="{{ _('One ZIP containing every country that already has generated files for this format.')|forceescape }}">
+                <i class="fas fa-file-archive" aria-hidden="true"></i>{{ _('Download ZIP of all generated countries') }}
             </a>
         </div>
-
+        <div class="upr-vis-table-tools">
+            <label class="sr-only" for="upr-vis-country-search">{{ _('Search countries') }}</label>
+            <input id="upr-vis-country-search"
+                   type="search"
+                   class="upr-vis-search"
+                   placeholder="{{ _('Search countries') }}"
+                   autocomplete="off"
+                   disabled>
+            <span id="upr-vis-country-count" class="text-xs text-gray-500"></span>
+            <div class="upr-vis-card__links">
+                <button type="button" id="upr-vis-select-all" class="upr-vis-link" disabled>{{ _('Select all') }}</button>
+                <span class="text-gray-300" aria-hidden="true">·</span>
+                <button type="button" id="upr-vis-select-none" class="upr-vis-link" disabled>{{ _('Clear') }}</button>
+            </div>
+        </div>
         <div id="upr-vis-narrative-files-wrap" class="upr-vis-narrative-files" hidden>
             <label for="upr-vis-narratives" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Narrative files') }}</label>
             <input id="upr-vis-narratives"
@@ -143,16 +111,14 @@
             </select>
             <p class="text-xs text-gray-500 mt-1">{{ _('Internal covers get a yellow INTERNAL banner. Auto uses the file name and first pages; if unclear it stays internal.') }}</p>
         </div>
-
-        <div id="upr-vis-progress" class="upr-vis-progress hidden" role="status" aria-live="polite">
-            <div class="flex items-start justify-between gap-3">
-                <p id="upr-vis-status" class="text-sm text-gray-700 min-w-0"></p>
-                <span id="upr-vis-pct" class="text-xs font-medium text-gray-500 tabular-nums shrink-0"></span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
-                <div id="upr-vis-progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
-            </div>
+        <div class="upr-vis-table-wrap">
+            <table id="upr-vis-table" class="upr-vis-table">
+                <caption class="sr-only">{{ _('Generated visuals') }}</caption>
+                <thead id="upr-vis-table-head"></thead>
+                <tbody id="upr-vis-countries"></tbody>
+            </table>
         </div>
+
     </div>
 
     <div id="upr-vis-pane-preview" class="upr-vis-preview-pane" role="tabpanel" aria-labelledby="upr-vis-tab-preview">
@@ -182,5 +148,52 @@
         </div>
     </div>
     </div>
+    {{ floating_progress_banner(
+        'upr-vis-progress',
+        'upr-vis-status',
+        'upr-vis-progress-detail',
+        'upr-vis-pct',
+        'upr-vis-progress-bar',
+        spinner_id='upr-vis-progress-spinner',
+        title_default='',
+        detail_default='',
+        detail_classes='text-xs truncate hidden',
+        percent_default='',
+        cancel_wrap_id='upr-vis-cancel-wrap',
+        cancel_button_id='upr-vis-cancel',
+        cancel_button_label=_('Cancel'),
+        cancel_button_aria_label=_('Cancel'),
+        buttons=[
+            {
+                'id': 'upr-vis-progress-dismiss',
+                'label': _('Dismiss'),
+                'aria_label': _('Dismiss'),
+                'classes': 'hidden text-xs font-medium px-3 py-1.5 rounded border transition-colors',
+                'style': 'color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); background: transparent;'
+            }
+        ]
+    ) }}
     {% include "plugins/upr/upr/_narrative_modal.html" %}
+    {% call modal_shell(
+        'upr-vis-dash-modal',
+        _('Choose dashboards'),
+        max_width='max-w-lg',
+        z_index=60,
+        close_class='upr-vis-dash-close'
+    ) %}
+        <p id="upr-vis-dash-modal-lead" class="text-sm text-gray-600"></p>
+        <div class="upr-vis-card__links mt-3" id="upr-vis-dash-modal-tools">
+            <button type="button" id="upr-vis-dash-modal-all" class="upr-vis-link">{{ _('Select all') }}</button>
+            <span class="text-gray-300" aria-hidden="true">·</span>
+            <button type="button" id="upr-vis-dash-modal-none" class="upr-vis-link">{{ _('Clear') }}</button>
+        </div>
+        <div id="upr-vis-dash-modal-list" class="upr-vis-dashboards mt-3"></div>
+        <p id="upr-vis-dash-modal-note" class="text-xs text-gray-500 mt-3" hidden></p>
+        <div class="flex justify-end gap-2 mt-5">
+            <button type="button" class="btn btn-secondary btn-sm upr-vis-dash-close">{{ _('Cancel') }}</button>
+            <button type="button" id="upr-vis-dash-modal-go" class="btn btn-primary btn-sm">
+                <i class="fas fa-play" aria-hidden="true"></i><span>{{ _('Generate') }}</span>
+            </button>
+        </div>
+    {% endcall %}
 </div>

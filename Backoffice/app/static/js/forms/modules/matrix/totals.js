@@ -104,14 +104,8 @@ function __matrixInputIsActive(input) {
 
 function __markCustomValue(input, conflictType) {
     if (!input) return;
-    const chars = Math.max(String(input.value ?? '').length, 1);
     input.classList.add('matrix-custom-value');
     input.classList.toggle('matrix-custom-value-error', conflictType === 'error');
-    // Resizing the control while it is focused drops the caret.
-    if (__matrixInputIsActive(input)) return;
-    input.style.setProperty('--matrix-value-ch', String(chars));
-    const wrap = __customValueWrap(input);
-    if (wrap) wrap.style.minWidth = `calc(${chars}ch + 2.5rem)`;
 }
 
 

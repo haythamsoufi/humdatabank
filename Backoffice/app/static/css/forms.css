@@ -707,8 +707,10 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     font-weight: 700;
 }
 
-/* A custom value sits beside a small warning mark. Matrix inputs are width:100%,
-   which paints that mark over the digits and does not widen the column. */
+/* Custom-value mark. It is taken out of flow so a text input's intrinsic
+   width (and any min-width beside the digits) cannot stretch the column.
+   The cell keeps just enough end padding for the 12px mark to sit clear of
+   the centered number. */
 .matrix-container .row-total-conflict-icon {
     width: 0.75rem;
     height: 0.75rem;
@@ -716,23 +718,18 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .matrix-container td:has(.row-total-conflict:not(.hidden)),
 .disaggregation-inputs table td:has(.row-total-conflict:not(.hidden)) {
+    position: relative;
     text-align: center;
-    padding-right: 0.625rem;
+    padding-inline-end: 1.125rem;
 }
-.matrix-container .calculated-value-wrap:has(.row-total-conflict:not(.hidden)),
-.matrix-container td:has(.row-total-conflict:not(.hidden)) > .flex {
-    display: inline-flex;
-    width: max-content;
-    max-width: none;
-    vertical-align: middle;
-    justify-content: center;
-}
-.disaggregation-inputs table .calculated-value-wrap:has(.row-total-conflict:not(.hidden)) input,
-.disaggregation-inputs table td:has(.row-total-conflict:not(.hidden)) input.row-total-input {
-    width: auto !important;
-    max-width: none !important;
-    flex: 0 0 auto !important;
-    min-width: calc(var(--matrix-value-ch, 1) * 1ch + 0.75rem) !important;
+.matrix-container .row-total-conflict:not(.hidden),
+.disaggregation-inputs .row-total-conflict:not(.hidden) {
+    position: absolute;
+    inset-inline-end: 0.125rem;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    z-index: 1;
 }
 .matrix-container input.matrix-custom-value {
     color: #b45309 !important;
@@ -2366,6 +2363,11 @@ a.btn.entry-form-doc-library-btn {
   .entry-form-root .matrix-container table td:not([role="rowheader"]) {
     padding-left: 3px !important;
     padding-right: 3px !important;
+  }
+
+  .entry-form-root .matrix-container table td:has(.row-total-conflict:not(.hidden)),
+  .entry-form-root .disaggregation-inputs table td:has(.row-total-conflict:not(.hidden)) {
+    padding-inline-end: 1.125rem !important;
   }
 
   .entry-form-root .matrix-container.disaggregation-inputs table input[type="number"],

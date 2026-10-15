@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import io
 from html import escape
 
-from flask import Response, current_app, g, has_request_context, redirect, render_template, request, send_from_directory, url_for
+from flask import Response, current_app, g, has_request_context, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_babel import force_locale, gettext as _
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException, NotFound
@@ -48,6 +49,12 @@ from plugins.upr.bulk_job import (
     request_bulk_export_cancel,
     serve_bulk_export_zip,
     start_bulk_export_job,
+)
+from plugins.upr.library import (
+    build_library_archive,
+    library_status,
+    open_library_dashboard,
+    open_library_package,
 )
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_required, permission_required, system_manager_required
@@ -950,12 +957,135 @@ def countries():
             }
             for spec in dashboards_for_kind(kind)
         ]
+    from plugins.upr.bundle import list_bundles_for_bulk
+
     return json_ok(
         countries=list_countries_for_bulk(assigned.id),
+        bundles=list_bundles_for_bulk(assigned.id),
         dashboards=dashboards,
         kind=kind,
         assigned_form_id=assigned.id,
     )
+
+
+def _library_request_ids() -> tuple[int, str]:
+    try:
+        assigned_form_id = int(request.args.get("assigned_form_id") or 0)
+    except (TypeError, ValueError):
+        raise UprError("Select an assignment.") from None
+    if not assigned_form_id:
+        raise UprError("Select an assignment.")
+    get_assigned_form_for_bulk(assigned_form_id)
+    export_format = normalize_export_format(request.args.get("export_format") or "png")
+    return assigned_form_id, export_format
+
+
+@bp.route("/admin/data-exploration/upr/library", methods=["GET"])
+@permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
+def library():
+    """Which dashboards and packages are already stored for this assignment."""
+    try:
+        assigned_form_id, export_format = _library_request_ids()
+        lang = _requested_language(strict=False)
+        return json_ok(library=library_status(assigned_form_id, export_format, lang))
+    except UprError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE, log_message="UPR library failed")
+
+
+def _library_bundle_id(assigned_form_id: int) -> str | None:
+    from plugins.upr.bundle import bundle_library_id, bundle_on_assignment
+
+    name = (request.args.get("bundle") or "").strip()
+    if not name:
+        return None
+    if not bundle_on_assignment(assigned_form_id, name):
+        raise UprError("Choose a bundle on this assignment.")
+    return bundle_library_id(name)
+
+
+@bp.route("/admin/data-exploration/upr/library/file", methods=["GET"])
+@permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
+def library_file():
+    try:
+        assigned_form_id, export_format = _library_request_ids()
+        library_id = _library_bundle_id(assigned_form_id)
+        aes_id = int(request.args.get("aes_id") or 0)
+        dashboard_id = (request.args.get("dashboard_id") or "").strip()
+        if not dashboard_id or (not library_id and not aes_id):
+            return json_bad_request("Select a stored visual.")
+        return open_library_dashboard(
+            assigned_form_id=assigned_form_id,
+            export_format=export_format,
+            lang=_requested_language(strict=False),
+            aes_id=aes_id or None,
+            dashboard_id=dashboard_id,
+            library_id=library_id,
+        )
+    except (TypeError, ValueError):
+        return json_bad_request("Select a stored visual.")
+    except UprError as exc:
+        return json_bad_request(str(exc))
+    except NotFound:
+        raise
+    except Exception as exc:
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE, log_message="UPR library file failed")
+
+
+@bp.route("/admin/data-exploration/upr/library/package", methods=["GET"])
+@permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
+def library_package():
+    try:
+        assigned_form_id, export_format = _library_request_ids()
+        library_id = _library_bundle_id(assigned_form_id)
+        aes_id = int(request.args.get("aes_id") or 0)
+        if not library_id and not aes_id:
+            return json_bad_request("Select a stored package.")
+        return open_library_package(
+            assigned_form_id=assigned_form_id,
+            export_format=export_format,
+            lang=_requested_language(strict=False),
+            aes_id=aes_id or None,
+            library_id=library_id,
+        )
+    except (TypeError, ValueError):
+        return json_bad_request("Select a stored package.")
+    except UprError as exc:
+        return json_bad_request(str(exc))
+    except NotFound:
+        raise
+    except Exception as exc:
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE, log_message="UPR library package failed")
+
+
+@bp.route("/admin/data-exploration/upr/library/all", methods=["GET"])
+@permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
+def library_all():
+    """ZIP of every country that already has generated PNG or PDF files."""
+    try:
+        assigned_form_id, export_format = _library_request_ids()
+        data, filename = build_library_archive(
+            assigned_form_id,
+            export_format,
+            _requested_language(strict=False),
+        )
+        return send_file(
+            io.BytesIO(data),
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=filename,
+        )
+    except UprError as exc:
+        return json_bad_request(str(exc))
+    except NotFound:
+        raise
+    except Exception as exc:
+        return handle_json_view_exception(exc, GENERIC_ERROR_MESSAGE, log_message="UPR library archive failed")
 
 
 @bp.route("/admin/data-exploration/upr/generate", methods=["POST"])
@@ -973,11 +1103,15 @@ def generate():
     if request.is_json:
         dashboard_ids = payload.get("dashboard_ids") or ["combined"]
         aes_ids = payload.get("aes_ids") or []
+        bundles = payload.get("bundles") or []
         include_narrative = bool(payload.get("include_narrative"))
         narrative_files = {}
+        only_selected = bool(payload.get("only_selected"))
     else:
         dashboard_ids = payload.getlist("dashboard_ids") or ["combined"]
         aes_ids = payload.getlist("aes_ids") or []
+        bundles = payload.getlist("bundles") or []
+        only_selected = str(payload.get("only_selected") or "").strip().lower() in {"1", "true", "yes", "on"}
         include_narrative = str(payload.get("include_narrative") or "").strip().lower() in {
             "1",
             "true",
@@ -996,8 +1130,16 @@ def generate():
         return json_bad_request(f"Select at most {MAX_BULK_DASHBOARDS} dashboards.")
     if not isinstance(aes_ids, (list, tuple)):
         return json_bad_request("Select countries.")
+    if isinstance(bundles, str):
+        bundles = [bundles]
+    if not isinstance(bundles, (list, tuple)):
+        return json_bad_request("Select bundles.")
     if len(aes_ids) > MAX_BULK_AES_IDS:
         return json_bad_request(f"Select at most {MAX_BULK_AES_IDS} countries.")
+    if len(bundles) > MAX_BULK_AES_IDS:
+        return json_bad_request(f"Select at most {MAX_BULK_AES_IDS} bundles.")
+    if only_selected and not aes_ids and not bundles:
+        return json_bad_request("Select at least one country.")
     try:
         export_format = normalize_export_format(payload.get("export_format") or payload.get("format") or "png")
         lang = _requested_language(strict=True)
@@ -1005,7 +1147,9 @@ def generate():
             user_id=int(getattr(current_user, "id", 0) or 0),
             assigned_form_id=assigned_form_id,
             dashboard_ids=list(dashboard_ids),
-            aes_ids=[int(i) for i in aes_ids] if aes_ids else None,
+            aes_ids=[int(i) for i in aes_ids] if aes_ids or only_selected else None,
+            bundles=[str(name) for name in bundles],
+            only_selected=only_selected,
             export_format=export_format,
             include_narrative=include_narrative,
             narrative_files=narrative_files,

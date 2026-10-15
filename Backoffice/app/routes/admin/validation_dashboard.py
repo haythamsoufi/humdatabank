@@ -57,6 +57,16 @@ register_validation_scope_routes(
 )
 
 
+@bp.route("/validation-dashboard/api/capacity", methods=["GET"])
+@login_required
+@permission_required(VALIDATION_DASHBOARD_PERMISSION)
+def validation_dashboard_capacity_api():
+    """Volunteers, staff, branches, and local units on planning vs country reporting."""
+    from plugins.upr.capacity_comparison import load_capacity_comparison
+
+    return json_ok(**load_capacity_comparison())
+
+
 @bp.route("/validation-dashboard/api/tracker", methods=["GET"])
 @login_required
 @permission_required(VALIDATION_DASHBOARD_PERMISSION)

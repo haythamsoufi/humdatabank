@@ -9,7 +9,7 @@ from typing import Any, Optional
 MATRIX_HEADER_KEY_PREFIX = "col_header|"
 
 # Internal grouping key for selectable column-header changes (col_header|{column}).
-# render_matrix_change() translates this to a user-facing "Column header" label.
+# render_matrix_change() labels each change with the column name or code.
 MATRIX_HEADER_ACTIVITY_ROW = "__col_header__"
 
 # Provenance flags stored alongside matrix data — not user-visible activity.

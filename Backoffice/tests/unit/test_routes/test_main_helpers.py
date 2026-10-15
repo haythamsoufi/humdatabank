@@ -885,10 +885,37 @@ class TestRenderMatrixChange:
             )
         assert "header|" not in result
         assert "col:" not in result.lower()
-        assert "Column header" in result
+        assert "Column header" not in result
         assert "EA3" in result
         assert "Population Movement" in result
         assert "Flash Floods" in result
+
+    def test_selectable_header_uses_column_name_when_configured(self, app):
+        from app.routes.main.helpers import render_matrix_change
+
+        form_item = MagicMock()
+        form_item.config = {
+            "matrix_config": {
+                "columns": [
+                    {
+                        "name": "EA1",
+                        "label": "Emergency appeal 1",
+                        "header_type": "selectable",
+                    }
+                ]
+            }
+        }
+        with app.app_context():
+            with patch("app.routes.main.helpers._get_form_item_cached", return_value=form_item):
+                result = render_matrix_change(
+                    "Emergency Appeals",
+                    {"_matrix_change": True, "col_header|EA1": "Old appeal"},
+                    {"_matrix_change": True, "col_header|EA1": "New appeal"},
+                    form_item_id=12,
+                )
+        assert "Column header" not in result
+        assert "Emergency appeal 1" in result
+        assert "EA1:" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -1291,6 +1318,29 @@ class TestLocalizedFieldName:
                 mock_fi_query.get.return_value = mock_fi
                 result = localized_field_name(1, assignment_id=1)
             assert isinstance(result, str)
+
+    def test_resolves_variables_in_form_item_title(self, app):
+        from app.routes.main.helpers import localized_field_name
+        mock_aes = MagicMock()
+        mock_aes.assigned_form.template.published_version_id = 9
+        with app.app_context():
+            with patch("app.routes.main.helpers.get_localized_field_name_by_id", return_value="Plan for [assignment_year]"), \
+                 patch("app.routes.main.helpers._get_form_item_cached", return_value=None), \
+                 patch("app.routes.main.helpers.AssignmentEntityStatus.query") as aes_query, \
+                 patch("app.models.forms.FormTemplateVersion.query") as version_query, \
+                 patch(
+                     "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables",
+                     return_value={"assignment_year": "2026"},
+                 ) as resolve_variables, \
+                 patch("app.services.forms.section_binding.resolve_section_variables", return_value={}):
+                aes_query.get.return_value = mock_aes
+                version_query.get.return_value = MagicMock(variables={})
+                result = localized_field_name(1, assignment_id=5, field_id_kind="form_item")
+                again = localized_field_name(1, assignment_id=5, field_id_kind="form_item")
+        assert result == "Plan for 2026"
+        assert again == "Plan for 2026"
+        assert resolve_variables.call_count == 1
+        assert aes_query.get.call_count == 1
 
 
 # ---------------------------------------------------------------------------

@@ -928,6 +928,55 @@ def matrix_activity_has_visible_changes(old_value, new_value):
 
 from app.utils.route_helpers import normalize_value_for_display as _normalize_value_for_summary_display
 
+def _localized_json_text(translations):
+    """First non-empty string from a translation map for the active locale."""
+    if isinstance(translations, str):
+        with suppress(Exception):
+            translations = json.loads(translations)
+    if not isinstance(translations, dict):
+        return ""
+    from flask_babel import get_locale
+
+    locale_code = (str(get_locale()) if get_locale() else "en").split("_", 1)[0]
+    translation_key = get_translation_key()
+    for key in (locale_code, translation_key, "en"):
+        value = translations.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _matrix_column_activity_label(form_item_id, column_code):
+    """Column name for a selectable-header change, or the column code."""
+    code = str(column_code or "").strip()
+    if not code or not form_item_id:
+        return code
+    try:
+        form_item = _get_form_item_cached(form_item_id)
+        config = getattr(form_item, "config", None) if form_item else None
+        if isinstance(config, str):
+            with suppress(Exception):
+                config = json.loads(config)
+        matrix = config.get("matrix_config") if isinstance(config, dict) else None
+        if not isinstance(matrix, dict) and isinstance(config, dict):
+            matrix = config
+        for column in (matrix or {}).get("columns") or []:
+            if not isinstance(column, dict):
+                continue
+            if str(column.get("name") or "").strip() != code:
+                continue
+            translated = _localized_json_text(column.get("name_translations"))
+            if translated:
+                return translated
+            label = str(column.get("label") or "").strip()
+            if label:
+                return label
+            return code
+    except Exception as exc:
+        current_app.logger.debug("matrix column activity label failed: %s", exc)
+    return code
+
+
 @bp.app_template_global()
 def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
     """
@@ -962,9 +1011,9 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
             return (2, 0, rc_str)
 
         for row_code in sorted(rows.keys(), key=_row_sort_key):
-            if str(row_code) == MATRIX_HEADER_ACTIVITY_ROW:
-                entity_label = _("Column header")
-            else:
+            is_header_row = str(row_code) == MATRIX_HEADER_ACTIVITY_ROW
+            entity_label = None
+            if not is_header_row:
                 entity_label = str(row_code)
                 try:
                     if str(row_code).isdigit():
@@ -978,7 +1027,10 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
 
             row_lines = []
             for col_label, old_v, new_v in sorted(rows[row_code], key=lambda item: str(item[0])):
-                col_label_str = str(col_label).strip()
+                if is_header_row:
+                    col_label_str = _matrix_column_activity_label(form_item_id, col_label)
+                else:
+                    col_label_str = str(col_label).strip()
                 old_disp, new_disp = matrix_cell_activity_render_displays(old_v, new_v)
                 if old_disp == new_disp:
                     continue
@@ -998,7 +1050,8 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
 
             if row_lines:
                 has_content = True
-                html_parts.append(f"<span class='font-semibold'>{escape(entity_label)}</span>:<br>")
+                if entity_label:
+                    html_parts.append(f"<span class='font-semibold'>{escape(entity_label)}</span>:<br>")
                 html_parts.extend(row_lines)
 
         if not has_content:
@@ -1083,6 +1136,103 @@ def get_localized_field_name_by_id(form_item_id, fallback_name=None):
         current_app.logger.error(f"Error getting localized field name for ID {form_item_id}: {e}")
         return fallback_name or "Unknown Field"
 
+def _activity_title_variable_context(assignment_id):
+    """Assignment-scoped variable values for form-item titles, cached per request."""
+    cache = getattr(g, '_activity_title_variable_context', None)
+    if cache is None:
+        cache = {}
+        g._activity_title_variable_context = cache
+    try:
+        key = int(assignment_id)
+    except (TypeError, ValueError):
+        return None
+    if key not in cache:
+        cache[key] = _load_activity_title_variable_context(key)
+    return cache[key]
+
+
+def _load_activity_title_variable_context(assignment_id):
+    from app.models.forms import FormTemplateVersion
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+
+    empty = {'resolved': {}, 'configs': {}, 'aes': None, 'bank_cache': {}}
+    try:
+        aes = AssignmentEntityStatus.query.get(assignment_id)
+        if aes is None:
+            return empty
+        template = getattr(getattr(aes, 'assigned_form', None), 'template', None)
+        published_id = getattr(template, 'published_version_id', None) if template else None
+        version = FormTemplateVersion.query.get(published_id) if published_id else None
+        resolved = VariableResolutionService.resolve_variables(version, aes) or {}
+        configs = getattr(version, 'variables', None) or {}
+        if not isinstance(configs, dict):
+            configs = {}
+        try:
+            from app.services.forms.section_binding import resolve_section_variables
+            for name, value in (resolve_section_variables(aes) or {}).items():
+                if value:
+                    resolved[name] = value
+        except Exception as exc:
+            current_app.logger.debug(
+                "Section variable resolution skipped for activity title: %s", exc
+            )
+        return {
+            'resolved': resolved,
+            'configs': configs,
+            'aes': aes,
+            'bank_cache': {},
+        }
+    except Exception as exc:
+        current_app.logger.debug("Activity title variable context failed: %s", exc)
+        return empty
+
+
+def _resolve_form_item_title_variables(label, assignment_id, form_item=None):
+    """Replace [variable] tokens in a form-item title using the assignment context."""
+    if not label or not assignment_id or '[' not in str(label):
+        return label
+    context = _activity_title_variable_context(assignment_id)
+    if not context:
+        return label
+    resolved = context.get('resolved') or {}
+    configs = context.get('configs') or {}
+    if not resolved and not configs:
+        return label
+
+    vars_for_text = resolved
+    if form_item is not None and configs:
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+
+        names = VariableResolutionService._VAR_PATTERN.findall(str(label))
+        merged = None
+        for var_name in names:
+            cfg = configs.get(var_name)
+            if not (isinstance(cfg, dict) and cfg.get('match_by_indicator_bank')):
+                continue
+            value = VariableResolutionService.resolve_variable_by_indicator_bank(
+                cfg,
+                context.get('aes'),
+                form_item,
+                cache=context.get('bank_cache'),
+            )
+            if merged is None:
+                merged = dict(resolved)
+            merged[var_name] = value
+        if merged is not None:
+            vars_for_text = merged
+
+    if not vars_for_text:
+        return label
+    try:
+        from app.services.forms.variable_resolution_service import VariableResolutionService
+        return VariableResolutionService.replace_variables_in_text(
+            str(label), vars_for_text, configs
+        )
+    except Exception as exc:
+        current_app.logger.debug("Form item title variable replacement failed: %s", exc)
+        return label
+
+
 @bp.app_template_global()
 def localized_field_name(field_id, fallback_name=None, field_id_kind=None, assignment_id=None):
     """Jinja helper to resolve localized field names in templates.
@@ -1093,35 +1243,46 @@ def localized_field_name(field_id, fallback_name=None, field_id_kind=None, assig
       as the DOM field id/anchor ("field-<id>").
 
     If field_id_kind is not provided, we try to disambiguate using assignment_id (when available).
+    Titles that contain template variables (for example ``[assignment_year]``) are resolved
+    for the assignment, matching the entry form.
     """
     try:
         if not field_id:
             return fallback_name or ""
 
         kind = (str(field_id_kind).lower().strip() if field_id_kind is not None else "")
+        form_item = None
         if kind in ("indicator_bank", "indicatorbank", "indicator_bank_id"):
-            return _get_localized_indicator_bank_name_by_id(field_id, fallback_name=fallback_name)
-        if kind in ("form_item", "formitem", "form_item_id"):
-            return get_localized_field_name_by_id(field_id, fallback_name)
+            label = _get_localized_indicator_bank_name_by_id(field_id, fallback_name=fallback_name)
+        elif kind in ("form_item", "formitem", "form_item_id"):
+            label = get_localized_field_name_by_id(field_id, fallback_name)
+            form_item = (getattr(g, '_form_item_cache', None) or {}).get(field_id)
+        else:
+            label = None
+            # No explicit kind: disambiguate using assignment/template when possible.
+            if assignment_id:
+                with suppress(Exception):
+                    aes = AssignmentEntityStatus.query.get(assignment_id)
+                    assigned_template_id = (
+                        aes.assigned_form.template_id
+                        if aes and getattr(aes, "assigned_form", None)
+                        else None
+                    )
+                    if assigned_template_id:
+                        fi = FormItem.query.get(field_id)
+                        # If the FormItem exists but belongs to a different template, treat this id as an IndicatorBank id.
+                        if not fi or (getattr(fi, "template_id", None) not in (None, assigned_template_id)):
+                            label = _get_localized_indicator_bank_name_by_id(
+                                field_id, fallback_name=fallback_name
+                            )
+                        else:
+                            form_item = fi
+            if label is None:
+                label = get_localized_field_name_by_id(field_id, fallback_name)
+                if form_item is None:
+                    form_item = (getattr(g, '_form_item_cache', None) or {}).get(field_id)
 
-        # No explicit kind: disambiguate using assignment/template when possible.
-        if assignment_id:
-            with suppress(Exception):
-                from app.models import AssignmentEntityStatus
-                aes = AssignmentEntityStatus.query.get(assignment_id)
-                assigned_template_id = (
-                    aes.assigned_form.template_id
-                    if aes and getattr(aes, "assigned_form", None)
-                    else None
-                )
-                if assigned_template_id:
-                    fi = FormItem.query.get(field_id)
-                    # If the FormItem exists but belongs to a different template, treat this id as an IndicatorBank id.
-                    if not fi or (getattr(fi, "template_id", None) not in (None, assigned_template_id)):
-                        return _get_localized_indicator_bank_name_by_id(field_id, fallback_name=fallback_name)
-
-        # Default: treat as FormItem id
-        return get_localized_field_name_by_id(field_id, fallback_name)
+        return _resolve_form_item_title_variables(label, assignment_id, form_item)
     except Exception as e:
         current_app.logger.debug("get_localized_field_name failed: %s", e)
         return fallback_name or ""

@@ -34295,3 +34295,460 @@ msgstr "Filas de cuadernos de ejercicios"
 
 msgid "{both} of {plan} that planned also reported"
 msgstr "{ambos} de {plan} que también informaron"
+
+#: app/templates/admin/analytics/audit_trail.html:314
+msgid "30 days"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1122
+msgid ""
+"A user restricted to a selected set with nothing ticked cannot access any "
+"assignment."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:268
+msgid "Active users today"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:319
+msgid "Activities per category"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:258
+msgid "Activities this week"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:253
+msgid "Activities today"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:332
+msgid "Activity by hour of day (last 7 days, UTC)"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:46
+msgid ""
+"Adds list rows that this same country or National Society already saved on "
+"another matrix, including rows the column lookups do not return. Cell values"
+" still come only from the column lookups. Turn this off to list lookup rows "
+"only."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:620
+msgid "Admin actions"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:399
+msgid "Aligned"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1090
+msgid "All assignments in their entities"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:262
+#: app/templates/admin/validation_dashboard.html:391
+msgid "All figures"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:256
+#: app/templates/admin/validation_dashboard.html:390
+msgid "All years"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:45
+msgid "Also list rows from another form filled by the same entity"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:229
+msgid "Analysis overview"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:285
+msgid "Annual report"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1077
+msgid "Assignment access"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:220
+msgid "Audit trail sections"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:435
+msgid "Blanks as zero"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:525
+msgid "Bundle"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:526
+msgid "Bundle · {count}"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1080
+msgid ""
+"By default a user can access every assignment within their entities. Limit "
+"this user to a selected set of assignments if needed. Assignments can also "
+"be restricted to specific roles from the assignment settings; both rules "
+"must allow access. System Managers are never restricted."
+msgstr ""
+
+#: plugins/upr/templates/upr/_manage_tools.html:179
+msgid "Choose dashboards"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:238
+msgid "Could not load the overview."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:338
+msgid ""
+"Counts follow the same visibility rules as the Entries tab (page views, "
+"logins and background noise are excluded)."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:456
+msgid "Create a custom role"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:298
+msgid "Daily activity (last 14 days)"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:240
+msgid "Discrepancies"
+msgstr ""
+
+#: plugins/upr/templates/upr/_manage_tools.html:76
+msgid "Download ZIP of all generated countries"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:522
+msgid "Download package for {country}"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:521
+msgid "Download {dashboard}"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:224
+msgid "Entries"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:536
+msgid "Export ready"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:284
+msgid "Failed requests (HTTP 4xx/5xx)"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:395
+msgid "Failed to load the capacity comparison"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:260
+#: app/templates/admin/validation_dashboard.html:282
+msgid "Figure"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1102
+msgid "Filter assignments..."
+msgstr ""
+
+#: plugins/upr/templates/upr/_manage_tools.html:67
+msgid "Full report only"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:514
+msgid "Generate for {count} selected countries."
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:519
+msgid "Generated"
+msgstr ""
+
+#: plugins/upr/templates/upr/_manage_tools.html:116
+msgid "Generated visuals"
+msgstr ""
+
+#: app/templates/forms/entry_form/entry_form.html:586
+msgid "Hide navigation"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:276
+msgid "High / critical risk (30d)"
+msgstr ""
+
+#: plugins/upr/templates/upr/_manage_tools.html:63
+msgid "InDesign exports the full report only, not each dashboard."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:64
+msgid "Latest period on the source template"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:235
+msgid "Loading overview..."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:286
+msgid "Mid-year"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:248
+msgid "Missing figures"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:323
+msgid "Most active users"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:88
+msgid "NS capacity"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:455
+msgid "Need a new group such as Finance or HR?"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:235
+msgid "Need attention"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:280
+msgid "Needs review (30d)"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:616
+msgid "No activity in this period."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1118
+msgid "No assignments available."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:394
+msgid "No figures match this filter."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:393
+msgid "No figures need attention for this filter."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:392
+msgid ""
+"No volunteers, staff, branches, or local units have been reported on "
+"planning or country reporting."
+msgstr ""
+
+#: plugins/upr/templates/upr/_manage_tools.html:75
+msgid ""
+"One ZIP containing every country that already has generated files for this "
+"format."
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:400
+msgid "One source"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1096
+msgid "Only selected assignments"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:293
+msgid "Open this tab to compare planning and country reporting."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:433
+msgid ""
+"Open to all users: anyone with access to the assigned entities can see and "
+"work on this assignment. Select roles to restrict it."
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:518
+msgid "Package"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:289
+msgid "Peak hour (last 7 days, UTC)"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:230
+msgid ""
+"Planning and country reporting both collect volunteers, staff, branches, and"
+" local units. A figure needs attention when the two forms disagree by 25 "
+"percent or more for the same year, when it moves by 50 percent or more from "
+"the previous year, or when a submitted form left it blank after the other "
+"reported a number. Smaller gaps, and blanks on forms still in progress, are "
+"listed as variations."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:65
+msgid "Previous period (ended before this assignment starts)"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:431
+msgid ""
+"Restricted: only users who hold at least one of the selected roles can see, "
+"open and edit this assignment."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:302
+msgid "Risk level (30 days)"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:66
+msgid "Same calendar year"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:67
+msgid "Same period name"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:537
+msgid "Saved files are in the table."
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:58
+msgid "Select a matrix"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:52
+msgid "Select a template"
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:524
+msgid "Select {country}"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:142
+msgid "Show a total for each group"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:336
+msgid "Source (30 days)"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:56
+msgid "Source matrix"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:62
+msgid "Source period"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_display_properties.html:50
+msgid "Source template"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:435
+msgid "System Managers always have access."
+msgstr ""
+
+#: app/routes/admin/assignment_management.py:1500
+msgid ""
+"This assignment is now restricted to roles you do not hold, so it is hidden "
+"from your lists."
+msgstr ""
+
+#: app/routes/admin/assignment_management.py:1056
+msgid ""
+"This assignment is restricted to roles you do not hold, so it is hidden from"
+" your lists."
+msgstr ""
+
+#: plugins/upr/templates/upr/tab_panel.html:515
+msgid "This export type uses All visuals only."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1130
+msgid "This user can access all assignments in their entities."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1128
+msgid "This user is limited to a selected set of assignments."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:313
+msgid "This week"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:310
+msgid "Top categories and users"
+msgstr ""
+
+#: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:433
+msgid "Treat blank cells as zero in + − × ÷"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:619
+msgid "User activity"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:398
+msgid "Variation"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:618
+msgid "Very high volume: counts are based on the most recent rows only."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:609
+msgid "Week starts"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:287
+msgid "What needs attention"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:427
+msgid "Who can access this assignment"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:244
+msgid "Year-to-year changes"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1132
+msgid "You do not have permission to change this."
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:610
+msgid "avg / day"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:612
+msgid "in 30 days"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:614
+msgid "last 30 days"
+msgstr ""
+
+#: app/templates/admin/validation_dashboard.html:396
+msgid "more to review"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:611
+msgid "this week"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:613
+msgid "today"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:608
+msgid "vs same point last week"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:607
+msgid "vs same time yesterday"
+msgstr ""
+
+#: app/templates/admin/analytics/audit_trail.html:606
+msgid "yesterday"
+msgstr ""

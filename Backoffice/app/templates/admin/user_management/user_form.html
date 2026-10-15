@@ -1099,7 +1099,7 @@ window.userFormConfig = {
                     <div id="assignment-access-picker" class="{% if assignment_access_mode != assignment_access_selected_mode %}hidden{% endif %} space-y-2">
                         <input type="search" id="assignment-access-filter" autocomplete="off"
                                class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
-                               placeholder="{{ _('Filter assignments...') }}">
+                               placeholder="{{ _('Filter assignments...')|forceescape }}">
                         <div class="max-h-72 overflow-y-auto rounded-md border border-gray-200 divide-y divide-gray-100">
                             {% for a in assignment_access_options %}
                             <label class="assignment-access-option flex items-start gap-2 px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"

@@ -114,7 +114,11 @@ def create_blueprint():
         if hit_rate_limit(_viewer_key('interactive_map:tiles'), TILE_REQUESTS_PER_USER_PER_MINUTE):
             return json_error('Too many tile requests', 429, success=False, error='Too many tile requests')
 
-        mapbox_token = plugin_config.get_api_key('mapbox')
+        mapbox_token = (plugin_config.get_api_key('mapbox') or '').strip()
+        if not mapbox_token:
+            # The validation dashboard and other maps use this env token. The
+            # plugin setting is optional when it is already set.
+            mapbox_token = (current_app.config.get('MAPBOX_ACCESS_TOKEN') or '').strip()
         if not mapbox_token:
             return json_bad_request('Mapbox is not configured', error='Mapbox is not configured')
 

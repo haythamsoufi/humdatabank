@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="{{ _ui_language|default('en') }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ L.flow_title }}</title>
+    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    <link rel="stylesheet" href="{{ static_url('vendor/leaflet/leaflet.css') }}">
+    <link rel="stylesheet" href="{{ upr_static_url('css/upr-flow-map.css') }}">
+</head>
+<body class="upri-flow-embed-body">
+    <div id="upri-flow-embed"
+         class="upri-flow-embed"
+         data-flow-url="{{ url_for('upr.support_flow_data') }}"
+         data-year="{{ year }}"
+         data-pns="{{ pns }}"
+         data-recipient="{{ recipient }}"
+         data-ui="{{ ui|tojson|forceescape }}">
+        <div id="upri-flow-loading" class="upri-state upri-state--compact" hidden>
+            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+            <p>{{ L.flow_loading }}</p>
+        </div>
+        <div id="upri-flow-error" class="upri-state upri-state--error upri-state--compact" hidden>
+            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            <p>{{ L.flow_error }}</p>
+        </div>
+        <div id="upri-flow-empty" class="upri-state upri-state--compact" hidden>
+            <i class="fas fa-route" aria-hidden="true"></i>
+            <p>{{ L.flow_empty }}</p>
+        </div>
+        {% include "plugins/upr/upr/_flow_map_stage.html" %}
+        <p id="upri-flow-note" class="upri-flow__note" hidden></p>
+    </div>
+    <script src="{{ static_url('vendor/leaflet/leaflet.js') }}"></script>
+    <script src="{{ upr_static_url('js/upr-flow-map.js') }}"></script>
+</body>
+</html>

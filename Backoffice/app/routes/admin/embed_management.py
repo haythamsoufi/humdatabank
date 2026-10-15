@@ -10,7 +10,7 @@ from app import db
 from app.models import EmbedContent
 from app.models.embed_content import validate_embed_url, validate_embed_category, validate_aspect_ratio, PAGE_SLOTS
 
-ALLOWED_EMBED_TYPES = frozenset({'powerbi', 'tableau', 'iframe'})
+ALLOWED_EMBED_TYPES = frozenset({'powerbi', 'tableau', 'iframe', 'databank'})
 
 bp = Blueprint("embed_management", __name__, url_prefix="/admin")
 
@@ -29,11 +29,16 @@ def manage_embed_content():
 
         categories = db.session.query(EmbedContent.category).distinct().all()
         category_list = sorted(set(c[0] for c in categories)) if categories else []
+        embed_visuals = []
+        plugin_manager = getattr(current_app, "plugin_manager", None)
+        if plugin_manager is not None:
+            embed_visuals = plugin_manager.list_embed_visuals()
 
         return render_template(
             "admin/embed_content/manage_embed_content.html",
             items=items,
             categories=category_list,
+            embed_visuals=embed_visuals,
             title="Manage Embed Content",
         )
     except Exception as e:
@@ -45,6 +50,7 @@ def manage_embed_content():
             "admin/embed_content/manage_embed_content.html",
             items=[],
             categories=[],
+            embed_visuals=[],
             title="Manage Embed Content",
             error="Failed to load embed content",
         )

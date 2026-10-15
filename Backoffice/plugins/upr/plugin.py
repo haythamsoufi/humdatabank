@@ -9,6 +9,7 @@ from app.plugins.base import (
     BasePlugin,
     CspOverride,
     DataExplorerTabConfig,
+    EmbedVisual,
     PluginDocsSource,
     SeedPermission,
     SeedRole,
@@ -30,6 +31,21 @@ _UPR_PDF_VIEWER_CSP = (
 # IFRC payload is interpolated into them). frame-ancestors is omitted, and the
 # override clears X-Frame-Options, so Power BI — including Desktop visual hosts
 # whose origin is not a stable allow-list entry — can iframe the page.
+# Frameable support-flow map. frame-ancestors is omitted and the override clears
+# X-Frame-Options, same as the documents gallery, so a parent page can iframe it.
+# Map tiles are same-origin when Mapbox is proxied, or OpenStreetMap otherwise.
+_UPR_SUPPORT_FLOW_CSP = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' https://tile.openstreetmap.org https://*.tile.openstreetmap.org data:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'none'; "
+    "form-action 'none'"
+)
+
 _UPR_DOCUMENTS_GALLERY_CSP = (
     "default-src 'self'; "
     "script-src 'unsafe-inline'; "
@@ -168,6 +184,45 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
             {"kind": "script", "url": upr_static_url("js/upr-emergency-coverage.js")},
         ]
 
+    def get_embed_visuals(self) -> list[EmbedVisual]:
+        from flask_babel import gettext as _
+
+        return [
+            EmbedVisual(
+                visual_id="upr.support_flow",
+                title=_("Network Bilateral Support"),
+                description=_(
+                    "Map of Participating National Societies and the countries they support, "
+                    "with bilateral funding by strategic priority and summary figures."
+                ),
+                endpoint="upr.support_flow_embed",
+                category="analysis",
+                aspect_ratio="16:9",
+            ),
+            EmbedVisual(
+                visual_id="upr.support_funding",
+                title=_("Bilateral funding"),
+                description=_(
+                    "Two rankings: Participating National Societies by bilateral funding sent, "
+                    "and countries by bilateral funding received."
+                ),
+                endpoint="upr.support_funding_embed",
+                category="analysis",
+                aspect_ratio="16:9",
+            ),
+            EmbedVisual(
+                visual_id="upr.support_overview",
+                title=_("Network Bilateral Support and funding"),
+                description=_(
+                    "The support map, priority chart and summary figures, "
+                    "with the bilateral funding rankings below."
+                ),
+                endpoint="upr.support_overview_embed",
+                category="analysis",
+                aspect_ratio="1:2",
+            ),
+        ]
+
     def get_csp_overrides(self) -> list[CspOverride]:
         return [
             CspOverride(
@@ -179,6 +234,27 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
                 endpoint="upr.assignment_narrative_file",
                 path_predicate=lambda path: True,
                 policy=_UPR_PDF_VIEWER_CSP,
+            ),
+            CspOverride(
+                endpoint="upr.support_flow_embed",
+                path_predicate=lambda path: True,
+                policy=_UPR_SUPPORT_FLOW_CSP,
+                x_frame_options=None,
+                cross_origin_resource_policy="cross-origin",
+            ),
+            CspOverride(
+                endpoint="upr.support_funding_embed",
+                path_predicate=lambda path: True,
+                policy=_UPR_SUPPORT_FLOW_CSP,
+                x_frame_options=None,
+                cross_origin_resource_policy="cross-origin",
+            ),
+            CspOverride(
+                endpoint="upr.support_overview_embed",
+                path_predicate=lambda path: True,
+                policy=_UPR_SUPPORT_FLOW_CSP,
+                x_frame_options=None,
+                cross_origin_resource_policy="cross-origin",
             ),
             CspOverride(
                 endpoint="upr.upr_documents_gallery",

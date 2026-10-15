@@ -2,6 +2,8 @@
 <link rel="stylesheet" href="{{ upr_static_url('css/upr-impact.css') }}">
 <link rel="stylesheet" href="{{ upr_static_url('css/upr-analysis-export.css') }}">
 <link rel="stylesheet" id="upri-report-print-css" href="{{ upr_static_url('css/upr-analysis-print.css') }}" media="not all">
+<link rel="stylesheet" href="{{ static_url('vendor/leaflet/leaflet.css') }}">
+<link rel="stylesheet" href="{{ upr_static_url('css/upr-flow-map.css') }}">
 
 <div id="panel-upr-impact"
      class="explore-panel{% if explore_first_tab != 'upr-impact' %} hidden{% endif %}"
@@ -34,6 +36,16 @@
         </div>
     </div>
 
+    <div class="upri-subtabs" role="tablist" aria-label="{{ L.intro_title }}">
+        <button type="button" class="upri-subtabs__btn is-active" id="upri-subtab-data" role="tab"
+                aria-selected="true" aria-controls="upri-pane-data" data-upri-pane="data">{{ L.subtab_data }}</button>
+        <button type="button" class="upri-subtabs__btn" id="upri-subtab-flow" role="tab"
+                aria-selected="false" aria-controls="upri-pane-flow" data-upri-pane="flow">{{ L.flow_title }}</button>
+        <button type="button" class="upri-subtabs__btn" id="upri-subtab-participation" role="tab"
+                aria-selected="false" aria-controls="upri-pane-participation" data-upri-pane="participation">{{ L.subtab_participation }}</button>
+    </div>
+
+    <div id="upri-pane-data" class="upri-pane" role="tabpanel" aria-labelledby="upri-subtab-data">
     <div id="upri-loading" class="upri-state" hidden>
         <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
         <p>{{ _('Loading analysis data…') }}</p>
@@ -52,7 +64,42 @@
         <div class="upri-grid" id="upri-grid"></div>
         <div id="upri-notes" hidden></div>
     </div>
+    </div>
 
+    <div id="upri-pane-flow" class="upri-pane" role="tabpanel" aria-labelledby="upri-subtab-flow" hidden>
+    <section class="upri-flow" aria-labelledby="upri-flow-h" data-flow-url="{{ url_for('upr.impact_flows') }}">
+        <div class="upri-flow__head">
+            <div class="upri-card__text">
+                <h3 id="upri-flow-h" class="upri-intro__title">{{ L.flow_title }}</h3>
+                <p class="upri-intro__lead">{{ L.flow_lead }}</p>
+            </div>
+        </div>
+
+        <div id="upri-flow-loading" class="upri-state upri-state--compact" hidden>
+            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+            <p>{{ L.flow_loading }}</p>
+        </div>
+        <div id="upri-flow-error" class="upri-state upri-state--error upri-state--compact" hidden>
+            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            <p>{{ L.flow_error }}</p>
+        </div>
+        <div id="upri-flow-empty" class="upri-state upri-state--compact" hidden>
+            <i class="fas fa-route" aria-hidden="true"></i>
+            <p>{{ L.flow_empty }}</p>
+        </div>
+
+        {% include "plugins/upr/upr/_flow_map_stage.html" %}
+        <p id="upri-flow-note" class="upri-flow__note" hidden></p>
+        <section class="upri-flow-funding" aria-label="{{ L.subtab_funding }}">
+            <h2 class="upri-combined__heading">{{ L.subtab_funding }}</h2>
+            {% with flow_url=url_for('upr.impact_flows'), follow_year='upri-flow-year' %}
+                {% include "plugins/upr/upr/_funding_bars.html" %}
+            {% endwith %}
+        </section>
+    </section>
+    </div>
+
+    <div id="upri-pane-participation" class="upri-pane" role="tabpanel" aria-labelledby="upri-subtab-participation" hidden>
     <section id="upri-narrative" class="upri-narr" aria-labelledby="upri-narr-h" data-narrative-url="{{ url_for('upr.impact_narrative') }}">
         <div class="upri-narr__head">
             <div class="upri-card__text">
@@ -83,6 +130,7 @@
             <div id="upri-narr-notes" hidden></div>
         </div>
     </section>
+    </div>
 
     <dialog id="upri-table-dialog" class="upri-dialog" aria-labelledby="upri-table-title">
         <div class="upri-dialog__head">
@@ -134,6 +182,7 @@
 window.UprImpactConfig = {
     dataUrl: {{ url_for('upr.impact_data')|tojson }},
     narrativeUrl: {{ url_for('upr.impact_narrative')|tojson }},
+    flowUrl: {{ url_for('upr.impact_flows')|tojson }},
     logoUrl: {{ url_for('static', filename='IFRC_logo_square.svg')|tojson }},
     pdf: {
         html2canvas: {{ url_for('static', filename='libs/html2canvas.min.js')|tojson }},
@@ -151,3 +200,6 @@ window.UprImpactConfig = {
 <script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-slides.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-analysis-report.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-impact.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ static_url('vendor/leaflet/leaflet.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-flow-map.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-funding-bars.js') }}"></script>

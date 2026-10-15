@@ -25,6 +25,22 @@ class DataExplorerTabConfig:
 
 
 @dataclass(frozen=True)
+class EmbedVisual:
+    """A first-party page an admin can pick when creating embed content.
+
+    ``endpoint`` is a Flask endpoint name. Core turns it into a URL and checks
+    saved embeds against that path, so a plugin does not edit the embed form.
+    """
+
+    visual_id: str
+    title: str
+    description: str
+    endpoint: str
+    category: str = "analysis"
+    aspect_ratio: str = "16:9"
+
+
+@dataclass(frozen=True)
 class CspOverride:
     """Content-Security-Policy override for plugin-served HTML assets.
 
@@ -317,6 +333,10 @@ class BasePlugin(ABC):
 
     def get_csp_overrides(self) -> List[CspOverride]:
         """CSP overrides for plugin-served HTML assets."""
+        return []
+
+    def get_embed_visuals(self) -> List[EmbedVisual]:
+        """Pages this plugin offers on Admin → Embed Content."""
         return []
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:

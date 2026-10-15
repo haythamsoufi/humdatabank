@@ -1,0 +1,54 @@
+<div class="upri-flow-layout">
+<div class="upri-flow__map-wrap">
+    <div id="upri-flow-map" class="upri-flow__map" hidden></div>
+    <aside id="upri-flow-filters" class="upri-flow__filters" hidden>
+        <div class="upri-flow__filters-head">
+            <p class="upri-flow__filters-title">{{ L.flow_title }}</p>
+            <div class="upri-flow__filters-actions">
+                <button type="button" id="upri-flow-filters-clear" class="upri-flow__filters-clear" hidden
+                        aria-label="{{ L.flow_filters_clear }}">
+                    <i class="fas fa-filter-circle-xmark" aria-hidden="true"></i>
+                </button>
+                <button type="button" id="upri-flow-filters-toggle" class="upri-flow__filters-toggle"
+                    aria-expanded="true" aria-controls="upri-flow-filters-body"
+                    aria-label="{{ L.flow_filters_hide }}"
+                    data-label-hide="{{ L.flow_filters_hide }}"
+                    data-label-show="{{ L.flow_filters_show }}">
+                <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                <i class="fas fa-sliders" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <div id="upri-flow-filters-body" class="upri-flow__filters-body">
+        <label class="upri-field" for="upri-flow-year">
+            <span class="upri-field__label">{{ L.flow_year }}</span>
+            <select id="upri-flow-year" class="upri-select upri-flow__year"></select>
+        </label>
+        <label class="upri-field" for="upri-flow-pns">
+            <span class="upri-field__label">{{ L.flow_pns }}</span>
+            <select id="upri-flow-pns" class="upri-select"></select>
+        </label>
+        <label class="upri-field" for="upri-flow-recipient">
+            <span class="upri-field__label">{{ L.flow_recipient }}</span>
+            <select id="upri-flow-recipient" class="upri-select"></select>
+        </label>
+        <div class="upri-flow__legend">
+            <span class="upri-flow__legend-item"><span class="upri-flow__dot upri-flow__dot--donor"></span>{{ L.flow_legend_donor }}</span>
+            <span class="upri-flow__legend-item"><span class="upri-flow__dot upri-flow__dot--host"></span>{{ L.flow_legend_host }}</span>
+        </div>
+        </div>
+    </aside>
+    <button type="button" id="upri-flow-reset" class="upri-flow__reset" hidden>
+        <i class="fas fa-expand" aria-hidden="true"></i><span>{{ L.flow_reset }}</span>
+    </button>
+</div>
+<aside id="upri-flow-areas" class="upri-flow-areas" hidden>
+    <h3 class="upri-flow-areas__title" id="upri-flow-areas-title"></h3>
+    <div id="upri-flow-areas-body"></div>
+    <p class="upri-flow-areas__legend">
+        <span><i class="upri-flow-areas__swatch upri-flow-areas__swatch--requirement"></i>{{ L.flow_legend_requirement }}</span>
+        <span id="upri-flow-areas-legend-expenditure"><i class="upri-flow-areas__swatch upri-flow-areas__swatch--expenditure"></i>{{ L.flow_legend_expenditure }}</span>
+    </p>
+</aside>
+</div>
+<div id="upri-flow-kpis" class="upri-flow-kpis" hidden></div>

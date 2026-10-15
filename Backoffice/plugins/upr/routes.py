@@ -60,8 +60,10 @@ from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_required, permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
 from app.utils.api_responses import GENERIC_ERROR_MESSAGE, json_accepted, json_bad_request, json_ok
+from app.utils.client_ip import get_client_ip
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.rate_limiting import rate_limit
+from app.utils.session_persistence import suppress_session_cookie_for_request
 
 MAX_BULK_AES_IDS = 250
 MAX_BULK_DASHBOARDS = 20
@@ -922,6 +924,171 @@ def impact_narrative():
         return json_ok(narrative=analysis["payload"], views=analysis["views"])
     except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
         return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/admin/data-exploration/upr-impact/flows", methods=["GET"])
+@permission_required("admin.data_explore.upr_impact")
+def impact_flows():
+    """PNS → host-country bilateral support flows for the Analysis flow map."""
+    try:
+        from plugins.upr.flow import build_support_flows
+
+        region = (request.args.get("region") or "").strip() or None
+        flows = build_support_flows(region=region)
+        return json_ok(flows=flows)
+    except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+def _support_flow_public():
+    """Do not start a session for an anonymous visitor of the framed visual."""
+    try:
+        from flask_login import current_user
+
+        if getattr(current_user, "is_authenticated", False):
+            return
+    except Exception:
+        pass
+    suppress_session_cookie_for_request()
+
+
+@bp.route("/upr/support-flow", methods=["GET"])
+@rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_flow:{get_client_ip()}")
+def support_flow_embed():
+    """Frameable support-flow map. ``format=powerbi`` returns the iframe snippet.
+
+    Public so Embed Content and other parents can iframe it without a session.
+    Filters accept ``year``, ``pns`` (ISO3) and ``recipient`` (ISO3).
+    """
+    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+
+    _support_flow_public()
+    year = (request.args.get("year") or "").strip()
+    pns = (request.args.get("pns") or "").strip().upper()
+    recipient = (request.args.get("recipient") or "").strip().upper()
+    if (request.args.get("format") or "").strip().lower() == "powerbi":
+        page = url_for(
+            "upr.support_flow_embed",
+            _external=True,
+            **{key: value for key, value in (("year", year), ("pns", pns), ("recipient", recipient)) if value},
+        )
+        body = (
+            "<!-- Power BI HTML visual: this iframe loads the live UPR support flow map. -->"
+            '<iframe title="Network Bilateral Support" '
+            f'src="{escape(page)}" '
+            'sandbox="allow-scripts allow-same-origin allow-popups" '
+            'style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"></iframe>'
+        )
+        return Response(body, mimetype="text/html; charset=utf-8")
+    return render_template(
+        "plugins/upr/support_flow_embed.html",
+        L=analysis_labels(),
+        ui=analysis_ui_labels(),
+        year=year,
+        pns=pns,
+        recipient=recipient,
+    )
+
+
+@bp.route("/upr/support-funding", methods=["GET"])
+@rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_funding:{get_client_ip()}")
+def support_funding_embed():
+    """Frameable bilateral funding rankings, separate from the support map."""
+    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+
+    _support_flow_public()
+    year = (request.args.get("year") or "").strip()
+    if (request.args.get("format") or "").strip().lower() == "powerbi":
+        page = url_for("upr.support_funding_embed", _external=True, **({"year": year} if year else {}))
+        body = (
+            "<!-- Power BI HTML visual: bilateral funding sent and received. -->"
+            '<iframe title="Bilateral funding" '
+            f'src="{escape(page)}" '
+            'sandbox="allow-scripts allow-same-origin allow-popups" '
+            'style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"></iframe>'
+        )
+        return Response(body, mimetype="text/html; charset=utf-8")
+    return render_template(
+        "plugins/upr/support_funding_embed.html",
+        L=analysis_labels(),
+        ui=analysis_ui_labels(),
+        year=year,
+    )
+
+
+@bp.route("/upr/support-overview", methods=["GET"])
+@rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_overview:{get_client_ip()}")
+def support_overview_embed():
+    """Frameable page with the support map above the funding rankings."""
+    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+
+    _support_flow_public()
+    year = (request.args.get("year") or "").strip()
+    pns = (request.args.get("pns") or "").strip().upper()
+    recipient = (request.args.get("recipient") or "").strip().upper()
+    if (request.args.get("format") or "").strip().lower() == "powerbi":
+        page = url_for(
+            "upr.support_overview_embed",
+            _external=True,
+            **{key: value for key, value in (("year", year), ("pns", pns), ("recipient", recipient)) if value},
+        )
+        body = (
+            "<!-- Power BI HTML visual: support map with bilateral funding rankings below. -->"
+            '<iframe title="Network Bilateral Support and funding" '
+            f'src="{escape(page)}" '
+            'sandbox="allow-scripts allow-same-origin allow-popups" '
+            'style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"></iframe>'
+        )
+        return Response(body, mimetype="text/html; charset=utf-8")
+    return render_template(
+        "plugins/upr/support_overview_embed.html",
+        L=analysis_labels(),
+        ui=analysis_ui_labels(),
+        year=year,
+        pns=pns,
+        recipient=recipient,
+    )
+
+
+@bp.route("/upr/support-flow/data", methods=["GET"])
+@rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_flow_data:{get_client_ip()}")
+def support_flow_data():
+    """Flow geometry for the public embed. The Analysis tab uses the signed-in route."""
+    _support_flow_public()
+    try:
+        from plugins.upr.flow import build_support_flows
+
+        region = (request.args.get("region") or "").strip() or None
+        flows = build_support_flows(region=region, public_tiles=True)
+        return json_ok(flows=flows)
+    except Exception as error:  # noqa: BLE001 - surfaced as a generic JSON error
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+@bp.route("/upr/support-flow/tiles/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
+@rate_limit(requests_per_minute=600, key_func=lambda: f"upr_support_flow_tiles:{get_client_ip()}")
+def support_flow_tile(z, x, y):
+    """Mapbox tiles for the public embed. The token stays on the server."""
+    from plugins.upr.flow import mapbox_tile
+
+    _support_flow_public()
+    body, mimetype, error = mapbox_tile(z, x, y)
+    if error == "invalid":
+        return json_bad_request("Invalid tile coordinates")
+    if error == "unconfigured":
+        return json_bad_request("Mapbox is not configured")
+    if body is None:
+        return Response(status=502)
+    return Response(
+        body,
+        status=200,
+        mimetype=mimetype,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
 
 
 @bp.route("/admin/data-exploration/upr/assignments", methods=["GET"])

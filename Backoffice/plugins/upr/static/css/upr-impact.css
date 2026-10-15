@@ -387,6 +387,40 @@
     background: #fff7ed;
 }
 
+.upri-subtabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.25rem;
+    margin: 0 0 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.upri-subtabs__btn {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.55rem 0.9rem;
+    background: transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+}
+.upri-subtabs__btn:hover {
+    color: var(--upri-navy);
+}
+.upri-subtabs__btn.is-active {
+    color: var(--upri-navy);
+    border-bottom-color: var(--upri-red);
+}
+.upri-pane .upri-flow {
+    margin-top: 0;
+}
+.upri-pane .upri-narr {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
 /* Narrative participation */
 .upri-narr {
     margin-top: 2rem;

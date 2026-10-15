@@ -1300,6 +1300,44 @@ class PluginManager:
         def plugin_entry_form_assets(template_id=None):
             return self.entry_form_assets(template_id)
 
+    def list_embed_visuals(self) -> list[dict[str, str]]:
+        """Visuals plugins offer when an admin creates embed content.
+
+        Each item includes the external URL for ``EmbedVisual.endpoint``.
+        """
+        from flask import url_for
+
+        offered: list[dict[str, str]] = []
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                visuals = plugin.get_embed_visuals() or []
+            except Exception as exc:
+                self.logger.warning("get_embed_visuals failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for visual in visuals:
+                try:
+                    url = url_for(visual.endpoint, _external=True)
+                except Exception as exc:
+                    self.logger.warning(
+                        "Embed visual %s has no URL (%s): %s",
+                        getattr(visual, "visual_id", visual),
+                        getattr(visual, "endpoint", ""),
+                        exc,
+                    )
+                    continue
+                offered.append(
+                    {
+                        "id": visual.visual_id,
+                        "title": visual.title,
+                        "description": visual.description,
+                        "category": visual.category,
+                        "aspect_ratio": visual.aspect_ratio,
+                        "endpoint": visual.endpoint,
+                        "url": url,
+                    }
+                )
+        return offered
+
     def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
         tabs: List[DataExplorerTabConfig] = []
         for plugin in self.plugins.values():

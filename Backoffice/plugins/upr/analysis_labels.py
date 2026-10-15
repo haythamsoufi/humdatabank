@@ -28,6 +28,9 @@ def fill(text: str, **values: Any) -> str:
 def analysis_labels() -> dict[str, str]:
     """Every display string of the Analysis visuals, in the active locale."""
     labels = {
+        "subtab_data": _("Data trends"),
+        "subtab_funding": _("Bilateral funding"),
+        "subtab_participation": _("Participation"),
         "intro_title": _("Analysis of Unified Plans and Reports"),
         "intro_lead": _("How the Unified Planning and Reporting process is growing across the IFRC network — rising participation, funding ambition, people reached, and partners engaged."),
         "narr_title": _("Participation: data and narrative"),
@@ -137,6 +140,25 @@ def analysis_labels() -> dict[str, str]:
         "narr_note_no_data": _("The databank holds no data assignments for {rounds}, so only narrative participation is shown for them."),
         "narr_note_sources": _("Sources: internal narratives {internal}, public narratives {public} (one per country and round, country appeals only)."),
         "narr_note_universe": _("Participation rate is out of the {n} National Societies seen in any round."),
+
+        # Flow map (rendered in the template)
+        "flow_title": _("Network Bilateral Support"),
+        "flow_lead": _("Every line links a Participating National Society to a country it supports bilaterally in the selected year. A plan and a report in that year are one line. Lines that leave the same society toward nearby countries merge into a thicker branch."),
+        "flow_year": _("Year"),
+        "flow_pns": _("Supporting society (PNS)"),
+        "flow_recipient": _("Recipient country"),
+        "flow_all": _("All"),
+        "flow_loading": _("Loading support flows…"),
+        "flow_error": _("Could not load the support flow map. Try refreshing."),
+        "flow_empty": _("No bilateral support between National Societies has been reported yet for this selection."),
+        "flow_legend_donor": _("Supporting society (PNS)"),
+        "flow_legend_host": _("Supported country"),
+        "flow_legend_requirement": _("Funding Requirement"),
+        "flow_legend_expenditure": _("Expenditure"),
+        "flow_reset": _("Reset view"),
+        "flow_filters_hide": _("Hide filters"),
+        "flow_filters_show": _("Show filters"),
+        "flow_filters_clear": _("Clear filters"),
     }
     # The msgid kept its HTML entity from when it lived in a template.
     labels["funding_title"] = html.unescape(labels["funding_title"])
@@ -177,4 +199,28 @@ def analysis_ui_labels() -> dict[str, str]:
         "track_P": _("Plans"),
         "track_MYR": _("Mid-year reports"),
         "track_AR": _("Annual reports"),
+        # Flow map (strings the browser renders itself)
+        "flow_sent": _("Bilateral Funding Sent (CHF)"),
+        "flow_received": _("Bilateral Funding Received (CHF)"),
+        "flow_funding_empty": _("No bilateral funding reported for {year}."),
+        "flow_area_title": _("Bilateral Funding (CHF) by Strategic Priority / Enabling Function"),
+        "flow_area_empty": _("No priority breakdown reported for {year}."),
+        "flow_kpi_donors": _("NSs supporting bilaterally"),
+        "flow_kpi_hosts": _("NSs receiving bilateral support"),
+        "flow_kpi_requirement": _("Funding Requirement"),
+        "flow_kpi_funding": _("Total Bilateral Funding (CHF)"),
+        "flow_kpi_expenditure": _("Expenditure"),
+        "flow_kpi_requirement_total": _("Total Bilateral Funding Requirement (CHF)"),
+        "flow_kpi_expenditure_total": _("Total Bilateral Expenditure (CHF)"),
+        "flow_all": _("All"),
+        "flow_error": _("Could not load the support flow map. Try refreshing."),
+        "flow_tooltip_supports": _("{donor} supports {host}"),
+        "flow_tooltip_rounds_one": _("{n} round: {rounds}"),
+        "flow_tooltip_rounds": _("{n} rounds: {rounds}"),
+        "flow_node_gives_one": _("Supports {n} country"),
+        "flow_node_gives": _("Supports {n} countries"),
+        "flow_node_gets_one": _("Supported by {n} society"),
+        "flow_node_gets": _("Supported by {n} societies"),
+        "flow_unresolved_one": _("{n} society could not be placed on the map."),
+        "flow_unresolved": _("{n} societies could not be placed on the map."),
     }

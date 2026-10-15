@@ -426,6 +426,7 @@ def test_pdf_viewer_csp_allows_same_origin_frame():
         UprPlugin,
         _UPR_DOCUMENTS_GALLERY_CSP,
         _UPR_PDF_VIEWER_CSP,
+        _UPR_SUPPORT_FLOW_CSP,
     )
 
     overrides = {item.endpoint: item for item in UprPlugin().get_csp_overrides()}
@@ -433,11 +434,24 @@ def test_pdf_viewer_csp_allows_same_origin_frame():
         "upr.assignment_pdf",
         "upr.assignment_narrative_file",
         "upr.upr_documents_gallery",
+        "upr.support_flow_embed",
+        "upr.support_funding_embed",
+        "upr.support_overview_embed",
     }
     assert overrides["upr.assignment_pdf"].policy == _UPR_PDF_VIEWER_CSP
     assert overrides["upr.assignment_narrative_file"].policy == _UPR_PDF_VIEWER_CSP
     assert overrides["upr.assignment_pdf"].x_frame_options == "SAMEORIGIN"
     assert "frame-ancestors 'self'" in _UPR_PDF_VIEWER_CSP
+    flow = overrides["upr.support_flow_embed"]
+    assert flow.policy == _UPR_SUPPORT_FLOW_CSP
+    assert "frame-ancestors" not in flow.policy
+    assert flow.x_frame_options is None
+    visuals = {item.visual_id: item.endpoint for item in UprPlugin().get_embed_visuals()}
+    assert visuals["upr.support_flow"] == "upr.support_flow_embed"
+    assert visuals["upr.support_funding"] == "upr.support_funding_embed"
+    assert visuals["upr.support_overview"] == "upr.support_overview_embed"
+    assert overrides["upr.support_funding_embed"].x_frame_options is None
+    assert overrides["upr.support_overview_embed"].x_frame_options is None
     gallery = overrides["upr.upr_documents_gallery"]
     assert gallery.policy == _UPR_DOCUMENTS_GALLERY_CSP
     assert "frame-ancestors" not in gallery.policy

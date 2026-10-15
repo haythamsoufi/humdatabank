@@ -1,0 +1,684 @@
+/* UPR Analysis — PNS support flow map. */
+
+.upri-flow {
+    margin-top: 1.5rem;
+}
+
+.upri-flow__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.upri-flow [hidden],
+.upri-flow-embed [hidden] {
+    display: none !important;
+}
+
+.upri-flow__filters {
+    position: absolute;
+    z-index: 500;
+    top: 0.75rem;
+    left: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    width: 15.5rem;
+    max-width: calc(100% - 1.5rem);
+    max-height: calc(100% - 1.5rem);
+    overflow: auto;
+    padding: 0.85rem 0.85rem 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 12px 32px rgba(1, 30, 65, 0.18);
+    color: #011e41;
+}
+
+.upri-flow__filters-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upri-flow__filters-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: auto;
+}
+
+.upri-flow__filters-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-left: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: #011e41;
+    cursor: pointer;
+}
+
+.upri-flow__filters-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: #f5333f;
+    cursor: pointer;
+}
+
+.upri-flow__filters-clear:hover,
+.upri-flow__filters-toggle:hover {
+    background: rgba(1, 30, 65, 0.08);
+}
+
+.upri-flow__filters-toggle .fa-sliders {
+    display: none;
+}
+
+.upri-flow__filters.is-collapsed {
+    width: auto;
+    gap: 0;
+    padding: 0.35rem;
+}
+
+.upri-flow__filters.is-collapsed .upri-flow__filters-body,
+.upri-flow__filters.is-collapsed .upri-flow__filters-title {
+    display: none;
+}
+
+.upri-flow__filters.is-collapsed .upri-flow__filters-toggle {
+    margin: 0;
+}
+
+.upri-flow__filters.is-collapsed .upri-flow__filters-actions {
+    margin: 0;
+}
+
+.upri-flow__filters.is-collapsed .upri-flow__filters-toggle .fa-chevron-left {
+    display: none;
+}
+
+.upri-flow__filters.is-collapsed .upri-flow__filters-toggle .fa-sliders {
+    display: inline-block;
+}
+
+.upri-flow__filters-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.upri-flow__filters-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #011e41;
+}
+
+.upri-flow__filters .upri-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+}
+
+.upri-flow__filters .upri-field__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #5c6b7a;
+}
+
+.upri-flow__filters .upri-select {
+    width: 100%;
+    min-width: 0;
+    appearance: none;
+    margin: 0;
+    padding: 0.45rem 1.85rem 0.45rem 0.65rem;
+    border: 1px solid rgba(1, 30, 65, 0.14);
+    border-radius: 0.5rem;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23011e41' d='M1.2 1.4 6 6.2 10.8 1.4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    color: #011e41;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+}
+
+.upri-flow__filters .upri-select:hover {
+    border-color: rgba(1, 30, 65, 0.32);
+}
+
+.upri-flow__filters .upri-select:focus {
+    outline: none;
+    border-color: #011e41;
+    box-shadow: 0 0 0 3px rgba(1, 30, 65, 0.12);
+}
+
+.upri-flow__filters .upri-flow__legend {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    margin: 0.1rem 0 0;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgba(1, 30, 65, 0.08);
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: #374151;
+}
+
+.upri-flow__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    align-items: center;
+    font-size: 0.8125rem;
+    color: #374151;
+}
+
+.upri-flow__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.upri-flow__dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid #fff;
+    box-shadow: 0 0 0 1px rgba(1, 30, 65, 0.25);
+    flex-shrink: 0;
+}
+
+.upri-flow__dot--donor { background: #f5333f; }
+.upri-flow__dot--host { background: #011e41; }
+
+.upri-flow__map-wrap {
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #eef3f7;
+}
+
+.upri-flow__map {
+    width: 100%;
+    height: 480px;
+}
+
+/* A click focuses the SVG path. The browser then draws a box around the
+   line's bounding box, which reads as a stray rectangle on the map. */
+.upri-flow__map .leaflet-interactive:focus,
+.upri-flow__map .leaflet-interactive:focus-visible,
+.upri-flow__map .leaflet-overlay-pane svg:focus {
+    outline: none;
+}
+
+@media (max-width: 639px) {
+    .upri-flow__map { height: 360px; }
+}
+
+/* Leaflet flow paths draw with round caps; hovering is handled in JS by
+   restyling the polylines, so no extra path CSS is needed. */
+
+/* Leaflet tooltip skinned to the IFRC navy. */
+.leaflet-tooltip.upri-flow-tip {
+    max-width: 16rem;
+    padding: 0.4rem 0.6rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: rgba(1, 30, 65, 0.95);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    white-space: normal;
+    box-shadow: 0 4px 12px rgba(1, 30, 65, 0.25);
+}
+
+.leaflet-tooltip.upri-flow-tip::before { display: none; }
+
+.upri-flow__reset {
+    position: absolute;
+    z-index: 500;
+    top: 0.6rem;
+    right: 0.6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(1, 30, 65, 0.12);
+}
+
+.upri-flow__reset:hover { border-color: #9ca3af; }
+
+.upri-flow-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(17rem, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+}
+
+.upri-flow-layout .upri-flow__map,
+.upri-flow-areas {
+    height: 520px;
+}
+
+.upri-flow-areas {
+    display: flex;
+    flex-direction: column;
+    min-height: 22rem;
+    overflow: auto;
+    padding: 0.85rem 0.9rem 0.7rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.upri-flow-areas__title {
+    margin: 0 0 0.65rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #011e41;
+}
+
+#upri-flow-areas-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    gap: 0.55rem;
+    min-height: 0;
+}
+
+.upri-flow-areas.is-single {
+    height: auto;
+    align-self: start;
+    min-height: 0;
+}
+
+.upri-flow-areas.is-single #upri-flow-areas-body {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    gap: 0.85rem;
+}
+
+.upri-flow-areas.is-single .upri-flow-areas__row {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+.upri-flow-areas__row {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 34%) minmax(0, 1fr);
+    gap: 0.35rem 0.65rem;
+    align-items: center;
+    flex: 1 1 0;
+    margin-bottom: 0;
+    min-height: 2.8rem;
+}
+
+.upri-flow-areas__label {
+    font-size: 0.72rem;
+    line-height: 1.25;
+    text-align: right;
+    color: #374151;
+}
+
+.upri-flow-areas__pair {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    height: 100%;
+}
+
+.upri-flow-areas__line {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.upri-flow-areas__track {
+    position: relative;
+    flex: 1 1 auto;
+    height: 1.15rem;
+    margin-right: 3.6rem;
+}
+
+.upri-flow-areas__fill {
+    position: relative;
+    display: block;
+    height: 100%;
+    min-width: 2px;
+}
+
+.upri-flow-areas__fill--requirement { background: #011e41; }
+.upri-flow-areas__fill--expenditure { background: #f5333f; }
+
+.upri-flow-areas__value {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    margin-left: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #111827;
+    white-space: nowrap;
+    transform: translateY(-50%);
+}
+
+.upri-flow-areas__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: #374151;
+}
+
+.upri-flow-areas__legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.upri-flow-areas__legend [hidden] {
+    display: none;
+}
+
+.upri-flow-areas__swatch {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 9999px;
+}
+
+.upri-flow-areas__swatch--requirement { background: #011e41; }
+.upri-flow-areas__swatch--expenditure { background: #f5333f; }
+
+.upri-flow-areas__empty,
+.upri-flow-bars__empty {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.upri-flow-kpis {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.upri-flow-kpi {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.7rem 0.75rem 0.8rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.35rem;
+    background: #fff;
+    text-align: center;
+}
+
+.upri-flow-kpi__label {
+    display: block;
+    flex: 1 1 auto;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: #6b7280;
+}
+
+.upri-flow-kpi__value {
+    display: block;
+    margin-top: auto;
+    padding-top: 0.35rem;
+    font-size: 1.45rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #0b6e99;
+}
+
+@media (max-width: 720px) {
+    .upri-flow-layout { grid-template-columns: 1fr; }
+    .upri-flow-layout .upri-flow__map,
+    .upri-flow-areas {
+        height: auto;
+        min-height: 22rem;
+        max-height: none;
+    }
+    .upri-flow-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.upri-flow-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-top: 0.85rem;
+    padding: 0.85rem 0.25rem 0.25rem;
+}
+
+.upri-flow-bars__empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.upri-flow-bars__title {
+    margin: 0 0 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #374151;
+    text-align: center;
+}
+
+.upri-flow-bars__col {
+    display: flex;
+    flex-direction: column;
+}
+
+.upri-flow-bars__row {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 34%) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+    margin-bottom: 0.55rem;
+}
+
+.upri-flow-bars__label {
+    font-size: 0.72rem;
+    line-height: 1.2;
+    color: #111827;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.upri-flow-bars__track {
+    position: relative;
+    height: 1.2rem;
+    margin-right: 3.4rem;
+    background: transparent;
+}
+
+.upri-flow-bars__fill {
+    position: relative;
+    display: block;
+    height: 100%;
+    min-width: 2px;
+}
+
+.upri-flow-bars__fill--sent { background: #f5333f; }
+.upri-flow-bars__fill--received { background: #011e41; }
+
+.upri-flow-bars__value {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    margin-left: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #111827;
+    white-space: nowrap;
+    transform: translateY(-50%);
+}
+
+.upri-flow-bars__axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: auto;
+    margin-left: calc(34% + 0.45rem);
+    margin-right: 3.4rem;
+    padding-top: 0.15rem;
+    font-size: 0.68rem;
+    color: #6b7280;
+}
+
+@media (max-width: 800px) {
+    .upri-flow-bars { grid-template-columns: 1fr; }
+}
+
+.upri-flow-embed .upri-flow-bars {
+    flex: 0 0 auto;
+    max-height: 38%;
+    overflow: auto;
+    margin: 0;
+    padding: 0.65rem 0.75rem 0.75rem;
+    background: #fff;
+}
+
+.upri-flow__note {
+    margin-top: 0.6rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+/* Keep the Leaflet zoom control clear of the reset button. */
+.upri-flow__map .leaflet-top.leaflet-left { margin-top: 0; }
+
+.upri-flow-embed-body {
+    margin: 0;
+    height: 100%;
+    background: #eef3f7;
+    font-family: "Open Sans", "Segoe UI", sans-serif;
+}
+
+.upri-flow-embed {
+    display: block;
+    min-height: 100%;
+    padding: 0.75rem;
+    box-sizing: border-box;
+}
+
+.upri-flow-embed .upri-flow-layout .upri-flow__map-wrap {
+    height: auto;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+}
+
+.upri-flow-embed .upri-flow-layout .upri-flow__map,
+.upri-flow-embed .upri-flow-areas {
+    height: 520px;
+    min-height: 22rem;
+    max-height: none;
+}
+
+.upri-flow-embed .upri-flow-areas.is-single {
+    height: auto;
+    min-height: 0;
+}
+
+.upri-flow-embed .upri-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 6rem;
+    color: #6b7280;
+    text-align: center;
+}
+
+.upri-flow-embed .upri-state--error { color: #b91c1c; }
+
+.upri-funding [hidden] {
+    display: none !important;
+}
+
+.upri-funding__toolbar {
+    margin-bottom: 0.85rem;
+}
+
+.upri-funding-embed-body {
+    margin: 0;
+    padding: 1rem 1.25rem 1.5rem;
+    background: #fff;
+    font-family: "Open Sans", "Segoe UI", sans-serif;
+}
+
+.upri-combined-body {
+    height: auto;
+    min-height: 100%;
+}
+
+.upri-combined-body .upri-flow-embed {
+    min-height: 0;
+    padding-bottom: 0;
+}
+
+.upri-flow-funding {
+    margin-top: 1.25rem;
+}
+
+.upri-combined-funding {
+    margin: 1.25rem 0.75rem 0.75rem;
+    padding: 0.9rem 1rem 1.1rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+}
+
+.upri-combined__heading {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #011e41;
+}

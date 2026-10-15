@@ -88,6 +88,10 @@
                                 title="{{ _('Edit')|forceescape }}">
                             <i class="fas fa-edit"></i> {{ _('Edit') }}
                         </button>
+                        <button type="button" class="btn btn-secondary btn-sm js-embed-copy" data-item-id="{{ item.id }}"
+                                title="{{ _('Copy iframe')|forceescape }}">
+                            <i class="fas fa-copy"></i> {{ _('Copy iframe') }}
+                        </button>
                         <button type="button" class="btn btn-primary btn-sm js-embed-preview" data-item-id="{{ item.id }}"
                                 title="{{ _('Preview')|forceescape }}">
                             <i class="fas fa-eye"></i>
@@ -149,6 +153,14 @@
                 <option value="powerbi">{{ _('Power BI') }}</option>
                 <option value="tableau">{{ _('Tableau Public') }}</option>
                 <option value="iframe">{{ _('Generic iframe (allowed hosts only)') }}</option>
+                {% for visual in embed_visuals|default([]) %}
+                <option value="visual:{{ visual.id }}"
+                        data-url="{{ visual.url }}"
+                        data-title="{{ visual.title }}"
+                        data-description="{{ visual.description }}"
+                        data-category="{{ visual.category }}"
+                        data-ratio="{{ visual.aspect_ratio }}">{{ visual.title }}</option>
+                {% endfor %}
             </select>
         </div>
     </div>
@@ -266,13 +278,44 @@
         var hint = document.getElementById('embed-url-hint');
         if (!t || !hint) return;
         var v = t.value;
+        var option = t.options[t.selectedIndex];
+        var urlField = document.getElementById('embed-url');
+        var isVisual = v.indexOf('visual:') === 0;
+        if (isVisual && option) applyEmbedVisual(option);
+        if (urlField) urlField.readOnly = isVisual;
         if (v === 'tableau') {
             hint.textContent = {{ _('HTTPS Tableau Public view URL, e.g. https://public.tableau.com/views/WorkbookName/SheetName. Embed parameters are added on the website.')|tojson }};
         } else if (v === 'powerbi') {
             hint.textContent = {{ _('HTTPS only. Hosts: app.powerbi.com, app.powerbigov.us, msit.powerbi.com')|tojson }};
+        } else if (isVisual) {
+            hint.textContent = {{ _('This visual is filled in for you. Copy iframe on the list uses this address.')|tojson }};
         } else {
             hint.textContent = {{ _('HTTPS only. Allowed hosts: Power BI or Tableau Public domains above.')|tojson }};
         }
+    }
+
+    function applyEmbedVisual(option) {
+        if (!option || !option.value) return;
+        var url = document.getElementById('embed-url');
+        var title = document.getElementById('embed-title');
+        var description = document.getElementById('embed-description');
+        var category = document.getElementById('embed-category');
+        var ratio = document.getElementById('embed-aspect-ratio');
+        if (url) url.value = option.getAttribute('data-url') || '';
+        if (title && !title.value.trim()) title.value = option.getAttribute('data-title') || '';
+        if (description && !description.value.trim()) description.value = option.getAttribute('data-description') || '';
+        if (category && option.getAttribute('data-category')) category.value = option.getAttribute('data-category');
+        if (ratio && !ratio.value.trim() && option.getAttribute('data-ratio')) ratio.value = option.getAttribute('data-ratio');
+    }
+
+    function selectVisualForUrl(embedUrl) {
+        var select = document.getElementById('embed-type');
+        if (!select) return;
+        var wanted = (embedUrl || '').split('?')[0];
+        Array.prototype.forEach.call(select.options, function (option) {
+            var url = (option.getAttribute('data-url') || '').split('?')[0];
+            if (url && url === wanted) select.value = option.value;
+        });
     }
 
     function buildTableauEmbedSrc(viewUrl) {
@@ -280,6 +323,27 @@
         if (!s) return s;
         if (/[?&:]embed\s*=\s*y/i.test(s) || /:embed=y/.test(s)) return s;
         return s + (s.indexOf('?') >= 0 ? '&' : '?') + ':embed=y&:showVizHome=no';
+    }
+
+    function iframeTag(url, title) {
+        var src = String(url || '').replace(/"/g, '&quot;');
+        var label = String(title || 'Embed').replace(/"/g, '&quot;');
+        return '<iframe title="' + label + '" src="' + src + '" style="width:100%;height:640px;border:0;"></iframe>';
+    }
+
+    function copyIframe(url, title, embedType, button) {
+        var tag = iframeTag(embedPreviewSrc(url, embedType), title);
+        var done = function () {
+            if (!button) return;
+            var previous = button.innerHTML;
+            button.textContent = {{ _('Copied')|tojson }};
+            window.setTimeout(function () { button.innerHTML = previous; }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(tag).then(done).catch(function () { window.prompt({{ _('Copy this iframe')|tojson }}, tag); });
+        } else {
+            window.prompt({{ _('Copy this iframe')|tojson }}, tag);
+        }
     }
 
     function embedPreviewSrc(url, embedType) {
@@ -338,6 +402,7 @@
         document.getElementById('embed-type').value = embedType || 'powerbi';
         document.getElementById('embed-aspect-ratio').value = aspectRatio || '';
         document.getElementById('embed-active').checked = !!isActive;
+        selectVisualForUrl(embedUrl || '');
         updateEmbedUrlHint();
         showModal('embed-modal');
     }
@@ -349,13 +414,19 @@
         if (saveBtn && saveBtn.disabled) return;
 
         const id = document.getElementById('embed-id').value;
+        var typeSelect = document.getElementById('embed-type');
+        var embedType = typeSelect.value;
+        if (embedType.indexOf('visual:') === 0) {
+            applyEmbedVisual(typeSelect.options[typeSelect.selectedIndex]);
+            embedType = 'databank';
+        }
         const payload = {
             title: document.getElementById('embed-title').value.trim(),
             description: document.getElementById('embed-description').value.trim(),
             category: document.getElementById('embed-category').value.trim(),
             page_slot: document.getElementById('embed-page-slot').value.trim() || null,
             embed_url: document.getElementById('embed-url').value.trim(),
-            embed_type: document.getElementById('embed-type').value,
+            embed_type: embedType,
             aspect_ratio: document.getElementById('embed-aspect-ratio').value.trim() || null,
             is_active: document.getElementById('embed-active').checked
         };
@@ -394,11 +465,14 @@
         });
     }
 
-    function isAllowedEmbedPreviewUrl(url) {
+    function isAllowedEmbedPreviewUrl(url, embedType) {
         var raw = (url || '').trim();
         if (!raw) return false;
         try {
             var u = new URL(raw);
+            if ((embedType || '').toLowerCase() === 'databank') {
+                return u.origin === window.location.origin;
+            }
             if (u.protocol !== 'https:') return false;
             var host = (u.hostname || '').toLowerCase();
             if (host === 'public.tableau.com' || host.endsWith('.public.tableau.com')) return true;
@@ -412,7 +486,7 @@
     function previewEmbed(url, title, embedType) {
         document.getElementById('preview-modal-title').textContent = title || {{ _("Preview")|tojson|safe }};
         var src = embedPreviewSrc(url, embedType);
-        document.getElementById('preview-iframe').src = isAllowedEmbedPreviewUrl(src) ? src : 'about:blank';
+        document.getElementById('preview-iframe').src = isAllowedEmbedPreviewUrl(src, embedType) ? src : 'about:blank';
         showModal('preview-modal');
     }
 
@@ -473,6 +547,8 @@
                 openEditModal(item.id, item.title, item.description, item.category, item.page_slot, item.embed_url, item.embed_type, item.aspect_ratio, item.is_active);
             } else if (btn.classList.contains('js-embed-preview')) {
                 previewEmbed(item.embed_url, item.title, item.embed_type);
+            } else if (btn.classList.contains('js-embed-copy')) {
+                copyIframe(item.embed_url, item.title, item.embed_type, btn);
             } else if (btn.classList.contains('js-embed-delete')) {
                 confirmDelete(String(item.id), item.title);
             }

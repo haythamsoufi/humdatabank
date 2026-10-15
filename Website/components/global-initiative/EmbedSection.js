@@ -21,6 +21,8 @@ function isAllowedForType(url, embedType) {
     if (t === 'iframe') {
       return hostMatches(parsed.hostname, POWERBI_HOSTS) || hostMatches(parsed.hostname, TABLEAU_HOSTS);
     }
+    // First-party visuals. The backoffice only saves a URL it registered.
+    if (t === 'databank') return parsed.protocol === 'https:' || parsed.protocol === 'http:';
     return false;
   } catch {
     return false;

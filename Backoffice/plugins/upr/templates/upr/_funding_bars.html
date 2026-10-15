@@ -1,0 +1,21 @@
+<section id="upri-funding" class="upri-funding" data-flow-url="{{ flow_url }}" data-year="{{ year|default('') }}"{% if follow_year %} data-follow-year="{{ follow_year }}"{% endif %} data-ui="{{ (ui if ui is defined else upr_analysis_ui())|tojson|forceescape }}">
+    <div class="upri-funding__toolbar"{% if follow_year %} hidden{% endif %}>
+        <label class="upri-field" for="upri-funding-year">
+            <span class="upri-field__label">{{ L.flow_year }}</span>
+            <select id="upri-funding-year" class="upri-select upri-flow__year"></select>
+        </label>
+    </div>
+    <div id="upri-funding-loading" class="upri-state upri-state--compact" hidden>
+        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+        <p>{{ L.flow_loading }}</p>
+    </div>
+    <div id="upri-funding-error" class="upri-state upri-state--error upri-state--compact" hidden>
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <p>{{ L.flow_error }}</p>
+    </div>
+    <p id="upri-funding-empty" class="upri-flow-bars__empty" hidden></p>
+    <div id="upri-funding-bars" class="upri-flow-bars" hidden>
+        <div class="upri-flow-bars__col" id="upri-funding-sent"></div>
+        <div class="upri-flow-bars__col" id="upri-funding-received"></div>
+    </div>
+</section>

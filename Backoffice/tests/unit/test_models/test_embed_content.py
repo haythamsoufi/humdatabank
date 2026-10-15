@@ -8,6 +8,7 @@ Covers: EmbedContent model, validate_embed_url, validate_aspect_ratio,
 import pytest
 from app.models.embed_content import (
     EmbedContent,
+    validate_databank_embed_url,
     validate_embed_url,
     validate_aspect_ratio,
     validate_embed_category,
@@ -248,6 +249,32 @@ class TestValidateEmbedUrl:
         is_valid, error, ratio = validate_embed_url(url, embed_type='invalid_type')
         assert is_valid is False
         assert 'Invalid embed type' in error
+
+    def test_databank_visual_accepts_this_site(self):
+        ok, url, ratio = validate_databank_embed_url(
+            "http://localhost:5000/upr/support-flow?year=2025",
+            allowed_paths={"/upr/support-flow"},
+            own_host="localhost:5000",
+        )
+        assert ok is True
+        assert url.startswith("http://localhost:5000/upr/support-flow")
+        assert ratio is None
+
+    def test_databank_visual_rejects_other_hosts_and_paths(self):
+        other_host, err, _ = validate_databank_embed_url(
+            "https://evil.example/upr/support-flow",
+            allowed_paths={"/upr/support-flow"},
+            own_host="localhost:5000",
+        )
+        other_path, path_err, _ = validate_databank_embed_url(
+            "http://localhost:5000/admin",
+            allowed_paths={"/upr/support-flow"},
+            own_host="localhost:5000",
+        )
+        assert other_host is False
+        assert "this site" in err
+        assert other_path is False
+        assert "not a Databank visual" in path_err
 
     def test_snippet_with_valid_url(self):
         """Test HTML snippet containing valid URL is accepted."""

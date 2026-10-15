@@ -54,6 +54,7 @@
 
     var data = section('upri-');
     var narr = section('upri-narr-');
+    narr.stale = true;
     narr.views = null;
     narr.track = 'ALL';
     narr.loading = byId('upri-narr-loading');
@@ -300,10 +301,37 @@
 
     // --- Wiring ----------------------------------------------------------
 
+    var subtab = 'data';
+
+    function narrativePaneOpen() {
+        var pane = byId('upri-pane-participation');
+        return pane && !pane.hidden;
+    }
+
+    function showSubtab(name) {
+        ['data', 'flow', 'participation'].forEach(function (id) {
+            var pane = byId('upri-pane-' + id);
+            var button = byId('upri-subtab-' + id);
+            var on = id === name;
+            if (pane) pane.hidden = !on;
+            if (button) {
+                button.classList.toggle('is-active', on);
+                button.setAttribute('aria-selected', on ? 'true' : 'false');
+            }
+        });
+        subtab = name;
+        if (name === 'participation' && narr.stale) {
+            narr.stale = false;
+            loadNarrative(els.region ? els.region.value : '');
+        }
+        if (name === 'data' || name === 'participation') resizeCharts();
+    }
+
     function reloadAll() {
         var region = els.region ? els.region.value : '';
         load(region);
-        loadNarrative(region);
+        if (narrativePaneOpen()) loadNarrative(region);
+        else narr.stale = true;
     }
 
     function ensureLoaded() {
@@ -318,6 +346,8 @@
     panel.addEventListener('click', function (event) {
         var target = event.target;
         if (!target || !target.closest) return;
+        var paneBtn = target.closest('[data-upri-pane]');
+        if (paneBtn) showSubtab(paneBtn.getAttribute('data-upri-pane'));
         var trackBtn = target.closest('[data-upri-track]');
         if (trackBtn) setTrack(trackBtn.getAttribute('data-upri-track'));
         var gapBtn = target.closest('[data-upri-gap]');

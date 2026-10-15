@@ -119,6 +119,55 @@ def _extract_from_snippet(text, embed_type):
     return url, aspect_ratio
 
 
+def validate_databank_embed_url(url, *, allowed_paths, own_host):
+    """Accept only a visual this app registered, on this site.
+
+    ``allowed_paths`` are URL paths (``/upr/support-flow``). ``own_host`` is
+    ``request.host`` (hostname, or hostname:port). Plugins add visuals through
+    :meth:`BasePlugin.get_embed_visuals`; this check does not list them.
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return False, "Embed URL is required", None
+    if raw.startswith("/"):
+        path = raw.split("?", 1)[0].rstrip("/") or "/"
+        allowed = {p.rstrip("/") or "/" for p in allowed_paths}
+        if path not in allowed:
+            return False, "That address is not a Databank visual", None
+        return True, raw, None
+    try:
+        parsed = urlparse(raw)
+    except Exception:
+        return False, "Invalid URL format", None
+    if parsed.scheme not in ("http", "https"):
+        return False, f"URL must use HTTP or HTTPS (got {parsed.scheme!r})", None
+    own = (own_host or "").lower()
+    netloc = (parsed.netloc or "").lower()
+    host = (parsed.hostname or "").lower()
+    if not own or netloc != own and host != own:
+        return False, "Databank visuals must be served by this site", None
+    path = (parsed.path or "").rstrip("/") or "/"
+    allowed = {p.rstrip("/") or "/" for p in allowed_paths}
+    if path not in allowed:
+        return False, "That address is not a Databank visual", None
+    return True, raw, None
+
+
+def _databank_visual_paths_and_host():
+    """Registered visual paths and this request's host. Empty when plugins are unavailable."""
+    from flask import current_app, has_request_context, request
+
+    manager = getattr(current_app, "plugin_manager", None)
+    paths: set[str] = set()
+    if manager is not None:
+        for visual in manager.list_embed_visuals():
+            path = urlparse(visual.get("url") or "").path
+            if path:
+                paths.add(path.rstrip("/") or "/")
+    own_host = request.host if has_request_context() else ""
+    return paths, own_host
+
+
 def validate_embed_url(url, embed_type='powerbi'):
     """Validate that an embed URL is HTTPS and on an allowlisted host.
 
@@ -132,6 +181,9 @@ def validate_embed_url(url, embed_type='powerbi'):
     if not url or not isinstance(url, str):
         return False, "Embed URL is required", None
     url = url.strip()
+    if (embed_type or "").strip().lower() == "databank":
+        paths, own_host = _databank_visual_paths_and_host()
+        return validate_databank_embed_url(url, allowed_paths=paths, own_host=own_host)
     extracted_ratio = None
 
     if '<' in url:

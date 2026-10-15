@@ -571,44 +571,57 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Sidebar Scroll Position Management ---
-    const saveSidebarScrollPosition = () => {
-        if (adminSidebar && window.innerWidth > 768) {
-            // SECURITY: Use safe localStorage operations with validation
-            const scrollTop = Math.max(0, Math.min(adminSidebar.scrollTop, 10000)); // Limit scroll values
-            safeLocalStorageSet(sidebarScrollPositionKey + '_desktop', scrollTop.toString());
-        }
-        const mobileMenuNav = document.getElementById('mobileFloatingMenuNav');
-        if (mobileMenuNav && window.innerWidth <= 768) {
-            // SECURITY: Use safe localStorage operations with validation
-            const scrollTop = Math.max(0, Math.min(mobileMenuNav.scrollTop, 10000)); // Limit scroll values
-            safeLocalStorageSet(sidebarScrollPositionKey + '_mobile', scrollTop.toString());
-        }
+    // The aside is overflow:hidden. Desktop scrolling happens on #adminSidebarNav.
+    const getDesktopSidebarScroller = () => document.getElementById('adminSidebarNav') || adminSidebar;
+
+    const readScrollerTop = (el) => {
+        if (!el) return 0;
+        return Math.max(0, Math.min(el.scrollTop, 10000));
     };
 
-    const restoreSidebarScrollPosition = () => {
-        if (adminSidebar && window.innerWidth > 768) {
-            // SECURITY: Use safe localStorage operations with validation
-            const savedScrollPosition = safeLocalStorageGet(sidebarScrollPositionKey + '_desktop', '0');
-            const scrollValue = parseInt(savedScrollPosition, 10);
-            if (!isNaN(scrollValue) && scrollValue >= 0 && scrollValue <= 10000) {
-                adminSidebar.scrollTop = scrollValue;
+    const applyScrollerTop = (el, value) => {
+        if (!el || !Number.isFinite(value)) return;
+        const max = Math.max(0, el.scrollHeight - el.clientHeight);
+        el.scrollTop = Math.min(value, max);
+    };
+
+    const saveSidebarScrollPosition = () => {
+        if (window.innerWidth > 768) {
+            const scroller = getDesktopSidebarScroller();
+            if (scroller) {
+                safeLocalStorageSet(sidebarScrollPositionKey + '_desktop', readScrollerTop(scroller).toString());
             }
         }
         const mobileMenuNav = document.getElementById('mobileFloatingMenuNav');
         if (mobileMenuNav && window.innerWidth <= 768) {
-            // SECURITY: Use safe localStorage operations with validation
+            safeLocalStorageSet(sidebarScrollPositionKey + '_mobile', readScrollerTop(mobileMenuNav).toString());
+        }
+    };
+
+    const restoreSidebarScrollPosition = () => {
+        document.documentElement.classList.remove('sidebar-scroll-restore');
+        if (window.innerWidth > 768) {
+            const savedScrollPosition = safeLocalStorageGet(sidebarScrollPositionKey + '_desktop', '0');
+            const scrollValue = parseInt(savedScrollPosition, 10);
+            if (!isNaN(scrollValue) && scrollValue >= 0 && scrollValue <= 10000) {
+                applyScrollerTop(getDesktopSidebarScroller(), scrollValue);
+            }
+        }
+        const mobileMenuNav = document.getElementById('mobileFloatingMenuNav');
+        if (mobileMenuNav && window.innerWidth <= 768) {
             const savedScrollPosition = safeLocalStorageGet(sidebarScrollPositionKey + '_mobile', '0');
             const scrollValue = parseInt(savedScrollPosition, 10);
             if (!isNaN(scrollValue) && scrollValue >= 0 && scrollValue <= 10000) {
-                mobileMenuNav.scrollTop = scrollValue;
+                applyScrollerTop(mobileMenuNav, scrollValue);
             }
         }
     };
 
     // Add scroll event listeners to save position
-    if (adminSidebar) {
+    const desktopScroller = getDesktopSidebarScroller();
+    if (desktopScroller) {
         let scrollTimeout;
-        adminSidebar.addEventListener('scroll', () => {
+        desktopScroller.addEventListener('scroll', () => {
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(saveSidebarScrollPosition, 150);
         });
@@ -633,8 +646,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save scroll position before page unload
     window.addEventListener('beforeunload', saveSidebarScrollPosition);
 
-    // Restore scroll position after a short delay to ensure DOM is ready
-    setTimeout(restoreSidebarScrollPosition, 100);
+    // Restore after layout. Category expand sets maxHeight and clears it ~300ms later,
+    // which can clamp an early scrollTop back to 0 if the nav is not yet full height.
+    const savedDesktopScroll = () => {
+        const raw = parseInt(safeLocalStorageGet(sidebarScrollPositionKey + '_desktop', '0'), 10);
+        return Number.isFinite(raw) ? raw : 0;
+    };
+    restoreSidebarScrollPosition();
+    requestAnimationFrame(restoreSidebarScrollPosition);
+    setTimeout(() => {
+        const scroller = window.innerWidth > 768 ? getDesktopSidebarScroller() : null;
+        const saved = savedDesktopScroll();
+        if (scroller && saved > 24 && scroller.scrollTop < 8) {
+            restoreSidebarScrollPosition();
+        }
+    }, 350);
 
     // --- Global Select2 Initialization ---
     if (typeof $ !== 'undefined' && $.fn.select2) {

@@ -104,6 +104,15 @@
                 document.documentElement.classList.add('sidebar-initially-collapsed');
             }
 
+            // Hide the nav until the inline restore below sets scrollTop, so the
+            // first paint is the saved position rather than the top of the list.
+            try {
+                const savedSidebarScroll = parseInt(localStorage.getItem('sidebarScrollPosition_desktop'), 10);
+                if (savedSidebarScroll > 0 && window.innerWidth > 768) {
+                    document.documentElement.classList.add('sidebar-scroll-restore');
+                }
+            } catch (e) {}
+
             // Set RTL direction immediately for Arabic (before CSS applies)
             const currentLanguage = {{ _ui_language | tojson }};
             if (currentLanguage === 'ar') {
@@ -238,6 +247,20 @@
             <div class="sidebar-footer">
                 {{ _('Powered by') }} <a href="https://github.com/haythamsoufi/humdatabank" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:text-blue-200 underline transition-colors duration-150">{{ _('Humanitarian Databank') }} <i class="fas fa-external-link-alt text-xs ml-1" aria-hidden="true"></i></a>
             </div>
+            <script nonce="{{ csp_nonce() }}">
+                (function () {
+                    var nav = document.getElementById('adminSidebarNav');
+                    try {
+                        if (nav && window.innerWidth > 768) {
+                            var saved = parseInt(localStorage.getItem('sidebarScrollPosition_desktop'), 10);
+                            if (saved > 0) {
+                                nav.scrollTop = saved;
+                            }
+                        }
+                    } catch (e) {}
+                    document.documentElement.classList.remove('sidebar-scroll-restore');
+                })();
+            </script>
         </aside>
         {% endif %}
 

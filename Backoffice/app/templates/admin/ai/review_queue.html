@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_status_label.html" import status_label, status_label_for_generic_status %}
 
 {% block title %}{{ _('AI Review Queue') }}{% endblock %}
@@ -35,7 +36,7 @@
     </div>
     <button id="autoQueueBtn"
             class="btn btn-warning">
-        <i class="fas fa-robot"></i> {{ _('Auto-Queue Low-Quality') }}
+        {{ svg_icon('bubbles', 'w-4 h-4 mr-2 align-text-bottom') }} {{ _('Auto-Queue Low-Quality') }}
     </button>
 </div>
 
@@ -145,8 +146,14 @@ const AUTO_QUEUE_URL = {{ url_for('ai_management.ai_review_auto_queue')|tojson|s
 const FETCH_CLIENT = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
 
 document.getElementById('autoQueueBtn').addEventListener('click', async function() {
+    var idleNodes = Array.prototype.map.call(this.childNodes, function (node) { return node.cloneNode(true); });
     this.disabled = true;
-    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + {{ _("Queueing...")|tojson|safe }};
+    this.replaceChildren();
+    var spinner = document.createElement('i');
+    spinner.className = 'fas fa-spinner fa-spin';
+    spinner.setAttribute('aria-hidden', 'true');
+    this.appendChild(spinner);
+    this.appendChild(document.createTextNode(' ' + {{ _("Queueing...")|tojson|safe }}));
     try {
         const resp = await FETCH_CLIENT(AUTO_QUEUE_URL, {
             method: 'POST',
@@ -164,7 +171,7 @@ document.getElementById('autoQueueBtn').addEventListener('click', async function
         alert({{ _("Error: ")|tojson|safe }} + e.message);
     } finally {
         this.disabled = false;
-        this.innerHTML = '<i class="fas fa-robot"></i> ' + {{ _("Auto-Queue Low-Quality")|tojson|safe }};
+        this.replaceChildren.apply(this, idleNodes.map(function (node) { return node.cloneNode(true); }));
     }
 });
 </script>

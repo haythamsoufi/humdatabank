@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_svg_icons.html" import svg_icon %}
 {% from "macros/modal_shell.html" import modal_shell %}
 {% from "components/_profile_icon.html" import profile_icon %}
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
@@ -117,7 +118,7 @@
         <div class="flex items-center justify-between min-w-0">
             <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                 <div class="p-2 sm:p-2.5 bg-white/25 rounded-lg backdrop-blur-sm border border-white/30 shrink-0">
-                    <i class="fas fa-robot text-lg sm:text-xl" style="color: #ffffff !important;"></i>
+                    {{ svg_icon('bubbles', 'w-5 h-5 text-white') }}
                 </div>
                 <div class="min-w-0">
                     <h3 class="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm truncate" style="color: #ffffff !important;">{{ _('AI Query Assistant') }}</h3>
@@ -162,8 +163,8 @@
         </div>
 
         <div id="aiAnswerSection" class="hidden mt-4 sm:mt-6 flex items-start gap-2 sm:gap-3 min-w-0">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb) !important;">
-                <i class="fas fa-robot" style="color: #ffffff !important; font-size: 1rem !important;"></i>
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md text-white" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb) !important; color: #ffffff !important;">
+                {{ svg_icon('bubbles', 'w-5 h-5 text-white') }}
             </div>
             <div class="flex-1 relative">
                 <div class="flex items-center gap-2 mb-1">
@@ -501,7 +502,7 @@
                         <p id="importSelectedSummary" class="text-sm text-gray-600 m-0 min-w-0"></p>
                         <div class="flex flex-row-reverse flex-wrap items-center gap-2 sm:gap-3 shrink-0">
                             <button type="button" class="btn btn-primary" id="processSelectedBtn" disabled>
-                                <i class="fas fa-robot mr-2"></i> {{ _('Process Selected') }}
+                                {{ svg_icon('bubbles', 'w-4 h-4 mr-2 align-text-bottom') }} {{ _('Process Selected') }}
                             </button>
                             <button type="button" class="btn btn-secondary" id="importTabCancelBtn">{{ _('Cancel') }}</button>
                         </div>
@@ -519,7 +520,7 @@
                         <p id="guidanceSelectedSummary" class="text-sm text-gray-600 m-0 min-w-0"></p>
                         <div class="flex flex-row-reverse flex-wrap items-center gap-2 sm:gap-3 shrink-0">
                             <button type="button" class="btn btn-primary" id="guidanceImportSelectedBtn" disabled>
-                                <i class="fas fa-robot mr-2"></i> {{ _('Import Selected') }}
+                                {{ svg_icon('bubbles', 'w-4 h-4 mr-2 align-text-bottom') }} {{ _('Import Selected') }}
                             </button>
                             <button type="button" class="btn btn-secondary" id="guidanceTabCancelBtn">{{ _('Cancel') }}</button>
                         </div>

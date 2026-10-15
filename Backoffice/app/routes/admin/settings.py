@@ -206,7 +206,7 @@ def _build_ai_groups():
         {
             'id': 'core',
             'title': 'Core Features',
-            'icon': 'fas fa-robot',
+            'icon': 'bubbles',
             'description': 'Enable or disable major AI capabilities.',
             'fields': [
                 bln('CHATBOT_ENABLED', 'Chatbot Enabled', 'Enable the AI chatbot across the application.', True),

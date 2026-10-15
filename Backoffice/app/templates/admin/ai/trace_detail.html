@@ -627,12 +627,32 @@ document.addEventListener('DOMContentLoaded', function () {
         return lines.join('\n');
     }
 
+    function setCopyMark(icon, done) {
+        if (!icon) return;
+        var idle = icon.querySelector('[data-copy-idle]');
+        var check = icon.querySelector('[data-copy-done]');
+        if (idle) idle.classList.toggle('hidden', !!done);
+        if (check) check.classList.toggle('hidden', !done);
+    }
+
     function copyToClipboardWithFeedback(text, btn, labelEl) {
+        var icon = btn.querySelector('[data-assistant-mark]') || btn.querySelector('i');
         navigator.clipboard.writeText(text).then(function () {
             var orig = labelEl.textContent;
             labelEl.textContent = {{ _("Copied!")|tojson|safe }};
-            btn.querySelector('i').className = 'fas fa-check text-green-600';
-            setTimeout(function () { labelEl.textContent = orig; btn.querySelector('i').className = btn.dataset.iconClass || 'fas fa-copy'; }, 2000);
+            if (icon && icon.hasAttribute('data-assistant-mark')) {
+                setCopyMark(icon, true);
+            } else if (icon) {
+                icon.className = 'fas fa-check text-green-600';
+            }
+            setTimeout(function () {
+                labelEl.textContent = orig;
+                if (icon && icon.hasAttribute('data-assistant-mark')) {
+                    setCopyMark(icon, false);
+                } else if (icon) {
+                    icon.className = btn.dataset.iconClass || 'fas fa-copy';
+                }
+            }, 2000);
         }).catch(function () {
             labelEl.textContent = {{ _("Copy failed")|tojson|safe }};
             setTimeout(function () { labelEl.textContent = labelEl.dataset.origText || {{ _("Copy")|tojson|safe }}; }, 2000);
@@ -654,7 +674,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var traceMetaEl = document.getElementById('traceTraceMeta');
     var stepsRawEl = document.getElementById('traceStepsRaw');
     if (copyAIBtn && copyAILabel && traceMetaEl) {
-        copyAIBtn.dataset.iconClass = 'fas fa-robot';
         copyAIBtn.addEventListener('click', function () {
             try {
                 var meta = JSON.parse(traceMetaEl.textContent || '{}');

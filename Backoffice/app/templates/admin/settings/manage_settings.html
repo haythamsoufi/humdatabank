@@ -5,6 +5,7 @@
 
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "macros/modal_shell.html" import modal_shell %}
 
@@ -1399,7 +1400,11 @@
     <details class="ai-group mb-3 border border-gray-200 rounded-lg overflow-hidden" open>
       <summary class="px-4 py-3 cursor-pointer bg-gray-50 hover:bg-gray-100 transition select-none flex items-center justify-between">
         <span class="text-sm font-medium text-gray-900">
-          <i class="{{ group.icon }} mr-1.5 text-gray-400 w-4 text-center"></i>{{ _(group.title) }}
+          {% if group.icon.startswith('fas ') or group.icon.startswith('far ') or group.icon.startswith('fab ') or group.icon.startswith('fal ') %}
+          <i class="{{ group.icon }} mr-1.5 text-gray-400 w-4 text-center"></i>
+          {% else %}
+          {{ svg_icon(group.icon, 'w-4 h-4 mr-1 text-gray-400 align-text-bottom') }}
+          {% endif %}{{ _(group.title) }}
         </span>
         <span class="text-xs text-gray-400">{{ group.fields | selectattr('type', 'ne', 'heading') | list | length }} {{ _('settings') }}</span>
       </summary>

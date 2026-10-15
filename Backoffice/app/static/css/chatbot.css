@@ -2302,10 +2302,7 @@ body.fb-ai-lightbox-open {
     color: #64748b;
 }
 
-/* Fix Font Awesome icon font-weight for robot icons and all solid icons */
-.typing-indicator .fas.fa-robot,
-.chat-message .fas.fa-robot,
-.chat-message i.fas.fa-robot,
+/* Solid Font Awesome glyphs inside chat messages */
 .typing-indicator i.fas,
 .chat-message i.fas {
     font-weight: 900 !important;

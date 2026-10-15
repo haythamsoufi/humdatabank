@@ -626,7 +626,7 @@
         var lab = AgGridRenderers.escapeHtml(shortLabel != null ? String(shortLabel) : '');
         return '<span class="ep-ai-identity-tip-trigger inline-flex items-center justify-center cursor-help" aria-label="' +
             AgGridRenderers.escapeHtmlAttr(raw) + '">' +
-            '<span class="inline-flex items-center justify-center"><i class="fas fa-robot text-purple-600" aria-hidden="true"></i>' +
+            '<span class="inline-flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" class="inline-block w-4 h-4 text-purple-600"><circle cx="7.2" cy="14.4" r="3.2"/><circle cx="14.8" cy="18" r="2"/><circle cx="15.2" cy="8.8" r="4.8"/></svg>' +
             '<span class="sr-only">' + lab + '</span></span>' +
             '<span class="ep-ai-identity-tip-source sr-only" aria-hidden="true">' + body + '</span></span>';
     }

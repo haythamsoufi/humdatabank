@@ -2,6 +2,7 @@
 {# Required: trace, user, tool_usages, id_prefix (e.g. "trace" or "trace-123-") #}
 {# Optional: quality_debug (default none), final_answer_mode: "render" = script+div for JS, "plain" = raw text only #}
 {% from "components/_status_label.html" import status_label, status_label_for_generic_status %}
+{% from "components/_svg_icons.html" import svg_icon %}
 {% set _quality_debug = quality_debug if quality_debug is defined else none %}
 {% set _final_answer_mode = final_answer_mode if final_answer_mode is defined else 'render' %}
 
@@ -57,8 +58,8 @@
 
         {% if trace.display_answer or trace.final_answer %}
         <div class="flex items-start gap-3 mb-6">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb);">
-                <i class="fas fa-robot text-white" style="font-size: 1rem;"></i>
+            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm text-white" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb); color: #ffffff;">
+                {{ svg_icon('bubbles', 'w-5 h-5 text-white') }}
             </div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
@@ -341,7 +342,7 @@
         <div class="flex items-center gap-2">
             {% if trace.steps %}
             <button type="button" id="{{ id_prefix }}CopyForAIReview" class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full trace with metadata for AI review')|forceescape }}">
-                <i class="fas fa-robot mr-0.5" aria-hidden="true"></i>
+                <span class="inline-flex items-center mr-0.5" data-assistant-mark aria-hidden="true"><span data-copy-idle>{{ svg_icon('bubbles', 'w-4 h-4') }}</span><i class="fas fa-check text-green-600 hidden" data-copy-done aria-hidden="true"></i></span>
                 <span id="{{ id_prefix }}CopyForAIReviewLabel">{{ _('Copy for AI Review') }}</span>
             </button>
             <button type="button" id="{{ id_prefix }}CopySteps" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with details')|forceescape }}">

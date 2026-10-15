@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_loading %}
+{% from "components/_svg_icons.html" import svg_icon %}
 
 {% block title %}{{ _('API Management') }}{% endblock %}
 
@@ -350,7 +351,7 @@
                     </span>
                     <span class="ep-filter-wrap">
                         <button type="button" data-surface="ai" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-none border"{% if ep_surface_filter_disabled['ai'] %} disabled{% endif %}>
-                            <i class="fas fa-robot mr-1"></i>{{ _('AI /v2') }}
+                            {{ svg_icon('bubbles', 'w-4 h-4 mr-1 align-text-bottom') }}{{ _('AI /v2') }}
                             <span class="ml-1 opacity-60">{{ surface_summary.ai.total }}</span>
                         </button>
                         <span class="ep-filter-tip" role="tooltip">
@@ -518,7 +519,7 @@
             <span class="ep-ai-identity-tip-trigger cursor-help outline-none rounded-sm" tabindex="0"
                   aria-label="{{ ep_ai_identity_tip }}">
                 <span class="inline-flex items-center">
-                    <i class="fas fa-robot text-purple-500 mr-1" aria-hidden="true"></i>{{ _('AI Session — resolve_ai_identity()') }}
+                    {{ svg_icon('bubbles', 'w-4 h-4 mr-1 align-text-bottom text-purple-500') }}{{ _('AI Session — resolve_ai_identity()') }}
                 </span>
                 <span class="ep-ai-identity-tip-source sr-only" aria-hidden="true">{{ ep_ai_identity_tip }}</span>
             </span>

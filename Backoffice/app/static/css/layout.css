@@ -235,6 +235,11 @@ html[dir="rtl"] .auto-translation-notice-banner__header {
     padding-right: 1rem;
 }
 
+/* Set in <head> until the inline restore script applies the saved scroll position. */
+html.sidebar-scroll-restore #adminSidebarNav {
+    visibility: hidden;
+}
+
 .admin-sidebar.collapsed #adminSidebarNav,
 .sidebar-initially-collapsed .admin-sidebar #adminSidebarNav {
     /* Pull scrollbar into the sidebar's right padding gutter (mirrors expanded -1rem rule) */

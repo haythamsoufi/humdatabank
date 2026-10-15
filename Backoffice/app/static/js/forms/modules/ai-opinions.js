@@ -175,7 +175,9 @@ function highlightFormItem(itemId) {
         badge.className = AI_OPINION_BADGE_CLASS;
         badge.setAttribute('role', 'status');
         badge.setAttribute('aria-live', 'polite');
-        badge.innerHTML = '<i class="fas fa-robot"></i> AI is processing this item';
+        const badgeRange = document.createRange();
+        badgeRange.selectNodeContents(badge);
+        badge.appendChild(badgeRange.createContextualFragment('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" class="inline-block align-text-bottom"><circle cx="7.2" cy="14.4" r="3.2"/><circle cx="14.8" cy="18" r="2"/><circle cx="15.2" cy="8.8" r="4.8"/></svg> AI is processing this item'));
         block.insertAdjacentElement('afterend', badge);
         block.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }

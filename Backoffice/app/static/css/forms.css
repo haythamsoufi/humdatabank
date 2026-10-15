@@ -3277,10 +3277,17 @@ a.btn.entry-form-doc-library-btn {
   transition: transform var(--fab-hover-duration, 0.2s) var(--fab-hover-ease, cubic-bezier(0.4, 0, 0.2, 1));
 }
 
-#chatbot-ai-hover-menu .fab-hover-pill-icon i {
+#chatbot-ai-hover-menu .fab-hover-pill-icon i,
+#chatbot-ai-hover-menu .fab-hover-pill-icon svg {
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.88);
   transition: color var(--fab-hover-duration, 0.2s) ease, transform 0.3s ease;
+}
+
+#chatbot-ai-hover-menu .fab-hover-pill-icon svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  display: block;
 }
 
 #chatbot-ai-hover-menu .fab-hover-pill-label {
@@ -3308,7 +3315,8 @@ a.btn.entry-form-doc-library-btn {
   transform: none;
 }
 
-#chatbot-ai-hover-menu .fab-hover-pill:hover .fab-hover-pill-icon i {
+#chatbot-ai-hover-menu .fab-hover-pill:hover .fab-hover-pill-icon i,
+#chatbot-ai-hover-menu .fab-hover-pill:hover .fab-hover-pill-icon svg {
   color: #ffffff;
   transform: scale(1.05);
 }

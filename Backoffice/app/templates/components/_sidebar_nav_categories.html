@@ -257,7 +257,7 @@
     </div>
     <div class="collapsable-content">
         <a href="{{ url_for('ai_management.ai_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('AI Dashboard')|forceescape }}">
-            <i class="fas fa-robot sidebar-icon w-6 h-6 mr-3 text-center"></i>
+            {{ svg_icon('bubbles', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('AI Dashboard') }}</span>
         </a>
         <a href="{{ url_for('ai_management.knowledge_base') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('AI Knowledge Base')|forceescape }}">

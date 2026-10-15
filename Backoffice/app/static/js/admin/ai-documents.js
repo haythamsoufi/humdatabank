@@ -3557,7 +3557,11 @@ async function processSelectedDocuments() {
         } finally {
             if (processBtn) {
                 processBtn.disabled = false;
-                processBtn.innerHTML = originalText || ('<i class="fas fa-robot mr-2"></i>' + escapeHtml(cfg.t.process_selected_0401d5a2));
+                const idleMarkup = originalText || ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" class="inline-block align-text-bottom mr-2"><circle cx="7.2" cy="14.4" r="3.2"/><circle cx="14.8" cy="18" r="2"/><circle cx="15.2" cy="8.8" r="4.8"/></svg>' + escapeHtml(cfg.t.process_selected_0401d5a2));
+                const idleRange = document.createRange();
+                idleRange.selectNodeContents(processBtn);
+                idleRange.deleteContents();
+                processBtn.appendChild(idleRange.createContextualFragment(idleMarkup));
             }
         }
     };

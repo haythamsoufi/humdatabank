@@ -11,6 +11,7 @@
 {% set scoped_reopenable_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled', 'requires_revision'] %}
 {% set scoped_revision_statuses = ['submitted', 'sent_for_review', 'approved'] %}
 {% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
+{% from "components/_svg_icons.html" import svg_icon %}
 {% set can_use_upr = (not is_public_submission|default(false)) and (not is_preview_mode|default(false)) and has_permission('admin.data_explore.upr_visuals') %}
 {% set enable_page_submission = enable_page_submission|default(false) %}
 {% set enable_scoped_submission = enable_page_submission %}
@@ -2750,7 +2751,7 @@
                             class="fab-hover-pill"
                             aria-label="{{ _('Run AI validation')|forceescape }}">
                         <span class="fab-hover-pill-icon">
-                            <i class="fas fa-robot"></i>
+                            {{ svg_icon('bubbles', 'w-4 h-4') }}
                         </span>
                         <span class="fab-hover-pill-label">{{ _('Run AI validation') }}</span>
                     </button>

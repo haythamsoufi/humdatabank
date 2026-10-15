@@ -1,5 +1,5 @@
 import { debugLog, debugWarn, isDebugEnabled } from './debug.js';
-import { getScrollableContainer, scrollElementIntoViewIfNeeded } from '../../core/scroll-container.js';
+import { getScrollableContainer, scrollElementIntoViewIfNeeded, scrollElementToStart } from '../../core/scroll-container.js';
 import { buildFormPageStorageKey, getStableFormStorageBaseUrl, isPageReload } from './form-page-state.js';
 
 const MODULE_NAME = 'pagination';
@@ -977,7 +977,7 @@ function initPagination() {
         saveCurrentSection(storageKey, sectionId);
         window.__ifrcSectionNavScrollSpy?.setActive?.(sectionId);
 
-        const didScroll = scrollElementIntoViewIfNeeded(section, { behavior });
+        const didScroll = scrollElementToStart(section, { behavior });
         debugLog(MODULE_NAME, `Scrolled to section: ${sectionId}`, {
             scrollContainer: getScrollableContainerForForm() === window ? 'window' : 'main',
             behavior,

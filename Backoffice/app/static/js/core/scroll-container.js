@@ -74,6 +74,74 @@ export function stabilizeScrollAfterLayoutChange(anchorElement = null) {
     });
 }
 
+/** Small gap so a section border is not clipped by the top of <main>. */
+const SECTION_START_INSET_PX = 8;
+
+/**
+ * Read the element's scroll-margin-top, falling back when it is unset.
+ * Used when the window itself scrolls under the sticky top nav.
+ */
+function resolveScrollMarginTop(element, override) {
+    if (override != null) return override;
+    const computed = window.getComputedStyle(element);
+    const parsed = parseInt(computed.scrollMarginTop || '0', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 80;
+}
+
+/**
+ * Scroll so the element's top sits at the top of the scroll container.
+ * Section-nav clicks use this so a long section opens at its start, not its middle.
+ * Returns true when a scroll was performed.
+ */
+export function scrollElementToStart(element, options = {}) {
+    if (!element || element.getClientRects().length === 0) {
+        return false;
+    }
+
+    const { behavior = 'smooth', scrollMarginTop = null } = options;
+    const scrollContainer = getScrollableContainer();
+    const isMainContainer = scrollContainer !== window;
+    // <main> starts below the sticky nav, so the section's scroll-margin would
+    // leave the previous section on screen. Keep that margin only for window scroll.
+    const marginTop = isMainContainer
+        ? (scrollMarginTop != null ? scrollMarginTop : SECTION_START_INSET_PX)
+        : resolveScrollMarginTop(element, scrollMarginTop);
+    const targetRect = element.getBoundingClientRect();
+
+    let targetTop;
+    let currentTop;
+
+    if (isMainContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const elementTopRel = targetRect.top - containerRect.top;
+        const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        targetTop = Math.min(
+            maxScroll,
+            Math.max(0, scrollContainer.scrollTop + elementTopRel - marginTop),
+        );
+        currentTop = scrollContainer.scrollTop;
+    } else {
+        const scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight || 0;
+        const maxScroll = Math.max(0, scrollHeight - window.innerHeight);
+        targetTop = Math.min(
+            maxScroll,
+            Math.max(0, window.pageYOffset + targetRect.top - marginTop),
+        );
+        currentTop = window.pageYOffset || 0;
+    }
+
+    if (Math.abs(currentTop - targetTop) < 2) {
+        return false;
+    }
+
+    if (isMainContainer) {
+        scrollContainer.scrollTo({ top: targetTop, behavior });
+    } else {
+        window.scrollTo({ top: targetTop, behavior });
+    }
+    return true;
+}
+
 /**
  * Scroll an element into view only when needed, using the correct scroll container.
  * Returns true when a scroll was performed.

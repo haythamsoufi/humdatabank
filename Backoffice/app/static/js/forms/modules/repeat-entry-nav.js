@@ -1,14 +1,7 @@
 import { debugLog } from './debug.js';
+import { scrollElementToStart } from '../../core/scroll-container.js';
 
 const MODULE = 'repeat-entry-nav';
-
-function getScrollableContainer() {
-    const mainElement = document.querySelector('main[style*="overflow-y"]') || document.querySelector('main');
-    if (mainElement && mainElement.scrollHeight > mainElement.clientHeight) {
-        return mainElement;
-    }
-    return window;
-}
 
 function isElementVisibleForScroll(el) {
     if (!el) return false;
@@ -21,46 +14,7 @@ function isElementVisibleForScroll(el) {
 function scrollToElement(elementId) {
     const target = document.getElementById(elementId);
     if (!target || !isElementVisibleForScroll(target)) return;
-
-    const scrollContainer = getScrollableContainer();
-    const isMainContainer = scrollContainer !== window;
-    const targetRect = target.getBoundingClientRect();
-    const computed = window.getComputedStyle(target);
-    const scrollMarginTop = parseInt(computed.scrollMarginTop || '0', 10) || 80;
-    const paddingBottom = 16;
-
-    let targetTop;
-    if (isMainContainer) {
-        const containerRect = scrollContainer.getBoundingClientRect();
-        const visibleTop = containerRect.top + scrollMarginTop;
-        const visibleBottom = containerRect.bottom - paddingBottom;
-        const sectionTopRel = targetRect.top - containerRect.top;
-
-        if (targetRect.top < visibleTop) {
-            targetTop = Math.max(0, scrollContainer.scrollTop + sectionTopRel - scrollMarginTop);
-        } else if (targetRect.bottom > visibleBottom) {
-            const delta = targetRect.bottom - visibleBottom;
-            targetTop = Math.max(0, scrollContainer.scrollTop + delta);
-        } else {
-            return;
-        }
-
-        scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
-    } else {
-        const visibleTop = scrollMarginTop;
-        const visibleBottom = window.innerHeight - paddingBottom;
-
-        if (targetRect.top < visibleTop) {
-            targetTop = Math.max(0, window.pageYOffset + targetRect.top - scrollMarginTop);
-        } else if (targetRect.bottom > visibleBottom) {
-            const delta = targetRect.bottom - visibleBottom;
-            targetTop = Math.max(0, window.pageYOffset + delta);
-        } else {
-            return;
-        }
-
-        window.scrollTo({ top: targetTop, behavior: 'smooth' });
-    }
+    scrollElementToStart(target, { behavior: 'smooth' });
 }
 
 function defaultRepeatEntryLabel(repeatEntry) {

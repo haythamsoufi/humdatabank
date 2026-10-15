@@ -1,5 +1,5 @@
 import { debugLog } from './debug.js';
-import { getScrollableContainer } from '../../core/scroll-container.js';
+import { getScrollableContainer, scrollElementToStart } from '../../core/scroll-container.js';
 import { buildFormPageStorageKey, getStableFormStorageBaseUrl } from './form-page-state.js';
 
 const MODULE_NAME = 'section-nav-scroll';
@@ -42,53 +42,11 @@ function initSectionNavScroll() {
     if (!section) return;
 
     const scrollContainer = getScrollableContainer();
-    const isMainContainer = scrollContainer !== window;
-
-    const sectionRect = section.getBoundingClientRect();
-    const computed = window.getComputedStyle(section);
-    const scrollMarginTop = parseInt(computed.scrollMarginTop || '0', 10) || 80;
-    const paddingBottom = 16;
-
-    let targetTop;
-    if (isMainContainer) {
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const visibleTop = containerRect.top + scrollMarginTop;
-      const visibleBottom = containerRect.bottom - paddingBottom;
-      const sectionTopRel = sectionRect.top - containerRect.top;
-
-      if (sectionRect.top < visibleTop) {
-        targetTop = Math.max(0, scrollContainer.scrollTop + sectionTopRel - scrollMarginTop);
-      } else if (sectionRect.bottom > visibleBottom) {
-        const delta = sectionRect.bottom - visibleBottom;
-        targetTop = Math.max(0, scrollContainer.scrollTop + delta);
-      } else {
-        debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
-        return;
-      }
-
-      scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
-    } else {
-      const visibleTop = scrollMarginTop;
-      const visibleBottom = window.innerHeight - paddingBottom;
-
-      if (sectionRect.top < visibleTop) {
-        targetTop = Math.max(0, window.pageYOffset + sectionRect.top - scrollMarginTop);
-      } else if (sectionRect.bottom > visibleBottom) {
-        const delta = sectionRect.bottom - visibleBottom;
-        targetTop = Math.max(0, window.pageYOffset + delta);
-      } else {
-        debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
-        return;
-      }
-
-      window.scrollTo({ top: targetTop, behavior: 'smooth' });
-    }
+    const didScroll = scrollElementToStart(section, { behavior: 'smooth' });
 
     debugLog(MODULE_NAME, `Scrolled to section: ${sectionId}`, {
-      scrollContainer: isMainContainer ? 'main' : 'window',
-      scrollMarginTop,
-      targetTop,
-      paddingBottom
+      scrollContainer: scrollContainer === window ? 'window' : 'main',
+      didScroll,
     });
   };
 

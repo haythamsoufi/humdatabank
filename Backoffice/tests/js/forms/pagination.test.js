@@ -15,6 +15,7 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
 vi.mock('../../../app/static/js/core/scroll-container.js', () => ({
   getScrollableContainer: () => document.documentElement,
   scrollElementIntoViewIfNeeded: vi.fn(),
+  scrollElementToStart: vi.fn(),
 }));
 
 vi.mock('../../../app/static/js/forms/modules/form-page-state.js', () => ({

@@ -1,11 +1,4 @@
-"""Tests for log_entity_activities_bulk (batch entity-activity-log writes).
-
-Added alongside the bulk UPR Excel importer's new activity logging — see
-``Backoffice/plugins/upr/scripts/import_upr_excel_data.py::_log_bulk_import_activity``,
-which closes the gap documented in
-``docs/investigations/2026-09-18-bilateral-matrix-overwrite.md`` ("Still open":
-the admin bulk runner never wrote ``entity_activity_log``).
-"""
+"""Tests for log_entity_activities_bulk (batch entity-activity-log writes)."""
 
 from unittest.mock import MagicMock, patch
 

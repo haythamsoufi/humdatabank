@@ -827,8 +827,8 @@ def run_import_targets(
 ) -> Dict[str, Any]:
     """Verify the selected targets against live data, then import them group by group.
 
-    ``user_id`` attributes the entity_activity_log entries each group's
-    ``run_upr_import`` call writes for the assignments it touches.
+    ``user_id`` is the acting user passed to each group's ``run_upr_import``
+    call for PNS status changes. Imports do not write entity activity rows.
     """
     selected = normalize_targets(targets)
     groups = group_targets(selected)

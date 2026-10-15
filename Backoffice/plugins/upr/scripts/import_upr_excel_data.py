@@ -5054,74 +5054,6 @@ def upsert_upr_discussion_comments(
     return stats
 
 
-def _log_bulk_import_activity(
-    touched_aes_ids: Set[int],
-    aes_row_counts: Dict[int, int],
-    template_ids: List[int],
-    *,
-    user_id: Optional[int] = None,
-) -> int:
-    """Best-effort entity-activity-log entries for a bulk UPR import.
-
-    One entry per assignment actually written to — ``touched_aes_ids`` is every
-    AES id the upsert's ``change_recorder`` saw at least one changed row for.
-    Mirrors the "Imported ... Excel: N values staged" activity the
-    per-assignment importer already writes (``assignment_routes.py``); the admin
-    bulk runner never wrote this (see
-    ``docs/investigations/2026-09-18-bilateral-matrix-overwrite.md``, "Still
-    open" — the import never populated a focal point's activity feed). This
-    closes that gap for the bulk path.
-
-    No-op without ``user_id``: ``EntityActivityLog.user_id`` is required, and a
-    CLI/background run has no focal-point user to attribute the activity to —
-    that is an accepted, silent no-op, not an error. Never raises; a
-    notification failure must never fail the import itself.
-    """
-    if not touched_aes_ids or not user_id:
-        return 0
-    try:
-        from app.models.assignments import AssignmentEntityStatus
-        from app.services.notification.core import log_entity_activities_bulk
-
-        template_names = ", ".join(
-            UPR_TEMPLATE_PROFILES[t]["name"]
-            for t in sorted(set(template_ids))
-            if t in UPR_TEMPLATE_PROFILES
-        )
-        rows = (
-            AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(touched_aes_ids))
-            .with_entities(
-                AssignmentEntityStatus.id,
-                AssignmentEntityStatus.entity_type,
-                AssignmentEntityStatus.entity_id,
-            )
-            .all()
-        )
-        entries = []
-        for aes_id, entity_type, entity_id in rows:
-            count = aes_row_counts.get(int(aes_id), 0)
-            entries.append(
-                {
-                    "entity_type": entity_type,
-                    "entity_id": entity_id,
-                    "activity_type": "excel_import",
-                    "activity_description": (
-                        f"UPR Master Excel import: {count} values updated for {template_names}"
-                    ),
-                    "summary_key": "activity.upr_excel_import",
-                    "summary_params": {"template": template_names, "count": count},
-                    "assignment_id": int(aes_id),
-                    "activity_category": "form",
-                    "icon": "fas fa-file-excel",
-                    "user_id": user_id,
-                }
-            )
-        return log_entity_activities_bulk(entries)
-    except Exception:
-        logger.warning("Entity activity logging failed for bulk UPR import", exc_info=True)
-        return 0
-
-
 def run_upr_import(
     input_path: str,
     *,
@@ -5148,10 +5080,9 @@ def run_upr_import(
     When ``collect_preview_rows`` is a list the transformed rows are appended to it
     instead of writing ``preview_excel_path`` (the caller writes one combined file).
 
-    ``user_id`` attributes the resulting ``entity_activity_log`` rows (one per
-    assignment actually written to, skipped entirely when ``None`` or
-    ``dry_run``) — pass the acting user explicitly; a background worker thread
-    has no reliable Flask-Login ``current_user``.
+    ``user_id`` is the acting user for PNS status changes. Pass it explicitly; a
+    background worker thread has no reliable Flask-Login ``current_user``.
+    Imports do not write ``entity_activity_log`` rows.
     """
     from app.extensions import db
     from contextlib import nullcontext
@@ -5222,21 +5153,6 @@ def run_upr_import(
             if progress_cb:
                 progress_cb(payload)
 
-        # Observe the same change stream the undo/audit change_recorder sees so a
-        # bulk run can also write entity_activity_log entries (one per assignment
-        # actually touched) without changing upsert_form_data_rows itself.
-        touched_aes_ids: Set[int] = set()
-        aes_row_counts: Dict[int, int] = {}
-
-        def _track_and_record(entry: Dict[str, Any]) -> None:
-            aes_id = entry.get("aes_id")
-            if aes_id:
-                aid = int(aes_id)
-                touched_aes_ids.add(aid)
-                aes_row_counts[aid] = aes_row_counts.get(aid, 0) + 1
-            if change_recorder:
-                change_recorder(entry)
-
         upsert_stats = upsert_form_data_rows(
             import_rows,
             dry_run=dry_run,
@@ -5248,7 +5164,7 @@ def run_upr_import(
             progress_start_pct=25.0,
             progress_end_pct=85.0,
             stats=stats,
-            change_recorder=_track_and_record,
+            change_recorder=change_recorder,
         )
         discussion_stats = upsert_upr_discussion_comments(
             ctx.discussion_comment_entries,
@@ -5304,10 +5220,6 @@ def run_upr_import(
         upsert_stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)
         if preview_excel_path:
             upsert_stats["preview_path"] = preview_excel_path
-        if not dry_run and touched_aes_ids:
-            upsert_stats["activity_logged"] = _log_bulk_import_activity(
-                touched_aes_ids, aes_row_counts, tids, user_id=user_id
-            )
         _progress("complete", "UPR import completed.", 100.0, stats=upsert_stats)
         return upsert_stats
 

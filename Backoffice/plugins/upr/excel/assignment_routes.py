@@ -13,7 +13,6 @@ from app.services.imports.assignment_excel_access import (
 )
 from app.services.imports.import_change_log import record_assignment_import_audit
 from app.services.monitoring.memory import memory_tracker
-from app.services.notification.core import log_entity_activity
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.platform.user_analytics_service import log_user_activity
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
@@ -226,17 +225,6 @@ def register_upr_excel_routes(excel_bp):
                 assignment_label=template_name,
                 extra_meta={"staged": True},
             )
-            log_entity_activity(
-                aes.entity_type,
-                aes.entity_id,
-                "excel_import",
-                f"Imported {UPR_COUNTRY_REPORTING_LABEL} Excel: {updated_count} values staged for {template_name}",
-                summary_key="activity.upr_excel_import",
-                summary_params={"template": template_name, "count": updated_count},
-                assignment_id=aes_id,
-                activity_category="form",
-                icon="fas fa-file-excel",
-            )
             if warnings:
                 success_msg = f"{success_msg} {' '.join(warnings[:5])}"
                 flash(success_msg, "warning")
@@ -368,17 +356,6 @@ def register_upr_excel_routes(excel_bp):
                 filename=excel_file.filename,
                 assignment_label=template_name,
                 extra_meta={"staged": True},
-            )
-            log_entity_activity(
-                aes.entity_type,
-                aes.entity_id,
-                "excel_import",
-                f"Imported {UNIFIED_COUNTRY_PLAN_LABEL} Excel: {updated_count} values staged for {template_name}",
-                summary_key="activity.upr_excel_import",
-                summary_params={"template": template_name, "count": updated_count},
-                assignment_id=aes_id,
-                activity_category="form",
-                icon="fas fa-file-excel",
             )
             if warnings:
                 success_msg = f"{success_msg} {' '.join(warnings[:5])}"

@@ -795,6 +795,19 @@ html[dir="rtl"] .chat-immersive-clear-all {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
+.chat-immersive-welcome-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    line-height: 0;
+    color: inherit;
+}
+
+.chat-immersive-welcome-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
 .chat-immersive-welcome-text {
     margin: 0;
     font-size: 1rem;

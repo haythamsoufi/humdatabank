@@ -9551,7 +9551,7 @@ msgstr "Déposez ici des fichiers d’orientation ou cliquez pour parcourir"
 
 #: plugins/upr/templates/upr/_narrative_modal.html:28
 msgid "Drop your Word or PDF file here"
-msgstr ""
+msgstr "Laissez votre fichier Word ou PDF ici"
 
 #: plugins/fdrs/templates/excel/_excel_modal.html:28
 #: plugins/upr/templates/upr/_excel_modals.html:34
@@ -9594,10 +9594,14 @@ msgid ""
 "Due date was not changed because some entities already have their own due "
 "dates."
 msgstr ""
+"La date d’échéance n’a pas été modifiée car certaines entités ont déjà leurs"
+" propres dates d’échéance."
 
 #: app/routes/admin/assignment_management.py:1387
 msgid "Due date was not saved because this assignment has no entities yet."
 msgstr ""
+"La date d’échéance n’a pas été enregistrée car cette mission n’a pas encore "
+"d’entités."
 
 #: app/templates/admin/templates/templates.html:271
 #: app/templates/components/ag_grid_i18n_js.html:50
@@ -9739,6 +9743,8 @@ msgid ""
 "ENABLE_SSH is not true, so Azure portal SSH will not connect. Set "
 "ENABLE_SSH=true on the app if break-glass SSH is required."
 msgstr ""
+"ENABLE_SSH n’est pas vrai, donc le SSH du portail Azure ne se connecte pas. "
+"Définissez ENABLE_SSH=vrai sur l’application si le SSH brisé est nécessaire."
 
 #: app/utils/form_localization.py:128
 msgid "EUR"
@@ -9755,11 +9761,11 @@ msgstr ""
 #: app/templates/admin/organization/_nss_component.html:135
 #: app/templates/admin/organization/index.html:1346
 msgid "Each National Society can be ticked for this category."
-msgstr ""
+msgstr "Chaque Société Nationale peut être cochée pour cette catégorie."
 
 #: app/templates/admin/organization/index.html:1347
 msgid "Each National Society can enter text for this category."
-msgstr ""
+msgstr "Chaque Société Nationale peut saisir du texte pour cette catégorie."
 
 #: app/templates/admin/indicator_bank/neural_map.html:220
 msgid ""
@@ -10137,11 +10143,11 @@ msgstr "Aperçu du corps de l’email"
 
 #: app/templates/admin/communication/_insights.html:79
 msgid "Email delivery"
-msgstr ""
+msgstr "Livraison par e-mail"
 
 #: app/templates/admin/communication/_insights.html:175
 msgid "Email delivery status chart"
-msgstr ""
+msgstr "Tableau de l’état de la livraison par e-mail"
 
 #: app/templates/admin/settings/manage_settings.html:1215
 msgid "Email digests"
@@ -10161,7 +10167,7 @@ msgstr ""
 
 #: app/services/communication/insights_service.py:86
 msgid "Email only"
-msgstr ""
+msgstr "Email uniquement"
 
 #: app/templates/admin/communication/center.html:1472
 msgid ""
@@ -10227,7 +10233,7 @@ msgstr ""
 
 #: app/templates/admin/communication/_insights.html:172
 msgid "Email status"
-msgstr ""
+msgstr "Statut de l’e-mail"
 
 #: app/templates/admin/communication/center.html:1477
 msgid "Email subject"
@@ -10259,6 +10265,8 @@ msgid ""
 "Emails and in-app notifications will be sent as soon as this assignment is "
 "created."
 msgstr ""
+"Les e-mails et notifications intégrés seront envoyés dès que cette mission "
+"sera créée."
 
 #: app/templates/admin/analytics/audit_trail.html:359
 #: app/utils/audit_trail_labels.py:23
@@ -10393,6 +10401,12 @@ msgid ""
 "Submitted, sent-for-review, approved, or cancelled entities keep that assignment status unless you reopen them.\n"
 "Save still writes the whole form."
 msgstr ""
+"Activer la soumission par page ? \n"
+"\n"
+"Les pages qui n’ont pas encore de statut hériteront du statut actuel d’attribution de chaque entité. \n"
+"Les pages déjà soumises restent verrouillées. \n"
+"Les entités soumises, envoyées pour révision, approuvées ou annulées conservent ce statut d’attribution à moins que vous ne les rouvriez. \n"
+"Sauvegarder écrit toujours le formulaire complet."
 
 #: app/templates/admin/assignments/manage_assignment.html:788
 msgid "Enable public reporting"
@@ -10471,7 +10485,7 @@ msgstr "Registre des terminaux"
 
 #: app/templates/admin/api_keys/_permissions_fields.html:84
 msgid "Endpoints unlocked"
-msgstr ""
+msgstr "Points de terminaison débloqués"
 
 #: app/templates/admin/api_management.html:369
 msgid ""
@@ -10621,10 +10635,12 @@ msgid ""
 "Entities on the source use different due dates. The earliest ({date}) was "
 "filled in."
 msgstr ""
+"Les entités sur la source utilisent des dates d’échéance différentes. La "
+"plus ancienne ({date}) a été remplie."
 
 #: app/templates/admin/communication/center.html:1565
 msgid "Entities that could not be notified"
-msgstr ""
+msgstr "Entités qui n’ont pas pu être notifiées"
 
 #: app/templates/admin/ai/knowledge_base.html:824
 #: app/templates/admin/analytics/audit_trail.html:447
@@ -10673,7 +10689,7 @@ msgstr "Types d’entités à inclure"
 
 #: app/templates/admin/communication/center.html:1581
 msgid "Entity added"
-msgstr ""
+msgstr "Entité ajoutée"
 
 #: app/templates/admin/user_management/user_form.html:886
 msgid "Entity assignment type"
@@ -10685,7 +10701,7 @@ msgstr "Campagnes d’entités uniquement"
 
 #: app/templates/admin/user_management/users.html:269
 msgid "Entity status"
-msgstr ""
+msgstr "Statut de l’entité"
 
 #: app/templates/admin/communication/center.html:174
 msgid "Entity-based"
@@ -10762,7 +10778,7 @@ msgstr "Document d’approbation d’erreur :"
 #: app/templates/admin/organization/index.html:1266
 #: app/templates/admin/organization/index.html:1283
 msgid "Error changing category type"
-msgstr ""
+msgstr "Type de catégorie à changement d’erreur"
 
 #: app/routes/admin/utilities/translations.py:1541
 #, python-format
@@ -10843,11 +10859,11 @@ msgstr "Documents de traitement des erreurs :"
 #: app/templates/admin/organization/index.html:1319
 #: app/templates/admin/organization/index.html:1331
 msgid "Error removing category"
-msgstr ""
+msgstr "Suppression d’erreur catégorie"
 
 #: app/routes/main/assignments.py:260
 msgid "Error reopening page."
-msgstr ""
+msgstr "Erreur de réouverture de la page."
 
 #: app/routes/admin/utilities/sessions.py:73
 msgid "Error retrieving session data."
@@ -10859,12 +10875,12 @@ msgstr "Erreur de retour de l’attribution pour révision."
 
 #: app/routes/main/assignments.py:327
 msgid "Error returning page for revision."
-msgstr ""
+msgstr "Page de retour d’erreur pour la révision."
 
 #: app/templates/admin/organization/index.html:1556
 #: app/templates/admin/organization/index.html:1565
 msgid "Error saving category text"
-msgstr ""
+msgstr "Sauvegarde du texte de catégorie par erreur"
 
 #: app/routes/admin/utilities/import_export.py:240
 msgid "Error updating suggestion status."
@@ -10954,19 +10970,19 @@ msgstr "Événements par type"
 
 #: app/services/platform/governance_program.py:312
 msgid "Every active indicator has a definition."
-msgstr ""
+msgstr "Chaque indicateur actif a une définition."
 
 #: app/services/platform/governance_program.py:354
 msgid "Every active public submission link has an expiry date."
-msgstr ""
+msgstr "Chaque lien de soumission public actif a une date d’expiration."
 
 #: app/services/platform/governance_program.py:250
 msgid "Every approval in the last 90 days records an approver."
-msgstr ""
+msgstr "Chaque approbation des 90 derniers jours enregistre un approbateur."
 
 #: app/services/platform/governance_program.py:188
 msgid "Every country on an open assignment has a focal point."
-msgstr ""
+msgstr "Chaque pays en mission ouverte a un point central."
 
 #: app/services/platform/governance_program.py:180
 msgid ""
@@ -10974,6 +10990,10 @@ msgid ""
 "submit for it. Countries that are not in a current cycle are listed in the "
 "register below and are not a failure of this control."
 msgstr ""
+"Chaque pays en mission ouverte dispose d’au moins un point focal qui peut "
+"soumettre sa demande. Les pays qui ne sont pas dans un cycle en cours sont "
+"listés dans le registre ci-dessous et ne constituent pas un échec à ce "
+"contrôle."
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:155
 msgid ""
@@ -10981,6 +11001,10 @@ msgid ""
 "FDRS assignments. Closed years use the published value. A figure that needs "
 "a source outside the databank is still listed, with that source named."
 msgstr ""
+"Chaque chiffre et tableau de Everyone Counts 2026, calculés à partir des "
+"affectations FDRS actuelles. Les années fermées utilisent la valeur publiée."
+" Une figure nécessitant une source en dehors de la base de données est "
+"toujours listée, avec cette source nommée."
 
 #: app/services/platform/governance_program.py:303
 msgid ""
@@ -10988,32 +11012,41 @@ msgid ""
 "are out of scope. This is the business glossary, not a score of form-field "
 "labels."
 msgstr ""
+"Chaque indicateur qui n’est pas archivé a une définition. Les indicateurs "
+"archivés sont hors de portée du cadre. Ceci est le glossaire métier, pas une"
+" vingtaine d’étiquettes de champs de formulaire."
 
 #: app/services/platform/governance_program.py:147
 msgid "Every open assignment has a data owner."
-msgstr ""
+msgstr "Chaque mission ouverte a un propriétaire de données."
 
 #: app/services/platform/governance_program.py:138
 msgid ""
 "Every open assignment names the person accountable for the data collected in"
 " that cycle."
 msgstr ""
+"Chaque devoir ouvert désigne la personne responsable des données collectées "
+"lors de ce cycle."
 
 #: app/services/platform/governance_program.py:168
 msgid "Every published template has an owner."
-msgstr ""
+msgstr "Chaque modèle publié a un propriétaire."
 
 #: app/services/platform/governance_program.py:159
 msgid ""
 "Every published template names the person accountable for the standard it "
 "defines."
 msgstr ""
+"Chaque modèle publié désigne la personne responsable de la norme qu’il "
+"définit."
 
 #: app/templates/admin/governance/dashboard.html:220
 msgid ""
 "Every rule, who is accountable, and whether the live check passes. Open gaps"
 " are worked on the Issues tab."
 msgstr ""
+"Chaque règle, qui est responsable, et si le contrôle en direct passe. Les "
+"espaces ouverts sont traités dans l’onglet Problèmes."
 
 #: app/templates/admin/ai/knowledge_base.html:734
 msgid ""
@@ -11025,11 +11058,11 @@ msgstr ""
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:153
 msgid "Everyone Counts"
-msgstr ""
+msgstr "Tout le monde compte"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:180
 msgid "Everyone Counts chapters"
-msgstr ""
+msgstr "Tout le monde compte les chapitres"
 
 #: app/templates/components/_auto_translation_notice_banner.html:20
 msgid ""
@@ -11043,7 +11076,7 @@ msgstr "Preuves"
 
 #: app/templates/admin/api_management.html:1183
 msgid "Exact FDRS reporting period name"
-msgstr ""
+msgstr "Nom exact de la période de rapport FDRS"
 
 #: app/templates/admin/api_management.html:635
 msgid "Example Requests"
@@ -11197,7 +11230,7 @@ msgstr "Chemin d’exécution"
 
 #: app/templates/admin/organization/_nss_component.html:103
 msgid "Existing categories"
-msgstr ""
+msgstr "Catégories existantes"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:8
 msgid "Exit fill content area"
@@ -11314,6 +11347,9 @@ msgid ""
 "Explore and filter form data directly from the database. Use parameters on "
 "the Data Table tab to narrow down data by template and assignment period."
 msgstr ""
+"Explorez et filtrez directement les données du formulaire depuis la base de "
+"données. Utilisez les paramètres de l’onglet Table de données pour réduire "
+"les données par modèle et période d’attribution."
 
 #: app/templates/admin/assignments/gantt_chart.html:187
 #: app/templates/admin/assignments/gantt_chart.html:247
@@ -11353,7 +11389,7 @@ msgstr "Exporter Excel (.xlsx)"
 
 #: plugins/fdrs/templates/excel/_excel_modal.html:20
 msgid "Export FDRS (.xlsx)"
-msgstr ""
+msgstr "FDRS à l’exportation (.xlsx)"
 
 #: app/templates/macros/excel_io_modal.html:188
 msgid "Export Options"
@@ -11368,11 +11404,11 @@ msgstr "Exporter PDF"
 
 #: plugins/upr/templates/upr/_excel_modals.html:97
 msgid "Export PNS Planning (.xlsx)"
-msgstr ""
+msgstr "Planification PNS à l’exportation (.xlsx)"
 
 #: plugins/upr/templates/upr/_excel_modals.html:131
 msgid "Export PNS Reporting (.xlsx)"
-msgstr ""
+msgstr "Rapport PNS à l’exportation (.xlsx)"
 
 #: app/templates/admin/translations/manage_translations.html:306
 msgid ""
@@ -11530,7 +11566,7 @@ msgstr "Liens externes"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:219
 msgid "External sources"
-msgstr ""
+msgstr "Sources externes"
 
 #: app/templates/admin/ai/knowledge_base.html:552
 msgid ""
@@ -11591,7 +11627,7 @@ msgstr "Extracteur"
 #: plugins/fdrs/templates/excel/_excel_modal.html:2
 #: plugins/fdrs/templates/excel/_excel_modal.html:6
 msgid "FDRS"
-msgstr ""
+msgstr "FDRS"
 
 #: plugins/fdrs/templates/compliance/tab_panel.html:83
 msgid "FDRS Document Compliance"
@@ -34060,13 +34096,6 @@ msgstr "Objectifs d’importation"
 msgid "Importable rounds absent from this workbook: "
 msgstr "Munitions importables absentes de ce cahier :"
 
-msgid ""
-"In the print dialog choose “Save as PDF”, paper size A4, margins None, and "
-"turn off headers and footers."
-msgstr ""
-"Dans la boîte d’impression choisis « Enregistrer en PDF », taille papier A4,"
-" marges Aucun, et désactive les en-têtes et pi-dessous."
-
 msgid "In the workbook but never imported (live or later rounds): "
 msgstr ""
 "Dans le cahier d’exercices mais jamais importé (en direct ou en phase "
@@ -34328,9 +34357,6 @@ msgstr "Présentation"
 msgid "Previous slide"
 msgstr "Diapositive précédente"
 
-msgid "Print or save as PDF"
-msgstr "Imprimer ou enregistrer en PDF"
-
 msgid "Public narrative"
 msgstr "Récit public"
 
@@ -34580,3 +34606,45 @@ msgstr "Lignes de cahiers d’exercices"
 
 msgid "{both} of {plan} that planned also reported"
 msgstr "{deux} de {plan} qui ont également rapporté"
+
+msgid "Could not create the PDF. Try again."
+msgstr "Impossible de créer le PDF. Réessayez."
+
+msgid "Dropped out"
+msgstr "Abandonné"
+
+msgid "Duplicate Group"
+msgstr "Groupe dupliqué"
+
+msgid ""
+"Each row is one target: a template plus a round, written to exactly one "
+"assigned form (template + period). Only the rows you tick are imported, and "
+"nothing else is touched. Every target is verified against the workbook and "
+"the live assignments; anything unmapped or ambiguous is flagged and cannot "
+"be selected."
+msgstr ""
+"Chaque ligne est une cible : un modèle plus une manche, écrite sur "
+"exactement un formulaire assigné (modèle + période). Seules les lignes que "
+"vous cochez sont importées, et rien d’autre n’est touché. Chaque cible est "
+"vérifiée par rapport au cahier d’exercices et aux affectations en direct ; "
+"tout ce qui n’est pas cartographié ou ambigu est signalé et ne peut pas être"
+" sélectionné."
+
+msgid "Either (data or narrative)"
+msgstr "Soit (données, soit récit)"
+
+msgid ""
+"Emergency appeals that are not in GO were imported with the Excel name and "
+"code."
+msgstr ""
+"Les appels d’urgence qui ne sont pas dans GO ont été importés avec le nom et"
+" le code Excel."
+
+msgid "Expand group"
+msgstr "Étendre le groupe"
+
+msgid "Preparing PDF…"
+msgstr "Préparation du PDF..."
+
+msgid "Saves an A4 PDF of these pages."
+msgstr "Sauvegarde un PDF A4 de ces pages."

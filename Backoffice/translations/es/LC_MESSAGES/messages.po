@@ -21857,7 +21857,7 @@ msgstr ""
 
 #: app/services/platform/governance_program.py:241
 msgid "Recent approvals name the approver"
-msgstr ""
+msgstr "Aprobaciones recientes nombran al aprobador"
 
 #: app/templates/admin/analytics/_user_detail_partial.html:314
 msgid "Recent login attempts"
@@ -21873,7 +21873,7 @@ msgstr "Procesado recientemente"
 
 #: app/templates/admin/governance/dashboard.html:209
 msgid "Recently cleared"
-msgstr ""
+msgstr "Recientemente aprobado"
 
 #: app/templates/admin/settings/manage_settings.html:1145
 msgid "Recipient"
@@ -21897,14 +21897,22 @@ msgid ""
 "Keys in the URL end up in server logs, browser history and Referer headers. "
 "Only enable for a client that cannot set headers (e.g. some BI connectors)."
 msgstr ""
+"Recomendado: dejar la clave desactivada y enviar la clave como "
+"\"Autorización: <key>Portador\". Las claves en la URL acaban en los "
+"registros del servidor, el historial del navegador y los encabezados de "
+"Referer. Solo habilitar para un cliente que no pueda establecer cabeceras "
+"(por ejemplo, algunos conectores BI)."
 
 #: app/templates/admin/api_keys/details.html:266
 msgid "Recommended: narrow this key to the permissions its client needs."
 msgstr ""
+"Recomendado: acotar esta clave a los permisos que necesita su cliente."
 
 #: app/templates/admin/api_keys/details.html:267
 msgid "Recommended: set an expiry date for keys with sensitive access."
 msgstr ""
+"Recomendado: establecer una fecha de caducidad para las llaves con acceso "
+"sensible."
 
 #: app/templates/forms/entry_form/entry_form.html:3556
 msgid "Reconnected!"
@@ -22000,7 +22008,7 @@ msgstr "Actualizando el constructor de formularios..."
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:225
 msgid "Refreshing…"
-msgstr ""
+msgstr "Refrescante..."
 
 #: app/utils/form_localization.py:151
 msgid "Refugees"
@@ -22063,6 +22071,10 @@ msgid ""
 "admin approval. If you already have an account, please sign in or use "
 "\"Forgot password\"."
 msgstr ""
+"Solicitud de registro recibida. Si este correo electrónico no estaba ya "
+"registrado, tu cuenta ha sido creada y la solicitud de acceso a tu país está"
+" pendiente de aprobación del administrador. Si ya tienes una cuenta, por "
+"favor inicia sesión o usa \"Olvidó la contraseña\"."
 
 #: app/templates/admin/api_management.html:231
 msgid "Registry coverage"
@@ -22273,7 +22285,7 @@ msgstr "¿Eliminar todas las cadenas eliminadas?"
 
 #: app/templates/admin/organization/index.html:1298
 msgid "Remove category"
-msgstr ""
+msgstr "Eliminar categoría"
 
 #: app/templates/admin/assignments/manage_assignment.html:1384
 msgid "Remove entities"
@@ -22284,6 +22296,8 @@ msgid ""
 "Remove this category? Values saved for it will be cleared on every National "
 "Society."
 msgstr ""
+"¿Eliminar esta categoría? Los valores ahorrados para ella serán aprobados en"
+" todas las Sociedades Nacionales."
 
 #: app/templates/forms/entry_form/entry_form.html:1303
 #: app/templates/forms/entry_form/entry_form.html:2250
@@ -22378,19 +22392,21 @@ msgstr ""
 
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:45
 msgid "Reopen Page?"
-msgstr ""
+msgstr "¿Reabrir la página?"
 
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:44
 msgid "Reopen this page"
-msgstr ""
+msgstr "Reabrir esta página"
 
 #: app/templates/forms/entry_form/partials/_nav_scope_actions.html:47
 msgid "Reopen this page for editing? Other submitted pages will stay locked."
 msgstr ""
+"¿Reabrir esta página para editarla? Las demás páginas enviadas permanecerán "
+"bloqueadas."
 
 #: app/templates/admin/governance/dashboard.html:196
 msgid "Reopen this risk"
-msgstr ""
+msgstr "Reabrir este riesgo"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:91
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:363
@@ -22400,7 +22416,7 @@ msgstr "Reapertura"
 #: app/routes/admin/governance_dashboard.py:109
 #, python-format
 msgid "Reopened %(code)s."
-msgstr ""
+msgstr "Reabrió %(code)s."
 
 #: app/templates/core/dashboard/_assignments_tab.html:289
 #: app/templates/core/dashboard/_assignments_tab.html:300
@@ -22499,7 +22515,7 @@ msgstr ""
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:79
 msgid "Reported NSs"
-msgstr ""
+msgstr "NS reportados"
 
 #: app/templates/core/dashboard.html:1280
 msgid "Reported expenditure"
@@ -22511,7 +22527,7 @@ msgstr "Ingresos declarados"
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:113
 msgid "Reported service income"
-msgstr ""
+msgstr "Ingresos por servicios reportados"
 
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:125
 msgid "Reported with disaggregation"
@@ -22536,7 +22552,7 @@ msgstr "Estado de los informes"
 
 #: app/services/platform/governance_program.py:841
 msgid "Reporting discipline"
-msgstr ""
+msgstr "Disciplina de reportaje"
 
 #: app/templates/admin/validation_dashboard.html:92
 #: app/templates/admin/validation_dashboard.html:157
@@ -22548,7 +22564,7 @@ msgstr "Periodo de reporte"
 
 #: app/templates/admin/api_management.html:1183
 msgid "Reporting period (e.g. 2024)"
-msgstr ""
+msgstr "Periodo de informe (por ejemplo, 2024)"
 
 #: app/templates/admin/reports/partials/_filter_panel.html:30
 msgid "Reporting periods"
@@ -22561,7 +22577,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:753
 msgid "Reporting-country comment"
-msgstr ""
+msgstr "Comentario sobre el país que informa"
 
 #: app/templates/admin/reports/builder.html:22
 #: app/templates/admin/reports/list.html:4
@@ -22922,7 +22938,7 @@ msgstr "Restaura o crea un borrador de otra versión para hacer cambios."
 
 #: app/templates/admin/api_keys/_access_summary.html:40
 msgid "Restricted to the selected templates/countries for:"
-msgstr ""
+msgstr "Restringido a las plantillas/países seleccionados para:"
 
 #: app/templates/admin/communication/center.html:1569
 msgid "Result"
@@ -32778,7 +32794,7 @@ msgstr ""
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:307
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1149
 msgid "missing"
-msgstr ""
+msgstr "desaparecido"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:876
 #: app/templates/components/ag_grid_i18n_js.html:45
@@ -32823,7 +32839,7 @@ msgstr "Sociedades nacionales"
 
 #: app/templates/admin/communication/_insights.html:85
 msgid "need attention"
-msgstr ""
+msgstr "Necesito atención"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:1952
 msgid "new"
@@ -32831,7 +32847,7 @@ msgstr "Nuevo"
 
 #: app/templates/admin/communication/center.html:1577
 msgid "no recipients to notify"
-msgstr ""
+msgstr "No hay destinatarios a los que notificar"
 
 #: plugins/fdrs/templates/compliance/tab_panel.html:592
 msgid "non-compliant countries have compliance documents pending validation."
@@ -32841,7 +32857,7 @@ msgstr ""
 
 #: app/templates/auth/login.html:767
 msgid "not registered"
-msgstr ""
+msgstr "No registrado"
 
 #: app/templates/forms/entry_form/validation_summary_pdf.html:92
 #: app/templates/forms/entry_form/validation_summary_progress.html:342
@@ -32851,7 +32867,7 @@ msgstr "no correr"
 
 #: app/templates/admin/communication/_insights.html:44
 msgid "notifications"
-msgstr ""
+msgstr "Notificaciones"
 
 #: app/templates/admin/communication/center.html:1436
 #: app/templates/admin/data_exploration/explore_data.html:140
@@ -32868,7 +32884,7 @@ msgstr "de"
 #: app/templates/admin/ai/knowledge_base.html:97
 #, python-format
 msgid "of %(total)s in knowledge base"
-msgstr ""
+msgstr "de %(total)s en la base de conocimiento"
 
 #: app/templates/admin/assignments/manage_assignment.html:133
 #: app/templates/admin/assignments/manage_assignment.html:187
@@ -32886,7 +32902,7 @@ msgstr "o"
 
 #: plugins/upr/templates/upr/_narrative_modal.html:29
 msgid "or click to browse — .docx or .pdf"
-msgstr ""
+msgstr "o haz clic para navegar — .docx o .pdf"
 
 #: plugins/fdrs/templates/excel/_excel_modal.html:29
 #: plugins/upr/templates/upr/_excel_modals.html:35
@@ -32930,7 +32946,7 @@ msgstr "Página"
 
 #: app/templates/core/dashboard/_assignments_tab.html:587
 msgid "pages"
-msgstr ""
+msgstr "Páginas"
 
 #: app/templates/admin/api_management.html:625
 msgid "parameters (max 1000 per page)"
@@ -32946,7 +32962,7 @@ msgstr "Solicitudes de acceso pendientes"
 
 #: app/templates/admin/communication/_insights.html:55
 msgid "per day"
-msgstr ""
+msgstr "por día"
 
 #: app/templates/admin/data_exploration/explore_data.html:1475
 msgid "periods"
@@ -32981,15 +32997,15 @@ msgstr "Nombre propio o término técnico, no hay traducción disponible"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:206
 msgid "provisional"
-msgstr ""
+msgstr "provisional"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:105
 msgid "public 403s unexpected"
-msgstr ""
+msgstr "403 públicos inesperados"
 
 #: app/templates/admin/communication/_insights.html:74
 msgid "read"
-msgstr ""
+msgstr "leer"
 
 #: app/templates/components/auto_translate_modal_js.html:35
 msgid "ready for translation."
@@ -33026,7 +33042,7 @@ msgstr "Grupo de repetición"
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:119
 msgid "reported"
-msgstr ""
+msgstr "Reportado"
 
 #: app/templates/admin/api_keys/details.html:275
 msgid "req / min"
@@ -33126,7 +33142,7 @@ msgstr "¿Trazas seleccionadas? Esto no se puede deshacer."
 
 #: app/templates/admin/communication/_insights.html:84
 msgid "sent"
-msgstr ""
+msgstr "enviado"
 
 #: app/templates/admin/analytics/page_path_analytics.html:61
 msgid "sessions in period"
@@ -33139,7 +33155,7 @@ msgstr "Escenarios"
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:306
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1147
 msgid "skipped"
-msgstr ""
+msgstr "saltado"
 
 #: app/templates/admin/ai/knowledge_base.html:807
 msgid "source(s)"
@@ -33182,7 +33198,7 @@ msgstr "presentación"
 #: app/templates/core/dashboard/_assignments_tab.html:141
 #: app/templates/forms/entry_form/entry_form.html:142
 msgid "submitted"
-msgstr ""
+msgstr "Enviado"
 
 #: app/templates/forms/form_builder/field_mapping.html:62
 msgid "submitted values"
@@ -33294,7 +33310,7 @@ msgstr "ilimitado"
 
 #: app/templates/admin/communication/_insights.html:73
 msgid "unread"
-msgstr ""
+msgstr "no leído"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:1953
 msgid "update"
@@ -33343,7 +33359,7 @@ msgstr "Asignado"
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:121
 msgid "with a service-income figure"
-msgstr ""
+msgstr "con una cifra de ingresos por servicios"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:399
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:404
@@ -33358,7 +33374,7 @@ msgstr "aún."
 #: app/templates/admin/assignments/manage_assignment.html:1434
 #, python-brace-format
 msgid "{countries} countries and {others} other entities selected."
-msgstr ""
+msgstr "{países} países y {otros} otras entidades seleccionadas."
 
 #: app/templates/forms/entry_form/entry_form.html:203
 #, python-brace-format
@@ -33766,13 +33782,6 @@ msgstr "Objetivos de importación"
 msgid "Importable rounds absent from this workbook: "
 msgstr "Rondas importables ausentes de este cuaderno de ejercicios:"
 
-msgid ""
-"In the print dialog choose “Save as PDF”, paper size A4, margins None, and "
-"turn off headers and footers."
-msgstr ""
-"En el cuadro de diálogo de impresión elige \"Guardar como PDF\", tamaño del "
-"papel A4, márgenes Ninguno, y desactiva encabezados y pies de página."
-
 msgid "In the workbook but never imported (live or later rounds): "
 msgstr "En el cuaderno pero nunca importado (en rondas vivas o posteriores):"
 
@@ -34029,9 +34038,6 @@ msgstr "Presentación"
 msgid "Previous slide"
 msgstr "Diapositiva anterior"
 
-msgid "Print or save as PDF"
-msgstr "Imprimir o guardar como PDF"
-
 msgid "Public narrative"
 msgstr "Narración pública"
 
@@ -34243,3 +34249,49 @@ msgstr "y {n} más"
 
 msgid "first year"
 msgstr "Primer año"
+
+msgid "Could not create the PDF. Try again."
+msgstr "No se pudo crear el PDF. Inténtalo de nuevo."
+
+msgid "Preparing PDF…"
+msgstr "Preparando PDF..."
+
+msgid "Region: {region}"
+msgstr "Región: {región}"
+
+msgid "Report round"
+msgstr "Ronda de informes"
+
+msgid "Reported funding"
+msgstr "Financiación reportada"
+
+msgid ""
+"Reporting figures use the annual report where available, otherwise the mid-"
+"year report (years: {years})."
+msgstr ""
+"Las cifras de reporte utilizan el informe anual cuando está disponible, o el"
+" informe de mitad de año (años: {años})."
+
+msgid "Reports submitted"
+msgstr "Informes enviados"
+
+msgid "Saves an A4 PDF of these pages."
+msgstr "Guarda un PDF A4 de estas páginas."
+
+msgid "of {n} completed rounds"
+msgstr "de {n} rondas completadas"
+
+msgid "published form items not resolved — "
+msgstr "Elementos del formulario publicado no resueltos —"
+
+msgid "target(s)"
+msgstr "Objetivo(s)"
+
+msgid "vs {year}"
+msgstr "vs {año}"
+
+msgid "workbook rows"
+msgstr "Filas de cuadernos de ejercicios"
+
+msgid "{both} of {plan} that planned also reported"
+msgstr "{ambos} de {plan} que también informaron"

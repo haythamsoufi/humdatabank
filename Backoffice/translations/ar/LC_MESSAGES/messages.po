@@ -450,7 +450,7 @@ msgstr ""
 #: app/templates/admin/assignments/manage_assignment.html:1409
 #, python-brace-format
 msgid ". {admin_users} admins in-app"
-msgstr ""
+msgstr ". {admin_users} admins in-app"
 
 #: app/templates/admin/assignments/manage_assignment.html:1408
 #, python-brace-format
@@ -8042,6 +8042,7 @@ msgstr "تحذف هذه المنحة؟?"
 msgid ""
 "Delete this guidance document? Any Knowledge Base copy will also be removed."
 msgstr ""
+"هل أحذف هذا المستند الإرشادي؟ سيتم أيضا إزالة أي نسخة من قاعدة المعرفة."
 
 #: app/templates/notifications/center.html:209
 msgid "Delete this notification?"
@@ -8086,11 +8087,13 @@ msgid ""
 "Deleting a guidance document also removes any linked Knowledge Base copy, "
 "including chunks and embeddings."
 msgstr ""
+"حذف وثيقة إرشادية يزيل أيضا أي نسخ مرتبطة من قاعدة المعرفة، بما في ذلك "
+"الأجزاء والتضمينات."
 
 #: app/templates/admin/ai/knowledge_base.html:443
 msgid ""
 "Deleting a guidance document also removes any linked Knowledge Base copy."
-msgstr ""
+msgstr "حذف وثيقة إرشادية يزيل أيضا أي نسخة مرتبطة من قاعدة المعرفة."
 
 #: app/templates/forms/form_builder/form_builder.html:1446
 msgid "Deleting item…"
@@ -8200,6 +8203,8 @@ msgid ""
 " of removed fields is kept on the archived version, and you can roll back by"
 " deploying an archived version."
 msgstr ""
+"نشر نسخة ينشرها وينقل البيانات المقدمة إليها. يتم الاحتفاظ ببيانات الحقول "
+"المحمولة في النسخة المؤرشيفة، ويمكنك التراجع عن طريق نشر نسخة مؤرشفة."
 
 #: app/templates/forms/form_builder/form_builder.html:336
 #: app/templates/forms/form_builder/form_builder.html:458
@@ -8208,7 +8213,7 @@ msgstr "يتم نشر النسخة..."
 
 #: app/templates/admin/validation_dashboard.html:258
 msgid "Descending"
-msgstr ""
+msgstr "النزول"
 
 #: app/templates/admin/analytics/security_events.html:128
 #: app/templates/admin/security/event_detail.html:66
@@ -8340,6 +8345,7 @@ msgid ""
 "Detected when you choose a file. Internal covers get a yellow INTERNAL "
 "banner."
 msgstr ""
+"يتم اكتشافك عند اختيار ملف. الأغلفة الداخلية تحصل على لافتة صفراء داخلية."
 
 #: app/templates/admin/ai/knowledge_base.html:676
 msgid "Detecting countries"
@@ -8394,11 +8400,11 @@ msgstr "التشخيصات"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:392
 msgid "Difference"
-msgstr ""
+msgstr "الفرق"
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:114
 msgid "Difference from the reference"
-msgstr ""
+msgstr "الاختلاف عن المرجع"
 
 #: app/templates/notifications/_preferences_form.html:56
 msgid "Digest Schedule"
@@ -8495,7 +8501,7 @@ msgstr "إعداد التفكيك المسبق"
 
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:79
 msgid "Disaggregation views"
-msgstr ""
+msgstr "وجهات نظر التفكيك"
 
 #: app/templates/forms/form_builder/form_builder.html:394
 #: app/templates/forms/form_builder/form_builder.html:403
@@ -8522,7 +8528,7 @@ msgstr "التخلص من المسودة..."
 
 #: app/services/ai/runtime/step_ux.py:164
 msgid "Discarding the draft…"
-msgstr ""
+msgstr "التخلص من التجنيد..."
 
 #: app/templates/forms/entry_form/entry_form.html:745
 #: app/templates/forms/entry_form/validation_summary_pdf.html:182
@@ -8710,7 +8716,7 @@ msgstr "ملصق العرض"
 #: app/templates/admin/organization/index.html:1040
 #: plugins/fdrs/templates/compliance/tab_panel.html:203
 msgid "Dissolved"
-msgstr ""
+msgstr "تم حل"
 
 #: app/templates/admin/api_management.html:267
 msgid "Distinct IP addresses (usage log)"
@@ -8722,7 +8728,7 @@ msgstr "مسارات مميزة"
 
 #: app/templates/admin/communication/_insights.html:64
 msgid "Distinct users reached"
-msgstr ""
+msgstr "تم الوصول إلى مستخدمين مميزين"
 
 #: plugins/fdrs/templates/disaggregation/tab_panel.html:257
 msgid "Distribution by Age Group"
@@ -8734,7 +8740,7 @@ msgstr "التوزيع حسب الجنس"
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:412
 msgid "Divide by"
-msgstr ""
+msgstr "قسمة على"
 
 #: app/templates/admin/analytics/audit_trail.html:452
 #: app/templates/admin/organization/index.html:1942
@@ -8906,16 +8912,16 @@ msgstr "مستودع المستندات"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:420
 msgid "Document scan cancelled."
-msgstr ""
+msgstr "تم إلغاء فحص المستندات."
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:421
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:505
 msgid "Document scan failed"
-msgstr ""
+msgstr "فشل مسح المستندات"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:123
 msgid "Document sheets"
-msgstr ""
+msgstr "أوراق الوثائق"
 
 #: plugins/fdrs/templates/compliance/tab_panel.html:145
 msgid "Document status:"
@@ -8928,7 +8934,7 @@ msgstr "عنوان الوثيقة (اختياري)"
 #: plugins/upr/templates/upr/_manage_tools.html:138
 #: plugins/upr/templates/upr/_narrative_modal.html:36
 msgid "Document type"
-msgstr ""
+msgstr "نوع المستند"
 
 #: app/templates/admin/ai/knowledge_base.html:391
 #: app/templates/admin/ai/knowledge_base.html:397
@@ -8984,7 +8990,7 @@ msgstr "النطاقات"
 
 #: app/templates/admin/assignments/manage_assignment.html:137
 msgid "Don't copy"
-msgstr ""
+msgstr "لا تقلد"
 
 #: app/templates/components/_ai_policy_modal.html:8
 msgid "Don't share sensitive information."
@@ -9082,7 +9088,7 @@ msgstr "تحميل كإكسل"
 
 #: app/templates/admin/analytics/import_change_log.html:37
 msgid "Download changes JSONL"
-msgstr ""
+msgstr "تحميل تغييرات JSONL"
 
 #: plugins/pb_progress/templates/pb_progress/manage.html:125
 msgid "Download dataset"
@@ -9098,7 +9104,7 @@ msgstr "تحميل المعاينة التجريبية لبرنامج Excel"
 
 #: app/templates/admin/analytics/import_change_log.html:33
 msgid "Download summary JSON"
-msgstr ""
+msgstr "تحميل ملخص JSON"
 
 #: plugins/fdrs/templates/excel/_excel_modal.html:12
 #: plugins/upr/templates/upr/_excel_modals.html:18
@@ -9113,18 +9119,23 @@ msgid ""
 "Download the FDRS workbook, fill in the indicator sheet, then upload it here"
 " and save the assignment."
 msgstr ""
+"قم بتحميل دفتر عمل FDRS، واملأ ورقة المؤشرات، ثم ارفعه هنا واحفظ المهمة."
 
 #: plugins/upr/templates/upr/_excel_modals.html:91
 msgid ""
 "Download the PNS Planning workbook, edit funding and staff figures for this "
 "National Society, then upload it here and save the assignment."
 msgstr ""
+"حمل دليل التخطيط الخاص ب PNS، وحرر أرقام التمويل والموظفين لهذه الجمعية "
+"الوطنية، ثم رفعه هنا واحفظ المهمة."
 
 #: plugins/upr/templates/upr/_excel_modals.html:125
 msgid ""
 "Download the PNS Reporting workbook, edit funding by host country, then "
 "upload it here and save the assignment."
 msgstr ""
+"قم بتحميل دليل تقارير PNS، وقم بتحرير التمويل حسب الدولة المضيفة، ثم ارفعه "
+"هنا واحفظ المهمة."
 
 #: app/templates/admin/plugin_management.html:33
 msgid "Download the sample plugin package and starter guide"
@@ -9141,7 +9152,7 @@ msgstr ""
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:105
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:230
 msgid "Downloadable"
-msgstr ""
+msgstr "قابل للتحميل"
 
 #: app/routes/admin/form_builder/templates.py:314
 #: app/services/communication/insights_service.py:101
@@ -33244,9 +33255,6 @@ msgstr "العرض"
 msgid "Previous slide"
 msgstr "الشريحة السابقة"
 
-msgid "Print or save as PDF"
-msgstr "اطبع أو احفظ كملف PDF"
-
 msgid "Public narrative"
 msgstr "السرد العام"
 
@@ -33485,3 +33493,15 @@ msgstr "صفوف دفاتر العمل"
 
 msgid "{both} of {plan} that planned also reported"
 msgstr "{كلاهما} من {الخطة} التي أبلغت أيضا عن الخطة"
+
+msgid "Could not create the PDF. Try again."
+msgstr "لم أتمكن من إنشاء ملف PDF. حاول مرة أخرى."
+
+msgid "Deselect all"
+msgstr "إلغاء تحديد الجميع"
+
+msgid "Preparing PDF…"
+msgstr "يتم إعداد ملف PDF..."
+
+msgid "Saves an A4 PDF of these pages."
+msgstr "يحفظ ملف PDF بحجم A4 لهذه الصفحات."

@@ -456,7 +456,7 @@ msgstr ""
 #: app/templates/admin/assignments/manage_assignment.html:1409
 #, python-brace-format
 msgid ". {admin_users} admins in-app"
-msgstr ""
+msgstr ". {admin_users} admins in-app"
 
 #: app/templates/admin/assignments/manage_assignment.html:1408
 #, python-brace-format
@@ -14980,7 +14980,7 @@ msgstr "Прошлый месяц"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:24
 msgid "Last scan"
-msgstr ""
+msgstr "Последнее сканирование"
 
 #: app/templates/admin/user_management/access_requests.html:341
 #: app/templates/admin/user_management/access_requests.html:346
@@ -14990,7 +14990,7 @@ msgstr "Последний раз отправлен"
 #: plugins/fdrs/templates/service_income/tab_panel.html:111
 #: plugins/fdrs/templates/service_income/tab_panel.html:124
 msgid "Last two closed rounds"
-msgstr ""
+msgstr "Последние два закрытых раунда"
 
 #: app/templates/admin/ai/review_detail.html:185
 #: plugins/pb_progress/templates/pb_progress/tab_panel.html:168
@@ -14999,7 +14999,7 @@ msgstr "Последнее обновление:"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:295
 msgid "Last verification"
-msgstr ""
+msgstr "Последняя проверка"
 
 #: app/templates/admin/analytics/dashboard.html:65
 #: app/templates/admin/analytics/page_path_analytics.html:37
@@ -15018,7 +15018,7 @@ msgstr "Последняя отправка"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:211
 msgid "Latest closed year"
-msgstr ""
+msgstr "Последний закрытый год"
 
 #: app/templates/core/dashboard/_assignments_tab.html:159
 msgid "Latest:"
@@ -15110,6 +15110,9 @@ msgid ""
 "assignment is created. You will confirm this before the assignment is "
 "created."
 msgstr ""
+"Оставьте это без отметки, чтобы создать задание без письма или уведомления. "
+"Отмечайте только если координаторы должны быть уведомлены сразу после "
+"создания задания. Вы подтвердите это до создания задания."
 
 #: app/templates/admin/ai/trace_compare.html:85
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:548
@@ -15122,11 +15125,11 @@ msgstr "Идентификатор Left Trace"
 
 #: app/templates/admin/api_keys/_permissions_fields.html:16
 msgid "Legacy full access"
-msgstr ""
+msgstr "Наследие полного доступа"
 
 #: app/templates/admin/api_keys/_access_summary.html:11
 msgid "Legacy: full access"
-msgstr ""
+msgstr "Наследие: полный доступ"
 
 #: app/templates/admin/indicator_bank/neural_map.html:236
 #: app/templates/admin/validation_dashboard.html:140
@@ -15162,6 +15165,9 @@ msgid ""
 "Let focal points submit each page independently instead of the whole form at"
 " once. Save still writes the whole form. Applies to paginated templates."
 msgstr ""
+"Пусть фокусные точки отправляют каждую страницу независимо, а не всю форму "
+"сразу. Сохранение всё равно записывает всю форму. Применяется к шаблонам с "
+"пагинами."
 
 #: app/templates/admin/assignments/manage_assignment.html:531
 msgid ""
@@ -15171,6 +15177,11 @@ msgid ""
 "submitted assignment statuses stay as they are, and any pages that were only"
 " partly submitted become editable again."
 msgstr ""
+"Пусть фокусные точки посылают каждую страницу отдельно, а не всю форму "
+"сразу. Сохранение всё равно пишет всю форму. Применяется к шаблонам с "
+"пагинами. Если отключить это позже, задание возвращается к отправке целой "
+"формы; статусы уже сданных заданий остаются прежними, а страницы, которые "
+"были только частично отправлены, становятся пригодными для редактирования."
 
 #: app/templates/admin/ai/knowledge_base.html:104
 msgid "Library-wide total"
@@ -15182,7 +15193,7 @@ msgstr "License"
 
 #: app/services/platform/governance_program.py:845
 msgid "Lifecycle"
-msgstr ""
+msgstr "Жизненный цикл"
 
 #: app/templates/admin/ai/_trace_card.html:176
 #: app/templates/admin/ai/reasoning_traces.html:381
@@ -15197,7 +15208,7 @@ msgstr ""
 
 #: app/templates/admin/api_keys/_access_summary.html:22
 msgid "Limited scope"
-msgstr ""
+msgstr "Ограниченный охват"
 
 #: app/templates/admin/reports/partials/_widget_palette.html:4
 msgid "Line"
@@ -15274,7 +15285,7 @@ msgstr ""
 
 #: app/templates/admin/governance/dashboard.html:86
 msgid "Live checks that currently pass"
-msgstr ""
+msgstr "Текущие проверки, которые уже проходят"
 
 #: app/templates/admin/communication/center.html:1324
 #: app/templates/admin/indicator_bank/neural_map.html:200
@@ -15403,7 +15414,7 @@ msgstr "Загрузка данных о соблюдении требовани
 
 #: app/templates/admin/assignments/manage_assignment.html:1427
 msgid "Loading configuration…"
-msgstr ""
+msgstr "Конфигурация загрузки..."
 
 #: app/templates/admin/data_exploration/explore_data.html:1432
 #: app/templates/admin/organization/_countries_component.html:37
@@ -15417,7 +15428,7 @@ msgstr "Загрузка стран..."
 
 #: app/templates/admin/governance/dashboard.html:329
 msgid "Loading country coverage…"
-msgstr ""
+msgstr "Загрузка покрытия по стране..."
 
 #: app/templates/admin/validation_questions.html:105
 msgid "Loading country summary…"
@@ -15437,7 +15448,7 @@ msgstr ""
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_panel.html:135
 msgid "Loading document status…"
-msgstr ""
+msgstr "Загрузка статуса документа..."
 
 #: app/templates/admin/docs/documentation.html:1198
 msgid "Loading documentation"
@@ -15630,7 +15641,7 @@ msgstr "Загрузка вопросов на валидацию..."
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:333
 msgid "Loading verification…"
-msgstr ""
+msgstr "Проверка загрузки..."
 
 #: plugins/upr/templates/upr/assignment_panel.html:4
 msgid "Loading visuals…"
@@ -15848,15 +15859,15 @@ msgstr "Треки низкого качества, требующие пров�
 
 #: app/templates/admin/settings/manage_settings.html:43
 msgid "MOBILE_JWT_SECRET is not set"
-msgstr ""
+msgstr "MOBILE_JWT_SECRET не установлен"
 
 #: app/templates/admin/settings/manage_settings.html:49
 msgid "MOBILE_JWT_SECRET is too short"
-msgstr ""
+msgstr "MOBILE_JWT_SECRET слишком короткий"
 
 #: app/templates/admin/settings/manage_settings.html:46
 msgid "MOBILE_JWT_SECRET matches SECRET_KEY"
-msgstr ""
+msgstr "MOBILE_JWT_SECRET совпадения SECRET_KEY"
 
 #: app/templates/admin/translations/quality_dashboard.html:148
 #: app/templates/admin/translations/quality_dashboard.html:266
@@ -15874,7 +15885,7 @@ msgstr "Главные экраны"
 #: app/templates/forms/form_builder/partials/_item_modal.html:210
 #: app/templates/forms/form_builder/partials/_item_modal.html:213
 msgid "Main item"
-msgstr ""
+msgstr "Основной пункт"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:217
 msgid ""
@@ -15882,6 +15893,9 @@ msgid ""
 "to indent it as a sub-item. Order is its position at that level (1–9 under a"
 " parent)."
 msgstr ""
+"Основной элемент держит это поле на верхнем уровне раздела. Выберите "
+"родителя, чтобы сделать отступ как подэлемент. Порядок — это его позиция на "
+"этом уровне (1–9 под родителем)."
 
 #: app/templates/public/maintenance.html:3
 msgid "Maintenance"
@@ -30656,20 +30670,20 @@ msgstr "Вердикт"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1218
 msgid "Verification cancelled."
-msgstr ""
+msgstr "Проверка отменена."
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:242
 msgid "Verification configuration"
-msgstr ""
+msgstr "Конфигурация верификации"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1209
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1312
 msgid "Verification failed"
-msgstr ""
+msgstr "Проверка не прошла"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:322
 msgid "Verification sheets"
-msgstr ""
+msgstr "Листы проверки"
 
 #: app/templates/admin/plugin_management.html:127
 #: app/templates/admin/plugin_management.html:237
@@ -30860,7 +30874,7 @@ msgstr "Создано новое задание"
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:704
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:298
 msgid "View change log"
-msgstr ""
+msgstr "Просмотр журнала изменений"
 
 #: app/templates/admin/ai/trace_detail.html:26
 msgid "View conversation"
@@ -30870,7 +30884,7 @@ msgstr "Просмотр беседы"
 #: app/templates/forms/entry_form/entry_form.html:742
 #: app/templates/forms/entry_form/entry_form.html:765
 msgid "View details"
-msgstr ""
+msgstr "Подробности просмотра"
 
 #: app/templates/forms/entry_form/partials/discussion_panel.html:37
 #: app/templates/forms/entry_form/partials/discussion_panel.html:95
@@ -30883,6 +30897,10 @@ msgid ""
 "volume and type insights, send email and mobile push messages to selected "
 "users or entities, and manage scheduled or draft communication campaigns."
 msgstr ""
+"Просматривайте каждое уведомление и связанные письма в системе, анализируйте"
+" объём и вводите аналитику, отправляйте email и мобильные push-сообщения "
+"выбранным пользователям или организациям, а также управляйте "
+"запланированными или черновиками коммуникационных кампаний."
 
 #: app/templates/components/_fb_ai_config.html:30
 msgid "View full size image"
@@ -30962,6 +30980,9 @@ msgid ""
 "file. Document type is detected when you choose a file — change it if that "
 "is wrong, then click Generate."
 msgstr ""
+"Визуальные элементы берутся из этого задания. Повествовательные страницы "
+"следуют за файлом Word или PDF. Тип документа определяется при выборе файла "
+"— измените его, если это неправильно, затем нажмите «Сгенерировать»."
 
 #: app/templates/core/layout.html:521
 msgid "Voice input"
@@ -30971,7 +30992,7 @@ msgstr "Голосовой вход"
 #: app/templates/admin/communication/center.html:1494
 #, python-format
 msgid "Volume, types, and delivery for %(start)s to %(end)s."
-msgstr ""
+msgstr "Объем, типы и доставка от %(start)s до %(end)s."
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:221
 msgid ""
@@ -30980,6 +31001,10 @@ msgid ""
 "files. That comparison only uses a year when most Societies have a published"
 " value."
 msgstr ""
+"Данные о волонтёрах, включая «Волонтёры без пяти крупнейших Обществ», "
+"берутся из назначений FDRS в базе данных, а не из этих файлов. Это сравнение"
+" использует только год, когда большинство Обществ имеют опубликованную "
+"ценность."
 
 #: app/utils/form_localization.py:123
 msgid "Volunteers"
@@ -30991,7 +31016,7 @@ msgstr "Волонтёры в Сирии со временем"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:207
 msgid "Volunteers, 3-year mean"
-msgstr ""
+msgstr "Волонтёры — средний срок 3 года"
 
 #: app/templates/forms/form_builder/form_builder.html:427
 msgid "WARNING: You are making direct changes to a PUBLISHED version"
@@ -30999,7 +31024,7 @@ msgstr "ВНИМАНИЕ: Вы вносите прямые изменения в
 
 #: app/templates/admin/communication/center.html:1570
 msgid "Waiting"
-msgstr ""
+msgstr "Жду"
 
 #: app/templates/admin/validation_questions.html:257
 msgid "Waive"
@@ -31101,7 +31126,7 @@ msgstr ""
 
 #: app/error_handlers.py:194
 msgid "We could not switch your selection. Please try again."
-msgstr ""
+msgstr "Мы не смогли изменить ваш выбор. Пожалуйста, попробуйте ещё раз."
 
 #: app/templates/forms/form_builder/form_builder.html:1302
 msgid "We ran into an issue while loading. Please reload the page."
@@ -31181,7 +31206,7 @@ msgstr ""
 
 #: app/templates/admin/api_keys/_permissions_fields.html:5
 msgid "What can this key do?"
-msgstr ""
+msgstr "Что может сделать этот ключ?"
 
 #: app/templates/forms/entry_form/entry_form.html:160
 msgid "What is completion?"
@@ -31189,11 +31214,11 @@ msgstr ""
 
 #: app/templates/admin/api_keys/create_success.html:66
 msgid "What this key can do"
-msgstr ""
+msgstr "Что может сделать этот ключ"
 
 #: app/templates/admin/governance/dashboard.html:184
 msgid "What was decided, and what residual risk remains."
-msgstr ""
+msgstr "Что было решено и какой остаточный риск остался."
 
 #: app/templates/admin/plugin_management.html:256
 msgid "What will be removed:"
@@ -31219,6 +31244,8 @@ msgid ""
 "When checked, people filling the form cannot type over this result. Uncheck "
 "to let them replace the calculated number."
 msgstr ""
+"При проверке люди, заполняющие форму, не могут перебрать этот результат. "
+"Снимите галочку, чтобы заменить вычисленное число."
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:442
 msgid ""
@@ -31226,6 +31253,9 @@ msgid ""
 "the form is reopened. When unchecked, the value is always recalculated and "
 "not stored."
 msgstr ""
+"При проверке вычисленное значение сохраняется вместе с формой и "
+"восстанавливается при повторном открытии формы. При снятии отметки значение "
+"всегда пересчитывается и не сохраняется."
 
 #: app/templates/forms/form_builder/partials/_item_modal_matrix_fields.html:295
 msgid ""
@@ -31330,6 +31360,9 @@ msgid ""
 " assignment has nobody. This list is the full stewardship register, "
 "including countries that are not in a current cycle."
 msgstr ""
+"Кто может подавать заявки от каждой страны. OWN-03 проваливается только "
+"тогда, когда в стране на открытом задании никого нет. Этот список — полный "
+"реестр управления, включая страны, которые не входят в текущий цикл."
 
 #: app/templates/admin/assignments/manage_assignment.html:367
 msgid ""
@@ -31338,7 +31371,7 @@ msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:1402
 msgid "Who will be notified:"
-msgstr ""
+msgstr "Кто будет уведомлен:"
 
 #: app/templates/admin/indicator_bank/neural_map.html:249
 msgid "Why do similar indicators sometimes appear far apart?"
@@ -31346,7 +31379,7 @@ msgstr "Почему похожие индикаторы иногда появл
 
 #: app/templates/admin/governance/dashboard.html:183
 msgid "Why this gap is accepted"
-msgstr ""
+msgstr "Почему этот разрыв принимается"
 
 #: app/templates/admin/reports/builder.html:79
 #: app/templates/admin/reports/partials/_widget_properties.html:8
@@ -31411,6 +31444,8 @@ msgid ""
 "Work these rows. An accepted row is a decision with a review date, not a "
 "pass."
 msgstr ""
+"Работайте с этими строками. Принятый ряд — это решение с датой рассмотрения,"
+" а не пропуск."
 
 #: plugins/upr/templates/admin/_upr_excel_import_script.html:458
 msgid "Workbook analysis timed out. Please try uploading again."
@@ -31438,7 +31473,7 @@ msgstr "Работа офлайн"
 
 #: app/services/ai/agent/executor.py:1086
 msgid "Working on your form…"
-msgstr ""
+msgstr "Работаю над своей формой..."
 
 #: app/templates/admin/ai/knowledge_base.html:839
 msgid "Working..."
@@ -31463,6 +31498,11 @@ msgid ""
 "ROUND, IF, BLANK. Operators: + − × ÷ and comparisons. Blank numbers are "
 "skipped by SUM and AVERAGE. Ticks are 0 or 1. Division by zero is blank."
 msgstr ""
+"Запишите код столбца напрямую, например, доход + грант. Коды не могут "
+"содержать пробелы. Функции: СУММА, СРЕДНЕЕ, МИНИМАЛЬНОЕ, МАКСИМАЛЬНОЕ, СЧЁТ,"
+" COUNTA, ABS, ROUND, IF, BLANK. Операторы: + − × ÷ и сравнения. Пустые числа"
+" пропускаются SUM и AVERAGE. Галочки равны 0 или 1. Деление на ноль — "
+"пустое."
 
 #: app/templates/admin/analytics/_user_detail_partial.html:63
 msgid "Wrong password / unknown account"
@@ -31498,7 +31538,7 @@ msgstr "Годовой диапазон"
 
 #: plugins/fdrs/templates/service_income/tab_panel.html:64
 msgid "Yearly comparison"
-msgstr ""
+msgstr "Годовое сравнение"
 
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:572
 #: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1043
@@ -31724,7 +31764,7 @@ msgstr "У вас нет разрешения на импорт индикато
 
 #: app/routes/main/assignments.py:205 app/routes/main/assignments.py:226
 msgid "You do not have permission to reopen this assignment."
-msgstr ""
+msgstr "У вас нет разрешения на повторное открытие этого задания."
 
 #: app/routes/main/assignments.py:413 app/routes/main/assignments.py:430
 msgid "You do not have permission to return this assignment for revision."
@@ -31732,11 +31772,11 @@ msgstr "У вас нет разрешения возвращать это зад
 
 #: app/routes/main/assignments.py:279 app/routes/main/assignments.py:300
 msgid "You do not have permission to return this page for revision."
-msgstr ""
+msgstr "У вас нет разрешения возвращать эту страницу для редактирования."
 
 #: app/routes/admin/assignment_management.py:1316
 msgid "You do not have permission to update assignment details."
-msgstr ""
+msgstr "У вас нет разрешения обновлять детали назначения."
 
 #: app/routes/translation_review/__init__.py:79
 msgid "You do not have permission to use translation review"
@@ -31949,27 +31989,27 @@ msgstr "__COUNT__ ошибки в доставке электронной поч
 
 #: app/templates/admin/communication/center.html:1556
 msgid "__COUNT__ email(s) sent"
-msgstr ""
+msgstr "__COUNT__ отправленные письма"
 
 #: app/templates/admin/communication/center.html:1555
 msgid "__COUNT__ failed"
-msgstr ""
+msgstr "__COUNT__ провалился"
 
 #: app/templates/admin/communication/center.html:1575
 msgid "__COUNT__ in-app notification(s)"
-msgstr ""
+msgstr "__COUNT__ уведомления внутри приложения"
 
 #: app/templates/admin/communication/center.html:1553
 msgid "__COUNT__ notified"
-msgstr ""
+msgstr "__COUNT__ уведомлен"
 
 #: app/templates/admin/communication/center.html:1554
 msgid "__COUNT__ without recipients"
-msgstr ""
+msgstr "__COUNT__ без получателей"
 
 #: app/templates/admin/communication/center.html:1552
 msgid "__DONE__ of __TOTAL__ entities processed"
-msgstr ""
+msgstr "__DONE__ __TOTAL__ обрабатываемых объектов"
 
 #: app/templates/admin/indicator_bank/neural_map.html:232
 msgid "a dot to select it and see similar indicators"
@@ -32009,7 +32049,7 @@ msgstr "одобрено"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:212
 msgid "archived"
-msgstr ""
+msgstr "Архивировано"
 
 #: app/templates/components/auto_translate_modal_js.html:31
 msgid "are already translated!"
@@ -32065,7 +32105,7 @@ msgstr "автор"
 
 #: plugins/fdrs/templates/ecr/tab_panel.html:213
 msgid "calculated from current data"
-msgstr ""
+msgstr "Рассчитанные на основе текущих данных"
 
 #: app/templates/admin/communication/center.html:1439
 msgid "campaign"
@@ -32073,7 +32113,7 @@ msgstr "Кампания"
 
 #: app/templates/admin/communication/_insights.html:95
 msgid "campaign sends"
-msgstr ""
+msgstr "Кампания отправляет"
 
 #: app/templates/admin/communication/center.html:1440
 msgid "campaigns"
@@ -32081,7 +32121,7 @@ msgstr "Кампании"
 
 #: app/routes/admin/assignment_management.py:215
 msgid "closed"
-msgstr ""
+msgstr "закрыто"
 
 #: app/templates/admin/organization/index.html:2867
 msgid "cluster offices"
@@ -32174,11 +32214,11 @@ msgstr "Документ(ы) обновлены."
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:101
 msgid "documents"
-msgstr ""
+msgstr "Документы"
 
 #: plugins/fdrs/templates/admin/_fdrs_documents_script.html:102
 msgid "downloadable"
-msgstr ""
+msgstr "Можно скачать"
 
 #: app/templates/admin/ai/knowledge_base.html:685
 msgid "downloading"
@@ -32316,11 +32356,11 @@ msgstr "например, срочно, требующие действий"
 
 #: app/templates/admin/communication/center.html:1576
 msgid "email sent"
-msgstr ""
+msgstr "Письмо отправлено"
 
 #: app/templates/admin/communication/_insights.html:45
 msgid "email-only"
-msgstr ""
+msgstr "Только по электронной почте"
 
 #: app/templates/admin/api_management.html:459
 msgid "endpoints visible"
@@ -33538,13 +33578,6 @@ msgstr "Импортные цели"
 msgid "Importable rounds absent from this workbook: "
 msgstr "Импортируемые патроны, отсутствующие в этой рабочей тетради:"
 
-msgid ""
-"In the print dialog choose “Save as PDF”, paper size A4, margins None, and "
-"turn off headers and footers."
-msgstr ""
-"В диалоге печати выберите «Сохранить как PDF», размер бумаги A4, поля «Нет»,"
-" и отключите заголовки и нижние колонтитулы."
-
 msgid "In the workbook but never imported (live or later rounds): "
 msgstr ""
 "В рабочей тетради, но никогда не импортированной (в живых или более поздних "
@@ -33788,9 +33821,6 @@ msgstr "Презентация"
 msgid "Previous slide"
 msgstr "Предыдущий слайд"
 
-msgid "Print or save as PDF"
-msgstr "Печать или сохранение в формате PDF"
-
 msgid "Public narrative"
 msgstr "Публичный нарратив"
 
@@ -34000,3 +34030,58 @@ msgstr "Строки рабочих тетради"
 
 msgid "{both} of {plan} that planned also reported"
 msgstr "{оба} из {плана} также сообщили"
+
+msgid "Could not create the PDF. Try again."
+msgstr "Не удалось создать PDF. Попробуйте ещё раз."
+
+msgid "Latest completed round: {round}."
+msgstr "Последний завершённый раунд: {раунд}."
+
+msgid "Loading analysis data…"
+msgstr "Загрузка данных анализа..."
+
+msgid "Loading narrative participation…"
+msgstr "Загрузка повествовательного участия..."
+
+msgid "Local units"
+msgstr "Местные подразделения"
+
+msgid "Preparing PDF…"
+msgstr "Подготовка PDF..."
+
+msgid "Saves an A4 PDF of these pages."
+msgstr "Сохраняет формат A4 PDF этих страниц."
+
+msgid "Verifying targets…"
+msgstr "Проверка целей..."
+
+msgid "View as table"
+msgstr "Просмотр в виде таблицы"
+
+msgid "View every country by round"
+msgstr "Просмотр каждой страны по кругу"
+
+msgid ""
+"Volunteers, staff, branches and local units reported by host National "
+"Societies."
+msgstr ""
+"Волонтёры, сотрудники, отделения и местные подразделения сообщают "
+"принимающие национальные общества."
+
+msgid ""
+"When checked, the user receives a welcome email at the address above as soon"
+" as you save, with a link to the platform and how to get started. Uncheck it"
+" to create the account silently."
+msgstr ""
+"При проверке пользователь получает приветственное письмо по указанному выше "
+"адресу сразу после сохранения, с ссылкой на платформу и инструкцией, как "
+"начать. Снимите галочку, чтобы создать аккаунт в тишине."
+
+msgid "Workbook notes"
+msgstr "Заметки к рабочей тетради"
+
+msgid "and {n} more"
+msgstr "и {n} больше"
+
+msgid "first year"
+msgstr "Первый год"

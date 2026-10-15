@@ -860,6 +860,7 @@ class TestDashboardAssignmentCategorization:
         with patch("app.routes.main.dashboard.get_enabled_entity_groups", return_value=["countries"]), \
              patch("app.routes.main.dashboard.get_allowed_entity_type_codes", return_value=["country"]), \
              patch("app.routes.main.dashboard.CountryAccessRequest.query") as mock_req_query, \
+             patch("app.routes.main.dashboard.apply_assignment_access", side_effect=lambda query, user, column: query), \
              patch("app.routes.main.dashboard.AssignmentEntityStatus.query") as mock_aes_q, \
              patch("app.routes.main.dashboard.get_country_recent_activities", return_value=[]), \
              patch("app.routes.main.dashboard.is_data_quality_dashboard_enabled", return_value=False), \

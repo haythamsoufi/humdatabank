@@ -34,7 +34,7 @@ from app.services.platform.user_analytics_service import (
 from app.middleware.activity_middleware import track_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_pagination import validate_pagination_params
-from app.utils.api_responses import json_ok
+from app.utils.api_responses import json_ok, json_server_error
 from app.services.audit.details_service import (
     format_activity_log_details,
     format_admin_action_details,
@@ -1251,6 +1251,19 @@ def audit_trail():
             'session_id': filters_session_id,
         }
     )
+
+
+@bp.route('/audit-trail/overview-data')
+@admin_permission_required('admin.audit.view')
+def audit_trail_overview_data():
+    """JSON aggregates for the Audit Trail "Overview" tab (lazy-loaded)."""
+    from app.services.audit.trail_overview_service import build_audit_trail_overview
+
+    try:
+        return json_ok(build_audit_trail_overview())
+    except Exception as e:
+        logger.error("audit_trail_overview_data: %s", e, exc_info=True)
+        return json_server_error(GENERIC_ERROR_MESSAGE)
 
 
 @bp.route("/activity-endpoint-catalog")

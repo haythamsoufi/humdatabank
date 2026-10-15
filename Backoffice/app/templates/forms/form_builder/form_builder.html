@@ -1,5 +1,6 @@
 {# templates/form_builder.html #}
 {% extends "core/layout.html" %}
+{% set page_import_map = true %}
 {% from "components/_form_helpers.html" import render_field, render_submit_button, render_checkbox_group %}
 {% from "components/_builder_items.html" import items_table_header, item_properties, item_actions, item_label_content %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
@@ -8,6 +9,13 @@
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
 
 {% from "components/_page_header.html" import page_header %}
+
+{# Import map MUST be the first thing in head, before any type="module" script (see
+   core/layout.html). Without it main.js's relative imports (form-submit-ui.js, ...)
+   resolve unversioned and stay cached as immutable after a deploy. #}
+{% block head %}
+<script type="importmap" nonce="{{ csp_nonce() }}">{{ form_builder_import_map() | tojson }}</script>
+{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ static_url('css/form-builder-page.css') }}">

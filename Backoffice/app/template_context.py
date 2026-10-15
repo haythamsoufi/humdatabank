@@ -479,6 +479,20 @@ def register_template_context(app, config_class):
         return _build_map(app, request.url_root)
     app.jinja_env.globals['forms_module_import_map'] = forms_module_import_map
 
+    def layout_import_map():
+        """Scoped import map for layout-loaded modules (chatbot) on pages without their own map."""
+        from flask import request
+        from app.static_import_map import layout_import_map as _build_map
+        return _build_map(app, request.url_root)
+    app.jinja_env.globals['layout_import_map'] = layout_import_map
+
+    def form_builder_import_map():
+        """Scoped import map so form-builder relative imports keep ?v= cache keys."""
+        from flask import request
+        from app.static_import_map import form_builder_import_map as _build_map
+        return _build_map(app, request.url_root)
+    app.jinja_env.globals['form_builder_import_map'] = form_builder_import_map
+
     from app.services.platform.app_settings_service import organization_visual_asset_href
     app.jinja_env.globals['org_visual_asset_url'] = organization_visual_asset_href
 

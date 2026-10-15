@@ -6,6 +6,7 @@
 {% from "components/_form_helpers.html" import format_number_value %}
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
 {% from "components/_status_label.html" import status_label, status_label_for_assignment, status_label_for_data_flag %}
+{% set page_import_map = true %}
 {% set scoped_locked_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled'] %}
 {% set scoped_reopenable_statuses = ['submitted', 'sent_for_review', 'approved', 'cancelled', 'requires_revision'] %}
 {% set scoped_revision_statuses = ['submitted', 'sent_for_review', 'approved'] %}

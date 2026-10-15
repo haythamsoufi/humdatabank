@@ -1,6 +1,18 @@
 """Tests for scoped ES module import map generation."""
 
-from app.static_import_map import build_scoped_import_map, clear_import_map_cache, forms_module_import_map
+import re
+from pathlib import Path
+
+from app.static_import_map import (
+    FORM_BUILDER_TEMPLATE_MODULES,
+    build_scoped_import_map,
+    clear_import_map_cache,
+    form_builder_import_map,
+    forms_module_import_map,
+)
+
+BACKOFFICE = Path(__file__).resolve().parents[2]
+FORM_BUILDER_TEMPLATE = BACKOFFICE / "app" / "templates" / "forms" / "form_builder" / "form_builder.html"
 
 
 def test_build_scoped_import_map_maps_relative_imports(tmp_path):
@@ -89,3 +101,128 @@ def test_import_map_keys_are_absolute_urls(app):
     assert cdn_scope[key].startswith(key + "?v=deploy1.")
     for scope in result["scopes"].values():
         assert not any(k.startswith(".") for k in scope)
+
+
+def _form_builder_map(app, cdn=""):
+    clear_import_map_cache()
+    app.config["STATIC_CDN_URL"] = cdn
+    app.config["ASSET_VERSION"] = "fbdeploy"
+    with app.test_request_context("/"):
+        return form_builder_import_map(app, "http://localhost:5000/")
+
+
+def test_form_builder_map_versions_form_submit_modules(app):
+    """form-submit-ui.js / form-submit.js are relative imports of the versioned main.js."""
+    result = _form_builder_map(app, "https://blob.example/static")
+    # main.js (versioned entry) imports ./modules/form-submit-ui.js
+    entry_scope = result["scopes"]["https://blob.example/static/js/form_builder/"]
+    ui_key = "https://blob.example/static/js/form_builder/modules/form-submit-ui.js"
+    assert entry_scope[ui_key].startswith(ui_key + "?v=fbdeploy.")
+    modal = result["scopes"]["https://blob.example/static/js/form_builder/modules/modal/"]
+    submit_key = "https://blob.example/static/js/form_builder/modules/modal/form-submit.js"
+    assert modal[submit_key].startswith(submit_key + "?v=fbdeploy.")
+
+
+def test_form_builder_map_covers_lib_and_components(app):
+    result = _form_builder_map(app, "https://blob.example/static")
+    lib_url = "https://blob.example/static/js/lib/waf-json-body.js"
+    imported_from_ui = result["scopes"]["https://blob.example/static/js/form_builder/modules/"]
+    assert imported_from_ui[lib_url].startswith(lib_url + "?v=fbdeploy.")
+    components = [
+        url
+        for scope in result["scopes"].values()
+        for key, url in scope.items()
+        if key.endswith("/js/components/translation-modal.js")
+    ]
+    assert components and all("?v=fbdeploy." in url for url in components)
+
+
+def test_form_builder_map_has_app_origin_fallback_scopes(app):
+    result = _form_builder_map(app, "https://blob.example/static")
+    assert "http://localhost:5000/static/js/form_builder/modules/" in result["scopes"]
+
+
+def test_form_builder_map_versions_absolute_static_imports(app):
+    """Inline/absolute ``/static/...`` imports resolve unversioned unless mapped globally."""
+    result = _form_builder_map(app, "https://blob.example/static")
+    imports = result["imports"]
+    assert imports, "absolute /static/ imports must be mapped"
+    for rel in FORM_BUILDER_TEMPLATE_MODULES:
+        key = f"http://localhost:5000/static/{rel}"
+        assert key in imports, rel
+        assert imports[key].startswith(key + "?v=fbdeploy.")
+    page_key = "http://localhost:5000/static/js/components/translation-utils.js"
+    assert page_key in imports  # discovered from js/form_builder/modules/translation/page.js
+
+
+def test_form_builder_template_modules_match_inline_imports():
+    html = FORM_BUILDER_TEMPLATE.read_text(encoding="utf-8")
+    inline = set(re.findall(r"""from\s+['"]/static/(js/[^'"]+\.js)['"]""", html))
+    assert inline, "expected inline module imports in form_builder.html"
+    assert inline <= set(FORM_BUILDER_TEMPLATE_MODULES), (
+        "Add these to FORM_BUILDER_TEMPLATE_MODULES so they get ?v=: "
+        f"{sorted(inline - set(FORM_BUILDER_TEMPLATE_MODULES))}"
+    )
+
+
+def test_form_builder_import_map_is_first_in_head():
+    html = FORM_BUILDER_TEMPLATE.read_text(encoding="utf-8")
+    head = html.split("{% block head %}", 1)[1].split("{% endblock %}", 1)[0]
+    assert 'type="importmap"' in head
+    assert "form_builder_import_map()" in head
+    module_match = re.search(r"""type=["']module["']""", head)
+    assert module_match is None or head.index('type="importmap"') < module_match.start()
+
+
+def test_layout_map_versions_chatbot_modules_and_shared_lib(app):
+    """Chatbot modules load on every page via layout.html; transport.js imports ../lib/."""
+    from app.static_import_map import layout_import_map
+
+    clear_import_map_cache()
+    app.config["STATIC_CDN_URL"] = "https://blob.example/static"
+    app.config["ASSET_VERSION"] = "layoutdeploy"
+    with app.test_request_context("/"):
+        result = layout_import_map(app, "http://localhost:5000/")
+
+    chatbot = result["scopes"]["https://blob.example/static/js/chatbot/"]
+    for name in ("core.js", "structured-payloads.js", "transport.js", "state.js"):
+        key = f"https://blob.example/static/js/chatbot/{name}"
+        assert key in chatbot, name
+        assert chatbot[key].startswith(key + "?v=layoutdeploy.")
+    waf_key = "https://blob.example/static/js/lib/waf-json-body.js"
+    assert chatbot[waf_key].startswith(waf_key + "?v=layoutdeploy.")
+
+
+def test_page_maps_include_layout_trees():
+    """Pages that set page_import_map replace the layout map, so they must cover chatbot too."""
+    from app.static_import_map import (
+        FORM_BUILDER_IMPORT_TREES,
+        FORMS_IMPORT_TREES,
+        LAYOUT_IMPORT_TREES,
+    )
+
+    for tree in LAYOUT_IMPORT_TREES:
+        assert tree in FORMS_IMPORT_TREES
+        assert tree in FORM_BUILDER_IMPORT_TREES
+
+
+def test_pages_with_own_import_map_opt_out_of_layout_map():
+    layout = (BACKOFFICE / "app" / "templates" / "core" / "layout.html").read_text(encoding="utf-8")
+    assert "layout_import_map()" in layout
+    assert "page_import_map" in layout.split("{% block head %}", 1)[0]
+    entry_form = (BACKOFFICE / "app" / "templates" / "forms" / "entry_form" / "entry_form.html").read_text(encoding="utf-8")
+    for html in (entry_form, FORM_BUILDER_TEMPLATE.read_text(encoding="utf-8")):
+        assert "{% set page_import_map = true %}" in html
+
+
+def test_layout_renders_exactly_one_import_map_before_modules(app):
+    clear_import_map_cache()
+    app.config["STATIC_CDN_URL"] = ""
+    with app.test_request_context("/"):
+        from flask import render_template_string
+
+        html = render_template_string(
+            "{% extends 'core/layout.html' %}{% block content %}x{% endblock %}"
+        )
+    assert html.count('type="importmap"') == 1
+    assert html.index('type="importmap"') < html.index('type="module"')

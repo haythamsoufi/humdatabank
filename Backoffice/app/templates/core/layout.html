@@ -184,6 +184,12 @@
 
     {# AG Grid skeleton/loading styles — must load in head so ag_grid_body_wrap paints at full height before extra_js #}
     <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
+    {# Fallback import map so the chatbot's relative imports keep ?v=. Pages that inject
+       their own map in the head block set page_import_map = true (a page may only have
+       one map before its first module script) and include these trees themselves. #}
+    {% if not page_import_map|default(false) %}
+    <script type="importmap" nonce="{{ csp_nonce() }}">{{ layout_import_map() | tojson }}</script>
+    {% endif %}
     {% block head %}{% endblock %}
     {# type="module" scripts MUST come after {% block head %}: browsers reject/ignore any
        <script type="importmap"> added once a module has already started loading (Chrome

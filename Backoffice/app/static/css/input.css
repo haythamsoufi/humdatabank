@@ -3,3 +3,23 @@
 @tailwind utilities;
 
 /* Custom styles can go here */
+
+/* ------------------------------------------------------------------ *
+ * Template-variable highlighting inside item-modal input fields.
+ * A transparent backdrop (.vh-backdrop) mirrors the field value and
+ * wraps each [token]. Spans use colour + background only (no padding or
+ * weight changes) so horizontal text metrics stay aligned with the caret.
+ * ------------------------------------------------------------------ */
+.vh-backdrop { user-select: none; }
+
+.vh-var-known {
+  color: #4338ca;                 /* indigo-700  — resolves to a real variable */
+  background-color: rgba(99, 102, 241, 0.16);
+  border-radius: 3px;
+}
+
+.vh-var-unknown {
+  color: #b45309;                 /* amber-700   — not a known variable */
+  background-color: rgba(245, 158, 11, 0.18);
+  border-radius: 3px;
+}

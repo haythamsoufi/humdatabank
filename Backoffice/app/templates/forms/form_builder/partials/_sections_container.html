@@ -498,6 +498,7 @@
                                     {% if item_instance.description %}
                                         <p class="mb-1"><strong>{{ _('Description') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
                                     {% endif %}
+                                    {% set matrix_var_ns = namespace(names=[]) %}
                                     {% if item_instance.config %}
                                         {# Handle config as dict or JSON string #}
                                         {% set config_dict = item_instance.config if item_instance.config is mapping else (item_instance.config | fromjson if item_instance.config else {}) %}
@@ -509,36 +510,32 @@
                                                     {{ matrix_config.rows | length }} {{ _('rows') }} &times; {{ matrix_config.columns | length }} {{ _('columns') }}
                                                 </p>
                                             {% endif %}
-                                            {# Extract and display variables from matrix columns #}
-                                            {% set matrix_variables = [] %}
+                                            {# Column variables this matrix defines. Tokens used in labels are appended by JavaScript. #}
                                             {% if matrix_config.get('columns') %}
                                                 {% for column in matrix_config.columns %}
                                                     {% set is_var = column.get('is_variable') %}
                                                     {% if is_var == True or (is_var is string and is_var.lower() == 'true') or is_var == 1 %}
                                                         {% set var_name = column.get('variable') or column.get('variable_name') %}
-                                                        {% if var_name and var_name not in matrix_variables %}
-                                                            {% set __ = matrix_variables.append(var_name) %}
+                                                        {% if var_name and var_name not in matrix_var_ns.names %}
+                                                            {% set __ = matrix_var_ns.names.append(var_name) %}
                                                         {% endif %}
                                                     {% endif %}
                                                 {% endfor %}
                                             {% endif %}
-                                            {% if matrix_variables %}
-                                                <p class="mb-1"><strong>{{ _('Variables') }}:</strong>
-                                                    {% for var_name in matrix_variables %}
-                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 font-medium text-xs mr-1 variable-formatted">
-                                                            <i class="fas fa-bolt w-2.5 h-2.5 mr-0.5"></i>
-                                                            <span>[{{ var_name }}]</span>
-                                                        </span>
-                                                    {% endfor %}
-                                                </p>
-                                            {% endif %}
                                         {% endif %}
                                     {% endif %}
-                                    {# Variables used in matrix config will be displayed by JavaScript #}
-                                    <div class="matrix-variables-container mb-1" data-item-id="{{ item_instance.id }}" style="display: none;">
-                                        <p class="mb-1"><strong>{{ _('Variables') }}:</strong></p>
-                                        <ul class="list-disc list-inside ml-2 space-y-0.5 matrix-variables-list"></ul>
-                                    </div>
+                                    {# One row: defined column variables, plus system/referenced tokens filled in by JavaScript. #}
+                                    <p class="mb-1 matrix-variables-row" data-item-id="{{ item_instance.id }}"{% if not matrix_var_ns.names %} style="display: none;"{% endif %}>
+                                        <strong>{{ _('Variables') }}:</strong>
+                                        <span class="matrix-variables-list">
+                                            {% for var_name in matrix_var_ns.names %}
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 font-medium text-xs mr-1 variable-formatted" data-variable-name="{{ var_name | e }}">
+                                                    <i class="fas fa-bolt w-2.5 h-2.5 mr-0.5" aria-hidden="true"></i>
+                                                    <span>[{{ var_name }}]</span>
+                                                </span>
+                                            {% endfor %}
+                                        </span>
+                                    </p>
                                 {% elif item_type == 'image' %}
                                     <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ _('Image') }}</p>
                                     {% if item_instance.label %}

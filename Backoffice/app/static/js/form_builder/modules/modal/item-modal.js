@@ -7,6 +7,7 @@ import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
 import { SharedFields } from '../shared-fields.js';
 import { VariableAutocompleteMixin } from './variable-autocomplete.js';
+import { VariableHighlightMixin } from './variable-highlight.js';
 import { AccessibilityMixin } from './accessibility.js';
 import { RuleUIMixin } from './rule-ui.js';
 import { SectionSelectorMixin } from './section-selector.js';
@@ -58,6 +59,7 @@ export const ItemModal = {
     setupFieldSync: function() { SharedFields.setupFieldSync(this.modalElement); },
 
     ...VariableAutocompleteMixin,
+    ...VariableHighlightMixin,
     ...AccessibilityMixin,
     ...RuleUIMixin,
     ...SectionSelectorMixin,
@@ -167,6 +169,7 @@ export const ItemModal = {
         this.setupWindowResize();
         this.setupFieldSync();
         this.setupVariableAutocomplete();
+        this.setupVariableHighlight();
         this.setupSectionSelector();
         this.cacheRuleToggleDefaults();
         this.modalElement = this.modalElement || Utils.getElementById('item-modal');
@@ -308,6 +311,7 @@ export const ItemModal = {
             if (this.currentItemType === 'question') {
                 this.updateItemTypeTriggerButton('question');
             }
+            try { this.refreshVariableHighlights(); } catch (_e) {}
             this.syncSectionProxyDropdowns();
             this.checkModalScroll();
             this.setupModalAria();
@@ -351,6 +355,7 @@ export const ItemModal = {
             mountEntryFormHintPanel(this.modalElement, this.currentItemType);
         } catch (_e) {}
         try { QuestionItem.resetOptionsState(this.modalElement); } catch (_e) {}
+        try { this.refreshVariableHighlights(); } catch (_e) {}
     },
 
     setupModalEvents: function() {

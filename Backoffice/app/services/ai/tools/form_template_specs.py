@@ -165,7 +165,6 @@ _ITEM_SCHEMA: Dict[str, Any] = {
                 "columns: [{name (stable code/slug), type: 'number_whole'|'number_decimal'|'tick'|'calculated', "
                 "decimals (int, only for number_decimal, default 2), "
                 "name_translations: {en: 'Column label', ...}, optional group, "
-                "include_in_row_total (default true for data columns, false for calculated), "
                 "calculation for type calculated: {operation: 'sum'|'average'|'min'|'max'|'count'|"
                 "'count_filled'|'difference'|'percentage'|'product'|'formula', sources: [column codes], "
                 "subtrahends (difference), denominators (percentage), decimals 0-6, blank_as_zero, "

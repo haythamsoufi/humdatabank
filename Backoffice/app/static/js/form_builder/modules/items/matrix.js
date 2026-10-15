@@ -231,7 +231,7 @@ export const MatrixItem = {
         const highlightManualRowsCheckbox = modalElement.querySelector('#matrix-highlight-manual-rows');
         const legendTextInput = modalElement.querySelector('#matrix-legend-text');
         const legendTextTranslationsInput = modalElement.querySelector('#matrix-legend-text-translations');
-        const legendHideInput = modalElement.querySelector('#matrix-legend-hide');
+        const legendShownCheckbox = modalElement.querySelector('#matrix-legend-shown');
 
         if (rowsContainer) rowsContainer.replaceChildren();
         if (columnsContainer) columnsContainer.replaceChildren();
@@ -281,13 +281,9 @@ export const MatrixItem = {
         this._ownRowsLoadToken = (this._ownRowsLoadToken || 0) + 1;
         this.updateOwnRowsVisibility(modalElement);
         if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = false;
-        if (legendTextInput) {
-            legendTextInput.value = 'Manually added row';
-            legendTextInput.disabled = false;
-            legendTextInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
-        }
+        if (legendTextInput) legendTextInput.value = 'Manually added row';
         if (legendTextTranslationsInput) legendTextTranslationsInput.value = '{}';
-        if (legendHideInput) legendHideInput.value = 'false';
+        if (legendShownCheckbox) legendShownCheckbox.checked = true;
         const lookupTooltipLabelInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label');
         const lookupTooltipLabelTranslationsInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label-translations');
         const submittedTooltipLabelInput = modalElement.querySelector('#matrix-variable-submitted-tooltip-label');
@@ -378,7 +374,6 @@ export const MatrixItem = {
                 e.target.classList.contains('column-header-placeholder') ||
                 e.target.classList.contains('column-header-option-text') ||
                 e.target.classList.contains('column-header-allow-other') ||
-                e.target.classList.contains('column-include-in-row-total') ||
                 e.target.classList.contains('column-calc-operation') ||
                 e.target.classList.contains('column-calc-source') ||
                 e.target.classList.contains('column-calc-subtrahend') ||
@@ -399,10 +394,6 @@ export const MatrixItem = {
                     const cleaned = e.target.value.replace(/\s+/g, '');
                     if (cleaned !== e.target.value) e.target.value = cleaned;
                     this._renameCalculationSource(modalElement, e.target);
-                }
-                if (e.target.classList.contains('column-include-in-row-total')) {
-                    const columnDiv = e.target.closest('.matrix-column');
-                    if (columnDiv) columnDiv.dataset.includeTouched = '1';
                 }
                 if (e.target.classList.contains('column-calc-decimals')) {
                     const columnDiv = e.target.closest('.matrix-column');
@@ -667,6 +658,12 @@ export const MatrixItem = {
                 });
                 this._syncCalculationPickerSummary(target.closest('.calc-column-picker'));
                 this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-calc-status-toggle')) {
+                e.preventDefault();
+                const wrap = target.closest('.column-calc-status-wrap');
+                if (!wrap) return;
+                const expanded = wrap.classList.toggle('is-expanded');
+                this._setCalculationStatusToggle(wrap, target, expanded);
             } else if (target.classList.contains('column-calc-bold')) {
                 e.preventDefault();
                 const columnDiv = target.closest('.matrix-column');
@@ -881,7 +878,6 @@ export const MatrixItem = {
         const panel = columnDiv.querySelector('.column-calculation-panel');
         const selectable = columnDiv.querySelector('.column-selectable-header-wrapper');
         const variableOptions = columnDiv.querySelector('.column-variable-options');
-        const includeCheckbox = columnDiv.querySelector('.column-include-in-row-total');
         panel?.classList.toggle('hidden', !isCalculated);
         selectable?.classList.toggle('hidden', isCalculated);
         if (isCalculated) {
@@ -890,14 +886,12 @@ export const MatrixItem = {
             if (isVariableCheckbox) isVariableCheckbox.checked = false;
             const variableSelect = columnDiv.querySelector('.column-variable-select');
             if (variableSelect) variableSelect.style.display = 'none';
-            if (includeCheckbox && !columnDiv.dataset.includeTouched) includeCheckbox.checked = false;
             this._syncCalculationPanel(columnDiv);
         } else if (variableOptions) {
             const templateVariables = window.templateVariables || {};
             const metadata = Array.isArray(window.builtInMetadataVariables) ? window.builtInMetadataVariables : [];
             const hasVariables = Object.keys(templateVariables).length > 0 || metadata.length > 0;
             variableOptions.style.display = hasVariables ? 'flex' : 'none';
-            if (includeCheckbox && !columnDiv.dataset.includeTouched) includeCheckbox.checked = true;
         }
     },
 
@@ -1115,21 +1109,38 @@ export const MatrixItem = {
         status.textContent = error || formula;
         status.classList.toggle('text-red-600', !!error);
         status.classList.toggle('text-gray-500', !error);
+        this._syncCalculationStatusOverflow(columnDiv);
     },
 
-    _applyCalculationConfig(columnDiv, calculation, includeInRowTotal, calculationOptions = null) {
+    _syncCalculationStatusOverflow(columnDiv) {
+        const wrap = columnDiv?.querySelector('.column-calc-status-wrap');
+        const status = wrap?.querySelector('.column-calc-status');
+        const toggle = wrap?.querySelector('.column-calc-status-toggle');
+        if (!wrap || !status || !toggle) return;
+        const apply = () => {
+            const wasExpanded = wrap.classList.contains('is-expanded');
+            wrap.classList.remove('is-expanded');
+            const overflows = status.scrollWidth > status.clientWidth + 1
+                || status.scrollHeight > status.clientHeight + 1;
+            if (wasExpanded && overflows) wrap.classList.add('is-expanded');
+            toggle.classList.toggle('hidden', !overflows);
+            this._setCalculationStatusToggle(wrap, toggle, wrap.classList.contains('is-expanded'));
+        };
+        requestAnimationFrame(apply);
+    },
+
+    _setCalculationStatusToggle(wrap, toggle, expanded) {
+        if (!toggle) return;
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        const label = expanded
+            ? (wrap?.dataset.showLess || 'Show less')
+            : (wrap?.dataset.showMore || 'Show more');
+        toggle.setAttribute('aria-label', label);
+        toggle.title = label;
+    },
+
+    _applyCalculationConfig(columnDiv, calculation, calculationOptions = null) {
         if (!columnDiv) return;
-        const type = columnDiv.querySelector('.column-type')?.value;
-        const includeCheckbox = columnDiv.querySelector('.column-include-in-row-total');
-        const isCalculated = type === 'calculated';
-        const defaultInclude = !isCalculated;
-        const include = includeInRowTotal === undefined || includeInRowTotal === null
-            ? defaultInclude
-            : includeInRowTotal !== false && includeInRowTotal !== 'false';
-        if (includeCheckbox) {
-            includeCheckbox.checked = !!include;
-            if (!!include !== defaultInclude) columnDiv.dataset.includeTouched = '1';
-        }
         const calcReadonly = columnDiv.querySelector('.column-calc-readonly');
         const calcSaveValue = columnDiv.querySelector('.column-calc-save-value');
         const boldButton = columnDiv.querySelector('.column-calc-bold');
@@ -1172,7 +1183,7 @@ export const MatrixItem = {
         this.updateColumnCalculationVisibility(columnDiv);
     },
 
-    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2, selectableHeaderConfig = null, calculation = null, includeInRowTotal = undefined, calculationOptions = null) {
+    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2, selectableHeaderConfig = null, calculation = null, calculationOptions = null) {
         const columnsContainer = Utils.getElementById('matrix-columns-container');
         const template = Utils.getElementById('matrix-column-template');
         if (!template) {
@@ -1356,7 +1367,7 @@ export const MatrixItem = {
             if (allowOtherCb) allowOtherCb.checked = !!shd.header_allow_other;
         }
         appendTarget.appendChild(clone);
-        this._applyCalculationConfig(columnDiv, calculation, includeInRowTotal, calculationOptions);
+        this._applyCalculationConfig(columnDiv, calculation, calculationOptions);
         this.refreshCalculationSourceLists(modalElement);
         // Bind custom tooltips on newly added column (e.g. Save value ?)
         if (typeof window.initTooltips === 'function') {
@@ -1714,7 +1725,6 @@ export const MatrixItem = {
             colData.variable_save_value !== false, colData.variable_readonly !== false,
             colData.name_translations || {}, targetContainer, colData.decimals,
             colData.header_type ? colData : null, colData.calculation || null,
-            colData.include_in_row_total,
             { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold }
         );
         const columnDiv = targetContainer?.lastElementChild;
@@ -1996,7 +2006,6 @@ export const MatrixItem = {
                 : (saveValueCheckbox ? saveValueCheckbox.checked : true);
         }
 
-        const includeInRowTotal = columnDiv.querySelector('.column-include-in-row-total');
         if (columnType === 'calculated') {
             columnConfig.calculation = this._readCalculation(columnDiv);
             const calcReadonly = columnDiv.querySelector('.column-calc-readonly');
@@ -2004,9 +2013,6 @@ export const MatrixItem = {
             if (calcReadonly && !calcReadonly.checked) columnConfig.calculation_readonly = false;
             if (calcSaveValue?.checked) columnConfig.calculation_save_value = true;
             if (!this._calculationBoldOn(columnDiv)) columnConfig.calculation_bold = false;
-            if (includeInRowTotal?.checked) columnConfig.include_in_row_total = true;
-        } else if (includeInRowTotal && !includeInRowTotal.checked) {
-            columnConfig.include_in_row_total = false;
         }
 
         // ── Selectable header ──────────────────────────────────────────────
@@ -2549,9 +2555,7 @@ export const MatrixItem = {
         const autoLoadWrapper = Utils.getElementById('matrix-auto-load-entities-wrapper');
         const highlightManualRowsCheckbox = Utils.getElementById('matrix-highlight-manual-rows');
         const legendTextInput = Utils.getElementById('matrix-legend-text');
-        const legendTextWrapper = Utils.getElementById('matrix-legend-text-wrapper');
-        const legendHideBtn = Utils.getElementById('matrix-legend-hide-btn');
-        const legendHideInput = Utils.getElementById('matrix-legend-hide');
+        const legendShownCheckbox = Utils.getElementById('matrix-legend-shown');
 
         if (rowTotalsCheckbox) {
             if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
@@ -2671,12 +2675,13 @@ export const MatrixItem = {
                 legendTextInput._matrixLegendListenerAdded = true;
             }
         }
-        if (legendHideBtn) {
-            if (!legendHideBtn._matrixLegendHideListenerAdded) {
-                legendHideBtn.addEventListener('click', () => {
-                    this.toggleLegendHide(modalElement);
+        if (legendShownCheckbox) {
+            if (!legendShownCheckbox._matrixLegendShownListenerAdded) {
+                legendShownCheckbox.addEventListener('change', () => {
+                    this._applyLegendShownState();
+                    this.updateConfig(modalElement);
                 });
-                legendHideBtn._matrixLegendHideListenerAdded = true;
+                legendShownCheckbox._matrixLegendShownListenerAdded = true;
             }
         }
 
@@ -2687,8 +2692,7 @@ export const MatrixItem = {
         // Update legend text visibility on initial load
         this.updateLegendTextVisibility(modalElement);
 
-        // Initialize legend hide button state
-        this.initializeLegendHideButton(modalElement);
+        this._applyLegendShownState();
         this.updateRowTotalOptionsVisibility(modalElement);
         this.updateIncludeTotalsInApiVisibility(modalElement);
     },
@@ -2742,26 +2746,14 @@ export const MatrixItem = {
     },
 
     /**
-     * Initialize legend hide button state on load
+     * The legend text and translations stay hidden while Legend is unticked.
      */
-    initializeLegendHideButton(modalElement) {
-        const legendHideInput = Utils.getElementById('matrix-legend-hide');
-        const legendTextInput = Utils.getElementById('matrix-legend-text');
-
-        if (legendHideInput) {
-            const isHidden = legendHideInput.value === 'true';
-
-            // Update text input state
-            if (legendTextInput) {
-                if (isHidden) {
-                    legendTextInput.disabled = true;
-                    legendTextInput.classList.add('bg-gray-100', 'cursor-not-allowed');
-                } else {
-                    legendTextInput.disabled = false;
-                    legendTextInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
-                }
-            }
-        }
+    _applyLegendShownState() {
+        const legendShownCheckbox = Utils.getElementById('matrix-legend-shown');
+        const details = Utils.getElementById('matrix-legend-details');
+        if (!details) return;
+        const hidden = legendShownCheckbox ? !legendShownCheckbox.checked : false;
+        details.classList.toggle('hidden', hidden);
     },
 
     /**
@@ -2780,70 +2772,6 @@ export const MatrixItem = {
         }
     },
 
-    /**
-     * Toggle legend hide/show state
-     */
-    toggleLegendHide(modalElement) {
-        const legendHideBtn = Utils.getElementById('matrix-legend-hide-btn');
-        const legendHideInput = Utils.getElementById('matrix-legend-hide');
-        const legendTextInput = Utils.getElementById('matrix-legend-text');
-
-        if (!legendHideBtn || !legendHideInput) return;
-
-        const isHidden = legendHideInput.value === 'true';
-        const newState = !isHidden;
-        legendHideInput.value = String(newState);
-
-        // Update button icon, text, and title
-        const icon = legendHideBtn.querySelector('i');
-        const textSpan = legendHideBtn.querySelector('span');
-
-        if (newState) {
-            // Legend is hidden
-            if (icon) {
-                icon.className = 'fas fa-eye-slash w-4 h-4 mr-1';
-            }
-            if (textSpan) {
-                textSpan.textContent = 'Legend hidden';
-            } else {
-                const span = document.createElement('span');
-                span.textContent = 'Legend hidden';
-                legendHideBtn.appendChild(span);
-            }
-            legendHideBtn.title = 'Legend is hidden - click to show';
-            legendHideBtn.classList.remove('text-gray-600');
-            legendHideBtn.classList.add('text-gray-500');
-
-            // Grey out the text input
-            if (legendTextInput) {
-                legendTextInput.disabled = true;
-                legendTextInput.classList.add('bg-gray-100', 'cursor-not-allowed');
-            }
-        } else {
-            // Legend is shown
-            if (icon) {
-                icon.className = 'fas fa-eye w-4 h-4 mr-1';
-            }
-            if (textSpan) {
-                textSpan.textContent = 'Legend shown';
-            } else {
-                const span = document.createElement('span');
-                span.textContent = 'Legend shown';
-                legendHideBtn.appendChild(span);
-            }
-            legendHideBtn.title = 'Legend is shown - click to hide';
-            legendHideBtn.classList.remove('text-gray-500');
-            legendHideBtn.classList.add('text-gray-600');
-
-            // Enable the text input
-            if (legendTextInput) {
-                legendTextInput.disabled = false;
-                legendTextInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
-            }
-        }
-
-        this.updateConfig(modalElement);
-    },
 
     /**
      * Check if at least one column is a variable and show/hide auto-load checkbox
@@ -3696,8 +3624,8 @@ export const MatrixItem = {
         const highlightManualRows = Utils.getElementById('matrix-highlight-manual-rows')?.checked === true;
         const legendText = Utils.getElementById('matrix-legend-text')?.value?.trim() || 'Manually added row';
         const legendTextTranslationsInput = Utils.getElementById('matrix-legend-text-translations');
-        const legendHideInput = Utils.getElementById('matrix-legend-hide');
-        const legendHide = legendHideInput?.value === 'true';
+        const legendShownCheckbox = Utils.getElementById('matrix-legend-shown');
+        const legendHide = legendShownCheckbox ? !legendShownCheckbox.checked : false;
         const selectedMode = modalElement.querySelector('input[name="matrix_row_mode"]:checked')?.value || 'manual';
         const config = {
             type: 'matrix',
@@ -4078,7 +4006,7 @@ export const MatrixItem = {
                                 }
                                 lastSubgroupLabel = subgroupLabel;
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, targetColumns, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold });
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, targetColumns, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold });
                             });
                         } else {
                             const colData = item.data;
@@ -4086,7 +4014,7 @@ export const MatrixItem = {
                                 this.addColumn(modalElement, colData, 'number_whole');
                             } else if (colData && typeof colData === 'object' && (colData.name || colData.is_variable || colData.type === 'variable')) {
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, colData.include_in_row_total, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold });
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null, colData.calculation || null, { readonly: colData.calculation_readonly, saveValue: colData.calculation_save_value, bold: colData.calculation_bold });
                             }
                         }
                     });
@@ -4098,8 +4026,7 @@ export const MatrixItem = {
                 const highlightManualRowsCheckbox = Utils.getElementById('matrix-highlight-manual-rows');
                 const legendTextInput = Utils.getElementById('matrix-legend-text');
                 const legendTextTranslationsInput = Utils.getElementById('matrix-legend-text-translations');
-                const legendHideInput = Utils.getElementById('matrix-legend-hide');
-                const legendHideBtn = Utils.getElementById('matrix-legend-hide-btn');
+                const legendShownCheckbox = Utils.getElementById('matrix-legend-shown');
                 if (rowTotalsCheckbox) rowTotalsCheckbox.checked = matrixConfig.show_row_totals !== false;
                 const rowTotalManualCheckbox = Utils.getElementById('matrix-row-total-manual-enabled');
                 const rowTotalValidationSelect = Utils.getElementById('matrix-row-total-validation');
@@ -4138,61 +4065,10 @@ export const MatrixItem = {
                 if (submittedTooltipLabelTranslationsInput && matrixConfig.variable_submitted_tooltip_label_translations) {
                     submittedTooltipLabelTranslationsInput.value = JSON.stringify(matrixConfig.variable_submitted_tooltip_label_translations);
                 }
-                if (legendHideInput) {
-                    const legendHide = matrixConfig.legend_hide === true;
-                    legendHideInput.value = String(legendHide);
-                    const legendTextInput = Utils.getElementById('matrix-legend-text');
-
-                    // Update button icon, text, and input state based on saved state
-                    if (legendHideBtn) {
-                        const icon = legendHideBtn.querySelector('i');
-                        const textSpan = legendHideBtn.querySelector('span');
-
-                        if (legendHide) {
-                            // Legend is hidden
-                            if (icon) {
-                                icon.className = 'fas fa-eye-slash w-4 h-4 mr-1';
-                            }
-                            if (textSpan) {
-                                textSpan.textContent = 'Legend hidden';
-                            } else {
-                                const span = document.createElement('span');
-                                span.textContent = 'Legend hidden';
-                                legendHideBtn.appendChild(span);
-                            }
-                            legendHideBtn.title = 'Legend is hidden - click to show';
-                            legendHideBtn.classList.remove('text-gray-600');
-                            legendHideBtn.classList.add('text-gray-500');
-
-                            // Grey out the text input
-                            if (legendTextInput) {
-                                legendTextInput.disabled = true;
-                                legendTextInput.classList.add('bg-gray-100', 'cursor-not-allowed');
-                            }
-                        } else {
-                            // Legend is shown
-                            if (icon) {
-                                icon.className = 'fas fa-eye w-4 h-4 mr-1';
-                            }
-                            if (textSpan) {
-                                textSpan.textContent = 'Legend shown';
-                            } else {
-                                const span = document.createElement('span');
-                                span.textContent = 'Legend shown';
-                                legendHideBtn.appendChild(span);
-                            }
-                            legendHideBtn.title = 'Legend is shown - click to hide';
-                            legendHideBtn.classList.remove('text-gray-500');
-                            legendHideBtn.classList.add('text-gray-600');
-
-                            // Enable the text input
-                            if (legendTextInput) {
-                                legendTextInput.disabled = false;
-                                legendTextInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
-                            }
-                        }
-                    }
+                if (legendShownCheckbox) {
+                    legendShownCheckbox.checked = matrixConfig.legend_hide !== true;
                 }
+                this._applyLegendShownState();
 
                 const rawRowTotalPosition = matrixConfig.row_total_position;
                 this.syncRowTotalColumn(

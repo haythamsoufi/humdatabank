@@ -461,7 +461,7 @@ export class VariableFormatter {
 
         matrixItems.forEach(matrixItem => {
             const itemId = matrixItem.id;
-            const container = document.querySelector(`.matrix-variables-container[data-item-id="${itemId}"]`);
+            const container = document.querySelector(`.matrix-variables-row[data-item-id="${itemId}"]`);
 
             if (!container) {
                 return;
@@ -473,6 +473,7 @@ export class VariableFormatter {
             }
 
             const allVariables = new Set();
+            const definedNames = [];
 
             // Extract variables from matrix config only (not label/description - those are shown inline)
             // Check both config.matrix_config and direct config
@@ -490,13 +491,17 @@ export class VariableFormatter {
                 // Also specifically check columns array for variable type columns
                 if (configToSearch.columns && Array.isArray(configToSearch.columns)) {
                     configToSearch.columns.forEach((column) => {
-                        // Check for variable type columns - they have variable or variable_name fields
-                        if (column.type === 'variable') {
-                            if (column.variable && typeof column.variable === 'string') {
-                                allVariables.add(column.variable);
-                            }
-                            if (column.variable_name && typeof column.variable_name === 'string') {
-                                allVariables.add(column.variable_name);
+                        if (!column || typeof column !== 'object') {
+                            return;
+                        }
+                        const isVariable = column.is_variable === true
+                            || column.is_variable === 1
+                            || column.is_variable === 'true'
+                            || column.type === 'variable';
+                        if (isVariable) {
+                            const definedName = column.variable || column.variable_name;
+                            if (typeof definedName === 'string' && definedName && !definedNames.includes(definedName)) {
+                                definedNames.push(definedName);
                             }
                         }
 
@@ -506,28 +511,82 @@ export class VariableFormatter {
                 }
             }
 
-            // Display variables if any found
-            if (allVariables.size > 0) {
-                container.style.display = 'block';
-                variablesList.replaceChildren();
-                Array.from(allVariables).sort().forEach(varName => {
-                    const li = document.createElement('li');
-                    li.className = 'text-sm';
-                    const badge = document.createElement('span');
-                    badge.className = 'inline-flex items-center px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 font-medium';
+            // Drop previously injected chips so a re-render does not duplicate them.
+            // Server-rendered column variables stay in place.
+            variablesList.querySelectorAll('[data-js-variable]').forEach((el) => el.remove());
 
-                    const icon = document.createElement('i');
-                    icon.className = 'fas fa-bolt w-3 h-3 mr-1';
+            const existing = new Set();
+            variablesList.querySelectorAll('[data-variable-name]').forEach((el) => {
+                existing.add(String(el.getAttribute('data-variable-name') || '').toLowerCase());
+            });
 
-                    const text = document.createElement('span');
-                    text.textContent = `[${varName}]`;
+            definedNames.forEach((varName) => {
+                const key = String(varName).toLowerCase();
+                if (existing.has(key)) {
+                    return;
+                }
+                this._appendVariableChip(variablesList, varName, { system: false });
+                existing.add(key);
+            });
 
-                    badge.append(icon, text);
-                    li.appendChild(badge);
-                    variablesList.appendChild(li);
+            Array.from(allVariables).sort((a, b) => a.localeCompare(b)).forEach((varName) => {
+                const key = String(varName).toLowerCase();
+                if (existing.has(key)) {
+                    return;
+                }
+                const meta = this._systemVariableMeta(varName);
+                this._appendVariableChip(variablesList, varName, {
+                    system: !!meta,
+                    label: meta ? (meta.label || meta.key || '') : '',
                 });
-            }
+                existing.add(key);
+            });
+
+            container.style.display = variablesList.querySelector('[data-variable-name]') ? '' : 'none';
         });
+    }
+
+    /**
+     * Built-in metadata and plugin label tokens (not column variables this matrix defines).
+     * @param {string} varName
+     * @returns {{key: string, label?: string}|null}
+     */
+    static _systemVariableMeta(varName) {
+        const key = String(varName || '').toLowerCase();
+        if (!key) return null;
+        const lists = []
+            .concat(Array.isArray(window.builtInMetadataVariables) ? window.builtInMetadataVariables : [])
+            .concat(Array.isArray(window.pluginLabelVariables) ? window.pluginLabelVariables : []);
+        return lists.find((item) => item && String(item.key || '').toLowerCase() === key) || null;
+    }
+
+    /**
+     * Append one variable chip to the properties row.
+     * Defined column variables use the filled badge; system tokens use an outlined badge.
+     */
+    static _appendVariableChip(list, varName, { system = false, label = '' } = {}) {
+        const badge = document.createElement('span');
+        badge.className = system
+            ? 'inline-flex items-center px-1.5 py-0.5 rounded-md border border-dashed border-purple-500 bg-purple-50 text-purple-700 font-medium text-xs mr-1 variable-formatted variable-system'
+            : 'inline-flex items-center px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 font-medium text-xs mr-1 variable-formatted';
+        badge.dataset.variableName = varName;
+        badge.dataset.jsVariable = 'true';
+        if (system && label) {
+            badge.title = label;
+        }
+
+        const icon = document.createElement('i');
+        icon.className = system
+            ? 'fas fa-asterisk w-2.5 h-2.5 mr-0.5'
+            : 'fas fa-bolt w-2.5 h-2.5 mr-0.5';
+        icon.setAttribute('aria-hidden', 'true');
+
+        const text = document.createElement('span');
+        text.textContent = `[${varName}]`;
+
+        badge.append(icon, text);
+        list.appendChild(badge);
+        return badge;
     }
 
     /**

@@ -300,14 +300,6 @@
                                             </span>
                                         </label>
                                     </div>
-                                    <label class="column-include-in-row-total-label flex items-center text-xs text-gray-600 whitespace-nowrap shrink-0">
-                                        <input type="checkbox" class="column-include-in-row-total mr-1" checked>
-                                        <span>{{ _('In row total') }}</span>
-                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
-                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
-                                            <span class="tooltip-text">{{ _('Uncheck to leave this column out of the row total and the grand total. Calculated columns stay out unless you check this.') }}</span>
-                                        </span>
-                                    </label>
                                     <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
@@ -389,10 +381,10 @@
                                      data-picker-none="{{ _('No other columns')|forceescape }}"
                                      data-picker-select-all="{{ _('Select all')|forceescape }}"
                                      data-picker-deselect-all="{{ _('Deselect all')|forceescape }}">
-                                    <p class="text-gray-600">{{ _('Calculated for each row from the other columns in that row. The column footer sums those results.') }}</p>
-                                    <label class="flex items-center gap-2">
-                                        <span class="text-gray-700 whitespace-nowrap">{{ _('Calculation') }}</span>
-                                        <select class="column-calc-operation shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <div class="column-calc-primary">
+                                    <label class="column-calc-field">
+                                        <span class="column-calc-field-label">{{ _('Calculation') }}</span>
+                                        <select class="column-calc-operation shadow-sm focus:ring-orange-500 focus:border-orange-500 border-gray-300 rounded-md">
                                             <option value="sum">{{ _('Sum') }}</option>
                                             <option value="average">{{ _('Average') }}</option>
                                             <option value="min">{{ _('Minimum') }}</option>
@@ -404,9 +396,13 @@
                                             <option value="product">{{ _('Product') }}</option>
                                             <option value="formula">{{ _('Custom formula') }}</option>
                                         </select>
+                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center shrink-0" aria-label="{{ _('Help')|forceescape }}">
+                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                            <span class="tooltip-text">{{ _('Calculated for each row from the other columns in that row. The column footer sums those results.') }}</span>
+                                        </span>
                                     </label>
-                                    <div class="column-calc-sources">
-                                        <p class="column-calc-sources-label text-gray-700 mb-1"
+                                    <div class="column-calc-sources column-calc-field">
+                                        <p class="column-calc-sources-label column-calc-field-label"
                                            data-label-columns="{{ _('Columns')|forceescape }}"
                                            data-label-numerator="{{ _('Numerator')|forceescape }}"
                                            data-label-add="{{ _('Columns to add')|forceescape }}">
@@ -414,12 +410,13 @@
                                         </p>
                                         <div class="column-calc-source-list"></div>
                                     </div>
-                                    <div class="column-calc-subtrahends hidden">
-                                        <p class="text-gray-700 mb-1">{{ _('Subtract') }}</p>
+                                    </div>
+                                    <div class="column-calc-subtrahends column-calc-field hidden">
+                                        <p class="column-calc-field-label">{{ _('Subtract') }}</p>
                                         <div class="column-calc-subtrahend-list"></div>
                                     </div>
-                                    <div class="column-calc-denominators hidden">
-                                        <p class="text-gray-700 mb-1">{{ _('Divide by') }}</p>
+                                    <div class="column-calc-denominators column-calc-field hidden">
+                                        <p class="column-calc-field-label">{{ _('Divide by') }}</p>
                                         <div class="column-calc-denominator-list"></div>
                                     </div>
                                     <div class="column-calc-formula-wrap hidden space-y-1">
@@ -427,34 +424,41 @@
                                         <textarea class="column-calc-formula w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-400" rows="2" placeholder="SUM(income, grant) - expenditure"></textarea>
                                         <p class="text-gray-500">{{ _('Write the column code directly, for example income + grant. Codes cannot contain spaces. Functions: SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, ABS, ROUND, IF, BLANK. Operators: + − × ÷ and comparisons. Blank numbers are skipped by SUM and AVERAGE. Ticks are 0 or 1. Division by zero is blank.') }}</p>
                                     </div>
-                                    <div class="flex items-center gap-4 flex-wrap">
+                                    <div class="column-calc-bar">
                                         <button type="button" class="column-calc-bold is-on" aria-pressed="true" title="{{ _('Bold')|forceescape }}" aria-label="{{ _('Bold')|forceescape }}">B</button>
-                                        <label class="flex items-center text-gray-600">
-                                            <span class="mr-1">{{ _('Decimals') }}</span>
-                                            <input type="number" class="column-calc-decimals shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-14 sm:text-sm border-gray-300 rounded-md" min="0" max="6" step="1" value="0">
+                                        <label class="column-calc-decimals-label">
+                                            <span>{{ _('Decimals') }}</span>
+                                            <input type="number" class="column-calc-decimals" min="0" max="6" step="1" value="0">
                                         </label>
-                                        <label class="flex items-center text-gray-600">
-                                            <input type="checkbox" class="column-calc-blank-as-zero mr-1" checked>
-                                            <span>{{ _('Treat blanks as zero in + − × ÷') }}</span>
+                                        <label class="column-calc-flag" title="{{ _('Treat blank cells as zero in + − × ÷')|forceescape }}">
+                                            <input type="checkbox" class="column-calc-blank-as-zero" checked>
+                                            <span>{{ _('Blanks as zero') }}</span>
                                         </label>
-                                        <label class="flex items-center text-gray-600">
-                                            <input type="checkbox" class="column-calc-readonly mr-1" checked>
+                                        <label class="column-calc-flag">
+                                            <input type="checkbox" class="column-calc-readonly" checked>
                                             <span>{{ _('Read-only') }}</span>
-                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center" aria-label="{{ _('Help')|forceescape }}">
                                                 <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
                                                 <span class="tooltip-text">{{ _('When checked, people filling the form cannot type over this result. Uncheck to let them replace the calculated number.') }}</span>
                                             </span>
                                         </label>
-                                        <label class="flex items-center text-gray-600">
-                                            <input type="checkbox" class="column-calc-save-value mr-1">
+                                        <label class="column-calc-flag">
+                                            <input type="checkbox" class="column-calc-save-value">
                                             <span>{{ _('Save value') }}</span>
-                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center" aria-label="{{ _('Help')|forceescape }}">
                                                 <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
                                                 <span class="tooltip-text">{{ _('When checked, the calculated value is saved with the form and restored when the form is reopened. When unchecked, the value is always recalculated and not stored.') }}</span>
                                             </span>
                                         </label>
+                                        <div class="column-calc-status-wrap"
+                                             data-show-more="{{ _('Show more')|forceescape }}"
+                                             data-show-less="{{ _('Show less')|forceescape }}">
+                                            <p class="column-calc-status text-gray-500 break-words" data-empty-message="{{ _('Choose columns or enter a formula')|forceescape }}"></p>
+                                            <button type="button" class="column-calc-status-toggle hidden" aria-expanded="false" aria-label="{{ _('Show more')|forceescape }}" title="{{ _('Show more')|forceescape }}">
+                                                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <p class="column-calc-status text-gray-500 break-words" data-empty-message="{{ _('Choose columns or enter a formula')|forceescape }}"></p>
                                 </div>
                             </div>
                         </template>

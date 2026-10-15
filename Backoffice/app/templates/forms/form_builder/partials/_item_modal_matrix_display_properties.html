@@ -74,25 +74,19 @@
             <input type="checkbox" id="matrix-highlight-manual-rows" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
             <span class="ml-2 text-sm text-gray-700">{{ _('Highlight Manually Added Rows') }}</span>
         </label>
-        <div id="matrix-legend-text-wrapper" class="mt-2 hidden">
-            <div class="flex items-center justify-between mb-1">
-                <div class="flex items-center gap-2 flex-wrap min-w-0">
-                    <label class="text-sm font-medium text-gray-700">{{ _('Legend Text') }}</label>
-                    {{ field_help(_('Text to display in the legend when manually added rows are highlighted')) }}
-                    <button type="button" id="matrix-legend-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
-                        <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
-                    </button>
-                </div>
-                <div class="flex items-center space-x-2 shrink-0">
-                    <button type="button" id="matrix-legend-hide-btn" class="text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline inline-flex items-center" title="{{ _('Legend is shown — click to hide')|forceescape }}">
-                        <i class="fas fa-eye w-4 h-4 mr-1"></i>
-                        <span>{{ _('Legend shown') }}</span>
-                    </button>
-                </div>
+        <div id="matrix-legend-text-wrapper" class="mt-2 hidden space-y-2">
+            <label class="inline-flex items-center">
+                <input type="checkbox" id="matrix-legend-shown" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                <span class="ml-2 text-sm text-gray-700">{{ _('Legend') }}</span>
+            </label>
+            <div id="matrix-legend-details" class="flex items-center gap-2">
+                <input type="text" id="matrix-legend-text" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Manually added row')|forceescape }}" value="{{ _('Manually added row') }}">
+                {{ field_help(_('Text to display in the legend when manually added rows are highlighted')) }}
+                <button type="button" id="matrix-legend-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                </button>
             </div>
-            <input type="text" id="matrix-legend-text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Manually added row')|forceescape }}" value="{{ _('Manually added row') }}">
             <input type="hidden" id="matrix-legend-text-translations" value="{}">
-            <input type="hidden" id="matrix-legend-hide" value="false">
         </div>
     </div>
 </div>

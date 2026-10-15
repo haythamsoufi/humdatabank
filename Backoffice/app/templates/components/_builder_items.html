@@ -1,23 +1,106 @@
-{# Matrix column display labels: English translation when set, otherwise column code (name/variable). #}
-{% macro matrix_column_labels_text(item_instance) -%}
+{# English column label, otherwise the column code (name/variable). #}
+{% macro matrix_column_display_label(column) -%}
+{%- if column is mapping -%}
+  {%- set col_code = (column.get('name') or column.get('variable') or column.get('variable_name') or '') | string | trim -%}
+  {%- set name_trans = column.get('name_translations', {}) if column.get('name_translations') is mapping else {} -%}
+  {%- set en_label = (name_trans.get('en', '') or '') | string | trim -%}
+  {{- en_label if en_label else col_code -}}
+{%- elif column is string -%}
+  {{- column.strip() -}}
+{%- endif -%}
+{%- endmacro %}
+
+{# Group and subgroup labels live in column_groups. Prefer the English translation. #}
+{% macro matrix_group_display_label(column_groups, key, fallback='') -%}
+{%- set meta = column_groups.get(key) if column_groups is mapping else none -%}
+{%- set en_label = ((meta.get('en') or '') | string | trim) if meta is mapping else '' -%}
+{%- if en_label -%}{{ en_label }}{%- elif fallback -%}{{ fallback }}{%- else -%}{{ key }}{%- endif -%}
+{%- endmacro %}
+
+{# header_color is a builder-saved #rrggbb. Anything else is ignored. #}
+{% macro matrix_saved_header_color(column_groups, key) -%}
+{%- set meta = column_groups.get(key) if column_groups is mapping else none -%}
+{%- set raw = ((meta.get('header_color') or '') | string | trim | lower) if meta is mapping else '' -%}
+{%- if raw | length == 7 and raw[0] == '#' -%}
+  {%- set hex = namespace(ok=true) -%}
+  {%- for ch in raw[1:] -%}
+    {%- if ch not in '0123456789abcdef' -%}{%- set hex.ok = false -%}{%- endif -%}
+  {%- endfor -%}
+  {%- if hex.ok -%}{{ raw }}{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{# Items-table outline of matrix columns. Groups and subgroups follow column order. #}
+{% macro matrix_column_outline(item_instance) -%}
 {%- set config_dict = item_instance.config if item_instance.config is mapping else (item_instance.config | fromjson if item_instance.config else {}) -%}
 {%- set matrix_config = config_dict.get('matrix_config', {}) if config_dict else {} -%}
 {%- set columns = matrix_config.get('columns', []) if matrix_config else [] -%}
-{%- set column_labels = [] -%}
+{%- set column_groups = matrix_config.get('column_groups', {}) if matrix_config is mapping else {} -%}
+{%- set segments = [] -%}
+{%- set cur = namespace(group='', subgroup='', labels=[]) -%}
 {%- for column in columns -%}
-  {%- if column is mapping -%}
-    {%- set col_code = (column.get('name') or column.get('variable') or column.get('variable_name') or '') | trim -%}
-    {%- set name_trans = column.get('name_translations', {}) if column.get('name_translations') is mapping else {} -%}
-    {%- set en_label = (name_trans.get('en', '') or '') | trim -%}
-    {%- set display_label = en_label if en_label else col_code -%}
-    {%- if display_label -%}
-      {%- set __ = column_labels.append(display_label) -%}
+  {%- set label = matrix_column_display_label(column) | trim -%}
+  {%- if label -%}
+    {%- set raw_group = column.get('group') if column is mapping else '' -%}
+    {%- set group = (raw_group | string | trim) if raw_group else '' -%}
+    {%- set raw_sub = column.get('subgroup') if column is mapping and group else '' -%}
+    {%- set subgroup = (raw_sub | string | trim) if raw_sub else '' -%}
+    {%- if group != cur.group or subgroup != cur.subgroup -%}
+      {%- if cur.labels -%}
+        {%- set _ = segments.append({'group': cur.group, 'subgroup': cur.subgroup, 'labels': cur.labels}) -%}
+      {%- endif -%}
+      {%- set cur.group = group -%}
+      {%- set cur.subgroup = subgroup -%}
+      {%- set cur.labels = [label] -%}
+    {%- else -%}
+      {%- set _ = cur.labels.append(label) -%}
     {%- endif -%}
-  {%- elif column is string and column.strip() -%}
-    {%- set __ = column_labels.append(column.strip()) -%}
   {%- endif -%}
 {%- endfor -%}
-{{- column_labels | join(', ') -}}
+{%- if cur.labels -%}
+  {%- set _ = segments.append({'group': cur.group, 'subgroup': cur.subgroup, 'labels': cur.labels}) -%}
+{%- endif -%}
+{%- set grouped = namespace(value=false) -%}
+{%- for seg in segments -%}
+  {%- if seg.group -%}{%- set grouped.value = true -%}{%- endif -%}
+{%- endfor -%}
+{%- if segments and not grouped.value -%}
+<span class="block text-xs text-gray-500 mt-0.5">{% for seg in segments %}{{ seg.labels | join(', ') }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+{%- elif grouped.value -%}
+<span class="fb-matrix-col-outline">
+  {%- set open = namespace(group='') -%}
+  {%- for seg in segments -%}
+    {%- if seg.group != open.group -%}
+      {%- if open.group -%}</span>{%- endif -%}
+      {%- if seg.group -%}
+      <span class="fb-matrix-col-group">
+        <span class="fb-matrix-col-group__name">
+          {%- set chip = matrix_saved_header_color(column_groups, seg.group) | trim -%}
+          {%- if chip -%}<span class="fb-matrix-col-group__swatch" style="background-color: {{ chip }}" aria-hidden="true"></span>{%- endif -%}
+          {{- matrix_group_display_label(column_groups, seg.group) -}}
+        </span>
+      {%- endif -%}
+      {%- set open.group = seg.group -%}
+    {%- endif -%}
+    {%- if seg.group and seg.subgroup -%}
+      <span class="fb-matrix-col-group__sub">
+        <span class="fb-matrix-col-group__sub-name">
+          {%- set sub_key = seg.group ~ '::' ~ seg.subgroup -%}
+          {%- set sub_chip = matrix_saved_header_color(column_groups, sub_key) | trim -%}
+          {%- if sub_chip -%}<span class="fb-matrix-col-group__swatch" style="background-color: {{ sub_chip }}" aria-hidden="true"></span>{%- endif -%}
+          {{- matrix_group_display_label(column_groups, sub_key, seg.subgroup) -}}
+        </span>
+        <span class="fb-matrix-col-group__cols">{{ seg.labels | join(', ') }}</span>
+      </span>
+    {%- elif seg.group -%}
+      <span class="fb-matrix-col-group__cols">{{ seg.labels | join(', ') }}</span>
+    {%- else -%}
+      <span class="fb-matrix-col-flat">{{ seg.labels | join(', ') }}</span>
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if open.group -%}</span>{%- endif -%}
+</span>
+{%- endif -%}
 {%- endmacro %}
 
 {% macro item_label_content(item_type, item_instance) %}
@@ -27,10 +110,7 @@
     {{ item_instance.label }}
   {% endif %}
   {% if item_type == 'matrix' %}
-    {% set _matrix_col_labels = matrix_column_labels_text(item_instance) %}
-    {% if _matrix_col_labels %}
-      <span class="block text-xs text-gray-500 mt-0.5">{{ _matrix_col_labels }}</span>
-    {% endif %}
+    {{ matrix_column_outline(item_instance) }}
   {% endif %}
 {% endmacro %}
 

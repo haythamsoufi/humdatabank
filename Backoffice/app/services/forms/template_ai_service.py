@@ -1513,10 +1513,6 @@ class FormTemplateAIService:
                     col_entry["calculation_readonly"] = False
                 if c.get("calculation_save_value") is True:
                     col_entry["calculation_save_value"] = True
-                if c.get("include_in_row_total") is True:
-                    col_entry["include_in_row_total"] = True
-            elif c.get("include_in_row_total") is False:
-                col_entry["include_in_row_total"] = False
             columns.append(col_entry)
 
         config: Dict[str, Any] = {

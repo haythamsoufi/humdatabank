@@ -771,6 +771,22 @@ Only a System Manager may grant/revoke the `system_manager`, `admin_full`, or `a
 - Behaviour changes for existing users: holders of only `admin.analytics.view` (including `admin_full`) can no longer end sessions / clean up sessions / clear monitoring logs until assigned `admin_system_maintainer`; `admin_plugins_manager` holders can no longer install/upload/uninstall plugins; custom roles that bundle the split-off actions must be given the new codes by an operator (the seeder does not touch custom roles). Non-System-Manager user managers can only delegate entity access within their own scope.
 - Config: set `PLUGIN_UPLOAD_ENABLED=false` (or leave unset in production) to disable ZIP upload, and optional `PLUGIN_PUBLIC_STATIC_PLUGINS` (plugin ids whose `/plugins/static/<id>/...` assets may be fetched anonymously; default none — everything else requires login).
 
+### Assignment access control (user scope and role restriction)
+
+By default every user reaches all assignments within their entities. Two optional, independent restrictions narrow that; a user passes only when **both** allow the assignment. System Managers are never restricted. The policy only hides: it never grants access, so entity scope and RBAC permissions still apply afterwards.
+
+| Restriction | Stored in | Default | Edited at |
+|---|---|---|---|
+| User scope | `user.assignment_access_mode` (`all` / `selected`) + `user_assignment_access` | `all` | Admin > Users > Edit user > *Entity permissions* tab > **Assignment access** |
+| Assignment roles | `assigned_form_allowed_role` (assignment ↔ `rbac_role`) | none = open to everyone | Admin > Assignments > Edit assignment > **Assignment access** |
+
+- **Custom roles** are ordinary `RbacRole` rows (System Managers create them under Admin > Users > Roles, e.g. *Finance*, *HR*). An assignment restricted to roles is visible only to users holding at least one of them.
+- **Permission:** `admin.assignments.access.manage` (in `admin_assignments_manager`, and therefore `admin_full`) is required to change either restriction. Self-editing the user scope is blocked for non-System-Managers.
+- **Code:** [`app/services/assignments/access_service.py`](../Backoffice/app/services/assignments/access_service.py). Use `user_can_access_assigned_form(user, id)` for one assignment and `assignment_access_clause(user, column)` / `apply_assignment_access(query, user, column)` to filter queries so lists and detail pages agree (the clause is `None` for unrestricted users). `AuthorizationService.can_access_assignment` (and therefore `can_edit_assignment`, `can_submit_assignment` and the `form_authorization.py` helpers) consult it, as do the dashboards, assigned-forms / submissions / `/data` APIs, mobile admin content, documents page, activity feed and admin assignment screens. Admin assignment routes answer **404** (not 403) for hidden assignments through a blueprint `before_request`, so existence is not disclosed.
+- **Guard rails:** an `RbacRole` that restricts any assignment cannot be deleted (it would silently open those assignments to everyone). If an admin restricts an assignment to roles they do not hold, they are told it is now hidden from them. Unseen assignments are preserved when an admin without visibility edits a user's selected set.
+- **Migration:** `add_assignment_access_control` (all existing users stay `all`, all assignments stay open). Run `flask rbac seed` (every deploy does) to create the permission.
+- **Known limits (not covered by this policy):** notification fan-out to focal points of a restricted assignment, API-key access and the Data Explorer remain template/country scoped.
+
 ### Troubleshooting
 
 - **A newly-added plugin role/permission is missing from the DB after deploy** — check `entrypoint.sh` actually ran `flask rbac seed` (not skipped via `RBAC_SEED_ON_STARTUP=false`), and that the plugin loaded successfully (`PluginManager.load_plugins()` logs per-plugin failures; one broken plugin doesn't fail the whole boot, but it does mean that plugin's permissions/roles never reach the seeder).

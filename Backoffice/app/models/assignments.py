@@ -36,6 +36,45 @@ assigned_form_submission_review_recipient = Table(
     ),
 )
 
+assigned_form_allowed_role = Table(
+    'assigned_form_allowed_role',
+    db.metadata,
+    Column(
+        'assigned_form_id',
+        Integer,
+        ForeignKey('assigned_form.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column(
+        'role_id',
+        Integer,
+        ForeignKey('rbac_role.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column('created_at', DateTime, default=utcnow, nullable=False),
+    db.Index('ix_assigned_form_allowed_role_role', 'role_id'),
+)
+
+user_assignment_access = Table(
+    'user_assignment_access',
+    db.metadata,
+    Column(
+        'user_id',
+        Integer,
+        ForeignKey('user.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column(
+        'assigned_form_id',
+        Integer,
+        ForeignKey('assigned_form.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column('created_at', DateTime, default=utcnow, nullable=False),
+    db.Index('ix_user_assignment_access_user', 'user_id'),
+    db.Index('ix_user_assignment_access_assignment', 'assigned_form_id'),
+)
+
 
 class ReportingPeriod(db.Model):
     """Typed reporting period catalog for assignment periods."""
@@ -131,6 +170,14 @@ class AssignedForm(db.Model):
     )
     activated_by_user = relationship('User', foreign_keys=[activated_by_user_id])
     deactivated_by_user = relationship('User', foreign_keys=[deactivated_by_user_id])
+    # Custom RBAC roles allowed to see and work on this assignment. Empty means
+    # every user who otherwise has access (the default).
+    allowed_roles = relationship(
+        'RbacRole',
+        secondary=assigned_form_allowed_role,
+        lazy='select',
+        order_by='RbacRole.name',
+    )
 
     # Relationship to country-specific AssignmentEntityStatus entries (filtered view)
     country_statuses = relationship(
@@ -158,6 +205,15 @@ class AssignedForm(db.Model):
         db.Index('ix_assigned_form_deactivated_by', 'deactivated_by_user_id'),
         db.Index('ix_assigned_form_custom_name', 'custom_name'),
     )
+
+    @property
+    def is_role_restricted(self) -> bool:
+        """True when only users holding one of ``allowed_roles`` may access this assignment."""
+        return bool(self.allowed_roles)
+
+    @property
+    def allowed_role_ids(self) -> list:
+        return [int(r.id) for r in self.allowed_roles]
 
     @property
     def submission_review_recipient_user_ids_csv(self) -> str:

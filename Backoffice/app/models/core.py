@@ -20,7 +20,7 @@ import json
 from ..extensions import db, login
 from sqlalchemy.sql import text
 from sqlalchemy import inspect
-from .assignments import AssignmentEntityStatus
+from .assignments import AssignmentEntityStatus, user_assignment_access
 from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
 
@@ -89,6 +89,24 @@ class User(UserMixin, db.Model):
 
     # Quiz game score
     quiz_score = db.Column(db.Integer, default=0, nullable=False)  # Total quiz points accumulated
+
+    # 'all' (default): every assignment on the user's entities is visible.
+    # 'selected': only the assignments listed in ``selected_assignments``.
+    assignment_access_mode = db.Column(
+        db.String(20), default='all', server_default='all', nullable=False
+    )
+    selected_assignments = relationship(
+        'AssignedForm',
+        secondary=user_assignment_access,
+        lazy='select',
+    )
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "assignment_access_mode IN ('all','selected')",
+            name='ck_user_assignment_access_mode',
+        ),
+    )
 
     # Countries derived via UserEntityPermission (entity_type='country')
     countries = relationship(

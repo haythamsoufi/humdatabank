@@ -18,7 +18,7 @@
     --chat-input-min-height: 44px;
 }
 
-/* AI Chatbot FAB – dark pill with robot icon */
+/* AI Chatbot FAB – dark pill with bubbles icon (same mark as the mobile app) */
 #aiChatbotFAB {
     position: fixed;
     bottom: var(--chat-fab-bottom-inset);
@@ -203,16 +203,18 @@
 }
 
 #aiChatbotFAB .robot-icon {
-    font-size: 0.95rem;
+    display: flex;
+    line-height: 0;
+    font-size: 1.2rem;
     color: rgba(255, 255, 255, 0.88);
     transition: all 0.3s ease;
     transform-origin: center;
 }
 
-#aiChatbotFAB .robot-icon.fas.fa-robot,
-#aiChatbotFAB i.fas.fa-robot {
-    font-weight: 900 !important;
-    font-family: "Font Awesome 6 Free" !important;
+#aiChatbotFAB .robot-icon svg {
+    width: 1em;
+    height: 1em;
+    display: block;
 }
 
 #aiChatbotFAB .fab-label {
@@ -717,9 +719,20 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
     letter-spacing: -0.01em;
 }
 
-.chat-header h3 .fa-robot {
+.chat-header h3 .chat-assistant-icon {
+    display: inline-block;
+    width: 1.2em;
+    height: 1.2em;
+    line-height: 0;
     color: #94a3b8;
     margin-right: 8px;
+    vertical-align: -0.22em;
+}
+
+.chat-header h3 .chat-assistant-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 /* Beta tester badge — floats next to the assistant name */
@@ -2432,8 +2445,8 @@ html[dir="rtl"] .streaming-cursor::after {
     margin-right: 2px;
 }
 
-/* Chat header robot icon margin */
-html[dir="rtl"] .chat-header h3 .fa-robot {
+/* Chat header bubbles icon margin */
+html[dir="rtl"] .chat-header h3 .chat-assistant-icon {
     margin-right: 0;
     margin-left: 8px;
 }

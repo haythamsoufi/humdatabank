@@ -464,7 +464,7 @@ html[dir="rtl"] #mobileFloatingMenuNav .mobile-language-menu-btn__chevron {
         animation: none;
     }
     #aiChatbotFAB .robot-icon {
-        font-size: 1.25rem;
+        font-size: 1.75rem;
     }
 
     /* LTR: chatbot bottom-right, admin menu bottom-left */

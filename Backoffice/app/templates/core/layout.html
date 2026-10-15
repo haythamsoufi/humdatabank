@@ -450,7 +450,7 @@
     <button id="aiChatbotFAB" aria-label="{{ _('Open %(assistant)s', assistant=CHATBOT_NAME) if CHATBOT_NAME else _('Open AI Assistant')|forceescape }}">
         <span class="fab-icon-slot">
             <div class="robot-face">
-                <i class="fas fa-robot robot-icon"></i>
+                {{ svg_icon('bubbles', 'robot-icon') }}
             </div>
         </span>
         <span class="fab-label">{{ CHATBOT_NAME or _('AI Assistant') }}</span>
@@ -473,7 +473,7 @@
                 </button>
                 <div class="chat-header-center">
                     <h3 id="chatTitle">
-                        <i class="fas fa-robot mr-2" aria-hidden="true"></i>
+                        {{ svg_icon('bubbles', 'chat-assistant-icon') }}
                         <span id="chatFloatingTitleLabel">{{ CHATBOT_NAME if CHATBOT_NAME else _('Assistant') }}</span>
                         {% if user_is_explicit_beta_tester(current_user) %}
                         <span class="chat-beta-badge" title="{{ _('You have early beta access — thank you for helping us build this!')|forceescape }}">Beta</span>

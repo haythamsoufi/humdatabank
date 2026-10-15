@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.models import db, User, AssignedForm, Country, FormTemplate, FormTemplateVersion, FormData, PublicSubmission, SubmittedDocument, FormSection, FormItem, FormItemType, QuestionType, EntityActivityLog, CountryAccessRequest
 from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
+from app.services.assignments.access_service import apply_assignment_access
 from app.models.rbac import RbacUserRole, RbacRole
 from app.models.enums import EntityType
 from app.models.system import CountryAccessRequestStatus
@@ -566,8 +567,12 @@ def dashboard():
             AF = aliased(AssignedForm)
             # Only active assignments (close no longer deactivates; deactivated rows are hidden)
             assigned_forms_statuses = (
-                AssignmentEntityStatus.query
-                .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id)
+                apply_assignment_access(
+                    AssignmentEntityStatus.query
+                    .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id),
+                    current_user,
+                    AssignmentEntityStatus.assigned_form_id,
+                )
                 .options(
                     db.joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template),
                     db.joinedload(AssignmentEntityStatus.submitted_by_user),
@@ -728,7 +733,9 @@ def dashboard():
             if selected_country is not None:
                 current_app.logger.debug(f"Fetching public submissions for selected country {selected_country.name} (ID: {selected_country.id}).")
 
-                public_submissions = PublicSubmission.query.filter_by(country_id=selected_country.id)\
+                public_submissions = apply_assignment_access(
+                    PublicSubmission.query, current_user, PublicSubmission.assigned_form_id
+                ).filter_by(country_id=selected_country.id)\
                     .options(
                         db.joinedload(PublicSubmission.assigned_form).joinedload(AssignedForm.template) # Eager load assignment and template
                     )\

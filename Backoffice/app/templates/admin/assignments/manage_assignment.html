@@ -419,6 +419,47 @@
         </div>
         {% endif %}
 
+        {# Access control: restrict the assignment to users holding selected roles #}
+        {% if assignment_access_roles is defined and (can_manage_assignment_access or selected_allowed_role_ids) %}
+        <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200" id="assignment-access-control">
+            <fieldset {% if not can_manage_assignment_access %}disabled{% endif %}>
+                <legend class="block text-gray-700 text-sm font-semibold mb-1">
+                    {{ _('Who can access this assignment') }}
+                </legend>
+                <p class="text-xs text-gray-500 mb-3">
+                    {% if selected_allowed_role_ids %}
+                        {{ _('Restricted: only users who hold at least one of the selected roles can see, open and edit this assignment.') }}
+                    {% else %}
+                        {{ _('Open to all users: anyone with access to the assigned entities can see and work on this assignment. Select roles to restrict it.') }}
+                    {% endif %}
+                    {{ _('System Managers always have access.') }}
+                </p>
+                <input type="hidden" name="allowed_roles_submitted" value="1">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
+                    {% for role in assignment_access_roles %}
+                    <label class="flex items-start gap-2 cursor-pointer rounded border border-gray-200 bg-white px-3 py-2">
+                        <input type="checkbox"
+                               name="allowed_role_ids"
+                               value="{{ role.id }}"
+                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                               {% if role.id in selected_allowed_role_ids %}checked{% endif %}>
+                        <span class="min-w-0">
+                            <span class="block text-sm text-gray-800 font-medium truncate">{{ role.name }}</span>
+                            <span class="block text-xs text-gray-500 truncate">{{ role.code }}</span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if current_user_has_role('system_manager') %}
+                <p class="mt-2 text-xs text-gray-500">
+                    {{ _('Need a new group such as Finance or HR?') }}
+                    <a href="{{ url_for('rbac_management.manage_roles') }}" class="text-blue-600 hover:underline">{{ _('Create a custom role') }}</a>
+                </p>
+                {% endif %}
+            </fieldset>
+        </div>
+        {% endif %}
+
         {# Hidden fields for country selections (for new assignments) - populated from Entity Assignments tab #}
         {% if not assignment %}
         <div id="country-selections-container" class="hidden">

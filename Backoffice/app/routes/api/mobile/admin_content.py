@@ -132,7 +132,11 @@ def list_assignments():
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
 
-    paginated = AssignedForm.query.options(
+    from app.services.assignments.access_service import apply_assignment_access
+
+    paginated = apply_assignment_access(
+        AssignedForm.query, current_user, AssignedForm.id
+    ).options(
         db.joinedload(AssignedForm.template),
     ).order_by(AssignedForm.period_name.desc()).paginate(page=page, per_page=per_page, error_out=False)
 
@@ -170,10 +174,12 @@ def get_assignment(assignment_id):
     from app.models import AssignedForm, AssignmentEntityStatus
     from app.services.organization.entity_service import EntityService
 
+    from app.services.assignments.access_service import user_can_access_assigned_form
+
     a = AssignedForm.query.options(
         db.joinedload(AssignedForm.template),
     ).get(assignment_id)
-    if not a:
+    if not a or not user_can_access_assigned_form(current_user, a.id):
         return mobile_not_found('Assignment not found')
 
     public_submission_count = None
@@ -266,8 +272,10 @@ def delete_assignment(assignment_id):
     """Delete a form assignment."""
     from app.models import AssignedForm
 
+    from app.services.assignments.access_service import user_can_access_assigned_form
+
     assignment = db.session.get(AssignedForm, assignment_id)
-    if not assignment:
+    if not assignment or not user_can_access_assigned_form(current_user, assignment.id):
         return mobile_not_found('Assignment not found')
 
     try:
@@ -297,8 +305,10 @@ def toggle_public_access(assignment_id):
     """Toggle public access for an assignment."""
     from app.models import AssignedForm
 
+    from app.services.assignments.access_service import user_can_access_assigned_form
+
     assignment = db.session.get(AssignedForm, assignment_id)
-    if not assignment:
+    if not assignment or not user_can_access_assigned_form(current_user, assignment.id):
         return mobile_not_found('Assignment not found')
 
     if not assignment.has_public_url():
@@ -324,8 +334,10 @@ def generate_public_url(assignment_id):
     """Generate a public URL for an assignment."""
     from app.models import AssignedForm
 
+    from app.services.assignments.access_service import user_can_access_assigned_form
+
     assignment = db.session.get(AssignedForm, assignment_id)
-    if not assignment:
+    if not assignment or not user_can_access_assigned_form(current_user, assignment.id):
         return mobile_not_found('Assignment not found')
 
     try:

@@ -103,6 +103,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.assignments.entities.status", "Update assignment entity status", "Update entity status and due dates without changing assignment details or adding/removing entities"),
         ("admin.assignments.entities.manage", "Manage assignment entities", "Add/remove entities from assignments (also allows updating entity status)"),
         ("admin.assignments.public_submissions.manage", "Manage public submissions", "Manage public submissions"),
+        ("admin.assignments.access.manage", "Manage assignment access", "Restrict assignments to specific roles and limit users to a selected set of assignments"),
 
         # Assignment participation (AES-level)
         ("assignment.view", "View assignments", "View assignments (read-only)"),
@@ -319,6 +320,7 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 "admin.assignments.entities.status",
                 "admin.assignments.entities.manage",
                 "admin.assignments.public_submissions.manage",
+                "admin.assignments.access.manage",
             ],
         },
         {

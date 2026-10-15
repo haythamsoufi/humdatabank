@@ -25,6 +25,7 @@ from app.models.assignments import AssignmentEntityStatus, PublicSubmission
 from app.models.core import UserEntityPermission
 from app.models.enums import EntityType
 from app.models.documents import SubmittedDocument
+from app.services.assignments.access_service import apply_assignment_access
 from app.services.assignments.completion_service import AssignmentCompletionService
 from app.utils.auth import require_api_key
 from app.services.security.api_authentication import redact_request_params
@@ -693,8 +694,12 @@ def get_dashboard():
             AF = aliased(AssignedForm)
             # Active assignments only, plus closed ones (inactive non-closed forms are hidden on web)
             assigned_forms_statuses = (
-                AssignmentEntityStatus.query
-                .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id)
+                apply_assignment_access(
+                    AssignmentEntityStatus.query
+                    .join(AF, AF.id == AssignmentEntityStatus.assigned_form_id),
+                    current_user,
+                    AssignmentEntityStatus.assigned_form_id,
+                )
                 .options(
                     joinedload(AssignmentEntityStatus.assigned_form)
                     .joinedload(AssignedForm.template)

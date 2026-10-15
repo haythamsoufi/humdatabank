@@ -87,6 +87,20 @@
             }
         },
         {
+            field: 'allowed_roles_text',
+            headerName: cfg.t.access_a1c0e7d2,
+            width: 200, minWidth: 140, maxWidth: 320,
+            filter: 'agTextColumnFilter', sortable: true,
+            cellRenderer: function (params) {
+                var roles = params.data.allowed_roles || [];
+                if (!roles.length) {
+                    return '<span class="text-gray-400 text-xs">' + cfg.t.all_users_b27d41f9 + '</span>';
+                }
+                var text = roles.join(', ').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return '<span class="inline-flex items-center gap-1.5 text-amber-700" title="' + text + '"><i class="fas fa-lock text-xs"></i>' + text + '</span>';
+            }
+        },
+        {
             field: 'due_date',
             headerName: cfg.t.due_date_4e61d8e3,
             width: 140, minWidth: 110, maxWidth: 180,

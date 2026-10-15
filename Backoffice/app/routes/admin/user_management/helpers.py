@@ -1086,3 +1086,93 @@ def _apply_user_translator_languages(user_id: int, *, can_manage: bool) -> None:
         languages,
         assigned_by_user_id=assigned_by,
     )
+
+
+def _assignment_access_label(assignment) -> str:
+    label = assignment.display_name
+    period = (assignment.period_name or "").strip()
+    if assignment.custom_name and period and period not in label:
+        label = f"{label} ({period})"
+    return label
+
+
+def _assignment_access_form_context(user=None, *, can_manage: bool) -> dict:
+    """Data for the per-user "Assignment access" picker on the user form."""
+    from flask import request
+    from flask_login import current_user
+    from sqlalchemy.orm import joinedload
+
+    from app.models import AssignedForm
+    from app.services.assignments.access_service import (
+        ACCESS_MODE_ALL,
+        ACCESS_MODE_SELECTED,
+        apply_assignment_access,
+        normalize_access_mode,
+    )
+
+    if request.method == "POST" and request.form.get("assignment_access_submitted"):
+        mode = normalize_access_mode(request.form.get("assignment_access_mode"))
+        selected_ids = {
+            int(v) for v in request.form.getlist("selected_assignment_ids") if str(v).strip().isdigit()
+        }
+    elif user is not None:
+        mode = normalize_access_mode(user.assignment_access_mode)
+        selected_ids = {int(a.id) for a in user.selected_assignments}
+    else:
+        mode, selected_ids = ACCESS_MODE_ALL, set()
+
+    assignments = []
+    if can_manage:
+        rows = (
+            apply_assignment_access(AssignedForm.query, current_user, AssignedForm.id)
+            .options(joinedload(AssignedForm.template))
+            .order_by(AssignedForm.assigned_at.desc(), AssignedForm.id.desc())
+            .all()
+        )
+        assignments = [
+            {
+                "id": a.id,
+                "label": _assignment_access_label(a),
+                "template_name": a.template.name if a.template else "",
+            }
+            for a in rows
+        ]
+    return {
+        "assignment_access_mode": mode,
+        "assignment_access_selected_ids": selected_ids,
+        "assignment_access_options": assignments,
+        "assignment_access_selected_mode": ACCESS_MODE_SELECTED,
+        "can_manage_assignment_access": can_manage,
+    }
+
+
+def _apply_assignment_access_from_request(user: User, *, can_manage: bool) -> bool:
+    """Persist the posted per-user assignment scope. Returns True when it changed.
+
+    Assignments the acting admin cannot see are preserved: they are neither offered in the
+    picker nor removed by a save.
+    """
+    from flask_login import current_user
+
+    from app.models import AssignedForm
+    from app.services.assignments.access_service import (
+        apply_assignment_access,
+        normalize_access_mode,
+        set_user_assignment_access,
+    )
+
+    if not can_manage or not request.form.get("assignment_access_submitted"):
+        return False
+
+    mode = normalize_access_mode(request.form.get("assignment_access_mode"))
+    posted = {
+        int(v) for v in request.form.getlist("selected_assignment_ids") if str(v).strip().isdigit()
+    }
+    visible = {
+        int(row[0])
+        for row in apply_assignment_access(
+            db.session.query(AssignedForm.id), current_user, AssignedForm.id
+        ).all()
+    }
+    hidden_existing = {int(a.id) for a in user.selected_assignments} - visible
+    return set_user_assignment_access(user, mode, (posted & visible) | hidden_existing)

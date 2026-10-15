@@ -68,6 +68,11 @@ from app.models.assignments import (
     SUBMISSION_REVIEW_RECIPIENT_MODES,
 )
 from app.services.organization.authorization_service import AuthorizationService
+from app.services.assignments.access_service import (
+    apply_assignment_access,
+    set_assignment_allowed_roles,
+    user_can_access_assigned_form,
+)
 from app.utils.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
@@ -75,6 +80,37 @@ bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
 ASSIGNMENT_DETAILS_PERMISSION = "admin.assignments.edit"
 ASSIGNMENT_ENTITIES_MANAGE_PERMISSION = "admin.assignments.entities.manage"
 ASSIGNMENT_ENTITY_STATUS_PERMISSION = "admin.assignments.entities.status"
+ASSIGNMENT_ACCESS_PERMISSION = "admin.assignments.access.manage"
+
+
+@bp.before_request
+def _hide_inaccessible_assignments():
+    """Answer 404 for assignments the signed-in user may not reach (access control).
+
+    Unknown and hidden ids look identical so a restricted assignment's existence is not
+    disclosed. Unauthenticated requests fall through to the route's own guards.
+    """
+    if not getattr(current_user, "is_authenticated", False):
+        return None
+    view_args = request.view_args or {}
+    assigned_form_id = view_args.get("assignment_id")
+    if assigned_form_id is None and view_args.get("aes_id") is not None:
+        assigned_form_id = (
+            db.session.query(AssignmentEntityStatus.assigned_form_id)
+            .filter(AssignmentEntityStatus.id == view_args["aes_id"])
+            .scalar()
+        )
+    elif assigned_form_id is None and view_args.get("submission_id") is not None:
+        assigned_form_id = (
+            db.session.query(PublicSubmission.assigned_form_id)
+            .filter(PublicSubmission.id == view_args["submission_id"])
+            .scalar()
+        )
+    if assigned_form_id is None:
+        return None
+    if not user_can_access_assigned_form(current_user, assigned_form_id):
+        abort(404)
+    return None
 
 
 def _has_assignment_perm(code):
@@ -156,18 +192,50 @@ def _flash_page_mode_change(summary: dict, *, template_changed: bool = False) ->
     flash(" ".join(str(part) for part in parts), "warning")
 
 
-def _manage_assignment_permission_context(*, is_create=False):
+def _can_manage_assignment_access():
+    return _has_assignment_perm(ASSIGNMENT_ACCESS_PERMISSION)
+
+
+def _posted_allowed_role_ids() -> list:
+    return [int(v) for v in request.form.getlist("allowed_role_ids") if str(v).strip().isdigit()]
+
+
+def _assignment_access_context(assignment=None) -> dict:
+    """Role-restriction picker data for manage_assignment.html."""
+    from app.models.rbac import RbacRole
+
+    if request.method == "POST" and request.form.get("allowed_roles_submitted"):
+        selected = set(_posted_allowed_role_ids())
+    else:
+        selected = {int(r.id) for r in assignment.allowed_roles} if assignment is not None else set()
+    return {
+        "assignment_access_roles": RbacRole.query.order_by(RbacRole.name).all(),
+        "selected_allowed_role_ids": selected,
+        "can_manage_assignment_access": _can_manage_assignment_access(),
+    }
+
+
+def _apply_assignment_access_from_form(assignment) -> bool:
+    """Save the posted role restriction when the actor may manage assignment access."""
+    if not _can_manage_assignment_access() or not request.form.get("allowed_roles_submitted"):
+        return False
+    return set_assignment_allowed_roles(assignment, _posted_allowed_role_ids())
+
+
+def _manage_assignment_permission_context(*, is_create=False, assignment=None):
     """UI flags for manage_assignment.html. Create flow keeps full details/entity add."""
     if is_create:
         return {
             "can_edit_assignment_details": True,
             "can_manage_assignment_entities": True,
             "can_update_assignment_entity_status": False,
+            **_assignment_access_context(),
         }
     return {
         "can_edit_assignment_details": _can_edit_assignment_details(),
         "can_manage_assignment_entities": _can_manage_assignment_entities(),
         "can_update_assignment_entity_status": _can_update_assignment_entity_status(),
+        **_assignment_access_context(assignment),
     }
 
 
@@ -221,7 +289,7 @@ def _copy_source_assignment_label(assignment):
 def _copy_source_assignment_groups():
     """Assignments whose template can still be selected on the create form."""
     rows = (
-        AssignedForm.query
+        apply_assignment_access(AssignedForm.query, current_user, AssignedForm.id)
         .options(joinedload(AssignedForm.template).joinedload(FormTemplate.published_version))
         .join(FormTemplate, AssignedForm.template_id == FormTemplate.id)
         .filter(FormTemplate.published_version_id.isnot(None))
@@ -296,6 +364,7 @@ def _assignment_copy_config(assignment):
             assignment.submission_review_recipient_mode or "fds_member"
         ),
         "submission_review_recipient_users": reviewers,
+        "allowed_role_ids": assignment.allowed_role_ids,
         "country_ids": [
             aes.entity_id for aes in statuses
             if aes.entity_type == EntityType.country.value
@@ -595,7 +664,9 @@ class EditAssignmentDetailsForm(FlaskForm):
 @bp.route("/assignments", methods=["GET"])
 @permission_required('admin.assignments.view')
 def manage_assignments():
-    assignments = AssignedForm.query.options(
+    assignments = apply_assignment_access(
+        AssignedForm.query, current_user, AssignedForm.id
+    ).options(
         db.joinedload(AssignedForm.template),
     ).order_by(AssignedForm.assigned_at.desc(), AssignedForm.id.desc()).all()
 
@@ -685,7 +756,9 @@ def api_search_submission_review_recipients():
 @permission_required('admin.assignments.view')
 def assignments_gantt():
     """Display assignments in a Gantt chart timeline view grouped by template."""
-    assignments = AssignedForm.query.options(
+    assignments = apply_assignment_access(
+        AssignedForm.query, current_user, AssignedForm.id
+    ).options(
         db.joinedload(AssignedForm.template),
     ).order_by(AssignedForm.assigned_at.asc()).all()
 
@@ -845,6 +918,7 @@ def new_assignment():
 
             db.session.add(new_assignment)
             db.session.flush()
+            _apply_assignment_access_from_form(new_assignment)
 
             # Collect all entities to add to the assignment
             created_aes_list = []
@@ -977,6 +1051,12 @@ def new_assignment():
                     success_msg += f" Public URL generated and is {public_status}."
                 flash(success_msg, "success")
 
+            if not user_can_access_assigned_form(current_user, new_assignment.id):
+                flash(
+                    _("This assignment is restricted to roles you do not hold, so it is hidden from your lists."),
+                    "info",
+                )
+                return redirect(url_for("assignment_management.manage_assignments"))
             return redirect(url_for("assignment_management.edit_assignment", assignment_id=new_assignment.id))
         except Exception as e:
             request_transaction_rollback()
@@ -1024,6 +1104,15 @@ def check_assignment_duplicate():
     existing = AssignedForm.query.filter_by(template_id=template_id, period_name=period_name).first()
     if not existing:
         return json_ok(exists=False)
+
+    if not user_can_access_assigned_form(current_user, existing.id):
+        return json_ok(exists=True, assignment={
+            "id": None,
+            "template_id": existing.template_id,
+            "template_name": None,
+            "period_name": existing.period_name,
+            "restricted": True,
+        })
 
     template_name = None
     with suppress(Exception):
@@ -1344,6 +1433,7 @@ def edit_assignment(assignment_id):
             assignment.email_attach_excel = bool(form.email_attach_excel.data)
             sync_assignment_custom_excel_flags(assignment)
             _apply_submission_review_recipient_from_form(assignment, form)
+            _apply_assignment_access_from_form(assignment)
 
             template_changed = previous_template_id != assignment.template_id
             page_mode_changed = previous_page_mode != next_page_mode
@@ -1405,6 +1495,11 @@ def edit_assignment(assignment_id):
                     # "Updated an assignment: no fields changed" audit row.
                     skip_activity_log()
             flash(f"Assignment '{assignment.period_name}' updated successfully.", "success")
+            if not user_can_access_assigned_form(current_user, assignment.id):
+                flash(
+                    _("This assignment is now restricted to roles you do not hold, so it is hidden from your lists."),
+                    "info",
+                )
             return redirect(url_for("assignment_management.manage_assignments"))
         except Exception as e:
             request_transaction_rollback()
@@ -1499,7 +1594,7 @@ def edit_assignment(assignment_id):
                          title=f"Edit Assignment: {assignment.period_name}",
                          enabled_entity_types=enabled_entity_groups,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment),
-                         **_manage_assignment_permission_context(),
+                         **_manage_assignment_permission_context(assignment=assignment),
                          **_manage_assignment_country_context())
 
 @bp.route("/assignments/edit/<int:assignment_id>/add_countries", methods=["POST"])
@@ -1996,7 +2091,9 @@ def toggle_public_access(assignment_id):
 def list_public_submissions():
     """View all public submissions across all assignments."""
     # Get all public submissions with related data
-    submissions = PublicSubmission.query.options(
+    submissions = apply_assignment_access(
+        PublicSubmission.query, current_user, PublicSubmission.assigned_form_id
+    ).options(
         db.joinedload(PublicSubmission.assigned_form).joinedload(AssignedForm.template),
         db.joinedload(PublicSubmission.country)
     ).order_by(PublicSubmission.submitted_at.desc()).all()

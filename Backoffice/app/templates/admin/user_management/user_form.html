@@ -1068,6 +1068,71 @@ window.userFormConfig = {
                 {% endif %}
                     </div>
                 </div>
+
+                {# Assignment access (per-user scope: all assignments or a selected set) #}
+                <div id="assignment-access-section" class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 sm:p-5 space-y-4"
+                     data-selected-mode="{{ assignment_access_selected_mode }}">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">
+                            <i class="fas fa-clipboard-check mr-1.5 text-gray-500"></i>{{ _('Assignment access') }}
+                        </h3>
+                        <p class="mt-1 text-sm text-gray-600">
+                            {{ _('By default a user can access every assignment within their entities. Limit this user to a selected set of assignments if needed. Assignments can also be restricted to specific roles from the assignment settings; both rules must allow access. System Managers are never restricted.') }}
+                        </p>
+                    </div>
+                    {% if can_manage_assignment_access %}
+                    <input type="hidden" name="assignment_access_submitted" value="1">
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 text-sm text-gray-800">
+                            <input type="radio" name="assignment_access_mode" value="all"
+                                   class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                                   {% if assignment_access_mode != assignment_access_selected_mode %}checked{% endif %}>
+                            {{ _('All assignments in their entities') }}
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-800">
+                            <input type="radio" name="assignment_access_mode" value="{{ assignment_access_selected_mode }}"
+                                   class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                                   {% if assignment_access_mode == assignment_access_selected_mode %}checked{% endif %}>
+                            {{ _('Only selected assignments') }}
+                        </label>
+                    </div>
+                    <div id="assignment-access-picker" class="{% if assignment_access_mode != assignment_access_selected_mode %}hidden{% endif %} space-y-2">
+                        <input type="search" id="assignment-access-filter" autocomplete="off"
+                               class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                               placeholder="{{ _('Filter assignments...')|forceescape }}">
+                        <div class="max-h-72 overflow-y-auto rounded-md border border-gray-200 divide-y divide-gray-100">
+                            {% for a in assignment_access_options %}
+                            <label class="assignment-access-option flex items-start gap-2 px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                                   data-search="{{ (a.label ~ ' ' ~ a.template_name)|lower }}">
+                                <input type="checkbox" name="selected_assignment_ids" value="{{ a.id }}"
+                                       class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                       {% if a.id in assignment_access_selected_ids %}checked{% endif %}>
+                                <span>
+                                    <span class="font-medium">{{ a.label }}</span>
+                                    {% if a.template_name and a.template_name not in a.label %}
+                                    <span class="block text-xs text-gray-500">{{ a.template_name }}</span>
+                                    {% endif %}
+                                </span>
+                            </label>
+                            {% else %}
+                            <p class="px-3 py-4 text-sm text-gray-500">{{ _('No assignments available.') }}</p>
+                            {% endfor %}
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            {{ _('A user restricted to a selected set with nothing ticked cannot access any assignment.') }}
+                        </p>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-700">
+                        {% if assignment_access_mode == assignment_access_selected_mode %}
+                        {{ _('This user is limited to a selected set of assignments.') }}
+                        {% else %}
+                        {{ _('This user can access all assignments in their entities.') }}
+                        {% endif %}
+                        <span class="text-gray-500">{{ _('You do not have permission to change this.') }}</span>
+                    </p>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
 
@@ -1529,6 +1594,7 @@ window.userFormConfig = {
 
 <script src="{{ static_url('js/components/hierarchical-entity-selector.js') }}"></script>
 <script src="{{ static_url('js/admin/user-form.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ static_url('js/admin/user-assignment-access.js') }}" nonce="{{ csp_nonce() }}"></script>
 {% if not read_only and form.profile_color is defined %}
 {# Profile colour picker modal ΓÇö rendered at body level so fixed positioning is never clipped #}
 <div id="user-profile-color-modal"

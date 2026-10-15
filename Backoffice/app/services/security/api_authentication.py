@@ -714,6 +714,15 @@ def apply_user_template_scoping(
     if public_form_data_query is not None:
         public_form_data_query = public_form_data_query.filter(AssignedForm.template_id.in_(allowed_template_ids))
 
+    # Assignment access control (per-user scope + per-assignment roles)
+    from app.services.assignments.access_service import assignment_access_clause
+    access_clause = assignment_access_clause(auth_user, AssignedForm.id)
+    if access_clause is not None:
+        if assigned_form_data_query is not None:
+            assigned_form_data_query = assigned_form_data_query.filter(access_clause)
+        if public_form_data_query is not None:
+            public_form_data_query = public_form_data_query.filter(access_clause)
+
     # Entity/country scoping: restrict to countries the user has permission for
     allowed_country_ids = _get_user_allowed_country_ids(auth_user)
     if allowed_country_ids is not None:

@@ -361,6 +361,7 @@ class TestManageGrants:
 
         with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True), \
+             patch("app.routes.admin.rbac_management.desc", return_value=MagicMock()), \
              patch("app.routes.admin.rbac_management.RbacAccessGrant") as mock_ag, \
              patch("app.routes.admin.rbac_management.User") as mock_u, \
              patch("app.routes.admin.rbac_management.RbacRole") as mock_rr, \

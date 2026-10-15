@@ -38,6 +38,7 @@ from app.services.security.api_authentication import (
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.request_validation import enforce_csrf_json
 from app import db
+from app.services.assignments.access_service import apply_assignment_access
 
 
 @api_bp.route('/assigned-forms', methods=['GET'])
@@ -134,6 +135,7 @@ def get_assigned_forms():
                         'period_name_filter': period_name
                     })
             query = query.filter(AssignedForm.template_id.in_(allowed_template_ids))
+            query = apply_assignment_access(query, auth_user, AssignedForm.id)
             session_country_ids = _get_user_allowed_country_ids(auth_user)
 
         # Apply filters

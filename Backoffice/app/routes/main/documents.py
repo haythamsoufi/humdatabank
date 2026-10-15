@@ -5,6 +5,7 @@ from app.models.documents import submitted_document_countries
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import EntityType
 from app.services.organization.entity_service import EntityService
+from app.services.assignments.access_service import assignment_access_clause
 from sqlalchemy import and_, or_, literal
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from datetime import datetime
@@ -106,7 +107,8 @@ def documents_submit():
         AssignmentEntityStatus.entity_id == sel_id,
     )
 
-    assignment_raw = (
+    assignment_access = assignment_access_clause(current_user, AssignmentEntityStatus.assigned_form_id)
+    assignment_raw_query = (
         db.session.query(
             SubmittedDocument,
             SubmittedDocument.status.label("status"),
@@ -119,9 +121,10 @@ def documents_submit():
         .join(AssignmentEntityStatus, SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id)
         .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
         .filter(SubmittedDocument.assignment_entity_status_id.in_(aes_id_subq))
-        .order_by(SubmittedDocument.uploaded_at.desc())
-        .all()
     )
+    if assignment_access is not None:
+        assignment_raw_query = assignment_raw_query.filter(assignment_access)
+    assignment_raw = assignment_raw_query.order_by(SubmittedDocument.uploaded_at.desc()).all()
 
     # All AES rows share the same (sel_type, sel_id) because of the subquery filter above,
     # so we resolve the country once instead of calling aes.country (→ EntityService DB

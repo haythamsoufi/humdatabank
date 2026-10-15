@@ -977,6 +977,13 @@ class AuthorizationService:
         if AuthorizationService.is_system_manager(user):
             return True
 
+        # Assignment access control (per-user scope + per-assignment roles) hides an
+        # assignment even from admins with global assignment view.
+        from app.services.assignments.access_service import user_can_access_assigned_form
+
+        if not user_can_access_assigned_form(user, assignment_entity_status.assigned_form_id):
+            return False
+
         # Build a scope payload for scoped grants
         try:
             scope = {

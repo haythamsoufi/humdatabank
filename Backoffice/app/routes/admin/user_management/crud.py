@@ -55,6 +55,8 @@ from .helpers import (
     _get_role_codes_by_id,
     _get_missing_rbac_role_codes_for_display,
     _RESTRICTED_RBAC_ROLE_CODES,
+    _assignment_access_form_context,
+    _apply_assignment_access_from_request,
 )
 
 
@@ -699,6 +701,10 @@ def new_user():
         current_is_sys_mgr
         or AuthorizationService.has_rbac_permission(current_user, 'admin.users.grants.manage')
     )
+    can_manage_assignment_access_create = (
+        current_is_sys_mgr
+        or AuthorizationService.has_rbac_permission(current_user, 'admin.assignments.access.manage')
+    )
 
     # Only a system manager can assign the System Manager RBAC role
     sys_role = RbacRole.query.filter_by(code="system_manager").first()
@@ -900,6 +906,10 @@ def new_user():
                                 ))
                     db.session.flush()
 
+                    _apply_assignment_access_from_request(
+                        new_user, can_manage=can_manage_assignment_access_create
+                    )
+
                     # Log admin action for user creation
                     log_admin_action(
                         action_type='user_create',
@@ -917,6 +927,8 @@ def new_user():
                             'profile_color': new_user.profile_color,
                             'country_ids': assigned_country_ids or [],
                             'entity_permissions': entity_permissions,
+                            'assignment_access_mode': new_user.assignment_access_mode,
+                            'assignment_access_ids': sorted(int(a.id) for a in new_user.selected_assignments),
                             'pre_provisioned_for_sso': sso_configured,
                         },
                         risk_level='medium'
@@ -973,6 +985,9 @@ def new_user():
                            profile_palette_hexes=PROFILE_COLORS,
                            role_codes_by_id=_get_role_codes_by_id(),
                            missing_rbac_role_codes=_get_missing_rbac_role_codes_for_display(current_is_sys_mgr),
+                           **_assignment_access_form_context(
+                               None, can_manage=can_manage_assignment_access_create
+                           ),
                            **_get_translator_form_context())
 
 @bp.route("/users/edit_user/<int:user_id>", methods=["GET", "POST"])
@@ -1015,6 +1030,10 @@ def edit_user(user_id):
         or AuthorizationService.has_rbac_permission(current_user, 'admin.users.grants.manage')
     )
     entity_grants_locked = not can_manage_entity_grants or (editing_self and not current_is_sys_mgr)
+    assignment_access_locked = not (
+        current_is_sys_mgr
+        or AuthorizationService.has_rbac_permission(current_user, 'admin.assignments.access.manage')
+    ) or (editing_self and not current_is_sys_mgr)
 
     # Only a system manager can assign the System Manager RBAC role
     if sys_role and not current_is_sys_mgr:
@@ -1128,7 +1147,9 @@ def edit_user(user_id):
                 'title': user.title,
                 'profile_color': user.profile_color,
                 'rbac_role_ids': old_rbac_role_ids,
-                'country_ids': [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
+                'country_ids': [c.id for c in user.countries.all()] if hasattr(user, "countries") else [],
+                'assignment_access_mode': user.assignment_access_mode,
+                'assignment_access_ids': sorted(int(a.id) for a in user.selected_assignments),
             }
 
             # Update user details (email is identity in B2C mode — never apply form email)
@@ -1270,6 +1291,8 @@ def edit_user(user_id):
                 if entity_scope_skipped:
                     flash("Some entity changes were not applied because they are outside your scope.", "warning")
 
+            _apply_assignment_access_from_request(user, can_manage=not assignment_access_locked)
+
             # Prepare new values for audit logging
             try:
                 from app.models.rbac import RbacUserRole
@@ -1286,6 +1309,8 @@ def edit_user(user_id):
                 'rbac_role_ids': new_rbac_role_ids,
                 'country_ids': selected_country_ids or [],
                 'entity_permissions': entity_permissions,
+                'assignment_access_mode': user.assignment_access_mode,
+                'assignment_access_ids': sorted(int(a.id) for a in user.selected_assignments),
                 'password_changed': bool(form.password.data)
             }
 
@@ -1393,6 +1418,7 @@ def edit_user(user_id):
                            profile_palette_hexes=PROFILE_COLORS,
                            role_codes_by_id=_get_role_codes_by_id(),
                            missing_rbac_role_codes=_get_missing_rbac_role_codes_for_display(current_is_sys_mgr),
+                           **_assignment_access_form_context(user, can_manage=not assignment_access_locked),
                            **_get_translator_form_context(user))
 
 

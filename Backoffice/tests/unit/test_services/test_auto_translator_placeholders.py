@@ -1,6 +1,7 @@
 """Tests for MT placeholder protection in auto_translator."""
 
-from unittest.mock import MagicMock
+import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -26,6 +27,54 @@ class TestProtectVariables:
         assert "PLACEHOLDER" not in token.upper()
         assert token_map[token] == "[assignment_period]"
         assert token in protected
+
+    def test_brace_format_field_replaced_with_opaque_token(self):
+        protected, token_map = AutoTranslator._protect_variables(
+            ". {admin_users} admins in-app"
+        )
+        assert "{admin_users}" not in protected
+        assert len(token_map) == 1
+        token = next(iter(token_map))
+        assert token.startswith(_MT_VAR_TOKEN_PREFIX)
+        assert token_map[token] == "{admin_users}"
+        assert token in protected
+
+    def test_brace_format_roundtrip(self):
+        original = ". {admin_users} admins in-app"
+        protected, token_map = AutoTranslator._protect_variables(original)
+        assert AutoTranslator._restore_variables(protected, token_map) == original
+
+    def test_brace_format_restore_after_simulated_arabic(self):
+        original = ". {admin_users} admins in-app"
+        protected, token_map = AutoTranslator._protect_variables(original)
+        token = next(iter(token_map))
+        # Engine translates the surrounding prose and preserves the opaque token.
+        simulated = protected.replace("admins in-app", "مسؤولون داخل التطبيق")
+        restored = AutoTranslator._restore_variables(simulated, token_map)
+        assert restored == ". {admin_users} مسؤولون داخل التطبيق"
+        assert "{admin_users}" in restored
+
+    def test_brace_format_with_spec_and_access(self):
+        original = "{count:,} of {obj[key]} ({value!r}) for {user.name}"
+        protected, token_map = AutoTranslator._protect_variables(original)
+        assert len(token_map) == 4
+        for original_field in ("{count:,}", "{obj[key]}", "{value!r}", "{user.name}"):
+            assert original_field not in protected
+            assert original_field in token_map.values()
+        assert AutoTranslator._restore_variables(protected, token_map) == original
+
+    def test_jinja_braces_not_treated_as_format_fields(self):
+        # `_protect_variables` must leave Jinja constructs alone (handled elsewhere).
+        protected, token_map = AutoTranslator._protect_variables(
+            "Hello {{ user.name }} and {% if x %}y{% endif %}"
+        )
+        assert token_map == {}
+        assert protected == "Hello {{ user.name }} and {% if x %}y{% endif %}"
+
+    def test_escaped_literal_braces_untouched(self):
+        protected, token_map = AutoTranslator._protect_variables("Use {{ and }} literally")
+        assert token_map == {}
+        assert protected == "Use {{ and }} literally"
 
     def test_multiple_placeholders_get_distinct_tokens(self):
         protected, token_map = AutoTranslator._protect_variables(
@@ -105,6 +154,7 @@ class TestTranslateTextRejectsMangledTokens:
         tr = AutoTranslator.__new__(AutoTranslator)
         tr.services = {}
         tr.default_service = None
+        tr._engine_trace = threading.local()
 
         good_svc = MagicMock()
         good_svc.service_name = "google"
@@ -132,8 +182,90 @@ class TestTranslateTextRejectsMangledTokens:
         tr.services = {"ifrc": bad_svc, "fallback": ok_svc}
         tr.default_service = "ifrc"
 
-        result = tr.translate_text(original, "fr", "en", service_name=None)
+        # Isolate from the DB-backed result cache so the mocked engines are exercised
+        # regardless of any persisted entry for this string.
+        with patch(
+            "app.services.translation.result_cache.get_cached", return_value=None
+        ), patch("app.services.translation.result_cache.put_cached"):
+            result = tr.translate_text(original, "fr", "en", service_name=None)
         assert result == "Société nationale [assignment_period] Total Funding"
         assert "IFRC" not in (result or "")
         bad_svc.translate_text.assert_called_once()
         ok_svc.translate_text.assert_called_once()
+
+
+class TestKeepsSourceWhenUntranslatable:
+    """When an engine can only echo a short/placeholder string unchanged and no other
+    engine translates it, keep the source instead of dropping it to None (a "skip")."""
+
+    @staticmethod
+    def _translator(services, default):
+        tr = AutoTranslator.__new__(AutoTranslator)
+        tr.services = services
+        tr.default_service = default
+        # `__new__` bypasses __init__; the success path records engine usage.
+        tr._engine_trace = threading.local()
+        return tr
+
+    def test_translate_text_keeps_source_on_unchanged_echo(self):
+        # First engine echoes the (protected) input unchanged; the fallback engine is down.
+        echo = MagicMock()
+        echo.service_name = "google"
+        echo.translate_text.side_effect = lambda t, tgt, src="en": t
+        down = MagicMock()
+        down.service_name = "libre"
+        down.translate_text.return_value = None
+
+        tr = self._translator({"google": echo, "libre": down}, "google")
+        # Unique placeholder name keeps the result-cache key distinct from sibling
+        # tests while the (short) prose stays below the suspicious-echo threshold.
+        src = ". {admin_echo_case} admins in-app"
+        result = tr.translate_text(src, "ar", "en")
+
+        assert result == src
+        echo.translate_text.assert_called_once()
+        down.translate_text.assert_called_once()
+
+    def test_translate_text_prefers_real_translation_over_source_fallback(self):
+        echo = MagicMock()
+        echo.service_name = "google"
+        echo.translate_text.side_effect = lambda t, tgt, src="en": t
+        real = MagicMock()
+        real.service_name = "libre"
+        # Translates the prose but preserves the opaque placeholder token.
+        real.translate_text.side_effect = lambda t, tgt, src="en": t.replace(
+            "admins online now", "مسؤولون متصلون الآن"
+        )
+
+        tr = self._translator({"google": echo, "libre": real}, "google")
+        result = tr.translate_text(". {admin_users} admins online now", "ar", "en")
+
+        assert result == ". {admin_users} مسؤولون متصلون الآن"
+
+    def test_translate_text_still_none_for_suspicious_long_echo(self):
+        # Long multi-word English echo is a real failure, not a legitimately-unchanged
+        # string: it must NOT be persisted as a copy-source "translation".
+        long_src = "National Society total funding received during the reporting period"
+        echo = MagicMock()
+        echo.service_name = "google"
+        echo.translate_text.side_effect = lambda t, tgt, src="en": t
+        down = MagicMock()
+        down.service_name = "libre"
+        down.translate_text.return_value = None
+
+        tr = self._translator({"google": echo, "libre": down}, "google")
+        assert tr.translate_text(long_src, "ar", "en") is None
+
+    def test_translate_batch_keeps_source_on_unchanged_echo(self):
+        echo = MagicMock()
+        echo.service_name = "google"
+        echo.translate_batch.side_effect = lambda texts, tgt, src="en": list(texts)
+        down = MagicMock()
+        down.service_name = "libre"
+        down.translate_batch.return_value = None
+
+        tr = self._translator({"google": echo, "libre": down}, "google")
+        src = ". {admin_batch_case} admins in-app"
+        out = tr.translate_batch([src], "ar", "en")
+
+        assert out == [src]

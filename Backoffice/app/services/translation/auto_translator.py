@@ -416,6 +416,20 @@ STATUS_PROBE_TIMEOUT_SECONDS = 3.0
 _MT_VAR_TOKEN_PREFIX = "QZXNTK"
 _MT_JINJA_TOKEN_PREFIX = "QZXJNK"
 
+# Python ``str.format`` brace fields (``python-brace-format`` catalog strings), e.g.
+# ``{admin_users}``, ``{0}``, ``{obj.attr}``, ``{obj[key]}``, ``{value!r}``, ``{count:,}``.
+# A single ``{`` must be followed by an identifier char or digit, so Jinja ``{{ ... }}``
+# and ``{% ... %}`` (doubled / ``%`` braces) are never matched. Bounded quantifiers and a
+# format spec that forbids nested braces keep this linear and prevent eating prose.
+_BRACE_FORMAT_FIELD = re.compile(
+    r"\{"
+    r"[A-Za-z0-9_]+"                               # field name (identifier or positional index)
+    r"(?:\.[A-Za-z_][A-Za-z0-9_]*|\[[^\]{}]{0,100}\])*"  # .attr / [index] access chains
+    r"(?:![rsa])?"                                 # conversion
+    r"(?::[^{}]{0,100})?"                           # format spec (no nested braces)
+    r"\}"
+)
+
 
 def _make_mt_protection_token(prefix: str, counter: int) -> str:
     """Build an alphanumeric-only token (no digits) for MT placeholder protection."""
@@ -1290,6 +1304,16 @@ class AutoTranslator:
         - Simple: `[variable]`
         - Nested/expressions: `[[period]+2]`, `[[a]+[b]]`, etc.
 
+        We also protect Python str.format brace fields (``python-brace-format``):
+        - Simple: `{name}`, `{admin_users}`, `{0}`
+        - With attribute/index access and conversion/format specs:
+          `{obj.attr}`, `{obj[key]}`, `{value!r}`, `{count:,}`, `{pct:.1%}`
+
+        Jinja ``{{ ... }}`` / ``{% ... %}`` are *not* matched here (that is the job of
+        :meth:`_protect_jinja_expressions` for email templates) — the field regex
+        requires an identifier/number right after a single ``{``, so doubled or
+        ``{%`` braces never match.
+
         We also protect Python %-format tokens:
         - Named: `%(name)s`, `%(count)d`, `%(value).2f`
         - Positional: `%s`, `%d`, `%.2f`, etc.
@@ -1309,6 +1333,20 @@ class AutoTranslator:
             token = _make_mt_protection_token(_MT_VAR_TOKEN_PREFIX, token_counter)
             token_counter += 1
             return token
+
+        # 0) Protect Python str.format brace fields FIRST, so a whole `{obj[key]}`
+        # expression is masked before the bracket scanner (step 1) can tokenize the
+        # inner `[key]`. The field name must start with an identifier char or digit
+        # right after a single `{`, which keeps Jinja `{{ ... }}` / `{% ... %}`
+        # untouched. Format/conversion specs are matched conservatively (no nested
+        # braces) to avoid eating surrounding prose.
+        def replace_brace(match: re.Match) -> str:
+            original = match.group(0)
+            token = make_token()
+            token_map[token] = original
+            return token
+
+        text = _BRACE_FORMAT_FIELD.sub(replace_brace, text)
 
         # 1) Protect any balanced bracket expressions (supports nested brackets).
         out: list[str] = []
@@ -1650,6 +1688,14 @@ class AutoTranslator:
             return None
 
         debug = _debug_translation_enabled()
+        # Last-resort result for strings an engine returns *unchanged* but which the
+        # heuristic deems legitimately-unchanged (short phrases, acronyms,
+        # placeholder-dominated fragments). If no engine produces a real translation
+        # we keep the source rather than dropping the string to None (which the caller
+        # reports as a "skip" and leaves the catalog entry blank). Suspicious long
+        # English echoes still go through `_is_likely_untranslated_output` and are
+        # rejected, so this never persists a fake prose translation.
+        unchanged_source_fallback: Optional[str] = None
         for svc_idx, svc in enumerate(services_to_try):
             try:
                 translated = svc.translate_text(protected_text, target_code, source_code)
@@ -1679,6 +1725,9 @@ class AutoTranslator:
                             f"{source_code}->{target_code} rejected=unchanged_englishish text={original_text[:120]!r}"
                         )
                     continue
+                # Engine had nothing to change: remember the source as a fallback.
+                if unchanged_source_fallback is None:
+                    unchanged_source_fallback = original_text
                 is_last_service = (svc_idx >= (len(services_to_try) - 1))
                 if not is_last_service:
                     if debug:
@@ -1736,6 +1785,13 @@ class AutoTranslator:
             self.note_engine(getattr(svc, "service_name", None))
             return restored
 
+        if unchanged_source_fallback is not None:
+            if debug:
+                logger.info(
+                    f"[auto_translate_debug] {source_code}->{target_code} "
+                    f"kept_source=no_engine_translated text={original_text[:120]!r}"
+                )
+            return unchanged_source_fallback
         return None
 
     def translate_batch(self, texts: List[str], target_language: str, source_language: str = 'en',
@@ -1763,6 +1819,10 @@ class AutoTranslator:
 
         # Prepare output list.
         out: list[Optional[str]] = [None] * len(texts)
+        # Per-item last-resort source fallback (see translate_text for rationale):
+        # populated when an engine returns a legitimately-unchanged echo but no engine
+        # produces a real translation, so the item keeps its source instead of None.
+        unchanged_fallback: list[Optional[str]] = [None] * len(texts)
         try:
             from app.services.translation.result_cache import get_cached_many
 
@@ -1833,6 +1893,9 @@ class AutoTranslator:
                         target_code=target_code,
                     ):
                         continue
+                    # Engine had nothing to change: remember source as a fallback.
+                    if unchanged_fallback[i] is None:
+                        unchanged_fallback[i] = originals[i]
                     is_last_service = (svc_idx >= (len(services_to_try) - 1))
                     if not is_last_service:
                         continue
@@ -1871,6 +1934,12 @@ class AutoTranslator:
                     put_cached_many(to_cache, source_code, target_code, engine_key)
                 except Exception as e:
                     logger.debug("batch result cache write skipped: %s", e)
+
+        # Keep the source for items an engine only ever echoed unchanged (and that no
+        # engine translated), instead of returning None (which the caller skips).
+        for i in range(len(out)):
+            if out[i] is None and unchanged_fallback[i] is not None:
+                out[i] = unchanged_fallback[i]
 
         return out
 

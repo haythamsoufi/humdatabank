@@ -472,4 +472,5 @@ def test_support_flow_csp_allows_static_cdn():
     assert f"script-src 'self' {origin}" in policy
     assert f"style-src 'self' 'unsafe-inline' {origin}" in policy
     assert f"font-src 'self' {origin}" in policy
+    assert f"connect-src 'self' {origin}" in policy
     assert "frame-ancestors" not in policy

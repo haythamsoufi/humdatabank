@@ -72,7 +72,7 @@ def support_flow_csp() -> str:
         f"style-src 'self' 'unsafe-inline'{extra}; "
         f"img-src 'self'{extra} https://tile.openstreetmap.org https://*.tile.openstreetmap.org data:; "
         f"font-src 'self'{extra}; "
-        "connect-src 'self'; "
+        f"connect-src 'self'{extra}; "
         "object-src 'none'; "
         "base-uri 'none'; "
         "form-action 'none'"

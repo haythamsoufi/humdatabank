@@ -1,0 +1,237 @@
+{% extends "plugins/nsd_report_forms/nsd_projects/base.html" %}
+{% from "plugins/nsd_report_forms/nsd_projects/_macros.html" import chf_short %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('plugin_static.serve_plugin_static', plugin_name='nsd_report_forms', filename='css/nsd-momo-list.css') }}">
+{% endblock %}
+
+{% macro dropdown(name, label, placeholder, value, options, readonly=False) %}
+        <div class="filter-group">
+          <label for="{{ name }}Filter">{{ label }}</label>
+          <div class="searchable-dropdown" data-name="{{ name }}">
+            <input type="hidden" name="{{ name }}" id="{{ name }}Filter" value="{{ value }}">
+            <input type="text" class="searchable-dropdown-input" placeholder="{{ placeholder }}" value="{{ value }}"{% if readonly %} readonly{% else %} autocomplete="off"{% endif %}>
+            <span class="searchable-dropdown-arrow">▼</span>
+            <div class="searchable-dropdown-list">
+              <div class="searchable-dropdown-item{% if not value %} selected{% endif %}" data-value="">{{ placeholder }}</div>
+              {% for o in options %}
+                <div class="searchable-dropdown-item{% if value == o %} selected{% endif %}" data-value="{{ o }}">{{ o }}</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+{% endmacro %}
+
+{% block content %}
+{% if problems %}
+<div class="alert alert-warning">
+  {% for m in problems %}<div>{{ m }}</div>{% endfor %}
+  <div>Create the templates with the form builder and run the NSD master import first.</div>
+</div>
+{% else %}
+<div class="container-fluid" style="max-width: 100%; padding-left: 2rem; padding-right: 2rem;">
+  <div class="filters-section">
+    <form method="GET" action="{{ url_for('nsd_projects.project_list') }}" id="filterForm">
+      <div class="filters-row">
+        {{ dropdown('fund', 'Fund Type', 'All Funds', fund_filter, all_fund_types, readonly=True) }}
+        {{ dropdown('region', 'Region', 'All Regions', region_filter, all_regions) }}
+        {{ dropdown('country', 'Country', 'All Countries', country_filter, all_countries) }}
+        {{ dropdown('status', 'Status', 'All Statuses', status_filter, all_statuses) }}
+        <div class="filter-actions">
+          <button type="button" class="btn-clear" id="clearFiltersBtn" data-url="{{ url_for('nsd_projects.project_list') }}">Clear</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="total-bar">
+    <div class="total-bar-item">
+      <div class="total-bar-label">Total number of approved projects</div>
+      <div class="total-bar-value">{{ stats.total }}</div>
+    </div>
+    <div class="total-bar-item">
+      <div class="total-bar-label">Open</div>
+      <div class="total-bar-value">{{ stats.open }}</div>
+    </div>
+    <div class="total-bar-item">
+      <div class="total-bar-label">Closed</div>
+      <div class="total-bar-value">{{ stats.closed }}</div>
+    </div>
+    <div class="total-bar-item">
+      <div class="total-bar-label">CHF granted</div>
+      <div class="total-bar-value currency">{% if stats.funds > 0 %}{{ chf_short(stats.funds) }}{% else %}-{% endif %}</div>
+      {% if stats.total > 0 and stats.with_amount != stats.total %}
+        <div class="total-bar-meta">based on {{ stats.with_amount }} projects</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="funds-grid {% if fund_filter %}single-fund{% endif %}">
+    {% for fund_type in ([fund_filter] if fund_filter else all_fund_types) %}
+      <div class="fund-card">
+        <div class="fund-header">
+          <h2>{{ fund_type }}</h2>
+        </div>
+        <div class="fund-card-content">
+          {% if not fund_filter %}
+          <div class="fund-card-image-section">
+            <div class="fund-image-container">
+              <div class="fund-image-placeholder">
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%;">{{ fund_type }}</div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="fund-card-stats-section">
+            {% if not fund_filter %}
+            <div class="fund-card-left">
+              <div class="fund-stats">
+                <div class="stat-row">
+                  <span class="stat-value">{{ stats.total }}</span>
+                  <span class="stat-label">Projects</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-value">{{ stats.open }}</span>
+                  <span class="stat-label">Open</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-value">{{ stats.closed }}</span>
+                  <span class="stat-label">Closed</span>
+                </div>
+                <div class="stat-row">
+                  <span class="stat-value currency">{% if stats.funds > 0 %}{{ chf_short(stats.funds) }}{% else %}-{% endif %}</span>
+                  <span class="stat-label">CHF</span>
+                  {% if stats.total > 0 and stats.with_amount != stats.total %}
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.25rem;">based on {{ stats.with_amount }} initiatives</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="fund-card-right {% if fund_filter %}full-height{% endif %}">
+              <div class="projects-list-header">Projects</div>
+              <div class="projects-list-section">
+                {% for project in projects %}
+                  {% if project.title and project.title != 'No Title' %}
+                    <div class="project-list-item" data-url="{{ url_for('nsd_projects.project_detail', reference=project.reference) }}">
+                      <div class="project-meta-text">
+                        {% if project.status in ('Closed', 'Archived') %}
+                          <span class="status-badge closed">{{ project.status }}</span>
+                        {% else %}
+                          <span class="status-badge open">{{ project.status }}</span>
+                        {% endif %}
+                        <span><span class="project-country-name">{{ project.country }}</span>{% if project.granted %} - {% if project.granted >= 1000000 %}{{ "{:.1f}".format(project.granted / 1000000) }} M CHF{% else %}{{ "{:,.0f}".format(project.granted) }} CHF{% endif %}{% endif %}</span>
+                      </div>
+                      <div class="project-title-text">{{ project.title }}</div>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.project-list-item').forEach(function (el) {
+      el.addEventListener('click', function () { window.location.href = el.getAttribute('data-url'); });
+    });
+    var clear = document.getElementById('clearFiltersBtn');
+    if (clear) clear.addEventListener('click', function () { window.location.href = clear.getAttribute('data-url'); });
+
+    // Searchable dropdowns (as in MOMO)
+    var dropdowns = document.querySelectorAll('.searchable-dropdown');
+    dropdowns.forEach(function (dropdown) {
+      var input = dropdown.querySelector('.searchable-dropdown-input');
+      var hidden = dropdown.querySelector('input[type="hidden"]');
+      var list = dropdown.querySelector('.searchable-dropdown-list');
+      var items = list.querySelectorAll('.searchable-dropdown-item');
+
+      input.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdowns.forEach(function (d) { if (d !== dropdown) d.classList.remove('open'); });
+        dropdown.classList.toggle('open');
+        if (!input.hasAttribute('readonly')) input.focus();
+      });
+      if (!input.hasAttribute('readonly')) {
+        input.addEventListener('input', function () {
+          var t = this.value.toLowerCase();
+          items.forEach(function (item) {
+            item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(t));
+          });
+        });
+      }
+      items.forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var value = this.getAttribute('data-value');
+          hidden.value = value;
+          input.value = value === '' ? '' : this.textContent;
+          dropdown.classList.remove('open');
+          document.getElementById('filterForm').submit();
+        });
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') dropdown.classList.remove('open');
+        else if (e.key === 'Enter') {
+          e.preventDefault();
+          var first = list.querySelector('.searchable-dropdown-item:not(.hidden)');
+          if (first) first.click();
+        }
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.searchable-dropdown')) {
+        dropdowns.forEach(function (d) { d.classList.remove('open'); });
+      }
+    });
+
+    // Fund image: show once loaded (as in MOMO)
+    document.querySelectorAll('.fund-image').forEach(function (img) {
+      if (img.complete && img.naturalHeight !== 0) img.classList.add('loaded');
+      else {
+        img.addEventListener('load', function () { this.classList.add('loaded'); }, { once: true });
+        img.addEventListener('error', function () {
+          this.style.display = 'none';
+          if (this.nextElementSibling) this.nextElementSibling.style.display = 'flex';
+        }, { once: true });
+      }
+    });
+
+    // Projects list as high as the stats column (as in MOMO)
+    function syncProjectsListHeight() {
+      document.querySelectorAll('.fund-card').forEach(function (card) {
+        var fundStats = card.querySelector('.fund-stats');
+        var left = card.querySelector('.fund-card-left');
+        var right = card.querySelector('.fund-card-right');
+        var plist = card.querySelector('.projects-list-section');
+        var header = card.querySelector('.projects-list-header');
+        if (!(fundStats && left && right && plist)) return;
+        void left.offsetHeight;
+        var ss = window.getComputedStyle(fundStats), ps = window.getComputedStyle(plist);
+        var statsContent = fundStats.offsetHeight - parseFloat(ss.paddingTop) - parseFloat(ss.paddingBottom);
+        var target = statsContent - (header ? header.offsetHeight : 0) + parseFloat(ps.paddingTop) + parseFloat(ps.paddingBottom);
+        var h = left.offsetHeight + 'px';
+        right.style.setProperty('height', h, 'important');
+        right.style.setProperty('max-height', h, 'important');
+        right.style.setProperty('min-height', h, 'important');
+        right.style.setProperty('overflow', 'hidden', 'important');
+        plist.style.setProperty('height', target + 'px', 'important');
+        plist.style.setProperty('max-height', target + 'px', 'important');
+        plist.style.setProperty('min-height', '0', 'important');
+      });
+    }
+    [0, 10, 50, 100, 200, 500, 1000].forEach(function (t) { setTimeout(syncProjectsListHeight, t); });
+    window.addEventListener('resize', function () { setTimeout(syncProjectsListHeight, 50); });
+    document.querySelectorAll('.fund-image').forEach(function (img) { img.addEventListener('load', syncProjectsListHeight); });
+  });
+</script>
+{% endblock %}

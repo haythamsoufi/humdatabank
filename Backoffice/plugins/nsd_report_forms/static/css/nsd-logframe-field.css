@@ -1,0 +1,24 @@
+/* NSD logframe field (plugin nsd_report_forms) */
+div.nsdlf { display: block; }
+script.nsdlf, script.nsdli { display: none !important; }
+.nsdlf-card { border: 1px solid #dee2e6; border-radius: .5rem; background: #fff; padding: 1rem; margin-bottom: 1rem; }
+.nsdlf-outcome { background: #f8f9fa; }
+.nsdlf-output { margin: 1rem 0 0 0; background: #fff; border-left: 4px solid #dc3545; }
+.nsdlf-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; font-size: 1rem; }
+.nsdlf-status { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.nsdlf-status-label { font-weight: 600; }
+.nsdlf-status .nsd-tl-group { flex: 1; margin-top: 0; }
+.nsdlf-status .nsd-tl-card { font-size: .8rem; padding: .4rem .75rem; }
+.nsdlf-grid { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: .75rem; }
+.nsdlf-c6 { flex: 6 1 16rem; } .nsdlf-c2 { flex: 2 1 6rem; }
+.nsdlf label, .nsdlf-lbl { display: block; font-size: .8rem; font-weight: 600; color: #495057; margin-bottom: .2rem; }
+.nsdlf-in { width: 100%; padding: .35rem .5rem; border: 1px solid #ced4da; border-radius: .25rem; font-size: .9rem; background: #fff; }
+.nsdlf-ro { padding: .35rem .5rem; background: #e9ecef; border-radius: .25rem; font-size: .9rem; min-height: 2rem; overflow-wrap: anywhere; }
+.nsdlf-table { width: 100%; border-collapse: collapse; margin: .5rem 0; font-size: .9rem; }
+.nsdlf-table th { text-align: left; font-size: .75rem; color: #6c757d; padding: .25rem .4rem; border-bottom: 1px solid #dee2e6; }
+.nsdlf-table td { padding: .25rem .4rem; vertical-align: top; }
+.nsdlf-pct { text-align: center; color: #495057; font-weight: 600; }
+.nsdlf-add { margin: .4rem 0; padding: .3rem .7rem; font-size: .8rem; color: #155724; background: #eef8f0; border: 1px dashed #28a745; border-radius: .25rem; cursor: pointer; }
+.nsdlf-x { border: 0; background: transparent; font-size: 1.2rem; line-height: 1; color: #dc3545; cursor: pointer; }
+.nsdlf-tools { margin-bottom: .75rem; }
+.nsdlf-empty { padding: 1rem; color: #6c757d; background: #f8f9fa; border-radius: .25rem; }

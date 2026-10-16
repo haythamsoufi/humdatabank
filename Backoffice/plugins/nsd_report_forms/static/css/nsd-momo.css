@@ -1,0 +1,112 @@
+body {
+  background-color: #f8f9fa;
+  overflow-x: hidden;
+}
+
+.card-header {
+  font-weight: 600;
+}
+
+.prefilled[readonly], .prefilled:read-only, .prefilled[disabled] {
+  background-color: #e9ecef !important;
+  color: #495057;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.loading-content { min-width: 120px; }
+
+/* Hierarchical headings */
+.heading-xxl {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.heading-lg {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.heading-md {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.heading-sm {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Table header consistency */
+.table thead th {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #343a40;
+}
+
+/* Make table body content slightly smaller than headers */
+.table tbody td,
+.table tbody td .form-control,
+.table tbody td input,
+.table tbody td textarea {
+  font-size: 0.8rem;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Ensure non-table outcome/output inputs use same small font */
+.outcomes-section .form-control,
+.outcomes-section input,
+.outcomes-section textarea {
+  font-size: 0.8rem;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Slightly tighter table spacing for readability */
+.table > :not(caption) > * > * {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+
+/* Modern toggle bar for outcomes */
+.toggle-bar {
+  background-color: #ffffff; /* white */
+  border-top: 1px solid #e9ecef;
+  border-bottom: 1px solid #e9ecef;
+  padding: 0.35rem 0.5rem;
+}
+
+/* Full-width gray background for toggle row */
+.toggle-row td {
+  background-color: #ffffff;
+}
+
+/* Lighter red tint for output rows compared to outcome rows */
+.table-danger-light td {
+  background-color: #fdecea !important; /* light red */
+}
+.table-danger-light th {
+  background-color: #fdecea !important;
+}
+.toggle-bar .toggle-btn {
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.toggle-bar .toggle-btn .chev {
+  transition: transform 180ms ease;
+}
+.toggle-bar .toggle-btn[aria-expanded="true"] .chev {
+  transform: rotate(180deg);
+}
+.toggle-bar .toggle-btn:focus {
+  box-shadow: 0 0 0 0.15rem rgba(220,53,69,.35); /* bootstrap danger focus */
+}
+.toggle-bar .toggle-btn:hover {
+  filter: brightness(0.96);
+}
+
+
+

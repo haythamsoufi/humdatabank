@@ -1,0 +1,35 @@
+<div id="panel-nsd_funds"
+     class="explore-panel{% if explore_first_tab != 'nsd_funds' %} hidden{% endif %}"
+     role="tabpanel"
+     aria-labelledby="tab-nsd_funds">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% if has_permission('nsd_funds.pm_overview') %}
+    <a href="{{ url_for('nsd_pm.pm_overview') }}"
+       class="block rounded-lg border border-gray-200 bg-white p-5 hover:border-red-300 hover:shadow-sm transition">
+      <div class="flex items-center gap-3 mb-2">
+        <i class="fas fa-user-tie text-red-600 text-xl" aria-hidden="true"></i>
+        <h3 class="text-base font-semibold text-gray-900">{{ _('My projects') }}</h3>
+      </div>
+      <p class="text-sm text-gray-600">{{ _('The CBF projects where you are named as IFRC project manager, with their reporting status and deadlines, as in MOMO.') }}</p>
+    </a>
+    {% endif %}
+    {% if has_permission('admin.nsd_funds.manage') %}
+    <a href="{{ url_for('nsd_projects.project_list') }}" target="_blank" rel="noopener"
+       class="block rounded-lg border border-gray-200 bg-white p-5 hover:border-red-300 hover:shadow-sm transition">
+      <div class="flex items-center gap-3 mb-2">
+        <i class="fas fa-table text-red-600 text-xl" aria-hidden="true"></i>
+        <h3 class="text-base font-semibold text-gray-900">{{ _('NSD project overview') }}</h3>
+      </div>
+      <p class="text-sm text-gray-600">{{ _('All CBF projects with their status, reporting progress and reports, as in MOMO. Opens in a new tab.') }}</p>
+    </a>
+    <a href="{{ url_for('nsd_import.import_page') }}"
+       class="block rounded-lg border border-gray-200 bg-white p-5 hover:border-red-300 hover:shadow-sm transition">
+      <div class="flex items-center gap-3 mb-2">
+        <i class="fas fa-file-import text-red-600 text-xl" aria-hidden="true"></i>
+        <h3 class="text-base font-semibold text-gray-900">{{ _('NSD master import') }}</h3>
+      </div>
+      <p class="text-sm text-gray-600">{{ _('Upload the master workbook to create or update projects, schedules, access and report history.') }}</p>
+    </a>
+    {% endif %}
+  </div>
+</div>

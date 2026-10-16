@@ -41,6 +41,18 @@ class EmbedVisual:
 
 
 @dataclass(frozen=True)
+class AssignmentBadge:
+    """A small labelled value a plugin shows on the dashboard card of an assignment (for example a KPI).
+
+    ``tone`` is one of the status label variants: ``neutral``, ``success``, ``warning``, ``danger``, ``info``.
+    """
+
+    label: str
+    value: str
+    tone: str = "neutral"
+
+
+@dataclass(frozen=True)
 class CspOverride:
     """Content-Security-Policy override for plugin-served HTML assets.
 
@@ -338,6 +350,13 @@ class BasePlugin(ABC):
     def get_embed_visuals(self) -> List[EmbedVisual]:
         """Pages this plugin offers on Admin → Embed Content."""
         return []
+
+    def get_assignment_badges(self, assignment_entity_statuses: List[Any]) -> Dict[int, List[AssignmentBadge]]:
+        """Badges for the dashboard cards of these assignments, keyed by ``AssignmentEntityStatus.id``.
+
+        Called once per dashboard load with every assignment shown, so implementations should query in batches.
+        """
+        return {}
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
         """Extra template context when rendering a Data Explorer panel."""

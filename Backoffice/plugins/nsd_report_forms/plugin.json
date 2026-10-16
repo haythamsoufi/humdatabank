@@ -1,0 +1,9 @@
+{
+  "plugin_id": "nsd_report_forms",
+  "name": "nsd_report_forms",
+  "display_name": "NSD Report Forms",
+  "version": "0.15.0",
+  "description": "Entry-form behaviour for the NSD funds monitoring reports: carried-forward spending is read-only and action-point lists start empty.",
+  "author": "IFRC NSD data team",
+  "license": "MIT"
+}

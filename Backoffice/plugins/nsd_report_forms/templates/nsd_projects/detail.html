@@ -1,0 +1,279 @@
+{% extends "plugins/nsd_report_forms/nsd_projects/base.html" %}
+{% from "plugins/nsd_report_forms/nsd_projects/_macros.html" import date, currency, no_decimal %}
+
+{% block title %}{{ p.reference }} - NSD investment monitoring{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ back_url|default(url_for('nsd_projects.project_list')) }}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left"></i> {{ back_label|default('Back to Welcome') }}
+        </a>
+        {% if p.country_id %}
+        <a href="{{ url_for('main.dashboard', entity_select='country:%d' % p.country_id) }}" class="btn btn-outline-secondary">
+          <i class="fas fa-th-large"></i> {{ p.country or 'Country' }} dashboard
+        </a>
+        {% endif %}
+      </div>
+
+      <!-- Project Information -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Project Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">National Society</small>
+                <strong>{{ p.ns or '-' }}</strong>
+              </div>
+            </div>
+            <div class="col-md-9">
+              <div class="mb-2">
+                <small class="text-muted d-block">Title</small>
+                <strong>{{ p.title or '-' }}</strong>
+              </div>
+            </div>
+
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">Reference</small>
+                <strong>{{ p.reference }}</strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">Funding Modality</small>
+                <strong>{{ p.modality or '-' }}</strong>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-2">
+                <small class="text-muted d-block">Categories/Thematics</small>
+                {% if p.categories_list and p.categories_list|length > 1 %}
+                  <div>
+                    {% for cat in p.categories_list %}
+                      <span class="badge bg-secondary me-1 mb-1">{{ cat }}</span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                <strong>{{ p.categories or '-' }}</strong>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">Start Date</small>
+                <strong>{{ date(p.start) }}</strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">End Date</small>
+                <strong>{{ date(p.end) }}</strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">Amount Granted (in CHF)</small>
+                <strong>{{ currency(p.granted) }}</strong>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">Actual Expenditure (in CHF)</small>
+                <strong>{{ currency(p.expenditure) }}</strong>
+              </div>
+            </div>
+
+            <div class="col-md-3">
+              <div class="mb-2">
+                <small class="text-muted d-block">NS Focal Person</small>
+                <strong>{{ p.ns_focal or '-' }}</strong>
+                {% if p.ns_focal_email %}<br><small class="text-muted">{{ p.ns_focal_email }}</small>{% endif %}
+              </div>
+            </div>
+            <div class="col-md-9">
+              <div class="mb-2">
+                <small class="text-muted d-block">IFRC Project Manager</small>
+                <strong>{{ p.pm or '-' }}</strong>
+                {% if p.pm_email %}<br><small class="text-muted">{{ p.pm_email }}</small>{% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Implementation monitoring Table -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Implementation monitoring</h5>
+        </div>
+        <div class="card-body">
+          {% if p.reports %}
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th style="width: 6%">Period</th>
+                    <th style="width: 6%">Reporting period start</th>
+                    <th style="width: 6%">Reporting period end</th>
+                    <th style="width: 6%">Deadline</th>
+                    <th style="width: 6%">Submission Date</th>
+                    <th style="width: 6%">Reports</th>
+                    <th style="width: 6%">Overall implementation assessment</th>
+                    <th style="width: 6%">Spending rate:</th>
+                    <th style="width: 6%">Activities' implementation according to the plan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for report in p.reports %}
+                  {% set is_final = report.kind == 'CBF final report' %}
+                  <tr>
+                    <td>{{ report.label or '-' }}</td>
+                    <td>{{ date(report.start) }}</td>
+                    <td>{{ date(report.end) }}</td>
+                    <td>
+                      {% if report.done %}
+                        <span class="badge bg-success">{{ date(report.due) }}</span>
+                      {% elif report.deadline_status == 'red' %}
+                        <span class="badge bg-danger">{{ date(report.due) }}</span>
+                      {% elif report.deadline_status == 'yellow' %}
+                        <span class="badge bg-warning text-dark">{{ date(report.due) }}</span>
+                      {% else %}
+                        {{ date(report.due) }}
+                      {% endif %}
+                    </td>
+                    <td>{{ date(report.submitted) }}</td>
+                    <td>
+                      <a href="/assignment/{{ report.aes_id }}" target="_blank" rel="noopener" class="text-decoration-none">
+                        {% if is_final %}
+                          <span class="badge" style="background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%); color: white; border: none;">CBF final</span>
+                        {% else %}
+                          <span class="badge" style="background: linear-gradient(135deg, #90CAF9 0%, #64B5F6 100%); color: #333; border: none;">CBF quarter</span>
+                        {% endif %}
+                      </a>
+                    </td>
+                    <td>
+                      {% if report.overall %}
+                        {% set a = report.overall %}
+                        {% if is_final %}
+                          {{ a }}
+                        {% elif a == 'All on track' %}
+                          <span class="badge bg-success">All on track</span>
+                        {% elif a == 'Partially on track' %}
+                          <span class="badge bg-warning text-dark">Partially on track</span>
+                        {% elif a == 'Not on track' %}
+                          <span class="badge bg-danger">Not on track</span>
+                        {% else %}
+                          {{ a }}
+                        {% endif %}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td>{% if report.rate is not none %}{{ report.rate }}%{% else %}-{% endif %}</td>
+                    <td>
+                      {% if report.activities %}
+                        {% set a = report.activities %}
+                        {% if a in ('On track', 'All achieved') %}
+                          <span class="badge bg-success">{{ a }}</span>
+                        {% elif a in ('Partially on track', 'Partially achieved') %}
+                          <span class="badge bg-warning text-dark">{{ a }}</span>
+                        {% elif a in ('Not on track', 'Not achieved') %}
+                          <span class="badge bg-danger">{{ a }}</span>
+                        {% else %}
+                          {{ a }}
+                        {% endif %}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center py-4">
+              <p class="text-muted">No upcoming reports found.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if p.outcomes %}
+        <!-- CBF Outcomes & Indicators Table -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">Outcomes & Indicators</h5>
+          </div>
+          <div class="card-body">
+            {% for outcome in p.outcomes %}
+              <div class="border rounded p-3 mb-4 bg-white">
+                <div class="row g-2 align-items-end mb-3">
+                  <div class="col-lg-3 col-md-6">
+                    <label class="form-label heading-xxl">Outcome {{ loop.index }}</label>
+                    <input class="form-control prefilled" value="{{ outcome.category or '-' }}" readonly style="background-color: #f8f9fa; color: #6c757d;">
+                  </div>
+                  <div class="col-lg-3 col-md-6">
+                    <label class="form-label heading-sm">Definition</label>
+                    <textarea class="form-control prefilled dynamic-textarea" readonly rows="2" style="resize: none; min-height: 32px; padding: 4px 8px; line-height: 1.2; background-color: #f8f9fa; color: #6c757d;">{% if outcome.definition == 'Other' %}{{ outcome.custom or outcome.category or '-' }}{% else %}{{ outcome.definition or '-' }}{% endif %}</textarea>
+                  </div>
+                  <div class="col-lg-2 col-md-4">
+                    <label class="form-label heading-sm">Planned budget</label>
+                    <input type="text" class="form-control prefilled" value="{% if outcome.planned_budget %}{{ no_decimal(outcome.planned_budget) }}{% else %}-{% endif %}" readonly style="background-color: #f8f9fa; color: #6c757d;">
+                  </div>
+                  <div class="col-lg-2 col-md-4">
+                    <label class="form-label heading-sm">Actual budget (sum)</label>
+                    <input type="text" class="form-control prefilled" value="{% if outcome.actual_budget %}{{ no_decimal(outcome.actual_budget) }}{% else %}-{% endif %}" readonly style="background-color: #f8f9fa; color: #6c757d;">
+                  </div>
+                  <div class="col-lg-2 col-md-4">
+                    <label class="form-label heading-sm">%</label>
+                    <input type="text" class="form-control prefilled" value="{% if outcome.actual_budget and outcome.planned_budget and outcome.planned_budget|float > 0 %}{{ ((outcome.actual_budget|float / outcome.planned_budget|float) * 100)|round(1) }}%{% else %}-{% endif %}" readonly style="background-color: #f8f9fa; color: #6c757d;">
+                  </div>
+                </div>
+
+                {% if outcome.indicators %}
+                  <div class="table-responsive mb-3">
+                    <table class="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th style="width:35%">Indicator</th>
+                          <th style="width:15%">Baseline</th>
+                          <th style="width:16.66%">Planned target</th>
+                          <th style="width:16.66%">Actual target</th>
+                          <th style="width:16.66%">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for ind in outcome.indicators %}
+                          <tr>
+                            <td><input class="form-control prefilled" value="{{ ind.name or '-' }}" readonly style="background-color: #f8f9fa; color: #6c757d;"></td>
+                            <td><input class="form-control prefilled" value="{{ ind.baseline or '-' }}" readonly style="background-color: #f8f9fa; color: #6c757d;"></td>
+                            <td><input class="form-control prefilled" value="{{ ind.target or '-' }}" readonly style="background-color: #f8f9fa; color: #6c757d;"></td>
+                            <td><input class="form-control prefilled" value="{{ ind.actual_target or '-' }}" readonly style="background-color: #f8f9fa; color: #6c757d;"></td>
+                            <td><input class="form-control prefilled" value="{% if ind.actual_target and ind.target and ind.target|float > 0 %}{{ ((ind.actual_target|float / ind.target|float) * 100)|round(1) }}%{% else %}-{% endif %}" readonly style="background-color: #f8f9fa; color: #6c757d;"></td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+            <div class="mt-3">
+              <small class="text-muted">
+                <strong>Note:</strong> This table displays outcomes and outcome indicators from the CBF final report.
+                All fields are read-only and reflect the data submitted in the final report.
+              </small>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

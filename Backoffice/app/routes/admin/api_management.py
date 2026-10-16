@@ -140,6 +140,7 @@ bp = Blueprint('api_management', __name__, url_prefix='/admin')
 #   'mobile'          – Flutter mobile API (/api/mobile/v1/*)
 #   'ai'              – AI chat + documents (/api/ai/v2/* and /api/ai/documents/*)
 #   'indicator_bank'  – Indicator Bank app routes (/Indicator, /Sector, /list-home, …)
+#   'fdrs_public'     – data.ifrc.org legacy contract (/api/data, /api/entities/ns, /csv/export, …)
 #
 # auth values (consistent vocabulary across surfaces):
 #   'public'             – no auth required
@@ -1129,6 +1130,9 @@ _API_PREFIXES = ('/api/v1/', '/api/mobile/v1/', '/api/ai/v2/', '/api/ai/')
 
 # Indicator Bank app routes live at the site root, not under /api.
 _INDICATOR_BANK_APP_ENDPOINT_PREFIX = 'indicator_bank_compat.'
+# FDRS public-frontend adapter (legacy data-api paths such as /api/data and /csv/export).
+# Plugin-owned; its view functions are all named ``fdrs_public_compat_*``.
+_FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX = 'fdrs.fdrs_public_compat_'
 
 # Mounted by flask-sock only when WEBSOCKET_ENABLED is on. Absent from url_map
 # while sockets are off, which is expected rather than a removed route.
@@ -1149,10 +1153,17 @@ def _is_scanned_api_rule(path: str, endpoint: str | None = None) -> bool:
     """Routes the registry compares against the live url_map."""
     if any(path.startswith(prefix) for prefix in _API_PREFIXES):
         return True
-    return bool(endpoint and endpoint.startswith(_INDICATOR_BANK_APP_ENDPOINT_PREFIX))
+    return bool(
+        endpoint
+        and endpoint.startswith(
+            (_INDICATOR_BANK_APP_ENDPOINT_PREFIX, _FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX)
+        )
+    )
 
 
 def _surface_for_path(path: str, endpoint: str | None = None) -> str:
+    if endpoint and endpoint.startswith(_FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX):
+        return 'fdrs_public'
     if endpoint and endpoint.startswith(_INDICATOR_BANK_APP_ENDPOINT_PREFIX):
         return 'indicator_bank'
     if path.startswith('/api/mobile/v1/'):
@@ -1315,6 +1326,7 @@ def _ep_surface_filter_disabled(grid_rows: list[dict]) -> dict[str, bool]:
         'mobile',
         'ai',
         'indicator_bank',
+        'fdrs_public',
         'flagged',
         'overlap',
         'has_stats',
@@ -1343,6 +1355,8 @@ def _endpoint_registry_grid_rows(all_endpoints: list[dict]) -> list[dict]:
                 group_label = f'AI /v2 — {grp}'
         elif surf == 'indicator_bank':
             group_label = grp or 'Indicator Bank app'
+        elif surf == 'fdrs_public':
+            group_label = grp or 'FDRS public frontend'
         else:
             group_label = grp or '—'
         desc = ep.get('description') or ''
@@ -1450,6 +1464,7 @@ def api_management():
         'ai':              _surface_summary('ai'),
         'mobile':          _surface_summary('mobile'),
         'indicator_bank':  _surface_summary('indicator_bank'),
+        'fdrs_public':     _surface_summary('fdrs_public'),
     }
     surface_summary['all'] = {
         'total':          len(all_endpoints),
@@ -1464,11 +1479,11 @@ def api_management():
         'total_live_paths': scan['total_live'],
     }
 
-    # ── v1 + Indicator Bank app endpoints for the URL builder ────────────────
+    # ── v1, Indicator Bank app, and the FDRS public frontend for the URL builder ─
     v1_endpoints = [
         {**ep, 'method': '/'.join(ep['methods'])}
         for ep in all_endpoints
-        if ep['surface'] in ('v1', 'indicator_bank') and not ep.get('undocumented')
+        if ep['surface'] in ('v1', 'indicator_bank', 'fdrs_public') and not ep.get('undocumented')
     ]
     url_builder_endpoint_groups = _url_builder_endpoint_groups(v1_endpoints)
     url_builder_contracts = _url_builder_param_contracts(v1_endpoints)

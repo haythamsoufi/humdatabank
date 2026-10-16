@@ -450,8 +450,7 @@ def send_admin_notification_email(suggestion):
         suggestion: IndicatorSuggestion instance
     """
     try:
-        # Get admin emails from configuration or database
-        admin_emails = current_app.config.get('ADMIN_EMAILS', [])
+        admin_emails = list(current_app.config.get('ADMIN_EMAILS') or [])
         if not admin_emails:
             current_app.logger.warning("No admin emails configured for notification")
             return False
@@ -540,9 +539,18 @@ def send_admin_notification_email(suggestion):
         # Format the submission date
         submitted_date = suggestion.submitted_at.strftime("%B %d, %Y at %I:%M %p")
 
-        # Admin URL for the suggestion review page in Backoffice
+        # Admin URL for the suggestion review page in Backoffice.
+        # url_for needs a request (or SERVER_NAME); the public API call has one,
+        # a direct send does not.
         base_url = current_app.config.get('BASE_URL', 'http://localhost:5000').rstrip("/")
-        admin_url = f"{base_url}{url_for('utilities.view_indicator_suggestion', suggestion_id=suggestion.id)}"
+        try:
+            path = url_for(
+                "utilities.view_indicator_suggestion",
+                suggestion_id=suggestion.id,
+            )
+        except RuntimeError:
+            path = f"/admin/indicator_suggestions/view/{suggestion.id}"
+        admin_url = f"{base_url}{path}"
 
         # Get organization branding
         org_name = get_org_name()

@@ -27,6 +27,7 @@ def load_routes() -> None:
     from plugins.fdrs import publication_routes  # noqa: F401
     from plugins.fdrs import document_status_routes  # noqa: F401
     from plugins.fdrs import public_api_routes  # noqa: F401
+    from plugins.fdrs import public_compat_routes  # noqa: F401
 
 
 __all__ = ["bp", "_PLUGIN_DIR", "load_routes"]

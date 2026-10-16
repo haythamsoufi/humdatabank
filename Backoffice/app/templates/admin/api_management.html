@@ -322,7 +322,7 @@
                         </button>
                         <span class="ep-filter-tip" role="tooltip">
                             <span class="ep-filter-tip-inner">
-                                <span class="ep-filter-tip-line">{{ _('Show every endpoint in the registry: External /v1, Mobile, AI, and the Indicator Bank app.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('Show every endpoint in the registry: External /v1, Mobile, AI, the Indicator Bank app, and the FDRS public frontend.') }}</span>
                                 <span class="ep-filter-tip-line">{{ _('No filter — the complete list.') }}</span>
                             </span>
                         </span>
@@ -369,6 +369,18 @@
                             <span class="ep-filter-tip-inner">
                                 <span class="ep-filter-tip-line">{{ _('Routes the Indicator Bank Blazor app calls: /Indicator, /Sector, /list-home, /CommonWord, and /Excel.') }}</span>
                                 <span class="ep-filter-tip-line">{{ _('Send X-API-Key or Authorization: Bearer. Locale is the X-Language header or the language query parameter.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="fdrs_public" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-none border"{% if ep_surface_filter_disabled['fdrs_public'] %} disabled{% endif %}>
+                            <i class="fas fa-globe mr-1"></i>{{ _('FDRS public frontend') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.fdrs_public.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Legacy data.ifrc.org paths: /api/data, /api/entities/ns, /api/KpiImputedValue, /csv/export, and the rest of that contract.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('API key with content:read. The site sends ?apiKey=, which needs “allow API key in query string” on the key. Bearer and X-API-Key also work.') }}</span>
                             </span>
                         </span>
                     </span>
@@ -507,6 +519,7 @@
                         {% elif ep.surface == 'mobile' %}<span class="px-1 py-0.5 rounded bg-teal-100 text-teal-700 text-xs font-bold">mob</span>
                         {% elif ep.surface == 'ai' %}<span class="px-1 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-bold">ai</span>
                         {% elif ep.surface == 'indicator_bank' %}<span class="px-1 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold">bank</span>
+                        {% elif ep.surface == 'fdrs_public' %}<span class="px-1 py-0.5 rounded bg-orange-100 text-orange-800 text-xs font-bold">fdrs</span>
                         {% endif %}
                     </span>
                     <code class="font-mono text-gray-700">{{ ep.path }}</code>
@@ -583,6 +596,7 @@
                             <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 ml-4">
                                 <li><strong>{{ _('API Key:') }}</strong> {{ _('Access is limited to the permissions granted to the key (see API Key Management) and responses are always paginated. Send it as') }} <code class="bg-gray-200 px-1 rounded">Authorization: Bearer YOUR_API_KEY</code>. {{ _('Passing it in the URL (?api_key=) only works for keys that were explicitly allowed to and is discouraged.') }}</li>
                                 <li><strong>{{ _('User Auth:') }}</strong> {{ _('HTTP Basic Auth or Flask-Login session. Returns all accessible data (no pagination) with access control filtering.') }}</li>
+                                <li><strong>{{ _('FDRS public frontend:') }}</strong> {{ _('The data.ifrc.org paths (/api/data, /api/entities/ns, /csv/export, …) take a key with content:read. That site sends it as ?apiKey=, so the key must allow the query string. Authorization: Bearer and X-API-Key work for other callers. These routes are not paginated.') }}</li>
                             </ul>
                         </div>
                     </div>

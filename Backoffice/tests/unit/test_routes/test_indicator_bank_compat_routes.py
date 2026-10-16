@@ -470,6 +470,33 @@ class TestIndicatorSuggestion:
         assert resp.status_code == 200
         assert captured.get("sector") is not None
 
+    def test_forward_secret_skips_second_captcha_check(self, client, app):
+        """The WebAPI already validated reCAPTCHA, so its forward does not send the token again."""
+        from app import db
+        payload = {
+            "name": "Test User",
+            "email": "test@example.com",
+            "motivation": "This indicator needs improvement",
+            "operation": 0,
+            "title": "New Indicator",
+        }
+        mock_suggestion = MagicMock()
+        app.config["INDICATOR_SUGGESTION_FORWARD_SECRET"] = "forward-secret"
+        with patch(_AUTH_PATCH, return_value=_FakeKey()), \
+             patch("app.routes.api.indicator_bank_compat._verify_recaptcha", return_value=False) as captcha, \
+             patch("app.routes.api.indicator_bank_compat.IndicatorSuggestion",
+                   return_value=mock_suggestion), \
+             patch.object(db.session, "add"), \
+             patch.object(db.session, "commit"):
+            resp = client.post(
+                self.URL,
+                json=payload,
+                headers={**_API_HEADERS, "X-Suggestion-Forward-Secret": "forward-secret"},
+                content_type="application/json",
+            )
+        assert resp.status_code == 200
+        captcha.assert_not_called()
+
 
 class TestSectorList:
     """Tests for GET /Sector."""

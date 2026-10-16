@@ -8,6 +8,7 @@ client) backed by Humanitarian Databank Backoffice data. Auth accepts X-API-Key
 
 from __future__ import annotations
 
+import hmac
 import io
 import os
 from functools import wraps
@@ -89,6 +90,15 @@ def _localized_text(translations: Optional[dict], locale: str, fallback: Optiona
 def _require_compat_api_key(capability: str = REFERENCE_READ):
     """Compat routes use the same key pipeline and capabilities as /api/v1."""
     return require_api_key(capability=capability)
+
+
+def _suggestion_forward_trusted() -> bool:
+    """True when the Indicator Bank WebAPI forwards a suggestion it already verified."""
+    expected = (current_app.config.get("INDICATOR_SUGGESTION_FORWARD_SECRET") or "").strip()
+    provided = (request.headers.get("X-Suggestion-Forward-Secret") or "").strip()
+    if not expected or not provided:
+        return False
+    return hmac.compare_digest(expected, provided)
 
 
 def _verify_recaptcha(token: str) -> bool:
@@ -741,7 +751,7 @@ def indicator_select_options():
 def indicator_suggestion():
     data = get_json_safe() or {}
     token = (data.get("token") or "").strip()
-    if not _verify_recaptcha(token):
+    if not _suggestion_forward_trusted() and not _verify_recaptcha(token):
         return api_error("reCAPTCHA validation failed", 400)
 
     operation = data.get("operation")

@@ -283,6 +283,9 @@ class TestApiManagementHelpers:
         assert _surface_for_path("/some/other") == "other"
         assert _surface_for_path("/Indicator", "indicator_bank_compat.indicator_list") == "indicator_bank"
         assert _surface_for_path("/Indicator") == "other"
+        assert _surface_for_path("/api/data", "fdrs.fdrs_public_compat_data") == "fdrs_public"
+        assert _surface_for_path("/csv/export", "fdrs.fdrs_public_compat_proxy_csv_export") == "fdrs_public"
+        assert _surface_for_path("/api/data") == "other"
 
     def test_count_unique_overlap_pairs(self):
         from app.routes.admin.api_management import _count_unique_overlap_pairs
@@ -421,6 +424,22 @@ class TestApiManagementHelpers:
         live = [r["path"] for r in scan["live"]]
         assert "/api/v1/fdrs/published-data" in live
         assert "/api/v1/fdrs/published-data" not in undoc
+
+    def test_scan_documents_fdrs_public_frontend(self, app):
+        from app.routes.admin.api_management import get_endpoint_registry, scan_flask_routes
+
+        with app.app_context():
+            scan = scan_flask_routes(app)
+            registry = {ep["path"]: ep for ep in get_endpoint_registry()}
+        live = {r["path"]: r for r in scan["live"]}
+        undoc = {r["path"] for r in scan["undocumented"]}
+        for path in ("/api/data", "/api/entities/ns/<don_code>", "/csv/export", "/api/documentSubscribe"):
+            assert path in live
+            assert live[path]["surface"] == "fdrs_public"
+            assert path not in undoc
+            assert registry[path]["surface"] == "fdrs_public"
+            assert registry[path]["paginated"] is False
+        assert registry["/api/data"]["query_params"][0]["name"] == "indicator"
 
     def test_endpoint_registry_grid_rows_ai_documents(self):
         from app.routes.admin.api_management import _endpoint_registry_grid_rows

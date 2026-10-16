@@ -1,7 +1,10 @@
 from functools import wraps
 from flask import request, g, current_app, redirect, url_for
 from flask_login import current_user
-from app.services.security.api_authentication import authenticate_db_api_key_only
+from app.services.security.api_authentication import (
+    authenticate_db_api_key_only,
+    query_api_key_value,
+)
 from app.utils.redirect_utils import get_current_relative_url
 
 
@@ -78,7 +81,7 @@ def _is_browser_navigation_without_api_key() -> bool:
         or request.headers.get("X-API-KEY", "").strip()
     ):
         return False
-    if (request.args.get("api_key") or "").strip():
+    if query_api_key_value():
         return False
     return "text/html" in request.headers.get("Accept", "").lower()
 

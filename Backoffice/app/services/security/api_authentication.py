@@ -310,10 +310,24 @@ def _extract_api_credential() -> Tuple[str, Optional[str]]:
     header_key = (request.headers.get('X-API-Key') or request.headers.get('X-API-KEY') or '').strip()
     if header_key:
         return header_key, 'header'
-    query_key = (request.args.get('api_key') or '').strip()
+    query_key = query_api_key_value()
     if query_key:
         return query_key, 'query'
     return '', None
+
+
+# ``apiKey`` is what the legacy FDRS data-API client sends (data.ifrc.org). Same opt-in
+# rule as ``api_key``: only keys with ``allow_query_api_key`` accept it.
+QUERY_API_KEY_PARAMS = ("api_key", "apiKey", "apikey")
+
+
+def query_api_key_value() -> str:
+    """Return the key presented in the query string, under any accepted parameter name."""
+    for name in QUERY_API_KEY_PARAMS:
+        value = (request.args.get(name) or '').strip()
+        if value:
+            return value
+    return ''
 
 
 def _extract_bearer_or_x_api_key() -> str:

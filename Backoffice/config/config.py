@@ -438,6 +438,10 @@ class Config:
     except (TypeError, ValueError):
         RECAPTCHA_MIN_SCORE = 0.5
 
+    # Shared with the Indicator Bank WebAPI. When the header matches, POST /Indicator/Suggestion
+    # skips a second reCAPTCHA check because the WebAPI already validated the browser token.
+    INDICATOR_SUGGESTION_FORWARD_SECRET = (os.environ.get("INDICATOR_SUGGESTION_FORWARD_SECRET") or "").strip() or None
+
     # Anonymous POST /api/mobile/v1/data/indicator-suggestions: require a reCAPTCHA token and
     # cap persisted submissions (DB-backed, so the caps hold across workers).
     MOBILE_SUGGESTION_REQUIRE_CAPTCHA = _parse_bool(os.environ.get("MOBILE_SUGGESTION_REQUIRE_CAPTCHA"), default=False)
@@ -795,6 +799,13 @@ class Config:
     FDRS_DATA_API_KEY = _fdrs_data_api_key_raw or None
     _fdrs_data_api_base_raw = (os.environ.get("FDRS_DATA_API_BASE") or "").strip().rstrip("/")
     FDRS_DATA_API_BASE = _fdrs_data_api_base_raw or None
+    # Public-frontend adapter (plugins/fdrs/public_compat_routes.py): forward the paths Backoffice
+    # does not store (documents, translations, embeds, offices, CSV) to FDRS_DATA_API_BASE using
+    # FDRS_DATA_API_KEY. Off by default. FDRS_DATA_API_BASE must be the legacy origin, not the
+    # hostname that now serves this app.
+    FDRS_PUBLIC_COMPAT_PASSTHROUGH = (
+        (os.environ.get("FDRS_PUBLIC_COMPAT_PASSTHROUGH") or "").strip().lower() in ("1", "true", "yes", "on")
+    )
     _fdrs_databank_api_key_raw = (os.environ.get("FDRS_DATABANK_API_KEY") or "").strip()
     FDRS_DATABANK_API_KEY = _fdrs_databank_api_key_raw or None
 

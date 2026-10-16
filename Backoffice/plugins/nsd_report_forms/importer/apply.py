@@ -25,7 +25,7 @@ from app.services.assignments.workflow_service import apply_entity_status_change
 from app.utils.datetime_helpers import utcnow
 
 from ..access_on_create import ROLE_BY_CONTACT
-from ..plugin import NSD_ROLE_FOCAL, NSD_ROLE_PM
+from ..plugin import GROUP_BY_ROLE, NSD_GROUP_FOCAL, NSD_ROLE_FOCAL, NSD_ROLE_PM
 from . import restrictions
 from . import layout
 from .workbook import Book, logframe_structure
@@ -277,25 +277,32 @@ class Run:
                 d.set_simple_value(v)
                 db.session.add(d)
 
-    def ensure_role(self, uid: int, code: str):
-        """Give the role that goes with a contact type; never removes roles and skips System Managers."""
+    def _role(self, code: str):
         role = self.roles.get(code)
         if role is None:
             role = self.roles[code] = RbacRole.query.filter_by(code=code).first() or False
-        if not role:
-            return
+        return role
+
+    def ensure_role(self, uid: int, code: str):
+        """Give the permission role that goes with a contact type, and its Access Group (which scopes the reports).
+
+        Only adds, except that the project manager pair replaces the focal point pair. Skips System Managers.
+        """
         held = {c for (c,) in db.session.query(RbacRole.code).join(RbacUserRole, RbacUserRole.role_id == RbacRole.id)
                 .filter(RbacUserRole.user_id == uid).all()}
-        if code in held or 'system_manager' in held:
+        if 'system_manager' in held:
             return
-        if code == NSD_ROLE_FOCAL and NSD_ROLE_PM in held:  # the PM role supersedes the focal point role
+        if code == NSD_ROLE_FOCAL and NSD_ROLE_PM in held:  # the PM pair supersedes the focal point pair
             return
-        if code == NSD_ROLE_PM and NSD_ROLE_FOCAL in held:
-            focal = RbacRole.query.filter_by(code=NSD_ROLE_FOCAL).first()
-            if focal:
-                RbacUserRole.query.filter_by(user_id=uid, role_id=focal.id).delete()
-        db.session.add(RbacUserRole(user_id=uid, role_id=role.id))
-        self.stats['roles_granted'] += 1
+        if code == NSD_ROLE_PM:
+            for old in (NSD_ROLE_FOCAL, NSD_GROUP_FOCAL):
+                if old in held and self._role(old):
+                    RbacUserRole.query.filter_by(user_id=uid, role_id=self._role(old).id).delete()
+        for wanted in (code, GROUP_BY_ROLE[code]):
+            role = self._role(wanted)
+            if role and wanted not in held:
+                db.session.add(RbacUserRole(user_id=uid, role_id=role.id))
+                self.stats['roles_granted'] += 1
 
     # -- one project
     def import_project(self, p: dict):
@@ -494,6 +501,8 @@ def run(book: Book, user_id: int, overwrite_reports: bool, progress, cancelled) 
     r = Run(book, user_id, overwrite_reports, progress, cancelled)
     if r.lk.problems:
         return {'stats': {}, 'messages': r.lk.problems, 'failed': len(book.rows['Projects']), 'cancelled': False}
+    if restrictions.ensure_groups(r.lk.nsd_roles):  # the NSD Access Groups, created once
+        db.session.commit()
     projects = book.rows['Projects']
     failed = 0
     for i, p in enumerate(projects, 1):

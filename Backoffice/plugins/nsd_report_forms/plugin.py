@@ -21,6 +21,19 @@ NSD_PM_PERMISSION = "nsd_funds.pm_overview"
 NSD_ROLE_FOCAL = "assignment_nsd_ns_focal"
 NSD_ROLE_PM = "assignment_nsd_ifrc_pm"
 
+# Access Groups (core ``rbac_role.kind = 'group'``): carry no permissions, only decide which NSD assignments a user
+# may reach. NSD assignments are limited to these groups (``AssignedForm.allowed_roles``); the roles above only give
+# the permissions to work on them. The groups are created by the master import (never seeded: the RBAC seed turns
+# every seeded role back into a permission role). Admins can also add people on Admin > Users > Access Groups.
+NSD_GROUP_FOCAL = "group_nsd_ns_focal"
+NSD_GROUP_PM = "group_nsd_ifrc_pm"
+NSD_GROUPS = {
+    NSD_GROUP_FOCAL: ("NSD: NS focal points", "NS focal persons of NSD-funded projects. Can reach the NSD quarterly reports."),
+    NSD_GROUP_PM: ("NSD: IFRC project managers", "IFRC project managers of NSD-funded projects. Can reach the NSD quarterly "
+                                                   "and final reports."),
+}
+GROUP_BY_ROLE = {NSD_ROLE_FOCAL: NSD_GROUP_FOCAL, NSD_ROLE_PM: NSD_GROUP_PM}
+
 
 class NsdLogframeFieldType(BaseFieldType):
     """Outcome / output / activity / indicator table (see static/js/nsd-logframe-field.js)."""
@@ -133,7 +146,7 @@ class NsdReportFormsPlugin(BasePlugin):
 
     @property
     def version(self) -> str:
-        return "0.5.0"
+        return "0.16.0"
 
     @property
     def description(self) -> str:

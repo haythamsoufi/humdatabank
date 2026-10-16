@@ -107,7 +107,7 @@
           stat(Object.keys(a.schedule).map(function (k) { return a.schedule[k] + ' ' + k; }).join(', ') || 0, 'scheduled reports') +
           stat(a.quarterly, 'quarterly reports with data') + stat(a.final, 'final reports with data') + '</div>';
         out += '<p>National Societies matched: <b>' + a.ns.matched + '</b> of ' + a.projects.total +
-          (a.ns.unmatched_count ? ' &middot; <b>' + a.ns.unmatched_count + '</b> names not found (imported with the name as text): ' + esc(a.ns.unmatched_names.slice(0, 8).join('; ')) + (a.ns.unmatched_count > 8 ? ' ...' : '') : '') + '</p>';
+          (a.ns.unmatched_count ? ' &middot; <b>' + a.ns.unmatched_count + '</b> names not found (these projects are skipped): ' + esc(a.ns.unmatched_names.slice(0, 8).join('; ')) + (a.ns.unmatched_count > 8 ? ' ...' : '') : '') + '</p>';
         out += '<p>Access by email: <b>' + a.access.matched + '</b> of ' + a.access.emails + ' addresses belong to existing users' +
           (a.access.unknown ? ' &middot; ' + a.access.unknown + ' are unknown (no access granted, e.g. ' + esc(a.access.unknown_sample.slice(0, 4).join(', ')) + ')' : '') + '.</p>';
       }

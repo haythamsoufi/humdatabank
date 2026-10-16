@@ -11,7 +11,7 @@ import logging
 from sqlalchemy import bindparam, event, text
 
 from app.models import User
-from plugins.nsd_report_forms.plugin import NSD_ROLE_FOCAL, NSD_ROLE_PM
+from plugins.nsd_report_forms.plugin import GROUP_BY_ROLE, NSD_ROLE_FOCAL, NSD_ROLE_PM
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +63,9 @@ def grant_for_new_user(mapper, connection, user):
             codes = {ROLE_BY_CONTACT[r.label] for r in rows}
             if NSD_ROLE_PM in codes:
                 codes.discard(NSD_ROLE_FOCAL)
-            for code in codes:
+            # the permission role and its Access Group (the group is what lets the user reach the reports; it is
+            # skipped quietly when the master import has not created it yet)
+            for code in codes | {GROUP_BY_ROLE[c] for c in codes}:
                 connection.execute(_GRANT_ROLE, {'uid': user.id, 'code': code})
         if rows:
             log.info('NSD funds: new user %s got project access from project contacts', email)

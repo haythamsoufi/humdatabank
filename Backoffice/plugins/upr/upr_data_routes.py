@@ -25,6 +25,7 @@ from app.services.security.api_key_permissions import DATA_READ
 from app.utils.error_handling import handle_json_view_exception
 from plugins.upr import bp
 from plugins.upr.api_cache import get_or_build_upr_payload
+from plugins.upr.ns_key_data import NS_KEY_COLUMNS, load_ns_key_rows
 from plugins.upr.upr_data import (
     FACT_COLUMNS,
     MASTER_COLUMNS,
@@ -194,6 +195,46 @@ API_ENDPOINTS = [
             },
         ],
     },
+    {
+        "group": "UPR",
+        "path": "/api/v1/nskeydata",
+        "methods": ["GET"],
+        "auth": "api_key_or_session",
+        "rate_limited": True,
+        "featured": True,
+        "description": (
+            "Volunteers, staff, branches, and local units: one figure per country and year. "
+            "Templates 21 (FDRS), 24 (planning), and 33 (annual and mid-year reporting) collect the same four indicators. "
+            "The row uses the assignment approved most recently for that country and year. "
+            "A planning round is dated to the year it was reported: P27 belongs to 2026. "
+            "Source names that round (FDRS, Planning, Annual reporting, or Mid-year reporting). "
+            "All four figures come from that source; a blank there stays blank. "
+            "Only approved country assignments are included. "
+            "Filters: iso2, iso3, year."
+        ),
+        "consumers": "Power BI, Backoffice session",
+        "paginated": False,
+        "query_params": [
+            {
+                "name": "iso2",
+                "type": "text",
+                "placeholder": "KE",
+                "description": "Filter by ISO 3166-1 alpha-2. Omit for every country.",
+            },
+            {
+                "name": "iso3",
+                "type": "select",
+                "option_source": "country_iso3",
+                "description": "Filter by ISO 3166-1 alpha-3. Omit for every country.",
+            },
+            {
+                "name": "year",
+                "type": "number",
+                "placeholder": "2024",
+                "description": "Calendar year. Omit for every year.",
+            },
+        ],
+    },
 ]
 
 _TEMPLATE_FILTERS = frozenset(TEMPLATE_KIND.values())
@@ -203,6 +244,7 @@ _COLUMNS_BY_PATH = {
     "/api/v1/upr/data": {"data": list(FACT_COLUMNS), "submissions": list(SUBMISSION_COLUMNS)},
     "/api/v1/upr/submissions": {"data": list(SUBMISSION_COLUMNS)},
     "/api/v1/upr/master": {"data": list(MASTER_COLUMNS)},
+    "/api/v1/nskeydata": {"data": list(NS_KEY_COLUMNS)},
 }
 
 _SECTION_VALUES = (
@@ -268,6 +310,8 @@ def _parameter_doc(param: dict) -> dict:
     elif name == "section":
         doc["values"] = list(_SECTION_VALUES)
         doc["example"] = param.get("placeholder")
+    elif name == "iso2":
+        doc["example"] = "KE"
     elif name == "iso3":
         doc["example"] = "AFG"
     options = param.get("options")
@@ -418,6 +462,68 @@ def get_upr_master():
                 "meta": {
                     "total": len(rows),
                     "columns": list(MASTER_COLUMNS),
+                },
+            },
+            cache_hit=cache_hit,
+        )
+    except Exception as error:
+        return handle_json_view_exception(error, GENERIC_ERROR_MESSAGE)
+
+
+def _ns_key_filters() -> tuple[str | None, str | None, int | None]:
+    iso2 = (request.args.get("iso2") or "").strip().upper() or None
+    if iso2 and (len(iso2) != 2 or not iso2.isalpha()):
+        raise ValueError("iso2 must be a 2-letter country code")
+    iso3 = (request.args.get("iso3") or "").strip().upper() or None
+    if iso3 and (len(iso3) != 3 or not iso3.isalpha()):
+        raise ValueError("iso3 must be a 3-letter country code")
+    year_raw = (request.args.get("year") or "").strip()
+    if not year_raw:
+        return iso2, iso3, None
+    if not year_raw.isdigit() or len(year_raw) != 4:
+        raise ValueError("year must be a 4-digit calendar year")
+    return iso2, iso3, int(year_raw)
+
+
+@bp.route("/api/v1/nskeydata", methods=["GET"])
+@require_api_key_or_session(capability=DATA_READ, browser_login_redirect=True)
+def get_ns_key_data():
+    """One approved figure per country and year for the four National Society key indicators."""
+    try:
+        try:
+            iso2, iso3, year = _ns_key_filters()
+        except ValueError as error:
+            return api_error(str(error), 400)
+
+        payload, cache_hit = get_or_build_upr_payload(
+            "nskeydata",
+            {},
+            lambda: {"data": load_ns_key_rows()},
+        )
+        rows = payload["data"]
+        if iso2:
+            rows = [row for row in rows if row.get("ISO2") == iso2]
+        if iso3:
+            rows = [row for row in rows if row.get("ISO3") == iso3]
+        if year is not None:
+            rows = [row for row in rows if row.get("Year") == year]
+        return _extract_response(
+            {
+                "data": rows,
+                "meta": {
+                    "total": len(rows),
+                    "columns": list(NS_KEY_COLUMNS),
+                    "priority": (
+                        "Most recently approved source among FDRS (template 21), "
+                        "planning (template 24), and reporting (template 33). "
+                        "Planning P27 is the 2026 figure."
+                    ),
+                    "sources": [
+                        "FDRS",
+                        "Planning",
+                        "Annual reporting",
+                        "Mid-year reporting",
+                    ],
                 },
             },
             cache_hit=cache_hit,

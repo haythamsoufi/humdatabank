@@ -179,6 +179,11 @@ class NsdReportFormsPlugin(BasePlugin):
             manage_requires_system_manager=False,
         )
 
+    def get_assignment_badges(self, assignment_entity_statuses):
+        from plugins.nsd_report_forms.badges import assignment_badges
+
+        return assignment_badges(assignment_entity_statuses)
+
     def get_seed_permissions(self) -> List[SeedPermission]:
         return [
             SeedPermission(

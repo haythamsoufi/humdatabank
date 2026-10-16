@@ -34,6 +34,7 @@ _UPR_PDF_VIEWER_CSP = (
 # Frameable support-flow map. frame-ancestors is omitted and the override clears
 # X-Frame-Options, same as the documents gallery, so a parent page can iframe it.
 # Map tiles are same-origin when Mapbox is proxied, or OpenStreetMap otherwise.
+# Production serves /static from a blob CDN; that origin is added per request.
 _UPR_SUPPORT_FLOW_CSP = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -45,6 +46,37 @@ _UPR_SUPPORT_FLOW_CSP = (
     "base-uri 'none'; "
     "form-action 'none'"
 )
+
+
+def support_flow_csp() -> str:
+    """Support-flow CSP, including the static CDN host when production uses one."""
+    origin = ""
+    try:
+        from urllib.parse import urlparse
+
+        from flask import current_app, has_app_context
+
+        if has_app_context():
+            static_cdn = (current_app.config.get("STATIC_CDN_URL") or "").strip().rstrip("/")
+            parsed = urlparse(static_cdn)
+            if parsed.scheme and parsed.netloc:
+                origin = f"{parsed.scheme}://{parsed.netloc}"
+    except Exception:
+        origin = ""
+    if not origin:
+        return _UPR_SUPPORT_FLOW_CSP
+    extra = f" {origin}"
+    return (
+        "default-src 'self'; "
+        f"script-src 'self'{extra}; "
+        f"style-src 'self' 'unsafe-inline'{extra}; "
+        f"img-src 'self'{extra} https://tile.openstreetmap.org https://*.tile.openstreetmap.org data:; "
+        f"font-src 'self'{extra}; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'none'; "
+        "form-action 'none'"
+    )
 
 _UPR_DOCUMENTS_GALLERY_CSP = (
     "default-src 'self'; "
@@ -238,21 +270,21 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
             CspOverride(
                 endpoint="upr.support_flow_embed",
                 path_predicate=lambda path: True,
-                policy=_UPR_SUPPORT_FLOW_CSP,
+                policy=support_flow_csp(),
                 x_frame_options=None,
                 cross_origin_resource_policy="cross-origin",
             ),
             CspOverride(
                 endpoint="upr.support_funding_embed",
                 path_predicate=lambda path: True,
-                policy=_UPR_SUPPORT_FLOW_CSP,
+                policy=support_flow_csp(),
                 x_frame_options=None,
                 cross_origin_resource_policy="cross-origin",
             ),
             CspOverride(
                 endpoint="upr.support_overview_embed",
                 path_predicate=lambda path: True,
-                policy=_UPR_SUPPORT_FLOW_CSP,
+                policy=support_flow_csp(),
                 x_frame_options=None,
                 cross_origin_resource_policy="cross-origin",
             ),

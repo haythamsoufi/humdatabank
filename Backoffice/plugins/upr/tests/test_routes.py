@@ -457,3 +457,19 @@ def test_pdf_viewer_csp_allows_same_origin_frame():
     assert "frame-ancestors" not in gallery.policy
     assert gallery.x_frame_options is None
     assert gallery.cross_origin_resource_policy == "cross-origin"
+
+
+def test_support_flow_csp_allows_static_cdn():
+    from flask import Flask
+
+    from plugins.upr.plugin import support_flow_csp
+
+    app = Flask(__name__)
+    app.config["STATIC_CDN_URL"] = "https://ifrcdatabankstorage2.blob.core.windows.net/static"
+    with app.app_context():
+        policy = support_flow_csp()
+    origin = "https://ifrcdatabankstorage2.blob.core.windows.net"
+    assert f"script-src 'self' {origin}" in policy
+    assert f"style-src 'self' 'unsafe-inline' {origin}" in policy
+    assert f"font-src 'self' {origin}" in policy
+    assert "frame-ancestors" not in policy

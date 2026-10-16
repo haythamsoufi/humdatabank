@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="{{ _ui_language|default('en') }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ L.flow_coverage_title }}</title>
+    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    <link rel="stylesheet" href="{{ upr_static_url('css/upr-impact.css') }}">
+    <link rel="stylesheet" href="{{ upr_static_url('css/upr-flow-map.css') }}">
+</head>
+<body class="upri-funding-embed-body">
+    {% with flow_url=url_for('upr.support_flow_data'), year=year %}
+        {% include "plugins/upr/upr/_coverage_scatter.html" %}
+    {% endwith %}
+    <script src="{{ upr_static_url('js/upr-coverage-scatter.js') }}"></script>
+</body>
+</html>

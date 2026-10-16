@@ -96,6 +96,11 @@
                 {% include "plugins/upr/upr/_funding_bars.html" %}
             {% endwith %}
         </section>
+        <section class="upri-flow-coverage" aria-label="{{ L.flow_coverage_title }}">
+            {% with flow_url=url_for('upr.impact_flows'), year='', follow_year='upri-flow-year' %}
+                {% include "plugins/upr/upr/_coverage_scatter.html" %}
+            {% endwith %}
+        </section>
     </section>
     </div>
 
@@ -203,3 +208,4 @@ window.UprImpactConfig = {
 <script nonce="{{ csp_nonce() }}" src="{{ static_url('vendor/leaflet/leaflet.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-flow-map.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-funding-bars.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_static_url('js/upr-coverage-scatter.js') }}"></script>

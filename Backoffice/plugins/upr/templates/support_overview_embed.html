@@ -38,8 +38,14 @@
             {% include "plugins/upr/upr/_funding_bars.html" %}
         {% endwith %}
     </section>
+    <section class="upri-combined-coverage" aria-label="{{ L.flow_coverage_title }}">
+        {% with flow_url=url_for('upr.support_flow_data'), year=year, follow_year='upri-flow-year' %}
+            {% include "plugins/upr/upr/_coverage_scatter.html" %}
+        {% endwith %}
+    </section>
     <script src="{{ static_url('vendor/leaflet/leaflet.js') }}"></script>
     <script src="{{ upr_static_url('js/upr-flow-map.js') }}"></script>
     <script src="{{ upr_static_url('js/upr-funding-bars.js') }}"></script>
+    <script src="{{ upr_static_url('js/upr-coverage-scatter.js') }}"></script>
 </body>
 </html>

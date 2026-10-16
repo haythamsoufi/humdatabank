@@ -1,0 +1,19 @@
+<section id="upri-coverage" class="upri-coverage" data-flow-url="{{ flow_url }}" data-year="{{ year|default('') }}"{% if follow_year %} data-follow-year="{{ follow_year }}"{% endif %} data-ui="{{ (ui if ui is defined else upr_analysis_ui())|tojson|forceescape }}">
+    <div class="upri-coverage__head">
+        <h2 class="upri-coverage__title">{{ L.flow_coverage_title }}</h2>
+        <div id="upri-coverage-years" class="upri-coverage__years" role="group" aria-label="{{ L.flow_year }}"{% if follow_year %} hidden{% endif %}></div>
+    </div>
+    <hr class="upri-coverage__rule">
+    <div id="upri-coverage-legend" class="upri-coverage__key" hidden></div>
+    <div id="upri-coverage-loading" class="upri-state upri-state--compact" hidden>
+        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+        <p>{{ L.flow_loading }}</p>
+    </div>
+    <div id="upri-coverage-error" class="upri-state upri-state--error upri-state--compact" hidden>
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        <p>{{ L.flow_error }}</p>
+    </div>
+    <p id="upri-coverage-empty" class="upri-coverage__empty" hidden></p>
+    <div id="upri-coverage-plot" class="upri-coverage__plot" hidden></div>
+    <p id="upri-coverage-note" class="upri-coverage__note" hidden></p>
+</section>

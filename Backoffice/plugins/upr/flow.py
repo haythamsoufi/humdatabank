@@ -138,6 +138,15 @@ def aggregate_flows(
             rounds_seen.add(code)
         edges.setdefault((donor_iso3, host_iso3), set()).add(code)
 
+    _add_reported_support_edges(
+        master_rows,
+        edges=edges,
+        unresolved=unresolved,
+        rounds_seen=rounds_seen,
+        donor_iso3_by_name=donor_iso3_by_name,
+        host_iso3s=host_iso3s,
+    )
+
     # Only keep edges whose both ends have a known centroid.
     nodes: dict[str, dict[str, Any]] = {}
     edge_list: list[dict[str, Any]] = []
@@ -201,6 +210,8 @@ def aggregate_flows(
         "edges": edge_list,
         "funding": funding,
         "figures": figures,
+        "coverage": _coverage_points(figures, countries),
+        "inform": {"edition": _inform_edition()},
         "areas": [
             {"code": code, "label": AREA_LABELS.get(code, code)}
             for code in _AREA_ORDER
@@ -304,6 +315,20 @@ def _chart_area(area: str) -> str | None:
     return None
 
 
+def _prefer_report(candidate: str, incumbent: str) -> bool:
+    """True when *candidate* should replace *incumbent* for the same year.
+
+    The annual report wins over the mid-year report. A later round wins within
+    the same kind. A mid-year figure is kept when the annual report has no row
+    for that country.
+    """
+    candidate_annual = round_prefix(candidate) == "AR"
+    incumbent_annual = round_prefix(incumbent) == "AR"
+    if candidate_annual != incumbent_annual:
+        return candidate_annual
+    return round_sort_key(candidate) > round_sort_key(incumbent)
+
+
 def _support_figures(
     master_rows: list[dict[str, Any]],
     *,
@@ -313,12 +338,14 @@ def _support_figures(
     """Requirement, funding and expenditure for one year, optionally by priority.
 
     Reported funding and expenditure are Participating Society self-reports
-    (``Source = PNS Data``). The annual report wins over the mid-year report
-    for the same year. The funding requirement is the PNS amount on the plan.
-    ``area`` is empty on the headline total. A host National Society's own
-    priority breakdown is not included.
+    (``Source = PNS Data``). On the PNS reporting form, the strategic-priority
+    columns are the expenditure breakdown. For the same country and priority,
+    the annual report wins over the mid-year report. A mid-year amount is kept
+    when the annual report does not mention that country. The funding
+    requirement is the PNS amount on the plan. ``area`` is empty on the
+    headline total. A host National Society's own priority breakdown is not
+    included.
     """
-    report_rounds: dict[int, set[str]] = {}
     raw: list[dict[str, Any]] = []
     for row in master_rows:
         metric = _FIGURE_METRICS.get(norm(row.get("Indicator")))
@@ -340,7 +367,6 @@ def _support_figures(
         else:
             if kind != "report" or source != "pns data":
                 continue
-            report_rounds.setdefault(year, set()).add(code)
         host = str(row.get("ISO3") or "").strip().upper()
         # On a plan the NS column is the host, not the supporting society.
         donor = ""
@@ -362,16 +388,21 @@ def _support_figures(
                 "value": float(value),
             }
         )
-    chosen_report: dict[int, str] = {}
-    for year, codes in report_rounds.items():
-        annual = [item for item in codes if round_prefix(item) == "AR"]
-        pool = annual or list(codes)
-        chosen_report[year] = sorted(pool, key=round_sort_key)[-1]
+    chosen: dict[tuple, str] = {}
+    for item in raw:
+        if item["metric"] == "requirement":
+            continue
+        key = (item["year"], item["from"], item["to"], item["area"] or "", item["metric"])
+        current = chosen.get(key)
+        if current is None or _prefer_report(item["round"], current):
+            chosen[key] = item["round"]
 
     merged: dict[tuple, dict[str, Any]] = {}
     for item in raw:
-        if item["metric"] != "requirement" and item["round"] != chosen_report.get(item["year"]):
-            continue
+        if item["metric"] != "requirement":
+            key = (item["year"], item["from"], item["to"], item["area"] or "", item["metric"])
+            if item["round"] != chosen.get(key):
+                continue
         key = (item["year"], item["from"], item["to"], item["area"] or "")
         current = merged.setdefault(
             key,
@@ -391,6 +422,135 @@ def _support_figures(
         for metric in ("requirement", "funding", "expenditure"):
             row[metric] = round(row[metric], 2)
     return figures
+
+
+def _inform_payload() -> dict[str, Any]:
+    path = _PLUGIN_DIR / "geo" / "inform_risk.json"
+    try:
+        with path.open(encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _inform_edition() -> str:
+    return str(_inform_payload().get("edition") or "INFORM Risk")
+
+
+def inform_class(score: float) -> str:
+    """Four INFORM classes. Scores under 3.5 are Low, including Very Low."""
+    if score >= 6.5:
+        return "very_high"
+    if score >= 5:
+        return "high"
+    if score >= 3.5:
+        return "medium"
+    return "low"
+
+
+def _coverage_points(
+    figures: list[dict[str, Any]],
+    countries: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """One point per host country and year: requirement, funding met, INFORM class."""
+    scores = _inform_payload().get("scores") or {}
+    buckets: dict[tuple, dict[str, float]] = {}
+    for row in figures:
+        host = str(row.get("to") or "").strip().upper()
+        year = row.get("year")
+        if not host or year is None:
+            continue
+        bucket = buckets.setdefault(
+            (int(year), host),
+            {"requirement_total": 0.0, "requirement_areas": 0.0, "funding": 0.0},
+        )
+        if row.get("area"):
+            bucket["requirement_areas"] += float(row.get("requirement") or 0)
+        else:
+            bucket["requirement_total"] += float(row.get("requirement") or 0)
+            bucket["funding"] += float(row.get("funding") or 0)
+    points = []
+    for (year, host), bucket in buckets.items():
+        requirement = bucket["requirement_total"] or bucket["requirement_areas"]
+        if requirement <= 0:
+            continue
+        funding = bucket["funding"]
+        score = scores.get(host)
+        try:
+            score_value = None if score is None else float(score)
+        except (TypeError, ValueError):
+            score_value = None
+        info = countries.get(host) or {}
+        points.append(
+            {
+                "year": year,
+                "iso3": host,
+                "name": info.get("name") or host,
+                "requirement": round(requirement, 2),
+                "funding": round(funding, 2),
+                "met": round(funding / requirement * 100, 1),
+                "inform_class": inform_class(score_value) if score_value is not None else "",
+                "inform_score": score_value,
+            }
+        )
+    points.sort(key=lambda point: (-point["year"], -point["requirement"], str(point["name"])))
+    return points
+
+
+def _add_reported_support_edges(
+    master_rows: list[dict[str, Any]],
+    *,
+    edges: dict[tuple[str, str], set[str]],
+    unresolved: set[str],
+    rounds_seen: set[str],
+    donor_iso3_by_name: dict[str, str],
+    host_iso3s: set[str] | None,
+) -> None:
+    """Draw a support line when a society reports funding or expenditure for a country.
+
+    The support matrix is not the only place bilateral support is recorded.
+    For one society and country, the annual report replaces the mid-year
+    report. A mid-year country with no annual-report row is kept.
+    """
+    pending: list[tuple[str, str, str]] = []
+    for row in master_rows:
+        if norm(row.get("Source")) != "pns data":
+            continue
+        if norm(row.get("Indicator")) not in {"funding", "expenditure"}:
+            continue
+        if not num(row.get("ValueNum")):
+            continue
+        code = str(row.get("Round") or "").strip()
+        if round_calendar_year(code) is None or round_kind(code) != "report":
+            continue
+        host = str(row.get("ISO3") or "").strip().upper()
+        donor_name = str(row.get("NS") or "").strip()
+        donor = donor_iso3_by_name.get(norm(donor_name), "")
+        if not donor:
+            if donor_name:
+                unresolved.add(donor_name)
+            continue
+        if not host or donor == host:
+            continue
+        if host_iso3s is not None and host not in host_iso3s:
+            continue
+        pending.append((donor, host, code))
+    best: dict[tuple[str, str, int], str] = {}
+    for donor, host, code in pending:
+        year = round_calendar_year(code)
+        if year is None:
+            continue
+        key = (donor, host, year)
+        current = best.get(key)
+        if current is None or _prefer_report(code, current):
+            best[key] = code
+    for donor, host, code in pending:
+        year = round_calendar_year(code)
+        if year is None or best.get((donor, host, year)) != code:
+            continue
+        edges.setdefault((donor, host), set()).add(code)
+        rounds_seen.add(code)
 
 
 def _touch_node(
@@ -498,7 +658,7 @@ def build_support_flows(*, region: str | None = None, public_tiles: bool = False
         return payload
 
     payload, _cache_hit = get_or_build_upr_payload(
-        "support_flows", {"region": region or None, "series": "pns-flow-v6"}, _loader
+        "support_flows", {"region": region or None, "series": "pns-flow-v9"}, _loader
     )
     # Tiles depend on runtime plugin config, not the DB revision — resolve fresh.
     tiles = _tile_config()

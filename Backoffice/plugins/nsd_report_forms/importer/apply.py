@@ -25,7 +25,7 @@ from app.services.assignments.workflow_service import apply_entity_status_change
 from app.utils.datetime_helpers import utcnow
 
 from ..access_on_create import ROLE_BY_CONTACT
-from ..plugin import GROUP_BY_ROLE, NSD_GROUP_FOCAL, NSD_ROLE_FOCAL, NSD_ROLE_PM
+from ..plugin import NSD_GROUP_FOCAL, NSD_GROUP_PM
 from . import restrictions
 from . import layout
 from .workbook import Book, logframe_structure
@@ -284,25 +284,22 @@ class Run:
         return role
 
     def ensure_role(self, uid: int, code: str):
-        """Give the permission role that goes with a contact type, and its Access Group (which scopes the reports).
+        """Put the user in the Access Group for a contact type. Adds nothing else, and skips System Managers.
 
-        Only adds, except that the project manager pair replaces the focal point pair. Skips System Managers.
+        A project manager is not also kept as a focal point.
         """
         held = {c for (c,) in db.session.query(RbacRole.code).join(RbacUserRole, RbacUserRole.role_id == RbacRole.id)
                 .filter(RbacUserRole.user_id == uid).all()}
-        if 'system_manager' in held:
+        if 'system_manager' in held or (code == NSD_GROUP_FOCAL and NSD_GROUP_PM in held):
             return
-        if code == NSD_ROLE_FOCAL and NSD_ROLE_PM in held:  # the PM pair supersedes the focal point pair
+        if code in held:
             return
-        if code == NSD_ROLE_PM:
-            for old in (NSD_ROLE_FOCAL, NSD_GROUP_FOCAL):
-                if old in held and self._role(old):
-                    RbacUserRole.query.filter_by(user_id=uid, role_id=self._role(old).id).delete()
-        for wanted in (code, GROUP_BY_ROLE[code]):
-            role = self._role(wanted)
-            if role and wanted not in held:
-                db.session.add(RbacUserRole(user_id=uid, role_id=role.id))
-                self.stats['roles_granted'] += 1
+        if code == NSD_GROUP_PM and NSD_GROUP_FOCAL in held and self._role(NSD_GROUP_FOCAL):
+            RbacUserRole.query.filter_by(user_id=uid, role_id=self._role(NSD_GROUP_FOCAL).id).delete()
+        group = self._role(code)
+        if group:
+            db.session.add(RbacUserRole(user_id=uid, role_id=group.id))
+            self.stats['roles_granted'] += 1
 
     # -- one project
     def import_project(self, p: dict):

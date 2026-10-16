@@ -9,13 +9,7 @@ from app.models.rbac import RbacRole, RbacUserRole
 from app.services.assignments import access_service
 from plugins.nsd_report_forms.importer import apply as nsd_apply
 from plugins.nsd_report_forms.importer import restrictions
-from plugins.nsd_report_forms.plugin import (
-    NSD_ADMIN_ROLE,
-    NSD_GROUP_FOCAL,
-    NSD_GROUP_PM,
-    NSD_ROLE_FOCAL,
-    NSD_ROLE_PM,
-)
+from plugins.nsd_report_forms.plugin import NSD_ADMIN_ROLE, NSD_GROUP_FOCAL, NSD_GROUP_PM
 from tests.factories import (
     _ensure_permission,
     _grant_entity_permission,
@@ -70,8 +64,6 @@ def _runner():
 @pytest.fixture
 def nsd(db_session, app):
     """The NSD roles, the NSD Access Groups made by the plugin, a country and two NSD assignments on it."""
-    for code in (NSD_ROLE_FOCAL, NSD_ROLE_PM):
-        _role(db_session, code, _WORK_PERMS)
     admin_role = _role(db_session, NSD_ADMIN_ROLE)
     roles = restrictions.load_roles()
     restrictions.ensure_groups(roles)
@@ -115,21 +107,14 @@ class TestAccessGroups:
 
 
 class TestWhoReachesWhat:
-    def test_role_without_group_reaches_nothing(self, db_session, nsd):
-        """The NSD permission role alone is not enough: the Access Group scopes the reports."""
-        user = _user(db_session, [NSD_ROLE_FOCAL])
-        _grant_entity_permission(db_session, user, "country", nsd["country"].id)
-        assert not _can(user, nsd["quarter"])
-        assert not _can(user, nsd["final"])
-
     def test_focal_group_reaches_quarterly_only(self, db_session, nsd):
-        user = _user(db_session, [NSD_ROLE_FOCAL, NSD_GROUP_FOCAL])
+        user = _user(db_session, [NSD_GROUP_FOCAL])
         _grant_entity_permission(db_session, user, "country", nsd["country"].id)
         assert _can(user, nsd["quarter"])
         assert not _can(user, nsd["final"])
 
     def test_pm_group_reaches_quarterly_and_final(self, db_session, nsd):
-        user = _user(db_session, [NSD_ROLE_PM, NSD_GROUP_PM])
+        user = _user(db_session, [NSD_GROUP_PM])
         _grant_entity_permission(db_session, user, "country", nsd["country"].id)
         assert _can(user, nsd["quarter"])
         assert _can(user, nsd["final"])
@@ -145,39 +130,33 @@ class TestWhoReachesWhat:
 class TestGrantingMembership:
     def test_focal_contact_gets_role_and_group(self, db_session, nsd):
         user = create_test_user(db_session, role="user")
-        _runner().ensure_role(user.id, NSD_ROLE_FOCAL)
+        _runner().ensure_role(user.id, NSD_GROUP_FOCAL)
         db_session.commit()
-        assert {NSD_ROLE_FOCAL, NSD_GROUP_FOCAL} <= _held(db_session, user)
+        assert NSD_GROUP_FOCAL in _held(db_session, user)
+        assert NSD_GROUP_PM not in _held(db_session, user)
 
-    def test_pm_contact_replaces_focal_pair(self, db_session, nsd):
+    def test_pm_contact_replaces_focal_group(self, db_session, nsd):
         user = create_test_user(db_session, role="user")
         run = _runner()
-        run.ensure_role(user.id, NSD_ROLE_FOCAL)
-        run.ensure_role(user.id, NSD_ROLE_PM)
+        run.ensure_role(user.id, NSD_GROUP_FOCAL)
+        run.ensure_role(user.id, NSD_GROUP_PM)
         db_session.commit()
         held = _held(db_session, user)
-        assert {NSD_ROLE_PM, NSD_GROUP_PM} <= held
-        assert not ({NSD_ROLE_FOCAL, NSD_GROUP_FOCAL} & held)
+        assert NSD_GROUP_PM in held
+        assert NSD_GROUP_FOCAL not in held
 
-    def test_focal_contact_keeps_pm_pair(self, db_session, nsd):
+    def test_focal_contact_keeps_pm_group(self, db_session, nsd):
         user = create_test_user(db_session, role="user")
         run = _runner()
-        run.ensure_role(user.id, NSD_ROLE_PM)
-        run.ensure_role(user.id, NSD_ROLE_FOCAL)
+        run.ensure_role(user.id, NSD_GROUP_PM)
+        run.ensure_role(user.id, NSD_GROUP_FOCAL)
         db_session.commit()
         held = _held(db_session, user)
-        assert {NSD_ROLE_PM, NSD_GROUP_PM} <= held
-        assert not ({NSD_ROLE_FOCAL, NSD_GROUP_FOCAL} & held)
+        assert NSD_GROUP_PM in held
+        assert NSD_GROUP_FOCAL not in held
 
     def test_system_manager_gets_nothing_extra(self, db_session, nsd):
         user = create_test_user(db_session, role="system_manager")
-        _runner().ensure_role(user.id, NSD_ROLE_PM)
+        _runner().ensure_role(user.id, NSD_GROUP_PM)
         db_session.commit()
-        assert not ({NSD_ROLE_PM, NSD_GROUP_PM} & _held(db_session, user))
-
-    def test_existing_member_gets_the_missing_group(self, db_session, nsd):
-        """A user who got the role before the groups existed is brought up to date by the next import."""
-        user = _user(db_session, [NSD_ROLE_PM])
-        _runner().ensure_role(user.id, NSD_ROLE_PM)
-        db_session.commit()
-        assert NSD_GROUP_PM in _held(db_session, user)
+        assert NSD_GROUP_PM not in _held(db_session, user)

@@ -11,18 +11,18 @@ import logging
 from sqlalchemy import bindparam, event, text
 
 from app.models import User
-from plugins.nsd_report_forms.plugin import GROUP_BY_ROLE, NSD_ROLE_FOCAL, NSD_ROLE_PM
+from plugins.nsd_report_forms.plugin import NSD_GROUP_FOCAL, NSD_GROUP_PM
 
 log = logging.getLogger(__name__)
 
 PROFILE_TEMPLATE = 'NSD Project profile - CBF'
 
-# project-record field holding the email -> role given to that person (change here to change the policy)
+# project-record field holding the email -> Access Group given to that person
 ROLE_BY_CONTACT = {
-    'NS focal person email': NSD_ROLE_FOCAL,
-    'IFRC project manager email': NSD_ROLE_PM,
+    'NS focal person email': NSD_GROUP_FOCAL,
+    'IFRC project manager email': NSD_GROUP_PM,
 }
-# the project manager role supersedes the focal point role: a person who is a PM never keeps the focal role
+# the project manager group supersedes the focal point group: a person who is a PM is not also a focal point
 
 _MATCHES = text("""
     SELECT DISTINCT aes.entity_id AS country_id, fi.label AS label
@@ -61,11 +61,9 @@ def grant_for_new_user(mapper, connection, user):
             for country_id in {r.country_id for r in rows}:
                 connection.execute(_GRANT_COUNTRY, {'uid': user.id, 'cid': country_id})
             codes = {ROLE_BY_CONTACT[r.label] for r in rows}
-            if NSD_ROLE_PM in codes:
-                codes.discard(NSD_ROLE_FOCAL)
-            # the permission role and its Access Group (the group is what lets the user reach the reports; it is
-            # skipped quietly when the master import has not created it yet)
-            for code in codes | {GROUP_BY_ROLE[c] for c in codes}:
+            if NSD_GROUP_PM in codes:
+                codes.discard(NSD_GROUP_FOCAL)
+            for code in codes:
                 connection.execute(_GRANT_ROLE, {'uid': user.id, 'code': code})
         if rows:
             log.info('NSD funds: new user %s got project access from project contacts', email)

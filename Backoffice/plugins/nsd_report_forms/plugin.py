@@ -17,14 +17,10 @@ NSD_ADMIN_ROLE = "admin_nsd_funds"
 # NSD funds tab in Explore Data. Deliberately WITHOUT an "admin." prefix: such codes make a user an "admin".
 NSD_PM_PERMISSION = "nsd_funds.pm_overview"
 
-# the two roles of NSD report users (they replace the ordinary assignment roles for NSD reports)
-NSD_ROLE_FOCAL = "assignment_nsd_ns_focal"
-NSD_ROLE_PM = "assignment_nsd_ifrc_pm"
-
-# Access Groups (core ``rbac_role.kind = 'group'``): carry no permissions, only decide which NSD assignments a user
-# may reach. NSD assignments are limited to these groups (``AssignedForm.allowed_roles``); the roles above only give
-# the permissions to work on them. The groups are created by the master import (never seeded: the RBAC seed turns
-# every seeded role back into a permission role). Admins can also add people on Admin > Users > Access Groups.
+# Access Groups (core ``rbac_role.kind = 'group'``). They carry no permissions: they only decide which NSD
+# assignments a user may reach. People are put in a group (user form, Access Groups screen, or the master import).
+# What they can do on a report still comes from a normal permission role. The groups are not seeded, because the
+# RBAC seed turns every seeded role back into a permission role; the plugin creates them.
 NSD_GROUP_FOCAL = "group_nsd_ns_focal"
 NSD_GROUP_PM = "group_nsd_ifrc_pm"
 NSD_GROUPS = {
@@ -32,7 +28,6 @@ NSD_GROUPS = {
     NSD_GROUP_PM: ("NSD: IFRC project managers", "IFRC project managers of NSD-funded projects. Can reach the NSD quarterly "
                                                    "and final reports."),
 }
-GROUP_BY_ROLE = {NSD_ROLE_FOCAL: NSD_GROUP_FOCAL, NSD_ROLE_PM: NSD_GROUP_PM}
 
 
 class NsdLogframeFieldType(BaseFieldType):
@@ -217,31 +212,14 @@ class NsdReportFormsPlugin(BasePlugin):
             SeedRole(
                 code=NSD_ADMIN_ROLE,
                 name="Admin: NSD funds",
-                description="Sees all NSD-funded projects and their reports, opens the project overview and master "
-                            "import, edits, submits, approves and reopens reports, and changes assignment status "
-                            "(open / close) for every country.",
+                description="Opens the NSD project overview and master import, and can reach every NSD assignment. "
+                            "NS focal points and IFRC project managers are not roles: add them to the NSD access groups.",
                 permission_codes=[
                     NSD_ADMIN_PERMISSION, NSD_PM_PERMISSION,
                     "admin.assignments.view", "admin.assignments.edit", "admin.assignments.entities.status",
                     "assignment.view", "assignment.enter", "assignment.submit",
                     "assignment.approve", "assignment.reopen",
                 ],
-            ),
-            SeedRole(
-                code=NSD_ROLE_FOCAL,
-                name="Assignment: NSD NS focal point",
-                description="NS focal person of NSD-funded projects: sees, edits and submits the NSD quarterly reports "
-                            "of the countries they are given. Cannot see the final report.",
-                permission_codes=["assignment.view", "assignment.enter", "assignment.submit",
-                                  "assignment.documents.upload"],
-            ),
-            SeedRole(
-                code=NSD_ROLE_PM,
-                name="Assignment: NSD IFRC project manager",
-                description="IFRC project manager of NSD-funded projects: sees, edits, submits, approves and reopens the "
-                            "quarterly reports and the final report of the countries they are given.",
-                permission_codes=[NSD_PM_PERMISSION, "assignment.view", "assignment.enter", "assignment.submit",
-                                  "assignment.documents.upload", "assignment.approve", "assignment.reopen"],
             ),
         ]
 

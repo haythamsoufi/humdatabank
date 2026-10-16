@@ -8,6 +8,16 @@ from app.utils.logging_security import redact_payload_for_storage
 from app import db
 
 
+def _is_tracked_usage_request() -> bool:
+    """External /api routes plus the Indicator Bank app routes at the site root."""
+    path = request.path or ""
+    if path.startswith("/api/"):
+        return True
+    from app.services.platform.api_usage_stats import is_indicator_bank_app_path
+
+    return is_indicator_bank_app_path(path)
+
+
 def _should_skip_api_usage_tracking() -> bool:
     """
     High-volume or low-signal endpoints excluded from api_usage (and API key usage rows).
@@ -31,7 +41,7 @@ def _api_tracker_logger():
 
 def track_api_request():
     """Track API request before it's processed."""
-    if request.path.startswith('/api/'):
+    if _is_tracked_usage_request():
         if _should_skip_api_usage_tracking():
             return
 
@@ -41,7 +51,7 @@ def track_api_request():
 
 def track_api_response(response):
     """Track API response after it's processed."""
-    if request.path.startswith('/api/'):
+    if _is_tracked_usage_request():
         if _should_skip_api_usage_tracking():
             return response
 

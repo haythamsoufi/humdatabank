@@ -28,6 +28,36 @@ def test_endpoint_path_prefix_strips_flask_variables():
     assert endpoint_path_prefix('/api/v1/data/{template_id}') == '/api/v1/data/'
 
 
+def test_assign_logged_paths_picks_the_most_specific_route():
+    from app.services.platform.api_usage_stats import assign_logged_paths
+
+    routes = [
+        '/api/v1/dashboard',
+        '/api/v1/dashboard/data-quality',
+        '/api/ai/documents/<document_id>',
+        '/api/ai/documents/<document_id>/download',
+        '/Indicator',
+        '/Indicator/<indicator_id>',
+        '/Indicator/search',
+    ]
+    assigned = assign_logged_paths(routes, [
+        '/api/v1/dashboard',
+        '/api/v1/dashboard/data-quality',
+        '/api/ai/documents/12',
+        '/api/ai/documents/12/download',
+        '/Indicator',
+        '/Indicator/9',
+        '/Indicator/search',
+    ])
+    assert assigned['/api/v1/dashboard'] == '/api/v1/dashboard'
+    assert assigned['/api/v1/dashboard/data-quality'] == '/api/v1/dashboard/data-quality'
+    assert assigned['/api/ai/documents/12'] == '/api/ai/documents/<document_id>'
+    assert assigned['/api/ai/documents/12/download'] == '/api/ai/documents/<document_id>/download'
+    assert assigned['/Indicator'] == '/Indicator'
+    assert assigned['/Indicator/9'] == '/Indicator/<indicator_id>'
+    assert assigned['/Indicator/search'] == '/Indicator/search'
+
+
 def test_bulk_endpoint_usage_stats_aggregates_by_prefix(app, db_session):
     now = utcnow()
     db_session.add_all([
@@ -58,9 +88,15 @@ def test_bulk_endpoint_usage_stats_aggregates_by_prefix(app, db_session):
     ])
     db_session.commit()
 
-    stats = bulk_endpoint_usage_stats(['/api/v1/data', '/api/v1/templates'])
-    assert stats['/api/v1/data']['total_requests'] == 2
-    assert stats['/api/v1/data']['success_rate'] == 50.0
+    stats = bulk_endpoint_usage_stats([
+        '/api/v1/data',
+        '/api/v1/data/<extra>',
+        '/api/v1/templates',
+    ])
+    assert stats['/api/v1/data']['total_requests'] == 1
+    assert stats['/api/v1/data']['success_rate'] == 100.0
+    assert stats['/api/v1/data/<extra>']['total_requests'] == 1
+    assert stats['/api/v1/data/<extra>']['success_rate'] == 0.0
     assert stats['/api/v1/templates']['total_requests'] == 1
 
 

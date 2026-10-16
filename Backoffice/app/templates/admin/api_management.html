@@ -322,7 +322,7 @@
                         </button>
                         <span class="ep-filter-tip" role="tooltip">
                             <span class="ep-filter-tip-inner">
-                                <span class="ep-filter-tip-line">{{ _('Show every endpoint in the registry: External /v1, Mobile, and AI.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('Show every endpoint in the registry: External /v1, Mobile, AI, and the Indicator Bank app.') }}</span>
                                 <span class="ep-filter-tip-line">{{ _('No filter — the complete list.') }}</span>
                             </span>
                         </span>
@@ -357,6 +357,18 @@
                         <span class="ep-filter-tip" role="tooltip">
                             <span class="ep-filter-tip-inner">
                                 <span class="ep-filter-tip-line">{{ _('Only /api/ai/v2 assistants, tools, and related routes.') }}</span>
+                            </span>
+                        </span>
+                    </span>
+                    <span class="ep-filter-wrap">
+                        <button type="button" data-surface="indicator_bank" class="ep-surface-btn px-3 py-1.5 text-xs font-semibold rounded-none border"{% if ep_surface_filter_disabled['indicator_bank'] %} disabled{% endif %}>
+                            <i class="fas fa-list-ol mr-1"></i>{{ _('Indicator Bank app') }}
+                            <span class="ml-1 opacity-60">{{ surface_summary.indicator_bank.total }}</span>
+                        </button>
+                        <span class="ep-filter-tip" role="tooltip">
+                            <span class="ep-filter-tip-inner">
+                                <span class="ep-filter-tip-line">{{ _('Routes the Indicator Bank Blazor app calls: /Indicator, /Sector, /list-home, /CommonWord, and /Excel.') }}</span>
+                                <span class="ep-filter-tip-line">{{ _('Send X-API-Key or Authorization: Bearer. Locale is the X-Language header or the language query parameter.') }}</span>
                             </span>
                         </span>
                     </span>
@@ -494,6 +506,7 @@
                         {% if ep.surface == 'v1' %}<span class="px-1 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold">v1</span>
                         {% elif ep.surface == 'mobile' %}<span class="px-1 py-0.5 rounded bg-teal-100 text-teal-700 text-xs font-bold">mob</span>
                         {% elif ep.surface == 'ai' %}<span class="px-1 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-bold">ai</span>
+                        {% elif ep.surface == 'indicator_bank' %}<span class="px-1 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold">bank</span>
                         {% endif %}
                     </span>
                     <code class="font-mono text-gray-700">{{ ep.path }}</code>
@@ -1220,8 +1233,9 @@ try {
 
         function selectedEndpointContract() {
             const opt = selectedEndpointOption();
-            const path = endpointMapKey(opt ? opt.value : '');
-            const declared = (urlBuilderContracts && urlBuilderContracts[path]) || null;
+            const raw = opt ? opt.value : '';
+            const path = endpointMapKey(raw);
+            const declared = (urlBuilderContracts && (urlBuilderContracts[raw] || urlBuilderContracts[path])) || null;
             let paginated = null;
             if (opt && opt.hasAttribute('data-paginated')) {
                 paginated = opt.getAttribute('data-paginated') === '1';
@@ -1300,9 +1314,13 @@ try {
             const endpointKey = endpointMapKey(selectedEndpoint);
 
             const contract = selectedEndpointContract();
-            currentParamDefinitions = contract.queryParams
-                ? resolveDeclaredParams(contract.queryParams)
-                : (endpointParamMap[endpointKey] || defaultParams);
+            if (contract.queryParams) {
+                currentParamDefinitions = resolveDeclaredParams(contract.queryParams);
+            } else if (contract.paginated === false) {
+                currentParamDefinitions = endpointParamMap[selectedEndpoint] || endpointParamMap[endpointKey] || [];
+            } else {
+                currentParamDefinitions = endpointParamMap[selectedEndpoint] || endpointParamMap[endpointKey] || defaultParams;
+            }
 
             const countEl = document.getElementById('queryParamsCount');
             if (countEl) {

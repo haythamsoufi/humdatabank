@@ -488,7 +488,10 @@ def dashboard():
             temp_entity = EntityService.get_entity(retrieved_entity_type, retrieved_entity_id)
             # Validate that the entity in session is still accessible to the user
             if temp_entity and retrieved_entity_type in allowed_entity_types:
-                if current_user.has_entity_access(retrieved_entity_type, retrieved_entity_id):
+                # same rule as the POST path above: an entity in the user's own list is accessible (admins without
+                # explicit entity permissions get every entity listed, so they must be able to keep their choice)
+                if ((retrieved_entity_type, retrieved_entity_id) in {(e['entity_type'], e['entity_id']) for e in user_entities}
+                        or current_user.has_entity_access(retrieved_entity_type, retrieved_entity_id)):
                     selected_entity_type = retrieved_entity_type
                     selected_entity_id = retrieved_entity_id
                     selected_entity = temp_entity

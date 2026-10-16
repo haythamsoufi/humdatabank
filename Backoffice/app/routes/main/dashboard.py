@@ -984,8 +984,15 @@ def dashboard():
     if show_profile_completion and not user_entities:
         show_profile_completion = False
 
+    # Plugins may add small labelled values (for example KPIs) to the assignment cards.
+    assignment_badges = {}
+    plugin_manager = getattr(current_app, 'plugin_manager', None)
+    if plugin_manager is not None and assigned_forms_statuses:
+        assignment_badges = plugin_manager.get_assignment_badges(assigned_forms_statuses)
+
     return render_template("core/dashboard.html",
                        user=current_user,
+                       assignment_badges=assignment_badges,
                        show_profile_completion=show_profile_completion,
                        data_quality_dashboard_enabled=data_quality_dashboard_enabled,
                        data_quality_templates=data_quality_templates,

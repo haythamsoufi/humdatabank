@@ -1395,6 +1395,21 @@ class PluginManager:
                 catalog.append((perm.code, perm.name, perm.description))
         return catalog
 
+    def get_assignment_badges(self, assignment_entity_statuses) -> Dict[int, list]:
+        """Badges plugins add to dashboard cards, keyed by AssignmentEntityStatus id. A failing plugin adds none."""
+        merged: Dict[int, list] = {}
+        if not assignment_entity_statuses:
+            return merged
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                result = plugin.get_assignment_badges(assignment_entity_statuses) or {}
+            except Exception as exc:
+                self.logger.warning("get_assignment_badges failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for aes_id, badges in result.items():
+                merged.setdefault(int(aes_id), []).extend(badges)
+        return merged
+
     def get_all_seed_roles(self) -> List[Dict[str, Any]]:
         roles: List[Dict[str, Any]] = []
         for plugin_id, plugin in self.plugins.items():

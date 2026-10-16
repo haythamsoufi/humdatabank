@@ -719,6 +719,9 @@ def get_dashboard():
                 .all()
             )
 
+            plugin_manager = getattr(current_app, 'plugin_manager', None)
+            badges_by_aes = plugin_manager.get_assignment_badges(assigned_forms_statuses) if plugin_manager else {}
+
             # Pre-compute item counts
             template_ids = {
                 aes.assigned_form.template.id
@@ -918,6 +921,7 @@ def get_dashboard():
                         form_definition_updated_at = pv.updated_at.isoformat()
 
                 assignment_data = {
+                    'badges': [{'label': b.label, 'value': b.value, 'tone': b.tone} for b in badges_by_aes.get(aes.id, [])],
                     'id': aes.id,
                     'name': f"{period_name} - {localized_template_name if localized_template_name else 'Template Missing'}",
                     'status': aes.status,

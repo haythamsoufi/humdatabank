@@ -91,6 +91,14 @@
                                                 <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('at') }}: {{ item.status_timestamp|format_datetime_localized('short', 'short') }}</span>
                                             {% endif %}
                                         </div>
+                                        {% set card_badges = assignment_badges.get(item.item_object.id, []) if assignment_badges is defined else [] %}
+                                        {% if card_badges %}
+                                            <div class="text-sm text-gray-600 mb-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+                                                {% for b in card_badges %}
+                                                    <span class="whitespace-nowrap">{{ b.label }}:</span>{{ status_label(b.value, b.tone, 'mr-2') }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
                                         {# Secondary line: show "Submitted by" when status is Approved (so both actors are visible) #}
                                         {% if item.status == 'approved' and item.submitted_by_user is defined and item.submitted_by_user %}
                                             <p class="text-xs text-gray-500 mb-1 ml-1">

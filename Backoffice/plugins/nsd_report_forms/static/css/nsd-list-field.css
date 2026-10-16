@@ -1,0 +1,9 @@
+/* NSD list field (plugin nsd_report_forms) */
+div.nsdli { display: block; }
+.nsdli-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .5rem; margin-bottom: .5rem; }
+.nsdli-cell { flex: 1 1 10rem; min-width: 0; }
+.nsdli-cell label { display: block; font-size: .75rem; font-weight: 600; color: #6c757d; margin-bottom: .15rem; }
+.nsdli-in { width: 100%; padding: .4rem .6rem; border: 1px solid #d1d5db; border-radius: .375rem; font-size: .9rem; background: #fff; }
+.nsdli-x { border: 0; background: transparent; font-size: 1.3rem; line-height: 1; color: #dc3545; cursor: pointer; padding: 0 .4rem .3rem; }
+.nsdli-add { padding: .4rem .9rem; font-size: .85rem; font-weight: 600; color: #fff; background: #198754; border: 0; border-radius: .375rem; cursor: pointer; }
+.nsdli-add:hover { background: #157347; }

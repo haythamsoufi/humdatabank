@@ -438,10 +438,6 @@ class Config:
     except (TypeError, ValueError):
         RECAPTCHA_MIN_SCORE = 0.5
 
-    # Shared with the Indicator Bank WebAPI. When the header matches, POST /Indicator/Suggestion
-    # skips a second reCAPTCHA check because the WebAPI already validated the browser token.
-    INDICATOR_SUGGESTION_FORWARD_SECRET = (os.environ.get("INDICATOR_SUGGESTION_FORWARD_SECRET") or "").strip() or None
-
     # Anonymous POST /api/mobile/v1/data/indicator-suggestions: require a reCAPTCHA token and
     # cap persisted submissions (DB-backed, so the caps hold across workers).
     MOBILE_SUGGESTION_REQUIRE_CAPTCHA = _parse_bool(os.environ.get("MOBILE_SUGGESTION_REQUIRE_CAPTCHA"), default=False)

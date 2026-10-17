@@ -37,6 +37,9 @@ def register_commands(app):
     from app.cli_commands.rbac import register_rbac_commands
     register_rbac_commands(app)
 
+    from app.cli_commands.fdrs_societies import register_fdrs_society_commands
+    register_fdrs_society_commands(app)
+
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)

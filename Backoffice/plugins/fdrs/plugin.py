@@ -76,9 +76,10 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     def get_api_endpoints(self):
         from plugins.fdrs import load_routes
         from plugins.fdrs.public_api_routes import API_ENDPOINTS
+        from plugins.fdrs.public_compat_routes import API_ENDPOINTS as COMPAT_API_ENDPOINTS
 
         load_routes()
-        return list(API_ENDPOINTS)
+        return list(API_ENDPOINTS) + list(COMPAT_API_ENDPOINTS)
 
     def get_data_explorer_tabs(self) -> list[DataExplorerTabConfig]:
         split_tabs = [

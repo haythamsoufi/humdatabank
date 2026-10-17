@@ -531,7 +531,7 @@
             maxBounds: window.L.latLngBounds([[-85, -180], [85, 180]]),
             maxBoundsViscosity: 1,
             worldCopyJump: false,
-            scrollWheelZoom: true,
+            scrollWheelZoom: !embed,
             zoomControl: false,
             fadeAnimation: false,
             zoomAnimation: false,
@@ -874,9 +874,12 @@
             return b.requirement - a.requirement || b.expenditure - a.expenditure;
         });
         body.replaceChildren();
+        var hasRequirement = list.some(function (area) { return area.requirement; });
         var hasExpenditure = list.some(function (area) { return area.expenditure; });
-        panel.classList.toggle('is-single', !hasExpenditure);
+        panel.classList.toggle('is-single', hasRequirement !== hasExpenditure);
+        var requirementLegend = document.getElementById('upri-flow-areas-legend-requirement');
         var expenditureLegend = document.getElementById('upri-flow-areas-legend-expenditure');
+        if (requirementLegend) requirementLegend.hidden = !hasRequirement;
         if (expenditureLegend) expenditureLegend.hidden = !hasExpenditure;
         if (!list.length) {
             var empty = document.createElement('p');
@@ -895,7 +898,7 @@
                 var pair = document.createElement('div');
                 pair.className = 'upri-flow-areas__pair';
                 ['requirement', 'expenditure'].forEach(function (metric) {
-                    if (metric === 'expenditure' && !area[metric]) return;
+                    if (!area[metric]) return;
                     var item = document.createElement('div');
                     item.className = 'upri-flow-areas__line';
                     var track = document.createElement('span');
@@ -1039,6 +1042,25 @@
         }
     }
 
+    function cacheKey(url) {
+        return 'upr-flow-cache:' + url;
+    }
+
+    function readCache(url) {
+        try {
+            var raw = window.sessionStorage && sessionStorage.getItem(cacheKey(url));
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeCache(url, payload) {
+        try {
+            if (window.sessionStorage) sessionStorage.setItem(cacheKey(url), JSON.stringify(payload));
+        } catch (e) { /* quota or private mode */ }
+    }
+
     function load() {
         var url = CFG.flowUrl || root.getAttribute('data-flow-url');
         if (!url) {
@@ -1047,16 +1069,22 @@
         }
         if (!url) return;
         var region = els.region ? els.region.value : '';
+        if (region) url += (url.indexOf('?') === -1 ? '?' : '&') + 'region=' + encodeURIComponent(region);
         var ticket = ++state.request;
-        setState('loading');
-        fetchJson(url, region)
+        // A framed page is sometimes recreated when the parent page scrolls.
+        // Paint the last payload immediately so that does not flash the loading state.
+        var cached = readCache(url);
+        if (cached && cached.flows) render(cached.flows);
+        else if (!state.allEdges.length) setState('loading');
+        fetchJson(url, '')
             .then(function (payload) {
-                if (ticket !== state.request) return;
+                if (!payload || ticket !== state.request) return;
+                writeCache(url, payload);
                 render((payload && payload.flows) || {});
             })
             .catch(function (err) {
                 if (ticket !== state.request) return;
-                setState('error');
+                if (!state.allEdges.length) setState('error');
                 if (window.console) console.error('UPR flow map load failed', err);
             });
     }

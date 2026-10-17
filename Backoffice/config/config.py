@@ -795,6 +795,13 @@ class Config:
     FDRS_DATA_API_KEY = _fdrs_data_api_key_raw or None
     _fdrs_data_api_base_raw = (os.environ.get("FDRS_DATA_API_BASE") or "").strip().rstrip("/")
     FDRS_DATA_API_BASE = _fdrs_data_api_base_raw or None
+    # Public-frontend adapter (plugins/fdrs/public_compat_routes.py): forward the paths Backoffice
+    # does not store (documents, translations, embeds, offices, CSV) to FDRS_DATA_API_BASE using
+    # FDRS_DATA_API_KEY. Off by default. FDRS_DATA_API_BASE must be the legacy origin, not the
+    # hostname that now serves this app.
+    FDRS_PUBLIC_COMPAT_PASSTHROUGH = (
+        (os.environ.get("FDRS_PUBLIC_COMPAT_PASSTHROUGH") or "").strip().lower() in ("1", "true", "yes", "on")
+    )
     _fdrs_databank_api_key_raw = (os.environ.get("FDRS_DATABANK_API_KEY") or "").strip()
     FDRS_DATABANK_API_KEY = _fdrs_databank_api_key_raw or None
 

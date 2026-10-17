@@ -223,7 +223,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     overflow: hidden;
-    background: #eef3f7;
+    background: #fff;
 }
 
 .upri-flow__map {
@@ -596,7 +596,7 @@
 .upri-flow-embed-body {
     margin: 0;
     height: 100%;
-    background: #eef3f7;
+    background: #fff;
     font-family: "Open Sans", "Segoe UI", sans-serif;
 }
 
@@ -681,4 +681,187 @@
     font-size: 1.05rem;
     font-weight: 700;
     color: #011e41;
+}
+
+.upri-coverage {
+    margin-top: 1.25rem;
+}
+
+.upri-coverage__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.upri-coverage__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #011e41;
+}
+
+.upri-coverage__years {
+    display: inline-flex;
+    flex-shrink: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.35rem;
+    overflow: hidden;
+}
+
+.upri-coverage__year {
+    padding: 0.35rem 0.8rem;
+    border: 0;
+    border-left: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.upri-coverage__year:first-child { border-left: 0; }
+
+.upri-coverage__year.is-active {
+    background: #1f2937;
+    color: #fff;
+}
+
+.upri-coverage__rule {
+    margin: 0.55rem 0 0.45rem;
+    border: 0;
+    border-top: 2px solid #f5333f;
+}
+
+.upri-coverage__key {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.85rem;
+    margin: 0 0 0.35rem;
+    color: #374151;
+    font-size: 0.75rem;
+}
+
+.upri-coverage__key-title {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.upri-coverage__key-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.upri-coverage__diamond {
+    width: 0.7rem;
+    height: 0.7rem;
+    background: #9ca3af;
+    transform: rotate(45deg);
+}
+
+.upri-coverage__plot {
+    margin-top: 0.15rem;
+}
+
+.upri-coverage__svg {
+    width: 100%;
+    height: auto;
+    font-family: "Open Sans", "Segoe UI", sans-serif;
+}
+
+.upri-coverage__grid {
+    stroke: #eceff3;
+    stroke-width: 1;
+}
+
+.upri-coverage__baseline {
+    stroke: #4b5563;
+    stroke-width: 1.5;
+}
+
+.upri-coverage__scale-track {
+    stroke: #d1d5db;
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+.upri-coverage__scale-range {
+    stroke: #374151;
+    stroke-width: 4;
+    stroke-linecap: round;
+    cursor: grab;
+    touch-action: none;
+}
+
+.upri-coverage__scale-handle {
+    fill: #fff;
+    stroke: #374151;
+    stroke-width: 2;
+    cursor: ew-resize;
+    touch-action: none;
+}
+
+.upri-coverage__scale-hit,
+.upri-coverage__scale-pan {
+    fill: transparent;
+    touch-action: none;
+}
+
+.upri-coverage__scale-hit { cursor: ew-resize; }
+
+.upri-coverage__scale-pan { cursor: grab; }
+
+.upri-coverage__svg.is-grabbing,
+.upri-coverage__svg.is-grabbing .upri-coverage__scale-range {
+    cursor: grabbing;
+}
+
+.upri-coverage__tick {
+    fill: #6b7280;
+    font-size: 11px;
+    text-anchor: middle;
+}
+
+.upri-coverage__tick--y { text-anchor: end; }
+
+.upri-coverage__axis {
+    fill: #111827;
+    font-size: 13px;
+    font-weight: 700;
+    text-anchor: middle;
+}
+
+.upri-coverage__pill {
+    fill: #f3f4f6;
+    stroke: #e5e7eb;
+}
+
+.upri-coverage__name {
+    fill: #4b5563;
+    font-size: 10px;
+}
+
+.upri-coverage__empty,
+.upri-coverage__note {
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.upri-coverage [hidden] { display: none !important; }
+
+.upri-combined-coverage,
+.upri-flow-coverage {
+    margin-top: 1.25rem;
+    padding: 0.9rem 1rem 1.1rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+}
+
+.upri-combined-coverage .upri-coverage,
+.upri-flow-coverage .upri-coverage {
+    margin-top: 0;
 }

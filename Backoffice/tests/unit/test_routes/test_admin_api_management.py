@@ -281,6 +281,11 @@ class TestApiManagementHelpers:
         assert _surface_for_path("/api/v1/data") == "v1"
         assert _surface_for_path("/api/other") == "other"
         assert _surface_for_path("/some/other") == "other"
+        assert _surface_for_path("/Indicator", "indicator_bank_compat.indicator_list") == "indicator_bank"
+        assert _surface_for_path("/Indicator") == "other"
+        assert _surface_for_path("/api/data", "fdrs.fdrs_public_compat_data") == "fdrs_public"
+        assert _surface_for_path("/csv/export", "fdrs.fdrs_public_compat_proxy_csv_export") == "fdrs_public"
+        assert _surface_for_path("/api/data") == "other"
 
     def test_count_unique_overlap_pairs(self):
         from app.routes.admin.api_management import _count_unique_overlap_pairs
@@ -341,6 +346,75 @@ class TestApiManagementHelpers:
         assert ep["auth"] == "api_key_or_session"
         assert ep.get("plugin_id") == "fdrs"
 
+    def test_get_endpoint_registry_includes_indicator_bank_app(self):
+        from app.routes.admin.api_management import get_endpoint_registry
+
+        registry = get_endpoint_registry()
+        by_path = {ep["path"]: ep for ep in registry}
+        assert "/Indicator" in by_path
+        assert "/Indicator/<indicator_id>" in by_path
+        assert "/Indicator/search" in by_path
+        assert "/Indicator/Suggestion" in by_path
+        assert "/list-home" in by_path
+        assert "/Excel" in by_path
+        listing = by_path["/Indicator"]
+        assert listing["surface"] == "indicator_bank"
+        assert listing["auth"] == "api_key"
+        assert listing["paginated"] is False
+        names = [p["name"] for p in listing["query_params"]]
+        assert names == [
+            "Filter", "SectorIds", "SubsectorIds", "IndicatorIds", "Tags",
+            "ShowIsArchived", "Offset", "Limit", "language",
+        ]
+        suggestion = by_path["/Indicator/Suggestion"]
+        assert suggestion["methods"] == ["POST"]
+        assert "indicators:suggest" in suggestion["description"]
+        for path in (
+            "/api/v1/public/global-trend",
+            "/api/v1/public/documents/search",
+            "/api/v1/public/documents/<document_id>/download",
+            "/api/v1/uploads/spef/<filename>",
+            "/api/v1/uploads/ns/<filename>",
+            "/api/v1/dashboard/data-quality",
+            "/api/v1/validation-questions",
+            "/api/v1/validation-questions/<question_id>/answer",
+            "/api/v1/matrix/auto-load-entities/batch",
+            "/api/mobile/v1/auth/oauth/exchange",
+            "/api/mobile/v1/data/disaggregation-overview",
+            "/api/mobile/v1/templates/<template_id>/structure",
+            "/api/mobile/v1/templates/<template_id>/resolve-fields",
+            "/api/mobile/v1/templates/<template_id>/items/by-stable-key/<stable_key>",
+        ):
+            assert path in by_path, path
+        assert by_path["/api/v1/public/documents/search"]["auth"] == "public"
+        assert by_path["/api/v1/dashboard/data-quality"]["auth"] == "session"
+        assert by_path["/api/mobile/v1/templates/<template_id>/structure"]["auth"] == "user"
+
+    def test_scan_documents_indicator_bank_app_routes(self, app):
+        from app.routes.admin.api_management import scan_flask_routes
+
+        with app.app_context():
+            scan = scan_flask_routes(app)
+        live = {r["path"]: r for r in scan["live"]}
+        undoc = {r["path"] for r in scan["undocumented"]}
+        stale = {ep["path"] for ep in scan["stale"]}
+        assert "/Indicator" in live
+        assert live["/Indicator"]["surface"] == "indicator_bank"
+        assert "/Indicator/<indicator_id>" in live
+        assert "/list-home" not in undoc
+        assert "/Excel" not in stale
+        for path in (
+            "/api/v1/public/global-trend",
+            "/api/v1/uploads/spef/<filename>",
+            "/api/mobile/v1/auth/oauth/exchange",
+            "/api/mobile/v1/data/disaggregation-overview",
+            "/api/mobile/v1/templates/<template_id>/structure",
+        ):
+            assert path not in undoc
+        if not app.config.get("WEBSOCKET_ENABLED", False):
+            assert "/api/ai/v2/ws" not in stale
+            assert "/api/ai/documents/ws" not in stale
+
     def test_scan_does_not_flag_fdrs_published_data_undocumented(self, app):
         from app.routes.admin.api_management import scan_flask_routes
 
@@ -350,6 +424,22 @@ class TestApiManagementHelpers:
         live = [r["path"] for r in scan["live"]]
         assert "/api/v1/fdrs/published-data" in live
         assert "/api/v1/fdrs/published-data" not in undoc
+
+    def test_scan_documents_fdrs_public_frontend(self, app):
+        from app.routes.admin.api_management import get_endpoint_registry, scan_flask_routes
+
+        with app.app_context():
+            scan = scan_flask_routes(app)
+            registry = {ep["path"]: ep for ep in get_endpoint_registry()}
+        live = {r["path"]: r for r in scan["live"]}
+        undoc = {r["path"] for r in scan["undocumented"]}
+        for path in ("/api/data", "/api/entities/ns/<don_code>", "/csv/export", "/api/documentSubscribe"):
+            assert path in live
+            assert live[path]["surface"] == "fdrs_public"
+            assert path not in undoc
+            assert registry[path]["surface"] == "fdrs_public"
+            assert registry[path]["paginated"] is False
+        assert registry["/api/data"]["query_params"][0]["name"] == "indicator"
 
     def test_endpoint_registry_grid_rows_ai_documents(self):
         from app.routes.admin.api_management import _endpoint_registry_grid_rows

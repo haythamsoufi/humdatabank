@@ -1016,6 +1016,32 @@ def support_funding_embed():
     )
 
 
+@bp.route("/upr/support-coverage", methods=["GET"])
+@rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_coverage:{get_client_ip()}")
+def support_coverage_embed():
+    """Frameable scatter of funding-requirement coverage by INFORM risk class."""
+    from plugins.upr.analysis_labels import analysis_labels, analysis_ui_labels
+
+    _support_flow_public()
+    year = (request.args.get("year") or "").strip()
+    if (request.args.get("format") or "").strip().lower() == "powerbi":
+        page = url_for("upr.support_coverage_embed", _external=True, **({"year": year} if year else {}))
+        body = (
+            "<!-- Power BI HTML visual: bilateral funding coverage by INFORM risk. -->"
+            '<iframe title="Bilateral funding coverage by INFORM risk" '
+            f'src="{escape(page)}" '
+            'sandbox="allow-scripts allow-same-origin allow-popups" '
+            'style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"></iframe>'
+        )
+        return Response(body, mimetype="text/html; charset=utf-8")
+    return render_template(
+        "plugins/upr/support_coverage_embed.html",
+        L=analysis_labels(),
+        ui=analysis_ui_labels(),
+        year=year,
+    )
+
+
 @bp.route("/upr/support-overview", methods=["GET"])
 @rate_limit(requests_per_minute=60, key_func=lambda: f"upr_support_overview:{get_client_ip()}")
 def support_overview_embed():

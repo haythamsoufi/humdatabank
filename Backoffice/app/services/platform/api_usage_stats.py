@@ -2,15 +2,28 @@
 
 from __future__ import annotations
 
+import re
 from calendar import monthrange
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 
 from app import db
 from app.models.api_usage import APIUsage
 from app.utils.datetime_helpers import utcnow
+
+_VAR_RE = re.compile(r"<([^>]+)>|\{([^}]+)\}")
+
+# Indicator Bank app routes live at the site root, outside /api.
+_INDICATOR_BANK_EXACT_PATHS = (
+    "/list-home",
+    "/Sector",
+    "/Subsector",
+    "/CommonWord",
+    "/Excel",
+    "/Indicator",
+)
 
 
 def endpoint_path_prefix(path: str) -> str:
@@ -18,15 +31,81 @@ def endpoint_path_prefix(path: str) -> str:
     return path.split('<')[0].split('{')[0]
 
 
-def bulk_endpoint_usage_stats(prefixes: list[str]) -> dict[str, dict[str, float | int]]:
-    """
-    Aggregate request counts by endpoint prefix in one query.
+def is_indicator_bank_app_path(path: str | None) -> bool:
+    """True for the Blazor Indicator Bank routes served at the site root."""
+    raw = (path or "").split("?", 1)[0]
+    normalized = raw.rstrip("/") or "/"
+    if normalized in _INDICATOR_BANK_EXACT_PATHS:
+        return True
+    return normalized.startswith("/Indicator/")
 
-    APIUsage is the canonical log for all /api traffic. APIKeyUsage stores
-    per-key audit rows for the same events when a DB-managed key is used;
-    those rows are not merged here to avoid double-counting.
+
+def usage_tracked_clause():
+    """SQL filter for rows the API Management page should count."""
+    return or_(
+        APIUsage.api_endpoint.like("/api/%"),
+        APIUsage.api_endpoint.in_(_INDICATOR_BANK_EXACT_PATHS),
+        APIUsage.api_endpoint.like("/Indicator/%"),
+    )
+
+
+def _pattern_for_registry_path(path: str) -> re.Pattern[str]:
+    """Full-match regex for a registry path. Variables are one segment, except path converters."""
+    parts: list[str] = []
+    pos = 0
+    for match in _VAR_RE.finditer(path):
+        parts.append(re.escape(path[pos:match.start()]))
+        token = match.group(1) or match.group(2) or ""
+        converter = token.split(":", 1)[0] if ":" in token else ""
+        parts.append(r".+" if converter == "path" else r"[^/]+")
+        pos = match.end()
+    parts.append(re.escape(path[pos:]))
+    body = "".join(parts)
+    if body.endswith("/"):
+        body = body[:-1] + "/?"
+    else:
+        body += "/?"
+    return re.compile("^" + body + "$")
+
+
+def _specificity(path: str) -> tuple[int, int]:
+    """More literal text, then fewer variables, wins a logged path."""
+    literals = _VAR_RE.sub("", path).rstrip("/")
+    params = len(_VAR_RE.findall(path))
+    return (len(literals), -params)
+
+
+def assign_logged_paths(registry_paths: list[str], logged_paths: list[str]) -> dict[str, str]:
+    """Map each logged path to the single most specific registry route that matches it."""
+    compiled = []
+    for path in dict.fromkeys(p for p in registry_paths if p):
+        compiled.append((path, _pattern_for_registry_path(path), _specificity(path)))
+    compiled.sort(key=lambda item: item[2], reverse=True)
+
+    assigned: dict[str, str] = {}
+    for logged in logged_paths:
+        if not logged or logged in assigned:
+            continue
+        for registry_path, pattern, _score in compiled:
+            if pattern.match(logged):
+                assigned[logged] = registry_path
+                break
+    return assigned
+
+
+def bulk_endpoint_usage_stats(paths: list[str]) -> dict[str, dict[str, float | int]]:
     """
-    if not prefixes:
+    Count APIUsage rows per registry route.
+
+    A logged path is credited to the most specific matching route, so
+    ``/api/v1/dashboard`` does not absorb ``/api/v1/dashboard/data-quality``
+    and ``/documents/<id>`` does not absorb ``/documents/<id>/download``.
+
+    APIKeyUsage stores per-key audit rows for the same events and is not
+    merged here.
+    """
+    unique_paths = list(dict.fromkeys(p for p in paths if p))
+    if not unique_paths:
         return {}
 
     rows = (
@@ -35,29 +114,31 @@ def bulk_endpoint_usage_stats(prefixes: list[str]) -> dict[str, dict[str, float 
             func.count().label('total_requests'),
             func.sum(case((APIUsage.status_code < 400, 1), else_=0)).label('successful_requests'),
         )
-        .filter(APIUsage.api_endpoint.like('/api/%'))
+        .filter(usage_tracked_clause())
         .group_by(APIUsage.api_endpoint)
         .all()
     )
 
-    endpoint_totals = [
-        (row.api_endpoint, int(row.total_requests or 0), int(row.successful_requests or 0))
+    endpoint_totals = {
+        row.api_endpoint: (int(row.total_requests or 0), int(row.successful_requests or 0))
         for row in rows
-    ]
+    }
+    assigned = assign_logged_paths(unique_paths, list(endpoint_totals))
 
-    result: dict[str, dict[str, float | int]] = {}
-    for prefix in dict.fromkeys(prefixes):
-        total = 0
-        success = 0
-        for path, path_total, path_success in endpoint_totals:
-            if path.startswith(prefix):
-                total += path_total
-                success += path_success
-        result[prefix] = {
+    totals = {path: [0, 0] for path in unique_paths}
+    for logged, registry_path in assigned.items():
+        path_total, path_success = endpoint_totals[logged]
+        bucket = totals[registry_path]
+        bucket[0] += path_total
+        bucket[1] += path_success
+
+    return {
+        path: {
             'total_requests': total,
             'success_rate': (success / total * 100) if total > 0 else 100.0,
         }
-    return result
+        for path, (total, success) in totals.items()
+    }
 
 
 def subtract_months(dt, months: int):

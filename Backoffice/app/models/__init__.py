@@ -92,6 +92,8 @@ from .organization import (
     SecretariatDepartment
 )
 
+from .fdrs_society import FdrsSociety
+
 from .system import (
     AdminActionLog,
     SecurityEvent,
@@ -300,6 +302,7 @@ __all__ = [
     'SecretariatRegionalOffice',
     'SecretariatClusterOffice',
     'SecretariatDepartment',
+    'FdrsSociety',
 
     # System models
     'AdminActionLog',

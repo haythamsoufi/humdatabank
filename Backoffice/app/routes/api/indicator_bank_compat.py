@@ -741,7 +741,9 @@ def indicator_select_options():
 def indicator_suggestion():
     data = get_json_safe() or {}
     token = (data.get("token") or "").strip()
-    if not _verify_recaptcha(token):
+    # The Indicator Bank WebAPI already checked reCAPTCHA, then forwards with the
+    # same API key and no token. A browser call that still sends a token is checked.
+    if token and not _verify_recaptcha(token):
         return api_error("reCAPTCHA validation failed", 400)
 
     operation = data.get("operation")

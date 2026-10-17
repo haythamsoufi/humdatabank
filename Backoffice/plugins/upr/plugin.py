@@ -243,11 +243,22 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
                 aspect_ratio="16:9",
             ),
             EmbedVisual(
+                visual_id="upr.support_coverage",
+                title=_("Bilateral funding coverage by INFORM risk"),
+                description=_(
+                    "Scatter of funding requirement against the share met, "
+                    "coloured by INFORM risk class."
+                ),
+                endpoint="upr.support_coverage_embed",
+                category="analysis",
+                aspect_ratio="16:9",
+            ),
+            EmbedVisual(
                 visual_id="upr.support_overview",
                 title=_("Network Bilateral Support and funding"),
                 description=_(
                     "The support map, priority chart and summary figures, "
-                    "with the bilateral funding rankings below."
+                    "with the bilateral funding rankings and INFORM coverage chart below."
                 ),
                 endpoint="upr.support_overview_embed",
                 category="analysis",
@@ -283,6 +294,13 @@ class UprPlugin(FirstPartyPluginMetadata, BasePlugin):
             ),
             CspOverride(
                 endpoint="upr.support_overview_embed",
+                path_predicate=lambda path: True,
+                policy=support_flow_csp(),
+                x_frame_options=None,
+                cross_origin_resource_policy="cross-origin",
+            ),
+            CspOverride(
+                endpoint="upr.support_coverage_embed",
                 path_predicate=lambda path: True,
                 policy=support_flow_csp(),
                 x_frame_options=None,

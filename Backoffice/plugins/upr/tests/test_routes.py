@@ -437,6 +437,7 @@ def test_pdf_viewer_csp_allows_same_origin_frame():
         "upr.support_flow_embed",
         "upr.support_funding_embed",
         "upr.support_overview_embed",
+        "upr.support_coverage_embed",
     }
     assert overrides["upr.assignment_pdf"].policy == _UPR_PDF_VIEWER_CSP
     assert overrides["upr.assignment_narrative_file"].policy == _UPR_PDF_VIEWER_CSP
@@ -450,6 +451,7 @@ def test_pdf_viewer_csp_allows_same_origin_frame():
     assert visuals["upr.support_flow"] == "upr.support_flow_embed"
     assert visuals["upr.support_funding"] == "upr.support_funding_embed"
     assert visuals["upr.support_overview"] == "upr.support_overview_embed"
+    assert visuals["upr.support_coverage"] == "upr.support_coverage_embed"
     assert overrides["upr.support_funding_embed"].x_frame_options is None
     assert overrides["upr.support_overview_embed"].x_frame_options is None
     gallery = overrides["upr.upr_documents_gallery"]

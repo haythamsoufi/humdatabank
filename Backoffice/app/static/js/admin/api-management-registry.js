@@ -63,6 +63,8 @@
         v1: 'External /api/v1',
         mobile: 'Mobile /api/mobile/v1',
         ai: 'AI /api/ai/v2',
+        indicator_bank: 'Indicator Bank app',
+        fdrs_public: 'FDRS public frontend',
     };
 
     function styleActiveBtn(activeBtn) {
@@ -71,6 +73,8 @@
             v1: ['bg-blue-100', 'text-blue-700', 'border-blue-300'],
             mobile: ['bg-teal-100', 'text-teal-700', 'border-teal-300'],
             ai: ['bg-purple-100', 'text-purple-700', 'border-purple-300'],
+            indicator_bank: ['bg-amber-100', 'text-amber-800', 'border-amber-300'],
+            fdrs_public: ['bg-orange-100', 'text-orange-800', 'border-orange-300'],
             flagged: ['bg-red-100', 'text-red-700', 'border-red-200'],
             has_stats: ['bg-green-100', 'text-green-700', 'border-green-200'],
             overlap: ['bg-indigo-100', 'text-indigo-700', 'border-indigo-200'],
@@ -761,6 +765,8 @@
         if (s === 'v1') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700 font-semibold">v1</span>';
         if (s === 'mobile') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-teal-100 text-teal-700 font-semibold">mob</span>';
         if (s === 'ai') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-700 font-semibold">ai</span>';
+        if (s === 'indicator_bank') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-amber-100 text-amber-800 font-semibold">bank</span>';
+        if (s === 'fdrs_public') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-orange-100 text-orange-800 font-semibold">fdrs</span>';
         return AgGridRenderers.escapeHtml(s || '');
     }
 
@@ -815,7 +821,7 @@
         });
         var flagged = eps.filter(function (e) { return e.flagged; });
         var overlapPairs = buildUniqueOverlapPairs(eps);
-        var bySurface = { v1: eps.filter(function (e) { return e.surface === 'v1'; }), mobile: eps.filter(function (e) { return e.surface === 'mobile'; }), ai: eps.filter(function (e) { return e.surface === 'ai'; }) };
+        var bySurface = { v1: eps.filter(function (e) { return e.surface === 'v1'; }), mobile: eps.filter(function (e) { return e.surface === 'mobile'; }), ai: eps.filter(function (e) { return e.surface === 'ai'; }), indicator_bank: eps.filter(function (e) { return e.surface === 'indicator_bank'; }), fdrs_public: eps.filter(function (e) { return e.surface === 'fdrs_public'; }) };
         function authOf(e) { return AUTH_LABELS[e.auth] || e.auth; }
         function surfOf(e) { return SURFACE_LABELS[e.surface] || e.surface; }
         function esc(s) {
@@ -828,7 +834,7 @@
         }
         var md = '# API Endpoint Registry — Audit Report\nGenerated: ' + now + '\n\n---\n\n## Summary\n\n| | Count |\n|---|---:|\n';
         md += '| **Total endpoints** | **' + eps.length + '** |\n';
-        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v2` | ' + bySurface.ai.length + ' |\n';
+        md += '| External `/api/v1` | ' + bySurface.v1.length + ' |\n| Mobile `/api/mobile/v1` | ' + bySurface.mobile.length + ' |\n| AI `/api/ai/v2` | ' + bySurface.ai.length + ' |\n| Indicator Bank app | ' + bySurface.indicator_bank.length + ' |\n| FDRS public frontend | ' + bySurface.fdrs_public.length + ' |\n';
         md += '| ⚠️ Flagged issues | **' + flagged.length + '** |\n| 🔁 Cross-surface overlaps | ' + overlapPairs.length + ' |\n';
         md += '| 📊 Endpoints with usage stats | ' + eps.filter(function (e) { return e.requests > 0; }).length + ' |\n';
         md += '| 👻 Undocumented | ' + rows.filter(function (r) { return r.undocumented; }).length + ' |\n';

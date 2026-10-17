@@ -94,6 +94,7 @@ def test_priority_chart_splits_requirement_and_expenditure():
         {"Source": "Country Data", "Indicator": "Funding Requirement", "Entity": "HNS", "Round": "P25", "ISO3": "KEN", "Area": "SP2", "ValueNum": 500},
         {"Source": "PNS Data", "Indicator": "Expenditure", "Round": "AR25", "ISO3": "KEN", "NS": "British Red Cross", "Area": "SP2", "ValueNum": 30},
         {"Source": "PNS Data", "Indicator": "Expenditure", "Round": "AR25", "ISO3": "KEN", "NS": "British Red Cross", "Area": "EF1", "ValueNum": 5},
+        {"Source": "PNS Data", "Indicator": "Expenditure", "Round": "AR25", "ISO3": "KEN", "NS": "British Red Cross", "Area": "SP3", "ValueNum": 18},
         {"Source": "PNS Data", "Indicator": "Funding", "Round": "AR25", "ISO3": "KEN", "NS": "British Red Cross", "Area": "Total", "ValueNum": 40},
         # The host's own priority breakdown is not bilateral PNS expenditure.
         {"Source": "Country Data", "Indicator": "Expenditure", "Attribute": "SP Breakdown", "Entity": "HNS", "Round": "AR25", "ISO3": "KEN", "NS": "Kenya Red Cross Society", "Area": "SP3", "ValueNum": 12},
@@ -106,7 +107,7 @@ def test_priority_chart_splits_requirement_and_expenditure():
         return sum(row[metric] for row in out["figures"] if row["area"] == area)
     assert total("SP2", "requirement") == 80
     assert total("SP2", "expenditure") == 30
-    assert total("SP3", "expenditure") == 0
+    assert total("SP3", "expenditure") == 18
     assert total("EFs", "expenditure") == 5
     assert total("", "expenditure") == 0
     totals = [row for row in out["figures"] if not row["area"]]
@@ -132,3 +133,49 @@ def test_self_support_and_unresolved_are_dropped():
     assert out["edges"] == []
     assert out["has_data"] is False
     assert "Unknown Society" in out["unresolved_donors"]
+
+
+def test_midyear_expenditure_keeps_country_the_annual_report_omits():
+    countries = dict(COUNTRIES)
+    countries["CHE"] = {"iso2": "CH", "name": "Switzerland", "region": "Europe"}
+    countries["AFG"] = {"iso2": "AF", "name": "Afghanistan", "region": "Asia"}
+    donors = dict(DONORS)
+    donors["swiss red cross"] = "CHE"
+    rows = [
+        {"Source": "PNS Data", "Indicator": "Expenditure", "Round": "AR26", "ISO3": "KEN", "NS": "Swiss Red Cross", "Area": "SP2", "ValueNum": 100},
+        {"Source": "PNS Data", "Indicator": "Expenditure", "Round": "MYR26", "ISO3": "AFG", "NS": "Swiss Red Cross", "Area": "SP2", "ValueNum": 8618},
+    ]
+    out = aggregate_flows(rows, countries=countries, donor_iso3_by_name=donors, host_iso3s=None)
+    assert {(edge["from"], edge["to"]) for edge in out["edges"]} == {("CHE", "KEN"), ("CHE", "AFG")}
+    spent = sum(row["expenditure"] for row in out["figures"] if row["area"] == "SP2")
+    assert spent == 8718
+
+
+def test_coverage_point_uses_inform_class_and_funding_met():
+    from plugins.upr.flow import _coverage_points, inform_class
+
+    assert inform_class(7.8) == "very_high"
+    assert inform_class(2.2) == "low"
+    figures = [
+        {"year": 2025, "from": "CHE", "to": "AFG", "area": "", "requirement": 10000, "funding": 5000, "expenditure": 0},
+        {"year": 2025, "from": "CHE", "to": "AFG", "area": "SP2", "requirement": 10000, "funding": 0, "expenditure": 8618},
+    ]
+    points = _coverage_points(figures, {"AFG": {"name": "Afghanistan"}})
+    assert len(points) == 1
+    point = points[0]
+    assert point["requirement"] == 10000
+    assert point["funding"] == 5000
+    assert point["met"] == 50
+    assert point["inform_class"] == "very_high"
+    assert point["name"] == "Afghanistan"
+
+
+def test_pns_reporting_priority_columns_are_expenditure():
+    from plugins.upr.upr_data import _pns_column_indicator
+
+    assert _pns_column_indicator("SP1") == "Expenditure"
+    assert _pns_column_indicator("EFs") == "Expenditure"
+    assert _pns_column_indicator("SP3_2026") == "Expenditure"
+    assert _pns_column_indicator("Total Expenditure") == "Expenditure"
+    assert _pns_column_indicator("Total Funding") == "Funding"
+    assert _pns_column_indicator("Comments") is None

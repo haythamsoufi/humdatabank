@@ -186,6 +186,14 @@ class TestTrackApiRequest:
             track_api_request()
             assert getattr(g, "api_start_time", None) is None
 
+    def test_indicator_bank_app_path_sets_start_time(self, app):
+        with app.test_request_context("/Indicator/search"):
+            with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",
+                       return_value=False):
+                self._clear_api_start_time()
+                track_api_request()
+                assert isinstance(getattr(g, "api_start_time", None), float)
+
     def test_api_path_sets_start_time(self, app):
         with app.test_request_context("/api/v1/users"):
             with patch("app.middleware.api_tracker._should_skip_api_usage_tracking",

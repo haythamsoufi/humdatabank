@@ -150,13 +150,40 @@
         if (pick) select.value = String(pick);
     }
 
+    function readFlowCache(url) {
+        try {
+            var raw = window.sessionStorage && sessionStorage.getItem('upr-flow-cache:' + url);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeFlowCache(url, payload) {
+        try {
+            if (window.sessionStorage) sessionStorage.setItem('upr-flow-cache:' + url, JSON.stringify(payload));
+        } catch (e) { /* quota or private mode */ }
+    }
+
+    function applyFundingPayload(payload) {
+        funding = (payload && payload.flows && payload.flows.funding) || [];
+        show(byId('upri-funding-loading'), false);
+        show(byId('upri-funding-error'), false);
+        fillYears(funding);
+        ready = true;
+        applyFollowedYear();
+        draw();
+    }
+
     function load() {
         var url = root.getAttribute('data-flow-url');
         if (!url) return;
         var regionSelect = byId('upri-region');
         var region = regionSelect ? regionSelect.value : '';
         if (region) url += (url.indexOf('?') === -1 ? '?' : '&') + 'region=' + encodeURIComponent(region);
-        show(byId('upri-funding-loading'), true);
+        var cached = readFlowCache(url);
+        if (cached && cached.flows) applyFundingPayload(cached);
+        else show(byId('upri-funding-loading'), true);
         show(byId('upri-funding-error'), false);
         fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
             .then(function (resp) {
@@ -164,16 +191,12 @@
                 return resp.json();
             })
             .then(function (payload) {
-                funding = (payload && payload.flows && payload.flows.funding) || [];
-                show(byId('upri-funding-loading'), false);
-                fillYears(funding);
-                ready = true;
-                applyFollowedYear();
-                draw();
+                writeFlowCache(url, payload);
+                applyFundingPayload(payload);
             })
             .catch(function (err) {
                 show(byId('upri-funding-loading'), false);
-                show(byId('upri-funding-error'), true);
+                if (!funding.length) show(byId('upri-funding-error'), true);
                 if (window.console) console.error('UPR funding rankings failed', err);
             });
     }

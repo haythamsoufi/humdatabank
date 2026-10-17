@@ -17,8 +17,11 @@ from flask import current_app
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
-from app.utils.sql_utils import safe_ilike_pattern
-from app.services.platform.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
+from app.services.platform.api_usage_stats import (
+    bulk_endpoint_usage_stats,
+    chart_stats_for_period,
+    usage_tracked_clause,
+)
 from app.services.forms.reporting_period_service import period_chronology_sort_key
 from sqlalchemy.orm import joinedload
 
@@ -133,9 +136,11 @@ bp = Blueprint('api_management', __name__, url_prefix='/admin')
 # Canonical source of truth for every API surface in the system.
 #
 # surface values:
-#   'v1'     – External data API  (/api/v1/*)
-#   'mobile' – Flutter mobile API (/api/mobile/v1/*)
-#   'ai'     – AI chat + documents (/api/ai/v2/* and /api/ai/documents/*)
+#   'v1'              – External data API  (/api/v1/*)
+#   'mobile'          – Flutter mobile API (/api/mobile/v1/*)
+#   'ai'              – AI chat + documents (/api/ai/v2/* and /api/ai/documents/*)
+#   'indicator_bank'  – Indicator Bank app routes (/Indicator, /Sector, /list-home, …)
+#   'fdrs_public'     – data.ifrc.org legacy contract (/api/data, /api/entities/ns, /csv/export, …)
 #
 # auth values (consistent vocabulary across surfaces):
 #   'public'             – no auth required
@@ -288,6 +293,12 @@ EXTERNAL_API_REGISTRY = [
     {'group': 'Documents & Resources', 'path': '/api/v1/uploads/branding/<filename>', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': False,
      'description': 'Stream organization logo/favicon uploaded from admin settings'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/uploads/spef/<filename>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False, 'paginated': False,
+     'description': 'Stream an SP/EF catalog icon from system storage'},
+    {'group': 'Documents & Resources', 'path': '/api/v1/uploads/ns/<filename>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': False, 'paginated': False,
+     'description': 'Stream a National Society logo from system storage'},
 
     # ── Quiz ───────────────────────────────────────────────────────────────────
     {'group': 'Quiz', 'path': '/api/v1/quiz/leaderboard', 'methods': ['GET'],
@@ -312,6 +323,9 @@ EXTERNAL_API_REGISTRY = [
     {'group': 'System', 'path': '/api/v1/matrix/auto-load-entities', 'methods': ['POST'],
      'auth': 'session', 'rate_limited': False,
      'description': 'Resolve matrix auto-load entity IDs for a saved context (template/period/item/AES)'},
+    {'group': 'System', 'path': '/api/v1/matrix/auto-load-entities/batch', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Batch the auto-load lookup: one access check for several matrix columns on the same assignment'},
     {'group': 'System', 'path': '/api/v1/matrix/own-rows', 'methods': ['POST'],
      'auth': 'session', 'rate_limited': False,
      'description': "Rows the same entity saved on another matrix, from a matrix's include_own_matrix_rows setting"},
@@ -321,6 +335,156 @@ EXTERNAL_API_REGISTRY = [
     {'group': 'System', 'path': '/api/v1/client-error', 'methods': ['POST'],
      'auth': 'public', 'rate_limited': True,
      'description': 'Accept JSON from client reporter for JavaScript runtime errors (SecurityEvent, no admin email)'},
+    {'group': 'System', 'path': '/api/v1/dashboard/data-quality/templates', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Templates the signed-in user can score for one entity on the data-quality dashboard',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Entity type the dashboard is showing.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Entity id. The user must have access to it.'},
+     ]},
+    {'group': 'System', 'path': '/api/v1/dashboard/data-quality', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Data-quality score for one entity, template, and reporting period',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Entity type.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Entity id. The user must have access to it.'},
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Form template id.'},
+         {'name': 'period', 'type': 'text', 'placeholder': '2024',
+          'description': 'Reporting period name.'},
+     ]},
+    {'group': 'System', 'path': '/api/v1/validation-questions', 'methods': ['GET'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Open validation questions for an entity or assignment the signed-in user can access',
+     'query_params': [
+         {'name': 'entity_type', 'type': 'text', 'placeholder': 'country',
+          'description': 'Entity type. Required together with entity_id unless assignment_entity_status_id is set.'},
+         {'name': 'entity_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Entity id.'},
+         {'name': 'assignment_entity_status_id', 'type': 'number', 'placeholder': '10',
+          'description': 'Scope questions to one assignment entity status.'},
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Optional template filter.'},
+         {'name': 'period', 'type': 'text', 'placeholder': '2024',
+          'description': 'Optional reporting period.'},
+         {'name': 'status', 'type': 'text', 'placeholder': 'open',
+          'description': 'Question status. Default open. Use all for every status.'},
+     ]},
+    {'group': 'System', 'path': '/api/v1/validation-questions/<question_id>/answer', 'methods': ['POST'],
+     'auth': 'session', 'rate_limited': False, 'paginated': False,
+     'description': 'Save an answer on a validation question (JSON body field answer_text). Requires a CSRF token.'},
+
+    # ── Public assistant API  /api/v1/public/* ────────────────────────────────
+    {'group': 'Public API', 'path': '/api/v1/public/global-trend', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Compact global totals by reporting period for one public indicator',
+     'query_params': [
+         {'name': 'indicator_bank_id', 'type': 'number', 'placeholder': '724',
+          'description': 'Indicator bank id. Use query when the id is not known.'},
+         {'name': 'query', 'type': 'text', 'placeholder': 'volunteers',
+          'description': 'Metric name used to resolve the indicator when no id is passed.'},
+         {'name': 'period_name', 'type': 'text', 'placeholder': '2024',
+          'description': 'Limit the trend to one reporting period.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/indicators/resolve', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Map a metric name to an indicator bank id',
+     'query_params': [
+         {'name': 'query', 'type': 'text', 'placeholder': 'volunteers',
+          'description': 'Required metric name.'},
+         {'name': 'limit', 'type': 'number', 'placeholder': '5',
+          'description': 'Maximum matches (1–20, default 5).'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/submissions/coverage', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'How many countries have a public submitted value for a template or indicator, by period',
+     'query_params': [
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Form template. 21 is FDRS, 24 is the Unified Country Plan.'},
+         {'name': 'indicator_bank_id', 'type': 'number', 'placeholder': '724',
+          'description': 'Optional indicator bank id.'},
+         {'name': 'period_name', 'type': 'text', 'placeholder': '2024',
+          'description': 'One reporting period. Omit for every year.'},
+         {'name': 'query', 'type': 'text', 'placeholder': 'volunteers',
+          'description': 'Metric name used when indicator_bank_id is omitted.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/countries/resolve', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Resolve a country name, ISO code, or numeric id',
+     'query_params': [
+         {'name': 'query', 'type': 'text', 'placeholder': 'Kenya',
+          'description': 'Required country name, ISO2, ISO3, or id.'},
+         {'name': 'limit', 'type': 'number', 'placeholder': '5',
+          'description': 'Maximum matches (1–20, default 5).'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/search', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Search public document chunks. The caller writes the answer from the returned text.',
+     'query_params': [
+         {'name': 'query', 'type': 'text', 'placeholder': 'health',
+          'description': 'Required search text.'},
+         {'name': 'country_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Limit chunks to one country.'},
+         {'name': 'country_ids', 'type': 'text', 'placeholder': '1,2',
+          'description': 'Comma-separated country ids for a batched search.'},
+         {'name': 'full_coverage', 'type': 'select', 'options': ['true', 'false'],
+          'description': 'Search every country instead of the top matches only.'},
+         {'name': 'page', 'type': 'number', 'placeholder': '1',
+          'description': 'Page number when full coverage is on.'},
+         {'name': 'per_page', 'type': 'number', 'placeholder': '80',
+          'description': 'Page size when full coverage is on.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/chunks/<chunk_id>/context', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Neighboring chunks around one public document chunk'},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/<document_id>', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Public metadata for one document (title, countries, source URL)'},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/<document_id>/download', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Download or redirect to a public document file'},
+    {'group': 'Public API', 'path': '/api/v1/public/documents/catalog', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'Count public documents by type, year, and country. This is an inventory, not a text search.',
+     'query_params': [
+         {'name': 'document_type', 'type': 'text', 'placeholder': 'annual_report',
+          'description': 'Document type, such as annual_report or unified_plan.'},
+         {'name': 'year', 'type': 'number', 'placeholder': '2024',
+          'description': 'Calendar year. Omit for every year.'},
+         {'name': 'country_id', 'type': 'number', 'placeholder': '1',
+          'description': 'Limit the inventory to one country.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/reports/country', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'One-country report data: headline indicators, a trend, and cited document themes',
+     'query_params': [
+         {'name': 'country', 'type': 'text', 'placeholder': 'Kenya',
+          'description': 'Required country name or code.'},
+         {'name': 'period_hint', 'type': 'text', 'placeholder': '2024',
+          'description': 'Reporting period hint, such as a year.'},
+     ]},
+    {'group': 'Public API', 'path': '/api/v1/public/reports/template', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'consumers': 'Custom GPT, Website, MCP',
+     'description': 'HTML skeleton and design tokens for rendering a country report',
+     'query_params': [
+         {'name': 'style', 'type': 'text', 'placeholder': 'default',
+          'description': 'Report style. Default is default.'},
+     ]},
 ]
 
 # ── AI Chat API  /api/ai/v2/* ─────────────────────────────────────────────────
@@ -339,7 +503,7 @@ AI_API_REGISTRY = [
      'description': 'Signal SSE stream cancellation by request_id'},
     {'group': 'Chat', 'path': '/api/ai/v2/ws', 'methods': ['WS'],
      'auth': 'ai_session', 'rate_limited': True,
-     'description': 'WebSocket streaming chat (requires flask-sock)',
+     'description': 'WebSocket streaming chat (flask-sock). Mounted only when WEBSOCKET_ENABLED is on.',
      'consumers': 'Backoffice, Mobile'},
     {'group': 'Chat', 'path': '/api/ai/v2/feedback', 'methods': ['POST'],
      'auth': 'ai_session', 'rate_limited': True,
@@ -405,7 +569,7 @@ AI_DOCUMENTS_API_REGISTRY = [
      'description': 'Document-grounded Q&A (RAG) over the user-visible corpus'},
     {'group': 'Documents (RAG)', 'path': '/api/ai/documents/ws', 'methods': ['GET'],
      'auth': 'session', 'rate_limited': False,
-     'description': 'WebSocket stream for document QA (requires admin.ai.manage when enabled)'},
+     'description': 'WebSocket stream for document QA. Mounted only when WEBSOCKET_ENABLED is on.'},
 
     {'group': 'Workflow docs', 'path': '/api/ai/documents/workflows/sync', 'methods': ['POST'],
      'auth': 'session', 'rate_limited': False,
@@ -469,6 +633,10 @@ MOBILE_ENDPOINT_REGISTRY = [
     {'group': 'Auth', 'path': '/api/mobile/v1/auth/refresh', 'methods': ['POST'],
      'auth': 'public', 'rate_limited': True,
      'description': 'Refresh JWT access token using refresh token',
+     'flutter': 'AuthService'},
+    {'group': 'Auth', 'path': '/api/mobile/v1/auth/oauth/exchange', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': 'Redeem the one-time Azure login code and PKCE verifier for a mobile JWT pair',
      'flutter': 'AuthService'},
     {'group': 'Auth', 'path': '/api/mobile/v1/auth/exchange-session', 'methods': ['POST'],
      'auth': 'user',
@@ -568,6 +736,23 @@ MOBILE_ENDPOINT_REGISTRY = [
          'Optional: template_id, period_name, locale. Path has no <id> segment — ID is only in the query string.'
      ),
      'flutter': 'GlobalOverviewDataService'},
+    {'group': 'Public Data', 'path': '/api/mobile/v1/data/disaggregation-overview', 'methods': ['GET'],
+     'auth': 'public', 'rate_limited': True, 'paginated': False,
+     'description': (
+         'Sex, age, and geography breakdown from the published public snapshot. '
+         'Anonymous callers get global and regional totals. Signed-in organization users can request country rows they are allowed to see.'
+     ),
+     'flutter': 'GlobalOverviewDataService',
+     'query_params': [
+         {'name': 'indicator_bank_id', 'type': 'number', 'placeholder': '729',
+          'description': 'Indicator bank id. Default is people reached.'},
+         {'name': 'template_id', 'type': 'number', 'placeholder': '21',
+          'description': 'Form template id. Default is FDRS.'},
+         {'name': 'period_name', 'type': 'text', 'placeholder': '2024',
+          'description': 'Optional reporting period.'},
+         {'name': 'country_id', 'type': 'number', 'placeholder': '1',
+          'description': 'One country. Organization users only.'},
+     ]},
     {'group': 'Public Data', 'path': '/api/mobile/v1/data/resources', 'methods': ['GET'],
      'auth': 'public', 'rate_limited': True,
      'description': (
@@ -606,6 +791,20 @@ MOBILE_ENDPOINT_REGISTRY = [
      'auth': 'user',
      'description': 'User-scoped dashboard data (entities, assignments)',
      'flutter': 'DashboardRepository'},
+
+    # ── TEMPLATES ─────────────────────────────────────────────────────────────
+    {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/structure', 'methods': ['GET'],
+     'auth': 'user', 'paginated': False,
+     'description': 'Published form structure, including stable keys, for a template the user can access',
+     'flutter': 'Form structure client'},
+    {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/resolve-fields', 'methods': ['POST'],
+     'auth': 'user', 'paginated': False,
+     'description': 'Resolve stable_key references in a fields array to published form item ids',
+     'flutter': 'Form structure client'},
+    {'group': 'Templates', 'path': '/api/mobile/v1/templates/<template_id>/items/by-stable-key/<stable_key>', 'methods': ['GET'],
+     'auth': 'user', 'paginated': False,
+     'description': 'Look up one published form item id by stable key',
+     'flutter': 'Form structure client'},
 
     # ── ANALYTICS ─────────────────────────────────────────────────────────────
     {'group': 'Analytics', 'path': '/api/mobile/v1/analytics/screen-view', 'methods': ['POST'],
@@ -788,12 +987,121 @@ MOBILE_ENDPOINT_REGISTRY = [
      'flutter': 'OrganizationalStructureProvider'},
 ]
 
+# ── Indicator Bank app  /Indicator, /Sector, /list-home, … ───────────────────
+# Same paths and response shapes the IFRC Indicator Bank Blazor public app
+# already calls. Auth is X-API-Key or Authorization: Bearer.
+_IB_LANGUAGE_PARAM = {
+    'name': 'language',
+    'type': 'text',
+    'placeholder': 'en',
+    'description': 'Locale for translated text (en, fr, es, ar). Same effect as the X-Language header.',
+}
+_IB_APP_CONSUMERS = 'IFRC Indicator Bank Blazor'
+
+INDICATOR_BANK_APP_REGISTRY = [
+    {'group': 'Indicator Bank app', 'path': '/list-home', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Home page sector tiles: id, name, indicator count, order, and logo bytes.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Sector', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Active sectors with nested subsectors for the sidebar and suggestion form.',
+     'query_params': [
+         {'name': 'includeImages', 'type': 'select', 'options': ['true', 'false'],
+          'description': 'Include sector logo bytes when true.'},
+         _IB_LANGUAGE_PARAM,
+     ]},
+    {'group': 'Indicator Bank app', 'path': '/Subsector', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Flat list of active subsectors (parent sector id, name, order).',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Indicator list. Response is {values, count, page:{offset, limit}}. '
+         'Archived rows are excluded unless ShowIsArchived=true. '
+         'Repeat list parameters for more than one value (SectorIds=1&SectorIds=2).'
+     ),
+     'query_params': [
+         {'name': 'Filter', 'type': 'text', 'placeholder': 'volunteer',
+          'description': 'Case-insensitive match on indicator name or definition.'},
+         {'name': 'SectorIds', 'type': 'text', 'placeholder': '1',
+          'description': 'Sector id. Repeat the parameter for more than one sector.'},
+         {'name': 'SubsectorIds', 'type': 'text', 'placeholder': '10',
+          'description': 'Subsector id. Repeat the parameter for more than one subsector.'},
+         {'name': 'IndicatorIds', 'type': 'text', 'placeholder': '724',
+          'description': 'Indicator id. Repeat the parameter for more than one indicator.'},
+         {'name': 'Tags', 'type': 'text', 'placeholder': 'health',
+          'description': 'Tag that must be present. Repeat the parameter for more than one tag.'},
+         {'name': 'ShowIsArchived', 'type': 'select', 'options': ['true', 'false'],
+          'description': 'true returns only archived indicators. false or omitted returns active indicators.'},
+         {'name': 'Offset', 'type': 'number', 'placeholder': '0',
+          'description': 'Rows to skip (default 0).'},
+         {'name': 'Limit', 'type': 'number', 'placeholder': '1000',
+          'description': 'Page size (default 1000).'},
+         _IB_LANGUAGE_PARAM,
+     ]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/<indicator_id>', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'One indicator, including sectors, subsectors, tags, and localized name and definition.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/search', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Semantic search (pgvector). Returns up to 20 matches with id, title, definition, and score. '
+         'Falls back to a name/definition text match when embeddings are missing. Empty filter returns [].'
+     ),
+     'query_params': [
+         {'name': 'filter', 'type': 'text', 'placeholder': 'volunteer',
+          'description': 'Search text. Filter is accepted as an alias.'},
+         _IB_LANGUAGE_PARAM,
+     ]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/tags', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Sorted distinct tags from active indicators.'},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/selectOptions', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Suggestion form dropdowns: units, types, disaggregations, emergencies, SPEF, '
+         'tags, monitoring questions, and related programmes.'
+     ),
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Indicator/Suggestion', 'methods': ['POST'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': (
+         'Submit a public suggestion as JSON. Requires name, email, motivation, and reCAPTCHA token. '
+         'operation is 0 (new), 1 (correction), or 2 (other). Optional: indicatorId, title, definition, '
+         'typeOfMeasurement, unitOfMeasurement, primary/secondary/tertiary sector and subsector, tags. '
+         'Needs the indicators:suggest capability. Returns 200 with an empty body.'
+     )},
+    {'group': 'Indicator Bank app', 'path': '/CommonWord', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Glossary terms and meanings for indicator tooltips.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+    {'group': 'Indicator Bank app', 'path': '/Excel', 'methods': ['GET'],
+     'auth': 'api_key', 'rate_limited': True, 'paginated': False,
+     'consumers': _IB_APP_CONSUMERS,
+     'description': 'Public indicator workbook (indicatorbank.xlsx). Response is a spreadsheet, not JSON.',
+     'query_params': [_IB_LANGUAGE_PARAM]},
+]
+
 # Combined registry — single source of truth for all API surfaces
 ENDPOINT_REGISTRY = (
     [dict(e, surface='v1')     for e in EXTERNAL_API_REGISTRY] +
     [dict(e, surface='ai')     for e in AI_API_REGISTRY] +
     [dict(e, surface='ai')     for e in AI_DOCUMENTS_API_REGISTRY] +
-    [dict(e, surface='mobile') for e in MOBILE_ENDPOINT_REGISTRY]
+    [dict(e, surface='mobile') for e in MOBILE_ENDPOINT_REGISTRY] +
+    [dict(e, surface='indicator_bank') for e in INDICATOR_BANK_APP_REGISTRY]
 )
 
 
@@ -820,6 +1128,19 @@ _SKIP_METHODS = frozenset({'HEAD', 'OPTIONS'})
 # Prefixes we care about
 _API_PREFIXES = ('/api/v1/', '/api/mobile/v1/', '/api/ai/v2/', '/api/ai/')
 
+# Indicator Bank app routes live at the site root, not under /api.
+_INDICATOR_BANK_APP_ENDPOINT_PREFIX = 'indicator_bank_compat.'
+# FDRS public-frontend adapter (legacy data-api paths such as /api/data and /csv/export).
+# Plugin-owned; its view functions are all named ``fdrs_public_compat_*``.
+_FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX = 'fdrs.fdrs_public_compat_'
+
+# Mounted by flask-sock only when WEBSOCKET_ENABLED is on. Absent from url_map
+# while sockets are off, which is expected rather than a removed route.
+_WEBSOCKET_ROUTES = frozenset({
+    '/api/ai/v2/ws',
+    '/api/ai/documents/ws',
+})
+
 # AI-surface path heuristic: auth via resolve_ai_identity() inline (no decorator)
 _AI_AUTH_HEURISTIC = 'ai_session'
 
@@ -828,7 +1149,23 @@ def _normalize_path(path: str) -> str:
     return _re.sub(r'<[^:>]+:([^>]+)>', r'<\1>', path)
 
 
-def _surface_for_path(path: str) -> str:
+def _is_scanned_api_rule(path: str, endpoint: str | None = None) -> bool:
+    """Routes the registry compares against the live url_map."""
+    if any(path.startswith(prefix) for prefix in _API_PREFIXES):
+        return True
+    return bool(
+        endpoint
+        and endpoint.startswith(
+            (_INDICATOR_BANK_APP_ENDPOINT_PREFIX, _FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX)
+        )
+    )
+
+
+def _surface_for_path(path: str, endpoint: str | None = None) -> str:
+    if endpoint and endpoint.startswith(_FDRS_PUBLIC_COMPAT_ENDPOINT_PREFIX):
+        return 'fdrs_public'
+    if endpoint and endpoint.startswith(_INDICATOR_BANK_APP_ENDPOINT_PREFIX):
+        return 'indicator_bank'
     if path.startswith('/api/mobile/v1/'):
         return 'mobile'
     if path.startswith('/api/ai/'):
@@ -896,7 +1233,8 @@ def scan_flask_routes(app) -> dict:
     (core ``ENDPOINT_REGISTRY`` plus plugin ``get_api_endpoints()``).
 
     Returns a dict with:
-      live          – list of dicts for every /api/* route found in url_map
+      live          – list of dicts for every tracked route found in url_map
+                      (/api/* plus Indicator Bank app routes)
       undocumented  – routes in url_map but NOT in the registry
       stale         – registry entries whose path is NOT in url_map
       coverage_pct  – float (0–100)
@@ -914,12 +1252,12 @@ def scan_flask_routes(app) -> dict:
 
     for rule in app.url_map.iter_rules():
         path = rule.rule
-        if not any(path.startswith(p) for p in _API_PREFIXES):
+        if not _is_scanned_api_rule(path, rule.endpoint):
             continue
 
         methods = sorted(rule.methods - _SKIP_METHODS)
         norm   = _normalize_path(path)
-        surface = _surface_for_path(path)
+        surface = _surface_for_path(path, rule.endpoint)
 
         view_fn  = app.view_functions.get(rule.endpoint)
         ep_auth, ep_perm = _auth_for_view(view_fn) if view_fn else (None, None)
@@ -947,6 +1285,8 @@ def scan_flask_routes(app) -> dict:
 
     # ── Stale: in registry but path not found in url_map ─────────────────
     stale_paths = registry_paths - live_paths
+    if not app.config.get('WEBSOCKET_ENABLED', False):
+        stale_paths -= _WEBSOCKET_ROUTES
     stale = [ep for ep in registry if _normalize_path(ep['path']) in stale_paths]
 
     total_live = len(live_paths)
@@ -985,6 +1325,8 @@ def _ep_surface_filter_disabled(grid_rows: list[dict]) -> dict[str, bool]:
         'v1',
         'mobile',
         'ai',
+        'indicator_bank',
+        'fdrs_public',
         'flagged',
         'overlap',
         'has_stats',
@@ -1011,6 +1353,10 @@ def _endpoint_registry_grid_rows(all_endpoints: list[dict]) -> list[dict]:
                 group_label = f'AI Documents — {grp}'
             else:
                 group_label = f'AI /v2 — {grp}'
+        elif surf == 'indicator_bank':
+            group_label = grp or 'Indicator Bank app'
+        elif surf == 'fdrs_public':
+            group_label = grp or 'FDRS public frontend'
         else:
             group_label = grp or '—'
         desc = ep.get('description') or ''
@@ -1094,12 +1440,10 @@ def api_management():
             'undocumented': True,
         })
 
-    # Attach usage stats from APIUsage (canonical /api traffic log; one grouped query)
-    usage_by_prefix = bulk_endpoint_usage_stats(
-        [endpoint_path_prefix(ep['path']) for ep in all_endpoints]
-    )
+    # Attach usage stats. Each logged path counts toward one registry route.
+    usage_by_path = bulk_endpoint_usage_stats([ep['path'] for ep in all_endpoints])
     for ep in all_endpoints:
-        stats = usage_by_prefix.get(endpoint_path_prefix(ep['path']), {})
+        stats = usage_by_path.get(ep['path'], {})
         ep['total_requests'] = stats.get('total_requests', 0)
         ep['success_rate'] = stats.get('success_rate', 100)
 
@@ -1116,9 +1460,11 @@ def api_management():
         }
 
     surface_summary = {
-        'v1':     _surface_summary('v1'),
-        'ai':     _surface_summary('ai'),
-        'mobile': _surface_summary('mobile'),
+        'v1':              _surface_summary('v1'),
+        'ai':              _surface_summary('ai'),
+        'mobile':          _surface_summary('mobile'),
+        'indicator_bank':  _surface_summary('indicator_bank'),
+        'fdrs_public':     _surface_summary('fdrs_public'),
     }
     surface_summary['all'] = {
         'total':          len(all_endpoints),
@@ -1133,10 +1479,11 @@ def api_management():
         'total_live_paths': scan['total_live'],
     }
 
-    # ── v1 endpoints for URL builder (keeps existing dropdown working) ─────────
+    # ── v1, Indicator Bank app, and the FDRS public frontend for the URL builder ─
     v1_endpoints = [
         {**ep, 'method': '/'.join(ep['methods'])}
-        for ep in all_endpoints if ep['surface'] == 'v1'
+        for ep in all_endpoints
+        if ep['surface'] in ('v1', 'indicator_bank', 'fdrs_public') and not ep.get('undocumented')
     ]
     url_builder_endpoint_groups = _url_builder_endpoint_groups(v1_endpoints)
     url_builder_contracts = _url_builder_param_contracts(v1_endpoints)
@@ -1174,7 +1521,7 @@ def api_management():
     # Chart data — last 24 h hourly breakdown (v1 traffic)
     last_24h  = utcnow() - timedelta(days=1)
     stats     = APIUsage.query.filter(
-        APIUsage.api_endpoint.like('/api/%'),
+        usage_tracked_clause(),
         APIUsage.timestamp >= last_24h,
     ).all()
     hour_counts = {}
@@ -1229,9 +1576,20 @@ def api_stats():
         period = request.args.get('period', 'daily')
         endpoint = request.args.get('endpoint', 'all')
 
-        base_query = APIUsage.query.filter(APIUsage.api_endpoint.like('/api/%'))
+        base_query = APIUsage.query.filter(usage_tracked_clause())
         if endpoint != 'all':
-            base_query = base_query.filter(APIUsage.api_endpoint.ilike(safe_ilike_pattern(endpoint)))
+            logged = [
+                row[0]
+                for row in base_query.with_entities(APIUsage.api_endpoint).distinct().all()
+            ]
+            from app.services.platform.api_usage_stats import assign_logged_paths
+
+            registry_paths = [ep['path'] for ep in get_endpoint_registry()]
+            assigned = assign_logged_paths(registry_paths, logged)
+            matched = [logged_path for logged_path, route in assigned.items() if route == endpoint]
+            base_query = base_query.filter(
+                APIUsage.api_endpoint.in_(matched or ['\x00'])
+            )
 
         if period not in ('daily', 'weekly', 'monthly', 'quarterly', 'yearly'):
             period = 'daily'

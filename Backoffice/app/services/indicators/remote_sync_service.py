@@ -27,6 +27,14 @@ from typing import Any
 
 
 logger = logging.getLogger(__name__)
+
+# Legacy Indicator Bank calls this sector "WASH". Backoffice stores that same
+# sector under the spelled-out name, with the logo and the WASH subsectors.
+# A sync that inserts a second sector named "WASH" shows two home-page tiles.
+SECTOR_NAME_ALIASES = {
+    "wash": "Water, Sanitation, and Hygiene",
+}
+
 _sync_lock = threading.Lock()
 _sync_state: dict[str, Any] = {
     "running": False,
@@ -35,6 +43,61 @@ _sync_state: dict[str, Any] = {
     "last_result": None,
     "last_error": None,
 }
+
+
+def resolve_sector_alias(name: str, existing_names) -> str:
+    """Return the Backoffice sector name a legacy name should attach to.
+
+    If the spelled-out sector is not in ``existing_names``, the original name is
+    kept so a fresh database can still create it.
+    """
+    key = (name or "").strip()
+    if not key:
+        return key
+    target = SECTOR_NAME_ALIASES.get(key.casefold())
+    if not target:
+        return key
+    by_fold = {existing.casefold(): existing for existing in existing_names if existing}
+    return by_fold.get(target.casefold(), key)
+
+
+def rewrite_sector_levels(payload: Any, source_id: int, target_id: int) -> tuple[dict | None, bool]:
+    """Replace ``source_id`` with ``target_id`` in a primary/secondary/tertiary map.
+
+    Drops a level that would repeat the same sector after the rewrite.
+    """
+    if not isinstance(payload, dict):
+        return None, False
+
+    def _as_id(value: Any) -> int | None:
+        if value is None or value == "":
+            return None
+        if value == source_id or str(value) == str(source_id):
+            return target_id
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    updated: dict[str, int] = {}
+    seen: set[int] = set()
+    for level in ("primary", "secondary", "tertiary"):
+        sector_id = _as_id(payload.get(level))
+        if sector_id is None or sector_id in seen:
+            continue
+        seen.add(sector_id)
+        updated[level] = sector_id
+
+    original: dict[str, int] = {}
+    for level in ("primary", "secondary", "tertiary"):
+        raw = payload.get(level)
+        if raw in (None, ""):
+            continue
+        try:
+            original[level] = int(raw)
+        except (TypeError, ValueError):
+            return (updated or None), True
+    return (updated or None), updated != original
 
 
 def get_remote_sync_state() -> dict[str, Any]:
@@ -265,9 +328,10 @@ def sync_remote_indicator_bank(
 
     sector_cache: dict[str, Sector] = {}
     subsector_cache: dict[str, SubSector] = {}
+    existing_sector_names = [row[0] for row in Sector.query.with_entities(Sector.name).all()]
 
     def _get_or_create_sector_by_name(name: str | None):
-        key = (name or "").strip()
+        key = resolve_sector_alias((name or "").strip(), existing_sector_names)
         if not key:
             return None
         if key in sector_cache:

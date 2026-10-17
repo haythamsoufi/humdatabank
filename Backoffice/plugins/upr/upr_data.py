@@ -783,6 +783,10 @@ def _pns_column_indicator(col: str) -> str | None:
         return "Transferred"
     if "fund" in lower:
         return "Funding"
+    # On the PNS reporting matrix, SP/EF columns are the expenditure breakdown.
+    token = (col or "").strip().split("_", 1)[0].split(" ", 1)[0]
+    if _area_code(token) in {"SP1", "SP2", "SP3", "SP4", "SP5", "EFs", "EF1", "EF2", "EF3", "EF4"}:
+        return "Expenditure"
     return None
 
 
@@ -797,6 +801,7 @@ def _pns_funding_facts(
         if indicator is None:
             continue
         host = ns_by_id.get(int(row_key)) if row_key.isdigit() else (row_key or None)
+        area_token = (col or "").strip().split("_", 1)[0].split(" ", 1)[0]
         fact = blank_fact(place)
         fact.update(
             {
@@ -805,7 +810,7 @@ def _pns_funding_facts(
                 "Source": "PNS Data",
                 "Entity": host,
                 "Attribute": "Funding Source",
-                "SP/EF": spef_label((col or "").split(" ", 1)[0]),
+                "SP/EF": spef_label(area_token),
                 "Indicator": indicator,
             }
         )
@@ -1199,6 +1204,7 @@ def _master_pns_funding_rows(
         if indicator is None:
             continue
         host = ns_country_by_id.get(int(row_key)) if row_key.isdigit() else None
+        area_token = (col or "").strip().split("_", 1)[0].split(" ", 1)[0]
         row = blank_master(place)
         row.update(
             {
@@ -1208,7 +1214,7 @@ def _master_pns_funding_rows(
                 "Entity": "PNS",
                 "NS": place.get("ns"),
                 "Source": "PNS Data",
-                "Area": spef_label((col or "").split(" ", 1)[0]) or "Total",
+                "Area": spef_label(area_token) or "Total",
                 "Attribute": "Total",
                 "Indicator": indicator,
                 "indicatorId": _SHEET_INDICATOR_IDS.get(indicator),

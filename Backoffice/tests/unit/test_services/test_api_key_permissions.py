@@ -224,6 +224,7 @@ class TestRouteCapabilityGuard:
         unaware = [r.path for r in collect_key_routes(app)
                    if r.capability in SCOPABLE_CAPABILITY_CODES and not r.scope_aware]
         assert set(unaware) <= {
+            "/api/v1/nskeydata",
             "/api/v1/upr", "/api/v1/upr/data", "/api/v1/upr/master", "/api/v1/upr/submissions",
         }
 

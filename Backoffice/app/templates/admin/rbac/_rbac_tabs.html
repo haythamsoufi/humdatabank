@@ -11,6 +11,7 @@
 
 {% set tabs = [
   {'key': 'roles', 'label': _('Roles'), 'url': url_for('rbac_management.manage_roles'), 'icon': 'fas fa-shield-alt', 'visible': can_manage_roles},
+  {'key': 'groups', 'label': _('Access Groups'), 'url': url_for('rbac_management.manage_groups'), 'icon': 'fas fa-users', 'visible': can_manage_roles},
   {'key': 'permissions', 'label': _('Permissions'), 'url': url_for('rbac_management.list_permissions'), 'icon': 'fas fa-key', 'visible': can_manage_roles},
   {'key': 'access_rules', 'label': _('Access Rules'), 'url': url_for('rbac_management.manage_grants'), 'icon': 'fas fa-user-lock', 'visible': can_manage_grants},
 ] %}

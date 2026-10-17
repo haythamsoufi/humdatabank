@@ -201,15 +201,26 @@ def _posted_allowed_role_ids() -> list:
 
 
 def _assignment_access_context(assignment=None) -> dict:
-    """Role-restriction picker data for manage_assignment.html."""
-    from app.models.rbac import RbacRole
+    """Access-group picker data for manage_assignment.html.
+
+    Only Access Groups (``RbacRole.kind == 'group'``, e.g. Finance, HR) are
+    offered and counted. A permission role that was stored here earlier is
+    ignored: it is not shown as selected and is dropped the next time the
+    audience is saved.
+    """
+    from app.models.rbac import RbacRole, ROLE_KIND_GROUP
 
     if request.method == "POST" and request.form.get("allowed_roles_submitted"):
         selected = set(_posted_allowed_role_ids())
     else:
         selected = {int(r.id) for r in assignment.allowed_roles} if assignment is not None else set()
+
+    all_roles = RbacRole.query.order_by(RbacRole.name).all()
+    group_ids = {int(r.id) for r in all_roles if r.kind == ROLE_KIND_GROUP}
+    selected &= group_ids
+    groups = [r for r in all_roles if int(r.id) in group_ids]
     return {
-        "assignment_access_roles": RbacRole.query.order_by(RbacRole.name).all(),
+        "assignment_access_roles": groups,
         "selected_allowed_role_ids": selected,
         "can_manage_assignment_access": _can_manage_assignment_access(),
     }

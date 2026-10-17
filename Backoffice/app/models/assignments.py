@@ -75,6 +75,28 @@ user_assignment_access = Table(
     db.Index('ix_user_assignment_access_assignment', 'assigned_form_id'),
 )
 
+# Templates whose assignments a user may reach when assignment_access_mode is
+# 'templates'. A row grants every current and future assignment of that template.
+user_assignment_template_access = Table(
+    'user_assignment_template_access',
+    db.metadata,
+    Column(
+        'user_id',
+        Integer,
+        ForeignKey('user.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column(
+        'template_id',
+        Integer,
+        ForeignKey('form_template.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column('created_at', DateTime, default=utcnow, nullable=False),
+    db.Index('ix_user_assignment_template_access_user', 'user_id'),
+    db.Index('ix_user_assignment_template_access_template', 'template_id'),
+)
+
 
 class ReportingPeriod(db.Model):
     """Typed reporting period catalog for assignment periods."""
@@ -170,8 +192,9 @@ class AssignedForm(db.Model):
     )
     activated_by_user = relationship('User', foreign_keys=[activated_by_user_id])
     deactivated_by_user = relationship('User', foreign_keys=[deactivated_by_user_id])
-    # Custom RBAC roles allowed to see and work on this assignment. Empty means
-    # every user who otherwise has access (the default).
+    # Access Groups (RbacRole.kind == 'group') allowed to see and work on this
+    # assignment. Empty means no audience limit. Permission roles stored here
+    # are ignored by the access check and dropped the next time this is saved.
     allowed_roles = relationship(
         'RbacRole',
         secondary=assigned_form_allowed_role,

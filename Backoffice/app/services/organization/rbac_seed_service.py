@@ -623,6 +623,27 @@ def _extension_baseline_roles() -> List[Dict[str, Any]]:
         return []
 
 
+def get_baseline_role_codes() -> set[str]:
+    """
+    Return the set of role codes that are defined in code (baseline + plugin roles).
+
+    These are the "built-in" roles seeded by `seed_rbac_permissions_and_roles()`.
+    Any role in `rbac_role` whose code is NOT in this set is a custom/group role
+    created by a System Manager (e.g. Finance, HR).
+
+    Best-effort: returns an empty set on any error (e.g. plugin registry
+    unavailable) so callers degrade to "treat everything as built-in" rather
+    than crashing.
+    """
+    try:
+        permission_catalog = _permission_catalog() + _extension_permission_catalog()
+        baseline_roles = _baseline_roles(permission_catalog) + _extension_baseline_roles()
+        return {str(r.get("code")).strip() for r in baseline_roles if r.get("code")}
+    except Exception as e:
+        logger.debug("get_baseline_role_codes failed: %s", e)
+        return set()
+
+
 def get_missing_baseline_role_codes() -> List[str]:
     """
     Return baseline/extension role codes defined in code but absent from `rbac_role`.
@@ -901,6 +922,7 @@ def seed_rbac_permissions_and_roles(
                         code=rcode,
                         name=rname,
                         description=rdesc,
+                        kind="permission",
                         created_by_user_id=created_by_user_id,
                     )
                     db.session.add(role)
@@ -913,6 +935,12 @@ def seed_rbac_permissions_and_roles(
                         changed = True
                     if role.description != rdesc:
                         role.description = rdesc
+                        changed = True
+                    # Baseline/plugin roles are always permission roles -- never
+                    # Access Groups. Repair any row mislabeled out-of-band or by
+                    # the kind backfill so the two concepts stay separated.
+                    if getattr(role, "kind", "permission") != "permission":
+                        role.kind = "permission"
                         changed = True
                     if changed:
                         updated_roles += 1

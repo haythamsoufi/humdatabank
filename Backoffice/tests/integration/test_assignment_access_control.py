@@ -31,8 +31,12 @@ _ADMIN_PERMS = (
 )
 
 
-def _make_role(db_session, perms=(), name=None):
-    role = RbacRole(code=f"r_{uuid.uuid4().hex[:10]}", name=name or f"Role {uuid.uuid4().hex[:6]}")
+def _make_role(db_session, perms=(), name=None, kind="permission"):
+    role = RbacRole(
+        code=f"r_{uuid.uuid4().hex[:10]}",
+        name=name or f"Role {uuid.uuid4().hex[:6]}",
+        kind=kind,
+    )
     db_session.add(role)
     db_session.flush()
     for code in perms:
@@ -77,7 +81,8 @@ def scenario(db_session, app):
         db_session, country=country, template=create_test_template(db_session), period_name="2025"
     )
     focal_role = _make_role(db_session, _FOCAL_PERMS, name="Focal")
-    finance_role = _make_role(db_session, (), name="Finance")
+    # Finance is an Access Group (no permissions) -- what the assignment picker offers.
+    finance_role = _make_role(db_session, (), name="Finance", kind="group")
     focal = _user_with_roles(db_session, [focal_role])
     finance_focal = _user_with_roles(db_session, [focal_role, finance_role])
     for user in (focal, finance_focal):
@@ -142,6 +147,47 @@ class TestUserScope:
         assert access_service.normalize_access_mode("bogus") == "all"
         assert access_service.normalize_access_mode(None) == "all"
 
+    def test_templates_mode_covers_current_and_future_assignments(self, db_session, scenario):
+        a1 = scenario["aes_1"].assigned_form_id
+        a2 = scenario["aes_2"].assigned_form_id
+        form1 = db_session.get(AssignedForm, a1)
+        user = db_session.get(User, scenario["focal"].id)
+        access_service.set_user_assignment_access(
+            user, "templates", [], template_ids=[form1.template_id]
+        )
+        db_session.commit()
+        access_service.invalidate_cache()
+        assert access_service.user_can_access_assigned_form(user, a1)
+        assert not access_service.user_can_access_assigned_form(user, a2)
+        assert access_service.filter_accessible_assigned_form_ids(user, [a1, a2]) == {a1}
+
+        later = create_test_assignment_entity_status(
+            db_session,
+            country=scenario["aes_1"].country,
+            template=form1.template,
+            period_name="2031",
+        )
+        access_service.invalidate_cache()
+        assert access_service.user_can_access_assigned_form(user, later.assigned_form_id)
+        visible = {
+            row.id
+            for row in access_service.apply_assignment_access(
+                AssignedForm.query, user, AssignedForm.id
+            ).all()
+        }
+        assert later.assigned_form_id in visible
+        assert a2 not in visible
+
+    def test_templates_mode_with_nothing_ticked_blocks_all(self, db_session, scenario):
+        user = db_session.get(User, scenario["focal"].id)
+        access_service.set_user_assignment_access(user, "templates", [], template_ids=[])
+        db_session.commit()
+        access_service.invalidate_cache()
+        for key in ("aes_1", "aes_2"):
+            assert not access_service.user_can_access_assigned_form(
+                scenario["focal"], scenario[key].assigned_form_id
+            )
+
     def test_system_manager_ignores_selected_mode(self, db_session, scenario):
         _select_for_user(db_session, scenario["system_manager"], [])
         assert access_service.user_can_access_assigned_form(
@@ -157,10 +203,36 @@ class TestRoleRestriction:
         assert access_service.user_can_access_assigned_form(scenario["finance_focal"], a1)
         assert access_service.user_can_access_assigned_form(scenario["system_manager"], a1)
 
-    def test_any_listed_role_is_enough(self, db_session, scenario):
+    def test_permission_role_is_not_an_audience(self, db_session, scenario):
+        """A permission role neither opens a group-restricted assignment nor locks one by itself."""
         a1 = scenario["aes_1"].assigned_form_id
-        _restrict_to_roles(db_session, a1, [scenario["finance_role"], scenario["focal_role"]])
-        assert access_service.user_can_access_assigned_form(scenario["focal"], a1)
+        assignment = db_session.get(AssignedForm, a1)
+        changed = access_service.set_assignment_allowed_roles(
+            assignment, [scenario["finance_role"].id, scenario["focal_role"].id]
+        )
+        db_session.commit()
+        access_service.invalidate_cache()
+        assert changed
+        assert {r.id for r in assignment.allowed_roles} == {scenario["finance_role"].id}
+        # Holds the permission role, not the group. "No personal limit" does not override the group.
+        assert scenario["focal"].assignment_access_mode == "all"
+        assert not access_service.user_can_access_assigned_form(scenario["focal"], a1)
+        assert access_service.user_can_access_assigned_form(scenario["finance_focal"], a1)
+
+        assignment.allowed_roles = [scenario["focal_role"]]
+        db_session.commit()
+        access_service.invalidate_cache()
+        bare = _user_with_roles(db_session, [])
+        access_service.invalidate_cache()
+        assert access_service.user_can_access_assigned_form(bare, a1)
+        assert access_service.filter_accessible_assigned_form_ids(bare, [a1]) == {a1}
+        visible = {
+            row.id
+            for row in access_service.apply_assignment_access(
+                AssignedForm.query, bare, AssignedForm.id
+            ).all()
+        }
+        assert a1 in visible
 
     def test_clearing_roles_reopens_assignment(self, db_session, scenario):
         a1 = scenario["aes_1"].assigned_form_id
@@ -255,20 +327,35 @@ class TestAdminAssignmentRoutes:
         assert 'name="allowed_role_ids"' in body
         assert "Finance" in body
 
-    def test_role_deletion_blocked_while_it_restricts_assignments(
+    def test_group_deletion_blocked_while_it_restricts_assignments(
         self, client, db_session, scenario
     ):
         a1 = scenario["aes_1"].assigned_form_id
-        role = _make_role(db_session, (), name="Temporary")
-        _restrict_to_roles(db_session, a1, [role])
+        group = _make_role(db_session, (), name="Temporary", kind="group")
+        _restrict_to_roles(db_session, a1, [group])
+        login_session(client, scenario["system_manager"].id)
+        resp = client.post(f"/admin/users/groups/{group.id}/delete", follow_redirects=False)
+        assert resp.status_code in (302, 303)
+        assert db_session.get(RbacRole, group.id) is not None
+        remaining = db_session.execute(
+            assigned_form_allowed_role.select().where(
+                assigned_form_allowed_role.c.role_id == group.id
+            )
+        ).all()
+        assert len(remaining) == 1
+
+    def test_permission_role_delete_ignores_leftover_audience_rows(
+        self, client, db_session, scenario
+    ):
+        """A permission role is not an audience, so a leftover link must not block its deletion."""
+        assignment = db_session.get(AssignedForm, scenario["aes_1"].assigned_form_id)
+        role = _make_role(db_session, (), name="Temporary permission")
+        assignment.allowed_roles = [role]
+        db_session.commit()
         login_session(client, scenario["system_manager"].id)
         resp = client.post(f"/admin/users/roles/{role.id}/delete", follow_redirects=False)
         assert resp.status_code in (302, 303)
-        assert db_session.get(RbacRole, role.id) is not None
-        remaining = db_session.execute(
-            assigned_form_allowed_role.select().where(assigned_form_allowed_role.c.role_id == role.id)
-        ).all()
-        assert len(remaining) == 1
+        assert db_session.get(RbacRole, role.id) is None
 
 
 class TestUserFormAssignmentAccess:
@@ -277,8 +364,15 @@ class TestUserFormAssignmentAccess:
         resp = client.get(f"/admin/users/edit_user/{scenario['focal'].id}")
         assert resp.status_code == 200
         body = resp.data.decode()
+        assert 'id="panel-assignment-access"' in body
+        assert 'id="assignment-access-tab"' in body
         assert 'id="assignment-access-section"' in body
         assert 'name="assignment_access_mode"' in body
+        assert 'name="selected_template_ids"' in body
+        assert 'id="panel-entity"' in body
+        assert 'assignment-access-section' not in body.split('id="panel-entity"', 1)[-1].split(
+            'id="panel-assignment-access"', 1
+        )[0]
         assert f'value="{scenario["aes_1"].assigned_form_id}"' in body
 
     def test_saving_selected_mode_persists(self, client, db_session, scenario):
@@ -320,6 +414,34 @@ class TestUserFormAssignmentAccess:
         assert resp.status_code in (302, 303)
         db_session.expire_all()
         assert db_session.get(User, focal.id).assignment_access_mode == "selected"
+
+    def test_saving_templates_mode_persists_and_covers_the_template(self, client, db_session, scenario):
+        login_session(client, scenario["system_manager"].id)
+        focal = scenario["focal"]
+        a1 = scenario["aes_1"].assigned_form_id
+        template_id = db_session.get(AssignedForm, a1).template_id
+        resp = client.post(
+            f"/admin/users/edit_user/{focal.id}",
+            data={
+                "email": focal.email,
+                "name": focal.name,
+                "profile_color": "#3B82F6",
+                "assignment_access_submitted": "1",
+                "assignment_access_mode": "templates",
+                "selected_template_ids": [str(template_id)],
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (302, 303), resp.data.decode()[:500]
+        db_session.expire_all()
+        user = db_session.get(User, focal.id)
+        assert user.assignment_access_mode == "templates"
+        assert {t.id for t in user.selected_assignment_templates} == {template_id}
+        access_service.invalidate_cache()
+        assert access_service.user_can_access_assigned_form(user, a1)
+        assert not access_service.user_can_access_assigned_form(
+            user, scenario["aes_2"].assigned_form_id
+        )
 
 
 class TestEditAssignmentSavesRoles:
@@ -370,3 +492,82 @@ class TestEditAssignmentSavesRoles:
         assert resp.status_code in (302, 303)
         db_session.expire_all()
         assert list(db_session.get(AssignedForm, assignment.id).allowed_roles) == []
+
+
+class TestAccessGroupSeparation:
+    """Access Groups (kind='group') stay separate from permission roles."""
+
+    def test_groups_hidden_from_roles_screen_shown_on_groups_screen(self, client, db_session):
+        sm = create_test_user(db_session, role="system_manager")
+        group = _make_role(db_session, (), name="FinanceDept", kind="group")
+        perm_role = _make_role(db_session, ("admin.users.view",), name="UsersViewerX")
+        login_session(client, sm.id)
+
+        roles_body = client.get("/admin/users/roles/").data.decode()
+        assert "UsersViewerX" in roles_body
+        assert "FinanceDept" not in roles_body
+
+        groups_body = client.get("/admin/users/groups/").data.decode()
+        assert "FinanceDept" in groups_body
+        assert "UsersViewerX" not in groups_body
+
+    def test_api_roles_excludes_groups(self, client, db_session):
+        sm = create_test_user(db_session, role="system_manager")
+        _make_role(db_session, (), name="HRDeptGroup", kind="group")
+        login_session(client, sm.id)
+        payload = client.get("/admin/users/api/roles").get_json()
+        names = [r["name"] for r in (payload or {}).get("roles", [])]
+        assert "HRDeptGroup" not in names
+
+    def test_create_group_with_member(self, client, db_session):
+        sm = create_test_user(db_session, role="system_manager")
+        member = create_test_user(db_session, role="user")
+        login_session(client, sm.id)
+        resp = client.post(
+            "/admin/users/groups/new",
+            data={"name": "CommsGroup", "member_ids": [str(member.id)]},
+            follow_redirects=False,
+        )
+        assert resp.status_code in (302, 303), resp.data.decode()[:500]
+        group = RbacRole.query.filter_by(name="CommsGroup").first()
+        assert group is not None
+        assert group.kind == "group"
+        assert (
+            RbacUserRole.query.filter_by(role_id=group.id, user_id=member.id).first()
+            is not None
+        )
+
+    def test_edit_group_replaces_members(self, client, db_session):
+        sm = create_test_user(db_session, role="system_manager")
+        group = _make_role(db_session, (), name="OpsGroup", kind="group")
+        u1 = create_test_user(db_session, role="user")
+        db_session.add(RbacUserRole(user_id=u1.id, role_id=group.id))
+        db_session.commit()
+        u2 = create_test_user(db_session, role="user")
+        login_session(client, sm.id)
+        resp = client.post(
+            f"/admin/users/groups/{group.id}/edit",
+            data={"name": "OpsGroup", "member_ids": [str(u2.id)]},
+            follow_redirects=False,
+        )
+        assert resp.status_code in (302, 303)
+        members = {ur.user_id for ur in RbacUserRole.query.filter_by(role_id=group.id)}
+        assert members == {u2.id}
+
+    def test_cannot_edit_group_via_role_route(self, client, db_session):
+        sm = create_test_user(db_session, role="system_manager")
+        group = _make_role(db_session, (), name="RedirectGroup", kind="group")
+        login_session(client, sm.id)
+        resp = client.get(f"/admin/users/roles/{group.id}/edit", follow_redirects=False)
+        assert resp.status_code in (302, 303)
+        assert f"/groups/{group.id}/edit" in resp.headers.get("Location", "")
+
+    def test_permission_role_not_offered_as_access_group(self, client, db_session, scenario):
+        """The assignment picker lists the group but not a plain permission role."""
+        perm_role = _make_role(db_session, ("admin.users.view",), name="PlainPermRoleZ")
+        a2 = scenario["aes_2"].assigned_form_id
+        login_session(client, scenario["system_manager"].id)
+        body = client.get(f"/admin/assignments/edit/{a2}").data.decode()
+        # Role codes are unique and only rendered inside the access-group picker.
+        assert scenario["finance_role"].code in body  # the access group is offered
+        assert perm_role.code not in body  # the permission role is not

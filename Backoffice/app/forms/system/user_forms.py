@@ -46,6 +46,18 @@ class UserForm(BaseForm):
         validators=[Optional()],
     )
 
+    # Access Groups (multi-select). Organizational groups (Finance, HR, ...) used
+    # only to scope assignment visibility; they carry no permissions. Stored in
+    # rbac_role (kind='group') and persisted through the same membership table as
+    # roles, but rendered and validated separately from the Roles picker.
+    access_groups = SelectMultipleField(
+        "Access Groups",
+        coerce=lambda x: int(x) if x else None,
+        option_widget=CheckboxInput(),
+        widget=ListWidget(prefix_label=False),
+        validators=[Optional()],
+    )
+
     countries = SelectMultipleField(
         "Assigned Countries",
         coerce=lambda x: int(x) if x else None,
@@ -62,13 +74,22 @@ class UserForm(BaseForm):
         # Populate country choices dynamically
         self.countries.choices = [(c.id, c.name) for c in Country.query.order_by(Country.name).all()]
 
-        # Populate RBAC role choices dynamically (best-effort; RBAC may not be migrated yet)
+        # Populate RBAC role + access group choices dynamically (best-effort; RBAC
+        # may not be migrated yet). Roles and Access Groups are split by kind so
+        # the two pickers never mix.
         try:
-            from app.models.rbac import RbacRole
-            self.rbac_roles.choices = [(r.id, r.name) for r in RbacRole.query.order_by(RbacRole.name).all()]
+            from app.models.rbac import RbacRole, ROLE_KIND_GROUP
+            all_roles = RbacRole.query.order_by(RbacRole.name).all()
+            self.rbac_roles.choices = [
+                (r.id, r.name) for r in all_roles if r.kind != ROLE_KIND_GROUP
+            ]
+            self.access_groups.choices = [
+                (r.id, r.name) for r in all_roles if r.kind == ROLE_KIND_GROUP
+            ]
         except Exception as e:
-            logger.debug("RBAC roles choices failed: %s", e)
+            logger.debug("RBAC roles/groups choices failed: %s", e)
             self.rbac_roles.choices = []
+            self.access_groups.choices = []
 
     def validate_rbac_roles(self, field):
         """

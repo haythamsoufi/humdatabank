@@ -13,6 +13,20 @@ from app.utils.datetime_helpers import utcnow
 from ..extensions import db
 
 
+# RbacRole.kind discriminator.
+#
+# "permission" roles are the classic RBAC roles: they bundle permissions and
+# answer "what can this user do?". "group" roles (Access Groups, e.g. Finance,
+# HR) carry NO permissions -- they only express organizational membership and
+# are used solely to scope which assignments a user can see/work on. Keeping
+# them in the same table lets memberships reuse the existing rbac_user_role
+# plumbing, but the two kinds are managed through separate UIs and a group may
+# never be given a permission.
+ROLE_KIND_PERMISSION = "permission"
+ROLE_KIND_GROUP = "group"
+ROLE_KINDS = (ROLE_KIND_PERMISSION, ROLE_KIND_GROUP)
+
+
 class RbacPermission(db.Model):
     __tablename__ = "rbac_permission"
 
@@ -33,6 +47,15 @@ class RbacRole(db.Model):
     code = db.Column(db.String(100), nullable=False, unique=True, index=True)
     name = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text, nullable=True)
+    # "permission" (classic RBAC role) or "group" (Access Group; no permissions).
+    # See ROLE_KIND_* above.
+    kind = db.Column(
+        db.String(20),
+        nullable=False,
+        default=ROLE_KIND_PERMISSION,
+        server_default=ROLE_KIND_PERMISSION,
+        index=True,
+    )
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
 
@@ -45,8 +68,18 @@ class RbacRole(db.Model):
         backref=db.backref("roles", lazy="select"),
     )
 
+    @property
+    def is_group(self) -> bool:
+        """True for Access Groups (organizational membership, no permissions)."""
+        return self.kind == ROLE_KIND_GROUP
+
+    @property
+    def is_permission_role(self) -> bool:
+        """True for classic permission-bundle RBAC roles."""
+        return self.kind != ROLE_KIND_GROUP
+
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<RbacRole {self.code}>"
+        return f"<RbacRole {self.code} ({self.kind})>"
 
 
 class RbacRolePermission(db.Model):

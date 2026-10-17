@@ -103,6 +103,11 @@
                     aria-controls="panel-entity" aria-selected="false">
                 <i class="fas fa-sitemap mr-1.5"></i>{{ _('Entity Permissions') }}
             </button>
+            <button type="button" role="tab" id="assignment-access-tab" data-tab="assignment-access"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="panel-assignment-access" aria-selected="false">
+                <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Assignment Access') }}
+            </button>
             {% if user %}
             <button type="button" role="tab" id="notification-preferences-tab" data-tab="notifications"
                     class="{{ admin_underline_tab_btn_classes(false) }}"
@@ -748,6 +753,7 @@
                         {% endfor %}
                     </div>
 {% endif %}
+
 {# The RBAC roles panel above only renders (and sets rbac_groups/default_role_type/
    show_admin_sections via {% set %}) when there are assignable roles for this actor/user;
    otherwise they stay undefined. Keep the debug snapshot below crash-safe either way. #}
@@ -1069,31 +1075,83 @@ window.userFormConfig = {
                     </div>
                 </div>
 
-                {# Assignment access (per-user scope: all assignments or a selected set) #}
+            </div>
+            {% endif %}
+
+            {# Assignment Access tab: all, specific assignments, or every assignment of selected templates #}
+            <div id="panel-assignment-access" class="user-form-panel hidden space-y-6" role="tabpanel" aria-labelledby="assignment-access-tab">
+                {% if can_assign_rbac_roles is defined and can_assign_rbac_roles and form.access_groups is defined %}
+                <div class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 sm:p-5 space-y-3">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">
+                            <i class="fas fa-users mr-1.5 text-gray-500"></i>{{ _('Access Groups') }}
+                        </h3>
+                        <p class="mt-1 text-sm text-gray-600">
+                            {{ _('Tick the groups this person belongs to, then save. A group does not grant permissions. It lets them open assignments whose audience includes that group. The personal limit below can only narrow that further.') }}
+                        </p>
+                    </div>
+                    {% if form.access_groups.choices %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
+                        {% for subfield in form.access_groups %}
+                        <label class="flex items-center gap-2 min-w-0 cursor-pointer rounded border border-gray-200 bg-white px-3 py-2">
+                            {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            <span class="text-sm text-gray-800 truncate">{{ subfield.label.text }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-500 italic">{{ _('No access groups exist yet.') }}</p>
+                    {% endif %}
+                    {% if current_user_has_role('system_manager') %}
+                    <p class="text-xs text-gray-500">
+                        <a href="{{ url_for('rbac_management.manage_groups') }}" class="text-blue-600 hover:underline">{{ _('Manage access groups') }}</a>
+                    </p>
+                    {% endif %}
+                    {% for error in form.access_groups.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <div id="assignment-access-section" class="rounded-lg border border-gray-200 bg-white shadow-sm p-4 sm:p-5 space-y-4"
-                     data-selected-mode="{{ assignment_access_selected_mode }}">
+                     data-selected-mode="{{ assignment_access_selected_mode }}"
+                     data-templates-mode="{{ assignment_access_templates_mode }}">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900">
                             <i class="fas fa-clipboard-check mr-1.5 text-gray-500"></i>{{ _('Assignment access') }}
                         </h3>
                         <p class="mt-1 text-sm text-gray-600">
-                            {{ _('By default a user can access every assignment within their entities. Limit this user to a selected set of assignments if needed. Assignments can also be restricted to specific roles from the assignment settings; both rules must allow access. System Managers are never restricted.') }}
+                            {{ _('Optional personal shortlist. It never overrides an assignment audience or entity permissions. "No personal limit" still cannot open an assignment restricted to a group this person is not in. System Managers are never restricted.') }}
                         </p>
                     </div>
                     {% if can_manage_assignment_access %}
                     <input type="hidden" name="assignment_access_submitted" value="1">
                     <div class="space-y-2">
-                        <label class="flex items-center gap-2 text-sm text-gray-800">
+                        <label class="flex items-start gap-2 text-sm text-gray-800">
                             <input type="radio" name="assignment_access_mode" value="all"
-                                   class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                                   {% if assignment_access_mode != assignment_access_selected_mode %}checked{% endif %}>
-                            {{ _('All assignments in their entities') }}
+                                   class="mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                                   {% if assignment_access_mode == 'all' %}checked{% endif %}>
+                            <span>
+                                <span class="font-medium">{{ _('No personal limit') }}</span>
+                                <span class="block text-xs text-gray-500">{{ _('Every assignment in their entities, except those restricted to an access group they are not in.') }}</span>
+                            </span>
                         </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-800">
+                        <label class="flex items-start gap-2 text-sm text-gray-800">
                             <input type="radio" name="assignment_access_mode" value="{{ assignment_access_selected_mode }}"
-                                   class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                                   class="mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                                    {% if assignment_access_mode == assignment_access_selected_mode %}checked{% endif %}>
-                            {{ _('Only selected assignments') }}
+                            <span>
+                                <span class="font-medium">{{ _('Specific assignments') }}</span>
+                                <span class="block text-xs text-gray-500">{{ _('Only the assignments ticked below. A ticked assignment is still hidden when its audience does not include this person.') }}</span>
+                            </span>
+                        </label>
+                        <label class="flex items-start gap-2 text-sm text-gray-800">
+                            <input type="radio" name="assignment_access_mode" value="{{ assignment_access_templates_mode }}"
+                                   class="mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                                   {% if assignment_access_mode == assignment_access_templates_mode %}checked{% endif %}>
+                            <span>
+                                <span class="font-medium">{{ _('All assignments of selected templates') }}</span>
+                                <span class="block text-xs text-gray-500">{{ _('Every current and future assignment of a ticked template, still subject to each assignment\'s access groups.') }}</span>
+                            </span>
                         </label>
                     </div>
                     <div id="assignment-access-picker" class="{% if assignment_access_mode != assignment_access_selected_mode %}hidden{% endif %} space-y-2">
@@ -1119,22 +1177,44 @@ window.userFormConfig = {
                             {% endfor %}
                         </div>
                         <p class="text-xs text-gray-500">
-                            {{ _('A user restricted to a selected set with nothing ticked cannot access any assignment.') }}
+                            {{ _('Nothing ticked means this user cannot access any assignment.') }}
+                        </p>
+                    </div>
+                    <div id="assignment-template-picker" class="{% if assignment_access_mode != assignment_access_templates_mode %}hidden{% endif %} space-y-2">
+                        <input type="search" id="assignment-template-filter" autocomplete="off"
+                               class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                               placeholder="{{ _('Filter templates...')|forceescape }}">
+                        <div class="max-h-72 overflow-y-auto rounded-md border border-gray-200 divide-y divide-gray-100">
+                            {% for t in assignment_access_template_options %}
+                            <label class="assignment-template-option flex items-center gap-2 px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                                   data-search="{{ t.name|lower }}">
+                                <input type="checkbox" name="selected_template_ids" value="{{ t.id }}"
+                                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                       {% if t.id in assignment_access_selected_template_ids %}checked{% endif %}>
+                                <span class="font-medium">{{ t.name }}</span>
+                            </label>
+                            {% else %}
+                            <p class="px-3 py-4 text-sm text-gray-500">{{ _('No templates available.') }}</p>
+                            {% endfor %}
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            {{ _('Nothing ticked means this user cannot access any assignment. New assignments of a ticked template are included automatically.') }}
                         </p>
                     </div>
                     {% else %}
                     <p class="text-sm text-gray-700">
                         {% if assignment_access_mode == assignment_access_selected_mode %}
-                        {{ _('This user is limited to a selected set of assignments.') }}
+                        {{ _('This user has a personal shortlist of assignments. Group-restricted assignments still require membership.') }}
+                        {% elif assignment_access_mode == assignment_access_templates_mode %}
+                        {{ _('This user is limited to assignments of selected templates. Group-restricted assignments still require membership.') }}
                         {% else %}
-                        {{ _('This user can access all assignments in their entities.') }}
+                        {{ _('This user has no personal limit. Group-restricted assignments still require membership.') }}
                         {% endif %}
                         <span class="text-gray-500">{{ _('You do not have permission to change this.') }}</span>
                     </p>
                     {% endif %}
                 </div>
             </div>
-            {% endif %}
 
             {# Notification Preferences Tab #}
             {% if user %}

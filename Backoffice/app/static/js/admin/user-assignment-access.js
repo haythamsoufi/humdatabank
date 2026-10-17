@@ -6,34 +6,48 @@
     if (!section) return;
 
     var selectedMode = section.getAttribute('data-selected-mode') || 'selected';
-    var picker = document.getElementById('assignment-access-picker');
-    var filter = document.getElementById('assignment-access-filter');
+    var templatesMode = section.getAttribute('data-templates-mode') || 'templates';
+    var assignmentPicker = document.getElementById('assignment-access-picker');
+    var templatePicker = document.getElementById('assignment-template-picker');
+    var assignmentFilter = document.getElementById('assignment-access-filter');
+    var templateFilter = document.getElementById('assignment-template-filter');
     var radios = section.querySelectorAll('input[name="assignment_access_mode"]');
-    if (!picker) return;
 
-    function syncPicker() {
-      var show = false;
+    function checkedMode() {
+      var mode = 'all';
       radios.forEach(function (r) {
-        if (r.checked && r.value === selectedMode) show = true;
+        if (r.checked) mode = r.value;
       });
-      picker.classList.toggle('hidden', !show);
+      return mode;
     }
 
-    radios.forEach(function (r) {
-      r.addEventListener('change', syncPicker);
-    });
+    function syncPickers() {
+      var mode = checkedMode();
+      if (assignmentPicker) {
+        assignmentPicker.classList.toggle('hidden', mode !== selectedMode);
+      }
+      if (templatePicker) {
+        templatePicker.classList.toggle('hidden', mode !== templatesMode);
+      }
+    }
 
-    if (filter) {
-      filter.addEventListener('input', function () {
-        var q = filter.value.trim().toLowerCase();
-        picker.querySelectorAll('.assignment-access-option').forEach(function (el) {
+    function bindFilter(input, root, rowSelector) {
+      if (!input || !root) return;
+      input.addEventListener('input', function () {
+        var q = input.value.trim().toLowerCase();
+        root.querySelectorAll(rowSelector).forEach(function (el) {
           var hay = el.getAttribute('data-search') || '';
           el.classList.toggle('hidden', q !== '' && hay.indexOf(q) === -1);
         });
       });
     }
 
-    syncPicker();
+    radios.forEach(function (r) {
+      r.addEventListener('change', syncPickers);
+    });
+    bindFilter(assignmentFilter, assignmentPicker, '.assignment-access-option');
+    bindFilter(templateFilter, templatePicker, '.assignment-template-option');
+    syncPickers();
   }
 
   if (document.readyState === 'loading') {

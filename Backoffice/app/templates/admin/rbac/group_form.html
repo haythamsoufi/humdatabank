@@ -1,0 +1,132 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "macros/form_actions.html" import form_actions %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=(group.name if group else _('New Access Group')),
+    icon='fas fa-users',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
+        {'name': _('Access Groups'), 'url': url_for('rbac_management.manage_groups')},
+        {'name': (group.name if group else _('New Access Group'))}
+    ],
+    subtitle=_('An Access Group grants no permissions. Members can open assignments that list this group, and only when their personal shortlist and entity permissions also allow it.')
+) }}
+
+<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Group Name -->
+        <div class="mb-6">
+            <label for="name" class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Group Name') }}
+            </label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                value="{{ group.name if group else '' }}"
+                class="form-control w-full sm:w-1/2"
+                placeholder="{{ _('e.g. Finance, HR')|forceescape }}"
+                required
+            >
+        </div>
+
+        {% if group %}
+        <!-- Group Code (read-only after creation) -->
+        <div class="mb-6">
+            <label for="code" class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Group Code') }}
+            </label>
+            <input
+                type="text"
+                id="code"
+                value="{{ group.code }}"
+                class="form-control w-full sm:w-1/2"
+                readonly
+            >
+            <p class="text-xs text-gray-500 mt-1">
+                {{ _('Unique identifier. Generated from the name and cannot be changed.') }}
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Description -->
+        <div class="mb-6">
+            <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Description') }}
+            </label>
+            <textarea
+                id="description"
+                name="description"
+                rows="2"
+                class="form-control w-full"
+            >{{ group.description if group else '' }}</textarea>
+        </div>
+
+        <!-- Members -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                {{ _('Members') }}
+            </label>
+            <p class="text-xs text-gray-600 mb-3">
+                {{ _('Choose the users who belong to this group. You can also add users to groups from the user edit form.') }}
+            </p>
+            <div class="relative max-w-xl mb-2">
+                <input
+                    type="text"
+                    id="group-member-filter"
+                    class="form-control w-full"
+                    placeholder="{{ _('Filter by name or email...')|forceescape }}"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="border border-gray-200 rounded-md max-h-80 overflow-y-auto divide-y divide-gray-100" id="group-member-list">
+                {% for u in users %}
+                <label class="group-member-row flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50"
+                       data-search="{{ (u.name ~ ' ' ~ u.email)|lower }}">
+                    <input
+                        type="checkbox"
+                        name="member_ids"
+                        value="{{ u.id }}"
+                        class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        {% if u.id in member_ids %}checked{% endif %}
+                    >
+                    <span class="min-w-0">
+                        <span class="block text-sm text-gray-800 font-medium truncate">{{ u.name or u.email }}</span>
+                        <span class="block text-xs text-gray-500 truncate">{{ u.email }}{% if u.is_active is defined and not u.is_active %} · {{ _('inactive') }}{% endif %}</span>
+                    </span>
+                </label>
+                {% else %}
+                <p class="px-3 py-4 text-sm text-gray-500 italic">{{ _('No users found.') }}</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="pt-4 border-t border-gray-200">
+            {{ form_actions(_('Update Group') if group else _('Create Group'), cancel_url=url_for('rbac_management.manage_groups')) }}
+        </div>
+    </form>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+    (function () {
+        var filter = document.getElementById('group-member-filter');
+        var list = document.getElementById('group-member-list');
+        if (!filter || !list) return;
+        filter.addEventListener('input', function () {
+            var q = (filter.value || '').trim().toLowerCase();
+            var rows = list.querySelectorAll('.group-member-row');
+            rows.forEach(function (row) {
+                var hay = row.getAttribute('data-search') || '';
+                row.classList.toggle('hidden', q !== '' && hay.indexOf(q) === -1);
+            });
+        });
+    })();
+</script>
+{% endblock %}

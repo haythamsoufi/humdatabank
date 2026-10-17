@@ -1118,6 +1118,8 @@
                 entity_permissions: 'entity',
                 notifications: 'notifications',
                 notification_preferences: 'notifications',
+                assignment_access: 'assignment-access',
+                assignments: 'assignment-access',
                 devices: 'devices',
                 registered_devices: 'devices',
                 analytics: 'analytics'
@@ -1125,6 +1127,7 @@
             MAIN_TO_PARAM: {
                 'user-details': 'details',
                 entity: 'entity',
+                'assignment-access': 'assignment_access',
                 notifications: 'notifications',
                 devices: 'devices',
                 analytics: 'analytics'
@@ -1173,6 +1176,7 @@
         const KNOWN_MAIN_TAB_IDS = [
             'user-details',
             'entity',
+            'assignment-access',
             'notifications',
             'devices',
             'analytics'

@@ -46,6 +46,7 @@ from .helpers import (
     apply_scoped_entity_replace,
     _get_countries_by_region,
     _set_user_rbac_roles,
+    _requested_access_group_ids,
     _ensure_user_has_default_rbac_role,
     _get_user_deletion_preview,
     _cascade_delete_user_related,
@@ -78,6 +79,9 @@ def manage_users():
         for ur in user_roles:
             r = roles_by_id.get(ur.role_id)
             if not r:
+                continue
+            # Access Groups are not roles; keep the grid's role chips permission-only.
+            if getattr(r, "is_group", False):
                 continue
             rbac_roles_by_user_id.setdefault(ur.user_id, []).append({"id": r.id, "code": r.code, "name": r.name})
     except Exception as e:
@@ -868,6 +872,9 @@ def new_user():
                             requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
                             if dropped:
                                 flash("Some admin roles were not applied because you can only assign admin roles you already have.", "warning")
+                        # Access Groups share the membership table; merge them in so
+                        # _set_user_rbac_roles (which replaces all roles) keeps them.
+                        requested_role_ids = list(requested_role_ids) + _requested_access_group_ids(form)
                         _set_user_rbac_roles(new_user, requested_role_ids)
                     else:
                         _ensure_user_has_default_rbac_role(new_user, default_role_code="assignment_viewer")
@@ -929,6 +936,9 @@ def new_user():
                             'entity_permissions': entity_permissions,
                             'assignment_access_mode': new_user.assignment_access_mode,
                             'assignment_access_ids': sorted(int(a.id) for a in new_user.selected_assignments),
+                            'assignment_access_template_ids': sorted(
+                                int(t.id) for t in new_user.selected_assignment_templates
+                            ),
                             'pre_provisioned_for_sso': sso_configured,
                         },
                         risk_level='medium'
@@ -1150,6 +1160,9 @@ def edit_user(user_id):
                 'country_ids': [c.id for c in user.countries.all()] if hasattr(user, "countries") else [],
                 'assignment_access_mode': user.assignment_access_mode,
                 'assignment_access_ids': sorted(int(a.id) for a in user.selected_assignments),
+                'assignment_access_template_ids': sorted(
+                    int(t.id) for t in user.selected_assignment_templates
+                ),
             }
 
             # Update user details (email is identity in B2C mode — never apply form email)
@@ -1176,6 +1189,9 @@ def edit_user(user_id):
                     requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
                     if dropped:
                         flash("Some admin roles were not applied because you can only assign admin roles you already have.", "warning")
+                # Access Groups share the membership table; merge them in so
+                # _set_user_rbac_roles (which replaces all roles) keeps them.
+                requested_role_ids = list(requested_role_ids) + _requested_access_group_ids(form)
                 _set_user_rbac_roles(user, requested_role_ids)
 
             _apply_user_translator_languages(
@@ -1311,6 +1327,9 @@ def edit_user(user_id):
                 'entity_permissions': entity_permissions,
                 'assignment_access_mode': user.assignment_access_mode,
                 'assignment_access_ids': sorted(int(a.id) for a in user.selected_assignments),
+                'assignment_access_template_ids': sorted(
+                    int(t.id) for t in user.selected_assignment_templates
+                ),
                 'password_changed': bool(form.password.data)
             }
 
@@ -1352,13 +1371,28 @@ def edit_user(user_id):
         form.profile_color.data = pc
         form.countries.data = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
 
-        # Pre-populate RBAC roles (best-effort)
+        # Pre-populate RBAC roles + access groups (best-effort), split by kind so
+        # each picker only shows its own members.
         try:
-            from app.models.rbac import RbacUserRole
-            form.rbac_roles.data = [ur.role_id for ur in RbacUserRole.query.filter_by(user_id=user.id).all()]
+            from app.models.rbac import RbacUserRole, RbacRole, ROLE_KIND_GROUP
+            member_role_ids = [ur.role_id for ur in RbacUserRole.query.filter_by(user_id=user.id).all()]
+            group_ids = set()
+            if member_role_ids:
+                group_ids = {
+                    int(r.id)
+                    for r in RbacRole.query.filter(
+                        RbacRole.id.in_(member_role_ids),
+                        RbacRole.kind == ROLE_KIND_GROUP,
+                    ).with_entities(RbacRole.id).all()
+                }
+            form.rbac_roles.data = [rid for rid in member_role_ids if int(rid) not in group_ids]
+            if getattr(form, "access_groups", None) is not None:
+                form.access_groups.data = [rid for rid in member_role_ids if int(rid) in group_ids]
         except Exception as e:
-            current_app.logger.debug("form.rbac_roles populate failed: %s", e)
+            current_app.logger.debug("form.rbac_roles/access_groups populate failed: %s", e)
             form.rbac_roles.data = []
+            if getattr(form, "access_groups", None) is not None:
+                form.access_groups.data = []
 
     # Fetch countries and group by region for the template
     countries_by_region, part_of_programs, part_of_category_to_countries, part_of_text_groups = (

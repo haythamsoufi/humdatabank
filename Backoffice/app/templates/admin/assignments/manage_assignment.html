@@ -419,7 +419,7 @@
         </div>
         {% endif %}
 
-        {# Access control: restrict the assignment to users holding selected roles #}
+        {# Access control: restrict the assignment to members of selected Access Groups #}
         {% if assignment_access_roles is defined and (can_manage_assignment_access or selected_allowed_role_ids) %}
         <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200" id="assignment-access-control">
             <fieldset {% if not can_manage_assignment_access %}disabled{% endif %}>
@@ -428,13 +428,14 @@
                 </legend>
                 <p class="text-xs text-gray-500 mb-3">
                     {% if selected_allowed_role_ids %}
-                        {{ _('Restricted: only users who hold at least one of the selected roles can see, open and edit this assignment.') }}
+                        {{ _('Restricted to these access groups. A user must belong to at least one of them, including users with no personal assignment limit. Entity permissions still apply.') }}
                     {% else %}
-                        {{ _('Open to all users: anyone with access to the assigned entities can see and work on this assignment. Select roles to restrict it.') }}
+                        {{ _('No group limit. Anyone with access to the assigned entities can open this assignment, unless that person has a personal shortlist that leaves it out.') }}
                     {% endif %}
-                    {{ _('System Managers always have access.') }}
+                    {{ _('System Managers always have access. Permission roles are not an audience.') }}
                 </p>
                 <input type="hidden" name="allowed_roles_submitted" value="1">
+                {% if assignment_access_roles %}
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
                     {% for role in assignment_access_roles %}
                     <label class="flex items-start gap-2 cursor-pointer rounded border border-gray-200 bg-white px-3 py-2">
@@ -450,10 +451,15 @@
                     </label>
                     {% endfor %}
                 </div>
+                {% else %}
+                <p class="text-sm text-gray-500 italic">
+                    {{ _('No access groups exist yet. Create a group such as Finance or HR to restrict this assignment to it.') }}
+                </p>
+                {% endif %}
                 {% if current_user_has_role('system_manager') %}
                 <p class="mt-2 text-xs text-gray-500">
                     {{ _('Need a new group such as Finance or HR?') }}
-                    <a href="{{ url_for('rbac_management.manage_roles') }}" class="text-blue-600 hover:underline">{{ _('Create a custom role') }}</a>
+                    <a href="{{ url_for('rbac_management.manage_groups') }}" class="text-blue-600 hover:underline">{{ _('Create an access group') }}</a>
                 </p>
                 {% endif %}
             </fieldset>

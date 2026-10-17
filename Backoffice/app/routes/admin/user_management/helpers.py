@@ -633,6 +633,31 @@ def _get_countries_by_region():
         countries_by_region[region_name].append(country)
     return countries_by_region
 
+def _requested_access_group_ids(form) -> list:
+    """Access Group ids selected on the user form, validated against the field choices.
+
+    Access Groups are stored as rbac_role rows (kind='group') and persisted via the
+    same membership table as roles, so they must be merged into the id list passed to
+    :func:`_set_user_rbac_roles` (which replaces *all* of a user's rbac roles). Only
+    ids present in the rendered choices are accepted, so a tampered POST cannot add
+    arbitrary roles through this field.
+    """
+    field = getattr(form, "access_groups", None)
+    if field is None or not getattr(field, "choices", None):
+        return []
+    valid = set()
+    for cid, _label in (field.choices or []):
+        with suppress(Exception):
+            valid.add(int(cid))
+    out = []
+    for gid in (field.data or []):
+        with suppress(Exception):
+            g = int(gid)
+            if g in valid:
+                out.append(g)
+    return out
+
+
 def _set_user_rbac_roles(user: User, role_ids):
     """Replace RBAC roles for a user (idempotent).
 
@@ -1096,32 +1121,38 @@ def _assignment_access_label(assignment) -> str:
     return label
 
 
+def _posted_int_ids(name: str) -> set:
+    return {int(v) for v in request.form.getlist(name) if str(v).strip().isdigit()}
+
+
 def _assignment_access_form_context(user=None, *, can_manage: bool) -> dict:
-    """Data for the per-user "Assignment access" picker on the user form."""
+    """Data for the per-user "Assignment access" tab on the user form."""
     from flask import request
     from flask_login import current_user
     from sqlalchemy.orm import joinedload
 
-    from app.models import AssignedForm
+    from app.models import AssignedForm, FormTemplate
     from app.services.assignments.access_service import (
         ACCESS_MODE_ALL,
         ACCESS_MODE_SELECTED,
+        ACCESS_MODE_TEMPLATES,
         apply_assignment_access,
         normalize_access_mode,
     )
 
     if request.method == "POST" and request.form.get("assignment_access_submitted"):
         mode = normalize_access_mode(request.form.get("assignment_access_mode"))
-        selected_ids = {
-            int(v) for v in request.form.getlist("selected_assignment_ids") if str(v).strip().isdigit()
-        }
+        selected_ids = _posted_int_ids("selected_assignment_ids")
+        selected_template_ids = _posted_int_ids("selected_template_ids")
     elif user is not None:
         mode = normalize_access_mode(user.assignment_access_mode)
         selected_ids = {int(a.id) for a in user.selected_assignments}
+        selected_template_ids = {int(t.id) for t in user.selected_assignment_templates}
     else:
-        mode, selected_ids = ACCESS_MODE_ALL, set()
+        mode, selected_ids, selected_template_ids = ACCESS_MODE_ALL, set(), set()
 
     assignments = []
+    templates = []
     if can_manage:
         rows = (
             apply_assignment_access(AssignedForm.query, current_user, AssignedForm.id)
@@ -1137,11 +1168,19 @@ def _assignment_access_form_context(user=None, *, can_manage: bool) -> dict:
             }
             for a in rows
         ]
+        templates = [
+            {"id": t.id, "name": (t.name or "").strip() or f"Template {t.id}"}
+            for t in FormTemplate.query.order_by(FormTemplate.id.asc()).all()
+        ]
+        templates.sort(key=lambda t: t["name"].lower())
     return {
         "assignment_access_mode": mode,
         "assignment_access_selected_ids": selected_ids,
         "assignment_access_options": assignments,
         "assignment_access_selected_mode": ACCESS_MODE_SELECTED,
+        "assignment_access_templates_mode": ACCESS_MODE_TEMPLATES,
+        "assignment_access_template_options": templates,
+        "assignment_access_selected_template_ids": selected_template_ids,
         "can_manage_assignment_access": can_manage,
     }
 
@@ -1150,11 +1189,11 @@ def _apply_assignment_access_from_request(user: User, *, can_manage: bool) -> bo
     """Persist the posted per-user assignment scope. Returns True when it changed.
 
     Assignments the acting admin cannot see are preserved: they are neither offered in the
-    picker nor removed by a save.
+    picker nor removed by a save. Template picks the admin was not shown are kept the same way.
     """
     from flask_login import current_user
 
-    from app.models import AssignedForm
+    from app.models import AssignedForm, FormTemplate
     from app.services.assignments.access_service import (
         apply_assignment_access,
         normalize_access_mode,
@@ -1165,9 +1204,7 @@ def _apply_assignment_access_from_request(user: User, *, can_manage: bool) -> bo
         return False
 
     mode = normalize_access_mode(request.form.get("assignment_access_mode"))
-    posted = {
-        int(v) for v in request.form.getlist("selected_assignment_ids") if str(v).strip().isdigit()
-    }
+    posted = _posted_int_ids("selected_assignment_ids")
     visible = {
         int(row[0])
         for row in apply_assignment_access(
@@ -1175,4 +1212,15 @@ def _apply_assignment_access_from_request(user: User, *, can_manage: bool) -> bo
         ).all()
     }
     hidden_existing = {int(a.id) for a in user.selected_assignments} - visible
-    return set_user_assignment_access(user, mode, (posted & visible) | hidden_existing)
+
+    posted_templates = _posted_int_ids("selected_template_ids")
+    visible_templates = {
+        int(row[0]) for row in db.session.query(FormTemplate.id).all()
+    }
+    hidden_templates = {int(t.id) for t in user.selected_assignment_templates} - visible_templates
+    return set_user_assignment_access(
+        user,
+        mode,
+        (posted & visible) | hidden_existing,
+        template_ids=(posted_templates & visible_templates) | hidden_templates,
+    )

@@ -20,7 +20,11 @@ import json
 from ..extensions import db, login
 from sqlalchemy.sql import text
 from sqlalchemy import inspect
-from .assignments import AssignmentEntityStatus, user_assignment_access
+from .assignments import (
+    AssignmentEntityStatus,
+    user_assignment_access,
+    user_assignment_template_access,
+)
 from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
 
@@ -90,8 +94,11 @@ class User(UserMixin, db.Model):
     # Quiz game score
     quiz_score = db.Column(db.Integer, default=0, nullable=False)  # Total quiz points accumulated
 
-    # 'all' (default): every assignment on the user's entities is visible.
+    # Personal shortlist only. It never overrides an assignment audience.
+    # 'all' (default): no personal shortlist.
     # 'selected': only the assignments listed in ``selected_assignments``.
+    # 'templates': current and future assignments of ``selected_assignment_templates``.
+    # Group-restricted assignments still require membership in every mode.
     assignment_access_mode = db.Column(
         db.String(20), default='all', server_default='all', nullable=False
     )
@@ -100,10 +107,15 @@ class User(UserMixin, db.Model):
         secondary=user_assignment_access,
         lazy='select',
     )
+    selected_assignment_templates = relationship(
+        'FormTemplate',
+        secondary=user_assignment_template_access,
+        lazy='select',
+    )
 
     __table_args__ = (
         db.CheckConstraint(
-            "assignment_access_mode IN ('all','selected')",
+            "assignment_access_mode IN ('all','selected','templates')",
             name='ck_user_assignment_access_mode',
         ),
     )

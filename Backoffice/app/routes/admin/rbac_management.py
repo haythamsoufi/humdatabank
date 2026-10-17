@@ -7,7 +7,8 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import current_user
 from app import db
 from app.models.rbac import (
-    RbacPermission, RbacRole, RbacRolePermission, RbacUserRole, RbacAccessGrant
+    RbacPermission, RbacRole, RbacRolePermission, RbacUserRole, RbacAccessGrant,
+    ROLE_KIND_GROUP, ROLE_KIND_PERMISSION,
 )
 from app.models import User, FormTemplate, AssignedForm
 from app.routes.admin.shared import admin_required, admin_permission_required, system_manager_required
@@ -39,9 +40,14 @@ bp = Blueprint("rbac_management", __name__, url_prefix="/admin/users")
 @admin_permission_required('admin.users.roles.assign')
 @system_manager_required
 def manage_roles():
-    """List all RBAC roles"""
+    """List all RBAC permission roles (Access Groups are managed separately)."""
     try:
-        roles = RbacRole.query.order_by(RbacRole.name).all()
+        roles = (
+            RbacRole.query
+            .filter(RbacRole.kind != ROLE_KIND_GROUP)
+            .order_by(RbacRole.name)
+            .all()
+        )
 
         # Get user counts for each role
         role_user_counts = {}
@@ -169,6 +175,9 @@ def new_role():
 def edit_role(role_id):
     """Edit an existing RBAC role"""
     role = RbacRole.query.get_or_404(role_id)
+    if role.is_group:
+        # Access Groups have no permissions; edit them in the dedicated area.
+        return redirect(url_for("rbac_management.edit_group", group_id=role.id))
 
     if request.method == "POST":
         try:
@@ -247,6 +256,8 @@ def edit_role(role_id):
 def delete_role(role_id):
     """Delete an RBAC role"""
     role = RbacRole.query.get_or_404(role_id)
+    if role.is_group:
+        return redirect(url_for("rbac_management.delete_group", group_id=role.id), code=307)
 
     try:
         # Check if role has users
@@ -257,16 +268,13 @@ def delete_role(role_id):
 
         from app.models.assignments import assigned_form_allowed_role
 
-        restricted_count = db.session.query(assigned_form_allowed_role.c.assigned_form_id).filter(
-            assigned_form_allowed_role.c.role_id == role.id
-        ).count()
-        if restricted_count > 0:
-            flash(
-                f"Cannot delete role '{role.name}' - it restricts access to {restricted_count} assignment(s). "
-                "Remove it from those assignments first, otherwise they would become visible to everyone.",
-                "warning",
+        # A permission role is not an audience. Drop any leftover link so deletion
+        # is not blocked by a row that no longer restricts anyone.
+        db.session.execute(
+            assigned_form_allowed_role.delete().where(
+                assigned_form_allowed_role.c.role_id == role.id
             )
-            return redirect(url_for("rbac_management.manage_roles"))
+        )
 
         role_name = role.name
         role_code = role.code
@@ -295,6 +303,277 @@ def delete_role(role_id):
         flash("Error deleting role.", "danger")
 
     return redirect(url_for("rbac_management.manage_roles"))
+
+
+# ============================================================================
+# ACCESS GROUPS MANAGEMENT
+# ============================================================================
+#
+# Access Groups (e.g. Finance, HR) are organizational groupings used ONLY to
+# scope which assignments a user can see/work on. They are stored in rbac_role
+# with kind='group' so membership reuses rbac_user_role, but they carry NO
+# permissions and are never shown on the Roles/Permissions screens.
+
+
+def _set_group_members(group: RbacRole, user_ids) -> None:
+    """Replace the membership of an Access Group with ``user_ids`` (user side M2M)."""
+    wanted = set()
+    for uid in (user_ids or []):
+        try:
+            wanted.add(int(uid))
+        except (TypeError, ValueError):
+            continue
+
+    existing = {
+        int(ur.user_id)
+        for ur in RbacUserRole.query.filter_by(role_id=group.id).all()
+    }
+
+    to_add = wanted - existing
+    to_remove = existing - wanted
+
+    if to_add:
+        valid_ids = {
+            int(u[0])
+            for u in User.query.filter(User.id.in_(to_add)).with_entities(User.id).all()
+        }
+        for uid in valid_ids:
+            db.session.add(RbacUserRole(user_id=uid, role_id=group.id))
+    if to_remove:
+        RbacUserRole.query.filter(
+            RbacUserRole.role_id == group.id,
+            RbacUserRole.user_id.in_(to_remove),
+        ).delete(synchronize_session=False)
+
+
+@bp.route("/groups", methods=["GET"])
+@bp.route("/groups/", methods=["GET"])
+@admin_permission_required('admin.users.roles.assign')
+@system_manager_required
+def manage_groups():
+    """List all Access Groups."""
+    try:
+        groups = (
+            RbacRole.query
+            .filter(RbacRole.kind == ROLE_KIND_GROUP)
+            .order_by(RbacRole.name)
+            .all()
+        )
+
+        member_counts = {}
+        rows = (
+            db.session.query(RbacUserRole.role_id, func.count(RbacUserRole.user_id))
+            .group_by(RbacUserRole.role_id)
+            .all()
+        )
+        for role_id, count in rows:
+            member_counts[role_id] = count
+
+        # Count assignments each group restricts (for the "in use" hint).
+        from app.models.assignments import assigned_form_allowed_role
+        restrict_counts = {}
+        rrows = (
+            db.session.query(
+                assigned_form_allowed_role.c.role_id,
+                func.count(assigned_form_allowed_role.c.assigned_form_id),
+            )
+            .group_by(assigned_form_allowed_role.c.role_id)
+            .all()
+        )
+        for role_id, count in rrows:
+            restrict_counts[role_id] = count
+
+        return render_template(
+            "admin/rbac/groups.html",
+            groups=groups,
+            member_counts=member_counts,
+            restrict_counts=restrict_counts,
+            title="Access Groups",
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error loading access groups: {e}", exc_info=True)
+        flash("Error loading access groups.", "danger")
+        return redirect(url_for("admin.admin_dashboard"))
+
+
+def _slugify_group_code(name: str) -> str:
+    import re
+    base = re.sub(r"[^a-z0-9]+", "_", (name or "").strip().lower()).strip("_")
+    return f"group_{base}" if base else ""
+
+
+def _active_users_for_group_picker():
+    """Users selectable as group members (active first, stable ordering).
+
+    ``User.is_active`` is a Flask-Login property over the ``active`` column, so
+    the query has to sort on the column.
+    """
+    return User.query.order_by(User.active.desc(), User.name.asc()).all()
+
+
+@bp.route("/groups/new", methods=["GET", "POST"])
+@admin_permission_required('admin.users.roles.assign')
+@system_manager_required
+def new_group():
+    """Create a new Access Group."""
+    if request.method == "POST":
+        try:
+            name = request.form.get('name', '').strip()
+            description = request.form.get('description', '').strip()
+            code = (request.form.get('code', '').strip() or _slugify_group_code(name))
+            member_ids = request.form.getlist('member_ids')
+
+            if not name:
+                flash("Group name is required.", "warning")
+                return redirect(url_for("rbac_management.new_group"))
+            if not code:
+                flash("Could not derive a group code from the name. Please provide one.", "warning")
+                return redirect(url_for("rbac_management.new_group"))
+
+            if RbacRole.query.filter_by(code=code).first():
+                flash(f"A role or group with code '{code}' already exists.", "warning")
+                return redirect(url_for("rbac_management.new_group"))
+
+            group = RbacRole(
+                code=code,
+                name=name,
+                description=description,
+                kind=ROLE_KIND_GROUP,
+                created_by_user_id=getattr(current_user, "id", None),
+            )
+            db.session.add(group)
+            db.session.flush()
+
+            _set_group_members(group, member_ids)
+            db.session.flush()
+
+            log_admin_action(
+                action_type='rbac_group_create',
+                description=f"Created access group: {group.name} ({group.code})",
+                target_type='rbac_role',
+                target_id=group.id,
+                new_values={'code': group.code, 'name': group.name, 'member_count': len(member_ids)},
+                risk_level='low',
+            )
+
+            flash(f"Access group '{group.name}' created successfully.", "success")
+            return redirect(url_for("rbac_management.manage_groups"))
+
+        except Exception as e:
+            request_transaction_rollback()
+            current_app.logger.error(f"Error creating access group: {e}", exc_info=True)
+            flash("Error creating access group.", "danger")
+
+    return render_template(
+        "admin/rbac/group_form.html",
+        group=None,
+        users=_active_users_for_group_picker(),
+        member_ids=set(),
+        title="Create Access Group",
+    )
+
+
+@bp.route("/groups/<int:group_id>/edit", methods=["GET", "POST"])
+@admin_permission_required('admin.users.roles.assign')
+@system_manager_required
+def edit_group(group_id):
+    """Edit an Access Group (name, description, members)."""
+    group = RbacRole.query.get_or_404(group_id)
+    if not group.is_group:
+        return redirect(url_for("rbac_management.edit_role", role_id=group.id))
+
+    if request.method == "POST":
+        try:
+            new_name = request.form.get('name', '').strip()
+            if not new_name:
+                flash("Group name is required.", "warning")
+                return redirect(url_for("rbac_management.edit_group", group_id=group_id))
+
+            old_name = group.name
+            group.name = new_name
+            group.description = request.form.get('description', '').strip()
+
+            _set_group_members(group, request.form.getlist('member_ids'))
+            db.session.flush()
+
+            log_admin_action(
+                action_type='rbac_group_update',
+                description=f"Updated access group: {group.name} ({group.code})",
+                target_type='rbac_role',
+                target_id=group.id,
+                old_values={'name': old_name},
+                new_values={'name': group.name},
+                risk_level='low',
+            )
+
+            flash(f"Access group '{group.name}' updated successfully.", "success")
+            return redirect(url_for("rbac_management.manage_groups"))
+
+        except Exception as e:
+            request_transaction_rollback()
+            current_app.logger.error(f"Error updating access group: {e}", exc_info=True)
+            flash("An error occurred. Please try again.", "danger")
+
+    current_member_ids = {
+        int(ur.user_id) for ur in RbacUserRole.query.filter_by(role_id=group.id).all()
+    }
+    return render_template(
+        "admin/rbac/group_form.html",
+        group=group,
+        users=_active_users_for_group_picker(),
+        member_ids=current_member_ids,
+        title=f"Edit Access Group: {group.name}",
+    )
+
+
+@bp.route("/groups/<int:group_id>/delete", methods=["POST"])
+@admin_permission_required('admin.users.roles.assign')
+@system_manager_required
+def delete_group(group_id):
+    """Delete an Access Group (blocked while it restricts assignments)."""
+    group = RbacRole.query.get_or_404(group_id)
+    if not group.is_group:
+        return redirect(url_for("rbac_management.delete_role", role_id=group.id), code=307)
+
+    try:
+        from app.models.assignments import assigned_form_allowed_role
+
+        restricted_count = db.session.query(assigned_form_allowed_role.c.assigned_form_id).filter(
+            assigned_form_allowed_role.c.role_id == group.id
+        ).count()
+        if restricted_count > 0:
+            flash(
+                f"Cannot delete group '{group.name}' - it restricts access to {restricted_count} assignment(s). "
+                "Remove it from those assignments first, otherwise they would become visible to everyone.",
+                "warning",
+            )
+            return redirect(url_for("rbac_management.manage_groups"))
+
+        group_name = group.name
+        group_code = group.code
+
+        # Remove memberships, then the group itself.
+        RbacUserRole.query.filter_by(role_id=group.id).delete()
+        db.session.delete(group)
+        db.session.flush()
+
+        log_admin_action(
+            action_type='rbac_group_delete',
+            description=f"Deleted access group: {group_name} ({group_code})",
+            target_type='rbac_role',
+            target_id=group_id,
+            old_values={'code': group_code, 'name': group_name},
+            risk_level='medium',
+        )
+
+        flash(f"Access group '{group_name}' deleted successfully.", "success")
+
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error(f"Error deleting access group: {e}", exc_info=True)
+        flash("Error deleting access group.", "danger")
+
+    return redirect(url_for("rbac_management.manage_groups"))
 
 
 # ============================================================================
@@ -564,9 +843,14 @@ def delete_grant(grant_id):
 @admin_permission_required('admin.users.roles.assign')
 @system_manager_required
 def api_list_roles():
-    """API: List all roles"""
+    """API: List all permission roles (excludes Access Groups)."""
     try:
-        roles = RbacRole.query.order_by(RbacRole.name).all()
+        roles = (
+            RbacRole.query
+            .filter(RbacRole.kind != ROLE_KIND_GROUP)
+            .order_by(RbacRole.name)
+            .all()
+        )
         return json_ok(
             success=True,
             roles=[

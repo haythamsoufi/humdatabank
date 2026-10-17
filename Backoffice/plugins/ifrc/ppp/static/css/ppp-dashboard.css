@@ -1,0 +1,318 @@
+:root {
+    --ppp-red: #e30613;
+    --ppp-ink: #1c1c1c;
+    --ppp-muted: #5c6570;
+    --ppp-line: #e6e1da;
+    --ppp-card: #f6f4f1;
+    --ppp-paper: #ffffff;
+    --ppp-icon: #243044;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ppp-paper);
+    color: var(--ppp-ink);
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.ppp-app { padding: 20px 24px 28px; }
+
+.ppp-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+    flex-wrap: nowrap;
+}
+
+.ppp-toolbar__filters {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    flex: 1;
+    flex-wrap: nowrap;
+}
+
+.ppp-toolbar__filters label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ppp-muted);
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.ppp-toolbar__filters select {
+    border: 1px solid #cfc9c2;
+    background: #fff;
+    border-radius: 2px;
+    padding: 4px 8px;
+    font: inherit;
+    color: var(--ppp-ink);
+    max-width: 220px;
+}
+
+.ppp-toggle {
+    display: inline-flex;
+    border: 1px solid #cfc9c2;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.ppp-toggle__button {
+    border: 0;
+    background: #fff;
+    color: var(--ppp-muted);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 14px;
+    cursor: pointer;
+}
+
+.ppp-toggle__button + .ppp-toggle__button { border-left: 1px solid #cfc9c2; }
+
+.ppp-toggle__button[aria-selected="true"] {
+    background: var(--ppp-red);
+    color: #fff;
+}
+
+.ppp-state {
+    margin: 48px 0;
+    color: var(--ppp-muted);
+    text-align: center;
+}
+
+.ppp-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 18px;
+}
+
+.ppp-headline strong {
+    color: var(--ppp-red);
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+
+.ppp-headline span {
+    font-size: 28px;
+    font-weight: 500;
+}
+
+.ppp-pillars {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.ppp-pillar {
+    background: var(--ppp-card);
+    border-radius: 2px;
+    min-height: 118px;
+    padding: 14px 12px 12px;
+    text-align: center;
+}
+
+.ppp-pillar svg { width: 36px; height: 36px; }
+
+.ppp-pillar h2 {
+    margin: 8px 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.ppp-pillar p {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.ppp-split {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.15fr);
+    gap: 28px;
+    align-items: start;
+}
+
+.ppp-kicker {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.ppp-highlight {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 0;
+    border-top: 1px solid var(--ppp-line);
+}
+
+.ppp-highlight:last-child { border-bottom: 1px solid var(--ppp-line); }
+
+.ppp-highlight svg { width: 28px; height: 28px; }
+
+.ppp-highlight p { margin: 0; font-size: 15px; line-height: 1.35; }
+
+.ppp-highlight strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+
+.ppp-map-tools {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 8px;
+    color: var(--ppp-muted);
+    font-size: 14px;
+}
+
+.ppp-map-tools label { display: flex; gap: 8px; align-items: center; }
+
+.ppp-map-tools select,
+.ppp-filters select {
+    border: 1px solid #cfc9c2;
+    background: #fff;
+    border-radius: 2px;
+    padding: 4px 8px;
+    font: inherit;
+    color: var(--ppp-ink);
+}
+
+.ppp-map {
+    height: 420px;
+    background: #f3f1ee;
+    border: 1px solid var(--ppp-line);
+}
+
+.ppp-map .leaflet-control-attribution { font-size: 10px; }
+
+.ppp-region-list { list-style: none; margin: 0; padding: 0; }
+
+.ppp-region-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--ppp-line);
+    font-size: 15px;
+}
+
+.ppp-footnote {
+    margin: 14px 0 0;
+    padding: 10px 12px;
+    background: #f7f5f2;
+    color: var(--ppp-muted);
+    font-size: 14px;
+}
+
+.ppp-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-bottom: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ppp-line);
+    font-size: 14px;
+}
+
+.ppp-filters label { display: flex; gap: 8px; align-items: center; color: var(--ppp-muted); }
+
+.ppp-body:has(.ppp-stage--detail) {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.ppp-body:has(.ppp-stage--detail) .ppp-app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ppp-stage--detail {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ppp-detail {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.2fr);
+    gap: 28px;
+    flex: 1;
+    min-height: 0;
+}
+
+.ppp-stage--detail .ppp-detail > div {
+    overflow-y: auto;
+    min-height: 0;
+    padding-right: 8px;
+}
+
+.ppp-panel {
+    background: var(--ppp-card);
+    padding: 16px 18px 8px;
+    margin-bottom: 18px;
+}
+
+.ppp-panel h2 { margin: 0 0 8px; font-size: 18px; }
+
+.ppp-reach-row {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.ppp-reach-row strong { display: block; font-size: 18px; }
+
+.ppp-reach-row span { color: var(--ppp-muted); font-size: 13px; line-height: 1.3; }
+
+.ppp-table { width: 100%; border-collapse: collapse; background: #fff; }
+
+.ppp-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--ppp-line);
+    vertical-align: top;
+    font-size: 15px;
+}
+
+.ppp-table td:last-child {
+    text-align: right;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ppp-activity {
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--ppp-line);
+}
+
+.ppp-activity h3 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; }
+
+.ppp-activity p { margin: 8px 0 0; color: #333; font-size: 14px; line-height: 1.45; }
+
+.ppp-section-title { margin: 0 0 8px; font-size: 22px; font-weight: 650; }
+
+@media (max-width: 900px) {
+    .ppp-pillars,
+    .ppp-split,
+    .ppp-detail { grid-template-columns: 1fr; }
+    .ppp-map { height: 320px; }
+}

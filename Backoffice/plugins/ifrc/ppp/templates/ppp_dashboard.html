@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+    <link rel="stylesheet" href="{{ ifrc_static_url('css/ppp-dashboard.css') }}">
+</head>
+<body class="ppp-body" data-view="{{ view }}" data-url="{{ url_for('ifrc.ppp_data') }}">
+    <div id="ppp-app" class="ppp-app">
+        <p class="ppp-state" id="ppp-loading">Loading programme figures…</p>
+    </div>
+    <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+    <script src="{{ ifrc_static_url('js/ppp-dashboard.js') }}"></script>
+</body>
+</html>

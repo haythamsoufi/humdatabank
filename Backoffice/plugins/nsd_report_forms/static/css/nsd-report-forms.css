@@ -1,0 +1,79 @@
+/* NSD report forms (plugin nsd_report_forms): MOMO-style project information and traffic lights. */
+
+/* Project information: small grey label above a bold value (note items only) */
+.form-item-block[data-item-type="blank"] {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+.form-item-block[data-item-type="blank"] {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+.form-item-block[data-item-type="blank"] > p:first-child {
+    font-size: 0.8rem;
+    font-weight: 400 !important;
+    color: #6c757d !important;
+    margin: 0;
+}
+.form-item-block[data-item-type="blank"] > p + p {
+    margin-top: 0 !important;
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: #212529;
+    line-height: 1.35;
+}
+.form-item-block[data-item-type="blank"] > p + p strong {
+    font-weight: 700;
+}
+
+/* Traffic-light rating cards */
+.nsd-tl-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+.nsd-tl-card {
+    flex: 1 1 9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    border: 2px solid transparent;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+}
+.nsd-tl-card input {
+    margin: 0;
+    flex: 0 0 auto;
+    cursor: inherit;
+}
+.nsd-tl-card--green { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+.nsd-tl-card--amber { background: #fff3cd; border-color: #ffeaa7; color: #856404; }
+.nsd-tl-card--red   { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+.nsd-tl-card--neutral { background: #f8f9fa; border-color: #dee2e6; color: #212529; }
+.nsd-tl-card--neutral.is-selected { border-color: #6c757d; box-shadow: 0 0 0 2px rgba(108, 117, 125, .25); }
+.nsd-tl-card--green.is-selected { border-color: #28a745; box-shadow: 0 0 0 2px rgba(40, 167, 69, .25); }
+.nsd-tl-card--amber.is-selected { border-color: #e0a800; box-shadow: 0 0 0 2px rgba(224, 168, 0, .30); }
+.nsd-tl-card--red.is-selected   { border-color: #dc3545; box-shadow: 0 0 0 2px rgba(220, 53, 69, .25); }
+.nsd-tl-group.is-disabled .nsd-tl-card { cursor: default; opacity: .75; }
+
+/* project information: plain bold text, not an input box */
+.nsd-info-value {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding-left: 0 !important;
+    font-weight: 600;
+    color: #111827;
+    resize: none;
+    overflow: hidden;
+    cursor: default;
+}
+
+/* "My projects" link next to the report title (IFRC project managers) */
+.nsd-pm-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.8rem;
+    font-weight: 600; color: #b91c1c; text-decoration: none; }
+.nsd-pm-link:hover { text-decoration: underline; color: #991b1b; }

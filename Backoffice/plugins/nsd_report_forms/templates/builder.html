@@ -1,0 +1,11 @@
+<div class="plugin-field-builder">
+  <h4 class="text-md font-semibold mb-3">NSD Outcomes and Outputs</h4>
+  <div class="plugin-option-to-properties">
+    <label class="block text-sm font-medium text-gray-700 mb-1">Mode</label>
+    <select name="mode" class="shadow-sm block w-full text-sm border-gray-300 rounded-md">
+      <option value="report" {% if config.get('mode', 'report') == 'report' %}selected{% endif %}>Report (structure read-only, actuals editable)</option>
+      <option value="plan" {% if config.get('mode') == 'plan' %}selected{% endif %}>Plan (structure editable, e.g. in the project profile)</option>
+    </select>
+    <p class="text-xs text-gray-500 mt-1">Use "Plan" in the project profile. Reports carry the structure forward from it.</p>
+  </div>
+</div>

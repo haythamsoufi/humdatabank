@@ -1,0 +1,5 @@
+{# MOMO's template filters date_ddmmyyyy, currency and no_decimal #}
+{% macro date(d) -%}{% if d %}{{ d.strftime('%d/%m/%Y') }}{% else %}-{% endif %}{%- endmacro %}
+{% macro currency(v) -%}{% if v is not none and v != '' %}{{ '{:,.2f}'.format(v | float) }}{% else %}-{% endif %}{%- endmacro %}
+{% macro no_decimal(v) -%}{% if v is none or v == '' %}{% elif v | float == (v | float) | int %}{{ (v | float) | int }}{% else %}{{ v | float }}{% endif %}{%- endmacro %}
+{% macro chf_short(a) -%}{% if a >= 1000000 %}{{ '{:.1f}'.format(a / 1000000) }} M{% else %}{{ '{:,.0f}'.format(a) }}{% endif %}{%- endmacro %}

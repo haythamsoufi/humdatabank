@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+{# Personal PM page, after MOMO's pm_personal.html. Cards are rendered here (escaped); the script only filters them. #}
+{% macro chf(n) -%}{% if not n %}—{% elif n >= 1000000 %}CHF {{ '%.2f' | format(n / 1000000) }}M{% else %}CHF {{ ((n / 1000) + 0.5) | int }}K{% endif %}{%- endmacro %}
+{% macro light_label(v) -%}{{ {'green': 'On track', 'amber': 'Partially on track', 'red': 'Not on track'}.get(v, 'No data') }}{%- endmacro %}
+{% set display_name = pm_name or email or '' %}
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>{{ display_name }} — NSD Funds Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous"/>
+<style nonce="{{ csp_nonce() }}">
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --nsia:#3B82F6;--cbf:#10B981;--esf:#8B5CF6;
+  --green:#22C55E;--amber:#F59E0B;--red:#EF4444;
+  --green-bg:#DCFCE7;--amber-bg:#FEF3C7;--red-bg:#FEE2E2;
+  --green-txt:#15803D;--amber-txt:#92400E;--red-txt:#B91C1C;
+  --bg:#F8FAFC;--card:#fff;--border:#E2E8F0;--text:#0F172A;--muted:#64748B;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+.breadcrumb-nav{font-size:.85rem;color:rgba(255,255,255,.75)}
+.breadcrumb-nav a{color:rgba(255,255,255,.75);text-decoration:none}
+.breadcrumb-nav a:hover{color:#fff}
+.breadcrumb-nav strong{color:#fff}
+
+.hero{background:#fff;border-bottom:1px solid var(--border);padding:1.75rem 2rem 1.5rem}
+.hero-top{display:flex;align-items:flex-start;gap:1rem}
+.hero-avatar{width:56px;height:56px;border-radius:14px;background:#4F46E5;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:1.2rem;color:#fff;flex-shrink:0}
+.hero-meta h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+.hero-meta .email{font-size:.85rem;color:var(--muted);margin-top:3px}
+.preview-bar{margin-left:auto;font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.preview-bar input{border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:.78rem;
+  font-family:'Inter',sans-serif;min-width:230px}
+.preview-bar button{border:none;border-radius:7px;background:var(--text);color:#fff;padding:5px 12px;
+  font-size:.75rem;font-weight:600;font-family:'Inter',sans-serif}
+.preview-note{margin-top:.9rem;font-size:.8rem;background:var(--amber-bg);color:var(--amber-txt);
+  border-radius:8px;padding:.45rem .8rem;display:inline-block}
+
+.kpi-summary{display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap}
+.kpi-sum-card{border-radius:10px;padding:.75rem 1.1rem;display:flex;align-items:center;gap:.6rem;
+  border:1.5px solid transparent}
+.kpi-sum-card .count{font-size:1.5rem;font-weight:700}
+.kpi-sum-card .lbl{font-size:.75rem;font-weight:500;line-height:1.3}
+.kpi-sum-card.on-track{background:var(--green-bg);border-color:#86EFAC;color:var(--green-txt)}
+.kpi-sum-card.at-risk  {background:var(--amber-bg);border-color:#FCD34D;color:var(--amber-txt)}
+.kpi-sum-card.off-track{background:var(--red-bg);  border-color:#FCA5A5;color:var(--red-txt)}
+.kpi-sum-card.no-data  {background:#F8FAFC;border-color:var(--border);color:var(--muted)}
+.kpi-sum-icon{font-size:1.1rem}
+.kpi-total{margin-left:auto;font-size:.8rem;color:var(--muted);align-self:center}
+
+.filter-bar{padding:.75rem 2rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;
+  background:#fff;border-bottom:1px solid var(--border)}
+.chip-group{display:flex;gap:5px;align-items:center}
+.chip-lbl{font-size:.74rem;color:var(--muted);font-weight:500;white-space:nowrap}
+.chip{border:1.5px solid var(--border);border-radius:20px;padding:4px 12px;font-size:.76rem;
+  font-weight:500;cursor:pointer;background:var(--card);color:var(--muted);transition:all .15s;
+  user-select:none;font-family:'Inter',sans-serif}
+.chip:hover{border-color:#94A3B8;color:var(--text)}
+.chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+.chip.cbf.active{background:var(--cbf);border-color:var(--cbf)}
+
+.legend-inline{margin-left:auto;font-size:.72rem;color:var(--muted);display:flex;
+  align-items:center;gap:.75rem;flex-wrap:wrap}
+.li{display:flex;align-items:center;gap:4px}
+.ld{width:9px;height:9px;border-radius:50%}
+.ld.green{background:#22C55E}.ld.amber{background:#F59E0B}.ld.red{background:#EF4444}.ld.grey{background:#CBD5E1}
+
+.content{max-width:860px;margin:0 auto;padding:1.5rem 2rem 4rem}
+
+.fund-section{margin-bottom:1.5rem}
+.fund-header{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.fund-badge{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 10px;border-radius:6px}
+.fund-badge.CBF{background:#ECFDF5;color:#065F46}
+.fund-proj-count{font-size:.74rem;color:var(--muted)}
+
+.proj-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:.6rem;padding:.9rem 1.1rem;display:grid;
+  grid-template-columns:1fr auto;gap:.75rem;align-items:center;
+  transition:box-shadow .15s,border-color .15s}
+.proj-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.07);border-color:#CBD5E1}
+.proj-card.sev-red  {border-left:3px solid var(--red)}
+.proj-card.sev-amber{border-left:3px solid var(--amber)}
+.proj-card.sev-green{border-left:3px solid var(--green)}
+.proj-card.sev-grey {border-left:3px solid #CBD5E1}
+.proj-card[hidden]{display:none}
+
+.proj-title{font-weight:600;font-size:.88rem}
+.proj-sub{display:flex;align-items:center;gap:.5rem;margin-top:3px;flex-wrap:wrap}
+.proj-ref{font-size:.72rem;font-family:monospace;color:var(--muted)}
+.proj-country{font-size:.72rem;color:var(--muted)}
+.proj-amount{font-size:.78rem;font-weight:600;color:var(--text)}
+
+.proj-kpis{display:flex;align-items:center;gap:.5rem;margin-top:.6rem;flex-wrap:wrap}
+.kpi-pill{display:flex;align-items:center;gap:5px;border-radius:6px;
+  padding:3px 10px;font-size:.72rem;font-weight:600}
+.kpi-pill.green{background:var(--green-bg);color:var(--green-txt)}
+.kpi-pill.amber{background:var(--amber-bg);color:var(--amber-txt)}
+.kpi-pill.red  {background:var(--red-bg);  color:var(--red-txt)}
+.kpi-pill.grey {background:#F1F5F9;color:var(--muted)}
+.kpi-dot-sm{width:7px;height:7px;border-radius:50%;background:currentColor}
+.deadline-line{margin-top:.5rem;font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:.4rem}
+.deadline-line .due{font-weight:600;border-radius:5px;padding:1px 7px;background:#F1F5F9;color:var(--text)}
+.deadline-line .due.red{background:var(--red-bg);color:var(--red-txt)}
+.deadline-line .due.yellow{background:var(--amber-bg);color:var(--amber-txt)}
+
+.proj-right{display:flex;flex-direction:column;align-items:flex-end;gap:.5rem}
+.open-btn{display:inline-flex;align-items:center;gap:5px;background:var(--text);
+  color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:.75rem;
+  font-weight:600;cursor:pointer;text-decoration:none;font-family:'Inter',sans-serif;
+  transition:background .15s;white-space:nowrap}
+.open-btn:hover{background:#334155;color:#fff}
+.proj-status-badge{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:5px}
+.proj-status-badge.open  {background:var(--green-bg);color:var(--green-txt)}
+.proj-status-badge.closed{background:#F1F5F9;color:var(--muted)}
+
+.empty-msg{text-align:center;padding:2.5rem;color:var(--muted);font-size:.875rem;
+  background:var(--card);border:1px solid var(--border);border-radius:10px}
+.empty-msg[hidden]{display:none}
+
+@media(max-width:600px){
+  .hero,.filter-bar,.content{padding-left:1rem;padding-right:1rem}
+  .proj-card{grid-template-columns:1fr}
+  .proj-right{align-items:flex-start}
+  .legend-inline{display:none}
+  .preview-bar{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-danger">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ request.path }}{% if previewing %}?as={{ email | urlencode }}{% endif %}">NSD investment monitoring</a>
+    <div class="breadcrumb-nav ms-auto">
+      <a href="{{ explore_url }}">Explore Data</a> ›
+      <strong>{{ display_name }}</strong>
+    </div>
+  </div>
+</nav>
+
+{% set name_parts = display_name.split() %}
+{% if name_parts|length >= 2 %}
+  {% set initials = (name_parts[0][0] + name_parts[-1][0])|upper %}
+{% else %}
+  {% set initials = (display_name[:2])|upper %}
+{% endif %}
+
+<div class="hero">
+  <div class="hero-top">
+    <div class="hero-avatar">{{ initials }}</div>
+    <div class="hero-meta">
+      <h1>{{ display_name }}</h1>
+      <div class="email">{% if previewing %}Project portfolio of {{ email }}{% else %}Your project portfolio{% endif %}</div>
+    </div>
+    {% if can_preview %}
+    <form class="preview-bar" method="get" action="{{ url_for('nsd_pm.pm_overview') }}">
+      <label for="asEmail">Preview another PM</label>
+      <input id="asEmail" type="email" name="as" value="{{ email if previewing else '' }}" placeholder="name@ifrc.org" required>
+      <button type="submit">Show</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if previewing %}<div class="preview-note">Preview: you see the page as {{ email }} would. Only NSD admins can do this.</div>{% endif %}
+  {% if problems %}
+    <div class="preview-note">{% for m in problems %}{{ m }} {% endfor %}</div>
+  {% endif %}
+  <div class="kpi-summary" id="kpi-summary"></div>
+</div>
+
+<div class="filter-bar">
+  <div class="chip-group">
+    <span class="chip-lbl">Show</span>
+    <button type="button" class="chip active" data-show="open">Open</button>
+    <button type="button" class="chip"        data-show="all">All</button>
+  </div>
+  {% if projects %}
+  <div class="chip-group">
+    <span class="chip-lbl">Fund</span>
+    <button type="button" class="chip active" data-fund="all">All</button>
+    <button type="button" class="chip cbf"    data-fund="CBF">CBF</button>
+  </div>
+  {% endif %}
+  <div class="legend-inline">
+    <span style="font-weight:600;color:var(--text)">KPI key:</span>
+    <span class="li"><div class="ld green"></div>On track</span>
+    <span class="li"><div class="ld amber"></div>Partially</span>
+    <span class="li"><div class="ld red"></div>Not on track</span>
+    <span class="li"><div class="ld grey"></div>No data</span>
+  </div>
+</div>
+
+<div class="content" id="content">
+  {% if projects %}
+  <div class="fund-section" data-fund-section="CBF">
+    <div class="fund-header">
+      <span class="fund-badge CBF">CBF</span>
+      <span class="fund-proj-count"></span>
+    </div>
+    {% for p in projects %}
+    <div class="proj-card sev-{{ p.severity }}" data-open="{{ 'true' if p.is_open else 'false' }}" data-fund="CBF"
+         data-sev="{{ p.severity }}" data-amount="{{ p.amount }}">
+      <div class="proj-main">
+        <div class="proj-title">{{ p.title }}</div>
+        <div class="proj-sub">
+          <span class="proj-ref">{{ p.reference }}</span>
+          <span class="proj-country">· {{ p.country or '—' }}</span>
+          <span class="proj-amount">· {{ chf(p.amount) }}</span>
+        </div>
+        <div class="proj-kpis">
+          <span class="kpi-pill {{ p.overall or 'grey' }}"><span class="kpi-dot-sm"></span>Overall: {{ light_label(p.overall) }}</span>
+          <span class="kpi-pill {{ p.activities or 'grey' }}"><span class="kpi-dot-sm"></span>Activities: {{ light_label(p.activities) }}</span>
+          <span class="kpi-pill {{ p.spending_light }}"><span class="kpi-dot-sm"></span>Spending: {% if p.spending is not none %}{{ '%.1f' | format(p.spending) }}%{% else %}No data{% endif %}</span>
+        </div>
+        {% if p.next_deadline %}
+        <div class="deadline-line">
+          Next report {{ p.next_deadline.label }} due
+          <span class="due {{ p.next_deadline.status or '' }}">{{ p.next_deadline.due.strftime('%d/%m/%Y') }}</span>
+          {% if p.next_deadline.status == 'red' %}<span class="due red">Overdue</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="proj-right">
+        {% if p.is_open %}<span class="proj-status-badge open">Open</span>{% else %}<span class="proj-status-badge closed">Closed</span>{% endif %}
+        <a class="open-btn" href="{{ p.url }}">
+          Open project page
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="empty-msg" id="empty-msg" {% if projects %}hidden{% endif %}>
+    {% if projects %}No projects match the current filter.{% elif previewing %}No project names {{ email }} as IFRC project manager.{% else %}No projects found where you are named as IFRC project manager.{% endif %}
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+  var activeShow = 'open', activeFund = 'all';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.proj-card'));
+  var summary = document.getElementById('kpi-summary');
+
+  function fmtCHF(n) {
+    if (!n) return '—';
+    if (n >= 1e6) return 'CHF ' + (n / 1e6).toFixed(2) + 'M';
+    return 'CHF ' + Math.round(n / 1e3) + 'K';
+  }
+
+  function box(cls, icon, count, label) {
+    return '<div class="kpi-sum-card ' + cls + '"><span class="kpi-sum-icon">' + icon + '</span>' +
+           '<div><div class="count">' + count + '</div><div class="lbl">' + label + '</div></div></div>';
+  }
+
+  function render() {
+    var counts = {green: 0, amber: 0, red: 0, grey: 0}, total = 0, money = 0, shown = 0;
+    cards.forEach(function (c) {
+      var ok = !(activeShow === 'open' && c.dataset.open !== 'true') && !(activeFund !== 'all' && c.dataset.fund !== activeFund);
+      c.hidden = !ok;
+      if (!ok) return;
+      counts[c.dataset.sev]++;
+      total++;
+      money += parseFloat(c.dataset.amount) || 0;
+    });
+    document.querySelectorAll('[data-fund-section]').forEach(function (sec) {
+      var n = sec.querySelectorAll('.proj-card:not([hidden])').length;
+      sec.hidden = n === 0;
+      sec.querySelector('.fund-proj-count').textContent = n + ' project' + (n !== 1 ? 's' : '');
+    });
+    var empty = document.getElementById('empty-msg');
+    if (cards.length) empty.hidden = total > 0;
+    var html = '';
+    if (counts.green) html += box('on-track', '✓', counts.green, 'On track');
+    if (counts.amber) html += box('at-risk', '▲', counts.amber, 'Need attention');
+    if (counts.red) html += box('off-track', '✕', counts.red, 'Critical');
+    if (counts.grey) html += box('no-data', '○', counts.grey, 'No report yet');
+    html += '<div class="kpi-total">' + total + ' project' + (total !== 1 ? 's' : '') + ' shown &nbsp;·&nbsp; ' +
+            fmtCHF(money) + ' allocated</div>';
+    summary.innerHTML = html;
+  }
+
+  document.querySelectorAll('[data-show]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      activeShow = b.dataset.show;
+      document.querySelectorAll('[data-show]').forEach(function (c) { c.classList.toggle('active', c === b); });
+      render();
+    });
+  });
+  document.querySelectorAll('[data-fund]').forEach(function (b) {
+    if (b.classList.contains('proj-card')) return;
+    b.addEventListener('click', function () {
+      activeFund = b.dataset.fund;
+      document.querySelectorAll('button[data-fund]').forEach(function (c) { c.classList.toggle('active', c === b); });
+      render();
+    });
+  });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@ PLUGIN_LICENSE = "MIT"
 FIRST_PARTY_PLUGIN_IDS = (
     "emergency_operations",
     "fdrs",
+    "ifrc",
     "interactive_map",
     "pb_progress",
     "upr",

@@ -1,31 +1,23 @@
-"""Give a newly created user access to the projects that name their email: country access and a role.
+"""Give a newly created user country access for projects that name their email.
 
 When a User row is inserted (Manage Users, or a first SSO sign-in), the project records are searched for that
-email in the NS focal person / IFRC project manager fields. The person then gets access to each matching country
-and the role that goes with the contact type (ROLE_BY_CONTACT). Same rule as the master import, which applies it to
-users that already exist. Nothing is ever removed, and System Managers are not given extra roles.
-A failure here is logged and never blocks the account creation.
+email in the NS focal person / IFRC project manager fields. The person then gets access to each matching country.
+Access Group membership is not granted here: that is set on the user form or the Access Groups screen.
+Nothing is ever removed. A failure here is logged and never blocks the account creation.
 """
 import logging
 
 from sqlalchemy import bindparam, event, text
 
 from app.models import User
-from plugins.nsd_report_forms.plugin import NSD_GROUP_FOCAL, NSD_GROUP_PM
 
 log = logging.getLogger(__name__)
 
 PROFILE_TEMPLATE = 'NSD Project profile - CBF'
-
-# project-record field holding the email -> Access Group given to that person
-ROLE_BY_CONTACT = {
-    'NS focal person email': NSD_GROUP_FOCAL,
-    'IFRC project manager email': NSD_GROUP_PM,
-}
-# the project manager group supersedes the focal point group: a person who is a PM is not also a focal point
+CONTACT_LABELS = ('NS focal person email', 'IFRC project manager email')
 
 _MATCHES = text("""
-    SELECT DISTINCT aes.entity_id AS country_id, fi.label AS label
+    SELECT DISTINCT aes.entity_id AS country_id
     FROM form_data fd
     JOIN form_item fi ON fi.id = fd.form_item_id
     JOIN form_template_version v ON v.id = fi.version_id AND v.status = 'published' AND v.name = :tpl
@@ -40,15 +32,6 @@ _GRANT_COUNTRY = text("""
                       WHERE user_id = :uid AND entity_type = 'country' AND entity_id = :cid)
 """)
 
-_GRANT_ROLE = text("""
-    INSERT INTO rbac_user_role (user_id, role_id, created_at)
-    SELECT :uid, r.id, now() FROM rbac_role r
-    WHERE r.code = :code
-      AND NOT EXISTS (SELECT 1 FROM rbac_user_role ur WHERE ur.user_id = :uid AND ur.role_id = r.id)
-      AND NOT EXISTS (SELECT 1 FROM rbac_user_role ur2 JOIN rbac_role r2 ON r2.id = ur2.role_id
-                      WHERE ur2.user_id = :uid AND r2.code = 'system_manager')
-""")
-
 
 def grant_for_new_user(mapper, connection, user):
     email = (user.email or '').strip().lower()
@@ -56,19 +39,14 @@ def grant_for_new_user(mapper, connection, user):
         return
     try:
         with connection.begin_nested():  # savepoint: a problem here must not poison the user insert
-            rows = connection.execute(_MATCHES, {'tpl': PROFILE_TEMPLATE, 'labels': list(ROLE_BY_CONTACT),
+            rows = connection.execute(_MATCHES, {'tpl': PROFILE_TEMPLATE, 'labels': list(CONTACT_LABELS),
                                                  'email': email}).all()
             for country_id in {r.country_id for r in rows}:
                 connection.execute(_GRANT_COUNTRY, {'uid': user.id, 'cid': country_id})
-            codes = {ROLE_BY_CONTACT[r.label] for r in rows}
-            if NSD_GROUP_PM in codes:
-                codes.discard(NSD_GROUP_FOCAL)
-            for code in codes:
-                connection.execute(_GRANT_ROLE, {'uid': user.id, 'code': code})
         if rows:
-            log.info('NSD funds: new user %s got project access from project contacts', email)
+            log.info('NSD funds: new user %s got country access from project contacts', email)
     except Exception:  # noqa: BLE001
-        log.exception('NSD funds: could not grant project access to new user %s', email)
+        log.exception('NSD funds: could not grant country access to new user %s', email)
 
 
 if not event.contains(User, 'after_insert', grant_for_new_user):

@@ -17,17 +17,6 @@ NSD_ADMIN_ROLE = "admin_nsd_funds"
 # NSD funds tab in Explore Data. Deliberately WITHOUT an "admin." prefix: such codes make a user an "admin".
 NSD_PM_PERMISSION = "nsd_funds.pm_overview"
 
-# Access Groups (core ``rbac_role.kind = 'group'``). They carry no permissions: they only decide which NSD
-# assignments a user may reach. People are put in a group (user form, Access Groups screen, or the master import).
-# What they can do on a report still comes from a normal permission role. The groups are not seeded, because the
-# RBAC seed turns every seeded role back into a permission role; the plugin creates them.
-NSD_GROUP_FOCAL = "group_nsd_ns_focal"
-NSD_GROUP_PM = "group_nsd_ifrc_pm"
-NSD_GROUPS = {
-    NSD_GROUP_FOCAL: ("NSD: NS focal points", "NS focal persons of NSD-funded projects. Can reach the NSD quarterly reports."),
-    NSD_GROUP_PM: ("NSD: IFRC project managers", "IFRC project managers of NSD-funded projects. Can reach the NSD quarterly "
-                                                   "and final reports."),
-}
 
 
 class NsdLogframeFieldType(BaseFieldType):
@@ -212,8 +201,8 @@ class NsdReportFormsPlugin(BasePlugin):
             SeedRole(
                 code=NSD_ADMIN_ROLE,
                 name="Admin: NSD funds",
-                description="Opens the NSD project overview and master import, and can reach every NSD assignment. "
-                            "NS focal points and IFRC project managers are not roles: add them to the NSD access groups.",
+                description="Opens the NSD project overview and master import. Who may open an NSD report is an "
+                            "Access Group on that assignment, not this role.",
                 permission_codes=[
                     NSD_ADMIN_PERMISSION, NSD_PM_PERMISSION,
                     "admin.assignments.view", "admin.assignments.edit", "admin.assignments.entities.status",

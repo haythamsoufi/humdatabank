@@ -17,15 +17,13 @@ from sqlalchemy import func
 
 from app import db
 from app.models import (AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, FormSection, FormTemplate,
-                        FormTemplateVersion, RbacRole, RbacUserRole, RepeatGroupData, RepeatGroupInstance, User)
+                        FormTemplateVersion, RepeatGroupData, RepeatGroupInstance, User)
 from app.models.enums import AssignmentEntityStatusValue
 from app.models.organization import NationalSociety
 from app.services.assignments.completion_service import AssignmentCompletionService
 from app.services.assignments.workflow_service import apply_entity_status_change
 from app.utils.datetime_helpers import utcnow
 
-from ..access_on_create import ROLE_BY_CONTACT
-from ..plugin import NSD_GROUP_FOCAL, NSD_GROUP_PM
 from . import restrictions
 from . import layout
 from .workbook import Book, logframe_structure
@@ -71,7 +69,7 @@ class Lookups:
         self.user_ids = {(e or '').strip().casefold(): uid for uid, e in db.session.query(User.id, User.email).all() if e}
         self.nsd_roles = restrictions.load_roles()
         for code in restrictions.missing_roles(self.nsd_roles):
-            self.problems.append(f'Role "{code}" does not exist yet. Restart the application once so the plugin can set up its roles.')
+            self.problems.append(f'Role "{code}" does not exist yet. Run the RBAC seed so the NSD admin permission role is created.')
 
     def _load_template(self, key: str, name: str):
         row = (db.session.query(FormTemplate, FormTemplateVersion)
@@ -218,8 +216,6 @@ class Run:
             self.stats['assignments_created'] += 1
         elif af.is_active != active:
             af.is_active = active
-        if restrictions.restrict(af, key, self.lk.nsd_roles):
-            self.stats['assignment_roles_set'] += 1
         aes = AssignmentEntityStatus.query.filter_by(assigned_form_id=af.id, entity_type=ENTITY, entity_id=proj.country_id).first()
         if not aes:
             aes = AssignmentEntityStatus(assigned_form_id=af.id, entity_type=ENTITY, entity_id=proj.country_id,
@@ -277,30 +273,6 @@ class Run:
                 d.set_simple_value(v)
                 db.session.add(d)
 
-    def _role(self, code: str):
-        role = self.roles.get(code)
-        if role is None:
-            role = self.roles[code] = RbacRole.query.filter_by(code=code).first() or False
-        return role
-
-    def ensure_role(self, uid: int, code: str):
-        """Put the user in the Access Group for a contact type. Adds nothing else, and skips System Managers.
-
-        A project manager is not also kept as a focal point.
-        """
-        held = {c for (c,) in db.session.query(RbacRole.code).join(RbacUserRole, RbacUserRole.role_id == RbacRole.id)
-                .filter(RbacUserRole.user_id == uid).all()}
-        if 'system_manager' in held or (code == NSD_GROUP_FOCAL and NSD_GROUP_PM in held):
-            return
-        if code in held:
-            return
-        if code == NSD_GROUP_PM and NSD_GROUP_FOCAL in held and self._role(NSD_GROUP_FOCAL):
-            RbacUserRole.query.filter_by(user_id=uid, role_id=self._role(NSD_GROUP_FOCAL).id).delete()
-        group = self._role(code)
-        if group:
-            db.session.add(RbacUserRole(user_id=uid, role_id=group.id))
-            self.stats['roles_granted'] += 1
-
     # -- one project
     def import_project(self, p: dict):
         ref = p['reference']
@@ -315,12 +287,11 @@ class Run:
                                                period_name=layout.period_name(ref, layout.PROFILE_PERIOD)).first()
         self.stats['projects_updated' if existed else 'projects_created'] += 1
 
-        for em, field in ((p['ns_focal_email'], 'NS focal person email'), (p['ifrc_pm_email'], 'IFRC project manager email')):
+        for em in (p['ns_focal_email'], p['ifrc_pm_email']):
             uid = self.lk.user_ids.get((em or '').strip().casefold())
             if uid:
                 db.session.get(User, uid).add_entity_permission(ENTITY, country_id)
                 self.stats['access_grants'] += 1
-                self.ensure_role(uid, ROLE_BY_CONTACT[field])
 
         self.write_profile(proj)
         for s in self.sched.get(ref, []):
@@ -498,8 +469,8 @@ def run(book: Book, user_id: int, overwrite_reports: bool, progress, cancelled) 
     r = Run(book, user_id, overwrite_reports, progress, cancelled)
     if r.lk.problems:
         return {'stats': {}, 'messages': r.lk.problems, 'failed': len(book.rows['Projects']), 'cancelled': False}
-    if restrictions.ensure_groups(r.lk.nsd_roles):  # the NSD Access Groups, created once
-        db.session.commit()
+    r.note('NSD assignments are not limited to an access group. Until "Who can access this assignment" is set, '
+           'anyone who can open that country can open them.')
     projects = book.rows['Projects']
     failed = 0
     for i, p in enumerate(projects, 1):

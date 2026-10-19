@@ -248,6 +248,7 @@ def national_society_logo(ns_id):
         storage.SYSTEM, rel_path,
         filename=ns.logo_filename, as_attachment=False,
         mimetype=_safe_logo_mimetype(ns.logo_filename),
+        allow_inline_svg=True,
     )
 
 

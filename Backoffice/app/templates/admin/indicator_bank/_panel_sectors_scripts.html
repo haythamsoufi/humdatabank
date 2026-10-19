@@ -521,7 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function buildLogoPreviewImage(logoUrl) {
         const img = document.createElement('img');
-        SafeDom.setSrc(img, logoUrl);
+        SafeDom.setSrc(img, logoUrl, { allowSameOrigin: false });
         img.alt = 'Current logo';
         img.style.maxWidth = '100px';
         img.style.maxHeight = '100px';

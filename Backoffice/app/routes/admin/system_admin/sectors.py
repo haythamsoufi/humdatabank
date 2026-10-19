@@ -318,6 +318,7 @@ def sector_logo(sector_id):
         storage.SYSTEM, rel_path,
         filename=sector.logo_filename, as_attachment=False,
         mimetype=_safe_logo_mimetype(sector.logo_filename),
+        allow_inline_svg=True,
     )
 
 

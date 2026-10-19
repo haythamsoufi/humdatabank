@@ -15,7 +15,7 @@ import os
 
 _SAFE_LOGO_MIMETYPES = {
     '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif', '.webp': 'image/webp',
+    '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
 }
 
 

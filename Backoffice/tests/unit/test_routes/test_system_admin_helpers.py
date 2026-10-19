@@ -42,7 +42,7 @@ class TestSafeLogoMimetype:
     def test_unknown_extension_returns_octet_stream(self, app):
         from app.routes.admin.system_admin.helpers import _safe_logo_mimetype
         with app.app_context():
-            assert _safe_logo_mimetype("logo.svg") == "application/octet-stream"
+            assert _safe_logo_mimetype("logo.svg") == "image/svg+xml"
             assert _safe_logo_mimetype("logo.bmp") == "application/octet-stream"
             assert _safe_logo_mimetype("noext") == "application/octet-stream"
 

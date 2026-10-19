@@ -218,7 +218,7 @@ def save_submission_document(
     return saved_rel
 
 
-_ALLOWED_LOGO_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
+_ALLOWED_LOGO_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
 _MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 _LOGO_SUBDIR_RE = re.compile(r"^[a-z0-9_-]+$")
 

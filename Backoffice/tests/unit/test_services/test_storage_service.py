@@ -469,6 +469,38 @@ class TestStreamResponse:
                 resp = svc.stream_response("admin_documents", "stream.txt", "stream.txt")
             assert resp is not None
 
+    def test_untrusted_svg_stays_an_attachment(self, app, tmp_path):
+        with app.app_context():
+            app.config["UPLOAD_FOLDER"] = str(tmp_path)
+            app.config.pop("UPLOAD_STORAGE_PROVIDER", None)
+            p = tmp_path / "admin_documents" / "icon.svg"
+            p.parent.mkdir(parents=True)
+            p.write_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>")
+            with app.test_request_context():
+                resp = svc.stream_response(
+                    "admin_documents", "icon.svg", "icon.svg",
+                    mimetype="image/svg+xml", as_attachment=False,
+                )
+            assert "attachment" in resp.headers.get("Content-Disposition", "")
+            assert "sandbox" in resp.headers.get("Content-Security-Policy", "")
+
+    def test_trusted_svg_logo_is_inline(self, app, tmp_path):
+        with app.app_context():
+            app.config["UPLOAD_FOLDER"] = str(tmp_path)
+            app.config.pop("UPLOAD_STORAGE_PROVIDER", None)
+            p = tmp_path / "system" / "sectors" / "WASH_sector.svg"
+            p.parent.mkdir(parents=True)
+            p.write_bytes(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>")
+            with app.test_request_context():
+                resp = svc.stream_response(
+                    "system", "sectors/WASH_sector.svg", "WASH_sector.svg",
+                    mimetype="image/svg+xml", as_attachment=False, allow_inline_svg=True,
+                )
+            assert resp.mimetype == "image/svg+xml"
+            assert "inline" in resp.headers.get("Content-Disposition", "")
+            assert "sandbox" not in resp.headers.get("Content-Security-Policy", "")
+            assert "script-src 'none'" in resp.headers.get("Content-Security-Policy", "")
+
     def test_azure_small_file(self, app):
         with app.app_context():
             app.config["UPLOAD_STORAGE_PROVIDER"] = "azure_blob"

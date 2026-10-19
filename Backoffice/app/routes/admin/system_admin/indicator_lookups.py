@@ -994,4 +994,5 @@ def spef_icon(sid: int):
         storage.SYSTEM, rel_path,
         filename=row.icon_filename, as_attachment=False,
         mimetype=_safe_logo_mimetype(row.icon_filename),
+        allow_inline_svg=True,
     )

@@ -225,6 +225,9 @@ _ACTIVE_CONTENT_MIMETYPES = frozenset({
 _ACTIVE_CONTENT_EXTENSIONS = (".svg", ".svgz", ".html", ".htm", ".xhtml", ".xml", ".js", ".mjs", ".css")
 
 UPLOAD_RESPONSE_CSP = "default-src 'none'; sandbox"
+# Trusted logos are drawn in <img>. Sandbox on the SVG response stops the browser
+# painting them. Scripts stay blocked if someone opens the logo URL directly.
+INLINE_SVG_CSP = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'"
 
 
 def is_active_content(mimetype: Optional[str], filename: Optional[str] = None) -> bool:
@@ -235,14 +238,18 @@ def is_active_content(mimetype: Optional[str], filename: Optional[str] = None) -
     return (filename or "").lower().endswith(_ACTIVE_CONTENT_EXTENSIONS)
 
 
-def harden_upload_response(response, *, mimetype: Optional[str], as_attachment: bool):
+def harden_upload_response(response, *, mimetype: Optional[str], as_attachment: bool, inline_svg: bool = False):
     """Apply the standard defensive headers to a response that serves user-supplied bytes.
 
     ``nosniff`` stops content-type guessing; the ``default-src 'none'; sandbox`` policy
     neutralises scripts if a file is opened directly. Inline PDFs are exempt from the
-    sandbox policy because Chrome refuses to render them under it.
+    sandbox policy because Chrome refuses to render them under it. Inline SVGs use a
+    script-blocking policy without ``sandbox``, which would hide the image.
     """
     response.headers["X-Content-Type-Options"] = "nosniff"
+    if inline_svg and not as_attachment:
+        response.headers["Content-Security-Policy"] = INLINE_SVG_CSP
+        return response
     inline_pdf = (not as_attachment) and (mimetype or "").split(";", 1)[0].strip().lower() == "application/pdf"
     if not inline_pdf:
         response.headers["Content-Security-Policy"] = UPLOAD_RESPONSE_CSP
@@ -307,6 +314,7 @@ def stream_response(
     filename: str,
     mimetype: Optional[str] = None,
     as_attachment: bool = True,
+    allow_inline_svg: bool = False,
 ):
     """Return a Flask response that streams the file to the client.
 
@@ -317,10 +325,17 @@ def stream_response(
     Every response carries ``nosniff`` and a locked-down CSP (see
     :func:`harden_upload_response`), and active content (HTML, SVG, XML, JS) is always
     sent as an attachment even when ``as_attachment=False`` was requested.
+    ``allow_inline_svg`` is only for trusted system logos drawn in an ``<img>``.
     """
     safe_rel = _normalize_rel(rel_path)
     effective_mime = mimetype or _guess_mimetype(filename)
-    if not as_attachment and is_active_content(effective_mime, filename):
+    inline_svg = (
+        allow_inline_svg
+        and not as_attachment
+        and (effective_mime or "").split(";", 1)[0].strip().lower() == "image/svg+xml"
+        and (filename or "").lower().endswith(".svg")
+    )
+    if not as_attachment and is_active_content(effective_mime, filename) and not inline_svg:
         as_attachment = True
 
     if not exists(category, safe_rel):
@@ -356,6 +371,7 @@ def stream_response(
                 FlaskResponse(_generate(), headers=headers),
                 mimetype=effective_mime,
                 as_attachment=as_attachment,
+                inline_svg=inline_svg,
             )
 
         content = blob.download_blob().readall()
@@ -374,7 +390,9 @@ def stream_response(
             as_attachment=as_attachment,
             download_name=filename,
         )
-    return harden_upload_response(response, mimetype=effective_mime, as_attachment=as_attachment)
+    return harden_upload_response(
+        response, mimetype=effective_mime, as_attachment=as_attachment, inline_svg=inline_svg
+    )
 
 
 def delete(category: str, rel_path: str) -> bool:

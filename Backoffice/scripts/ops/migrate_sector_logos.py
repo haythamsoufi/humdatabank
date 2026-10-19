@@ -119,9 +119,18 @@ def _apply(app, manifest_path: Path, files_dir: Path, apply: bool) -> int:
             )
             if not apply:
                 continue
+            previous = (sector.logo_filename or "").strip()
             storage.upload(storage.SYSTEM, f"sectors/{filename}", data)
+            if previous and previous != filename:
+                storage.unpublish_system_logo_from_cdn("sectors", previous)
             sector.logo_filename = filename
-            storage.publish_system_logo_to_cdn("sectors", filename)
+            if storage.public_cdn_enabled():
+                mime = "image/svg+xml" if filename.lower().endswith(".svg") else None
+                storage.publish_to_static_cdn(
+                    storage.system_logo_cdn_blob_name("sectors", filename),
+                    data,
+                    mime,
+                )
         if apply:
             db.session.commit()
     print(json.dumps(summary, indent=2))

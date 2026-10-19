@@ -187,10 +187,14 @@ def _serve_system_upload(subdir, filename, *, log_label, download_name=None):
     if safe_name is None:
         abort(404)
     try:
+        served_name = download_name(safe_name) if download_name else safe_name
+        mime = "image/svg+xml" if served_name.lower().endswith(".svg") else None
         return storage.stream_response(
             storage.SYSTEM, f"{subdir}/{safe_name}",
-            filename=download_name(safe_name) if download_name else safe_name,
+            filename=served_name,
+            mimetype=mime,
             as_attachment=False,
+            allow_inline_svg=True,
         )
     except Exception as e:
         current_app.logger.error("Error serving %s %s: %s", log_label, filename, e)

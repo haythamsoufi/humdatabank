@@ -20,7 +20,8 @@ from app.services.platform import storage_service as storage
 from app.utils.safe_image import clamp_render_scale, open_image_safe, render_page_size
 
 _OFFICE_MEDIA = ("word/media/", "ppt/media/", "xl/media/")
-_YOUTUBE_IMAGE_HOSTS = ("img.youtube.com",)
+_YOUTUBE_IMAGE_HOSTS = ("img.youtube.com", "i.ytimg.com")
+_YOUTUBE_PAGE_HOSTS = ("www.youtube.com", "youtube.com")
 _MIN_EMBEDDED_EDGE = 120
 
 
@@ -222,10 +223,14 @@ class ThumbnailService:
         category: Optional[str] = None,
     ) -> Optional[str]:
         """Download the public YouTube preview image and store it."""
-        video_id = ThumbnailService.youtube_video_id(url)
-        if not video_id or not folder:
+        if not folder:
             return None
-        image_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+        video_id = ThumbnailService.youtube_video_id(url)
+        image_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg" if video_id else ""
+        if not image_url and ThumbnailService.youtube_playlist_id(url):
+            image_url = ThumbnailService._playlist_preview_url(url) or ""
+        if not image_url:
+            return None
         return ThumbnailService._store_remote_image(
             image_url, folder, language_code, category or storage.RESOURCES,
             allowed_hosts=_YOUTUBE_IMAGE_HOSTS,
@@ -250,6 +255,32 @@ class ThumbnailService:
         if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id or ""):
             return video_id
         return None
+
+    @staticmethod
+    def youtube_playlist_id(url: str) -> Optional[str]:
+        """Return a YouTube playlist id, or None."""
+        parts = urlparse((url or "").strip())
+        host = (parts.hostname or "").lower()
+        if host not in {"youtube.com", "www.youtube.com", "m.youtube.com"} and not host.endswith(".youtube.com"):
+            return None
+        playlist_id = parse_qs(parts.query).get("list", [""])[0]
+        if re.fullmatch(r"PL[A-Za-z0-9_-]{10,80}", playlist_id or ""):
+            return playlist_id
+        return None
+
+    @staticmethod
+    def _playlist_preview_url(page_url: str) -> Optional[str]:
+        import json
+        from urllib.parse import quote
+
+        oembed = "https://www.youtube.com/oembed?format=json&url=" + quote(page_url, safe="")
+        try:
+            raw = ThumbnailService._download_https(oembed, allowed_hosts=_YOUTUBE_PAGE_HOSTS)
+            thumbnail = (json.loads(raw.decode("utf-8")).get("thumbnail_url") or "").strip()
+        except Exception as exc:
+            current_app.logger.warning("YouTube playlist preview was not read: %s", exc)
+            return None
+        return thumbnail or None
 
     @staticmethod
     def _pdf_bytes_to_storage(data: bytes, folder: str, language_code: Optional[str], category: str) -> Optional[str]:
@@ -313,10 +344,19 @@ class ThumbnailService:
 
     @staticmethod
     def _download_https(url: str, *, allowed_hosts: Optional[tuple] = None) -> bytes:
+        import urllib.parse
         import urllib.request
 
         from app.utils.outbound_url import validate_outbound_url
 
+        parts = urllib.parse.urlsplit(url)
+        url = urllib.parse.urlunsplit((
+            parts.scheme,
+            parts.netloc,
+            urllib.parse.quote(parts.path, safe="/"),
+            parts.query,
+            parts.fragment,
+        ))
         hosts = list(allowed_hosts or ())
         result = validate_outbound_url(url, allowed_hosts=hosts, allowed_ports=(443,), resolve_dns=True)
         if not result.ok:

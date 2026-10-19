@@ -28,6 +28,9 @@ def test_youtube_id_accepts_short_and_watch_links():
     assert ThumbnailService.youtube_video_id("https://youtu.be/s8gWS22wpro") == "s8gWS22wpro"
     assert ThumbnailService.youtube_video_id("https://www.youtube.com/watch?v=s8gWS22wpro") == "s8gWS22wpro"
     assert ThumbnailService.youtube_video_id("https://evil.example/watch?v=s8gWS22wpro") is None
+    assert ThumbnailService.youtube_playlist_id(
+        "https://www.youtube.com/playlist?list=PLf2g_NkFyyv6_tXhWfA71vHfW7ZS8LFpz"
+    ) == "PLf2g_NkFyyv6_tXhWfA71vHfW7ZS8LFpz"
 
 
 def test_word_file_uses_its_embedded_picture(app):

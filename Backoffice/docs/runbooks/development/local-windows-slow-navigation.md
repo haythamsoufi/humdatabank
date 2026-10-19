@@ -35,6 +35,19 @@ These stay in the dev server so a navigation opens fewer files and runs fewer qu
 
 `FLASK_USE_RELOADER=false` avoids a second process and mid-request restarts. It does not stop real-time scanning.
 
+## Dev Drive
+
+Windows Security → Virus & threat protection → **Dev Drive protection** only changes scanning on a Dev Drive volume. The system drive cannot be switched to asynchronous scanning. If the only row is `Windows (C:)` and it says asynchronous scanning is off, the clone on `C:\` is still scanned on every file open. That matches this laptop.
+
+A Dev Drive is a ReFS volume (often a VHD) where Defender scans in the background instead of blocking the read. Create one from **Settings → System → Storage → Advanced storage settings → Disks & volumes → Create Dev Drive** (50 GB minimum). Then put both of these on it:
+
+- the git clone
+- the virtual environment (`python -m venv` on that volume)
+
+Python under `%LOCALAPPDATA%` or `%APPDATA%\Python` stays on `C:` and is still scanned synchronously. PostgreSQL can stay on `C:`; query time was not the wait.
+
+If **Create Dev Drive** is missing, device policy has turned the feature off. That is an IT setting, not an app bug.
+
 ## If IT will add exclusions
 
 The durable fix is a performance exclusion for local dev, not an app change. On a managed laptop this needs an administrator. Ask for:

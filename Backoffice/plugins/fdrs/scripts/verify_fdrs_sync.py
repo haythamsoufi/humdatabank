@@ -291,8 +291,20 @@ def execute_verification(
 
     def _on_fetch(payload: Dict[str, Any]) -> None:
         _raise_if_cancelled()
-        if progress_cb:
-            progress_cb(payload)
+        if not progress_cb:
+            return
+        # build_fdrs_table reports 0–8 because that is the fetch slice of a full
+        # data sync. Verification spends most of its time in that fetch, so
+        # stretch it across 2–58 instead of leaving the bar stuck near 8%.
+        mapped = dict(payload)
+        try:
+            raw = float(payload.get("percent") or 0.0)
+        except (TypeError, ValueError):
+            raw = 0.0
+        raw = max(0.0, min(raw, 8.0))
+        mapped["percent"] = 2.0 + (raw / 8.0) * 56.0
+        mapped["stage"] = payload.get("stage") or "fetch_fdrs"
+        progress_cb(mapped)
 
     resolved_key = _resolve_api_key(api_key)
     base_url = (

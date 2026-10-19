@@ -684,7 +684,8 @@ def _verify_table_args():
         per_page = 0 if all_rows else 200
     if all_rows:
         per_page = 0
-    return sheet, status, page, per_page
+    problems_only = (request.args.get("problems_only") or "").strip().lower() in ("1", "true", "yes")
+    return sheet, status, page, per_page, problems_only
 
 
 @bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-download/<job_id>", methods=["GET"])
@@ -720,12 +721,13 @@ def sync_verify_results(template_id: int, job_id: str):
     if source is None:
         return json_not_found("Verification file not available")
 
-    sheet, status, page, per_page = _verify_table_args()
+    sheet, status, page, per_page, problems_only = _verify_table_args()
     try:
         table = read_fdrs_sync_verify_workbook(
             source,
             sheet=sheet,
             status=status,
+            problems_only=problems_only,
             page=page,
             per_page=per_page,
         )
@@ -772,12 +774,13 @@ def sync_verify_latest_results(template_id: int):
     if source is None:
         return json_not_found("Verification file not available")
 
-    sheet, status, page, per_page = _verify_table_args()
+    sheet, status, page, per_page, problems_only = _verify_table_args()
     try:
         table = read_fdrs_sync_verify_workbook(
             source,
             sheet=sheet,
             status=status,
+            problems_only=problems_only,
             page=page,
             per_page=per_page,
         )

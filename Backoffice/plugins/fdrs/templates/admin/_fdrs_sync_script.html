@@ -106,22 +106,34 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function setSyncRunDetailsOpen(kind, open) {
-        const id = kind === 'verify' ? 'fdrs-sync-verify-run-details' : 'fdrs-sync-run-details';
-        const el = document.getElementById(id);
-        if (el) el.open = !!open;
-    }
-
     function showFdrsSyncSubtab(which) {
         activateSyncMainTab();
-        if (which === 'run' || which === 'verify') {
-            setSyncRunDetailsOpen(which, true);
+        const tab = which === 'run' ? 'run' : 'verify';
+        document.querySelectorAll('#fdrs-sync-subtabs [data-fdrs-subtab]').forEach(function (btn) {
+            const on = btn.getAttribute('data-fdrs-subtab') === tab;
+            if (window.AdminUnderlineTabs && typeof window.AdminUnderlineTabs.setSubTabButton === 'function') {
+                window.AdminUnderlineTabs.setSubTabButton(btn, on);
+            }
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        document.querySelectorAll('.fdrs-sync-subpanel').forEach(function (panel) {
+            panel.classList.toggle('hidden', panel.getAttribute('data-fdrs-subpanel') !== tab);
+        });
+        if (typeof paintVerifyGrid === 'function') {
+            requestAnimationFrame(paintVerifyGrid);
         }
     }
+
+    document.querySelectorAll('#fdrs-sync-subtabs [data-fdrs-subtab]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            showFdrsSyncSubtab(btn.getAttribute('data-fdrs-subtab'));
+        });
+    });
 
     let syncVerifyResultsUrl = null;
     let syncVerifyTableState = { sheet: 'data_points' };
     let syncVerifyGridHelper = null;
+    let pendingVerifyGrid = null;
 
     function formatFdrsLastRunDate(iso) {
         if (!iso) return '';
@@ -164,16 +176,46 @@ document.addEventListener('DOMContentLoaded', function () {
         err.classList.remove('hidden');
     }
 
+    function showVerifyGridNote(message) {
+        const note = document.getElementById('sync-verify-grid-note');
+        if (!note) return;
+        if (!message) {
+            note.classList.add('hidden');
+            note.textContent = '';
+            return;
+        }
+        note.textContent = message;
+        note.classList.remove('hidden');
+    }
+
+    function verifyCoverageNote(data) {
+        data = data || {};
+        const loaded = (data.rows || []).length;
+        const filtered = Number(data.filtered_rows || 0);
+        const stats = data.stats || {};
+        if (data.truncated && filtered > loaded) {
+            return {{ _("Showing")|tojson|safe }} + ' ' + loaded + ' / ' + filtered + ' '
+                + {{ _("rows. The rest are not in this table, and search only covers loaded rows. Use “Missing and mismatch only” to load problem rows.")|tojson|safe }};
+        }
+        const problemsOnlyFile = !!(stats.problems_only);
+        const problemsBox = document.getElementById('sync-verify-problems-only');
+        const viewingProblems = !!(problemsBox && problemsBox.checked);
+        if (!viewingProblems && problemsOnlyFile && (data.sheet || '') === 'data_points' && Number(stats.total || 0) > loaded) {
+            return {{ _("This saved workbook only contains missing and mismatch rows. Run verification again to store the full comparison.")|tojson|safe }};
+        }
+        return '';
+    }
+
     function resetSyncVerifyTable() {
         syncVerifyResultsUrl = null;
         syncVerifyTableState = { sheet: 'data_points' };
-        const wrap = document.getElementById('sync-verify-table-wrap');
-        if (wrap) wrap.classList.add('hidden');
         const cards = document.getElementById('sync-verify-stats-cards');
         if (cards) cards.replaceChildren();
         const search = document.getElementById('sync-verify-search');
         if (search) search.value = '';
         showVerifyGridError('');
+        showVerifyGridNote('');
+        pendingVerifyGrid = null;
         if (syncVerifyGridHelper) syncVerifyGridHelper.setRowData([]);
     }
 
@@ -279,14 +321,42 @@ document.addEventListener('DOMContentLoaded', function () {
         applyVerifyQuickFilter();
     }
 
+    function syncPanelIsVisible() {
+        const panel = document.getElementById('panel-sync');
+        return !!(panel && !panel.classList.contains('hidden'));
+    }
+
+    function paintVerifyGrid() {
+        if (!syncPanelIsVisible()) return;
+        if (!pendingVerifyGrid) {
+            pendingVerifyGrid = { columns: [], rows: [] };
+        }
+        if (typeof AgGridHelper === 'undefined') {
+            showVerifyGridError({{ _("The results table could not start. Reload the page.")|tojson|safe }});
+            return;
+        }
+        applyVerifyGrid(pendingVerifyGrid.columns, pendingVerifyGrid.rows);
+        const api = syncVerifyGridHelper && syncVerifyGridHelper.gridApi;
+        if (api && typeof api.sizeColumnsToFit === 'function') {
+            requestAnimationFrame(function () {
+                api.sizeColumnsToFit();
+            });
+        }
+    }
+
     function renderSyncVerifyTable(data) {
         const wrap = document.getElementById('sync-verify-table-wrap');
         if (!wrap) return;
         wrap.classList.remove('hidden');
         showVerifyGridError('');
+        showVerifyGridNote(verifyCoverageNote(data));
         renderSyncVerifyStats(data.stats);
         setActiveSheetButton(data.sheet || syncVerifyTableState.sheet);
-        applyVerifyGrid(data.columns || [], data.rows || []);
+        pendingVerifyGrid = {
+            columns: data.columns || [],
+            rows: data.rows || []
+        };
+        paintVerifyGrid();
     }
 
     function fetchSyncVerifyResultsPage() {
@@ -294,6 +364,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const params = new URLSearchParams();
         params.set('sheet', syncVerifyTableState.sheet);
         params.set('all', '1');
+        const problemsBox = document.getElementById('sync-verify-problems-only');
+        if (problemsBox && problemsBox.checked && syncVerifyTableState.sheet === 'data_points') {
+            params.set('problems_only', '1');
+        }
         fetch(syncVerifyResultsUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
@@ -325,6 +399,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const verifySearch = document.getElementById('sync-verify-search');
     if (verifySearch) {
         verifySearch.addEventListener('input', applyVerifyQuickFilter);
+    }
+    const verifyProblemsOnly = document.getElementById('sync-verify-problems-only');
+    if (verifyProblemsOnly) {
+        verifyProblemsOnly.addEventListener('change', function () {
+            if (syncVerifyResultsUrl) fetchSyncVerifyResultsPage();
+        });
+    }
+    const syncTabBtn = document.querySelector('#data-sync-tabs [data-tab="sync"]');
+    if (syncTabBtn) {
+        syncTabBtn.addEventListener('click', function () {
+            requestAnimationFrame(paintVerifyGrid);
+        });
     }
 
     window.updateDataSyncUrlTemplates = function (templateId) {
@@ -387,6 +473,13 @@ function getSelectedDataSyncYears() {
         .sort(function (a, b) { return a - b; });
 }
 
+function yearsAreContiguous(years) {
+    for (let i = 1; i < years.length; i += 1) {
+        if (years[i] !== years[i - 1] + 1) return false;
+    }
+    return true;
+}
+
 function formatDataSyncYearsDisplay(years) {
     if (!years.length) {
         return {{ _("No years selected")|tojson|safe }};
@@ -395,13 +488,15 @@ function formatDataSyncYearsDisplay(years) {
     for (let y = FDRS_YEARS_START; y <= FDRS_YEARS_END; y += 1) {
         allYears.push(y);
     }
+    const yearsWord = {{ _("years")|tojson|safe }};
     if (years.length === allYears.length) {
-        return FDRS_YEARS_START + '\u2013' + FDRS_YEARS_END + ' (' + years.length + ' ' + {{ _("years")|tojson|safe }} + ')';
+        return FDRS_YEARS_START + '\u2013' + FDRS_YEARS_END + ' (' + years.length + ' ' + yearsWord + ')';
     }
-    if (years.length <= 4) {
-        return years.join(', ');
+    if (years.length <= 4 || !yearsAreContiguous(years)) {
+        if (years.length <= 8) return years.join(', ');
+        return years.slice(0, 6).join(', ') + '\u2026 (' + years.length + ' ' + yearsWord + ')';
     }
-    return years[0] + '\u2013' + years[years.length - 1] + ' (' + years.length + ' ' + {{ _("years")|tojson|safe }} + ')';
+    return years[0] + '\u2013' + years[years.length - 1] + ' (' + years.length + ' ' + yearsWord + ')';
 }
 
 function updateDataSyncYearsLabel() {
@@ -560,7 +655,9 @@ function dataSyncBoolIcon(isTrue) {
 function renderDataSyncConfigSummary(params) {
     if (!dataSyncConfigSummaryBody) return;
 
-    const yearsDisplay = formatDataSyncYearsDisplay(params.selectedYears || []);
+    const yearsDisplay = params.test
+        ? '2024'
+        : formatDataSyncYearsDisplay(params.selectedYears || []);
     const batchDisplay = params.batchSize !== null && !isNaN(params.batchSize)
         ? String(params.batchSize)
         : {{ _("Default (1000)")|tojson|safe }};
@@ -662,14 +759,64 @@ function setDataSyncProgress(percent, stage, message, current, total, opts) {
     }
 }
 
+function readJobPoll(res) {
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    if (res.status === 401 || res.status === 403) {
+        return res.json().then(function (data) {
+            return { denied: true, data: data };
+        }).catch(function () {
+            return { denied: true };
+        });
+    }
+    if (res.status === 404) {
+        if (type.indexOf('application/json') === -1) {
+            return Promise.resolve({ missing: true });
+        }
+        return res.json().then(function (data) {
+            return { missing: true, data: data };
+        }).catch(function () {
+            return { missing: true };
+        });
+    }
+    if (type.indexOf('application/json') === -1) {
+        return Promise.reject(new Error({{ _("Request failed")|tojson|safe }} + ' (' + res.status + ')'));
+    }
+    return res.json().then(function (data) {
+        return { ok: res.ok, data: data };
+    });
+}
+
+function jobPollIsMissing(result) {
+    if (!result) return false;
+    if (result.missing) return true;
+    const data = result.data || {};
+    return data.success === false && /not found/i.test(String(data.error || ''));
+}
+
 function pollDataSyncStatus() {
     if (!dataSyncActiveJobId) return;
     const url = dataSyncStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(dataSyncActiveJobId));
 
     fetch(url)
-        .then(res => res.json())
-        .then(data => {
-            if (!data || !data.success || !data.job) {
+        .then(readJobPoll)
+        .then(result => {
+            if (result && result.denied) {
+                stopDataSyncPolling();
+                clearDataSyncStorage();
+                dataSyncResult.classList.remove('hidden');
+                dataSyncResultText.textContent = (result.data && result.data.error) || {{ _("Access denied")|tojson|safe }};
+                dataSyncResultText.className = 'text-sm text-red-700';
+                showDataSyncDone();
+                return;
+            }
+            if (jobPollIsMissing(result)) {
+                stopDataSyncPolling();
+                clearDataSyncStorage();
+                resetDataSyncUI();
+                return;
+            }
+            const data = result.data;
+            if (!result.ok || !data || !data.success || !data.job) {
                 throw new Error((data && data.error) || 'Failed to read sync status');
             }
             const job = data.job;
@@ -736,11 +883,12 @@ function pollDataSyncStatus() {
             scheduleDataSyncPoll();
         })
         .catch(err => {
-            stopDataSyncPolling();
-            dataSyncResult.classList.remove('hidden');
-            dataSyncResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
-            dataSyncResultText.className = 'text-sm text-red-700';
-            showDataSyncDone();
+            if (!dataSyncActiveJobId) return;
+            if (dataSyncProgressStage) {
+                dataSyncProgressStage.textContent = (err.message || {{ _("Request failed")|tojson|safe }})
+                    + ' — ' + {{ _("retrying")|tojson|safe }};
+            }
+            scheduleDataSyncPoll();
         });
 }
 
@@ -974,6 +1122,17 @@ if (syncVerifyYearsToggle && syncVerifyYearsDropdown) {
     }
 }
 
+(function bindVerifySkipImputed() {
+    const skipBox = document.getElementById('sync-verify-skip-imputed');
+    const cacheBox = document.getElementById('sync-verify-imputed-cache');
+    if (!skipBox || !cacheBox) return;
+    function syncCacheEnabled() {
+        cacheBox.disabled = !!skipBox.checked;
+    }
+    skipBox.addEventListener('change', syncCacheEnabled);
+    syncCacheEnabled();
+})();
+
 let syncVerifyActiveJobId = null;
 let syncVerifyPollTimer = null;
 let syncVerifyPollDelayMs = 2000;
@@ -1021,16 +1180,23 @@ function scheduleSyncVerifyPoll() {
     );
 }
 
+function getSelectedSyncVerifyStates() {
+    return Array.from(document.querySelectorAll('input[name="sync-verify-status"]:checked'))
+        .map(function (el) { return parseInt(el.value, 10); })
+        .filter(function (n) { return !isNaN(n); });
+}
+
 function collectSyncVerifyParams() {
     const selectedYears = getSelectedSyncVerifyYears();
     const test = !!(document.getElementById('sync-verify-test') && document.getElementById('sync-verify-test').checked);
+    const skipImputed = !!(document.getElementById('sync-verify-skip-imputed') && document.getElementById('sync-verify-skip-imputed').checked);
     return {
         years: selectedYears.join(','),
         selectedYears: selectedYears,
         test: test,
-        skipImputed: !!(document.getElementById('sync-verify-skip-imputed') && document.getElementById('sync-verify-skip-imputed').checked),
-        imputedUseCache: !!(document.getElementById('sync-verify-imputed-cache') && document.getElementById('sync-verify-imputed-cache').checked),
-        problemsOnly: !!(document.getElementById('sync-verify-problems-only') && document.getElementById('sync-verify-problems-only').checked)
+        skipImputed: skipImputed,
+        imputedUseCache: !skipImputed && !!(document.getElementById('sync-verify-imputed-cache') && document.getElementById('sync-verify-imputed-cache').checked),
+        reportedStates: getSelectedSyncVerifyStates()
     };
 }
 
@@ -1039,12 +1205,15 @@ function renderSyncVerifyConfigSummary(params) {
     const yearsDisplay = params.test
         ? '2024'
         : formatDataSyncYearsDisplay(params.selectedYears || []);
+    const statusLabels = (params.reportedStates || [])
+        .map(function (code) { return SYNC_STATUS_LABELS[code] || String(code); })
+        .join(', ');
     const rows = [
         { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
+        { label: {{ _("Data status")|tojson|safe }}, value: statusLabels || '-' },
         { label: {{ _("Test mode")|tojson|safe }}, node: dataSyncBoolIcon(params.test), inline: true },
         { label: {{ _("Skip imputed")|tojson|safe }}, node: dataSyncBoolIcon(params.skipImputed), inline: true },
-        { label: {{ _("Cached imputed values")|tojson|safe }}, node: dataSyncBoolIcon(params.imputedUseCache), inline: true },
-        { label: {{ _("Problems only")|tojson|safe }}, node: dataSyncBoolIcon(params.problemsOnly), inline: true }
+        { label: {{ _("Cached imputed values")|tojson|safe }}, node: dataSyncBoolIcon(params.imputedUseCache), inline: true }
     ];
     renderConfigSummaryRows(syncVerifyConfigSummaryBody, rows);
 }
@@ -1151,13 +1320,34 @@ function formatSyncVerifyStats(stats) {
         + String(stats.mismatch || 0) + ' ' + {{ _("mismatch")|tojson|safe }};
 }
 
+function abandonStaleVerifyJob() {
+    stopSyncVerifyPolling();
+    clearSyncVerifyStorage();
+    resetSyncVerifyUI();
+    restoreLatestVerifyIfNeeded(true);
+}
+
 function pollSyncVerifyStatus() {
     if (!syncVerifyActiveJobId) return;
     const url = syncVerifyStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(syncVerifyActiveJobId));
     fetch(url)
-        .then(res => res.json())
-        .then(data => {
-            if (!data || !data.success || !data.job) {
+        .then(readJobPoll)
+        .then(result => {
+            if (result && result.denied) {
+                stopSyncVerifyPolling();
+                clearSyncVerifyStorage();
+                syncVerifyResult.classList.remove('hidden');
+                syncVerifyResultText.textContent = (result.data && result.data.error) || {{ _("Access denied")|tojson|safe }};
+                syncVerifyResultText.className = 'text-sm text-red-700';
+                showSyncVerifyDone();
+                return;
+            }
+            if (jobPollIsMissing(result)) {
+                abandonStaleVerifyJob();
+                return;
+            }
+            const data = result.data;
+            if (!result.ok || !data || !data.success || !data.job) {
                 throw new Error((data && data.error) || 'Failed to read verification status');
             }
             const job = data.job;
@@ -1226,11 +1416,12 @@ function pollSyncVerifyStatus() {
             scheduleSyncVerifyPoll();
         })
         .catch(err => {
-            stopSyncVerifyPolling();
-            syncVerifyResult.classList.remove('hidden');
-            syncVerifyResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
-            syncVerifyResultText.className = 'text-sm text-red-700';
-            showSyncVerifyDone();
+            if (!syncVerifyActiveJobId) return;
+            if (syncVerifyProgressStage) {
+                syncVerifyProgressStage.textContent = (err.message || {{ _("Request failed")|tojson|safe }})
+                    + ' — ' + {{ _("retrying")|tojson|safe }};
+            }
+            scheduleSyncVerifyPoll();
         });
 }
 
@@ -1275,9 +1466,13 @@ if (syncVerifyRunBtn) {
             syncVerifyResultText.className = 'text-sm text-red-700';
             return;
         }
-        resetSyncVerifyUI();
-        const tableWrap = document.getElementById('sync-verify-table-wrap');
-        if (tableWrap) tableWrap.classList.add('hidden');
+        if (!params.reportedStates.length) {
+            syncVerifyResult.classList.remove('hidden');
+            syncVerifyResultText.textContent = {{ _("Select at least one data status to include.")|tojson|safe }};
+            syncVerifyResultText.className = 'text-sm text-red-700';
+            return;
+        }
+        resetSyncVerifyUI({ keepTable: true });
         renderSyncVerifyConfigSummary(params);
         setSyncVerifyUIMode('running');
         if (syncVerifyProgress) syncVerifyProgress.classList.remove('hidden');
@@ -1294,7 +1489,7 @@ if (syncVerifyRunBtn) {
             test: params.test,
             skip_imputed: params.skipImputed,
             imputed_use_cache: params.imputedUseCache,
-            problems_only: params.problemsOnly
+            fdrs_reported_import_states: params.reportedStates
         };
         fetch(templateApiUrl(TEMPLATE_API_URLS.runSyncVerify, currentTemplateId), {
             method: 'POST',
@@ -1349,12 +1544,14 @@ function resumeSyncVerifyJobIfNeeded() {
     pollSyncVerifyStatus();
 }
 
-function restoreLatestVerifyIfNeeded() {
-    if (readSyncVerifyActiveJobs().length) return;
-    try {
-        const stored = JSON.parse(localStorage.getItem(SYNC_VERIFY_STORAGE_KEY) || 'null');
-        if (stored && stored.jobId) return;
-    } catch (e) { /* ignore */ }
+function restoreLatestVerifyIfNeeded(force) {
+    if (!force && readSyncVerifyActiveJobs().length) return;
+    if (!force) {
+        try {
+            const stored = JSON.parse(localStorage.getItem(SYNC_VERIFY_STORAGE_KEY) || 'null');
+            if (stored && stored.jobId) return;
+        } catch (e) { /* ignore */ }
+    }
     const latestUrl = templateApiUrl(TEMPLATE_API_URLS.syncVerifyLatest, currentTemplateId);
     fetch(latestUrl, { headers: { 'Accept': 'application/json' } })
         .then(function (res) { return res.json(); })
@@ -1374,5 +1571,6 @@ function restoreLatestVerifyIfNeeded() {
 
 resumeSyncVerifyJobIfNeeded();
 restoreLatestVerifyIfNeeded();
+paintVerifyGrid();
 });
 </script>

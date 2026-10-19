@@ -134,6 +134,40 @@ def test_execute_verification_reuses_app_context(app, tmp_path):
     assert "matched" in result
 
 
+def test_execute_verification_stretches_fetch_progress(app, tmp_path):
+    from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
+
+    ensure_fdrs_scripts_in_path()
+    import verify_fdrs_sync as verify_mod
+
+    captured = []
+
+    def _fake_build(**kwargs):
+        cb = kwargs.get("progress_cb")
+        if cb:
+            cb({"stage": "fetch_fdrs", "message": "Fetching reported fdrsdata", "percent": 8.0})
+        return ([], {}, {}, [], {})
+
+    out = tmp_path / "fdrs_sync_verification.xlsx"
+    with app.app_context():
+        with patch.object(verify_mod, "_resolve_api_key", return_value="test-key"), \
+             patch.object(verify_mod, "build_fdrs_table", side_effect=_fake_build), \
+             patch.object(
+                 verify_mod,
+                 "_load_databank_lookups",
+                 return_value=({}, {}, set(), {}, {}, {}),
+             ):
+            verify_mod.execute_verification(
+                years=[2024],
+                output_path=str(out),
+                skip_imputed=True,
+                progress_cb=captured.append,
+            )
+    fetch = [row for row in captured if row.get("message") == "Fetching reported fdrsdata"]
+    assert fetch
+    assert fetch[0]["percent"] == 58.0
+
+
 def test_read_fdrs_sync_verify_workbook_filters_and_paginates(tmp_path):
     import openpyxl
 
@@ -162,6 +196,14 @@ def test_read_fdrs_sync_verify_workbook_filters_and_paginates(tmp_path):
     mismatches = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", status="mismatch")
     assert mismatches["filtered_rows"] == 2
     assert {row["ISO3"] for row in mismatches["rows"]} == {"UGA", "RWA"}
+
+    problems = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", problems_only=True)
+    assert problems["filtered_rows"] == 2
+    assert problems["truncated"] is False
+    assert {row["status"] for row in problems["rows"]} == {"mismatch"}
+
+    summary = read_fdrs_sync_verify_workbook(str(path), sheet="summary", problems_only=True)
+    assert summary["sheet"] == "summary"
 
     unpaged = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", per_page=0)
     assert len(unpaged["rows"]) == 3

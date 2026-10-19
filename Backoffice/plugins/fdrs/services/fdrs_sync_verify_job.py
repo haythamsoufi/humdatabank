@@ -216,6 +216,7 @@ def read_fdrs_sync_verify_workbook(
     *,
     sheet: str = "data_points",
     status: Optional[str] = None,
+    problems_only: bool = False,
     page: int = 1,
     per_page: int = 200,
 ) -> Dict[str, Any]:
@@ -232,6 +233,10 @@ def read_fdrs_sync_verify_workbook(
     status_filter = (status or "").strip().lower()
     if status_filter:
         filters["status"] = status_filter
+    sheet_key = _VERIFY_SHEET_ALIASES.get((sheet or "").strip().lower(), (sheet or "").strip())
+    column_in = None
+    if problems_only and not status_filter and sheet_key == "data_points":
+        column_in = {"status": ("missing", "mismatch")}
     return read_xlsx_sheet(
         source,
         sheet=sheet,
@@ -239,6 +244,7 @@ def read_fdrs_sync_verify_workbook(
         page=page,
         per_page=per_page,
         filters=filters or None,
+        column_in=column_in,
     )
 
 

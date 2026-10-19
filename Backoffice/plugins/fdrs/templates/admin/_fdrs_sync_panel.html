@@ -1,16 +1,22 @@
 {# In-page Sync tab (Run + Verify) — injected by plugins.fdrs.routes.fdrs_tools. #}
 {% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_subtab_btn_classes %}
 {% set fdrs_years_start = fdrs_years_start | default(0) %}
 {% set fdrs_years_end = fdrs_years_end | default(0) %}
 
 <div id="fdrs-sync-root">
-  <details id="fdrs-sync-run-details" class="group mb-3 border border-gray-200 rounded-md bg-white">
-    <summary class="flex items-center gap-2 cursor-pointer list-none select-none px-3 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
-      <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
-      <i class="fas fa-sync-alt text-purple-600" aria-hidden="true"></i>
-      <span>{{ _('Run sync') }}</span>
-    </summary>
-    <div id="fdrs-sync-subpanel-run" class="px-3 pb-3 pt-1 border-t border-gray-100">
+  {% call scroll_tab_bar(inner_id='fdrs-sync-subtabs', aria_label=_('Verification and sync'), wrapper_class='mb-4') %}
+    <button type="button" role="tab" data-fdrs-subtab="verify" aria-selected="true"
+            class="{{ admin_underline_subtab_btn_classes(true) }}">
+      <i class="fas fa-clipboard-check mr-1.5" aria-hidden="true"></i>{{ _('Verification') }}
+    </button>
+    <button type="button" role="tab" data-fdrs-subtab="run" aria-selected="false"
+            class="{{ admin_underline_subtab_btn_classes(false) }}">
+      <i class="fas fa-sync-alt mr-1.5" aria-hidden="true"></i>{{ _('Sync') }}
+    </button>
+  {% endcall %}
+
+  <div id="fdrs-sync-subpanel-run" class="fdrs-sync-subpanel hidden pt-4" role="tabpanel" data-fdrs-subpanel="run">
     <div id="data-sync-settings" class="space-y-3">
       <p class="text-sm text-gray-600">{{ _('Sync data from the FDRS API into form data for this template.') }}</p>
 
@@ -165,16 +171,9 @@
         {{ _('Reload page') }}
       </button>
     </div>
-    </div>
-  </details>
+  </div>
 
-  <details id="fdrs-sync-verify-run-details" class="group mb-3 border border-gray-200 rounded-md bg-white">
-    <summary class="flex items-center gap-2 cursor-pointer list-none select-none px-3 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50">
-      <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
-      <i class="fas fa-clipboard-check text-blue-600" aria-hidden="true"></i>
-      <span>{{ _('Run verification') }}</span>
-    </summary>
-    <div class="px-3 pb-3 pt-1 border-t border-gray-100">
+  <div id="fdrs-sync-subpanel-verify" class="fdrs-sync-subpanel pt-4" role="tabpanel" data-fdrs-subpanel="verify">
     <div id="sync-verify-settings" class="space-y-3">
       <p class="text-sm text-gray-600">{{ _('Compare FDRS API values to synced form data. Results stay on this page after reload (stored in blob storage) and can also be downloaded as Excel.') }}</p>
       <div>
@@ -218,6 +217,36 @@
           </div>
         </div>
       </div>
+      <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+        <span class="block text-sm font-medium text-gray-800 mb-1">{{ _('Status of the data') }}</span>
+        <p class="text-xs text-gray-600 mb-1.5">{{ _('Same IFRC statuses the sync treats as importable reported values. Verification only compares those rows.') }}</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1.5">
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="sync-verify-status" value="0" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+            <span>{{ _('Not filled') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="sync-verify-status" value="100" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+            <span>{{ _('Saved') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="sync-verify-status" value="200" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+            <span>{{ _('Reopened') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="sync-verify-status" value="300" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+            <span>{{ _('Submitted') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="sync-verify-status" value="400" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+            <span>{{ _('Validated') }}</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox" name="sync-verify-status" value="500" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+            <span>{{ _('Published') }}</span>
+          </label>
+        </div>
+      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
       <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
         <input type="checkbox" id="sync-verify-test" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
@@ -230,10 +259,6 @@
       <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
         <input type="checkbox" id="sync-verify-imputed-cache" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
         <span>{{ _('Use cached imputed values (recommended)') }}</span>
-      </label>
-      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" id="sync-verify-problems-only" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-        <span>{{ _('Data points table: missing and mismatch rows only') }}</span>
       </label>
       </div>
     </div>
@@ -282,11 +307,10 @@
         {{ _('Download Excel') }}
       </a>
     </div>
-    </div>
-  </details>
+  </div>
 
   {% set verify_latest = fdrs_verify_latest or None %}
-  <div id="fdrs-sync-subpanel-verify">
+  <div id="fdrs-sync-verify-results" class="mt-5 pt-4 border-t border-gray-200">
     <div id="sync-verify-last-run" class="mb-3 border border-gray-200 rounded-md px-3 py-2.5 bg-gray-50{% if not verify_latest %} hidden{% endif %}"
          data-completed-at="{{ (verify_latest.completed_at if verify_latest else '')|e }}">
       <div class="flex flex-wrap items-start justify-between gap-2">
@@ -316,7 +340,7 @@
       </div>
     </div>
 
-    <div id="sync-verify-table-wrap" class="hidden mt-5">
+    <div id="sync-verify-table-wrap" class="mt-5">
       <div id="sync-verify-stats-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3"></div>
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <div id="sync-verify-sheet-tabs" class="inline-flex rounded-md border border-gray-200 overflow-hidden" role="tablist" aria-label="{{ _('Verification sheets') }}">
@@ -327,7 +351,12 @@
         <label for="sync-verify-search" class="sr-only">{{ _('Search verification rows') }}</label>
         <input type="search" id="sync-verify-search" placeholder="{{ _('Search…') }}"
                class="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white w-48">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" id="sync-verify-problems-only" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+          <span>{{ _('Missing and mismatch only') }}</span>
+        </label>
       </div>
+      <p id="sync-verify-grid-note" class="hidden text-sm text-amber-700 mb-2"></p>
       <p id="sync-verify-grid-error" class="hidden text-sm text-red-700 mb-2"></p>
       {{ ag_grid_header_toolbar(placeholder_id='syncVerifyGrid-colvis', wrapper_class='mb-2') }}
       {{ ag_grid_body_wrap('syncVerifyGrid', loading_text=_('Loading verification…'), placeholder_id='syncVerifyGrid-colvis', grid_height='560px', show_loading_overlay=false, use_container=false, empty_message=_('No rows in this sheet.')) }}

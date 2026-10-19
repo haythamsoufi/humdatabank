@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, BinaryIO, Dict, List, Optional, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Sequence, Union
 
 from app.services.platform import storage_service
 
@@ -199,16 +199,19 @@ def read_xlsx_sheet(
     page: int = 1,
     per_page: int = 200,
     filters: Optional[Dict[str, str]] = None,
+    column_in: Optional[Dict[str, Sequence[str]]] = None,
     search: Optional[str] = None,
     search_columns: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Read one sheet as a paginated JSON table.
 
     *filters* is ``{column_name_lower: expected_value_lower}`` and matches
-    case-insensitively (booleans become ``true``/``false``). *search* is a
-    substring match across *search_columns* (or every column when omitted).
-    ``per_page <= 0`` returns every matching row (capped at 50_000) so
-    client-side grids can filter locally.
+    case-insensitively (booleans become ``true``/``false``). *column_in*
+    keeps a row when the cell is one of the listed values (also
+    case-insensitive). *search* is a substring match across *search_columns*
+    (or every column when omitted). ``per_page <= 0`` returns every matching
+    row (capped at 50_000) so client-side grids can filter locally.
+    ``truncated`` is true when that cap drops matching rows.
     """
     page = max(1, int(page or 1))
     try:
@@ -227,6 +230,11 @@ def read_xlsx_sheet(
     }
     query = (search or "").strip().lower() or None
     search_cols = {c.strip().lower() for c in (search_columns or []) if c and c.strip()}
+    any_filters = {
+        str(key).strip().lower(): {str(val).strip().lower() for val in values if str(val).strip()}
+        for key, values in (column_in or {}).items()
+        if values
+    }
 
     wb = _open_workbook(source)
     try:
@@ -244,6 +252,7 @@ def read_xlsx_sheet(
                 "per_page": per_page,
                 "total_rows": 0,
                 "filtered_rows": 0,
+                "truncated": False,
             }
 
         rows_iter = ws.iter_rows(values_only=True)
@@ -262,6 +271,13 @@ def read_xlsx_sheet(
                 if _as_filter_text(cell) != expected:
                     skip = True
                     break
+            if not skip:
+                for col_key, allowed in any_filters.items():
+                    idx = col_index.get(col_key)
+                    cell = raw[idx] if idx is not None and idx < len(raw) else None
+                    if _as_filter_text(cell) not in allowed:
+                        skip = True
+                        break
             if skip:
                 continue
             if query:
@@ -302,6 +318,7 @@ def read_xlsx_sheet(
             "per_page": per_page if not return_all else len(page_rows),
             "total_rows": total_rows,
             "filtered_rows": filtered_rows,
+            "truncated": bool(return_all and filtered_rows > len(page_rows)),
         }
     finally:
         wb.close()

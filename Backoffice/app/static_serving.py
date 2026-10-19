@@ -11,8 +11,11 @@ Cache strategy
 All static files emitted by static_url() include a ?v=<ASSET_VERSION>.<content-hash>
 cache-buster so a file byte change is always a new URL, even if ASSET_VERSION is pinned.
   • Versioned (?v=…)   → max-age=31536000, immutable (browser never re-validates)
+    This includes DEBUG. The ?v= token already changes when file bytes change,
+    so dev navigation can reuse CSS/JS the way Azure does.
   • Unversioned JS/CSS → max-age=0 + must-revalidate  (re-check on every load)
   • Unversioned other  → max-age=3600                 (1-hour heuristic)
+  • Unversioned + DEBUG → no-store (direct /static/... hits stay fresh)
 
 The Cache-Control header is set as a raw string to avoid any Werkzeug cache_control
 API quirks that can silently drop directives.  The header is also set unconditionally
@@ -57,15 +60,20 @@ def register_static_route(app, static_folder_path):
             response.headers.remove(hdr)
 
         path_lower = filename.lower()
+        query_string = req.query_string.decode('utf-8', errors='ignore')
+        versioned = 'v=' in query_string
 
-        if is_development:
-            # No caching in dev so code changes are immediately visible.
+        # Unversioned dev URLs stay uncached so a direct /static/... hit still
+        # shows edits. Versioned URLs (?v=deploy.contenthash) are safe to keep:
+        # static_url() changes ?v= when the file bytes change, same as Azure.
+        # no-store on those forced the dev server to re-send every layout
+        # stylesheet and script on each click, so the page sat blank for seconds.
+        if is_development and not versioned:
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
         elif any(path_lower.endswith(ext) for ext in _CACHEABLE_EXTS):
-            query_string = req.query_string.decode('utf-8', errors='ignore')
-            if 'v=' in query_string:
+            if versioned:
                 # Content-addressed: safe to cache forever in the browser.
                 response.headers['Cache-Control'] = _IMMUTABLE
             elif path_lower.endswith(('.js', '.css')):

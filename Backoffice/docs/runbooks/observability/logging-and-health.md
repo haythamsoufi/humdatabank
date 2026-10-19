@@ -175,6 +175,7 @@ See: `Backoffice/app/static/docs/AZURE_INDEXEDDB_DEBUGGING.md`
 | Symptom | Where to look |
 |---------|--------------|
 | Slow page loads on admin pages | Azure App Service metrics → Response time; DB query time in logs |
+| Slow only in local `python run.py` on Windows | [Slow local navigation](../development/local-windows-slow-navigation.md). Debug prints `>> METHOD path` when the request arrives and a Werkzeug line when it finishes. |
 | AI chat takes >30s | AI agent timeout (`AI_AGENT_TIMEOUT_SECONDS`); check `ai_reasoning_traces` for stuck runs |
 | Excel export times out | Memory/compute limits; consider exporting per-country batch |
 | 429 rate limit errors | Rate-limit decorators on sensitive routes; Redis consistency if multi-worker |

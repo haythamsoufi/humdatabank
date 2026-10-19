@@ -16,6 +16,14 @@
     }
 
     if (!cfg.swRegister || !('serviceWorker' in navigator)) {
+        // DEBUG leaves swRegister false. A worker left over from a non-debug
+        // run still intercepts /static/ and forces a network reload of every
+        // script and stylesheet, which is the multi-second blank navigation.
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+                regs.forEach(function (reg) { reg.unregister(); });
+            }).catch(function () { /* no-op */ });
+        }
         return;
     }
 

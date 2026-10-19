@@ -27,6 +27,20 @@ def register_request_hooks(app):
     install_suppressable_session_interface(app)
 
     @app.before_request
+    def log_dev_request_start():
+        """Show page requests as soon as they reach the debug server.
+
+        Werkzeug's own access line is written only after the response is
+        finished, and it used to be disabled entirely, so a multi-second
+        navigation looked like the terminal was idle.
+        """
+        if not app.debug or app.config.get("TESTING"):
+            return
+        if is_static_asset_request():
+            return
+        current_app.logger.info(">> %s %s", request.method, request.path)
+
+    @app.before_request
     def serve_root_health_probe_fast_path():
         if request.path != '/' or request.method != 'GET' or current_user.is_authenticated:
             return None

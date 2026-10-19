@@ -344,6 +344,13 @@ def init_flask_extensions(app, config_class, startup_start):
         from flask import g, session
 
         from app.models import User
+        from app.utils.request_utils import is_static_asset_request
+
+        # Stylesheets and scripts do not need the User row. Loading it here
+        # opened a DB connection on every asset, and dev used to re-request
+        # all of them on each navigation.
+        if is_static_asset_request():
+            return
 
         raw_user_id = session.get("_user_id")
         if not raw_user_id:

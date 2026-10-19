@@ -113,6 +113,22 @@ class TestReadWriteSettings:
             result = svc.read_settings()
         assert result.get("test_key") == "test_value"
 
+    def test_read_settings_hits_database_once_per_request(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            svc.write_settings({"cache_key": "one"})
+        with app.test_request_context("/"):
+            with patch.object(svc.SystemSettings, "get_all_as_dict", wraps=svc.SystemSettings.get_all_as_dict) as mocked:
+                first = svc.read_settings()
+                second = svc.read_settings()
+                assert mocked.call_count == 1
+            assert first == second
+            assert first.get("cache_key") == "one"
+            # A write in this request must not leave the previous copy in place.
+            svc.write_settings({"cache_key": "two"})
+            third = svc.read_settings()
+            assert third.get("cache_key") == "two"
+
     def test_write_settings_returns_true(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)

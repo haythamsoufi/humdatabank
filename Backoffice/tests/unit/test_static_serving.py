@@ -108,7 +108,7 @@ class TestStaticServingProductionCacheHeaders:
 
 
 class TestStaticServingDevelopmentCacheHeaders:
-    """Debug=True mode: cache should be disabled."""
+    """Debug=True: unversioned URLs stay uncached; ?v= URLs match production."""
 
     def test_development_mode_no_cache(self, tmp_path):
         filepath = tmp_path / 'app.js'
@@ -139,3 +139,15 @@ class TestStaticServingDevelopmentCacheHeaders:
         assert response.status_code == 200
         expires = response.headers.get('Expires', '')
         assert expires == '0'
+
+    def test_development_mode_versioned_file_is_immutable(self, tmp_path):
+        filepath = tmp_path / 'app.js'
+        filepath.write_bytes(b"var x = 1;")
+        flask_app = _make_app_with_static(str(tmp_path), debug=True)
+        client = flask_app.test_client()
+        response = client.get('/static/app.js?v=deploy.abc')
+        assert response.status_code == 200
+        cc = response.headers.get('Cache-Control', '')
+        assert 'immutable' in cc
+        assert 'max-age=31536000' in cc
+        assert 'no-store' not in cc

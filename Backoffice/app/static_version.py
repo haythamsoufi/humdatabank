@@ -27,11 +27,26 @@ def normalize_static_relative(filename: str) -> str:
     return rel
 
 
-@lru_cache(maxsize=8192)
 def file_content_token(static_root: str, relative: str) -> str:
+    """Content hash for *relative*, recomputed when the file's mtime or size changes.
+
+    The digest itself stays cached. Dev navigation calls this once per asset on
+    every HTML render; re-reading ``output.css`` each time was wasted work, but
+    a pure process-lifetime cache hid CSS/JS edits until restart because the
+    reloader only watches Python files.
+    """
     path = Path(static_root, *relative.split("/")) if relative else Path(static_root)
     try:
-        data = path.read_bytes()
+        stat = path.stat()
+    except OSError:
+        return ""
+    return _cached_file_digest(str(path), stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=8192)
+def _cached_file_digest(path_str: str, mtime_ns: int, size: int) -> str:
+    try:
+        data = Path(path_str).read_bytes()
     except OSError:
         return ""
     return hashlib.sha256(data).hexdigest()[:12]
@@ -71,4 +86,4 @@ def static_tree_fingerprint(static_root: Path, tree_relative: str) -> str:
 
 
 def clear_static_version_cache() -> None:
-    file_content_token.cache_clear()
+    _cached_file_digest.cache_clear()

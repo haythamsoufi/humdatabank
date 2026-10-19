@@ -96,6 +96,8 @@ $env:FLASK_APP = "run.py"
 
 **One Flask on port 5000.** Windows can bind two `python run.py` processes to `127.0.0.1:5000` at once, which makes assignment/PDF requests look stuck. Start only one server — a second `run.py` now exits with an error instead of sharing the port. To stop a forgotten copy: `netstat -ano | findstr :5000` then `taskkill /F /PID <pid>`. For WeasyPrint/P&B exports, `FLASK_USE_RELOADER=false` avoids mid-request restarts.
 
+**Pages fast on Azure but slow only in local `python run.py`:** that is endpoint protection scanning file access on the laptop, not Postgres or RAM. See [Slow local navigation (Windows)](../Backoffice/docs/runbooks/development/local-windows-slow-navigation.md).
+
 ## Common Development Commands
 
 ### Backoffice Development
@@ -1187,6 +1189,7 @@ Publication is **scoped to one `AssignedForm` (template + reporting period) at a
 - **`/api/ai/v2/ws` not working**: ensure `flask-sock` is installed/enabled; HTTP/SSE endpoints can still work without websockets.
 - **RAG returns nothing / errors after changing embedding model**: `AI_EMBEDDING_DIMENSIONS` must match the pgvector column; changing it requires a migration and re-embedding.
 - **AI falls back / “no provider configured”**: set at least one provider key (`OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure equivalents) and confirm model name via `OPENAI_MODEL`.
+- **Backoffice is fast on Azure and slow only in local `python run.py` (Windows):** the request reaches Flask and then sits inside the process while real-time endpoint protection scans imports and templates. The local database is not the cause. See [Slow local navigation (Windows)](../Backoffice/docs/runbooks/development/local-windows-slow-navigation.md).
 - **CSS changes not appearing**: run `npm run watch:css` in `Backoffice/` (and ensure `npm install` was run there).
 - **New button class not applying / missing styles**: the `.btn` system lives in `components.css` (static file, always served). Tailwind utility classes go through `output.css` (compiled). If a new Tailwind class on a button is missing, run `npm run build:css`. If a `.btn-*` class is missing, check `components.css` is loaded (via `layout.html`).
 - **Button appears rounded when it should be sharp**: do not add `rounded-*` Tailwind classes to buttons. The sharp-corner rule is enforced globally in `theme.css`; only `.rounded-full` is excluded (for FAB/circular buttons).

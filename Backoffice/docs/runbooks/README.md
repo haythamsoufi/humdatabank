@@ -114,6 +114,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 |---------|-------------|
 | [Release process](development/release-process.md) | Pre-release checklist, branch/migration safety, CSS rebuild, rollback |
 | [Tailwind & template safety](development/tailwind-and-template-safety.md) | CSS rebuild, CSP, sanitization, CI console guards |
+| [Slow local navigation (Windows)](development/local-windows-slow-navigation.md) | Pages fast on Azure, multi-second or stuck locally; endpoint protection, not the database |
 | [`scripts/` catalogue](development/repo-maintenance-scripts.md) | DB migration checker, AI trace exporters, console guard tooling |
 
 ---

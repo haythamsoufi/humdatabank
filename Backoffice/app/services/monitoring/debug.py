@@ -189,11 +189,17 @@ class DebugManager:
             logger = logging.getLogger(logger_name)
             logger.setLevel(log_level)
 
-        # Suppress werkzeug HTTP request logs and startup messages - only show errors
+        # Production keeps werkzeug quiet (Gunicorn writes the access log).
+        # The local debug server has no other access log, so page requests must
+        # stay at INFO or the terminal looks idle while a navigation is in flight.
+        # Static files are still dropped by StaticFileFilter.
         werkzeug_logger = logging.getLogger('werkzeug')
-        werkzeug_logger.setLevel(logging.ERROR)
-        # Remove any existing handlers that might have been added by Flask's debug mode
         werkzeug_logger.handlers.clear()
+        werkzeug_logger.propagate = True
+        if app.debug and log_level <= logging.INFO:
+            werkzeug_logger.setLevel(logging.INFO)
+        else:
+            werkzeug_logger.setLevel(logging.ERROR)
 
         # Specifically suppress SQLAlchemy debug logging regardless of environment
         sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')

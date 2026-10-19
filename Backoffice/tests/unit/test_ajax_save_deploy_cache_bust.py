@@ -111,6 +111,27 @@ class TestAssignment1593ContentChangeBustsAjaxSaveUrl:
             "they keep posting ?ajax=1 without the WAF wrap and get 403."
         )
 
+    def test_content_hash_tracks_mtime_without_manual_cache_clear(self, tmp_path):
+        """Dev edits CSS/JS without a Flask restart; ?v= must change on the next render."""
+        import os
+        import time
+
+        sv = _load_module("static_version_mtime", STATIC_VERSION_PY)
+        ajax = tmp_path / "js" / "forms" / "modules" / "ajax-save.js"
+        ajax.parent.mkdir(parents=True)
+        ajax.write_text("export function initAjaxSave(){ /* first */ }\n", encoding="utf-8")
+        app = SimpleNamespace(
+            static_folder=str(tmp_path),
+            root_path=str(tmp_path),
+            config={"ASSET_VERSION": "pinned-sha"},
+        )
+        before = sv.asset_query_version(app, AJAX_SAVE_REL)
+        ajax.write_text("export function initAjaxSave(){ /* second */ }\n", encoding="utf-8")
+        future = time.time() + 10
+        os.utime(ajax, (future, future))
+        after = sv.asset_query_version(app, AJAX_SAVE_REL)
+        assert before != after
+
     def test_import_map_ajax_save_url_includes_content_hash(self):
         module = _load_import_map_module()
         module.clear_import_map_cache()

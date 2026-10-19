@@ -68,13 +68,49 @@ def _write_settings_json_file(settings: Dict) -> bool:
         return False
 
 
+def _request_settings_stash():
+    """Return Flask ``g`` when a request can share one settings read."""
+    try:
+        from flask import g, has_request_context
+        if has_request_context():
+            return g
+    except Exception:
+        return None
+    return None
+
+
+def _clear_request_settings_cache() -> None:
+    stash = _request_settings_stash()
+    if stash is not None and hasattr(stash, "_humdb_system_settings"):
+        delattr(stash, "_humdb_system_settings")
+
+
 def read_settings() -> Dict:
     """Read settings from database. Returns empty dict if no settings exist.
 
     This function now reads from the database instead of JSON file.
     For backward compatibility during migration, it falls back to JSON file if DB is not available
     or if there is no Flask application context (e.g. CLI, imports, background threads).
+
+    Within one HTTP request the row set is read once. Layout context processors
+    each used to call this, so a page waited on several identical queries before
+    the first byte. Callers receive a copy and may mutate it before writing.
     """
+    stash = _request_settings_stash()
+    if stash is not None:
+        cached = getattr(stash, "_humdb_system_settings", None)
+        if isinstance(cached, dict):
+            return dict(cached)
+
+    data = _read_settings_from_store()
+    if stash is not None and isinstance(data, dict):
+        stash._humdb_system_settings = dict(data)
+        return dict(data)
+    return data
+
+
+def _read_settings_from_store() -> Dict:
+    """Uncached settings read (database, then legacy JSON file)."""
     if SystemSettings is None or db is None:
         return _read_settings_json_file()
 
@@ -130,6 +166,9 @@ def write_settings(settings: Dict, user_id: Optional[int] = None) -> bool:
         if current_app:
             current_app.logger.error(f"Failed to write setting to database: {e}")
         return False
+    finally:
+        # Drop the per-request copy so the next read sees the rows just written.
+        _clear_request_settings_cache()
 
 
 ALLOWED_ENTITY_TYPE_GROUPS = ['countries', 'ns_structure', 'secretariat']

@@ -9,9 +9,10 @@ Auth: an API key holding ``content:read`` with ``allow_query_api_key`` enabled, 
 ``?apiKey=`` (also accepted: ``api_key``, ``Authorization: Bearer``, ``X-API-Key``).
 Reads the published snapshot only (``plugins/fdrs/services/fdrs_public_adapter.py``).
 
-Content that Backoffice does not store (documents, translations, embeds, offices, the
-mailing list, CSV exports) is forwarded to the legacy data API when
-``FDRS_PUBLIC_COMPAT_PASSTHROUGH`` is on; otherwise those paths answer 501.
+Content that Backoffice does not store (translations, embeds, offices, the
+mailing list) is always forwarded to ``https://data-api.ifrc.org`` (or
+``FDRS_DATA_API_BASE``) using ``FDRS_DATA_API_KEY``.
+``/csv/export`` and ``/csv/exportns`` are files built from the published snapshot.
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from plugins.fdrs.services import fdrs_public_adapter as adapter
 
 CACHE_SECONDS = 300
 PASSTHROUGH_TIMEOUT_SECONDS = 25
+DEFAULT_LEGACY_DATA_API_BASE = "https://data-api.ifrc.org"
 _HOP_HEADERS = ("Content-Type", "Content-Disposition", "Content-Language")
 
 # Query contracts for Admin → API Management URL builder. The builder sends the key as
@@ -204,7 +206,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Digital-maturity style KPI values per society. Params: kpicode (optional), year.",
+        "description": "Published KPI values per society for kpicode and year. No kpicode returns [].",
         "consumers": "data.ifrc.org",
     },
     {
@@ -213,7 +215,11 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Forwarded to the legacy data API when FDRS_PUBLIC_COMPAT_PASSTHROUGH is on; otherwise 501.",
+        "description": (
+            "Publications from Manage Resources (type=EveryoneCounts|Analysis|FrontendVideo|DocumentGuide matches the subcategory). "
+            "ns=<DON code> returns that society's public approved submitted documents. "
+            "Read as response[0].documents."
+        ),
         "consumers": "data.ifrc.org",
     },
     {
@@ -222,7 +228,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Forwarded to the legacy data API when FDRS_PUBLIC_COMPAT_PASSTHROUGH is on; otherwise 501.",
+        "description": "Forwarded to https://data-api.ifrc.org using FDRS_DATA_API_KEY.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -231,7 +237,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Forwarded to the legacy data API when FDRS_PUBLIC_COMPAT_PASSTHROUGH is on; otherwise 501.",
+        "description": "Forwarded to https://data-api.ifrc.org using FDRS_DATA_API_KEY.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -240,7 +246,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Forwarded to the legacy data API when FDRS_PUBLIC_COMPAT_PASSTHROUGH is on; otherwise 501.",
+        "description": "Forwarded to https://data-api.ifrc.org using FDRS_DATA_API_KEY.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -249,7 +255,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Forwarded to the legacy data API when FDRS_PUBLIC_COMPAT_PASSTHROUGH is on; otherwise 501.",
+        "description": "Forwarded to https://data-api.ifrc.org using FDRS_DATA_API_KEY.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -258,7 +264,7 @@ API_ENDPOINTS = [
         "methods": ["POST"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Document mailing-list sign-up. Forwarded to the legacy data API when passthrough is on; otherwise 501.",
+        "description": "Document mailing-list sign-up. Forwarded to https://data-api.ifrc.org using FDRS_DATA_API_KEY.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -267,7 +273,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Full CSV / Excel download (excel=1). Forwarded to the legacy data API when passthrough is on.",
+        "description": "Published public FDRS figures as CSV. excel=1 returns the same rows as an .xlsx workbook.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -276,7 +282,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "One-society CSV (doncode). Forwarded to the legacy data API when passthrough is on.",
+        "description": "Published public FDRS figures for one society (doncode). excel=1 returns an .xlsx workbook.",
         "consumers": "data.ifrc.org",
     },
 ]
@@ -417,7 +423,9 @@ def fdrs_public_compat_kpi_value():
         year, error = _year_or_latest()
         if error is not None:
             return error
-        codes = adapter.split_codes(request.args.get("kpicode")) or list(adapter.DIGITAL_MATURITY_CODES)
+        codes = adapter.split_codes(request.args.get("kpicode"))
+        if not codes:
+            return _json([])
         return _json(adapter.build_kpi_values(codes, year=year))
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -436,12 +444,10 @@ def _passthrough(upstream_path: str):
     would happen if ``FDRS_DATA_API_BASE`` pointed at the host that now serves this app.
     """
     cfg = current_app.config
-    if not cfg.get("FDRS_PUBLIC_COMPAT_PASSTHROUGH"):
-        return api_error("Not served by Backoffice yet", 501)
-    base = (cfg.get("FDRS_DATA_API_BASE") or "").rstrip("/")
+    base = (cfg.get("FDRS_DATA_API_BASE") or DEFAULT_LEGACY_DATA_API_BASE).rstrip("/")
     key = cfg.get("FDRS_DATA_API_KEY")
-    if not base or not key:
-        return api_error("Legacy data API is not configured", 501)
+    if not key:
+        return api_error("FDRS_DATA_API_KEY is not configured", 501)
     if urlparse(base).netloc.lower() == (request.host or "").lower():
         current_app.logger.error("FDRS passthrough refused: FDRS_DATA_API_BASE points at this host (%s)", base)
         return api_error("Legacy data API is misconfigured", 502)
@@ -497,10 +503,68 @@ def _register_passthrough(rule: str, methods: list[str], *, exempt_csrf: bool = 
     bp.add_url_rule(rule, endpoint=name, view_func=view, methods=methods)
 
 
-for _path in ("/api/documents", "/api/embeddedcontent", "/api/smarttran", "/api/tran", "/api/offices"):
+for _path in ("/api/embeddedcontent", "/api/smarttran", "/api/tran", "/api/offices"):
     _register_passthrough(_path, ["GET"])
-for _path in ("/csv/export", "/csv/exportns"):
-    _register_passthrough(_path, ["GET"])
+
+
+@bp.route("/api/documents", methods=["GET"])
+@require_api_key(capability=CONTENT_READ)
+def fdrs_public_compat_documents():
+    try:
+        from plugins.fdrs.services.fdrs_public_documents import list_documents
+
+        payload = list_documents(
+            type_name=(request.args.get("type") or "").strip() or None,
+            ns=(request.args.get("ns") or "").strip() or None,
+        )
+        if payload is None:
+            return api_error("National Society not found", 404)
+        return _json(payload)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+def _download(body: bytes, *, filename: str, mimetype: str):
+    response = Response(body, mimetype=mimetype)
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.headers["Cache-Control"] = f"public, max-age={CACHE_SECONDS}"
+    return response
+
+
+def _export_file(don_code: str | None):
+    excel = (request.args.get("excel") or "").strip().lower() in {"1", "true", "yes"}
+    rows = adapter.export_rows(don_code=don_code)
+    stem = f"fdrs-{don_code}" if don_code else "fdrs"
+    if excel:
+        return _download(
+            adapter.export_xlsx(rows),
+            filename=f"{stem}.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    return _download(adapter.export_csv(rows), filename=f"{stem}.csv", mimetype="text/csv; charset=utf-8")
+
+
+@bp.route("/csv/export", methods=["GET"])
+@require_api_key(capability=CONTENT_READ)
+def fdrs_public_compat_csv_export():
+    try:
+        return _export_file(None)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/csv/exportns", methods=["GET"])
+@require_api_key(capability=CONTENT_READ)
+def fdrs_public_compat_csv_export_ns():
+    try:
+        don_code = (request.args.get("doncode") or "").strip().upper()
+        if not don_code:
+            return api_error("doncode is required", 400)
+        if adapter.get_society(don_code) is None:
+            return api_error("National Society not found", 404)
+        return _export_file(don_code)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 # The mailing-list POST carries no cookie and is authenticated by the API key
 # (``require_api_key``), so a CSRF token adds nothing; the browser cannot send one cross-origin.
 _register_passthrough("/api/documentSubscribe", ["POST"], exempt_csrf=True)

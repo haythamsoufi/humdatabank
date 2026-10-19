@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.models import FdrsSociety, FormData, IndicatorBank
+from app.models import FormData, IndicatorBank, NationalSociety
 from app.models.assignments import AssignmentEntityStatus
 from app.services.security.api_key_permissions import CONTENT_READ, build_permissions_document
 from app.utils.datetime_helpers import utcnow
@@ -212,11 +212,13 @@ def scenario(db_session, monkeypatch):
 
     country_a = create_test_country(db_session, name="Compatland A", iso2="CA", iso3="CAA")
     country_b = create_test_country(db_session, name="Compatland B", iso2="CB", iso3="CBB")
-    society_a = FdrsSociety(
-        don_code="DCAA001", country_id=country_a.id, name="Society A", zone_code="S1",
+    society_a = NationalSociety(
+        country_id=country_a.id, name="Society A", fdrs_don_code="DCAA001", fdrs_zone_code="S1",
         latitude=1.5, longitude=2.5,
     )
-    society_b = FdrsSociety(don_code="DCBB001", country_id=country_b.id, name="Society B", zone_code="S2")
+    society_b = NationalSociety(
+        country_id=country_b.id, name="Society B", fdrs_don_code="DCBB001", fdrs_zone_code="S2",
+    )
     db_session.add_all([society_a, society_b])
     db_session.commit()
 
@@ -319,7 +321,7 @@ class TestReferenceEndpoints:
         assert _get(client, key, "/api/entities/ns/NOPE").status_code == 404
 
     def test_inactive_society_is_hidden(self, client, db_session, scenario, key):
-        FdrsSociety.query.filter_by(don_code="DCBB001").one().is_active = False
+        NationalSociety.query.filter_by(fdrs_don_code="DCBB001").one().is_active = False
         db_session.commit()
         codes = {r["KPI_DON_code"] for r in _get(client, key, "/api/entities/ns").get_json()}
         assert "DCBB001" not in codes
@@ -439,7 +441,7 @@ class TestMapAndSummaries:
         assert by_zone["S3"] == 0
         assert by_zone[""] == 2200
 
-    def test_kpivalue_without_digital_items_is_empty(self, client, scenario, key):
+    def test_kpivalue_without_kpicode_is_empty(self, client, scenario, key):
         assert _get(client, key, "/api/kpivalue", year=2024, showunpublished="true").get_json() == []
 
     def test_kpivalue_returns_both_code_spellings(self, client, scenario, key):
@@ -462,20 +464,13 @@ class _FakeUpstream:
 
 
 class TestPassthrough:
-    def test_off_by_default(self, client, app, scenario, key, monkeypatch):
-        monkeypatch.setitem(app.config, "FDRS_PUBLIC_COMPAT_PASSTHROUGH", False)
-        assert _get(client, key, "/api/documents", isglobal="true").status_code == 501
-
-    def test_needs_upstream_configuration(self, client, app, scenario, key, monkeypatch):
-        monkeypatch.setitem(app.config, "FDRS_PUBLIC_COMPAT_PASSTHROUGH", True)
-        monkeypatch.setitem(app.config, "FDRS_DATA_API_BASE", None)
+    def test_needs_the_legacy_key(self, client, app, scenario, key, monkeypatch):
         monkeypatch.setitem(app.config, "FDRS_DATA_API_KEY", None)
-        assert _get(client, key, "/api/documents").status_code == 501
+        assert _get(client, key, "/api/embeddedcontent").status_code == 501
 
     def test_forwards_with_the_server_key(self, client, app, scenario, key, monkeypatch):
         import plugins.fdrs.public_compat_routes as routes
 
-        monkeypatch.setitem(app.config, "FDRS_PUBLIC_COMPAT_PASSTHROUGH", True)
         monkeypatch.setitem(app.config, "FDRS_DATA_API_BASE", "https://legacy.example.org")
         monkeypatch.setitem(app.config, "FDRS_DATA_API_KEY", "server-key")
         calls = []
@@ -485,28 +480,26 @@ class TestPassthrough:
             return _FakeUpstream()
 
         monkeypatch.setattr(routes.requests, "request", fake_request)
-        response = _get(client, key, "/csv/exportns", doncode="DCAA001")
+        response = _get(client, key, "/api/embeddedcontent", type="OCAC")
         assert response.status_code == 200
         assert response.data == b"a,b\n1,2\n"
         assert response.headers["Content-Type"].startswith("text/csv")
         method, url, kwargs = calls[0]
-        assert (method, url) == ("GET", "https://legacy.example.org/csv/exportns")
+        assert (method, url) == ("GET", "https://legacy.example.org/api/embeddedcontent")
         params = dict(kwargs["params"])
         assert params["apiKey"] == "server-key"
-        assert params["doncode"] == "DCAA001"
+        assert params["type"] == "OCAC"
         assert key not in params.values()
         assert kwargs["allow_redirects"] is False
 
     def test_refuses_to_call_itself(self, client, app, scenario, key, monkeypatch):
-        monkeypatch.setitem(app.config, "FDRS_PUBLIC_COMPAT_PASSTHROUGH", True)
         monkeypatch.setitem(app.config, "FDRS_DATA_API_BASE", "http://localhost")
         monkeypatch.setitem(app.config, "FDRS_DATA_API_KEY", "server-key")
-        assert _get(client, key, "/api/documents").status_code == 502
+        assert _get(client, key, "/api/embeddedcontent").status_code == 502
 
     def test_subscribe_posts_json_without_csrf_token(self, client, app, scenario, key, monkeypatch):
         import plugins.fdrs.public_compat_routes as routes
 
-        monkeypatch.setitem(app.config, "FDRS_PUBLIC_COMPAT_PASSTHROUGH", True)
         monkeypatch.setitem(app.config, "FDRS_DATA_API_BASE", "https://legacy.example.org")
         monkeypatch.setitem(app.config, "FDRS_DATA_API_KEY", "server-key")
         seen = {}
@@ -527,6 +520,219 @@ class TestPassthrough:
 
     def test_subscribe_requires_a_key(self, client, scenario):
         assert client.post("/api/documentSubscribe", json={"email": "a@example.org"}).status_code == 401
+
+
+def _csv_rows(response):
+    import csv
+    import io
+
+    text = response.data.decode("utf-8-sig")
+    return list(csv.DictReader(io.StringIO(text)))
+
+
+class TestDocuments:
+    def test_publications_follow_the_subcategory(self, client, db_session, scenario, key):
+        from datetime import date
+
+        from app.models.documents import Resource, ResourceSubcategory, ResourceTranslation
+
+        counts = ResourceSubcategory(name="Everyone Counts", display_order=1)
+        analysis = ResourceSubcategory(name="Analysis", display_order=2)
+        report = Resource(
+            resource_type="publication",
+            default_title="Everyone Counts 2024",
+            default_description="The report",
+            publication_date=date(2024, 6, 1),
+            resource_subcategory=counts,
+        )
+        other = Resource(
+            resource_type="publication",
+            default_title="Finance analysis",
+            publication_date=date(2023, 1, 1),
+            resource_subcategory=analysis,
+        )
+        not_a_publication = Resource(resource_type="resource", default_title="Toolkit")
+        db_session.add_all([counts, analysis, report, other, not_a_publication])
+        db_session.flush()
+        db_session.add(ResourceTranslation(
+            resource_id=report.id,
+            language_code="en",
+            title="Everyone Counts 2024",
+            filename="ec2024.pdf",
+            file_relative_path="resources/ec2024.pdf",
+            thumbnail_relative_path="resources/ec2024.png",
+        ))
+        db_session.commit()
+
+        payload = _get(client, key, "/api/documents", type="EveryoneCounts", isglobal="true").get_json()
+        documents = payload[0]["documents"]
+        assert payload[0]["code"] == ""
+        assert len(documents) == 1
+        assert documents[0]["name"] == "ec2024.pdf"
+        assert documents[0]["document_type"] == "EveryoneCounts"
+        assert documents[0]["year"] == 2024
+        assert documents[0]["LangCode"] == "en"
+        assert documents[0]["url"].endswith("/resources/download/%s/en" % report.id)
+        assert "Toolkit" not in {row["name"] for row in documents}
+        assert _get(client, key, "/api/documents", type="Analysis").get_json()[0]["documents"][0]["title"] == "Finance analysis"
+
+    def test_videos_and_document_guides_keep_their_urls(self, client, db_session, scenario, key):
+        from datetime import date
+
+        from app.models.documents import Resource, ResourceSubcategory, ResourceTranslation
+
+        videos = ResourceSubcategory(name="Frontend Video", display_order=3)
+        guides = ResourceSubcategory(name="Video Guide", display_order=4)
+        documents = ResourceSubcategory(name="Document Guide", display_order=5)
+        video = Resource(
+            resource_type="publication",
+            default_title="FDRS user guide",
+            publication_date=date(2021, 1, 1),
+            resource_subcategory=videos,
+        )
+        guide = Resource(
+            resource_type="publication",
+            default_title="How to add a user",
+            publication_date=date(2021, 1, 1),
+            resource_subcategory=guides,
+        )
+        handbook = Resource(
+            resource_type="publication",
+            default_title="User guide 2021",
+            publication_date=date(2021, 1, 1),
+            resource_subcategory=documents,
+        )
+        blocked = Resource(
+            resource_type="publication",
+            default_title="Blocked video",
+            publication_date=date(2021, 1, 1),
+            resource_subcategory=videos,
+        )
+        db_session.add_all([videos, guides, documents, video, guide, handbook, blocked])
+        db_session.flush()
+        db_session.add_all([
+            ResourceTranslation(
+                resource_id=video.id,
+                language_code="en",
+                title="FDRS user guide",
+                external_url="https://youtu.be/s8gWS22wpro",
+            ),
+            ResourceTranslation(
+                resource_id=video.id,
+                language_code="fr",
+                title="Guide FR",
+                external_url="https://www.youtube.com/watch?v=abcdef12345",
+            ),
+            ResourceTranslation(
+                resource_id=guide.id,
+                language_code="en",
+                title="How to add a user",
+                external_url="https://youtube.com/watch?v=zzzzzzzzzzz",
+            ),
+            ResourceTranslation(
+                resource_id=handbook.id,
+                language_code="en",
+                title="User guide 2021",
+                filename="guide.pdf",
+                file_relative_path="resources/guide.pdf",
+            ),
+            ResourceTranslation(
+                resource_id=blocked.id,
+                language_code="en",
+                title="Blocked video",
+                external_url="https://evil.example/watch",
+            ),
+        ])
+        db_session.commit()
+
+        rows = _get(client, key, "/api/documents", type="FrontendVideo").get_json()[0]["documents"]
+        by_title = {row["title"]: row for row in rows}
+        assert set(by_title) == {"FDRS user guide", "Guide FR", "How to add a user"}
+        assert by_title["FDRS user guide"]["url"] == "https://youtu.be/s8gWS22wpro"
+        assert by_title["FDRS user guide"]["document_type"] == "FrontendVideo"
+        assert by_title["FDRS user guide"]["LangCode"] == "en"
+        assert by_title["Guide FR"]["url"] == "https://www.youtube.com/watch?v=abcdef12345"
+        assert by_title["How to add a user"]["document_type"] == "FrontendVideo"
+        assert "Blocked video" not in by_title
+
+        guides_payload = _get(client, key, "/api/documents", type="DocumentGuide").get_json()[0]["documents"]
+        assert len(guides_payload) == 1
+        assert guides_payload[0]["document_type"] == "DocumentGuide"
+        assert guides_payload[0]["url"].endswith("/resources/download/%s/en" % handbook.id)
+
+    def test_ns_returns_public_approved_submitted_documents(self, client, db_session, scenario, key):
+        from app.models.documents import SubmittedDocument
+        from app.models.enums import DocumentStatus
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
+        country = scenario.country_a
+        public = SubmittedDocument(
+            filename="annual-report.pdf",
+            uploaded_by_user_id=user.id,
+            country_id=country.id,
+            document_type="Annual Report",
+            language="en",
+            period="2024",
+            is_public=True,
+            status=DocumentStatus.APPROVED,
+            storage_path="docs/annual-report.pdf",
+        )
+        hidden = SubmittedDocument(
+            filename="draft.pdf",
+            uploaded_by_user_id=user.id,
+            country_id=country.id,
+            is_public=False,
+            status=DocumentStatus.APPROVED,
+            storage_path="docs/draft.pdf",
+        )
+        db_session.add_all([public, hidden])
+        db_session.commit()
+
+        payload = _get(client, key, "/api/documents", ns="dcaa001").get_json()
+        documents = payload[0]["documents"]
+        assert payload[0]["code"] == "DCAA001"
+        assert [row["name"] for row in documents] == ["annual-report.pdf"]
+        assert documents[0]["document_type"] == "Annual Report"
+        assert documents[0]["year"] == 2024
+        assert documents[0]["Public"] == 1
+        assert str(public.public_id) in documents[0]["url"]
+        assert _get(client, key, "/api/documents", ns="NOPE").status_code == 404
+
+
+class TestExport:
+    def test_full_export_is_the_published_snapshot(self, client, scenario, key):
+        rows = _csv_rows(_get(client, key, "/csv/export"))
+        by_key = {(row["KPI_DON_code"], row["year"], row["KPI_code"]): row for row in rows}
+        reported = by_key[("DCAA001", "2024", "KPI_PeopleVol")]
+        assert reported["Value"] == "1500"
+        assert reported["source"] == "reported"
+        assert reported["iso_3"] == "CAA"
+        assert reported["ZON_Code"] == "S1"
+        assert by_key[("DCAA001", "2024", "KPI_PeopleVol_M_age_6_12")]["Value"] == "100"
+        assert by_key[("DCAA001", "2024", "KPI_PeopleVol_M")]["Value"] == "405"
+        assert by_key[("DCAA001", "2024", "h_gov_CHF")]["Value"] == "50"
+        assert by_key[("DCAA001", "2024", "KPI_pr_sex")]["Value"] == "Female"
+        assert by_key[("DCAA001", "2024", "supported1")]["Value"] == "DCBB001"
+        imputed = by_key[("DCBB001", "2024", "KPI_PeopleVol")]
+        assert imputed["Value"] == "700"
+        assert imputed["source"] == "imputed"
+        assert "KPI_CompatSecret" not in {row["KPI_code"] for row in rows}
+        assert _get(client, key, "/csv/export").headers["Content-Disposition"].endswith('filename="fdrs.csv"')
+
+    def test_one_society_export(self, client, scenario, key):
+        rows = _csv_rows(_get(client, key, "/csv/exportns", doncode="dcaa001"))
+        assert rows
+        assert {row["KPI_DON_code"] for row in rows} == {"DCAA001"}
+        assert _get(client, key, "/csv/exportns").status_code == 400
+        assert _get(client, key, "/csv/exportns", doncode="NOPE").status_code == 404
+
+    def test_excel_is_a_workbook(self, client, scenario, key):
+        response = _get(client, key, "/csv/export", excel="1")
+        assert response.status_code == 200
+        assert response.data[:2] == b"PK"
+        assert response.headers["Content-Disposition"].endswith('filename="fdrs.xlsx"')
+        assert "spreadsheetml" in response.headers["Content-Type"]
 
 
 class TestRegistry:
@@ -584,26 +790,27 @@ class TestSocietyImport:
 
     def test_dry_run_writes_nothing(self, db_session):
         stats = upsert_societies([_ENTITY], apply=False)
-        assert stats["created"] == 1
-        assert FdrsSociety.query.filter_by(don_code="DXX001").first() is None
+        assert stats["unlinked"] == ["DXX001"]
+        assert stats["created"] == 0
+        assert NationalSociety.query.filter_by(fdrs_don_code="DXX001").first() is None
 
     def test_apply_creates_and_links_by_iso3(self, db_session):
         country = create_test_country(db_session, name="Xland", iso2="XL", iso3="XXL")
         stats = upsert_societies([_ENTITY, {"NSO_DON_name": "skip me"}], apply=True)
         assert (stats["created"], stats["skipped"], stats["unlinked"]) == (1, 1, [])
-        society = FdrsSociety.query.filter_by(don_code="DXX001").one()
+        society = NationalSociety.query.filter_by(fdrs_don_code="DXX001").one()
         assert society.country_id == country.id
-        assert society.zone_code == "S3"
+        assert society.fdrs_zone_code == "S3"
 
     def test_unmatched_country_is_reported(self, db_session):
         stats = upsert_societies([{**_ENTITY, "iso_3": "QQQ", "iso_2": "QQ"}], apply=True)
         assert stats["unlinked"] == ["DXX001"]
-        assert FdrsSociety.query.filter_by(don_code="DXX001").one().country_id is None
+        assert NationalSociety.query.filter_by(fdrs_don_code="DXX001").first() is None
 
     def test_rerun_fills_blanks_but_keeps_backoffice_edits(self, db_session):
         create_test_country(db_session, name="Xland", iso2="XL", iso3="XXL")
         upsert_societies([_ENTITY], apply=True)
-        society = FdrsSociety.query.filter_by(don_code="DXX001").one()
+        society = NationalSociety.query.filter_by(fdrs_don_code="DXX001").one()
         society.name = "Edited in Backoffice"
         society.website = None
         db_session.commit()

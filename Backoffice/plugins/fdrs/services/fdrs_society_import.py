@@ -1,8 +1,8 @@
-"""Seed ``fdrs_society`` from a legacy ``GET /api/entities/ns`` payload.
+"""Fill FDRS identity on ``national_societies`` from a legacy ``GET /api/entities/ns`` payload.
 
-Run once before pointing the public site at the adapter, then maintain the table in
-Backoffice. Re-running only fills blanks unless ``overwrite`` is set, so edits made in
-Backoffice are not lost.
+Run once before pointing the public site at the adapter. A society is a National
+Society, so a DON code with no matching ``country`` is reported and not inserted.
+Re-running only fills blanks unless ``overwrite`` is set.
 """
 
 from __future__ import annotations
@@ -14,7 +14,24 @@ from datetime import date, datetime
 from typing import Any, Iterable, Mapping, Optional
 
 from app.extensions import db
-from app.models import Country, FdrsSociety
+from app.models import Country, NationalSociety
+
+# Legacy payload keys that are stored on the National Society. ISO codes stay on Country.
+_NS_COLUMNS = {
+    "name": "name",
+    "zone_code": "fdrs_zone_code",
+    "zone_name": "fdrs_zone_name",
+    "latitude": "latitude",
+    "longitude": "longitude",
+    "admission_date": "admission_date",
+    "admission_date_note": "admission_date_note",
+    "currency_code": "currency_code",
+    "search_string": "fdrs_search_string",
+    "website": "website",
+    "facebook": "facebook",
+    "twitter": "twitter",
+    "other_social": "other_social",
+}
 
 DEFAULT_LEGACY_BASE = "https://data-api.ifrc.org"
 _DATE_FORMATS = ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M:%S", "%m/%d/%Y")
@@ -97,13 +114,27 @@ def _find_country(fields: Mapping[str, Any]) -> Optional[Country]:
     return None
 
 
+def _find_society(don_code: str, country: Optional[Country]) -> Optional[NationalSociety]:
+    society = NationalSociety.query.filter(NationalSociety.fdrs_don_code == don_code).first()
+    if society is not None or country is None:
+        return society
+    return (
+        NationalSociety.query.filter(
+            NationalSociety.country_id == country.id,
+            NationalSociety.fdrs_don_code.is_(None),
+        )
+        .order_by(NationalSociety.is_active.desc(), NationalSociety.id.asc())
+        .first()
+    )
+
+
 def upsert_societies(
     entities: Iterable[Mapping[str, Any]],
     *,
     apply: bool = False,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Create or update ``FdrsSociety`` rows. ``apply=False`` computes the stats only."""
+    """Create or update National Society FDRS fields. ``apply=False`` computes the stats only."""
     stats: dict[str, Any] = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "unlinked": []}
     seen: set[str] = set()
     for entity in entities:
@@ -115,27 +146,34 @@ def upsert_societies(
         country = _find_country(fields)
         if country is None:
             stats["unlinked"].append(fields["don_code"])
+            continue
 
-        society = FdrsSociety.query.filter(FdrsSociety.don_code == fields["don_code"]).first()
+        society = _find_society(fields["don_code"], country)
         if society is None:
             stats["created"] += 1
             if apply:
-                db.session.add(FdrsSociety(country_id=country.id if country else None, **fields))
+                society = NationalSociety(country_id=country.id, name=fields["name"], fdrs_don_code=fields["don_code"])
+                for source, column in _NS_COLUMNS.items():
+                    if source == "name":
+                        continue
+                    setattr(society, column, fields.get(source))
+                db.session.add(society)
             continue
 
         changed = False
-        for column, value in fields.items():
-            if column == "don_code" or value is None:
+        if not society.fdrs_don_code:
+            changed = True
+            if apply:
+                society.fdrs_don_code = fields["don_code"]
+        for source, column in _NS_COLUMNS.items():
+            value = fields.get(source)
+            if value is None:
                 continue
             if overwrite or getattr(society, column) in (None, ""):
                 if getattr(society, column) != value:
                     changed = True
                     if apply:
                         setattr(society, column, value)
-        if country is not None and society.country_id is None:
-            changed = True
-            if apply:
-                society.country_id = country.id
         stats["updated" if changed else "unchanged"] += 1
 
     if apply:

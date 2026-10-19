@@ -19,19 +19,20 @@ Legacy semantics this module reproduces:
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Iterable, Mapping, Optional
 
-from sqlalchemy import func
+from sqlalchemy import and_, func
 
 from app.extensions import db
-from app.models import AssignedForm, FdrsSociety, FormData, FormItem, IndicatorBank
+from app.models import AssignedForm, Country, FormData, FormItem, IndicatorBank, NationalSociety
 from app.models.assignments import AssignmentEntityStatus
-from app.models.fdrs_society import FDRS_ZONES
-from app.models.organization import NationalSociety
+from app.models.organization import FDRS_ZONES
 from app.services.data_quality.helpers import parse_period_year
 from app.services.data_retrieval.shared import form_item_privacy_is_public_expr
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
@@ -67,7 +68,6 @@ NETWORK_ITEMS = {
 AGE_BANDS = ("6_12", "13_17", "18_29", "30_39", "40_49", "50_59", "60_69", "70_79", "80")
 HEADLINE_SUFFIXES = ("_Tot", "_CPD")
 IMPUTED_SUFFIX = "_IP"
-DIGITAL_MATURITY_CODES = ("KPIDigitalPeople", "KPIDigitalProcess", "KPIDigitalTechnology")
 VOLUNTEER_BANK_CODE = "KPI_PeopleVol"
 MAX_INDICATORS_PER_REQUEST = 200
 
@@ -410,6 +410,14 @@ def _norm(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _with_don_code():
+    """Active National Societies the public site can select."""
+    return and_(
+        NationalSociety.is_active.is_(True),
+        NationalSociety.fdrs_don_code.isnot(None),
+    )
+
+
 def society_name_index() -> dict[str, str]:
     """Normalised society name, ISO3 or DON code -> DON code.
 
@@ -417,19 +425,12 @@ def society_name_index() -> dict[str, str]:
     reply needs the reverse lookup the importer used to build them.
     """
     index: dict[str, str] = {}
-    by_country: dict[int, str] = {}
-    for society in FdrsSociety.query.filter(FdrsSociety.is_active.is_(True)).all():
-        index.setdefault(_norm(society.name), society.don_code)
-        index.setdefault(_norm(society.don_code), society.don_code)
-        iso3 = society.iso3 or (society.country.iso3 if society.country else None)
+    for society in NationalSociety.query.filter(_with_don_code()).all():
+        index.setdefault(_norm(society.name), society.fdrs_don_code)
+        index.setdefault(_norm(society.fdrs_don_code), society.fdrs_don_code)
+        iso3 = society.country.iso3 if society.country else None
         if iso3:
-            index.setdefault(_norm(iso3), society.don_code)
-        if society.country_id:
-            by_country.setdefault(society.country_id, society.don_code)
-    if by_country:
-        for ns in NationalSociety.query.filter(NationalSociety.country_id.in_(list(by_country))).all():
-            if (ns.name or "").strip():
-                index.setdefault(_norm(ns.name), by_country[ns.country_id])
+            index.setdefault(_norm(iso3), society.fdrs_don_code)
     return index
 
 
@@ -499,25 +500,27 @@ def _fetch_cells(
             FormData.published_disagg_data,
             FormData.published_source,
             AssignedForm.period_name,
-            FdrsSociety.don_code,
-            FdrsSociety.zone_code,
+            NationalSociety.fdrs_don_code.label("don_code"),
+            NationalSociety.fdrs_zone_code.label("zone_code"),
         )
         .select_from(FormData)
         .join(AssignmentEntityStatus, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
         .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
-        .join(FdrsSociety, FdrsSociety.country_id == AssignmentEntityStatus.entity_id)
+        .join(NationalSociety, and_(
+            NationalSociety.country_id == AssignmentEntityStatus.entity_id,
+            _with_don_code(),
+        ))
         .filter(AssignedForm.template_id == FDRS_TEMPLATE_ID)
         .filter(AssignmentEntityStatus.entity_type == "country")
-        .filter(FdrsSociety.is_active.is_(True))
         .filter(FormData.form_item_id.in_(item_ids))
         .filter(published_snapshot_clause())
     )
     if year is not None:
         query = query.filter(AssignedForm.period_name.like(f"%{int(year)}%"))
     if don_codes:
-        query = query.filter(FdrsSociety.don_code.in_(don_codes))
+        query = query.filter(NationalSociety.fdrs_don_code.in_(don_codes))
     if zone_code:
-        query = query.filter(FdrsSociety.zone_code == zone_code)
+        query = query.filter(NationalSociety.fdrs_zone_code == zone_code)
     return query.order_by(FormData.published_at.asc().nullsfirst(), FormData.id.asc()).all()
 
 
@@ -643,8 +646,8 @@ def build_global_validation(year: int) -> list[dict[str, Any]]:
     by_don = compute_series([spec], year=year).get(spec.code, {})
     zone_by_don = {
         don: zone
-        for don, zone in db.session.query(FdrsSociety.don_code, FdrsSociety.zone_code)
-        .filter(FdrsSociety.don_code.in_(list(by_don)))
+        for don, zone in db.session.query(NationalSociety.fdrs_don_code, NationalSociety.fdrs_zone_code)
+        .filter(NationalSociety.fdrs_don_code.in_(list(by_don)))
         .all()
     } if by_don else {}
     totals = {zone: 0.0 for zone in FDRS_ZONES}
@@ -691,23 +694,23 @@ def _legacy_date(value: Optional[date]) -> Optional[str]:
     return value.strftime("%d.%m.%Y") if value else None
 
 
-def society_to_legacy(society: FdrsSociety) -> dict[str, Any]:
+def society_to_legacy(society: NationalSociety) -> dict[str, Any]:
     country = society.country
-    zone_name = society.zone_name or FDRS_ZONES.get(society.zone_code or "")
+    zone_name = society.fdrs_zone_name or FDRS_ZONES.get(society.fdrs_zone_code or "")
     return {
-        "KPI_DON_code": society.don_code,
+        "KPI_DON_code": society.fdrs_don_code,
         "NSO_DON_name": society.name,
         "NSO_ZON_name": zone_name,
-        "ZON_Code": society.zone_code,
-        "iso_3": (country.iso3 if country else None) or society.iso3,
-        "iso_2": (country.iso2 if country else None) or society.iso2,
-        "country": society.country_name or (country.name if country else None),
+        "ZON_Code": society.fdrs_zone_code,
+        "iso_3": country.iso3 if country else None,
+        "iso_2": country.iso2 if country else None,
+        "country": country.name if country else None,
         "lat": society.latitude,
         "long": society.longitude,
         "admission_date": _legacy_date(society.admission_date),
         "admission_date_note": society.admission_date_note,
         "cur_code": society.currency_code,
-        "SearchString": society.search_string,
+        "SearchString": society.fdrs_search_string,
         "Url": society.website,
         "url": society.website,
         "facebook": society.facebook,
@@ -717,13 +720,185 @@ def society_to_legacy(society: FdrsSociety) -> dict[str, Any]:
 
 
 def list_societies() -> list[dict[str, Any]]:
-    rows = FdrsSociety.query.filter(FdrsSociety.is_active.is_(True)).order_by(FdrsSociety.name.asc()).all()
+    rows = NationalSociety.query.filter(_with_don_code()).order_by(NationalSociety.name.asc()).all()
     return [society_to_legacy(s) for s in rows]
 
 
 def get_society(don_code: str) -> Optional[dict[str, Any]]:
-    society = FdrsSociety.query.filter(
-        func.upper(FdrsSociety.don_code) == (don_code or "").strip().upper(),
-        FdrsSociety.is_active.is_(True),
+    society = NationalSociety.query.filter(
+        func.upper(NationalSociety.fdrs_don_code) == (don_code or "").strip().upper(),
+        NationalSociety.is_active.is_(True),
     ).first()
     return society_to_legacy(society) if society else None
+
+
+# ---------------------------------------------------------------------------
+# CSV / Excel download
+# ---------------------------------------------------------------------------
+
+EXPORT_COLUMNS = (
+    "KPI_DON_code",
+    "NSO_DON_name",
+    "iso_3",
+    "ZON_Code",
+    "NSO_ZON_name",
+    "year",
+    "KPI_code",
+    "Value",
+    "source",
+)
+_SEX_LETTER = {"male": "M", "female": "F"}
+
+
+def _source_label(row: Any) -> str:
+    if (row.published_source or "").strip().lower() == "imputed":
+        return "imputed"
+    return "reported"
+
+
+def _codes_for_cell(row: Any, *, name_to_don: Mapping[str, str]) -> list[tuple[str, Any]]:
+    """Legacy KPI strings this published cell contributes to the download."""
+    item_id = row.form_item_id
+    bank_code = (row.fdrs_kpi_code or "").strip()
+    if bank_code:
+        found: list[tuple[str, Any]] = []
+        total = json_number(_total_value(row))
+        if total is not None:
+            found.append((bank_code, total))
+        cells = breakdown_cells(row.published_disagg_data)
+        sex_sums: dict[str, float] = {}
+        for (sex, band), number in cells.items():
+            letter = _SEX_LETTER.get(sex)
+            if letter is None:
+                continue
+            sex_sums[letter] = sex_sums.get(letter, 0.0) + number
+            if band:
+                found.append((f"{bank_code}_{letter}_age_{band}", json_number(number)))
+        for letter, total_for_sex in sex_sums.items():
+            found.append((f"{bank_code}_{letter}", json_number(total_for_sex)))
+        return found
+
+    if item_id == INCOME_MATRIX_ITEM_ID:
+        cells = matrix_cells(row.published_disagg_data)
+        return [
+            (code, json_number(cells[f"{label}_{INCOME_MATRIX_COLUMN}".lower()]))
+            for code, label in INCOME_KPI_TO_ROW.items()
+            if f"{label}_{INCOME_MATRIX_COLUMN}".lower() in cells
+        ]
+
+    for code, question_item in QUESTION_KPI_TO_ITEM.items():
+        if question_item == item_id:
+            text = _clean_text(row.published_value)
+            return [(code, text)] if text else []
+
+    for prefix, (network_item, _column) in NETWORK_ITEMS.items():
+        if network_item != item_id:
+            continue
+        spec = SeriesSpec(
+            f"{prefix}1",
+            KIND_NETWORK,
+            reported_only=False,
+            item_id=network_item,
+            network_prefix=prefix,
+            network_slot=1,
+        )
+        amounts = SeriesSpec(
+            f"{prefix}1_amount",
+            KIND_NETWORK,
+            reported_only=False,
+            item_id=network_item,
+            network_prefix=prefix,
+            network_slot=1,
+            network_amount=True,
+        )
+        found = []
+        for candidate in (spec, amounts):
+            observation = observation_for(candidate, row, name_to_don=name_to_don)
+            if observation is not None:
+                found.append((candidate.code, observation.value))
+        return found
+    return []
+
+
+def export_rows(*, don_code: Optional[str] = None) -> list[dict[str, Any]]:
+    """One row per published public KPI, society and year. Later publications win a duplicate."""
+    query = (
+        db.session.query(
+            FormData.id,
+            FormData.form_item_id,
+            FormData.published_value,
+            FormData.published_numeric_value,
+            FormData.published_disagg_data,
+            FormData.published_source,
+            AssignedForm.period_name,
+            IndicatorBank.fdrs_kpi_code,
+            NationalSociety.fdrs_don_code.label("don_code"),
+            NationalSociety.name.label("name"),
+            NationalSociety.fdrs_zone_code.label("zone_code"),
+            NationalSociety.fdrs_zone_name.label("zone_name"),
+            Country.iso3.label("country_iso3"),
+        )
+        .select_from(FormData)
+        .join(AssignmentEntityStatus, FormData.assignment_entity_status_id == AssignmentEntityStatus.id)
+        .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+        .join(FormItem, FormData.form_item_id == FormItem.id)
+        .outerjoin(IndicatorBank, IndicatorBank.id == FormItem.indicator_bank_id)
+        .join(NationalSociety, and_(
+            NationalSociety.country_id == AssignmentEntityStatus.entity_id,
+            _with_don_code(),
+        ))
+        .outerjoin(Country, Country.id == NationalSociety.country_id)
+        .filter(AssignedForm.template_id == FDRS_TEMPLATE_ID)
+        .filter(AssignmentEntityStatus.entity_type == "country")
+        .filter(form_item_privacy_is_public_expr())
+        .filter(published_snapshot_clause())
+        .order_by(FormData.published_at.asc().nullsfirst(), FormData.id.asc())
+    )
+    if don_code:
+        query = query.filter(func.upper(NationalSociety.fdrs_don_code) == don_code.strip().upper())
+    fetched = query.all()
+    network_ids = {item_id for item_id, _column in NETWORK_ITEMS.values()}
+    name_to_don = society_name_index() if any(row.form_item_id in network_ids for row in fetched) else {}
+
+    chosen: dict[tuple[str, int, str], dict[str, Any]] = {}
+    for row in fetched:
+        year = parse_period_year(row.period_name)
+        if year is None:
+            continue
+        identity = {
+            "KPI_DON_code": row.don_code,
+            "NSO_DON_name": row.name,
+            "iso_3": row.country_iso3,
+            "ZON_Code": row.zone_code,
+            "NSO_ZON_name": row.zone_name or FDRS_ZONES.get(row.zone_code or ""),
+            "year": year,
+            "source": _source_label(row),
+        }
+        for code, value in _codes_for_cell(row, name_to_don=name_to_don):
+            if value is None or not code:
+                continue
+            chosen[(row.don_code, year, code)] = {**identity, "KPI_code": code, "Value": value}
+    return [chosen[key] for key in sorted(chosen)]
+
+
+def export_csv(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=EXPORT_COLUMNS, extrasaction="ignore", lineterminator="\r\n")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({column: "" if row.get(column) is None else row[column] for column in EXPORT_COLUMNS})
+    return buffer.getvalue().encode("utf-8-sig")
+
+
+def export_xlsx(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "FDRS"
+    sheet.append(list(EXPORT_COLUMNS))
+    for row in rows:
+        sheet.append([row.get(column) for column in EXPORT_COLUMNS])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()

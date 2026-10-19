@@ -1124,7 +1124,7 @@ def _resolve_owner(email: str | None):
 
 
 def _country_indexes():
-    from app.models import Country, FdrsSociety, NationalSociety
+    from app.models import Country, NationalSociety
     from sqlalchemy.exc import SQLAlchemyError
 
     from app.extensions import db
@@ -1139,9 +1139,9 @@ def _country_indexes():
             by_fold.setdefault(fold_name(country.iso3), country)
     societies = {}
     try:
-        for society in FdrsSociety.query.all():
-            if society.don_code and society.country_id and society.country:
-                societies[society.don_code.strip().upper()] = society.country
+        for society in NationalSociety.query.filter(NationalSociety.fdrs_don_code.isnot(None)).all():
+            if society.country_id and society.country:
+                societies[society.fdrs_don_code.strip().upper()] = society.country
     except SQLAlchemyError:
         db.session.rollback()
     ns_by_fold = {}

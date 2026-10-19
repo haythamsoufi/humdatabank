@@ -44,3 +44,65 @@ def safe_external_redirect_target(url: str | None) -> str | None:
     candidate = (url or "").strip()
     ok, _reason = validate_allowlisted_https_url(candidate)
     return candidate if ok else None
+
+
+# Hosts a Manage Resources row may point at instead of an uploaded file.
+# YouTube is not on ``IFRC_DOCUMENT_ALLOWED_HOSTS``: that list is also used to
+# fetch documents server-side, and a video link must never be downloaded as a file.
+_RESOURCE_LINK_HOSTS = (
+    "youtube.com",
+    "youtu.be",
+    "youtube-nocookie.com",
+)
+
+
+def resource_link_hosts() -> list[str]:
+    """YouTube plus the configured IFRC document hosts."""
+    configured = current_app.config.get("IFRC_DOCUMENT_ALLOWED_HOSTS") or []
+    hosts: list[str] = list(_RESOURCE_LINK_HOSTS)
+    for host in configured:
+        text = str(host or "").strip().lower().strip(".")
+        if text and text not in hosts:
+            hosts.append(text)
+    return hosts
+
+
+def resource_external_url_error(url: str | None) -> str:
+    """Empty string when *url* is blank or an allowed https link; otherwise the reason."""
+    candidate = (url or "").strip()
+    if not candidate:
+        return ""
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in candidate):
+        return "Invalid URL"
+    result = validate_outbound_url(
+        candidate,
+        allowed_hosts=resource_link_hosts(),
+        allowed_ports=(443,),
+        resolve_dns=False,
+    )
+    if result.ok:
+        return ""
+    if result.reason == "Outbound host allow-list is not configured":
+        return "This link host is not allowed"
+    return result.reason or "Invalid URL"
+
+
+def safe_resource_external_url(url: str | None) -> str | None:
+    """Return a stored resource link when it is safe to show or redirect to."""
+    candidate = (url or "").strip()
+    if not candidate or not isinstance(url, str):
+        return None
+    if resource_external_url_error(candidate):
+        return None
+    return candidate
+
+
+def is_youtube_url(url: str | None) -> bool:
+    """True when *url* is an allowlisted YouTube link."""
+    candidate = safe_resource_external_url(url)
+    if not candidate:
+        return False
+    from urllib.parse import urlparse
+
+    host = (urlparse(candidate).hostname or "").lower()
+    return host == "youtu.be" or host.endswith(".youtu.be") or host == "youtube.com" or host.endswith(".youtube.com") or host.endswith(".youtube-nocookie.com")

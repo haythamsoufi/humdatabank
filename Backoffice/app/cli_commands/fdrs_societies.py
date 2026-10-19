@@ -28,7 +28,7 @@ def register_fdrs_society_commands(app):
     @click.option("--apply/--dry-run", default=False, show_default=True, help="Write changes to the database.")
     @with_appcontext
     def import_societies(file_path, from_api, overwrite, apply):
-        """Create or update fdrs_society rows from a legacy entities/ns payload."""
+        """Fill FDRS DON code, zone and profile fields on national_societies."""
         from plugins.fdrs.services.fdrs_society_import import fetch_entities, upsert_societies
 
         if bool(file_path) == bool(from_api):
@@ -57,25 +57,17 @@ def register_fdrs_society_commands(app):
             click.echo("Nothing written. Re-run with --apply.")
 
     @fdrs_societies_group.command("link")
-    @click.option("--apply/--dry-run", default=False, show_default=True)
     @with_appcontext
-    def link_societies(apply):
-        """Link societies that have no country yet to a country by ISO3 / ISO2."""
-        from app.extensions import db
-        from app.models import FdrsSociety
-        from plugins.fdrs.services.fdrs_society_import import _find_country
+    def link_societies():
+        """List National Societies that still have no FDRS DON code."""
+        from app.models import NationalSociety
 
-        linked, missing = 0, []
-        for society in FdrsSociety.query.filter(FdrsSociety.country_id.is_(None)).all():
-            country = _find_country({"iso3": society.iso3, "iso2": society.iso2})
-            if country is None:
-                missing.append(society.don_code)
-                continue
-            linked += 1
-            if apply:
-                society.country_id = country.id
-        if apply:
-            db.session.commit()
-        click.echo(f"{'Linked' if apply else 'Would link'} {linked}; still unlinked: {len(missing)}")
+        missing = [
+            society.name
+            for society in NationalSociety.query.filter(NationalSociety.fdrs_don_code.is_(None))
+            .order_by(NationalSociety.name.asc())
+            .all()
+        ]
+        click.echo(f"{len(missing)} national society row(s) have no FDRS DON code.")
         if missing:
-            click.echo(", ".join(sorted(missing)))
+            click.echo("Import entities/ns to fill a match. Still without a code: " + ", ".join(missing))

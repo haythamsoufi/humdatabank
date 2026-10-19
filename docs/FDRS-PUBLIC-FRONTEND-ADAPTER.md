@@ -16,13 +16,15 @@ Implemented in the FDRS plugin:
 |---|---|
 | Routes (`/api/lastpublishedyear`, `/api/entities/ns[/<doncode>]`, `/api/data`, `/api/dataimputed`, `/api/KpiImputedValue`, `/api/globalvalidationdata`, `/api/kpivalue`) | `Backoffice/plugins/fdrs/public_compat_routes.py` |
 | Code translation, published-snapshot query, response trees | `Backoffice/plugins/fdrs/services/fdrs_public_adapter.py` |
-| Society reference (`fdrs_society`) | `Backoffice/app/models/fdrs_society.py`, migration `add_fdrs_society` |
+| Society reference | `national_societies.fdrs_don_code` and zone columns (`flask fdrs-societies import`) |
 | Seeding | `flask fdrs-societies import` / `link` (`app/cli_commands/fdrs_societies.py`) |
 | `apiKey` query alias | `query_api_key_value()` in `app/services/security/api_authentication.py` |
-| Forward to the legacy API for `documents`, `embeddedcontent`, `smarttran`, `tran`, `offices`, `documentSubscribe`, `/csv/export`, `/csv/exportns` | `_passthrough()` in `public_compat_routes.py`, off unless `FDRS_PUBLIC_COMPAT_PASSTHROUGH=true` |
+| `/csv/export` and `/csv/exportns` (`excel=1` for `.xlsx`) | Published snapshot, one row per society, year and KPI code |
+| `GET /api/documents` | Publications (`resource_type = publication`, subcategory → `EveryoneCounts` / `Analysis` / `FrontendVideo`) and, with `ns`, public approved submitted documents |
+| Forward to `https://data-api.ifrc.org` for `embeddedcontent`, `smarttran`, `tran`, `offices`, `documentSubscribe` | Always. Uses `FDRS_DATA_API_KEY`. `FDRS_DATA_API_BASE` overrides the host |
 | Tests | `Backoffice/tests/unit/test_plugins/test_fdrs_public_compat.py` |
 
-Not implemented: Backoffice-owned documents, translations, embeds, offices and CSV export (see [Content that is not the indicator bank](#content-that-is-not-the-indicator-bank)).
+Not implemented: translations, embeds and offices (see [Content that is not the indicator bank](#content-that-is-not-the-indicator-bank)). `/api/documents` reads Manage Resources publications and public approved submitted documents. `/csv/export` and `/csv/exportns` are files of the published snapshot.
 
 ### Set up
 
@@ -31,9 +33,8 @@ Not implemented: Backoffice-owned documents, translations, embeds, offices and C
 3. Create an API key in Admin → API Keys with the **`content:read`** capability and **"allow API key in query string"** on. The client sends the key in the URL, so a key without that setting gets `403`. Raise its rate limit: the default is 60 requests a minute per key, and every visitor shares the one key the site ships.
 4. Mark the FDRS form items the site shows as `privacy = public` and publish them with Manage Publication. Anything else is invisible here, including the income-sources matrix (item 943), the network-support matrices (919, 929) and the President / Secretary General sex questions (924, 934).
 5. Browser calls from data.ifrc.org are cross-origin. Add that origin to `CORS_ALLOWED_ORIGINS`; `/api/*` already goes through Flask-CORS. `/csv/*` is a plain link and needs no CORS entry.
-6. Optional, for a single-host cutover: set `FDRS_PUBLIC_COMPAT_PASSTHROUGH=true`.
 
-If Backoffice takes over the `data-api.ifrc.org` hostname (option A), `FDRS_DATA_API_BASE` must keep pointing at the **legacy origin** under a different hostname. The existing FDRS sync scripts read that variable, and so does the passthrough; pointed at Backoffice they would call themselves. The passthrough refuses a base that equals the request host and answers `502`.
+`FDRS_DATA_API_KEY` is the key already used for FDRS sync against data-api.ifrc.org. `FDRS_DATA_API_BASE` defaults to `https://data-api.ifrc.org`. Set it only to point at a different legacy host. If Backoffice takes over the `data-api.ifrc.org` hostname, this base must stay the old origin under another hostname. A base equal to the request host is refused with `502`.
 
 The production bundle initialises its FDRS client once:
 
@@ -91,7 +92,7 @@ Confirmed against the live bundle and `fdrs_api_endpoints.xlsx`.
 | GET | `/api/dataimputed` | Imputed income/expenditure and people-reached charts |
 | GET | `/api/KpiImputedValue` | Imputed map layer |
 | GET | `/api/globalvalidationdata` | Volunteer total; zone filter is applied in the browser |
-| GET | `/api/kpivalue` | Digital-maturity indicators on the society profile |
+| GET | `/api/kpivalue` | One KPI per society. The public site no longer calls this for digital maturity |
 | GET | `/api/documents` | Everyone Counts, analysis, videos, society documents |
 | GET | `/api/embeddedcontent` | Dashboard embeds |
 | GET | `/api/smarttran` | Page translations |
@@ -156,7 +157,6 @@ Other fixed values:
 | `h_gov_CHF,f_gov_CHF,ind_CHF,corp_CHF,found_CHF,un_CHF,pooled_f_CHF,ngo_CHF,si_CHF,iga_CHF,KPI_incomeFromNSsLC_CHF,ifrc_CHF,icrc_CHF,other_CHF` | `GET /api/data?year=` and the same list with `KPI_Don_Code` on a society profile |
 | `KPI_pr_sex,KPI_sg_sex` | `GET /api/data?year=&KPI_Don_Code=` |
 | `supported1,received_support1` | `GET /api/data?KPI_Don_Code=` |
-| `KPIDigitalPeople`, `KPIDigitalProcess`, `KPIDigitalTechnology` | `GET /api/kpivalue`. The current client hardcodes `year=2021` inside the service and drops the year argument. |
 
 Sex and age are not extra query parameters. The client derives response ids:
 
@@ -241,7 +241,7 @@ Resolve in this order:
 3. If the remainder ends in `_M` or `_F`, or in `_M_age_<band>` / `_F_age_<band>`, the bank code is the part before that suffix. The number comes from `published_disagg_data` (male/female, then the age band). Bands already used in Backoffice are `6_12`, `13_17`, `18_29`, `30_39`, `40_49`, `50_59`, `60_69`, `70_79`, `80`.
 4. Income-source codes (`h_gov_CHF`, `f_gov_CHF`, `ind_CHF`, `corp_CHF`, `found_CHF`, `un_CHF`, `pooled_f_CHF`, `ngo_CHF`, `si_CHF`, `iga_CHF`, `other_CHF`, `KPI_incomeFromNSsLC_CHF`, `ifrc_CHF`, `icrc_CHF`) are published matrix rows on the FDRS finance item, not `indicator_bank` rows.
 5. `KPI_pr_sex` and `KPI_sg_sex` are the published President and Secretary General sex questions.
-6. `supported1` and `received_support1` are the published network-support values. The client splits `value` on commas and treats the pieces as DON codes, so the adapter keeps that comma-separated text. Backoffice stores one matrix cell per counterpart (`{society name}_{column}`) and has lost the legacy slot numbers, so slot 1 carries every counterpart and `supported2` … `supported10` return nothing. `supported1_amount` returns the matching amounts in the same order. Counterpart names are mapped back to DON codes through `fdrs_society.name`, then `national_societies.name`, then ISO3.
+6. `supported1` and `received_support1` are the published network-support values. The client splits `value` on commas and treats the pieces as DON codes, so the adapter keeps that comma-separated text. Backoffice stores one matrix cell per counterpart (`{society name}_{column}`) and has lost the legacy slot numbers, so slot 1 carries every counterpart and `supported2` … `supported10` return nothing. `supported1_amount` returns the matching amounts in the same order. Counterpart names are mapped back to DON codes through `national_societies.name`, then ISO3.
 7. `year` matches the calendar year of `AssignedForm.period_name` (FDRS periods are stored as the year, for example `2024`).
 8. `KPI_Don_Code` matches the society reference below, then the country’s published row. When several DON codes are passed, return each of them under that indicator.
 
@@ -253,7 +253,7 @@ When a code is unknown, private, or has no published value for the filters, its 
 
 `/api/lastpublishedyear` returns a bare JSON number. With no published data it returns the previous calendar year.
 
-`/api/KpiImputedValue` and `/api/globalvalidationdata` use the latest published year when `year` is missing. `/api/kpivalue` without `kpicode` asks for `KPIDigitalPeople`, `KPIDigitalProcess` and `KPIDigitalTechnology`; each is resolved like any other code (a bank code in `indicator_bank.fdrs_kpi_code`) and returns `[]` until those indicators exist on template 21 and are public.
+`/api/KpiImputedValue` and `/api/globalvalidationdata` use the latest published year when `year` is missing. `/api/kpivalue` resolves `kpicode` like any other bank code and returns `[]` when `kpicode` is omitted. The public site no longer requests `KPIDigitalPeople`, `KPIDigitalProcess`, or `KPIDigitalTechnology`.
 
 `/api/lastpublishedyear` is the greatest year that has any published public FDRS value.
 
@@ -263,23 +263,23 @@ When a code is unknown, private, or has no published value for the filters, its 
 
 `Country` has ISO codes, name, and region. It does not have a FDRS DON code, `S1`–`S5`, coordinates, admission date, or website. `NationalSociety.code` is not the DON code (`DKEN001` and similar).
 
-`fdrs_society` holds one row per society the public site can select:
+`national_societies` holds the society the public site selects. FDRS-only fields sit on that row (`fdrs_don_code`, `fdrs_zone_code`, `fdrs_zone_name`, coordinates, admission date, website). A row with no `fdrs_don_code` is hidden from these endpoints.
 
 | Column | Legacy field |
 |---|---|
-| `don_code` | `KPI_DON_code` |
+| `fdrs_don_code` | `KPI_DON_code` |
 | `country_id` | join to `country` (iso2 / iso3) |
 | `name` | `NSO_DON_name` |
-| `country_name`, `iso2`, `iso3` | `country`, `iso_2`, `iso_3` (used when no country is linked) |
-| `zone_code` | `ZON_Code` (`S1`–`S5`) |
-| `zone_name` | `NSO_ZON_name` (defaults to the zone table above) |
+| `country.iso2`, `country.iso3` | `iso_2`, `iso_3` |
+| `fdrs_zone_code` | `ZON_Code` (`S1`–`S5`) |
+| `fdrs_zone_name` | `NSO_ZON_name` (defaults to the zone table above) |
 | `latitude`, `longitude` | `lat`, `long` |
 | `admission_date`, `admission_date_note` | `admission_date` (served as `dd.MM.yyyy`), `admission_date_note` |
-| `currency_code`, `search_string` | `cur_code`, `SearchString` |
+| `currency_code`, `fdrs_search_string` | `cur_code`, `SearchString` |
 | `website`, `facebook`, `twitter`, `other_social` | `Url` (also served as `url`), `facebook`, `twitter`, `othersocial` |
 | `is_active` | Hidden from every endpoint when false |
 
-Seed it once from the current `GET /api/entities/ns` payload (`flask fdrs-societies import`), then maintain it in Backoffice. There is no admin screen for it yet; edit rows in the database or re-import with `--overwrite`. Data endpoints join through `country_id`, so a society with no linked country returns the profile but no figures.
+Seed it once from the current `GET /api/entities/ns` payload (`flask fdrs-societies import`). A DON code is stored on the National Society for that ISO code. A code with no `country` match is reported and skipped, because every National Society belongs to a country. Re-import fills blanks; `--overwrite` replaces edited values. Data endpoints join through `country_id`.
 
 ## Content that is not the indicator bank
 
@@ -288,12 +288,13 @@ Numbers can move first. The rest of the homepage is content the published-data f
 | Endpoint | Backoffice today | Adapter approach |
 |---|---|---|
 | `/api/data`, `/api/dataimputed`, `/api/KpiImputedValue`, `/api/globalvalidationdata`, `/api/lastpublishedyear` | Published FDRS snapshot | **Done** (phase 1) |
-| `/api/entities/ns` | `fdrs_society` | **Done** (phase 1) |
-| `/api/kpivalue` | Only if those three digital-maturity indicators are on template 21 and published | **Done**; returns `[]` until the items exist |
-| `/api/documents`, `/csv/export`, `/csv/exportns` | Public documents exist, but not in the `documents[0].documents` shape, and not as the FDRS CSV | Phase 2. Until then, forwarded to the legacy API when `FDRS_PUBLIC_COMPAT_PASSTHROUGH` is on, otherwise `501` |
+| `/api/entities/ns` | `national_societies` rows that have `fdrs_don_code` | **Done** (phase 1) |
+| `/api/kpivalue` | Published snapshot for the requested `kpicode`. Omitted `kpicode` returns `[]` | **Done** |
+| `/csv/export`, `/csv/exportns` | Published snapshot, long file (`KPI_DON_code`, year, `KPI_code`, `Value`, `source`). `excel=1` is the same rows as `.xlsx` | **Done** |
+| `/api/documents` | Manage Resources publications when `type` / `isglobal` is set. `ns` is that society's public approved submitted documents. Shape is `[{code, documents}]` | **Done** |
 | `/api/embeddedcontent`, `/api/smarttran`, `/api/tran`, `/api/offices`, `/api/documentSubscribe` | Not stored as FDRS CMS content | Phase 3. Same forward or `501` until an editor exists in Backoffice |
 
-With the passthrough on, one host serves the whole contract and no gateway split is needed: Backoffice answers the numeric paths and relays the rest, replacing the caller’s key with `FDRS_DATA_API_KEY`. The upstream host and path are fixed in code, redirects are not followed, and the relay adds a hop and the legacy API’s latency to those paths. A gateway split in front of `data-api.ifrc.org` stays valid if you would rather not relay.
+Translations, embeds, offices, and the mailing list are always relayed to `https://data-api.ifrc.org`. Backoffice replaces the caller’s key with `FDRS_DATA_API_KEY`. The upstream path is fixed in code and redirects are not followed. The relay adds a hop and the legacy API’s latency to those paths.
 
 ## Implementation sketch
 

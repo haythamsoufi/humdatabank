@@ -2,7 +2,7 @@
 Organization hierarchy models for National Society structure.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, Date, event
+from sqlalchemy import Column, Integer, Float, ForeignKey, String, Text, DateTime, Boolean, Date, event
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, backref, validates
 from ..extensions import db
@@ -24,6 +24,15 @@ NS_STATUSES = (
     NS_STATUS_INACTIVE,
 )
 NS_STATUS_CHOICES = [(value, value) for value in NS_STATUSES]
+
+# Legacy FDRS public site zones (data.ifrc.org ZON_Code).
+FDRS_ZONES = {
+    "S1": "Africa",
+    "S2": "Americas",
+    "S3": "Asia Pacific",
+    "S4": "Europe and Central Asia",
+    "S5": "Middle East and North Africa",
+}
 
 
 def _ns_status_key(value):
@@ -99,6 +108,21 @@ class NationalSociety(db.Model):
 
     # FDRS ns_logos file stored under system/ns/ (usually {ISO3}.png).
     logo_filename = db.Column(db.String(255), nullable=True)
+
+    # Legacy data.ifrc.org identity. ``code`` is not the DON code.
+    fdrs_don_code = db.Column(db.String(20), nullable=True, unique=True, index=True)
+    fdrs_zone_code = db.Column(db.String(2), nullable=True, index=True)
+    fdrs_zone_name = db.Column(db.String(100), nullable=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    admission_date = db.Column(db.Date, nullable=True)
+    admission_date_note = db.Column(db.Text, nullable=True)
+    currency_code = db.Column(db.String(3), nullable=True)
+    fdrs_search_string = db.Column(db.Text, nullable=True)
+    website = db.Column(db.Text, nullable=True)
+    facebook = db.Column(db.Text, nullable=True)
+    twitter = db.Column(db.Text, nullable=True)
+    other_social = db.Column(db.Text, nullable=True)
 
     # Relationships
     country = db.relationship('Country', backref='national_societies')

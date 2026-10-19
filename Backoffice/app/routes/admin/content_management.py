@@ -790,23 +790,135 @@ def _decode_b64_form_text_fields(form):
             pass  # Not base64-encoded (e.g. server-side pre-population on GET); leave unchanged
 
 
+def _thumbnail_file_exists(translation) -> bool:
+    """True when the translation's thumbnail path points at a stored image."""
+    path = (getattr(translation, "thumbnail_relative_path", None) or "").strip()
+    return bool(path) and storage.exists(storage.RESOURCES, path)
+
+
+def _thumbnail_language(rows):
+    """English cover when one exists, otherwise the first language that has a file."""
+    chosen = None
+    for row in rows:
+        path = (getattr(row, "thumbnail_relative_path", None) or "").strip()
+        if not path or not storage.exists(storage.RESOURCES, path):
+            continue
+        code = (getattr(row, "language_code", None) or "").strip().lower()
+        if not code:
+            continue
+        if code == "en":
+            return "en"
+        if chosen is None or code < chosen:
+            chosen = code
+    return chosen
+
+
+def _format_resource_date(value):
+    if not value:
+        return ""
+    try:
+        from flask_babel import format_date
+        return format_date(value, format="medium")
+    except Exception:
+        return value.isoformat()
+
+
+def _resource_grid_rows(resources):
+    """Rows for the admin resources grid, including cover and download links."""
+    resource_ids = [resource.id for resource in resources]
+    grouped = {}
+    if resource_ids:
+        translations = (
+            ResourceTranslation.query
+            .filter(ResourceTranslation.resource_id.in_(resource_ids))
+            .all()
+        )
+        for translation in translations:
+            grouped.setdefault(translation.resource_id, []).append(translation)
+
+    rows = []
+    for resource in resources:
+        translations = sorted(
+            grouped.get(resource.id, []),
+            key=lambda translation: (
+                0 if (translation.language_code or "").strip().lower() == "en" else 1,
+                (translation.language_code or "").strip().lower(),
+            ),
+        )
+        thumb_lang = _thumbnail_language(translations)
+        languages = []
+        downloads = []
+        seen = set()
+        for translation in translations:
+            code = (translation.language_code or "").strip().lower()
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            languages.append(code.upper())
+            if translation.has_uploaded_document:
+                downloads.append({
+                    "language": code.upper(),
+                    "name": translation.document_display_name or "",
+                    "url": url_for(
+                        "content_management.download_resource_file_admin",
+                        resource_id=resource.id,
+                        language=code,
+                    ),
+                    "external": False,
+                })
+            elif translation.public_external_url:
+                downloads.append({
+                    "language": code.upper(),
+                    "name": "",
+                    "url": translation.public_external_url,
+                    "external": True,
+                })
+        subcategory = resource.resource_subcategory.name if resource.resource_subcategory else ""
+        rows.append({
+            "id": resource.id,
+            "title": resource.default_title or "",
+            "resource_type": (resource.resource_type or "").replace("_", " ").title(),
+            "resource_type_key": (resource.resource_type or "").strip().lower(),
+            "subcategory": subcategory,
+            "languages": languages,
+            "publication_date": (
+                f"{resource.publication_date.isoformat()}T00:00:00" if resource.publication_date else None
+            ),
+            "publication_date_display": _format_resource_date(resource.publication_date),
+            "description": resource.default_description or "",
+            "thumbnail_url": (
+                url_for(
+                    "content_management.download_resource_thumbnail_admin",
+                    resource_id=resource.id,
+                    language=thumb_lang,
+                )
+                if thumb_lang else None
+            ),
+            "thumbnail_lang": thumb_lang or "",
+            "edit_url": url_for("content_management.edit_resource", resource_id=resource.id),
+            "delete_url": url_for("content_management.delete_resource", resource_id=resource.id),
+            "downloads": downloads,
+        })
+    return rows
+
+
 # === Resource Management Routes ===
 @bp.route("/resources", methods=["GET"])
 @permission_required('admin.resources.manage')
 def manage_resources():
-    from app.utils.api_pagination import validate_pagination_params
-    page, per_page = validate_pagination_params(request.args, default_per_page=10, max_per_page=100)
     search_query = request.args.get('search', '').strip()
     query = (
         Resource.query.options(joinedload(Resource.resource_subcategory))
         .order_by(Resource.publication_date.desc(), Resource.created_at.desc())
     )
-    if search_query:
-        query = query.filter(Resource.default_title.ilike(safe_ilike_pattern(search_query)))
-    resources = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    # Return JSON for API requests (mobile app)
+    # JSON stays paginated for the mobile app. The HTML page loads the full list into AG Grid.
     if is_json_request():
+        from app.utils.api_pagination import validate_pagination_params
+        page, per_page = validate_pagination_params(request.args, default_per_page=10, max_per_page=100)
+        if search_query:
+            query = query.filter(Resource.default_title.ilike(safe_ilike_pattern(search_query)))
+        resources = query.paginate(page=page, per_page=per_page, error_out=False)
         resources_data = []
         for resource in resources.items:
             resources_data.append({
@@ -824,13 +936,10 @@ def manage_resources():
             pages=resources.pages,
         )
 
-    delete_form = DeleteForm()
     return render_template(
         "admin/resources/manage_resources.html",
         title="Manage Resources",
-        resources=resources,
-        delete_form=delete_form,
-        search_query=search_query
+        resource_rows=_resource_grid_rows(query.all()),
     )
 
 @bp.route("/resources/new", methods=["GET", "POST"])
@@ -879,6 +988,7 @@ def new_resource():
         form=form,
         title="Create New Resource",
         resource_subcategories=_resource_subcategories_for_modal(),
+        thumbnail_file_exists=_thumbnail_file_exists,
     )
 
 @bp.route("/resources/edit/<int:resource_id>", methods=["GET", "POST"])
@@ -971,6 +1081,7 @@ def edit_resource(resource_id):
         form=form,
         resource=resource,
         resource_subcategories=_resource_subcategories_for_modal(),
+        thumbnail_file_exists=_thumbnail_file_exists,
     )
 
 @bp.route("/resources/delete/<int:resource_id>", methods=["POST"])
@@ -1234,19 +1345,11 @@ def download_resource_thumbnail_admin(resource_id, language):
         language_code=language
     ).first()
 
-    if not translation:
-        flash(f"No thumbnail found for {language} version.", "warning")
-        return redirect(url_for("content_management.manage_resources"))
-
-    if not translation.thumbnail_relative_path:
-        flash(f"No thumbnail found for {language} version.", "warning")
-        return redirect(url_for("content_management.manage_resources"))
+    # This URL is used as an <img> source. A redirect to an HTML page shows up as a broken image.
+    if not _thumbnail_file_exists(translation):
+        abort(404)
 
     try:
-        if not storage.exists(storage.RESOURCES, translation.thumbnail_relative_path):
-            flash("Thumbnail file not found on server.", "danger")
-            return redirect(url_for("content_management.manage_resources"))
-
         response = storage.stream_response(
             storage.RESOURCES, translation.thumbnail_relative_path,
             filename=f"thumbnail_{resource_id}_{language}.png",
@@ -1261,8 +1364,7 @@ def download_resource_thumbnail_admin(resource_id, language):
 
     except Exception as e:
         current_app.logger.error(f"Error downloading thumbnail: {e}", exc_info=True)
-        flash("Error downloading thumbnail.", "danger")
-        return redirect(url_for("content_management.manage_resources"))
+        abort(404)
 
 @bp.route("/resources/<int:resource_id>/generate-thumbnail/<language_code>", methods=["POST"])
 @permission_required('admin.resources.manage')

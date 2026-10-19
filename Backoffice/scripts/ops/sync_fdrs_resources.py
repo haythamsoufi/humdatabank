@@ -6,8 +6,10 @@ The source is the legacy catalog:
     GET https://data-api.ifrc.org/api/documents?isglobal=true
 
 That list is Everyone Counts, analysis notes, user guides, and videos.
-Files already stored under the same filename are left in place. Resources
-that exist only in Databank (extra languages, local guidance) are not deleted.
+Every FDRS resource is checked. A file or cover already stored is kept only
+when the blob is in storage; a missing blob is downloaded or rendered again.
+Resources that exist only in Databank (extra languages, local guidance) are
+not deleted.
 
 Dry run (default) prints the comparison and writes nothing:
 
@@ -248,6 +250,7 @@ def main() -> int:
             "missing": plan["missing"],
             "create_resources": plan["create_resources"],
             "attach_to_existing": plan["attach_to_existing"],
+            "verify_resources": plan.get("verify_resources"),
             "only_databank": plan["only_databank"],
             "files": plan["files"],
             "only_databank_files": plan["only_databank_files"],

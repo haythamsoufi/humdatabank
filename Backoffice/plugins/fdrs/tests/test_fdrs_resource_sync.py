@@ -71,5 +71,9 @@ def test_plan_keeps_existing_files_and_lists_databank_only_copies():
     assert ("Everyone_counts_2014_EN.pdf", "missing") in statuses
     assert plan["create_resources"] == 1
     assert plan["attach_to_existing"] == 0
+    assert plan["verify_resources"] == 2
     assert plan["only_databank_files"][0]["language"] == "hu"
     assert plan["only_databank_files"][0]["resource_id"] == 3
+    stored_group = next(action for action in plan["sync"] if action["resource_id"] == 3)
+    assert stored_group["files"][0]["url"] == "https://data-api.ifrc.org/covid.pdf"
+    assert {action["resource_id"] for action in plan["sync"]} == {3, None}

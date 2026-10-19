@@ -2,9 +2,10 @@
 
 The legacy catalog is ``GET /api/documents?isglobal=true`` on
 ``https://data-api.ifrc.org``. Each row is one file or one video, not one
-library record. This groups language copies of the same publication, skips
-files already stored under the same filename, and leaves Databank-only
-resources in place.
+library record. This groups language copies of the same publication.
+``apply_plan`` writes every FDRS resource: a stored file or cover is kept
+only when the blob is actually in storage, and a missing blob is downloaded
+or rendered again. Resources that exist only in Databank stay in place.
 
 Dry-run planning is pure. Writing files and rows is ``apply_plan``.
 """
@@ -261,6 +262,7 @@ def build_plan(
     file_rows: list[dict[str, Any]] = []
     to_create: list[dict[str, Any]] = []
     to_attach: list[dict[str, Any]] = []
+    to_sync: list[dict[str, Any]] = []
     matched_filenames: set[str] = set()
     matched_urls: set[str] = set()
 
@@ -300,6 +302,16 @@ def build_plan(
                 "databank_id": resource_id,
                 "databank_title": hits[0].resource_title if hits else None,
             })
+        files = [
+            {
+                "language": doc.language,
+                "name": doc.name,
+                "url": doc.url,
+                "thumbnail": doc.thumbnail,
+                "video": doc.is_video,
+            }
+            for doc in group.docs
+        ]
         action = {
             "type": group.document_type,
             "subcategory": SUBCATEGORY_BY_TYPE.get(group.document_type, group.document_type),
@@ -307,23 +319,20 @@ def build_plan(
             "title": group.title,
             "description": group.description,
             "resource_id": resource_id,
-            "files": [
-                {
-                    "language": doc.language,
-                    "name": doc.name,
-                    "url": doc.url,
-                    "thumbnail": doc.thumbnail,
-                    "video": doc.is_video,
-                }
-                for doc in pending
-            ],
+            "files": files,
         }
+        to_sync.append(action)
         if not pending:
             continue
+        pending_files = [
+            row for row in files
+            if any(row["language"] == doc.language and row["url"] == doc.url for doc in pending)
+        ]
+        narrowed = {**action, "files": pending_files}
         if resource_id is None:
-            to_create.append(action)
+            to_create.append(narrowed)
         else:
-            to_attach.append(action)
+            to_attach.append(narrowed)
 
     only_databank = []
     for row in stored:
@@ -352,11 +361,13 @@ def build_plan(
         "missing": sum(1 for row in file_rows if row["status"] == "missing"),
         "create_resources": len(to_create),
         "attach_to_existing": len(to_attach),
+        "verify_resources": len(to_sync),
         "only_databank": len(only_databank),
         "files": sorted(file_rows, key=lambda row: (row["type"], row["year"] or 0, row["name"].casefold())),
         "only_databank_files": only_databank,
         "create": to_create,
         "attach": to_attach,
+        "sync": to_sync,
         "skipped_duplicates": [
             {"type": doc.document_type, "language": doc.language, "name": doc.name}
             for doc in skipped
@@ -448,7 +459,7 @@ def _store_external_url(translation, url: str) -> None:
 
 
 def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
-    """Create missing resources and download their files. Existing files stay."""
+    """Write every FDRS resource. Keep a stored file or cover only when its blob exists."""
     import uuid
     from io import BytesIO
 
@@ -462,6 +473,8 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
     created = 0
     attached = 0
     saved = 0
+    repaired = 0
+    thumbnails = 0
     errors: list[str] = []
 
     def subcategory_for(name: str) -> ResourceSubcategory:
@@ -482,24 +495,32 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
                 return path.split("/")[0]
         return str(uuid.uuid4())
 
+    def blob_exists(relative_path: str | None) -> bool:
+        path = (relative_path or "").strip()
+        return bool(path) and storage.exists(storage.RESOURCES, path)
+
     def store_thumbnail(translation, folder: str, *, file_bytes: bytes | None = None, remote_url: str = "") -> None:
-        """Keep a cover image: the FDRS thumbnail, otherwise one we render."""
-        if translation.thumbnail_relative_path:
+        """Keep a cover image when the blob is present. Otherwise store the FDRS image or render one."""
+        nonlocal thumbnails
+        stored_path = (translation.thumbnail_relative_path or "").strip()
+        if blob_exists(stored_path):
             return
         from app.services.content.thumbnail_service import ThumbnailService
 
-        before = translation.thumbnail_relative_path
         ThumbnailService.ensure_for_translation(
             translation,
             folder,
             category=storage.RESOURCES,
             file_bytes=file_bytes,
             remote_thumbnail_url=remote_url,
+            force=bool(stored_path),
         )
-        if not translation.thumbnail_relative_path and (remote_url or file_bytes or translation.file_relative_path or translation.external_url):
+        if blob_exists(translation.thumbnail_relative_path):
+            thumbnails += 1
+            return
+        if remote_url or file_bytes or translation.file_relative_path or translation.external_url:
             label = translation.filename or translation.title or translation.language_code
-            if before == translation.thumbnail_relative_path:
-                errors.append(f"{label}: thumbnail was not generated")
+            errors.append(f"{label}: thumbnail was not generated")
 
     def store_file(resource: Resource, language: str, filename: str, data: bytes, *, thumbnail: bool) -> str:
         safe = secure_filename(filename) or "document"
@@ -509,9 +530,14 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
         storage.upload(storage.RESOURCES, relative, FileStorage(stream=BytesIO(data), filename=safe))
         return relative
 
-    for action in list(plan.get("create") or []) + list(plan.get("attach") or []):
+    actions = list(plan.get("sync") or [])
+    if not actions:
+        actions = list(plan.get("create") or []) + list(plan.get("attach") or [])
+    for action in actions:
         try:
             resource = Resource.query.get(action["resource_id"]) if action.get("resource_id") else None
+            existed = resource is not None
+            extended = False
             if resource is None:
                 published = date(action["year"], 1, 1) if action.get("year") else None
                 resource = Resource(
@@ -525,7 +551,6 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
                 db.session.flush()
                 created += 1
             else:
-                attached += 1
                 if resource.resource_type != "publication":
                     resource.resource_type = "publication"
                 if resource.resource_subcategory_id is None:
@@ -543,39 +568,58 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
                     )
                     db.session.add(translation)
                     db.session.flush()
+                    extended = True
                 if item.get("video"):
+                    already_linked = bool((getattr(translation, "external_url", None) or "").strip())
                     _store_external_url(translation, item.get("url") or "")
                     store_thumbnail(
                         translation,
                         folder_for(resource),
                         remote_url=(item.get("thumbnail") or "").strip(),
                     )
-                    saved += 1
+                    if not already_linked:
+                        saved += 1
+                        extended = True
                     continue
-                if translation.file_relative_path:
+                remote_thumb = (item.get("thumbnail") or "").strip()
+                if blob_exists(translation.file_relative_path):
                     store_thumbnail(
                         translation,
                         folder_for(resource),
-                        remote_url=(item.get("thumbnail") or "").strip(),
+                        remote_url=remote_thumb,
                     )
                     continue
+                had_path = bool((translation.file_relative_path or "").strip())
                 data = download_bytes(item["url"])
                 translation.file_relative_path = store_file(
                     resource, language, item.get("name") or "document", data, thumbnail=False,
                 )
                 translation.filename = (item.get("name") or "")[:255]
-                saved += 1
+                if had_path:
+                    repaired += 1
+                else:
+                    saved += 1
+                    extended = True
                 store_thumbnail(
                     translation,
                     folder_for(resource),
                     file_bytes=data,
                     remote_url=(item.get("thumbnail") or "").strip(),
                 )
+            if existed and extended:
+                attached += 1
             db.session.commit()
         except Exception as exc:  # noqa: BLE001 — keep going and report the publication
             db.session.rollback()
             errors.append(f"{action.get('title')}: {exc}")
-    return {"created": created, "attached": attached, "saved": saved, "errors": errors}
+    return {
+        "created": created,
+        "attached": attached,
+        "saved": saved,
+        "repaired": repaired,
+        "thumbnails": thumbnails,
+        "errors": errors,
+    }
 
 
 def stored_translations_from_db() -> list[StoredTranslation]:

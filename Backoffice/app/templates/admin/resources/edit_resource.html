@@ -299,13 +299,15 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                         <span class="text-xs text-gray-400 ml-auto">Optional</span>
                     </div>
 
+                    {% set en_thumb_ready = en_tr and thumbnail_file_exists(en_tr) %}
+                    {% set en_thumb_missing = en_tr and en_tr.thumbnail_relative_path and not en_thumb_ready %}
                     {# hidden delete flag — submitted with the form if user marks thumbnail for deletion #}
-                    {% if en_tr and en_tr.thumbnail_relative_path %}
+                    {% if en_thumb_ready %}
                         <input type="hidden" name="delete_thumbnail_en" id="delete-thumb-flag-en" value="">
                     {% endif %}
 
-                    <div id="thumb-preview-en" class="{% if en_tr and en_tr.thumbnail_relative_path %}mb-3{% endif %}">
-                        {% if en_tr and en_tr.thumbnail_relative_path %}
+                    <div id="thumb-preview-en" class="{% if en_thumb_ready or en_thumb_missing %}mb-3{% endif %}">
+                        {% if en_thumb_ready %}
                             <img src="{{ url_for('content_management.download_resource_thumbnail_admin', resource_id=resource.id, language='en') }}"
                                  alt="Thumbnail" data-thumbnail-preview="true"
                                  class="border rounded shadow-sm mb-2 block"
@@ -314,12 +316,14 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                 <i class="fas fa-clock"></i>Will be removed on save
                                 <button type="button" class="thumb-undo-btn ml-1 text-blue-600 hover:underline font-medium" data-lang="en">Undo</button>
                             </span>
+                        {% elif en_thumb_missing %}
+                            <p class="text-xs text-amber-700">The saved thumbnail file is missing from storage. Upload a new image, or generate one if the document file is available.</p>
                         {% endif %}
                     </div>
 
                     {{ thumb_field_en(id="thumb-input-en", class="file-input-hidden") }}
                     <div class="flex items-center gap-2 flex-wrap" id="thumb-actions-en">
-                        {% if en_tr and en_tr.thumbnail_relative_path %}
+                        {% if en_thumb_ready %}
                             <label for="thumb-input-en" class="btn btn-secondary btn-sm cursor-pointer" title="Replace thumbnail">
                                 <i class="fas fa-sync-alt mr-1.5"></i>Replace
                             </label>
@@ -488,13 +492,15 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                 <span class="text-xs text-gray-400 ml-auto">Optional</span>
                             </div>
 
+                            {% set lang_thumb_ready = resource and ltr and thumbnail_file_exists(ltr) %}
+                            {% set lang_thumb_missing = resource and ltr and ltr.thumbnail_relative_path and not lang_thumb_ready %}
                             {# hidden delete flag #}
-                            {% if resource and ltr and ltr.thumbnail_relative_path %}
+                            {% if lang_thumb_ready %}
                                 <input type="hidden" name="delete_thumbnail_{{ lang_code }}" id="delete-thumb-flag-{{ lang_code }}" value="">
                             {% endif %}
 
-                            <div id="thumb-preview-{{ lang_code }}" class="{% if resource and ltr and ltr.thumbnail_relative_path %}mb-3{% endif %}">
-                                {% if resource and ltr and ltr.thumbnail_relative_path %}
+                            <div id="thumb-preview-{{ lang_code }}" class="{% if lang_thumb_ready or lang_thumb_missing %}mb-3{% endif %}">
+                                {% if lang_thumb_ready %}
                                     <img src="{{ url_for('content_management.download_resource_thumbnail_admin', resource_id=resource.id, language=lang_code) }}"
                                          alt="Thumbnail" data-thumbnail-preview="true"
                                          class="border rounded shadow-sm mb-2 block"
@@ -503,13 +509,15 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                         <i class="fas fa-clock"></i>Will be removed on save
                                         <button type="button" class="thumb-undo-btn ml-1 text-blue-600 hover:underline font-medium" data-lang="{{ lang_code }}">Undo</button>
                                     </span>
+                                {% elif lang_thumb_missing %}
+                                    <p class="text-xs text-amber-700">The saved thumbnail file is missing from storage. Upload a new image, or generate one if the document file is available.</p>
                                 {% endif %}
                             </div>
 
                             {{ thumb_field(id="thumb-input-" + lang_code, class="file-input-hidden") }}
                             <div class="flex items-center gap-2 flex-wrap" id="thumb-actions-{{ lang_code }}">
                                 {% if resource %}
-                                    {% if ltr and ltr.thumbnail_relative_path %}
+                                    {% if lang_thumb_ready %}
                                         <label for="thumb-input-{{ lang_code }}" class="btn btn-secondary btn-sm cursor-pointer" title="Replace thumbnail">
                                             <i class="fas fa-sync-alt mr-1.5"></i>Replace
                                         </label>

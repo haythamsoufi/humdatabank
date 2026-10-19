@@ -1,36 +1,14 @@
 {% extends "core/layout.html" %}
-{% from "macros/breadcrumbs.html" import breadcrumb %}
-{% from "components/pagination.html" import render_pagination %}
+{% from "components/ag_grid_includes.html" import ag_grid_container, ag_grid_js %}
 
-{% from "components/_page_header.html" import page_header %}
-{% from "components/_status_label.html" import status_label %}
 {% block title %}{{ _('Manage Resources') }}{% endblock %}
-
-{% block extra_js %}
-<script nonce="{{ csp_nonce() }}">
-    // Optional: JS for clearing search
-    function clearSearch() {
-        document.getElementById('search_query_input').value = '';
-        document.getElementById('searchForm').submit();
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const clearBtn = document.getElementById('clear-search-btn');
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                clearSearch();
-            });
-        }
-    });
-</script>
-{% endblock %}
 
 {% block content %}
 
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_manage_resources = current_is_system_manager or has_permission('admin.resources.manage') %}
 
+{% from "components/_page_header.html" import page_header %}
 {{ page_header(
     title=_('Manage Resources'),
     icon='fas fa-folder-open',
@@ -51,178 +29,299 @@
     | reject('none') | list
 ) }}
 
-<div>
+<div id="resourcesGridConfig" class="hidden" data-can-manage="{{ 'true' if can_manage_resources else 'false' }}"></div>
+<script type="application/json" id="resources-grid-data">{{ resource_rows|tojson }}</script>
 
-    <form method="GET" action="{{ url_for('content_management.manage_resources') }}" id="searchForm" class="mb-6">
-        <div class="flex flex-col sm:flex-row gap-2">
-            <input type="text" name="search" id="search_query_input" value="{{ search_query or '' }}" placeholder="Search by title..." class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-            <button type="submit" class="btn btn-dark">Search</button>
-            {% if search_query %}
-            <button type="button" id="clear-search-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg shadow text-sm whitespace-nowrap">Clear</button>
-            {% endif %}
-        </div>
-    </form>
+{{ ag_grid_container(
+    'resourcesGrid',
+    loading_text=_('Loading resources...'),
+    empty_message=_('No resources found.')
+) }}
 
-    {% if resources and resources.items %}
-    <div class="overflow-x-auto bg-white shadow-md border border-gray-200">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subcategory</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Languages</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publication Date</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Description</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for resource in resources.items %}
-                <tr>
-                    <td class="px-6 py-4 text-sm text-gray-900 align-top">{{ resource.default_title }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">
-                        {{ status_label(resource.resource_type.title(), 'info' if resource.resource_type == 'publication' else 'success') }}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-700 align-top">
-                        {% if resource.resource_subcategory %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-800 border border-purple-100">
-                                {{ resource.resource_subcategory.name }}
-                            </span>
-                        {% else %}
-                            <span class="text-gray-400 text-xs">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-900 align-top">
-                        {% set available_languages = resource.get_available_languages() %}
-                        {% if available_languages %}
-                            <div class="flex flex-wrap gap-1">
-                                {% for lang in available_languages %}
-                                    {{ status_label(lang.upper(), 'neutral') }}
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <span class="text-gray-500 text-xs">No translations</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">{{ resource.publication_date|datetime_local('date') if resource.publication_date else '-' }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-700 align-top">{{ resource.default_description | truncate(100, true) if resource.default_description else '-' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 align-top">
-                        {% if can_manage_resources %}
-                            <a href="{{ url_for('content_management.edit_resource', resource_id=resource.id) }}" class="text-indigo-600 hover:text-indigo-900" title="Edit {{ resource.default_title }}"><i class="fas fa-pen"></i></a>
-                            <form action="{{ url_for('content_management.delete_resource', resource_id=resource.id) }}" method="POST" class="inline-block" data-confirm="Are you sure you want to delete '{{ resource.default_title|e }}'? This action cannot be undone." data-confirm-danger="true">
-                                {{ delete_form.csrf_token }}
-                                <button type="submit" class="text-red-600 hover:text-red-900" title="Delete {{ resource.default_title }}" data-loading-text=""><i class="fas fa-trash-alt"></i></button>
-                            </form>
-                        {% endif %}
-                        {% if available_languages %}
-                            <div class="relative inline-block">
-                                <button type="button" class="text-green-600 hover:text-green-900 toggle-downloads-btn" data-target="downloads-{{ resource.id }}" title="Download files" aria-haspopup="menu" aria-expanded="false">
-                                    <i class="fas fa-download"></i>
-                                </button>
-                                <div id="downloads-{{ resource.id }}" class="download-menu hidden absolute right-0 top-full z-50 mt-1 max-w-sm bg-white border border-gray-200 rounded-md shadow-lg" role="menu">
-                                    {% for lang in available_languages %}
-                                        {% set translation = resource.get_translation(lang) %}
-                                        {% if translation and translation.has_uploaded_document %}
-                                            <a href="{{ url_for('content_management.download_resource_file_admin', resource_id=resource.id, language=lang) if can_manage_resources else '#' }}"
-                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 break-words" role="menuitem">
-                                                {{ lang.upper() }}: {{ translation.document_display_name }}
-                                            </a>
-                                        {% elif translation and translation.public_external_url %}
-                                            <a href="{{ translation.public_external_url }}" target="_blank" rel="noopener noreferrer"
-                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 break-words" role="menuitem">
-                                                {{ lang.upper() }}: Watch video
-                                            </a>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+{% endblock %}
 
-    {{ render_pagination(resources) }}
-
-    {% else %}
-    <div class="text-center py-8 bg-white p-6 shadow-md border border-gray-200">
-        <i class="far fa-file-alt fa-3x mx-auto text-gray-400 mb-2"></i>
-        <p class="mt-2 text-sm font-medium text-gray-600">No resources found.</p>
-        {% if search_query %}
-             <p class="text-xs text-gray-500">Try adjusting your search terms or <a href="{{ url_for('content_management.manage_resources') }}" class="text-blue-600 hover:underline">clear the search</a>.</p>
-        {% else %}
-            <p class="text-xs text-gray-500">Click "Upload New Resource" to add one.</p>
-        {% endif %}
-    </div>
-    {% endif %}
-</div>
-
+{% block extra_js %}
+{{ ag_grid_js() }}
 <script nonce="{{ csp_nonce() }}">
-function hideDownloadMenus(exceptId) {
-    document.querySelectorAll('.download-menu').forEach(menu => {
-        if (menu.id === exceptId) return;
-        menu.classList.add('hidden');
-        const btn = document.querySelector('.toggle-downloads-btn[data-target="' + menu.id + '"]');
-        if (btn) btn.setAttribute('aria-expanded', 'false');
-    });
-}
-
-// The actions column sits on the right of an overflow-x table, so a normal
-// dropdown runs off the viewport. Pin it to the button and flip it inward.
-function placeDownloadMenu(menu, button) {
-    const margin = 8;
-    const gap = 4;
-    menu.style.position = 'fixed';
-    menu.style.right = 'auto';
-    menu.style.marginTop = '0';
-    menu.style.maxWidth = Math.max(160, window.innerWidth - margin * 2) + 'px';
-
-    const rect = button.getBoundingClientRect();
-    const width = menu.offsetWidth;
-    const height = menu.offsetHeight;
-    let left = rect.right - width;
-    if (left < margin) left = margin;
-    if (left + width > window.innerWidth - margin) {
-        left = Math.max(margin, window.innerWidth - width - margin);
+(function() {
+    var configEl = document.getElementById('resourcesGridConfig');
+    var canManage = configEl && configEl.getAttribute('data-can-manage') === 'true';
+    var dataEl = document.getElementById('resources-grid-data');
+    var resourceRows = [];
+    try {
+        resourceRows = dataEl ? JSON.parse(dataEl.textContent || '[]') : [];
+    } catch (e) {
+        resourceRows = [];
     }
-    let top = rect.bottom + gap;
-    if (top + height > window.innerHeight - margin && rect.top - height - gap >= margin) {
-        top = rect.top - height - gap;
-    }
-    menu.style.left = left + 'px';
-    menu.style.top = top + 'px';
-}
 
-function toggleDownloads(elementId, button) {
-    const element = document.getElementById(elementId);
-    if (!element || !button) return;
-    const willOpen = element.classList.contains('hidden');
-    hideDownloadMenus(elementId);
-    if (!willOpen) {
-        element.classList.add('hidden');
-        button.setAttribute('aria-expanded', 'false');
-        return;
-    }
-    element.classList.remove('hidden');
-    button.setAttribute('aria-expanded', 'true');
-    placeDownloadMenu(element, button);
-}
+    var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    var esc = AgGridRenderers.escapeHtml;
+    var attr = AgGridRenderers.escapeHtmlAttr;
 
-document.addEventListener('click', function(event) {
-    const toggleBtn = event.target.closest('.toggle-downloads-btn');
-    if (toggleBtn) {
-        const targetId = toggleBtn.getAttribute('data-target');
-        if (targetId) toggleDownloads(targetId, toggleBtn);
-        return;
+    function placeholderBox(title) {
+        return '<div class="h-16 w-20 rounded border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300" title="' + attr(title) + '"><i class="far fa-image" aria-hidden="true"></i></div>';
     }
-    if (event.target.closest('.download-menu')) return;
-    hideDownloadMenus();
-});
 
-window.addEventListener('resize', function() { hideDownloadMenus(); });
-document.addEventListener('scroll', function() { hideDownloadMenus(); }, true);
+    function thumbnailCell(params) {
+        var data = params.data || {};
+        if (!data.thumbnail_url) {
+            return placeholderBox('No thumbnail');
+        }
+        var img = '<img src="' + attr(data.thumbnail_url) + '" alt="' + attr(data.title || '') + '" data-resource-thumb="true" class="h-16 w-20 object-contain rounded border border-gray-200 bg-gray-50" loading="lazy">';
+        if (canManage && data.edit_url) {
+            return '<a href="' + attr(data.edit_url) + '" title="' + attr((data.thumbnail_lang || '').toUpperCase() + ' thumbnail') + '">' + img + '</a>';
+        }
+        return img;
+    }
+
+    function typeCell(params) {
+        var label = params.value || '';
+        if (!label) return '<span class="text-gray-400">-</span>';
+        var variant = (params.data && params.data.resource_type_key === 'publication') ? 'info' : 'success';
+        if (window.StatusLabels) return window.StatusLabels.render(label, variant);
+        return esc(label);
+    }
+
+    function subcategoryCell(params) {
+        if (!params.value) return '<span class="text-gray-400 text-xs">—</span>';
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-800 border border-purple-100">' + esc(params.value) + '</span>';
+    }
+
+    function languagesCell(params) {
+        var languages = params.value || [];
+        if (!languages.length) return '<span class="text-gray-500 text-xs">No translations</span>';
+        var html = '<div class="flex flex-wrap gap-1 py-1">';
+        languages.forEach(function(lang) {
+            html += window.StatusLabels
+                ? window.StatusLabels.render(lang, 'neutral')
+                : '<span class="status-label status-label--neutral">' + esc(lang) + '</span>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    function descriptionCell(params) {
+        var text = params.value || '';
+        if (!text) return '<span class="text-gray-400">-</span>';
+        var shown = text.length > 100 ? text.slice(0, 100) + '…' : text;
+        return '<span class="text-sm text-gray-700" title="' + attr(text) + '">' + esc(shown) + '</span>';
+    }
+
+    function actionsCell(params) {
+        var data = params.data || {};
+        var html = '<div class="flex items-center gap-2">';
+        if (canManage && data.edit_url) {
+            html += '<a href="' + attr(data.edit_url) + '" class="text-indigo-600 hover:text-indigo-900" title="' + attr('Edit ' + (data.title || '')) + '"><i class="fas fa-pen"></i></a>';
+        }
+        if (canManage && data.delete_url) {
+            var confirmMsg = "Are you sure you want to delete '" + (data.title || '') + "'? This action cannot be undone.";
+            html += '<form action="' + attr(data.delete_url) + '" method="POST" class="inline-block" data-confirm="' + attr(confirmMsg) + '" data-confirm-danger="true">';
+            html += '<input type="hidden" name="csrf_token" value="' + attr(csrfToken) + '">';
+            html += '<button type="submit" class="text-red-600 hover:text-red-900" title="' + attr('Delete ' + (data.title || '')) + '" data-loading-text=""><i class="fas fa-trash-alt"></i></button>';
+            html += '</form>';
+        }
+        var downloads = data.downloads || [];
+        if (downloads.length) {
+            html += '<button type="button" class="text-green-600 hover:text-green-900 toggle-downloads-btn" data-downloads="' + attr(JSON.stringify(downloads)) + '" title="Download files" aria-haspopup="menu" aria-expanded="false"><i class="fas fa-download"></i></button>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    var columnDefs = [
+        {
+            field: 'thumbnail_url',
+            headerName: {{ _('Thumbnail')|tojson }},
+            width: 120,
+            minWidth: 110,
+            maxWidth: 140,
+            sortable: false,
+            filter: false,
+            cellRenderer: thumbnailCell
+        },
+        {
+            field: 'title',
+            headerName: {{ _('Title')|tojson }},
+            flex: 2,
+            minWidth: 220,
+            filter: 'agTextColumnFilter'
+        },
+        {
+            field: 'resource_type',
+            headerName: {{ _('Type')|tojson }},
+            minWidth: 140,
+            filter: 'customSetFilter',
+            cellRenderer: typeCell
+        },
+        {
+            field: 'subcategory',
+            headerName: {{ _('Subcategory')|tojson }},
+            minWidth: 160,
+            filter: 'customSetFilter',
+            cellRenderer: subcategoryCell
+        },
+        {
+            field: 'languages',
+            headerName: {{ _('Languages')|tojson }},
+            minWidth: 160,
+            filter: 'customSetFilter',
+            valueFormatter: function(params) {
+                return (params.value || []).join(', ');
+            },
+            cellRenderer: languagesCell
+        },
+        {
+            field: 'publication_date',
+            headerName: {{ _('Publication Date')|tojson }},
+            minWidth: 160,
+            filter: 'agDateColumnFilter',
+            filterParams: AgGridRenderers.dateFilterParams,
+            cellRenderer: function(params) {
+                var display = params.data && params.data.publication_date_display;
+                if (!display) return '<span class="text-gray-400">-</span>';
+                return esc(display);
+            }
+        },
+        {
+            field: 'description',
+            headerName: {{ _('Description')|tojson }},
+            flex: 2,
+            minWidth: 220,
+            filter: 'agTextColumnFilter',
+            tooltipField: 'description',
+            cellRenderer: descriptionCell
+        },
+        {
+            field: 'actions',
+            headerName: {{ _('Actions')|tojson }},
+            width: 140,
+            minWidth: 120,
+            maxWidth: 160,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: actionsCell
+        }
+    ];
+
+    function hideDownloadMenu() {
+        var menu = document.getElementById('resource-download-menu');
+        if (menu) menu.classList.add('hidden');
+        document.querySelectorAll('.toggle-downloads-btn[aria-expanded="true"]').forEach(function(btn) {
+            btn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function placeDownloadMenu(menu, button) {
+        var margin = 8;
+        var gap = 4;
+        menu.style.position = 'fixed';
+        menu.style.right = 'auto';
+        menu.style.zIndex = '10050';
+        menu.style.maxWidth = Math.max(160, window.innerWidth - margin * 2) + 'px';
+        var rect = button.getBoundingClientRect();
+        var width = menu.offsetWidth;
+        var height = menu.offsetHeight;
+        var left = rect.right - width;
+        if (left < margin) left = margin;
+        if (left + width > window.innerWidth - margin) {
+            left = Math.max(margin, window.innerWidth - width - margin);
+        }
+        var top = rect.bottom + gap;
+        if (top + height > window.innerHeight - margin && rect.top - height - gap >= margin) {
+            top = rect.top - height - gap;
+        }
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+    }
+
+    function openDownloadMenu(button) {
+        var items = [];
+        try {
+            items = JSON.parse(button.getAttribute('data-downloads') || '[]');
+        } catch (e) {
+            items = [];
+        }
+        if (!items.length) return;
+        var menu = document.getElementById('resource-download-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'resource-download-menu';
+            menu.className = 'hidden bg-white border border-gray-200 rounded-md shadow-lg';
+            menu.setAttribute('role', 'menu');
+            document.body.appendChild(menu);
+        }
+        var html = '';
+        items.forEach(function(item) {
+            var label = item.external
+                ? (item.language + ': Watch video')
+                : (item.language + ': ' + (item.name || ''));
+            var extra = item.external ? ' target="_blank" rel="noopener noreferrer"' : '';
+            html += '<a href="' + attr(item.url || '#') + '"' + extra + ' class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 break-words" role="menuitem">' + esc(label) + '</a>';
+        });
+        menu.innerHTML = html;
+        hideDownloadMenu();
+        menu.classList.remove('hidden');
+        button.setAttribute('aria-expanded', 'true');
+        placeDownloadMenu(menu, button);
+    }
+
+    document.addEventListener('click', function(event) {
+        var toggleBtn = event.target.closest('.toggle-downloads-btn');
+        if (toggleBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            var menu = document.getElementById('resource-download-menu');
+            var open = menu && !menu.classList.contains('hidden') && toggleBtn.getAttribute('aria-expanded') === 'true';
+            if (open) {
+                hideDownloadMenu();
+            } else {
+                openDownloadMenu(toggleBtn);
+            }
+            return;
+        }
+        if (event.target.closest('#resource-download-menu')) return;
+        hideDownloadMenu();
+    }, true);
+
+    window.addEventListener('resize', hideDownloadMenu);
+    document.addEventListener('scroll', hideDownloadMenu, true);
+
+    function replaceMissingThumb(img) {
+        if (!img || img.getAttribute('data-resource-thumb') !== 'true') return;
+        var holder = document.createElement('div');
+        holder.innerHTML = placeholderBox('Thumbnail file missing');
+        var link = img.closest('a');
+        (link || img).replaceWith(holder.firstChild);
+    }
+
+    document.addEventListener('error', function(event) {
+        var img = event.target;
+        if (img && img.getAttribute && img.getAttribute('data-resource-thumb') === 'true') {
+            replaceMissingThumb(img);
+        }
+    }, true);
+
+    function initializeGrid() {
+        var result = AgGridHelper.create('resourcesGrid', 'manage-resources', columnDefs, resourceRows, {
+            emptyMessage: {{ _('No resources found.')|tojson }},
+            onReady: function(api, helper) {
+                if (api && typeof AgGridHelper.pinActionsColumn === 'function') {
+                    AgGridHelper.pinActionsColumn(api, [
+                        'thumbnail_url', 'title', 'resource_type', 'subcategory',
+                        'languages', 'publication_date', 'description', 'actions'
+                    ], helper && helper.columnVisibilityManager);
+                }
+            }
+        });
+        window.resourcesGridApi = result.api;
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeGrid);
+    } else {
+        initializeGrid();
+    }
+})();
 </script>
 {% endblock %}

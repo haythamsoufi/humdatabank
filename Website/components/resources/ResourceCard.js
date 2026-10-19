@@ -28,8 +28,14 @@ export default function ResourceCard({ resource, isActive, onClick, onExpand }) 
     }
   };
 
+  const isVideo = !!resource.is_video && !!resource.external_url;
+
   const handleDownload = (e) => {
     e.stopPropagation(); // Prevent card expansion when download is clicked
+    if (isVideo) {
+      window.open(resource.external_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
     if (resource.download_url) {
       // Modify the download URL to include the selected language
       // This assumes the backend can handle language parameters
@@ -157,20 +163,24 @@ export default function ResourceCard({ resource, isActive, onClick, onExpand }) 
 
 
             {/* Download section - button and language dropdown */}
-            {isActive && resource.download_url && (
+            {isActive && (resource.download_url || isVideo) && (
               <div className="download-section">
                 <button
                   onClick={handleDownload}
                   className="download-btn"
                 >
                   <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    {isVideo ? (
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                    ) : (
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    )}
                   </svg>
-                  Download in {selectedDownloadLanguage?.toUpperCase() || 'EN'}
+                  {isVideo ? 'Watch' : `Download in ${selectedDownloadLanguage?.toUpperCase() || 'EN'}`}
                 </button>
 
-                {/* Language selector dropdown */}
-                {resource.available_languages && resource.available_languages.length > 1 && (
+                {/* Language selector dropdown. A video URL is already for this language. */}
+                {!isVideo && resource.available_languages && resource.available_languages.length > 1 && (
                   <div className="language-selector">
                     <button
                       ref={dropdownButtonRef}

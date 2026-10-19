@@ -44,6 +44,9 @@ def download_resource_file(resource_id, language):
     translation = resource.get_translation(language)
 
     if not translation or not translation.file_relative_path:
+        target = translation.public_external_url if translation else None
+        if target:
+            return redirect(target)
         current_app.logger.error(f"Public download (doc): No file path for resource ID {resource_id} in language {language}")
         abort(404, description="Document file not found for this resource.")
 

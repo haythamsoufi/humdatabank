@@ -144,9 +144,10 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
 
             {# English tab — compute badge state #}
             {% set en_tr = resource.get_translation('en') if resource else none %}
-            {% if en_tr and en_tr.has_uploaded_document and (resource.default_title or en_tr.title) %}
+            {% set en_ready = en_tr and (en_tr.has_uploaded_document or en_tr.public_external_url) %}
+            {% if en_ready and (resource.default_title or en_tr.title) %}
                 {% set en_badge = 'filled' %}
-            {% elif resource and (resource.default_title or (en_tr and en_tr.has_uploaded_document)) %}
+            {% elif resource and (resource.default_title or en_ready) %}
                 {% set en_badge = 'partial' %}
             {% else %}
                 {% set en_badge = 'empty' %}
@@ -166,9 +167,9 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
             {% for lang_code in form.languages %}
                 {% if lang_code != 'en' %}
                     {% set ltr = resource.get_translation(lang_code) if resource else none %}
-                    {% if ltr and (ltr.title or '') | trim and ltr.has_uploaded_document %}
+                    {% if ltr and (ltr.title or '') | trim and (ltr.has_uploaded_document or ltr.public_external_url) %}
                         {% set lbadge = 'filled' %}
-                    {% elif ltr and ((ltr.title or '') | trim or ltr.has_uploaded_document) %}
+                    {% elif ltr and ((ltr.title or '') | trim or ltr.has_uploaded_document or ltr.public_external_url) %}
                         {% set lbadge = 'partial' %}
                     {% else %}
                         {% set lbadge = 'empty' %}
@@ -222,9 +223,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                     <div class="flex items-center gap-2 mb-3">
                         <i class="fas fa-file-alt text-gray-400"></i>
                         <span class="text-sm font-semibold text-gray-700">Document File</span>
-                        {% if not resource %}
-                            <span class="ml-auto text-xs text-red-600 font-medium">Required</span>
-                        {% endif %}
+                        <span class="ml-auto text-xs text-gray-400 font-medium">File or link</span>
                     </div>
 
                     {% if en_tr and en_tr.has_uploaded_document %}
@@ -233,6 +232,11 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                             <a href="{{ url_for('content_management.download_resource_file_admin', resource_id=resource.id, language='en') }}"
                                title="Download {{ en_tr.document_display_name }}">{{ en_tr.document_display_name }}</a>
                             <i class="fas fa-external-link-alt text-xs opacity-50 ml-auto flex-shrink-0"></i>
+                        </div>
+                    {% elif en_tr and en_tr.public_external_url %}
+                        <div class="saved-file-pill mb-3">
+                            <i class="fas fa-video"></i>
+                            <a href="{{ en_tr.public_external_url }}" target="_blank" rel="noopener noreferrer">{{ en_tr.public_external_url }}</a>
                         </div>
                     {% elif resource %}
                         <p class="text-xs text-amber-700 mb-3"><i class="fas fa-info-circle mr-1"></i>No document saved yet.</p>
@@ -255,6 +259,16 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                     {% for error in doc_field_en.errors %}
                         <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
                     {% endfor %}
+
+                    {% set link_field_en = form['external_url_en'] %}
+                    <div class="mt-4">
+                        {{ link_field_en.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+                        {{ link_field_en(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", placeholder="https://youtu.be/…") }}
+                        <p class="mt-1 text-xs text-gray-500">YouTube link for a video. Leave empty for an uploaded file.</p>
+                        {% for error in link_field_en.errors %}
+                            <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                        {% endfor %}
+                    </div>
                 </div>
 
                 {# Thumbnail #}
@@ -328,8 +342,9 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                         {# Generate from PDF — only when saved doc is a PDF #}
                         {% if resource %}
                             {% set en_is_pdf = en_tr and en_tr.source_document_is_pdf %}
+                            {% set en_can_thumb = en_tr and (en_tr.file_relative_path or en_tr.public_external_url) %}
                             <div id="generateThumbnailSection-en"
-                                 class="{% if not en_is_pdf %}hidden{% endif %}"
+                                 class="{% if not en_can_thumb %}hidden{% endif %}"
                                  data-server-pdf="{{ 'true' if en_is_pdf else 'false' }}">
                                 <button type="button"
                                         data-action="thumbnail:generate"
@@ -341,7 +356,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                     <i class="fas fa-magic mr-1.5"></i>
                                     <span id="generate-text-en"
                                           data-thumbnail-btn-text="generate"
-                                          data-default-text="{{ _('Generate from PDF')|forceescape }}">{{ _('Generate from PDF') }}</span>
+                                          data-default-text="{{ _('Generate thumbnail')|forceescape }}">{{ _('Generate thumbnail') }}</span>
                                 </button>
                             </div>
                         {% endif %}
@@ -408,6 +423,11 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                            title="Download {{ ltr.document_display_name }}">{{ ltr.document_display_name }}</a>
                                         <i class="fas fa-external-link-alt text-xs opacity-50 ml-auto flex-shrink-0"></i>
                                     </div>
+                                {% elif ltr and ltr.public_external_url %}
+                                    <div class="saved-file-pill mb-3">
+                                        <i class="fas fa-video"></i>
+                                        <a href="{{ ltr.public_external_url }}" target="_blank" rel="noopener noreferrer">{{ ltr.public_external_url }}</a>
+                                    </div>
                                 {% else %}
                                     <p class="text-xs text-amber-700 mb-3"><i class="fas fa-info-circle mr-1"></i>No document saved yet.</p>
                                 {% endif %}
@@ -429,6 +449,15 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                             {% for error in doc_field.errors %}
                                 <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
                             {% endfor %}
+
+                            {% set link_field = form['external_url_' + lang_code] %}
+                            <div class="mt-4">
+                                {{ link_field.label(class="block text-gray-700 text-sm font-semibold mb-1") }}
+                                {{ link_field(class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", placeholder="https://youtu.be/…") }}
+                                {% for error in link_field.errors %}
+                                    <p class="mt-1 text-red-500 text-xs">{{ error }}</p>
+                                {% endfor %}
+                            </div>
                         </div>
 
                         {# Thumbnail #}
@@ -507,8 +536,9 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                 </span>
                                 {% if resource %}
                                     {% set lang_is_pdf = ltr and ltr.source_document_is_pdf %}
+                                    {% set lang_can_thumb = ltr and (ltr.file_relative_path or ltr.public_external_url) %}
                                     <div id="generateThumbnailSection-{{ lang_code }}"
-                                         class="{% if not lang_is_pdf %}hidden{% endif %}"
+                                         class="{% if not lang_can_thumb %}hidden{% endif %}"
                                          data-server-pdf="{{ 'true' if lang_is_pdf else 'false' }}">
                                         <button type="button"
                                                 data-action="thumbnail:generate"
@@ -520,7 +550,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                             <i class="fas fa-magic mr-1.5"></i>
                                             <span id="generate-text-{{ lang_code }}"
                                                   data-thumbnail-btn-text="generate"
-                                                  data-default-text="{{ _('Generate from PDF')|forceescape }}">{{ _('Generate from PDF') }}</span>
+                                                  data-default-text="{{ _('Generate thumbnail')|forceescape }}">{{ _('Generate thumbnail') }}</span>
                                         </button>
                                     </div>
                                 {% endif %}

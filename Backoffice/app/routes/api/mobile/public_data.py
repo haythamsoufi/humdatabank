@@ -524,8 +524,19 @@ def mobile_disaggregation_overview():
 
 def _serialize_public_resource(r, *, locale: str, base_url: str, storage) -> dict:
     """Build the public JSON object for one Resource row (mobile /data/resources)."""
+    from app.utils.external_url_validation import is_youtube_url, safe_resource_external_url
+
     title = r.get_title(locale)
     description = r.get_description(locale)
+
+    def _link_for(lang: str) -> str | None:
+        tr = r.get_translation(lang)
+        if tr is None:
+            return None
+        raw = getattr(tr, "external_url", None)
+        if not isinstance(raw, str):
+            return None
+        return safe_resource_external_url(raw)
 
     def _resolve_locale(get_path_attr):
         """Return language code for the first lang with a real file."""
@@ -538,7 +549,21 @@ def _serialize_public_resource(r, *, locale: str, base_url: str, storage) -> dic
                 return lang
         return None
 
-    file_locale = _resolve_locale('file_relative_path')
+    locale_translation = r.get_translation(locale)
+    locale_has_file = bool(
+        locale_translation
+        and locale_translation.file_relative_path
+        and storage.exists(storage.RESOURCES, locale_translation.file_relative_path)
+    )
+    locale_link = _link_for(locale)
+    # A video in the requested language is the thing to open. Do not fall back
+    # to another language's PDF and hide the link.
+    if locale_link and not locale_has_file:
+        file_locale = None
+        external_url = locale_link
+    else:
+        file_locale = _resolve_locale('file_relative_path')
+        external_url = locale_link or (None if locale == 'en' else _link_for('en'))
     thumb_locale = _resolve_locale('thumbnail_relative_path')
 
     file_url = (
@@ -567,6 +592,8 @@ def _serialize_public_resource(r, *, locale: str, base_url: str, storage) -> dic
         'publication_date': r.publication_date.isoformat() if r.publication_date else None,
         'created_at': r.created_at.isoformat() if r.created_at else None,
         'file_url': file_url,
+        'external_url': external_url,
+        'is_video': bool(external_url and not file_url and is_youtube_url(external_url)),
         'thumbnail_url': thumbnail_url,
         'available_languages': r.get_available_languages(),
         'file_languages': [

@@ -952,6 +952,9 @@ def edit_resource(resource_id):
                     getattr(form, title_attr).data = translation.title or ''
                 if hasattr(form, desc_attr):
                     getattr(form, desc_attr).data = translation.description or ''
+                link_attr = f'external_url_{lang_code}'
+                if hasattr(form, link_attr):
+                    getattr(form, link_attr).data = translation.external_url or ''
             else:
                 # If no translation exists, pre-populate with default values for English
                 if lang_code == 'en':
@@ -1200,6 +1203,9 @@ def download_resource_file_admin(resource_id, language):
     ).first()
 
     if not translation or not translation.file_relative_path:
+        target = translation.public_external_url if translation else None
+        if target:
+            return redirect(target)
         flash(f"No file found for {language} version of this resource.", "warning")
         return redirect(url_for("content_management.manage_resources"))
 
@@ -1261,77 +1267,55 @@ def download_resource_thumbnail_admin(resource_id, language):
 @bp.route("/resources/<int:resource_id>/generate-thumbnail/<language_code>", methods=["POST"])
 @permission_required('admin.resources.manage')
 def generate_resource_thumbnail(resource_id, language_code):
-    """Generate thumbnail for a specific resource language version."""
-    if not _check_pdf_processing_capability():
-        if is_json_request():
-            return json_server_error('PDF processing libraries not available on server.')
-        flash("PDF processing libraries not available on server.", "danger")
-        return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
-
+    """Generate a thumbnail for a PDF, Office file, image, or YouTube link."""
     try:
         resource = Resource.query.get_or_404(resource_id)
         translation = _get_resource_translation_for_lang(resource_id, language_code)
         lang_label = (language_code or "").strip() or "?"
+        has_link = bool(translation and (getattr(translation, "external_url", None) or "").strip())
 
-        if not translation or not translation.file_relative_path:
+        if not translation or (not translation.file_relative_path and not has_link):
             if is_json_request():
                 return json_bad_request(f'No file found for {lang_label} version.')
             flash(f"No file found for {lang_label} version.", "warning")
             return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
-        if not storage.exists(storage.RESOURCES, translation.file_relative_path):
+        if translation.file_relative_path and not storage.exists(storage.RESOURCES, translation.file_relative_path):
             if is_json_request():
                 return json_not_found('File not found on server.')
             flash("File not found on server.", "danger")
             return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
-        if translation.file_relative_path.lower().endswith('.pdf'):
-            path_parts = translation.file_relative_path.replace('\\', '/').split('/')
-            current_app.logger.info(f"Path parts after normalization: {path_parts}")
+        if (translation.file_relative_path or "").lower().endswith(".pdf") and not _check_pdf_processing_capability():
+            if is_json_request():
+                return json_server_error('PDF processing libraries not available on server.')
+            flash("PDF processing libraries not available on server.", "danger")
+            return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
-            if len(path_parts) >= 1:
-                unique_folder_name = path_parts[0]
-            else:
-                if is_json_request():
-                    return json_bad_request('Invalid file path structure.')
-                flash("Invalid file path structure.", "danger")
-                return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
+        path_parts = (translation.file_relative_path or "").replace("\\", "/").split("/")
+        unique_folder_name = path_parts[0] if path_parts and path_parts[0] else str(uuid.uuid4())
+        tr_lang = translation.language_code
+        thumbnail_path = ThumbnailService.ensure_for_translation(
+            translation, unique_folder_name, category=storage.RESOURCES, force=True,
+        )
 
-            file_path = storage.get_absolute_path(storage.RESOURCES, translation.file_relative_path)
-            _cleanup_temp = storage.is_azure()
-            tr_lang = translation.language_code
-
-            thumbnail_path = _generate_pdf_thumbnail_to_storage(
-                file_path, unique_folder_name, tr_lang,
-                category=storage.RESOURCES,
-            )
-
-            if _cleanup_temp:
-                with suppress(OSError):
-                    os.remove(file_path)
-
-            if thumbnail_path:
-                ThumbnailService.apply_generated_thumbnail(translation, thumbnail_path)
-                db.session.flush()
-                if is_json_request():
-                    return json_ok(
-                        message=f'Thumbnail generated successfully for {tr_lang} version.',
-                        thumbnail_path=thumbnail_path,
-                        thumbnail_url=url_for(
-                            'content_management.download_resource_thumbnail_admin',
-                            resource_id=resource_id,
-                            language=tr_lang,
-                        ),
-                    )
-                flash(f"Thumbnail generated successfully for {tr_lang} version.", "success")
-            else:
-                if is_json_request():
-                    return json_server_error('Error generating thumbnail.')
-                flash("Error generating thumbnail.", "danger")
+        if thumbnail_path:
+            db.session.flush()
+            if is_json_request():
+                return json_ok(
+                    message=f'Thumbnail generated successfully for {tr_lang} version.',
+                    thumbnail_path=thumbnail_path,
+                    thumbnail_url=url_for(
+                        'content_management.download_resource_thumbnail_admin',
+                        resource_id=resource_id,
+                        language=tr_lang,
+                    ),
+                )
+            flash(f"Thumbnail generated successfully for {tr_lang} version.", "success")
         else:
             if is_json_request():
-                return json_bad_request('Thumbnail generation is only supported for PDF files.')
-            flash("Thumbnail generation is only supported for PDF files.", "warning")
+                return json_server_error('Error generating thumbnail.')
+            flash("Error generating thumbnail.", "danger")
 
     except Exception as e:
         if is_json_request():
@@ -2319,10 +2303,18 @@ def _handle_multilingual_uploads(form, resource, upload_base_path, unique_id_fol
         if not title_value and lang == 'en':
             title_value = resource.default_title or "Untitled"
 
+        link_field = getattr(form, f'external_url_{lang}', None)
+        link_value = ""
+        if link_field is not None and getattr(link_field, "data", None):
+            link_value = str(link_field.data).strip()
+
         if not title_value and lang != 'en':
-            if translation:
-                db.session.delete(translation)
-            continue
+            has_file = bool(translation and translation.has_uploaded_document)
+            if not link_value and not has_file:
+                if translation:
+                    db.session.delete(translation)
+                continue
+            title_value = resource.default_title or "Untitled"
 
         if not translation:
             translation = ResourceTranslation(
@@ -2342,6 +2334,9 @@ def _handle_multilingual_uploads(form, resource, upload_base_path, unique_id_fol
                 translation.description = resource.default_description or ""
         elif lang == 'en' and not translation.description:
             translation.description = resource.default_description or ""
+
+        if link_field is not None:
+            translation.external_url = link_value or None
 
         file_field = getattr(form, f'document_{lang}', None)
         if file_field and file_field.data:
@@ -2440,28 +2435,19 @@ def _check_pdf_processing_capability():
 
 
 def _auto_generate_resource_pdf_thumbnail_if_needed(translation, unique_folder_name):
-    """When a language version has a PDF and no thumbnail image, generate one (same idea as manual generate)."""
-    if not translation or not translation.file_relative_path:
+    """Generate a thumbnail for a PDF, Office file, image, or YouTube link."""
+    if not translation or translation.thumbnail_relative_path:
         return
-    if not translation.file_relative_path.lower().endswith('.pdf'):
+    has_file = bool((translation.file_relative_path or "").strip())
+    has_link = bool((getattr(translation, "external_url", None) or "").strip())
+    if not has_file and not has_link:
         return
-    if translation.thumbnail_relative_path:
+    if has_file and translation.file_relative_path.lower().endswith(".pdf") and not _check_pdf_processing_capability():
         return
-    if not _check_pdf_processing_capability():
-        return
-    if not storage.exists(storage.RESOURCES, translation.file_relative_path):
-        return
-    file_path = storage.get_absolute_path(storage.RESOURCES, translation.file_relative_path)
-    _cleanup_temp = storage.is_azure()
     try:
-        thumbnail_path = _generate_pdf_thumbnail_to_storage(
-            file_path, unique_folder_name, translation.language_code,
-            category=storage.RESOURCES,
+        ThumbnailService.ensure_for_translation(
+            translation, unique_folder_name, category=storage.RESOURCES,
         )
-        if thumbnail_path:
-            ThumbnailService.apply_generated_thumbnail(translation, thumbnail_path)
-    finally:
-        if _cleanup_temp:
-            with suppress(OSError):
-                os.remove(file_path)
+    except Exception as exc:
+        current_app.logger.warning("Resource thumbnail was not generated: %s", exc)
 

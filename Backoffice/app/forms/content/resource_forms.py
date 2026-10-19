@@ -12,6 +12,21 @@ from wtforms.validators import DataRequired, Optional, Length, ValidationError
 from ..base import BaseForm, MultilingualForm, FileUploadForm, _get_language_display_name
 
 
+def _validate_resource_external_url(form, field):
+    from app.utils.external_url_validation import resource_external_url_error
+
+    reason = resource_external_url_error(field.data or "")
+    if reason:
+        raise ValidationError(reason)
+
+
+def _external_url_field(lang_name):
+    return StringField(
+        f"Video or external link ({lang_name})",
+        validators=[Optional(), Length(max=1000), _validate_resource_external_url],
+    )
+
+
 def _add_language_fields_to_class(cls):
     """Add language-specific fields to the form class before it's instantiated"""
     from config import Config
@@ -60,6 +75,10 @@ def _add_language_fields_to_class(cls):
             setattr(cls, doc_field_name,
                    FileField(f"Document File ({lang_name}) - PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT",
                             validators=document_validators))
+
+        link_field_name = f'external_url_{lang_code}'
+        if not hasattr(cls, link_field_name):
+            setattr(cls, link_field_name, _external_url_field(lang_name))
 
         # Thumbnail field
         thumb_field_name = f'thumbnail_{lang_code}'
@@ -172,6 +191,10 @@ class ResourceForm(MultilingualForm, FileUploadForm):
                 setattr(cls, doc_field_name,
                        FileField(f"Document File ({lang_name}) - PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT",
                                 validators=document_validators))
+
+            link_field_name = f'external_url_{lang_code}'
+            if not hasattr(cls, link_field_name):
+                setattr(cls, link_field_name, _external_url_field(lang_name))
 
             # Thumbnail field
             thumb_field_name = f'thumbnail_{lang_code}'

@@ -24,6 +24,20 @@ from app.utils.rate_limiting import api_rate_limit
 from app.utils.api_helpers import json_response, api_error
 
 
+def _public_link(translation):
+    """Allowlisted external URL, ignoring mocks and missing attributes."""
+    if translation is None:
+        return None
+    raw = getattr(translation, "public_external_url", None)
+    return raw if isinstance(raw, str) and raw.strip() else None
+
+
+def _is_video_link(url):
+    from app.utils.external_url_validation import is_youtube_url
+
+    return is_youtube_url(url)
+
+
 def _has_thumbnail_with_fallback(resource, language):
     """Check if resource has a thumbnail, with fallback logic."""
     translation = resource.get_translation(language)
@@ -113,6 +127,8 @@ def get_resources():
         for resource in paginated_resources.items:
             # Get translation for the requested language
             translation = resource.get_translation(language)
+            external_url = _public_link(translation)
+            has_file = bool(translation and translation.file_relative_path)
 
             # Build resource data with multilingual support
             sub = getattr(resource, 'resource_subcategory', None)
@@ -137,15 +153,23 @@ def get_resources():
                 'description': translation.description if translation else resource.default_description,
                 'language': language,
 
-                # File information and URLs
+                # File information and URLs. A video has no file; download_url is the
+                # YouTube (or other allowlisted) link and is_video tells clients not to
+                # treat it as a file download.
                 'filename': translation.filename if translation else None,
-                'has_file': bool(translation and translation.file_relative_path),
+                'has_file': has_file,
+                'external_url': external_url,
+                'is_video': bool(external_url and not has_file and _is_video_link(external_url)),
                 'has_thumbnail': _has_thumbnail_with_fallback(resource, language),
-                'file_available': bool(translation and translation.file_relative_path),
-                'download_url': url_for('public.download_resource_file',
-                                      resource_id=resource.id,
-                                      language=language,
-                                      _external=True) if translation and translation.file_relative_path else None,
+                'file_available': has_file,
+                'download_url': (
+                    url_for('public.download_resource_file',
+                            resource_id=resource.id,
+                            language=language,
+                            _external=True)
+                    if has_file
+                    else external_url
+                ),
                 'thumbnail_url': _get_thumbnail_url_with_fallback(resource, language),
 
                 # Available languages

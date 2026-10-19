@@ -275,6 +275,8 @@ class ResourceTranslation(db.Model):
     # Language-specific file information
     filename = Column(String(255), nullable=True)  # Original secure filename of the document
     file_relative_path = Column(String(512), nullable=True)  # e.g., <uuid_folder>/<language>/<filename>
+    # Public link when the file is hosted elsewhere (FDRS YouTube resources).
+    external_url = Column(String(1000), nullable=True)
 
     # Language-specific thumbnail
     thumbnail_filename = Column(String(255), nullable=True)  # Original secure filename of the thumbnail
@@ -295,6 +297,21 @@ class ResourceTranslation(db.Model):
         if self.filename and str(self.filename).strip():
             return True
         return bool(self.file_relative_path and str(self.file_relative_path).strip())
+
+    @property
+    def has_external_link(self):
+        """True when this language points at a public URL instead of an uploaded file."""
+        return bool(self.external_url and str(self.external_url).strip())
+
+    @property
+    def public_external_url(self):
+        """Allowlisted link safe to render or redirect to, or None."""
+        from app.utils.external_url_validation import safe_resource_external_url
+
+        raw = self.external_url
+        if not isinstance(raw, str):
+            return None
+        return safe_resource_external_url(raw)
 
     @property
     def document_display_name(self):

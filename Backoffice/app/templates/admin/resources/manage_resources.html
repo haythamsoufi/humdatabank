@@ -116,17 +116,22 @@
                             </form>
                         {% endif %}
                         {% if available_languages %}
-                            <div class="inline-block">
-                                <button type="button" class="text-green-600 hover:text-green-900 toggle-downloads-btn" data-target="downloads-{{ resource.id }}" title="Download files">
+                            <div class="relative inline-block">
+                                <button type="button" class="text-green-600 hover:text-green-900 toggle-downloads-btn" data-target="downloads-{{ resource.id }}" title="Download files" aria-haspopup="menu" aria-expanded="false">
                                     <i class="fas fa-download"></i>
                                 </button>
-                                <div id="downloads-{{ resource.id }}" class="hidden absolute z-10 bg-white border border-gray-200 rounded-md shadow-lg mt-1">
+                                <div id="downloads-{{ resource.id }}" class="download-menu hidden absolute right-0 top-full z-50 mt-1 max-w-sm bg-white border border-gray-200 rounded-md shadow-lg" role="menu">
                                     {% for lang in available_languages %}
                                         {% set translation = resource.get_translation(lang) %}
                                         {% if translation and translation.has_uploaded_document %}
                                             <a href="{{ url_for('content_management.download_resource_file_admin', resource_id=resource.id, language=lang) if can_manage_resources else '#' }}"
-                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 break-words" role="menuitem">
                                                 {{ lang.upper() }}: {{ translation.document_display_name }}
+                                            </a>
+                                        {% elif translation and translation.public_external_url %}
+                                            <a href="{{ translation.public_external_url }}" target="_blank" rel="noopener noreferrer"
+                                               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 break-words" role="menuitem">
+                                                {{ lang.upper() }}: Watch video
                                             </a>
                                         {% endif %}
                                     {% endfor %}
@@ -156,31 +161,68 @@
 </div>
 
 <script nonce="{{ csp_nonce() }}">
-function toggleDownloads(elementId) {
-    const element = document.getElementById(elementId);
-    element.classList.toggle('hidden');
-
-    // Close other open download menus
-    document.querySelectorAll('[id^="downloads-"]').forEach(menu => {
-        if (menu.id !== elementId) {
-            menu.classList.add('hidden');
-        }
+function hideDownloadMenus(exceptId) {
+    document.querySelectorAll('.download-menu').forEach(menu => {
+        if (menu.id === exceptId) return;
+        menu.classList.add('hidden');
+        const btn = document.querySelector('.toggle-downloads-btn[data-target="' + menu.id + '"]');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
     });
 }
 
-// Close download menus when clicking outside
+// The actions column sits on the right of an overflow-x table, so a normal
+// dropdown runs off the viewport. Pin it to the button and flip it inward.
+function placeDownloadMenu(menu, button) {
+    const margin = 8;
+    const gap = 4;
+    menu.style.position = 'fixed';
+    menu.style.right = 'auto';
+    menu.style.marginTop = '0';
+    menu.style.maxWidth = Math.max(160, window.innerWidth - margin * 2) + 'px';
+
+    const rect = button.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const height = menu.offsetHeight;
+    let left = rect.right - width;
+    if (left < margin) left = margin;
+    if (left + width > window.innerWidth - margin) {
+        left = Math.max(margin, window.innerWidth - width - margin);
+    }
+    let top = rect.bottom + gap;
+    if (top + height > window.innerHeight - margin && rect.top - height - gap >= margin) {
+        top = rect.top - height - gap;
+    }
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+}
+
+function toggleDownloads(elementId, button) {
+    const element = document.getElementById(elementId);
+    if (!element || !button) return;
+    const willOpen = element.classList.contains('hidden');
+    hideDownloadMenus(elementId);
+    if (!willOpen) {
+        element.classList.add('hidden');
+        button.setAttribute('aria-expanded', 'false');
+        return;
+    }
+    element.classList.remove('hidden');
+    button.setAttribute('aria-expanded', 'true');
+    placeDownloadMenu(element, button);
+}
+
 document.addEventListener('click', function(event) {
     const toggleBtn = event.target.closest('.toggle-downloads-btn');
     if (toggleBtn) {
         const targetId = toggleBtn.getAttribute('data-target');
-        if (targetId) toggleDownloads(targetId);
+        if (targetId) toggleDownloads(targetId, toggleBtn);
         return;
     }
-    {
-        document.querySelectorAll('[id^="downloads-"]').forEach(menu => {
-            menu.classList.add('hidden');
-        });
-    }
+    if (event.target.closest('.download-menu')) return;
+    hideDownloadMenus();
 });
+
+window.addEventListener('resize', function() { hideDownloadMenus(); });
+document.addEventListener('scroll', function() { hideDownloadMenus(); }, true);
 </script>
 {% endblock %}

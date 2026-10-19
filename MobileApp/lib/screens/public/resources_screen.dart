@@ -3,6 +3,7 @@ import 'dart:math' show min;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/routes.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/shared/resource.dart';
@@ -491,10 +492,20 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
     String? title,
   }) {
     final resolvedTitle = title ?? AppLocalizations.of(context)!.document;
-    // All resource file_url values come from /resources/download/<id>/<lang>
-    // which streams the file (typically a PDF) via the backend.
-    // Route directly to the in-app PDF viewer; it has an "Open in browser"
-    // fallback in its own error state for any non-PDF content.
+    final uri = Uri.tryParse(url);
+    final host = uri?.host.toLowerCase() ?? '';
+    final isVideo = host == 'youtu.be' ||
+        host.endsWith('.youtu.be') ||
+        host == 'youtube.com' ||
+        host.endsWith('.youtube.com') ||
+        host.endsWith('.youtube-nocookie.com');
+    if (isVideo && uri != null) {
+      launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    // File URLs come from /resources/download/<id>/<lang>, which streams the
+    // file (typically a PDF). The in-app viewer has an "Open in browser"
+    // fallback for any non-PDF content.
     Navigator.of(context).pushNamed(
       AppRoutes.pdfViewer,
       arguments: <String, String>{'url': url, 'title': resolvedTitle},
@@ -854,6 +865,10 @@ class _ResourceCardState extends State<_ResourceCard>
         resource.thumbnailUrl != null && resource.thumbnailUrl!.isNotEmpty;
     final hasFile =
         resource.fileUrl != null && resource.fileUrl!.isNotEmpty;
+    final hasVideo =
+        resource.isVideo &&
+        resource.externalUrl != null &&
+        resource.externalUrl!.isNotEmpty;
     final typeLabel = resource.resourceType ?? loc.genericLowercaseResource;
     final title = resource.title ?? loc.genericUntitled;
 
@@ -869,7 +884,9 @@ class _ResourceCardState extends State<_ResourceCard>
           onTapDown: (_) => _pressController.forward(),
           onTapUp: (_) {
             _pressController.reverse();
-            if (hasFile) {
+            if (hasVideo) {
+              widget.onOpen(resource.externalUrl!);
+            } else if (hasFile) {
               final url = _localizedFileUrl(
                     widget.resource, widget.currentLanguage) ??
                   resource.fileUrl!;
@@ -921,7 +938,7 @@ class _ResourceCardState extends State<_ResourceCard>
                   ),
 
                   // ── File-available indicator (top-right) ──────────
-                  if (hasFile)
+                  if (hasFile || hasVideo)
                     Positioned(
                       top: 10,
                       right: 10,
@@ -931,8 +948,8 @@ class _ResourceCardState extends State<_ResourceCard>
                           color: Colors.black.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Icon(
-                          Icons.download_rounded,
+                        child: Icon(
+                          hasVideo ? Icons.play_arrow_rounded : Icons.download_rounded,
                           color: Colors.white,
                           size: 14,
                         ),

@@ -9,6 +9,11 @@ class Resource {
   final String? description;
   final String? thumbnailUrl;
   final String? fileUrl;
+
+  /// YouTube or other public link when this language has no uploaded file.
+  final String? externalUrl;
+  final bool isVideo;
+
   final List<String> availableLanguages;
 
   /// Languages that have an actual uploaded document file.
@@ -30,6 +35,8 @@ class Resource {
     this.description,
     this.thumbnailUrl,
     this.fileUrl,
+    this.externalUrl,
+    this.isVideo = false,
     this.availableLanguages = const [],
     this.fileLanguages = const [],
     this.subcategory,
@@ -49,6 +56,8 @@ class Resource {
           json['default_description'] as String?,
       thumbnailUrl: json['thumbnail_url'] as String?,
       fileUrl: json['file_url'] as String?,
+      externalUrl: json['external_url'] as String?,
+      isVideo: json['is_video'] as bool? ?? false,
       availableLanguages: (json['available_languages'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -77,6 +86,8 @@ class Resource {
       'description': description,
       'thumbnail_url': thumbnailUrl,
       'file_url': fileUrl,
+      'external_url': externalUrl,
+      'is_video': isVideo,
       'available_languages': availableLanguages,
       'file_languages': fileLanguages,
       'subcategory': subcategory?.toJson(),

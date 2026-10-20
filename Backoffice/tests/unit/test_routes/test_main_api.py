@@ -277,6 +277,15 @@ class TestApiGetNotificationsCount:
             resp = client.get(self.URL)
         assert resp.status_code == 500
 
+    def test_requests_error_surfacing(self, client, db_session, app, admin_user):
+        """A DB failure must be a 500, not a silent unread_count of 0."""
+        login_session(client, admin_user.id)
+        with patch(f"{_NOTIF_SVC}.get_unread_count", return_value=1) as mock_count:
+            resp = client.get(self.URL)
+        assert resp.status_code == 200
+        assert mock_count.call_args.kwargs["raise_on_error"] is True
+        assert mock_count.call_args.kwargs["statement_timeout_ms"] > 0
+
 
 # ===========================================================================
 # /api/notifications/websocket-status  (public, no auth required)

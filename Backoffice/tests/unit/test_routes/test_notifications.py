@@ -372,14 +372,83 @@ class TestApiGetNotificationCount:
         data = _get_json(resp)
         assert data.get("unread_count") == 7
 
-    def test_with_device_token(self, logged_in_client, db_session):
+    def test_device_token_header_does_not_write(self, logged_in_client, db_session):
+        """The hot badge poll is read-only; device presence has its own heartbeat endpoints."""
         with patch("app.services.notification.service.NotificationService.get_unread_count", return_value=3), \
-             patch("app.services.notification.push.PushNotificationService.update_device_activity"):
+             patch("app.services.notification.push.PushNotificationService.update_device_activity") as mock_touch:
             resp = logged_in_client.get(
                 "/notifications/api/count",
                 headers={"X-Device-Token": "device-abc"},
             )
         _assert_status(resp, 200)
+        assert _get_json(resp).get("unread_count") == 3
+        mock_touch.assert_not_called()
+
+    def test_requests_error_surfacing_and_bounded_query(self, logged_in_client, db_session):
+        """The route must ask the service to raise on DB errors and cap the query."""
+        from app.routes.notifications import NOTIFICATION_COUNT_STATEMENT_TIMEOUT_MS
+
+        with patch(
+            "app.services.notification.service.NotificationService.get_unread_count",
+            return_value=1,
+        ) as mock_count:
+            resp = logged_in_client.get("/notifications/api/count")
+        _assert_status(resp, 200)
+        kwargs = mock_count.call_args.kwargs
+        assert kwargs["raise_on_error"] is True
+        assert kwargs["statement_timeout_ms"] == NOTIFICATION_COUNT_STATEMENT_TIMEOUT_MS
+        assert 0 < NOTIFICATION_COUNT_STATEMENT_TIMEOUT_MS <= 10_000
+
+    def test_database_failure_is_an_error_not_zero(self, logged_in_client, db_session):
+        """A failed COUNT must not be reported as '0 unread' (would clear the badge)."""
+        with patch(
+            "app.services.notification.service.NotificationService.get_unread_count",
+            side_effect=RuntimeError("db down"),
+        ):
+            resp = logged_in_client.get("/notifications/api/count")
+        _assert_status(resp, 500)
+        data = _get_json(resp)
+        assert data.get("success") is False
+        assert "unread_count" not in data
+        assert resp.headers.get("Retry-After") == "30"
+        # Generic message only: no exception text leaks to the client.
+        assert "db down" not in resp.get_data(as_text=True)
+
+
+class TestNotificationCountRateLimitKey:
+    def test_keys_by_user_when_authenticated(self, app):
+        from app.utils.rate_limiting import per_user_rate_limit_key
+
+        key_func = per_user_rate_limit_key("notif_count")
+        user = MagicMock(is_authenticated=True)
+        user.get_id.return_value = "42"
+        with app.test_request_context("/notifications/api/count"), \
+             patch("flask_login.current_user", user):
+            assert key_func() == "notif_count_u42"
+
+    def test_two_users_on_same_ip_get_separate_buckets(self, app):
+        from app.utils.rate_limiting import per_user_rate_limit_key
+
+        key_func = per_user_rate_limit_key("notif_count")
+        keys = set()
+        for uid in ("1", "2"):
+            user = MagicMock(is_authenticated=True)
+            user.get_id.return_value = uid
+            with app.test_request_context(
+                "/notifications/api/count", environ_base={"REMOTE_ADDR": "10.0.0.5"}
+            ), patch("flask_login.current_user", user):
+                keys.add(key_func())
+        assert len(keys) == 2
+
+    def test_falls_back_to_ip_when_anonymous(self, app):
+        from app.utils.rate_limiting import per_user_rate_limit_key
+
+        key_func = per_user_rate_limit_key("notif_count")
+        anon = MagicMock(is_authenticated=False)
+        with app.test_request_context(
+            "/notifications/api/count", environ_base={"REMOTE_ADDR": "10.0.0.5"}
+        ), patch("flask_login.current_user", anon):
+            assert key_func().startswith("notif_count_ip")
 
 
 # ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from flask import current_app
 from flask_babel import gettext as _
 from app.models import db, Notification, NotificationPreferences, User, CountryAccessRequest, NotificationType, EmailDeliveryLog
-from sqlalchemy import and_, or_ as sa_or_, func, cast, String
+from sqlalchemy import and_, or_ as sa_or_, func, cast, String, text
 from app.services.notification.core import (
     get_default_icon_for_notification_type,
     validate_and_sanitize_action_buttons,
@@ -1070,7 +1070,6 @@ class NotificationService:
 
         Args:
             user_id: ID of the user
-            country_ids: List of country IDs the user has access to
             unread_only: Only return unread notifications
             notification_type: Filter by notification type
             priority: Filter by ``normal``, ``high``, or ``urgent``
@@ -1476,34 +1475,72 @@ class NotificationService:
             )
         return query
 
+    @staticmethod
+    def _apply_local_statement_timeout(timeout_ms: int) -> None:
+        """
+        Cap statements in the *current transaction* (``SET LOCAL``); PostgreSQL only.
+
+        Lets latency-sensitive callers fail well inside the gateway timeout even when
+        the engine-wide ``statement_timeout`` is larger or disabled. ``SET LOCAL`` is
+        reset when the transaction ends, so it never leaks to other requests.
+        """
+        if db.engine.dialect.name != 'postgresql':
+            return
+        db.session.execute(text(f"SET LOCAL statement_timeout = {int(timeout_ms)}"))
+
     @classmethod
-    def _safe_notification_count(cls, query, error_context: str) -> int:
+    def _safe_notification_count(
+        cls,
+        query,
+        error_context: str,
+        *,
+        raise_on_error: bool = False,
+        statement_timeout_ms: Optional[int] = None,
+    ) -> int:
         """
         Run a lightweight COUNT without autoflush side effects.
+
+        ``query`` must select ``func.count(...)`` (see the ``get_*_count`` callers).
         Rolls back the session on failure so callers can still commit cleanly.
+
+        By default a failure is logged and reported as ``0`` so UI badges degrade
+        quietly. Callers that must distinguish "no rows" from "query failed" (the
+        badge endpoint) pass ``raise_on_error=True`` and get the exception re-raised
+        after the rollback.
         """
         try:
             with db.session.no_autoflush:
-                return query.count()
+                if statement_timeout_ms:
+                    cls._apply_local_statement_timeout(statement_timeout_ms)
+                return int(query.scalar() or 0)
         except Exception as e:
             logger.error("Error getting %s: %s", error_context, e, exc_info=True)
             db.session.rollback()
+            if raise_on_error:
+                raise
             return 0
 
     @classmethod
-    def get_unread_count(cls, user_id: int) -> int:
+    def get_unread_count(
+        cls,
+        user_id: int,
+        *,
+        raise_on_error: bool = False,
+        statement_timeout_ms: Optional[int] = None,
+    ) -> int:
         """
         Get count of unread, non-archived, non-expired, user-visible notifications.
 
         Args:
             user_id: ID of the user
-            country_ids: List of country IDs the user has access to
+            raise_on_error: Re-raise database errors instead of returning 0
+            statement_timeout_ms: Optional per-transaction statement cap (PostgreSQL)
 
         Returns:
             Count of unread notifications
         """
         now = utcnow()
-        query = Notification.query.with_entities(Notification.id).filter(
+        query = db.session.query(func.count(Notification.id)).filter(
             and_(
                 Notification.user_id == user_id,
                 Notification.is_read == False,
@@ -1515,7 +1552,12 @@ class NotificationService:
             )
         )
         query = cls._exclude_user_hidden_types(query)
-        return cls._safe_notification_count(query, 'unread notification count')
+        return cls._safe_notification_count(
+            query,
+            'unread notification count',
+            raise_on_error=raise_on_error,
+            statement_timeout_ms=statement_timeout_ms,
+        )
 
     @classmethod
     def get_archived_count(cls, user_id: int) -> int:
@@ -1524,13 +1566,12 @@ class NotificationService:
 
         Args:
             user_id: ID of the user
-            country_ids: List of country IDs the user has access to
 
         Returns:
             Count of archived notifications
         """
         now = utcnow()
-        query = Notification.query.with_entities(Notification.id).filter(
+        query = db.session.query(func.count(Notification.id)).filter(
             and_(
                 Notification.user_id == user_id,
                 Notification.is_archived == True,
@@ -1550,13 +1591,12 @@ class NotificationService:
 
         Args:
             user_id: ID of the user
-            country_ids: List of country IDs the user has access to
 
         Returns:
             Count of all notifications (excluding archived)
         """
         now = utcnow()
-        query = Notification.query.with_entities(Notification.id).filter(
+        query = db.session.query(func.count(Notification.id)).filter(
             and_(
                 Notification.user_id == user_id,
                 Notification.is_archived == False,

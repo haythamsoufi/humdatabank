@@ -151,12 +151,86 @@ class TestCountMethods:
     def test_get_unread_count_error_rolls_back_session(self, app, db_session):
         from app import db
         mock_query = MagicMock()
-        mock_query.count.side_effect = Exception('timeout')
+        mock_query.scalar.side_effect = Exception('timeout')
         with app.app_context():
             with patch.object(db.session, 'rollback') as mock_rb:
                 result = NotificationService._safe_notification_count(mock_query, 'test count')
         assert result == 0
         mock_rb.assert_called_once()
+
+    def test_safe_count_raise_on_error_reraises_after_rollback(self, app, db_session):
+        """The badge endpoint must see DB failures instead of a silent 0."""
+        from app import db
+        mock_query = MagicMock()
+        mock_query.scalar.side_effect = RuntimeError('db down')
+        with app.app_context():
+            with patch.object(db.session, 'rollback') as mock_rb:
+                with pytest.raises(RuntimeError, match='db down'):
+                    NotificationService._safe_notification_count(
+                        mock_query, 'test count', raise_on_error=True
+                    )
+        mock_rb.assert_called_once()
+
+    def test_get_unread_count_raise_on_error_propagates(self, app, db_session):
+        with app.app_context():
+            with patch.object(
+                NotificationService, '_safe_notification_count',
+                side_effect=RuntimeError('boom'),
+            ) as mock_safe:
+                with pytest.raises(RuntimeError):
+                    NotificationService.get_unread_count(1, raise_on_error=True)
+        assert mock_safe.call_args.kwargs['raise_on_error'] is True
+
+    def test_safe_count_applies_statement_timeout_before_query(self, app, db_session):
+        mock_query = MagicMock()
+        mock_query.scalar.return_value = 5
+        calls = []
+        with app.app_context():
+            with patch.object(
+                NotificationService, '_apply_local_statement_timeout',
+                side_effect=lambda ms: calls.append(('timeout', ms)),
+            ):
+                mock_query.scalar.side_effect = lambda: calls.append(('scalar', None)) or 5
+                result = NotificationService._safe_notification_count(
+                    mock_query, 'test count', statement_timeout_ms=5000
+                )
+        assert result == 5
+        assert calls == [('timeout', 5000), ('scalar', None)]
+
+    def test_safe_count_skips_statement_timeout_when_not_requested(self, app, db_session):
+        mock_query = MagicMock()
+        mock_query.scalar.return_value = 2
+        with app.app_context():
+            with patch.object(NotificationService, '_apply_local_statement_timeout') as mock_apply:
+                result = NotificationService._safe_notification_count(mock_query, 'test count')
+        assert result == 2
+        mock_apply.assert_not_called()
+
+    def test_apply_local_statement_timeout_noop_off_postgres(self, app, db_session):
+        with app.app_context():
+            with patch('app.services.notification.service.db') as mock_db:
+                mock_db.engine.dialect.name = 'sqlite'
+                NotificationService._apply_local_statement_timeout(5000)
+        mock_db.session.execute.assert_not_called()
+
+    def test_apply_local_statement_timeout_sets_local_on_postgres(self, app, db_session):
+        with app.app_context():
+            with patch('app.services.notification.service.db') as mock_db:
+                mock_db.engine.dialect.name = 'postgresql'
+                NotificationService._apply_local_statement_timeout(5000)
+        stmt = mock_db.session.execute.call_args.args[0]
+        assert str(stmt) == 'SET LOCAL statement_timeout = 5000'
+
+    def test_get_unread_count_with_statement_timeout_against_real_db(self, app, db_session):
+        """SET LOCAL + COUNT must work end to end on the test database."""
+        from app import db
+
+        with app.app_context():
+            user, _ = _create_user_and_notification(db, 'unread_timeout', is_read=False)
+            count = NotificationService.get_unread_count(
+                user.id, raise_on_error=True, statement_timeout_ms=5000
+            )
+        assert count == 1
 
     def test_get_archived_count_with_archived(self, app, db_session):
         from app import db

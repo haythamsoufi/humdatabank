@@ -206,11 +206,15 @@ FDRS_NETWORK_SUPPORT_SLOT_COUNT = 10
 FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX = "supported"
 FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX = "received_support"
 
-# FDRS section workflow KPIs (Governance, Finance, Reach) → assignment_entity_status
+# FDRS section workflow KPIs. ``page_name`` is the published template 21 form page
+# (match by name; page ids differ per database). Today the importer still rolls
+# these flags up to assignment_entity_status. Once every FDRS assignment has
+# enable_page_submission, each prefix should be written to assignment_page_status
+# for that page. See docs/runbooks/fdrs-page-submission.md.
 FDRS_SECTION_WORKFLOW_SPECS = (
-    {"prefix": "KPI_NSGS", "label": "Governance"},
-    {"prefix": "KPI_NSFP", "label": "Finance"},
-    {"prefix": "KPI_NSR", "label": "Reach"},
+    {"prefix": "KPI_NSGS", "label": "Governance", "page_name": "NS Governance & Structure"},
+    {"prefix": "KPI_NSFP", "label": "Finance", "page_name": "NS Finance & Partnerships"},
+    {"prefix": "KPI_NSR", "label": "Reach", "page_name": "NS Reach"},
 )
 
 FDRS_SECTION_WORKFLOW_SUFFIXES = (

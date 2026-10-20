@@ -797,6 +797,9 @@ class Config:
     # Legacy FDRS data API. Passthrough for translations, embeds, offices, and the mailing
     # list uses this host. It must stay data-api.ifrc.org, not the host that serves this app.
     FDRS_DATA_API_BASE = _fdrs_data_api_base_raw or "https://data-api.ifrc.org"
+    # IFRC CHF exchange rates: GetCHFExchangeRate/{currency}/{year}-01-01
+    _ifrc_exchange_rate_key = (os.environ.get("IFRC_EXCHANGE_RATE_API_KEY") or "").strip()
+    IFRC_EXCHANGE_RATE_API_KEY = _ifrc_exchange_rate_key or None
     _fdrs_databank_api_key_raw = (os.environ.get("FDRS_DATABANK_API_KEY") or "").strip()
     FDRS_DATABANK_API_KEY = _fdrs_databank_api_key_raw or None
 
@@ -1450,25 +1453,41 @@ class ProductionConfig(Config):
     #
     # connect_timeout:   abort TCP handshake that hangs (e.g. private-endpoint warming up).
     # statement_timeout: kill runaway queries before they exhaust the pool and cause 504s.
-    #                    Must be < GUNICORN_TIMEOUT (25 s) so the worker releases its DB
-    #                    connection before being killed. Default 18 s.
-    #                    Overridable via DB_STATEMENT_TIMEOUT_MS (0 = disabled).
-    # pool_timeout:      stop waiting for a free pool slot before Gunicorn kills the worker.
-    #                    Must be < GUNICORN_TIMEOUT (25 s). Default 15 s.
+    #                    Keep (pool_timeout + statement_timeout) in mind against the App
+    #                    Gateway's ~30 s backend timeout: a request can wait for a pool slot
+    #                    AND then run a slow query. Latency-sensitive endpoints (e.g. the
+    #                    notification badge) additionally apply a tighter per-transaction
+    #                    ``SET LOCAL statement_timeout`` so they never depend on this value.
+    #                    Default 18 s. Overridable via DB_STATEMENT_TIMEOUT_MS (0 = disabled).
+    # pool_timeout:      stop waiting for a free pool slot. Must stay well below the gateway's
+    #                    ~30 s (NOT the 60 s Gunicorn heartbeat timeout). Default 15 s.
+    # keepalives*/tcp_user_timeout: detect a black-holed database peer (NAT/private-endpoint
+    #                    drops, failover) in seconds. Without them a ``pool_pre_ping``
+    #                    ``SELECT 1`` on a dead socket can block for minutes, pinning a
+    #                    request thread long after the gateway has answered 502/504.
+    #                    DB_TCP_USER_TIMEOUT_MS=0 disables tcp_user_timeout (libpq >= 12).
     _stmt_timeout_ms = int(os.environ.get("DB_STATEMENT_TIMEOUT_MS", "18000"))
+    _db_tcp_user_timeout_ms = int(os.environ.get("DB_TCP_USER_TIMEOUT_MS", "20000"))
+    _db_connect_args = {
+        "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
+        "keepalives": 1,
+        "keepalives_idle": int(os.environ.get("DB_KEEPALIVES_IDLE", "30")),
+        "keepalives_interval": int(os.environ.get("DB_KEEPALIVES_INTERVAL", "10")),
+        "keepalives_count": int(os.environ.get("DB_KEEPALIVES_COUNT", "3")),
+        "options": " ".join(
+            ["-c timezone=UTC"]
+            + ([f"-c statement_timeout={_stmt_timeout_ms}"] if _stmt_timeout_ms > 0 else [])
+        ),
+    }
+    if _db_tcp_user_timeout_ms > 0:
+        _db_connect_args["tcp_user_timeout"] = _db_tcp_user_timeout_ms
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
         "pool_size": int(os.environ.get("SQLALCHEMY_POOL_SIZE", "5")),
         "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "20")),
         "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
-        "connect_args": {
-            "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
-            "options": " ".join(
-                ["-c timezone=UTC"]
-                + ([f"-c statement_timeout={_stmt_timeout_ms}"] if _stmt_timeout_ms > 0 else [])
-            ),
-        },
+        "connect_args": _db_connect_args,
     }
 
     # Azure App Service front-end HTTP timeout is ~230s. Keep in-app limits below that

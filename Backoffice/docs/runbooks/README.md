@@ -20,6 +20,7 @@
 | Triage an email shown as "Failed" that may have sent | [Email API no-response timeouts](incidents/email-api-no-response.md) |
 | Manage database migrations safely | [Flask-Migrate & pgvector](data/flask-migrate-and-pgvector.md) |
 | Track FDRS sync field coverage (template 21) | [FDRS sync coverage](fdrs-sync-coverage.md) |
+| Turn on FDRS per-page submit (local and production) | [FDRS page-level submission](fdrs-page-submission.md) |
 | Restore from backup | [Backup & restore](data/backup-and-restore.md) |
 | Understand the AI chat system | [AI system docs](ai/) |
 | Set up a new developer locally | **[Developer handbook](../../../docs/DEVELOPER-HANDBOOK.md)** — Quickstarts · [Backoffice README](../../README.md) · [Documentation index](../../docs/README.md) |
@@ -78,6 +79,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 |---------|-------------|
 | [Flask-Migrate & pgvector](data/flask-migrate-and-pgvector.md) | Schema changes, migration single-head policy, pgvector / AI embedding caveats |
 | [Backup & restore](data/backup-and-restore.md) | PostgreSQL dumps, file storage backups, DR checklist (includes **Azure Flexible Server restore → infra must recreate private endpoints**) |
+| [FDRS page-level submission](fdrs-page-submission.md) | Enable per-page save and submit on every FDRS assignment, then import section workflow KPIs as page status |
 
 ---
 

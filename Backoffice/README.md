@@ -90,9 +90,10 @@ Backoffice/
 ### Performance and Scaling Notes
 
 - Database connection pool (production): tune via env vars
-  - `SQLALCHEMY_POOL_SIZE` (default 20)
-  - `SQLALCHEMY_MAX_OVERFLOW` (default 30)
-  - `SQLALCHEMY_POOL_TIMEOUT` (default 60)
+  - `SQLALCHEMY_POOL_SIZE` (default 5)
+  - `SQLALCHEMY_MAX_OVERFLOW` (default 20)
+  - `SQLALCHEMY_POOL_TIMEOUT` (default 15; keep well below the ~30 s gateway timeout)
+  - `DB_TCP_USER_TIMEOUT_MS` (default 20000; `0` disables)
 - Web server concurrency (Waitress): set `WEB_CONCURRENCY` to align with DB pool capacity.
   - A good starting point is `WEB_CONCURRENCY=8` with the default pool above.
   - Ensure total concurrent requests do not exceed available DB connections.

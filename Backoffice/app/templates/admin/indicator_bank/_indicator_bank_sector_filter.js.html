@@ -1,0 +1,121 @@
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    var subsectorSectorMap = {{ (form.subsector_sector_map or {})|tojson }};
+    var pairs = [
+        ['sector_primary', 'sub_sector_primary'],
+        ['sector_secondary', 'sub_sector_secondary'],
+        ['sector_tertiary', 'sub_sector_tertiary']
+    ];
+
+    function normalizeId(value) {
+        if (!value || value === 'None') {
+            return '';
+        }
+        return String(value);
+    }
+
+    function parentSectorId(subId) {
+        subId = normalizeId(subId);
+        if (!subId || !Object.prototype.hasOwnProperty.call(subsectorSectorMap, subId)) {
+            return undefined;
+        }
+        var parent = subsectorSectorMap[subId];
+        if (parent === null || parent === undefined || parent === '') {
+            return null;
+        }
+        return String(parent);
+    }
+
+    function snapshotOptions(select) {
+        return Array.prototype.map.call(select.options, function(opt) {
+            return { value: opt.value, text: opt.text };
+        });
+    }
+
+    function fillSelect(select, options, include, selected) {
+        var wanted = normalizeId(selected);
+        var blankValue = '';
+        select.innerHTML = '';
+        options.forEach(function(opt) {
+            if (!include(opt)) {
+                return;
+            }
+            var el = document.createElement('option');
+            el.value = opt.value;
+            el.textContent = opt.text;
+            if (!normalizeId(opt.value)) {
+                blankValue = opt.value;
+            }
+            select.appendChild(el);
+        });
+        select.value = wanted || blankValue;
+        if (wanted && select.value !== wanted) {
+            select.value = blankValue;
+        }
+    }
+
+    function syncPair(sectorEl, subEl, sectorOptions, subOptions, source) {
+        var sectorId = normalizeId(sectorEl.value);
+        var subId = normalizeId(subEl.value);
+        var parent = parentSectorId(subId);
+
+        if (source === 'sub') {
+            if (parent) {
+                sectorId = parent;
+            }
+        } else if (source === 'init') {
+            if (!sectorId && parent) {
+                sectorId = parent;
+            }
+            if (sectorId && subId && parent !== sectorId) {
+                parent = undefined;
+            }
+        } else if (!sectorId || (subId && parentSectorId(subId) !== sectorId)) {
+            subId = '';
+            parent = undefined;
+        }
+
+        fillSelect(subEl, subOptions, function(opt) {
+            var optId = normalizeId(opt.value);
+            if (!optId || optId === subId || !sectorId) {
+                return true;
+            }
+            return parentSectorId(optId) === sectorId;
+        }, subId);
+
+        var onlySector = (parent && sectorId === parent) ? parent : '';
+        fillSelect(sectorEl, sectorOptions, function(opt) {
+            var optId = normalizeId(opt.value);
+            if (!optId || !onlySector) {
+                return true;
+            }
+            return optId === onlySector;
+        }, sectorId);
+    }
+
+    function initSectorSubsectorFilters() {
+        pairs.forEach(function(pair) {
+            var sectorEl = document.getElementById(pair[0]);
+            var subEl = document.getElementById(pair[1]);
+            if (!sectorEl || !subEl) {
+                return;
+            }
+            var sectorOptions = snapshotOptions(sectorEl);
+            var subOptions = snapshotOptions(subEl);
+            syncPair(sectorEl, subEl, sectorOptions, subOptions, 'init');
+            sectorEl.addEventListener('change', function() {
+                syncPair(sectorEl, subEl, sectorOptions, subOptions, 'sector');
+            });
+            subEl.addEventListener('change', function() {
+                syncPair(sectorEl, subEl, sectorOptions, subOptions, 'sub');
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSectorSubsectorFilters);
+    } else {
+        initSectorSubsectorFilters();
+    }
+})();
+</script>

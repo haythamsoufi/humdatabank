@@ -268,6 +268,65 @@ class TestIndicatorBankForm:
                 result = IndicatorBankForm.related_programs_from_request()
                 assert result == ['Prog A', 'Prog B']
 
+    def test_subsector_sector_map_uses_parent_sector(self, app):
+        with app.app_context():
+            sector = MagicMock()
+            sector.id = 10
+            sector.name = 'Health'
+            subsector = MagicMock()
+            subsector.id = 20
+            subsector.name = 'Primary Health'
+            subsector.sector_id = 10
+            with patch('app.forms.system.indicator_bank_forms.IndicatorBankType') as mt, \
+                 patch('app.forms.system.indicator_bank_forms.IndicatorBankUnit') as mu, \
+                 patch('app.forms.system.indicator_bank_forms.IndicatorBankSpef') as msp, \
+                 patch('app.forms.system.indicator_bank_forms.Sector') as ms, \
+                 patch('app.forms.system.indicator_bank_forms.SubSector') as mss, \
+                 patch('app.routes.admin.shared.get_localized_sector_name', return_value='Health'), \
+                 patch('app.routes.admin.shared.get_localized_subsector_name', return_value='Primary Health'):
+                mt.query.filter_by.return_value.order_by.return_value.all.return_value = []
+                mu.query.filter_by.return_value.order_by.return_value.all.return_value = []
+                msp.query.filter_by.return_value.order_by.return_value.all.return_value = []
+                ms.query.filter_by.return_value.order_by.return_value.all.return_value = [sector]
+                mss.query.filter_by.return_value.order_by.return_value.all.return_value = [subsector]
+                from app.forms.system.indicator_bank_forms import IndicatorBankForm
+                form = IndicatorBankForm(data={'name': 'Test Indicator', 'type': 1})
+                assert form.subsector_sector_map == {20: 10}
+
+    def _bind_sector_pair(self, form, sector_id, subsector_id, parent_id):
+        form.sector_primary.choices = [(None, '-- Select --'), (10, 'Health'), (11, 'WASH')]
+        form.sub_sector_primary.choices = [(None, '-- Select --'), (20, 'Primary Health'), (21, 'WASH Sub')]
+        form.subsector_sector_map = {subsector_id: parent_id}
+        form.sector_primary.data = sector_id
+        form.sub_sector_primary.data = subsector_id
+
+    def test_matching_sector_and_subsector_is_valid(self, app):
+        with app.app_context():
+            form = _make_ib_form(app)
+            self._bind_sector_pair(form, 10, 20, 10)
+            assert form.validate() is True
+
+    def test_subsector_from_another_sector_is_rejected(self, app):
+        with app.app_context():
+            form = _make_ib_form(app)
+            self._bind_sector_pair(form, 11, 20, 10)
+            assert form.validate() is False
+            assert form.sub_sector_primary.errors
+
+    def test_subsector_selection_fills_parent_sector(self, app):
+        with app.app_context():
+            form = _make_ib_form(app)
+            self._bind_sector_pair(form, None, 20, 10)
+            assert form.validate() is True
+            assert form.sector_primary.data == 10
+
+    def test_unassigned_subsector_cannot_be_combined_with_sector(self, app):
+        with app.app_context():
+            form = _make_ib_form(app)
+            self._bind_sector_pair(form, 10, 20, None)
+            assert form.validate() is False
+            assert form.sub_sector_primary.errors
+
 
 class TestIndicatorBankFormPopulateFrom:
     def _make_mock_indicator_bank(self):

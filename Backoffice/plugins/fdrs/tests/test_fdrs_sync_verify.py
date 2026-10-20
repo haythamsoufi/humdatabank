@@ -12,6 +12,7 @@ for p in (backoffice_dir, fdrs_scripts, imports_dir):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from fdrs_data_fetcher import build_fdrs_snapshot_rows  # noqa: E402
 from fdrs_sync_constants import FDRS_INCOME_SOURCES_MATRIX_ITEM_ID  # noqa: E402
 from fdrs_sync_verify import (  # noqa: E402
     STATUS_MATCHED,
@@ -92,6 +93,59 @@ def test_zero_value_is_intentional_skip():
     assert points[0].skip_reason == "main_value_empty_or_zero"
     attach_classification(points)
     assert points[0].status == STATUS_SKIPPED
+
+
+def test_given_support_amount_merges_into_one_slot():
+    rows = build_fdrs_snapshot_rows([
+        {
+            "ISO3": "GBR",
+            "DonCode": "DGBR001",
+            "year": 2024,
+            "KPI_code": "supported1",
+            "Value": "DFR001",
+            "ImputedValue": None,
+            "State": 500,
+        },
+        {
+            "ISO3": "GBR",
+            "DonCode": "DGBR001",
+            "year": 2024,
+            "KPI_code": "supported1_amount",
+            "Value": "1000",
+            "ImputedValue": None,
+            "State": 500,
+        },
+    ])
+    points = group_snapshot_to_points(rows)
+    assert len(points) == 1
+    assert points[0].base_kpi == "supported1"
+    assert points[0].skip_reason == "network_support_slot"
+    assert points[0].kpi_code_used == "supported1"
+    assert points[0].fdrs_value == "DFR001"
+
+
+def test_sex_age_rows_stay_one_point_per_base_kpi():
+    rows = build_fdrs_snapshot_rows([
+        {
+            "ISO3": "KEN",
+            "DonCode": "DKEN001",
+            "year": 2024,
+            "KPI_code": code,
+            "Value": "10",
+            "ImputedValue": None,
+            "State": 500,
+        }
+        for code in (
+            "KPI_PeopleVol_Tot",
+            "KPI_PeopleVol_Tot_M",
+            "KPI_PeopleVol_Tot_F",
+            "KPI_PeopleVol_M_age_5_17",
+            "KPI_PeopleVol_F_age_18_49",
+        )
+    ])
+    points = group_snapshot_to_points(rows)
+    assert len(points) == 1
+    assert points[0].base_kpi == "KPI_PeopleVol"
 
 
 def test_workflow_and_network_slots_are_intentional_skips():

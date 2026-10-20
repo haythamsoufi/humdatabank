@@ -244,11 +244,21 @@ def build_point_from_group(rows: Sequence[Dict[str, Any]]) -> FdrsDataPoint:
         point.fdrs_value_status = (first.get("ValueStatus") or "")
         return point
     if kind == KIND_NETWORK:
+        # Partner-code and _amount rows share one base KPI. Prefer the partner
+        # list for the displayed value; the amount is the same slot, not a second point.
+        sample = next(
+            (
+                r
+                for r in rows
+                if not str(r.get("KPI_code") or "").lower().endswith("_amount")
+            ),
+            first,
+        )
         point.skip_reason = "network_support_slot"
-        point.kpi_code_used = (first.get("KPI_code") or base_kpi).strip()
-        point.fdrs_value = first.get("Value")
-        point.fdrs_state = first.get("State")
-        point.fdrs_value_status = (first.get("ValueStatus") or "")
+        point.kpi_code_used = (sample.get("KPI_code") or base_kpi).strip()
+        point.fdrs_value = sample.get("Value")
+        point.fdrs_state = sample.get("State")
+        point.fdrs_value_status = (sample.get("ValueStatus") or "")
         return point
 
     if not iso3:

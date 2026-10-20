@@ -7,12 +7,15 @@ sidecar through ``storage_service`` (filesystem locally, Azure Blob in prod).
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
 import os
+import threading
+from collections import OrderedDict
 from datetime import datetime, timezone
-from typing import Any, BinaryIO, Dict, List, Optional, Sequence, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Sequence, Tuple, Union
 
 from app.services.platform import storage_service
 
@@ -178,6 +181,50 @@ def _as_filter_text(value: Any) -> str:
     return str(value).strip().lower()
 
 
+# Parsed verification workbooks are large (one row per society × year × base KPI).
+# Keep a couple of sheets in memory so paging and search do not re-read the xlsx.
+_SHEET_CACHE_LOCK = threading.Lock()
+_SHEET_CACHE: "OrderedDict[tuple, Dict[str, Any]]" = OrderedDict()
+_SHEET_CACHE_LIMIT = 2
+
+
+def _sheet_cache_key(source: Source, sheet_name: str, cache_token: Optional[str]) -> Optional[tuple]:
+    if cache_token:
+        return ("token", str(cache_token), sheet_name)
+    if isinstance(source, (str, os.PathLike)):
+        path = os.path.abspath(os.fspath(source))
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        return ("path", path, st.st_mtime_ns, st.st_size, sheet_name)
+    if isinstance(source, (bytes, bytearray)):
+        digest = hashlib.sha256(source).hexdigest()
+        return ("bytes", len(source), digest, sheet_name)
+    return None
+
+
+def _sheet_cache_get(key: Optional[tuple]) -> Optional[Dict[str, Any]]:
+    if key is None:
+        return None
+    with _SHEET_CACHE_LOCK:
+        hit = _SHEET_CACHE.get(key)
+        if hit is None:
+            return None
+        _SHEET_CACHE.move_to_end(key)
+        return hit
+
+
+def _sheet_cache_put(key: Optional[tuple], value: Dict[str, Any]) -> None:
+    if key is None:
+        return
+    with _SHEET_CACHE_LOCK:
+        _SHEET_CACHE[key] = value
+        _SHEET_CACHE.move_to_end(key)
+        while len(_SHEET_CACHE) > _SHEET_CACHE_LIMIT:
+            _SHEET_CACHE.popitem(last=False)
+
+
 def _open_workbook(source: Source):
     from app.utils.safe_workbook import load_workbook_safe, read_workbook_file_bytes
 
@@ -191,6 +238,85 @@ def _open_workbook(source: Source):
     return load_workbook_safe(source, read_only=True, data_only=True)
 
 
+def _load_sheet_rows(source: Source, wanted: str) -> Dict[str, Any]:
+    """Parse one sheet into column-aligned tuples. Empty result when the sheet is missing."""
+    wb = _open_workbook(source)
+    try:
+        sheet_names = list(wb.sheetnames)
+        resolved = wanted
+        if resolved not in wb.sheetnames:
+            resolved = sheet_names[0] if sheet_names else resolved
+        ws = wb[resolved] if resolved in wb.sheetnames else None
+        if ws is None:
+            return {
+                "sheet": resolved,
+                "sheets": sheet_names,
+                "columns": [],
+                "col_index": {},
+                "rows": [],
+            }
+        rows_iter = ws.iter_rows(values_only=True)
+        raw_header = next(rows_iter, None) or ()
+        columns = [str(c) if c is not None else "" for c in raw_header]
+        col_index = {col.lower(): i for i, col in enumerate(columns) if col}
+        width = len(columns)
+        stored: List[Tuple[Any, ...]] = []
+        for raw in rows_iter:
+            stored.append(tuple(_cell_to_json(raw[i] if i < len(raw) else None) for i in range(width)))
+        return {
+            "sheet": resolved,
+            "sheets": sheet_names,
+            "columns": columns,
+            "col_index": col_index,
+            "rows": stored,
+        }
+    finally:
+        wb.close()
+
+
+def _row_matches(
+    raw: Tuple[Any, ...],
+    *,
+    columns: Sequence[str],
+    col_index: Dict[str, int],
+    active_filters: Dict[str, str],
+    any_filters: Dict[str, set],
+    query: Optional[str],
+    search_cols: set,
+) -> bool:
+    for col_key, expected in active_filters.items():
+        idx = col_index.get(col_key)
+        cell = raw[idx] if idx is not None and idx < len(raw) else None
+        if _as_filter_text(cell) != expected:
+            return False
+    for col_key, allowed in any_filters.items():
+        idx = col_index.get(col_key)
+        cell = raw[idx] if idx is not None and idx < len(raw) else None
+        if _as_filter_text(cell) not in allowed:
+            return False
+    if not query:
+        return True
+    haystack_idxs = (
+        [col_index[c] for c in search_cols if c in col_index]
+        if search_cols
+        else range(len(columns))
+    )
+    for idx in haystack_idxs:
+        cell = raw[idx] if idx < len(raw) else None
+        if query in _as_filter_text(cell):
+            return True
+    return False
+
+
+def _tuple_to_row(raw: Tuple[Any, ...], columns: Sequence[str]) -> Dict[str, Any]:
+    row: Dict[str, Any] = {}
+    for i, col in enumerate(columns):
+        if not col:
+            continue
+        row[col] = raw[i] if i < len(raw) else None
+    return row
+
+
 def read_xlsx_sheet(
     source: Source,
     *,
@@ -202,6 +328,7 @@ def read_xlsx_sheet(
     column_in: Optional[Dict[str, Sequence[str]]] = None,
     search: Optional[str] = None,
     search_columns: Optional[List[str]] = None,
+    cache_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read one sheet as a paginated JSON table.
 
@@ -212,6 +339,9 @@ def read_xlsx_sheet(
     (or every column when omitted). ``per_page <= 0`` returns every matching
     row (capped at 50_000) so client-side grids can filter locally.
     ``truncated`` is true when that cap drops matching rows.
+
+    Parsed rows are cached (path mtime, content hash, or *cache_token*) so
+    later pages do not reopen the workbook.
     """
     page = max(1, int(page or 1))
     try:
@@ -236,89 +366,69 @@ def read_xlsx_sheet(
         if values
     }
 
-    wb = _open_workbook(source)
-    try:
-        sheet_names = list(wb.sheetnames)
-        if wanted not in wb.sheetnames:
-            wanted = sheet_names[0] if sheet_names else wanted
-        ws = wb[wanted] if wanted in wb.sheetnames else None
-        if ws is None:
-            return {
-                "sheet": wanted,
-                "sheets": sheet_names,
-                "columns": [],
-                "rows": [],
-                "page": page,
-                "per_page": per_page,
-                "total_rows": 0,
-                "filtered_rows": 0,
-                "truncated": False,
-            }
+    cache_key = _sheet_cache_key(source, wanted, cache_token)
+    parsed = _sheet_cache_get(cache_key)
+    if parsed is None:
+        parsed = _load_sheet_rows(source, wanted)
+        _sheet_cache_put(cache_key, parsed)
 
-        rows_iter = ws.iter_rows(values_only=True)
-        raw_header = next(rows_iter, None) or ()
-        columns = [str(c) if c is not None else "" for c in raw_header]
-        col_index = {col.lower(): i for i, col in enumerate(columns) if col}
+    columns: List[str] = list(parsed.get("columns") or [])
+    col_index: Dict[str, int] = dict(parsed.get("col_index") or {})
+    stored: List[Tuple[Any, ...]] = list(parsed.get("rows") or [])
+    sheet_names = list(parsed.get("sheets") or [])
+    resolved = parsed.get("sheet") or wanted
+    total_rows = len(stored)
+    visible_columns = [c for c in columns if c]
 
-        matched: List[Dict[str, Any]] = []
-        total_rows = 0
-        for raw in rows_iter:
-            total_rows += 1
-            skip = False
-            for col_key, expected in active_filters.items():
-                idx = col_index.get(col_key)
-                cell = raw[idx] if idx is not None and idx < len(raw) else None
-                if _as_filter_text(cell) != expected:
-                    skip = True
-                    break
-            if not skip:
-                for col_key, allowed in any_filters.items():
-                    idx = col_index.get(col_key)
-                    cell = raw[idx] if idx is not None and idx < len(raw) else None
-                    if _as_filter_text(cell) not in allowed:
-                        skip = True
-                        break
-            if skip:
-                continue
-            if query:
-                haystack_idxs = (
-                    [col_index[c] for c in search_cols if c in col_index]
-                    if search_cols
-                    else range(len(columns))
-                )
-                found = False
-                for idx in haystack_idxs:
-                    cell = raw[idx] if idx < len(raw) else None
-                    if query in _as_filter_text(cell):
-                        found = True
-                        break
-                if not found:
-                    continue
-            row: Dict[str, Any] = {}
-            for i, col in enumerate(columns):
-                if not col:
-                    continue
-                row[col] = _cell_to_json(raw[i] if i < len(raw) else None)
-            matched.append(row)
-
-        filtered_rows = len(matched)
-        if return_all:
-            start = 0
-            page_rows = matched[:per_page]
-            page = 1
-        else:
-            start = (page - 1) * per_page
-            page_rows = matched[start:start + per_page]
+    if not columns and not stored:
         return {
-            "sheet": wanted,
+            "sheet": resolved,
             "sheets": sheet_names,
-            "columns": [c for c in columns if c],
-            "rows": page_rows,
+            "columns": [],
+            "rows": [],
             "page": page,
-            "per_page": per_page if not return_all else len(page_rows),
-            "total_rows": total_rows,
-            "filtered_rows": filtered_rows,
-            "truncated": bool(return_all and filtered_rows > len(page_rows)),
+            "per_page": per_page,
+            "total_rows": 0,
+            "filtered_rows": 0,
+            "truncated": False,
         }
-    finally:
-        wb.close()
+
+    needs_scan = bool(active_filters or any_filters or query)
+    if needs_scan:
+        matched = [
+            raw
+            for raw in stored
+            if _row_matches(
+                raw,
+                columns=columns,
+                col_index=col_index,
+                active_filters=active_filters,
+                any_filters=any_filters,
+                query=query,
+                search_cols=search_cols,
+            )
+        ]
+    else:
+        matched = stored
+
+    filtered_rows = len(matched)
+    if return_all:
+        start = 0
+        window = matched[:per_page]
+        page = 1
+        reported_per_page = len(window)
+    else:
+        start = (page - 1) * per_page
+        window = matched[start:start + per_page]
+        reported_per_page = per_page
+    return {
+        "sheet": resolved,
+        "sheets": sheet_names,
+        "columns": visible_columns,
+        "rows": [_tuple_to_row(raw, columns) for raw in window],
+        "page": page,
+        "per_page": reported_per_page,
+        "total_rows": total_rows,
+        "filtered_rows": filtered_rows,
+        "truncated": bool(return_all and filtered_rows > len(window)),
+    }

@@ -131,9 +131,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     let syncVerifyResultsUrl = null;
-    let syncVerifyTableState = { sheet: 'data_points' };
+    let syncVerifyTableState = { sheet: 'data_points', page: 1 };
     let syncVerifyGridHelper = null;
     let pendingVerifyGrid = null;
+    let syncVerifyFetchSeq = 0;
+    let syncVerifySearchTimer = null;
+    const SYNC_VERIFY_PAGE_SIZE = 500;
 
     function formatFdrsLastRunDate(iso) {
         if (!iso) return '';
@@ -200,15 +203,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const problemsOnlyFile = !!(stats.problems_only);
         const problemsBox = document.getElementById('sync-verify-problems-only');
         const viewingProblems = !!(problemsBox && problemsBox.checked);
-        if (!viewingProblems && problemsOnlyFile && (data.sheet || '') === 'data_points' && Number(stats.total || 0) > loaded) {
+        if (!viewingProblems && problemsOnlyFile && (data.sheet || '') === 'data_points' && Number(stats.total || 0) > filtered) {
             return {{ _("This saved workbook only contains missing and mismatch rows. Run verification again to store the full comparison.")|tojson|safe }};
         }
         return '';
     }
 
+    function setVerifyGridLoading(on) {
+        const el = document.getElementById('syncVerifyGrid-loading');
+        if (!el) return;
+        if (window.AgGridHelper && typeof AgGridHelper.showGridLoadingOverlay === 'function') {
+            if (on) AgGridHelper.showGridLoadingOverlay(el);
+            else AgGridHelper.hideGridLoadingOverlay(el);
+            return;
+        }
+        el.style.display = on ? 'flex' : 'none';
+    }
+
     function resetSyncVerifyTable() {
         syncVerifyResultsUrl = null;
-        syncVerifyTableState = { sheet: 'data_points' };
+        syncVerifyTableState = { sheet: 'data_points', page: 1 };
         const cards = document.getElementById('sync-verify-stats-cards');
         if (cards) cards.replaceChildren();
         const search = document.getElementById('sync-verify-search');
@@ -216,6 +230,8 @@ document.addEventListener('DOMContentLoaded', function () {
         showVerifyGridError('');
         showVerifyGridNote('');
         pendingVerifyGrid = null;
+        const pager = document.getElementById('sync-verify-pager');
+        if (pager) pager.classList.add('hidden');
         if (syncVerifyGridHelper) syncVerifyGridHelper.setRowData([]);
     }
 
@@ -267,22 +283,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     return '<span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium '
                         + statusBadgeClass(text) + '">' + escapeHtmlAttr(text) + '</span>';
                 };
-                def.filter = 'customSetFilter';
                 def.minWidth = 140;
             }
+            def.filter = false;
+            def.sortable = true;
             return def;
         });
-        if (window.AgGridHelper && typeof AgGridHelper.autoDetectColumnFilters === 'function') {
-            AgGridHelper.autoDetectColumnFilters(defs, rows || []);
-        }
         return defs.length ? defs : [{ field: '_empty', headerName: '', hide: true }];
-    }
-
-    function applyVerifyQuickFilter() {
-        const search = document.getElementById('sync-verify-search');
-        if (syncVerifyGridHelper && syncVerifyGridHelper.gridApi && typeof syncVerifyGridHelper.gridApi.setGridOption === 'function') {
-            syncVerifyGridHelper.gridApi.setGridOption('quickFilterText', (search && search.value) || '');
-        }
     }
 
     function applyVerifyGrid(columns, rows) {
@@ -318,7 +325,9 @@ document.addEventListener('DOMContentLoaded', function () {
             syncVerifyGridHelper._hasSizedColumnsToFit = false;
             syncVerifyGridHelper.setRowData(rows || []);
         }
-        applyVerifyQuickFilter();
+        if (syncVerifyGridHelper.gridApi && typeof syncVerifyGridHelper.gridApi.setGridOption === 'function') {
+            syncVerifyGridHelper.gridApi.setGridOption('quickFilterText', '');
+        }
     }
 
     function syncPanelIsVisible() {
@@ -328,9 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function paintVerifyGrid() {
         if (!syncPanelIsVisible()) return;
-        if (!pendingVerifyGrid) {
-            pendingVerifyGrid = { columns: [], rows: [] };
-        }
+        if (!pendingVerifyGrid) return;
         if (typeof AgGridHelper === 'undefined') {
             showVerifyGridError({{ _("The results table could not start. Reload the page.")|tojson|safe }});
             return;
@@ -344,6 +351,43 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function renderVerifyPager(data) {
+        const pager = document.getElementById('sync-verify-pager');
+        const label = document.getElementById('sync-verify-pager-label');
+        const prev = document.getElementById('sync-verify-page-prev');
+        const next = document.getElementById('sync-verify-page-next');
+        if (!pager || !label) return;
+        const filtered = Number(data.filtered_rows || 0);
+        const pageSize = Number(data.per_page || SYNC_VERIFY_PAGE_SIZE) || SYNC_VERIFY_PAGE_SIZE;
+        const page = Math.max(1, Number(data.page || 1));
+        const loaded = (data.rows || []).length;
+        if (!filtered) {
+            pager.classList.add('hidden');
+            return;
+        }
+        const start = (page - 1) * pageSize + 1;
+        const end = start + loaded - 1;
+        const pageCount = Math.max(1, Math.ceil(filtered / pageSize));
+        label.textContent = {{ _("Showing")|tojson|safe }} + ' ' + start.toLocaleString()
+            + '–' + end.toLocaleString() + ' / ' + filtered.toLocaleString()
+            + ' · ' + {{ _("page")|tojson|safe }} + ' ' + page + ' / ' + pageCount
+            + '. ' + {{ _("Download Excel for the full sheet.")|tojson|safe }};
+        pager.classList.remove('hidden');
+        if (prev) {
+            prev.disabled = page <= 1;
+            prev.style.opacity = page <= 1 ? '0.5' : '1';
+        }
+        if (next) {
+            next.disabled = page >= pageCount;
+            next.style.opacity = page >= pageCount ? '0.5' : '1';
+        }
+        const pageInput = document.getElementById('sync-verify-page-input');
+        if (pageInput) {
+            pageInput.max = String(pageCount);
+            pageInput.value = String(page);
+        }
+    }
+
     function renderSyncVerifyTable(data) {
         const wrap = document.getElementById('sync-verify-table-wrap');
         if (!wrap) return;
@@ -352,18 +396,28 @@ document.addEventListener('DOMContentLoaded', function () {
         showVerifyGridNote(verifyCoverageNote(data));
         renderSyncVerifyStats(data.stats);
         setActiveSheetButton(data.sheet || syncVerifyTableState.sheet);
+        syncVerifyTableState.page = Math.max(1, Number(data.page || syncVerifyTableState.page || 1));
+        renderVerifyPager(data);
         pendingVerifyGrid = {
             columns: data.columns || [],
             rows: data.rows || []
         };
         paintVerifyGrid();
+        setVerifyGridLoading(false);
     }
 
     function fetchSyncVerifyResultsPage() {
         if (!syncVerifyResultsUrl) return;
+        const seq = ++syncVerifyFetchSeq;
+        setVerifyGridLoading(true);
+        showVerifyGridError('');
         const params = new URLSearchParams();
         params.set('sheet', syncVerifyTableState.sheet);
-        params.set('all', '1');
+        params.set('page', String(syncVerifyTableState.page || 1));
+        params.set('per_page', String(SYNC_VERIFY_PAGE_SIZE));
+        const search = document.getElementById('sync-verify-search');
+        const query = search && search.value ? search.value.trim() : '';
+        if (query) params.set('q', query);
         const problemsBox = document.getElementById('sync-verify-problems-only');
         if (problemsBox && problemsBox.checked && syncVerifyTableState.sheet === 'data_points') {
             params.set('problems_only', '1');
@@ -371,12 +425,23 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(syncVerifyResultsUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
+                if (seq !== syncVerifyFetchSeq) return;
                 if (!data || data.success === false) {
                     throw new Error((data && data.error) || {{ _("Failed to load verification table")|tojson|safe }});
+                }
+                const filtered = Number(data.filtered_rows || 0);
+                const pageSize = Number(data.per_page || SYNC_VERIFY_PAGE_SIZE) || SYNC_VERIFY_PAGE_SIZE;
+                const pageCount = Math.max(1, Math.ceil(filtered / pageSize));
+                if (filtered && syncVerifyTableState.page > pageCount) {
+                    syncVerifyTableState.page = pageCount;
+                    fetchSyncVerifyResultsPage();
+                    return;
                 }
                 renderSyncVerifyTable(data);
             })
             .catch(function (err) {
+                if (seq !== syncVerifyFetchSeq) return;
+                setVerifyGridLoading(false);
                 const wrap = document.getElementById('sync-verify-table-wrap');
                 if (wrap) wrap.classList.remove('hidden');
                 showVerifyGridError(err.message || {{ _("Failed to load verification table")|tojson|safe }});
@@ -385,12 +450,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function loadSyncVerifyResults(resultsUrl) {
         syncVerifyResultsUrl = resultsUrl;
+        syncVerifyTableState.page = 1;
         fetchSyncVerifyResultsPage();
     }
 
     document.querySelectorAll('#sync-verify-sheet-tabs [data-verify-sheet]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             syncVerifyTableState.sheet = this.getAttribute('data-verify-sheet');
+            syncVerifyTableState.page = 1;
             const search = document.getElementById('sync-verify-search');
             if (search) search.value = '';
             fetchSyncVerifyResultsPage();
@@ -398,12 +465,46 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const verifySearch = document.getElementById('sync-verify-search');
     if (verifySearch) {
-        verifySearch.addEventListener('input', applyVerifyQuickFilter);
+        verifySearch.addEventListener('input', function () {
+            if (syncVerifySearchTimer) clearTimeout(syncVerifySearchTimer);
+            syncVerifySearchTimer = setTimeout(function () {
+                syncVerifyTableState.page = 1;
+                if (syncVerifyResultsUrl) fetchSyncVerifyResultsPage();
+            }, 300);
+        });
     }
     const verifyProblemsOnly = document.getElementById('sync-verify-problems-only');
     if (verifyProblemsOnly) {
         verifyProblemsOnly.addEventListener('change', function () {
+            syncVerifyTableState.page = 1;
             if (syncVerifyResultsUrl) fetchSyncVerifyResultsPage();
+        });
+    }
+    const verifyPagePrev = document.getElementById('sync-verify-page-prev');
+    const verifyPageNext = document.getElementById('sync-verify-page-next');
+    if (verifyPagePrev) {
+        verifyPagePrev.addEventListener('click', function () {
+            if (syncVerifyTableState.page <= 1) return;
+            syncVerifyTableState.page -= 1;
+            fetchSyncVerifyResultsPage();
+        });
+    }
+    if (verifyPageNext) {
+        verifyPageNext.addEventListener('click', function () {
+            syncVerifyTableState.page += 1;
+            fetchSyncVerifyResultsPage();
+        });
+    }
+    const verifyPageInput = document.getElementById('sync-verify-page-input');
+    if (verifyPageInput) {
+        verifyPageInput.addEventListener('change', function () {
+            const nextPage = parseInt(verifyPageInput.value, 10);
+            if (!nextPage || nextPage < 1) {
+                verifyPageInput.value = String(syncVerifyTableState.page || 1);
+                return;
+            }
+            syncVerifyTableState.page = nextPage;
+            fetchSyncVerifyResultsPage();
         });
     }
     const syncTabBtn = document.querySelector('#data-sync-tabs [data-tab="sync"]');
@@ -1553,10 +1654,15 @@ function restoreLatestVerifyIfNeeded(force) {
         } catch (e) { /* ignore */ }
     }
     const latestUrl = templateApiUrl(TEMPLATE_API_URLS.syncVerifyLatest, currentTemplateId);
+    setVerifyGridLoading(true);
     fetch(latestUrl, { headers: { 'Accept': 'application/json' } })
         .then(function (res) { return res.json(); })
         .then(function (data) {
-            if (!data || data.success === false || !data.exists) return;
+            if (!data || data.success === false || !data.exists) {
+                setVerifyGridLoading(false);
+                showVerifyGridNote({{ _("No verification results yet. Run verification to fill this table.")|tojson|safe }});
+                return;
+            }
             renderSyncVerifyLastRun(data);
             if (data.download_url && syncVerifyDownloadBtn && isSafeHref(data.download_url)) {
                 syncVerifyDownloadBtn.classList.remove('hidden');
@@ -1566,11 +1672,15 @@ function restoreLatestVerifyIfNeeded(force) {
                 loadSyncVerifyResults(data.results_url);
             }
         })
-        .catch(function () { /* keep page usable without latest snapshot */ });
+        .catch(function () {
+            setVerifyGridLoading(false);
+        });
 }
 
 resumeSyncVerifyJobIfNeeded();
+if (syncVerifyActiveJobId) {
+    setVerifyGridLoading(false);
+}
 restoreLatestVerifyIfNeeded();
-paintVerifyGrid();
 });
 </script>

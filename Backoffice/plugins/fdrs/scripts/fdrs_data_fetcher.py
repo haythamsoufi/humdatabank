@@ -52,6 +52,8 @@ import urllib.error
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from fdrs_sync_constants import (
+    FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX,
+    FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX,
     FdrsSyncCancelled,
     fdrs_kpi_has_data_availability_suffix,
     fdrs_kpi_strip_data_availability_suffix,
@@ -211,6 +213,24 @@ DEFAULT_DATA_API_BASE = "https://data-api.ifrc.org"
 # This should match the importer/UI expectation (see import_fdrs_form_data.py help text).
 DEFAULT_FDRS_YEARS_START = 2010
 DEFAULT_FDRS_YEARS_END = 2025  # inclusive
+
+# Network-support slots are one base KPI per slot. The amount column
+# (supported1_amount, received_support1_amount) must share that base so
+# verification does not count the partner list and the amount as two points.
+# received_support1_amount already collapses via the first-two-tokens rule;
+# supported1_amount does not, because "supported1" is a single token.
+_NETWORK_SLOT_BASE_RE = re.compile(
+    rf"^({re.escape(FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX)}|{re.escape(FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX)})(\d+)(?:_amount)?$",
+    re.IGNORECASE,
+)
+
+
+def _network_slot_base_kpi(kpi: str) -> Optional[str]:
+    match = _NETWORK_SLOT_BASE_RE.match((kpi or "").strip())
+    if not match:
+        return None
+    return f"{match.group(1)}{match.group(2)}"
+
 
 # KPI codes that use the full code as BaseKPI (indicator bank uses full code, not first-two-tokens)
 # KPI_pr_sex and KPI_sg_sex are questions linked directly to form_items (no indicator bank)
@@ -896,6 +916,9 @@ def _classify_fdrs_combined_row(
         if parent_kpi == full or parent_kpi.startswith(full + "_"):
             base_kpi = full
             break
+    slot_base = _network_slot_base_kpi(parent_kpi)
+    if slot_base:
+        base_kpi = slot_base
     return (reason == ""), reason, year_text, tokens, base_kpi
 
 

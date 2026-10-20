@@ -133,6 +133,25 @@ class TestIsNoisyAccessLogMessage:
         )
         assert is_noisy_access_log_message(msg) is True
 
+    def test_successful_notification_badge_poll_filtered(self):
+        """The bell polls /notifications/api/count on every page and tab; 2xx is pure noise."""
+        msg = (
+            '4.175.128.233:3277 - - [19/Aug/2026:13:52:32 +0200] '
+            '"GET /notifications/api/count HTTP/1.1" 200 42 '
+            '"https://databank.ifrc.org/" "Mozilla/5.0" 9000'
+        )
+        assert is_noisy_access_log_message(msg) is True
+
+    @pytest.mark.parametrize("status", [429, 500, 502, 504])
+    def test_failed_notification_badge_poll_not_filtered(self, status):
+        """Failures on the same path must stay visible for incident triage."""
+        msg = (
+            '4.175.128.233:3277 - - [19/Aug/2026:13:52:32 +0200] '
+            f'"GET /notifications/api/count HTTP/1.1" {status} 89 '
+            '"https://databank.ifrc.org/" "Mozilla/5.0" 30000'
+        )
+        assert is_noisy_access_log_message(msg) is False
+
     def test_notification_send_not_filtered(self):
         msg = (
             '4.175.128.233:3279 - - [19/Aug/2026:13:52:32 +0200] '

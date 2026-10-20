@@ -9,6 +9,8 @@ from contextlib import suppress
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
+from app.extensions import limiter
+from app.utils.rate_limiting import per_user_rate_limit_key
 from app.utils.profile_summary_payload import (
     role_badge_key_from_rbac_codes,
     collect_arg_strings,
@@ -216,12 +218,21 @@ def api_get_notifications():
 
 @bp.route("/api/notifications/count", methods=["GET"])
 @login_required
+@limiter.limit("60 per minute", key_func=per_user_rate_limit_key("notif_count_legacy"))
 def api_get_notifications_count():
-    """Get unread notifications count for the current user"""
+    """Get unread notifications count for the current user.
+
+    Legacy alias of ``GET /notifications/api/count`` (the bell uses that one).
+    Same contract: a database failure is a 500, never ``unread_count: 0``.
+    """
     from app.services.notification.service import NotificationService
 
     try:
-        unread_count = NotificationService.get_unread_count(current_user.id)
+        unread_count = NotificationService.get_unread_count(
+            current_user.id,
+            raise_on_error=True,
+            statement_timeout_ms=5000,
+        )
 
         return json_ok(success=True, unread_count=unread_count)
 

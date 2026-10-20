@@ -37,6 +37,7 @@ _NOISY_ACCESS_SUCCESS_PATH_SUBSTRINGS = (
     '/api/forms/presence/',
     '/api/forms/session/keepalive',
     '/api/notifications/count',
+    '/notifications/api/count',
     '/api/notifications/websocket-status',
     '/api/stream/status',
     '/api/devices/heartbeat',

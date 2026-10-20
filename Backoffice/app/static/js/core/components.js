@@ -1066,7 +1066,68 @@ document.addEventListener('DOMContentLoaded', function() {
     let reconnectTimeout = null;
     let pingIntervalId = null;
     let stableConnectionTimeoutId = null;
-    let pollingInterval = null; // Track polling interval to prevent duplicates
+    let pollingInterval = null; // Pending badge-poll timer (setTimeout id); null when none is scheduled
+
+    // --- Badge polling (GET /notifications/api/count) -------------------------------
+    // Notification WebSockets are disabled server-side, so every open tab polls. This is
+    // the hottest authenticated request, and when the backend is saturated it is also the
+    // first thing to pile up behind stuck workers. So the loop must be gentle:
+    //   * no requests while the tab is hidden (resumes on visibilitychange),
+    //   * exponential backoff + jitter after 429/5xx/network errors, honouring Retry-After,
+    //   * never more than one request in flight, and a client-side timeout so a hung
+    //     request cannot hold a connection open for minutes.
+    const BADGE_POLL_INTERVAL_MS = 120000;       // normal cadence
+    const BADGE_POLL_MAX_BACKOFF_MS = 600000;    // never wait longer than 10 min between polls
+    const BADGE_FETCH_TIMEOUT_MS = 15000;        // well under the ~30s gateway timeout
+    const BADGE_POLL_MAX_FAILURES = 5;           // caps the backoff exponent
+    let badgePollActive = false;                 // true while polling is the active transport
+    let badgeFetchInFlight = false;
+    let badgePollFailures = 0;
+    let badgePollRetryAfterMs = 0;
+
+    function stopBadgePolling() {
+        badgePollActive = false;
+        if (pollingInterval !== null) {
+            clearTimeout(pollingInterval);
+            pollingInterval = null;
+        }
+    }
+
+    function nextBadgePollDelayMs() {
+        const backoff = Math.min(
+            BADGE_POLL_INTERVAL_MS * Math.pow(2, badgePollFailures),
+            BADGE_POLL_MAX_BACKOFF_MS
+        );
+        const base = Math.max(backoff, badgePollRetryAfterMs);
+        // +0-10% jitter so tabs/users that loaded together do not poll in lockstep
+        return base + Math.floor(Math.random() * base * 0.1);
+    }
+
+    function scheduleBadgePoll() {
+        if (!badgePollActive) return;
+        if (pollingInterval !== null) {
+            clearTimeout(pollingInterval);
+        }
+        pollingInterval = setTimeout(runBadgePoll, nextBadgePollDelayMs());
+    }
+
+    function runBadgePoll() {
+        pollingInterval = null;
+        if (!badgePollActive) return;
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+            // Skip while hidden; the visibilitychange handler restarts the loop.
+            return;
+        }
+        updateBadgeCountFromAPI().then(scheduleBadgePoll, scheduleBadgePoll);
+    }
+
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState !== 'visible' || !badgePollActive) return;
+        // A timer (or request) is already pending: nothing was skipped.
+        if (pollingInterval !== null || badgeFetchInFlight) return;
+        runBadgePoll();
+    });
+
     const MAX_RECONNECT_ATTEMPTS = 10;
     const INITIAL_RECONNECT_DELAY = 1000; // 1 second
     const WS_PING_INTERVAL_MS = 15000; // 15s keeps idle links alive better than 30s
@@ -1127,11 +1188,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     reconnectAttempts = 0;
                 }, 20000);
 
-                // Clear polling interval since WebSocket is now active
-                if (pollingInterval !== null) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
+                // Stop badge polling since WebSocket is now active
+                stopBadgePolling();
 
                 // Keep exactly one heartbeat timer active.
                 if (pingIntervalId !== null) {
@@ -1410,28 +1468,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fallback to polling if WebSocket is not available
     function fallbackToPolling() {
-        // Clear any existing polling interval to prevent duplicates
-        if (pollingInterval !== null) {
-            clearInterval(pollingInterval);
-            pollingInterval = null;
-        }
-        // Poll for badge count every 120 seconds (reduced frequency to minimize server load).
-        // Also fetch immediately: without this, a session that lands on polling (WS disabled,
-        // limit exceeded, WS unsupported, etc.) would show a blank badge for up to 120s.
-        updateBadgeCountFromAPI();
-        pollingInterval = setInterval(updateBadgeCountFromAPI, 120000);
+        // Reset any existing loop so repeated calls never create duplicate timers.
+        stopBadgePolling();
+        badgePollActive = true;
+        badgePollFailures = 0;
+        badgePollRetryAfterMs = 0;
+        // Fetch immediately (without this a session that lands on polling would show a blank
+        // badge for a full interval), then keep polling on the self-scheduling, backoff-aware
+        // loop. If the tab is hidden the first fetch is deferred until it becomes visible.
+        runBadgePoll();
     }
 
-    // Badge update from API (used as fallback and for initial load)
+    // Badge update from API. Returns a promise that always resolves (never rejects) so the
+    // polling loop can schedule the next run; failures only feed the backoff counters.
     function updateBadgeCountFromAPI() {
         const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
         if (!csrfTokenMeta) {
             console.debug('CSRF token not found');
-            return;
+            return Promise.resolve();
+        }
+        if (badgeFetchInFlight) {
+            return Promise.resolve();
         }
         const csrfToken = csrfTokenMeta.getAttribute('content');
 
-        _nfetch('/notifications/api/count', {
+        badgeFetchInFlight = true;
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const abortTimerId = controller
+            ? setTimeout(() => controller.abort(), BADGE_FETCH_TIMEOUT_MS)
+            : null;
+        const fetchOptions = {
             method: 'GET',
             headers: {
                 'X-CSRFToken': csrfToken,
@@ -1440,14 +1506,23 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             credentials: 'same-origin',
             cache: 'no-cache'
-        })
+        };
+        if (controller) {
+            fetchOptions.signal = controller.signal;
+        }
+
+        return _nfetch('/notifications/api/count', fetchOptions)
         .then(async (response) => {
             if (response.status === 401 || response.status === 403) {
-                if (pollingInterval !== null) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
+                stopBadgePolling();
                 return null;
+            }
+            if (response.status === 429 || response.status >= 500) {
+                // Server is shedding load or failing: honour Retry-After when present.
+                const retryAfterSec = parseInt(response.headers.get('Retry-After'), 10);
+                badgePollRetryAfterMs = retryAfterSec > 0
+                    ? Math.min(retryAfterSec * 1000, BADGE_POLL_MAX_BACKOFF_MS)
+                    : 0;
             }
             if (window.responseAsResult) {
                 const result = await window.responseAsResult(response);
@@ -1475,10 +1550,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 const count = parseInt(data.unread_count) || 0;
                 lastBadgeCount = count;
                 updateNotificationsBadge(count);
+                // Healthy response: return to the normal cadence.
+                badgePollFailures = 0;
+                badgePollRetryAfterMs = 0;
             }
         })
         .catch(error => {
-            console.debug('Badge update failed:', error.message);
+            // Keep the last known badge (a failed poll must not clear it) and back off.
+            badgePollFailures = Math.min(badgePollFailures + 1, BADGE_POLL_MAX_FAILURES);
+            console.debug('Badge update failed:', error && error.message);
+        })
+        .finally(() => {
+            if (abortTimerId !== null) {
+                clearTimeout(abortTimerId);
+            }
+            badgeFetchInFlight = false;
         });
     }
 
@@ -1527,9 +1613,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
             }
-            if (pollingInterval !== null) {
-                clearInterval(pollingInterval);
-            }
+            stopBadgePolling();
         });
     }
 

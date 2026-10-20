@@ -2,7 +2,7 @@
 
 Track what the FDRS import pipeline (`Backoffice/plugins/fdrs/scripts/import_fdrs_form_data.py`) fills from [data-api.ifrc.org](https://data-api.ifrc.org), and what remains manual or blocked.
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-10-20
 
 ## Summary
 
@@ -13,7 +13,7 @@ Track what the FDRS import pipeline (`Backoffice/plugins/fdrs/scripts/import_fdr
 | Income Sources matrix | 1 (943) | **Synced** (matrix `disagg_data`) |
 | Document fields | 4 | **Metadata synced**; file download **blocked** (IFRC URL fix pending) |
 | Network Support matrices | 2 (919, 929) | **Synced** (CSV DonCode + amount KPIs → matrix `disagg_data`) |
-| Assignment workflow | per `(country, year)` | **Synced** (section workflow KPIs → `assignment_entity_status`) |
+| Assignment workflow | per `(country, year)` | **Synced** to `assignment_entity_status` only. Page-level status is **not** imported yet — every FDRS assignment must have per-page submit on first. See [FDRS page-level submission](fdrs-page-submission.md). |
 | **Total published items** | **40** | **40 covered** |
 
 ## Done
@@ -58,7 +58,7 @@ Constants: `Backoffice/plugins/fdrs/scripts/fdrs_sync_constants.py` → `FDRS_QU
   - `WasStarted`, `WasSubmitted`, `WasValidated`, `WasPublished`
   - `ValidationDate`, `PublishDate` (ISO datetimes on raw fdrsdata rows)
 - Module: `Backoffice/plugins/fdrs/scripts/fdrs_assignment_status_sync.py` (runs after form_data upsert).
-- Mapping to databank status:
+- Mapping to databank status (whole assignment only):
   - all 3 sections validated/published → `approved`
   - all 3 submitted → `submitted`
   - any section submitted/validated → `submitted` (partial)
@@ -67,6 +67,20 @@ Constants: `Backoffice/plugins/fdrs/scripts/fdrs_sync_constants.py` → `FDRS_QU
 - Does **not** set `submitted_by_user_id` / `approved_by_user_id` (FDRS has no user identity).
 - FDRS workflow KPIs **always** overwrite databank assignment status during sync (no downgrade protection).
 - CLI opt-out: `--no-sync-assignment-status`.
+
+### Page-level submission (required before per-page workflow import)
+
+Every FDRS assignment, including inactive years, needs **Allow save and submit per page** (`enable_page_submission`). Procedure: [FDRS page-level submission](fdrs-page-submission.md).
+
+Once that flag is on, the same workflow KPIs should be imported as `assignment_page_status` for the matching published page:
+
+| Prefix | Page |
+|---|---|
+| `KPI_NSGS` | NS Governance & Structure |
+| `KPI_NSFP` | NS Finance & Partnerships |
+| `KPI_NSR` | NS Reach |
+
+Per page: validated/published → `approved`, submitted → `submitted`, started only → `in_progress`. The whole-assignment status stays the rollup of those three pages. That page import is **not built yet**; sync still writes only `assignment_entity_status`. Page names are on `FDRS_SECTION_WORKFLOW_SPECS`.
 
 ### Documents (metadata only)
 
@@ -108,7 +122,7 @@ python scripts/dev/verify_fdrs_sync.py --years 2024
 python scripts/dev/verify_fdrs_sync.py --years 2020-2024 --problems-only
 ```
 
-Writes `instance/fdrs_sync_verification.xlsx` with `data_points` (FDRS value, databank value, status), `summary`, and `kpi_coverage`. Status is `matched`, `skipped_intentionally` (zeros, unpublished, unmapped KPIs, no assignment, workflow/network slots, …), `missing`, or `mismatch`. Exit code 1 when any missing/mismatch rows exist.
+Writes `instance/fdrs_sync_verification.xlsx` with `data_points` (FDRS value, databank value, status), `summary`, and `kpi_coverage`. Status is `matched`, `skipped_intentionally` (zeros, unpublished, unmapped KPIs, no assignment, workflow, …), `missing`, or `mismatch`. `received_supportN` / `received_supportN_amount` are checked against matrix item 929, and `supportedN` / `supportedN_amount` against item 919. Exit code 1 when any missing/mismatch rows exist.
 
 Optional env:
 
@@ -126,6 +140,7 @@ Dry-run still counts document rows when `dry_run=true`.
 
 | Date | Change |
 |---|---|
+| 2026-10-20 | All FDRS assignments must use per-page submit so `KPI_NSGS` / `KPI_NSFP` / `KPI_NSR` can become page status. Ops script and prod guide: [fdrs-page-submission.md](fdrs-page-submission.md) |
 | 2026-09-18 | Added `scripts/dev/verify_fdrs_sync.py` to compare FDRS API values to synced form_data |
 | 2026-06-05 | Disability `_ddd` / `_wgq` KPIs merged into `disagg_data.values.disability` on indicator sync |
 | 2026-06-05 | Assignment workflow sync from FDRS section WasSubmitted/WasValidated KPIs |

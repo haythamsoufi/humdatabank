@@ -27,6 +27,7 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.utils.transactions import no_auto_transaction, request_transaction_rollback
 from app.services.notification.core import create_notification
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.rate_limiting import per_user_rate_limit_key
 from app.utils.request_utils import get_json_or_form, is_json_request
 from app.routes.admin.shared import permission_required
 from app.utils.api_responses import json_bad_request, json_created, json_forbidden, json_not_found, json_ok, json_ok_result, json_server_error, json_error_handler, require_json_data
@@ -384,29 +385,52 @@ def api_get_notifications():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+# Latency budget for the bell badge poll. The App Gateway gives up on the backend at
+# ~30s; waiting for a pool connection (SQLALCHEMY_POOL_TIMEOUT, default 15s) plus the
+# query must fit inside that, so the count query is capped well below the engine-wide
+# statement_timeout (which may be 18s, 120s, or disabled depending on the environment).
+NOTIFICATION_COUNT_STATEMENT_TIMEOUT_MS = 5000
+# Hint for clients (components.js honours it) when the count could not be computed.
+NOTIFICATION_COUNT_RETRY_AFTER_SECONDS = 30
+
+
+# Per-user bucket: the limiter's default key is the client IP, which would put every
+# user behind one office/VPN/NAT address into a single 60/min budget.
+_notification_count_rate_limit_key = per_user_rate_limit_key("notif_count")
+
+
 @bp.route("/api/count", methods=["GET"])
 @login_required
-@limiter.limit("60 per minute")  # Rate limit: 60 requests per minute per user
+@limiter.limit("60 per minute", key_func=_notification_count_rate_limit_key)  # per user
 def api_get_notification_count():
-    """Get unread notification count for the current user"""
+    """
+    Get unread notification count for the current user.
+
+    This is the hottest authenticated poll (every page load + every ~2 min per tab),
+    so it stays a single bounded read:
+
+    * database failures are surfaced as HTTP 500 (with ``Retry-After``) rather than
+      ``200 {unread_count: 0}``, so the UI keeps the last known badge instead of
+      clearing it;
+    * the query is capped by ``NOTIFICATION_COUNT_STATEMENT_TIMEOUT_MS``;
+    * it performs no writes. Device presence is recorded by the dedicated
+      ``/api/devices/heartbeat`` endpoints, not by this GET.
+    """
     try:
         user_id = _get_current_user_id()
-        unread_count = NotificationService.get_unread_count(user_id)
-
-        # Update device activity if device_token provided in header (non-blocking)
-        device_token = request.headers.get('X-Device-Token')
-        if device_token:
-            with suppress(Exception):  # Ignore errors - non-critical
-                PushNotificationService.update_device_activity(
-                    user_id=user_id,
-                    device_token=device_token,
-                    throttle_minutes=5
-                )
-
+        unread_count = NotificationService.get_unread_count(
+            user_id,
+            raise_on_error=True,
+            statement_timeout_ms=NOTIFICATION_COUNT_STATEMENT_TIMEOUT_MS,
+        )
         return json_ok(success=True, unread_count=unread_count)
 
     except Exception as e:
-        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+        request_transaction_rollback(reason="notification_count")
+        current_app.logger.error("Notification count failed: %s", e, exc_info=True)
+        response = json_server_error(GENERIC_ERROR_MESSAGE, success=False)
+        response.headers['Retry-After'] = str(NOTIFICATION_COUNT_RETRY_AFTER_SECONDS)
+        return response
 
 
 @bp.route("/api/stream/status", methods=["GET"])

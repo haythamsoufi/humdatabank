@@ -222,6 +222,34 @@ def _api_rate_limit_identity_key() -> str:
     return f"api_{get_client_ip()}"
 
 
+def per_user_rate_limit_key(prefix: str):
+    """
+    Build a Flask-Limiter ``key_func`` that buckets by logged-in user id.
+
+    The limiter's default key is the client IP, so every user behind one office,
+    VPN, or NAT address shares a single budget. Per-user keys keep a noisy tab from
+    throttling its colleagues. Unauthenticated requests fall back to the client IP
+    (they are rejected by ``login_required`` right after).
+
+    Use as ``@limiter.limit("60 per minute", key_func=per_user_rate_limit_key("x"))``.
+    """
+
+    def _key() -> str:
+        user_id = None
+        try:
+            from flask_login import current_user
+
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.get_id()
+        except Exception as e:
+            _rl_logger.debug("per_user_rate_limit_key(%s): user lookup failed: %s", prefix, e)
+        if user_id:
+            return f"{prefix}_u{user_id}"
+        return f"{prefix}_ip{get_client_ip()}"
+
+    return _key
+
+
 def api_rate_limit(requests_per_minute=60):
     """Rate limiting for API endpoints. Keys by API key when authenticated, else client IP."""
     return rate_limit(requests_per_minute=requests_per_minute, key_func=_api_rate_limit_identity_key)

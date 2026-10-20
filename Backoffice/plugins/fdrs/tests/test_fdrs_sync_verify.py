@@ -12,6 +12,7 @@ for p in (backoffice_dir, fdrs_scripts, imports_dir):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from fdrs_data_fetcher import build_fdrs_snapshot_rows  # noqa: E402
 from fdrs_sync_constants import FDRS_INCOME_SOURCES_MATRIX_ITEM_ID  # noqa: E402
 from fdrs_sync_verify import (  # noqa: E402
     STATUS_MATCHED,
@@ -92,6 +93,63 @@ def test_zero_value_is_intentional_skip():
     assert points[0].skip_reason == "main_value_empty_or_zero"
     attach_classification(points)
     assert points[0].status == STATUS_SKIPPED
+
+
+def test_network_code_and_amount_stay_separate_points():
+    rows = build_fdrs_snapshot_rows([
+        {
+            "ISO3": "GBR",
+            "DonCode": "DGBR001",
+            "year": 2024,
+            "KPI_code": code,
+            "Value": value,
+            "ImputedValue": None,
+            "State": 500,
+        }
+        for code, value in (
+            ("supported1", "DFR001"),
+            ("supported1_amount", "1000"),
+            ("received_support1", "DNO001"),
+            ("received_support1_amount", "50"),
+        )
+    ])
+    points = group_snapshot_to_points(rows)
+    by_kpi = {p.base_kpi: p for p in points}
+    assert set(by_kpi) == {
+        "supported1",
+        "supported1_amount",
+        "received_support1",
+        "received_support1_amount",
+    }
+    assert by_kpi["supported1"].fdrs_value == "DFR001"
+    assert by_kpi["supported1_amount"].fdrs_value == "1000"
+    assert by_kpi["received_support1"].fdrs_value == "DNO001"
+    assert by_kpi["received_support1_amount"].fdrs_value == "50"
+    assert all(p.skip_reason == "network_support_slot" for p in points)
+
+
+def test_sex_age_rows_stay_one_point_per_base_kpi():
+    rows = build_fdrs_snapshot_rows([
+        {
+            "ISO3": "KEN",
+            "DonCode": "DKEN001",
+            "year": 2024,
+            "KPI_code": code,
+            "Value": "10",
+            "ImputedValue": None,
+            "State": 500,
+        }
+        for code in (
+            "KPI_PeopleVol_Tot",
+            "KPI_PeopleVol_Tot_M",
+            "KPI_PeopleVol_Tot_F",
+            "KPI_PeopleVol_M_age_5_17",
+            "KPI_PeopleVol_F_age_18_49",
+        )
+    ])
+    points = group_snapshot_to_points(rows)
+    assert len(points) == 1
+    assert points[0].base_kpi == "KPI_PeopleVol"
 
 
 def test_workflow_and_network_slots_are_intentional_skips():

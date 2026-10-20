@@ -208,3 +208,9 @@ def test_read_fdrs_sync_verify_workbook_filters_and_paginates(tmp_path):
     unpaged = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", per_page=0)
     assert len(unpaged["rows"]) == 3
     assert unpaged["page"] == 1
+
+    kenya = read_fdrs_sync_verify_workbook(str(path), sheet="data_points", search="ken", per_page=50)
+    assert kenya["filtered_rows"] == 1
+    assert kenya["total_rows"] == 3
+    assert kenya["rows"][0]["ISO3"] == "KEN"
+    assert kenya["truncated"] is False

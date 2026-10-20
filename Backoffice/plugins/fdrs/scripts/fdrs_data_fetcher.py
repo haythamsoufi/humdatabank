@@ -52,6 +52,8 @@ import urllib.error
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from fdrs_sync_constants import (
+    FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX,
+    FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX,
     FdrsSyncCancelled,
     fdrs_kpi_has_data_availability_suffix,
     fdrs_kpi_strip_data_availability_suffix,
@@ -211,6 +213,17 @@ DEFAULT_DATA_API_BASE = "https://data-api.ifrc.org"
 # This should match the importer/UI expectation (see import_fdrs_form_data.py help text).
 DEFAULT_FDRS_YEARS_START = 2010
 DEFAULT_FDRS_YEARS_END = 2025  # inclusive
+
+# Network-support list and amount are different fields: supported1 is the
+# partner NS codes, supported1_amount is the amounts for that list (same for
+# received_supportN / received_supportN_amount). The first-two-tokens rule
+# would fold received_support1_amount into received_support1; keep the amount
+# code as its own BaseKPI.
+_NETWORK_SLOT_AMOUNT_RE = re.compile(
+    rf"^({re.escape(FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX)}|{re.escape(FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX)})\d+_amount$",
+    re.IGNORECASE,
+)
+
 
 # KPI codes that use the full code as BaseKPI (indicator bank uses full code, not first-two-tokens)
 # KPI_pr_sex and KPI_sg_sex are questions linked directly to form_items (no indicator bank)
@@ -896,6 +909,8 @@ def _classify_fdrs_combined_row(
         if parent_kpi == full or parent_kpi.startswith(full + "_"):
             base_kpi = full
             break
+    if _NETWORK_SLOT_AMOUNT_RE.match(parent_kpi):
+        base_kpi = parent_kpi
     return (reason == ""), reason, year_text, tokens, base_kpi
 
 

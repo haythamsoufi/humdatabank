@@ -673,6 +673,7 @@ def _verify_workbook_source(template_id: int, job: Optional[Dict[str, Any]] = No
 def _verify_table_args():
     sheet = (request.args.get("sheet") or "data_points").strip()
     status = (request.args.get("status") or "").strip()
+    search = (request.args.get("q") or request.args.get("search") or "").strip()
     try:
         page = int(request.args.get("page") or 1)
     except (TypeError, ValueError):
@@ -685,7 +686,18 @@ def _verify_table_args():
     if all_rows:
         per_page = 0
     problems_only = (request.args.get("problems_only") or "").strip().lower() in ("1", "true", "yes")
-    return sheet, status, page, per_page, problems_only
+    return sheet, status, search, page, per_page, problems_only
+
+
+def _verify_cache_token(template_id: int, source) -> Optional[str]:
+    """Stable cache key for blob bytes. Filesystem paths key themselves by mtime."""
+    if isinstance(source, (str, os.PathLike)):
+        return None
+    latest = artifacts.load_verify_latest_meta(template_id) or {}
+    completed = latest.get("completed_at") or ""
+    if not completed:
+        return None
+    return f"verify:{int(template_id)}:{completed}"
 
 
 @bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-download/<job_id>", methods=["GET"])
@@ -721,7 +733,7 @@ def sync_verify_results(template_id: int, job_id: str):
     if source is None:
         return json_not_found("Verification file not available")
 
-    sheet, status, page, per_page, problems_only = _verify_table_args()
+    sheet, status, search, page, per_page, problems_only = _verify_table_args()
     try:
         table = read_fdrs_sync_verify_workbook(
             source,
@@ -730,6 +742,8 @@ def sync_verify_results(template_id: int, job_id: str):
             problems_only=problems_only,
             page=page,
             per_page=per_page,
+            search=search,
+            cache_token=_verify_cache_token(template_id, source),
         )
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -774,7 +788,7 @@ def sync_verify_latest_results(template_id: int):
     if source is None:
         return json_not_found("Verification file not available")
 
-    sheet, status, page, per_page, problems_only = _verify_table_args()
+    sheet, status, search, page, per_page, problems_only = _verify_table_args()
     try:
         table = read_fdrs_sync_verify_workbook(
             source,
@@ -783,6 +797,8 @@ def sync_verify_latest_results(template_id: int):
             problems_only=problems_only,
             page=page,
             per_page=per_page,
+            search=search,
+            cache_token=_verify_cache_token(template_id, source),
         )
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

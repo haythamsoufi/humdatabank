@@ -219,6 +219,8 @@ def read_fdrs_sync_verify_workbook(
     problems_only: bool = False,
     page: int = 1,
     per_page: int = 200,
+    search: Optional[str] = None,
+    cache_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read one verification Excel sheet as paginated table rows.
 
@@ -245,6 +247,9 @@ def read_fdrs_sync_verify_workbook(
         per_page=per_page,
         filters=filters or None,
         column_in=column_in,
+        search=search,
+        search_columns=["year", "ISO3", "country_name", "DonCode", "KPI", "kpi_name", "status", "detail"],
+        cache_token=cache_token,
     )
 
 

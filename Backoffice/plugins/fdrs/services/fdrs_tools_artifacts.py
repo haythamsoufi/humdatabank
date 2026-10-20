@@ -337,8 +337,8 @@ def read_xlsx_sheet(
     keeps a row when the cell is one of the listed values (also
     case-insensitive). *search* is a substring match across *search_columns*
     (or every column when omitted). ``per_page <= 0`` returns every matching
-    row (capped at 50_000) so client-side grids can filter locally.
-    ``truncated`` is true when that cap drops matching rows.
+    row so a client-side grid can hold the full sheet. ``truncated`` stays
+    false in that case.
 
     Parsed rows are cached (path mtime, content hash, or *cache_token*) so
     later pages do not reopen the workbook.
@@ -349,7 +349,7 @@ def read_xlsx_sheet(
     except (TypeError, ValueError):
         requested = 200
     return_all = requested <= 0
-    per_page = 50000 if return_all else min(500, max(1, requested))
+    per_page = 0 if return_all else min(500, max(1, requested))
     wanted = (sheet or "").strip()
     if aliases:
         wanted = aliases.get(wanted.lower(), wanted)
@@ -413,8 +413,7 @@ def read_xlsx_sheet(
 
     filtered_rows = len(matched)
     if return_all:
-        start = 0
-        window = matched[:per_page]
+        window = matched
         page = 1
         reported_per_page = len(window)
     else:

@@ -358,6 +358,22 @@
          * @param {AgGridHelper} helper
          * @returns {HTMLElement|null}
          */
+        AgGridHelper.placeholderClaimedByOtherGrid = function(placeholder, gridDiv) {
+            if (!placeholder || !placeholder.id || !gridDiv) {
+                return false;
+            }
+            const escapedId = (window.CSS && typeof CSS.escape === 'function')
+                ? CSS.escape(placeholder.id)
+                : String(placeholder.id).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            const owners = document.querySelectorAll('[data-placeholder-id="' + escapedId + '"]');
+            for (let i = 0; i < owners.length; i++) {
+                if (owners[i] !== gridDiv) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
         AgGridHelper.resolveColumnVisibilityPlaceholder = function(helper) {
             if (!helper) {
                 return null;
@@ -366,14 +382,28 @@
             const configuredPlaceholderId = columnVisibilityOptions.buttonPlaceholderId;
             const gridPlaceholderId = helper.gridDiv && helper.gridDiv.getAttribute('data-placeholder-id');
             const placeholderId = configuredPlaceholderId || gridPlaceholderId || 'column-visibility-button-placeholder';
-    
+            const gridDiv = helper.gridDiv;
+
+            function accept(candidate) {
+                return !!(candidate && !AgGridHelper.placeholderClaimedByOtherGrid(candidate, gridDiv));
+            }
+
             let placeholder = placeholderId ? document.getElementById(placeholderId) : null;
-            if (!placeholder && helper.gridDiv) {
-                let searchContainer = helper.gridDiv.parentElement;
+            if (!accept(placeholder)) {
+                placeholder = null;
+            }
+            if (!placeholder && gridDiv) {
+                let searchContainer = gridDiv.parentElement;
                 while (searchContainer && searchContainer !== document.body) {
-                    placeholder = searchContainer.querySelector(
+                    const candidates = searchContainer.querySelectorAll(
                         '[id*="column-visibility-button-placeholder"], [id*="-colvis"], [id*="col-vis"]'
                     );
+                    for (let i = 0; i < candidates.length; i++) {
+                        if (accept(candidates[i])) {
+                            placeholder = candidates[i];
+                            break;
+                        }
+                    }
                     if (placeholder) {
                         break;
                     }
@@ -607,6 +637,25 @@
                 return;
             }
 
+            const gridId = this.config && this.config.containerId;
+            if (gridId) {
+                const keep = this.resultCountElement;
+                Array.prototype.forEach.call(
+                    document.querySelectorAll('.ag-grid-result-count[data-grid-id="' + gridId + '"]'),
+                    function (el) {
+                        if (el === keep) {
+                            return;
+                        }
+                        const parent = el.parentElement;
+                        el.remove();
+                        if (parent && parent.classList && parent.classList.contains('ag-grid-result-count-row')
+                            && !parent.querySelector('.ag-grid-result-count')) {
+                            parent.remove();
+                        }
+                    }
+                );
+            }
+
             var liveRowData = null;
             if (typeof this.gridApi.getGridOption === 'function') {
                 liveRowData = this.gridApi.getGridOption('rowData');
@@ -614,13 +663,37 @@
             if (!Array.isArray(liveRowData)) {
                 liveRowData = Array.isArray(this.config.rowData) ? this.config.rowData : [];
             }
-    
+
+            // paginationGetRowCount is the filtered total across pages. forEachNodeAfterFilter
+            // can still return 0 after setRowData, before childrenAfterAggFilter is ready,
+            // which painted "Showing 0 of N records" next to a second "N records" label.
             let displayedCount = 0;
-            if (typeof this.gridApi.forEachNodeAfterFilter === 'function') {
-                this.gridApi.forEachNodeAfterFilter(function () { displayedCount += 1; });
-            } else if (typeof this.gridApi.getDisplayedRowCount === 'function') {
-                displayedCount = this.gridApi.getDisplayedRowCount();
-            } else {
+            let haveFilteredCount = false;
+            if (typeof this.gridApi.paginationGetRowCount === 'function') {
+                const masterCount = this.gridApi.paginationGetRowCount();
+                if (typeof masterCount === 'number' && !isNaN(masterCount) && masterCount > 0) {
+                    displayedCount = masterCount;
+                    haveFilteredCount = true;
+                }
+            }
+            if (!haveFilteredCount && typeof this.gridApi.forEachNodeAfterFilter === 'function') {
+                let walked = 0;
+                this.gridApi.forEachNodeAfterFilter(function () { walked += 1; });
+                if (walked > 0) {
+                    displayedCount = walked;
+                    haveFilteredCount = true;
+                }
+            }
+            const paginationOn = !(this.config.options && this.config.options.pagination === false);
+            if (!haveFilteredCount && !paginationOn && typeof this.gridApi.getDisplayedRowCount === 'function') {
+                const visible = this.gridApi.getDisplayedRowCount();
+                if (typeof visible === 'number' && !isNaN(visible) && visible > 0) {
+                    displayedCount = visible;
+                    haveFilteredCount = true;
+                }
+            }
+            const filtering = typeof this.gridApi.isAnyFilterPresent === 'function' && this.gridApi.isAnyFilterPresent();
+            if (!haveFilteredCount && !filtering) {
                 displayedCount = liveRowData.length;
             }
     
@@ -634,11 +707,13 @@
             const recordText = this.getTranslation('record', 'record');
             const recordsText = this.getTranslation('records', 'records');
             const noun = totalCount === 1 ? recordText : recordsText;
+            const displayedLabel = Number(displayedCount).toLocaleString();
+            const totalLabel = Number(totalCount).toLocaleString();
     
             if (displayedCount === totalCount) {
-                this.resultCountElement.textContent = totalCount + ' ' + noun;
+                this.resultCountElement.textContent = totalLabel + ' ' + noun;
             } else {
-                this.resultCountElement.textContent = showingText + ' ' + displayedCount + ' ' + ofText + ' ' + totalCount + ' ' + noun;
+                this.resultCountElement.textContent = showingText + ' ' + displayedLabel + ' ' + ofText + ' ' + totalLabel + ' ' + noun;
             }
         };
     

@@ -16,6 +16,7 @@ import pytest
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models import FormData, IndicatorBank, NationalSociety
+from app.models.organization import NS_STATUS_INACTIVE
 from app.models.assignments import AssignmentEntityStatus
 from app.services.security.api_key_permissions import CONTENT_READ, build_permissions_document
 from app.utils.datetime_helpers import utcnow
@@ -321,10 +322,13 @@ class TestReferenceEndpoints:
         assert _get(client, key, "/api/entities/ns/NOPE").status_code == 404
 
     def test_inactive_society_is_hidden(self, client, db_session, scenario, key):
-        NationalSociety.query.filter_by(fdrs_don_code="DCBB001").one().is_active = False
+        # An explicit membership status wins, so flipping is_active alone is stored back as Active.
+        society = NationalSociety.query.filter_by(fdrs_don_code="DCBB001").one()
+        society.status = NS_STATUS_INACTIVE
         db_session.commit()
         codes = {r["KPI_DON_code"] for r in _get(client, key, "/api/entities/ns").get_json()}
         assert "DCBB001" not in codes
+        assert _get(client, key, "/api/entities/ns/DCBB001").status_code == 404
 
 
 class TestData:

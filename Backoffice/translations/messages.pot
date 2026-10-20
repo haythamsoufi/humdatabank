@@ -33041,3 +33041,638 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:606
 msgid "yesterday"
 msgstr ""
+
+#: app/templates/admin/api_management.html:383
+msgid ""
+"API key with content:read. The site sends ?apiKey=, which needs “allow API "
+"key in query string” on the key. Bearer and X-API-Key also work."
+msgstr ""
+
+#: app/templates/admin/rbac/_rbac_tabs.html:14
+#: app/templates/admin/rbac/group_form.html:14
+#: app/templates/admin/rbac/groups.html:5
+#: app/templates/admin/rbac/groups.html:11
+#: app/templates/admin/rbac/groups.html:16
+#: app/templates/admin/user_management/user_form.html:1087
+msgid "Access Groups"
+msgstr ""
+
+#: app/templates/admin/rbac/groups.html:38
+msgid ""
+"Access Groups are separate from Roles. A Role decides what a user can do. An"
+" Access Group is an assignment audience: members may open those assignments "
+"only when their personal shortlist and entity permissions also allow it. "
+"Groups never carry permissions."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:937
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1471
+msgid "Access denied"
+msgstr ""
+
+#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:23
+msgid ""
+"All CBF projects with their status, reporting progress and reports, as in "
+"MOMO. Opens in a new tab."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1152
+msgid "All assignments of selected templates"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:17
+msgid ""
+"An Access Group grants no permissions. Members can open assignments that "
+"list this group, and only when their personal shortlist and entity "
+"permissions also allow it."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:109
+msgid "Assignment Access"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:208
+msgid "Bilateral Funding (CHF) by Strategic Priority / Enabling Function"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:206
+msgid "Bilateral Funding Received (CHF)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:205
+msgid "Bilateral Funding Sent (CHF)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:32 plugins/upr/plugin.py:236
+msgid "Bilateral funding"
+msgstr ""
+
+#: plugins/upr/plugin.py:247
+msgid "Bilateral funding coverage by INFORM risk"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:78
+msgid ""
+"Choose the users who belong to this group. You can also add users to groups "
+"from the user edit form."
+msgstr ""
+
+#: app/templates/admin/embed_content/manage_embed_content.html:92
+#: app/templates/admin/embed_content/manage_embed_content.html:93
+msgid "Copy iframe"
+msgstr ""
+
+#: app/templates/admin/embed_content/manage_embed_content.html:343
+#: app/templates/admin/embed_content/manage_embed_content.html:345
+msgid "Copy this iframe"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:152 plugins/upr/analysis_labels.py:233
+msgid "Could not load the support flow map. Try refreshing."
+msgstr ""
+
+#: app/templates/admin/rbac/groups.html:22
+msgid "Create Access Group"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:112
+msgid "Create Group"
+msgstr ""
+
+#: app/templates/admin/rbac/groups.html:125
+msgid "Create a group such as Finance or HR to restrict assignments to it."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:462
+msgid "Create an access group"
+msgstr ""
+
+#: app/templates/admin/rbac/groups.html:101
+msgid "Delete access group"
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:376
+msgid "Download Excel for the full sheet."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:231
+msgid "Drag to move the range. Double-click to reset."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1135
+msgid ""
+"Every assignment in their entities, except those restricted to an access "
+"group they are not in."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1153
+msgid ""
+"Every current and future assignment of a ticked template, still subject to "
+"each assignment's access groups."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:146
+msgid ""
+"Every line links a Participating National Society to a country it supports "
+"bilaterally in the selected year. A plan and a report in that year are one "
+"line. Lines that leave the same society toward nearby countries merge into a"
+" thicker branch."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:157 plugins/upr/analysis_labels.py:214
+msgid "Expenditure"
+msgstr ""
+
+#: app/templates/admin/api_management.html:377
+msgid "FDRS public frontend"
+msgstr ""
+
+#: app/templates/admin/api_management.html:599
+msgid "FDRS public frontend:"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:85
+msgid "Filter by name or email..."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1186
+msgid "Filter templates..."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:220
+msgid "Funding Met (%)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:156 plugins/upr/analysis_labels.py:212
+msgid "Funding Requirement"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:219
+msgid "Funding Requirement (CHF)"
+msgstr ""
+
+#: app/templates/admin/resources/edit_resource.html:363
+#: app/templates/admin/resources/edit_resource.html:561
+msgid "Generate thumbnail"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:44
+msgid "Group Code"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:27
+#: app/templates/admin/rbac/groups.html:46
+msgid "Group Name"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:227
+#, python-format
+msgid ""
+"INFORM Risk 2026. Funding met is reported bilateral funding divided by the "
+"funding requirement. Shares above 100% sit on the top line."
+msgstr ""
+
+#: app/templates/admin/api_management.html:365
+msgid "Indicator Bank app"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:230
+msgid "Largest funding requirement shown"
+msgstr ""
+
+#: app/templates/admin/api_management.html:382
+msgid ""
+"Legacy data.ifrc.org paths: /api/data, /api/entities/ns, "
+"/api/KpiImputedValue, /csv/export, and the rest of that contract."
+msgstr ""
+
+#: app/templates/admin/resources/manage_resources.html:37
+msgid "Loading resources..."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:151
+msgid "Loading support flows…"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1107
+msgid "Manage access groups"
+msgstr ""
+
+#: plugins/upr/plugin.py:227
+msgid ""
+"Map of Participating National Societies and the countries they support, with"
+" bilateral funding by strategic priority and summary figures."
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:75
+#: app/templates/admin/rbac/groups.html:55
+msgid "Members"
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:143
+msgid "Missing and mismatch only"
+msgstr ""
+
+#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:11
+msgid "My projects"
+msgstr ""
+
+#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:29
+msgid "NSD master import"
+msgstr ""
+
+#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:21
+msgid "NSD project overview"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:211
+msgid "NSs receiving bilateral support"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:210
+msgid "NSs supporting bilaterally"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:145 plugins/upr/plugin.py:225
+msgid "Network Bilateral Support"
+msgstr ""
+
+#: plugins/upr/plugin.py:258
+msgid "Network Bilateral Support and funding"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:9
+#: app/templates/admin/rbac/group_form.html:15
+msgid "New Access Group"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1103
+msgid "No access groups exist yet."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:456
+msgid ""
+"No access groups exist yet. Create a group such as Finance or HR to restrict"
+" this assignment to it."
+msgstr ""
+
+#: app/templates/admin/rbac/groups.html:124
+msgid "No access groups yet."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:207
+#, python-brace-format
+msgid "No bilateral funding reported for {year}."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:163 plugins/upr/analysis_labels.py:226
+#, python-brace-format
+msgid "No bilateral funding requirement reported for {year}."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:153
+msgid ""
+"No bilateral support between National Societies has been reported yet for "
+"this selection."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:433
+msgid ""
+"No group limit. Anyone with access to the assigned entities can open this "
+"assignment, unless that person has a personal shortlist that leaves it out."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1134
+msgid "No personal limit"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:209
+#, python-brace-format
+msgid "No priority breakdown reported for {year}."
+msgstr ""
+
+#: app/templates/admin/resources/manage_resources.html:38
+#: app/templates/admin/resources/manage_resources.html:307
+msgid "No resources found."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1197
+msgid "No templates available."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1688
+msgid "No verification results yet. Run verification to fill this table."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1180
+msgid "Nothing ticked means this user cannot access any assignment."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1201
+msgid ""
+"Nothing ticked means this user cannot access any assignment. New assignments"
+" of a ticked template are included automatically."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:131
+msgid ""
+"One row per national society, year, and base KPI (2010–2025 is 16 years). "
+"Sex and age breakdowns are merged into that KPI. Network-support partner "
+"lists and their amounts stay separate rows. The total also includes skipped "
+"rows: those network fields, workflow flags, zeros, and unpublished values."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1144
+msgid ""
+"Only the assignments ticked below. A ticked assignment is still hidden when "
+"its audience does not include this person."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1123
+msgid ""
+"Optional personal shortlist. It never overrides an assignment audience or "
+"entity permissions. \"No personal limit\" still cannot open an assignment "
+"restricted to a group this person is not in. System Managers are never "
+"restricted."
+msgstr ""
+
+#: app/templates/admin/rbac/groups.html:29
+msgid ""
+"Organizational groups such as Finance or HR. Used only to control which "
+"assignments members can access — they grant no permissions."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:33
+msgid "Participation"
+msgstr ""
+
+#: plugins/ifrc/plugin.py:93
+msgid ""
+"People reached, programme highlights, and a country map, with a toggle to "
+"pillar indicators and activity narratives."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:162 plugins/upr/analysis_labels.py:218
+msgid "Percentage of Bilateral Funding Requirements Coverage by INFORM Risk"
+msgstr ""
+
+#: plugins/ifrc/plugin.py:91
+msgid "Pilot Programmatic Partnership"
+msgstr ""
+
+#: app/templates/admin/resources/manage_resources.html:175
+msgid "Publication Date"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:149
+msgid "Recipient country"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:158
+msgid "Reset view"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:431
+msgid ""
+"Restricted to these access groups. A user must belong to at least one of "
+"them, including users with no personal assignment limit. Entity permissions "
+"still apply."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:221
+msgid "Risk class"
+msgstr ""
+
+#: app/templates/admin/api_management.html:370
+msgid ""
+"Routes the Indicator Bank Blazor app calls: /Indicator, /Sector, /list-home,"
+" /CommonWord, and /Excel."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:327
+msgid ""
+"Same IFRC statuses the sync treats as importable reported values. "
+"Verification only compares those rows."
+msgstr ""
+
+#: plugins/upr/plugin.py:249
+msgid ""
+"Scatter of funding requirement against the share met, coloured by INFORM "
+"risk class."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:139
+msgid "Search all rows…"
+msgstr ""
+
+#: app/templates/admin/api_management.html:371
+msgid ""
+"Send X-API-Key or Authorization: Bearer. Locale is the X-Language header or "
+"the language query parameter."
+msgstr ""
+
+#: app/templates/admin/api_management.html:325
+msgid ""
+"Show every endpoint in the registry: External /v1, Mobile, AI, the Indicator"
+" Bank app, and the FDRS public frontend."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:229
+msgid "Smallest funding requirement shown"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1143
+msgid "Specific assignments"
+msgstr ""
+
+#: app/templates/admin/resources/manage_resources.html:158
+msgid "Subcategory"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:240
+#, python-brace-format
+msgid "Supported by {n} societies"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:239
+#, python-brace-format
+msgid "Supported by {n} society"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:155
+msgid "Supported country"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:148 plugins/upr/analysis_labels.py:154
+msgid "Supporting society (PNS)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:238
+#, python-brace-format
+msgid "Supports {n} countries"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:237
+#, python-brace-format
+msgid "Supports {n} country"
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:435
+msgid ""
+"System Managers always have access. Permission roles are not an audience."
+msgstr ""
+
+#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:13
+msgid ""
+"The CBF projects where you are named as IFRC project manager, with their "
+"reporting status and deadlines, as in MOMO."
+msgstr ""
+
+#: app/templates/admin/api_management.html:599
+msgid ""
+"The data.ifrc.org paths (/api/data, /api/entities/ns, /csv/export, …) take a"
+" key with content:read. That site sends it as ?apiKey=, so the key must "
+"allow the query string. Authorization: Bearer and X-API-Key work for other "
+"callers. These routes are not paginated."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:344
+msgid "The results table could not start. Reload the page."
+msgstr ""
+
+#: plugins/upr/plugin.py:260
+msgid ""
+"The support map, priority chart and summary figures, with the bilateral "
+"funding rankings and INFORM coverage chart below."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:209
+msgid ""
+"This saved workbook only contains missing and mismatch rows. Run "
+"verification again to store the full comparison."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1207
+msgid ""
+"This user has a personal shortlist of assignments. Group-restricted "
+"assignments still require membership."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1211
+msgid ""
+"This user has no personal limit. Group-restricted assignments still require "
+"membership."
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1209
+msgid ""
+"This user is limited to assignments of selected templates. Group-restricted "
+"assignments still require membership."
+msgstr ""
+
+#: app/templates/admin/embed_content/manage_embed_content.html:291
+msgid ""
+"This visual is filled in for you. Copy iframe on the list uses this address."
+msgstr ""
+
+#: app/templates/admin/resources/manage_resources.html:134
+msgid "Thumbnail"
+msgstr ""
+
+#: app/templates/admin/user_management/user_form.html:1090
+msgid ""
+"Tick the groups this person belongs to, then save. A group does not grant "
+"permissions. It lets them open assignments whose audience includes that "
+"group. The personal limit below can only narrow that further."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:216
+msgid "Total Bilateral Expenditure (CHF)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:213
+msgid "Total Bilateral Funding (CHF)"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:215
+msgid "Total Bilateral Funding Requirement (CHF)"
+msgstr ""
+
+#: plugins/upr/plugin.py:238
+msgid ""
+"Two rankings: Participating National Societies by bilateral funding sent, "
+"and countries by bilateral funding received."
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:54
+msgid "Unique identifier. Generated from the name and cannot be changed."
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:112
+msgid "Update Group"
+msgstr ""
+
+#: plugins/nsd_report_forms/templates/nsd_explorer/tab_panel.html:31
+msgid ""
+"Upload the master workbook to create or update projects, schedules, access "
+"and report history."
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:10
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:63
+#: plugins/fdrs/templates/admin/_fdrs_sync_panel.html:281
+msgid "Verification"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:225
+msgid "Very High"
+msgstr ""
+
+#: app/templates/admin/rbac/group_form.html:35
+msgid "e.g. Finance, HR"
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:375
+msgid "page"
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1019
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:1553
+msgid "retrying"
+msgstr ""
+
+#: plugins/fdrs/templates/admin/_fdrs_sync_script.html:203
+msgid ""
+"rows. The rest are not in this table, and search only covers loaded rows. "
+"Use “Missing and mismatch only” to load problem rows."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:234
+#, python-brace-format
+msgid "{donor} supports {host}"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:228
+#, python-brace-format
+msgid "{name}: requirement {requirement}, funding met {met}%"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:235
+#, python-brace-format
+msgid "{n} round: {rounds}"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:236
+#, python-brace-format
+msgid "{n} rounds: {rounds}"
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:242
+#, python-brace-format
+msgid "{n} societies could not be placed on the map."
+msgstr ""
+
+#: plugins/upr/analysis_labels.py:241
+#, python-brace-format
+msgid "{n} society could not be placed on the map."
+msgstr ""

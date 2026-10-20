@@ -546,6 +546,34 @@ def test_data_availability_from_group_rows_maps_is_data_not_collected_to_not_app
     assert not_applic is True
 
 
+def test_network_amount_keeps_its_own_base_kpi():
+    """Partner NS codes and amounts are different fields, including received-support slots."""
+    _, _, _, _, given_code = _classify_fdrs_combined_row({
+        "KPI_code": "supported1",
+        "Value": "DFR001",
+        "year": 2024,
+    })
+    _, _, _, _, given_amount = _classify_fdrs_combined_row({
+        "KPI_code": "supported1_amount",
+        "Value": "100",
+        "year": 2024,
+    })
+    _, _, _, _, received_code = _classify_fdrs_combined_row({
+        "KPI_code": "received_support1",
+        "Value": "DNO001",
+        "year": 2024,
+    })
+    _, _, _, _, received_amount = _classify_fdrs_combined_row({
+        "KPI_code": "received_support1_amount",
+        "Value": "50",
+        "year": 2024,
+    })
+    assert given_code == "supported1"
+    assert given_amount == "supported1_amount"
+    assert received_code == "received_support1"
+    assert received_amount == "received_support1_amount"
+
+
 def test_classify_fdrs_combined_row_keeps_is_data_not_collected_with_empty_value():
     include, reason, _, _, base_kpi = _classify_fdrs_combined_row({
         "KPI_code": "KPI_PeopleVol_isDataNotCollected",

@@ -529,7 +529,7 @@ def add_indicator_bank():
     if request.method == "POST" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return json_form_errors(form, _("Please correct the errors in the form."))
 
-    return render_template("admin/indicator_bank/add_indicator_bank.html",
+    return render_template("admin/indicator_bank/manage_indicator.html",
                          form=form,
                          title="Add New Indicator",
                          form_lists=_indicator_bank_dynamic_list_values())
@@ -730,7 +730,7 @@ def edit_indicator_bank(id):
     if request.method == "POST" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return json_form_errors(form, _("Please correct the errors in the form."))
 
-    return render_template("admin/indicator_bank/edit_indicator_bank.html",
+    return render_template("admin/indicator_bank/manage_indicator.html",
                          form=form,
                          indicator=indicator,
                          title=f"Edit Indicator: {indicator.name}",

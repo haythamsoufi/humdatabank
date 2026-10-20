@@ -51,6 +51,20 @@ def _spef_choice_label(code, name=None):
     return code or name or ""
 
 
+def _optional_db_id(value):
+    """Return a database id, or None for blanks and non-numeric values."""
+    if type(value) is int:
+        return value
+    return None
+
+
+_SECTOR_SUBSECTOR_PAIRS = (
+    ("sector_primary", "sub_sector_primary"),
+    ("sector_secondary", "sub_sector_secondary"),
+    ("sector_tertiary", "sub_sector_tertiary"),
+)
+
+
 class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     """Form for adding or editing an IndicatorBank entry."""
 
@@ -124,6 +138,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
 
     def _populate_choices(self):
         """Populate type/unit/SPEF area and sector/subsector choices."""
+        self.subsector_sector_map = {}
         try:
             from app.routes.admin.shared import get_localized_sector_name, get_localized_subsector_name
 
@@ -164,6 +179,12 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             self.sub_sector_primary.choices = subsector_choices
             self.sub_sector_secondary.choices = subsector_choices
             self.sub_sector_tertiary.choices = subsector_choices
+            self.subsector_sector_map = {}
+            for sub in subsectors:
+                sub_id = _optional_db_id(getattr(sub, "id", None))
+                if sub_id is None:
+                    continue
+                self.subsector_sector_map[sub_id] = _optional_db_id(getattr(sub, "sector_id", None))
 
         except Exception as e:
             import logging
@@ -178,6 +199,49 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             self.sub_sector_primary.choices = empty_subsector_choices
             self.sub_sector_secondary.choices = empty_subsector_choices
             self.sub_sector_tertiary.choices = empty_subsector_choices
+            self.subsector_sector_map = {}
+
+    def validate(self, extra_validators=None):
+        valid = super().validate(extra_validators)
+        if not self._validate_sector_subsector_pairs():
+            valid = False
+        return valid
+
+    def _validate_sector_subsector_pairs(self):
+        """Keep each sector / sub-sector level inside the same parent sector."""
+        ok = True
+        sector_map = getattr(self, "subsector_sector_map", None) or {}
+        for sector_name, sub_name in _SECTOR_SUBSECTOR_PAIRS:
+            sector_field = getattr(self, sector_name)
+            sub_field = getattr(self, sub_name)
+            sub_id = sub_field.data
+            if not sub_id or sub_id not in sector_map:
+                continue
+            parent_id = sector_map[sub_id]
+            sector_id = sector_field.data
+            if parent_id is None:
+                if sector_id:
+                    sub_field.errors.append(
+                        "This sub-sector is not assigned to the selected sector."
+                    )
+                    ok = False
+                continue
+            if not sector_id:
+                choice_ids = {choice[0] for choice in (sector_field.choices or [])}
+                if parent_id in choice_ids:
+                    sector_field.data = parent_id
+                else:
+                    sub_field.errors.append(
+                        "This sub-sector does not belong to an available sector."
+                    )
+                    ok = False
+                continue
+            if sector_id != parent_id:
+                sub_field.errors.append(
+                    "This sub-sector does not belong to the selected sector."
+                )
+                ok = False
+        return ok
 
     def _ensure_area_choice(self, code, label=None):
         """Keep a legacy/inactive SPEF code selectable when editing an existing indicator."""

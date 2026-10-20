@@ -144,8 +144,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        initIndicatorBankFormWafSubmit('edit-indicator-form', 'editIndicatorBankSubmitBtn', { stayOnPage: true });
-        initIndicatorBankFormWafSubmit('add-indicator-form', null, { stayOnPage: false });
+        var form = document.getElementById('indicator-bank-form');
+        if (!form) {
+            return;
+        }
+        initIndicatorBankFormWafSubmit('indicator-bank-form', 'indicatorBankSubmitBtn', {
+            stayOnPage: form.getAttribute('data-stay-on-page') === 'true'
+        });
     });
 })();
 </script>

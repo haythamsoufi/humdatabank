@@ -1,4 +1,10 @@
 <script nonce="{{ csp_nonce() }}">
+function formatCount(value) {
+    const n = Number(value);
+    if (!isFinite(n)) return String(value == null ? '' : value);
+    return n.toLocaleString();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const syncRoot = document.getElementById('fdrs-sync-root');
     if (!syncRoot) return;
@@ -48,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
             label.textContent = item.label;
             const value = document.createElement('div');
             value.className = 'text-lg font-semibold';
-            value.textContent = String(item.value);
+            value.textContent = formatCount(item.value);
             wrap.append(label, value);
             container.appendChild(wrap);
         });
@@ -133,12 +139,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let syncVerifyResultsUrl = null;
-    let syncVerifyTableState = { sheet: 'data_points', page: 1 };
+    let syncVerifyTableState = { sheet: 'data_points' };
     let syncVerifyGridHelper = null;
     let pendingVerifyGrid = null;
     let syncVerifyFetchSeq = 0;
-    let syncVerifySearchTimer = null;
-    const SYNC_VERIFY_PAGE_SIZE = 500;
+    let syncVerifyColumns = [];
+    let syncVerifyRows = [];
+    let syncVerifyLastPayload = null;
 
     function formatFdrsLastRunDate(iso) {
         if (!iso) return '';
@@ -199,8 +206,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const filtered = Number(data.filtered_rows || 0);
         const stats = data.stats || {};
         if (data.truncated && filtered > loaded) {
-            return {{ _("Showing")|tojson|safe }} + ' ' + loaded + ' / ' + filtered + ' '
-                + {{ _("rows. The rest are not in this table, and search only covers loaded rows. Use “Missing and mismatch only” to load problem rows.")|tojson|safe }};
+            return {{ _("Showing")|tojson|safe }} + ' ' + formatCount(loaded) + ' / ' + formatCount(filtered) + ' '
+                + {{ _("rows. This table stops at the loaded rows.")|tojson|safe }};
         }
         const problemsOnlyFile = !!(stats.problems_only);
         const problemsBox = document.getElementById('sync-verify-problems-only');
@@ -224,7 +231,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function resetSyncVerifyTable() {
         syncVerifyResultsUrl = null;
-        syncVerifyTableState = { sheet: 'data_points', page: 1 };
+        syncVerifyTableState = { sheet: 'data_points' };
+        syncVerifyColumns = [];
+        syncVerifyRows = [];
+        syncVerifyLastPayload = null;
         const cards = document.getElementById('sync-verify-stats-cards');
         if (cards) cards.replaceChildren();
         const search = document.getElementById('sync-verify-search');
@@ -232,8 +242,9 @@ document.addEventListener('DOMContentLoaded', function () {
         showVerifyGridError('');
         showVerifyGridNote('');
         pendingVerifyGrid = null;
-        const pager = document.getElementById('sync-verify-pager');
-        if (pager) pager.classList.add('hidden');
+        if (syncVerifyGridHelper && typeof syncVerifyGridHelper.setResultCountTotal === 'function') {
+            syncVerifyGridHelper.setResultCountTotal(null);
+        }
         if (syncVerifyGridHelper) syncVerifyGridHelper.setRowData([]);
     }
 
@@ -287,10 +298,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 };
                 def.minWidth = 140;
             }
-            def.filter = false;
+            // Currency codes, dates, and partner codes share these columns with numbers.
+            // A number data type prints text such as AFN as "Invalid Number".
+            if (key === 'fdrs_value' || key === 'fdrs_imputed_value' || key === 'databank_value' || key === 'databank_imputed_value') {
+                def.cellDataType = 'text';
+                def.filter = 'agTextColumnFilter';
+                def.skipAutoDetect = true;
+                def.valueFormatter = function (params) {
+                    if (params.value == null || params.value === '') return '';
+                    return String(params.value);
+                };
+            }
             def.sortable = true;
             return def;
         });
+        if (window.AgGridHelper && typeof AgGridHelper.autoDetectColumnFilters === 'function') {
+            AgGridHelper.autoDetectColumnFilters(defs, rows || [], { sampleSize: 4000 });
+        }
         return defs.length ? defs : [{ field: '_empty', headerName: '', hide: true }];
     }
 
@@ -327,9 +351,26 @@ document.addEventListener('DOMContentLoaded', function () {
             syncVerifyGridHelper._hasSizedColumnsToFit = false;
             syncVerifyGridHelper.setRowData(rows || []);
         }
-        if (syncVerifyGridHelper.gridApi && typeof syncVerifyGridHelper.gridApi.setGridOption === 'function') {
-            syncVerifyGridHelper.gridApi.setGridOption('quickFilterText', '');
+        applyVerifyQuickFilter();
+    }
+
+    function applyVerifyQuickFilter() {
+        const search = document.getElementById('sync-verify-search');
+        const text = search && search.value ? search.value : '';
+        if (syncVerifyGridHelper && syncVerifyGridHelper.gridApi && typeof syncVerifyGridHelper.gridApi.setGridOption === 'function') {
+            syncVerifyGridHelper.gridApi.setGridOption('quickFilterText', text);
         }
+    }
+
+    function verifyRowsForGrid() {
+        const problemsBox = document.getElementById('sync-verify-problems-only');
+        if (!(problemsBox && problemsBox.checked && syncVerifyTableState.sheet === 'data_points')) {
+            return syncVerifyRows;
+        }
+        return syncVerifyRows.filter(function (row) {
+            const status = String((row && row.status) || '').toLowerCase();
+            return status === 'missing' || status === 'mismatch';
+        });
     }
 
     function syncPanelIsVisible() {
@@ -353,41 +394,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function renderVerifyPager(data) {
-        const pager = document.getElementById('sync-verify-pager');
-        const label = document.getElementById('sync-verify-pager-label');
-        const prev = document.getElementById('sync-verify-page-prev');
-        const next = document.getElementById('sync-verify-page-next');
-        if (!pager || !label) return;
+    function syncVerifyResultTotal(data) {
+        data = data || {};
         const filtered = Number(data.filtered_rows || 0);
-        const pageSize = Number(data.per_page || SYNC_VERIFY_PAGE_SIZE) || SYNC_VERIFY_PAGE_SIZE;
-        const page = Math.max(1, Number(data.page || 1));
         const loaded = (data.rows || []).length;
-        if (!filtered) {
-            pager.classList.add('hidden');
-            return;
-        }
-        const start = (page - 1) * pageSize + 1;
-        const end = start + loaded - 1;
-        const pageCount = Math.max(1, Math.ceil(filtered / pageSize));
-        label.textContent = {{ _("Showing")|tojson|safe }} + ' ' + start.toLocaleString()
-            + '–' + end.toLocaleString() + ' / ' + filtered.toLocaleString()
-            + ' · ' + {{ _("page")|tojson|safe }} + ' ' + page + ' / ' + pageCount
-            + '. ' + {{ _("Download Excel for the full sheet.")|tojson|safe }};
-        pager.classList.remove('hidden');
-        if (prev) {
-            prev.disabled = page <= 1;
-            prev.style.opacity = page <= 1 ? '0.5' : '1';
-        }
-        if (next) {
-            next.disabled = page >= pageCount;
-            next.style.opacity = page >= pageCount ? '0.5' : '1';
-        }
-        const pageInput = document.getElementById('sync-verify-page-input');
-        if (pageInput) {
-            pageInput.max = String(pageCount);
-            pageInput.value = String(page);
-        }
+        if (data.truncated && filtered > loaded) return filtered;
+        return null;
     }
 
     function renderSyncVerifyTable(data) {
@@ -395,17 +407,32 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!wrap) return;
         wrap.classList.remove('hidden');
         showVerifyGridError('');
+        syncVerifyLastPayload = data;
         showVerifyGridNote(verifyCoverageNote(data));
         renderSyncVerifyStats(data.stats);
         setActiveSheetButton(data.sheet || syncVerifyTableState.sheet);
-        syncVerifyTableState.page = Math.max(1, Number(data.page || syncVerifyTableState.page || 1));
-        renderVerifyPager(data);
+        syncVerifyColumns = data.columns || [];
+        syncVerifyRows = data.rows || [];
         pendingVerifyGrid = {
-            columns: data.columns || [],
-            rows: data.rows || []
+            columns: syncVerifyColumns,
+            rows: verifyRowsForGrid()
         };
         paintVerifyGrid();
+        if (syncVerifyGridHelper && typeof syncVerifyGridHelper.setResultCountTotal === 'function') {
+            syncVerifyGridHelper.setResultCountTotal(syncVerifyResultTotal(data));
+        }
         setVerifyGridLoading(false);
+    }
+
+    function refreshVerifyGridRows() {
+        const rows = verifyRowsForGrid();
+        pendingVerifyGrid = { columns: syncVerifyColumns, rows: rows };
+        if (!syncVerifyGridHelper || !syncVerifyGridHelper.gridApi) {
+            paintVerifyGrid();
+            return;
+        }
+        syncVerifyGridHelper.setRowData(rows);
+        applyVerifyQuickFilter();
     }
 
     function fetchSyncVerifyResultsPage() {
@@ -415,29 +442,13 @@ document.addEventListener('DOMContentLoaded', function () {
         showVerifyGridError('');
         const params = new URLSearchParams();
         params.set('sheet', syncVerifyTableState.sheet);
-        params.set('page', String(syncVerifyTableState.page || 1));
-        params.set('per_page', String(SYNC_VERIFY_PAGE_SIZE));
-        const search = document.getElementById('sync-verify-search');
-        const query = search && search.value ? search.value.trim() : '';
-        if (query) params.set('q', query);
-        const problemsBox = document.getElementById('sync-verify-problems-only');
-        if (problemsBox && problemsBox.checked && syncVerifyTableState.sheet === 'data_points') {
-            params.set('problems_only', '1');
-        }
+        params.set('all', '1');
         fetch(syncVerifyResultsUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 if (seq !== syncVerifyFetchSeq) return;
                 if (!data || data.success === false) {
                     throw new Error((data && data.error) || {{ _("Failed to load verification table")|tojson|safe }});
-                }
-                const filtered = Number(data.filtered_rows || 0);
-                const pageSize = Number(data.per_page || SYNC_VERIFY_PAGE_SIZE) || SYNC_VERIFY_PAGE_SIZE;
-                const pageCount = Math.max(1, Math.ceil(filtered / pageSize));
-                if (filtered && syncVerifyTableState.page > pageCount) {
-                    syncVerifyTableState.page = pageCount;
-                    fetchSyncVerifyResultsPage();
-                    return;
                 }
                 renderSyncVerifyTable(data);
             })
@@ -452,14 +463,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function loadSyncVerifyResults(resultsUrl) {
         syncVerifyResultsUrl = resultsUrl;
-        syncVerifyTableState.page = 1;
         fetchSyncVerifyResultsPage();
     }
 
     document.querySelectorAll('#sync-verify-sheet-tabs [data-verify-sheet]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             syncVerifyTableState.sheet = this.getAttribute('data-verify-sheet');
-            syncVerifyTableState.page = 1;
             const search = document.getElementById('sync-verify-search');
             if (search) search.value = '';
             fetchSyncVerifyResultsPage();
@@ -467,46 +476,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const verifySearch = document.getElementById('sync-verify-search');
     if (verifySearch) {
-        verifySearch.addEventListener('input', function () {
-            if (syncVerifySearchTimer) clearTimeout(syncVerifySearchTimer);
-            syncVerifySearchTimer = setTimeout(function () {
-                syncVerifyTableState.page = 1;
-                if (syncVerifyResultsUrl) fetchSyncVerifyResultsPage();
-            }, 300);
-        });
+        verifySearch.addEventListener('input', applyVerifyQuickFilter);
     }
     const verifyProblemsOnly = document.getElementById('sync-verify-problems-only');
     if (verifyProblemsOnly) {
         verifyProblemsOnly.addEventListener('change', function () {
-            syncVerifyTableState.page = 1;
-            if (syncVerifyResultsUrl) fetchSyncVerifyResultsPage();
-        });
-    }
-    const verifyPagePrev = document.getElementById('sync-verify-page-prev');
-    const verifyPageNext = document.getElementById('sync-verify-page-next');
-    if (verifyPagePrev) {
-        verifyPagePrev.addEventListener('click', function () {
-            if (syncVerifyTableState.page <= 1) return;
-            syncVerifyTableState.page -= 1;
-            fetchSyncVerifyResultsPage();
-        });
-    }
-    if (verifyPageNext) {
-        verifyPageNext.addEventListener('click', function () {
-            syncVerifyTableState.page += 1;
-            fetchSyncVerifyResultsPage();
-        });
-    }
-    const verifyPageInput = document.getElementById('sync-verify-page-input');
-    if (verifyPageInput) {
-        verifyPageInput.addEventListener('change', function () {
-            const nextPage = parseInt(verifyPageInput.value, 10);
-            if (!nextPage || nextPage < 1) {
-                verifyPageInput.value = String(syncVerifyTableState.page || 1);
-                return;
-            }
-            syncVerifyTableState.page = nextPage;
-            fetchSyncVerifyResultsPage();
+            showVerifyGridNote(verifyCoverageNote(syncVerifyLastPayload));
+            refreshVerifyGridRows();
         });
     }
     const syncTabBtn = document.querySelector('#data-sync-tabs [data-tab="sync"]');
@@ -882,7 +858,7 @@ function setDataSyncProgress(percent, stage, message, current, total, opts) {
     }
     if (dataSyncProgressCount) {
         if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
-            dataSyncProgressCount.textContent = `${current || 0} / ${total}`;
+            dataSyncProgressCount.textContent = formatCount(current || 0) + ' / ' + formatCount(total);
         } else {
             dataSyncProgressCount.textContent = '';
         }
@@ -959,7 +935,12 @@ function pollDataSyncStatus() {
                 clearDataSyncStorage();
                 dataSyncResult.classList.remove('hidden');
                 const stats = job.stats || {};
-                let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Unchanged: ${stats.unchanged || 0}, Errors: ${stats.errors || 0}`;
+                let msg = 'Loaded: ' + formatCount(stats.loaded || 0)
+                    + ', Skipped: ' + formatCount(stats.skipped || 0)
+                    + ', Inserted: ' + formatCount(stats.inserted || 0)
+                    + ', Updated: ' + formatCount(stats.updated || 0)
+                    + ', Unchanged: ' + formatCount(stats.unchanged || 0)
+                    + ', Errors: ' + formatCount(stats.errors || 0);
                 dataSyncResultText.replaceChildren();
                 if (job.download_ready && job.download_url) {
                     msg += `\n\n` + {{ _("Preview Excel ready:")|tojson|safe }} + ` `;
@@ -1430,7 +1411,7 @@ function setSyncVerifyProgress(percent, stage, message, current, total, opts) {
     }
     if (syncVerifyProgressCount) {
         if (total !== null && total !== undefined && total !== '' && Number(total) > 0) {
-            syncVerifyProgressCount.textContent = `${current || 0} / ${total}`;
+            syncVerifyProgressCount.textContent = formatCount(current || 0) + ' / ' + formatCount(total);
         } else {
             syncVerifyProgressCount.textContent = '';
         }
@@ -1440,15 +1421,15 @@ function setSyncVerifyProgress(percent, stage, message, current, total, opts) {
 function formatSyncVerifyStats(stats) {
     stats = stats || {};
     return {{ _("Points:")|tojson|safe }}
-        + ' ' + String(stats.total || 0)
+        + ' ' + formatCount(stats.total || 0)
         + ' — '
-        + String(stats.matched || 0) + ' ' + {{ _("matched")|tojson|safe }}
+        + formatCount(stats.matched || 0) + ' ' + {{ _("matched")|tojson|safe }}
         + ', '
-        + String(stats.skipped_intentionally || 0) + ' ' + {{ _("skipped")|tojson|safe }}
+        + formatCount(stats.skipped_intentionally || 0) + ' ' + {{ _("skipped")|tojson|safe }}
         + ', '
-        + String(stats.missing || 0) + ' ' + {{ _("missing")|tojson|safe }}
+        + formatCount(stats.missing || 0) + ' ' + {{ _("missing")|tojson|safe }}
         + ', '
-        + String(stats.mismatch || 0) + ' ' + {{ _("mismatch")|tojson|safe }};
+        + formatCount(stats.mismatch || 0) + ' ' + {{ _("mismatch")|tojson|safe }};
 }
 
 function abandonStaleVerifyJob() {

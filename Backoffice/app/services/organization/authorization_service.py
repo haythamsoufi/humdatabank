@@ -808,7 +808,7 @@ class AuthorizationService:
     # take away, reach that they do not have themselves.
 
     COUNTRY_LINKED_ENTITY_TYPES = frozenset(
-        {"country", "national_society", "ns_branch", "ns_subbranch", "ns_localunit"}
+        {"country", "national_society", "ns_branch", "ns_subbranch", "ns_localunit", "initiative"}
     )
     GLOBAL_COUNTRY_SCOPE_PERMISSIONS = (
         "admin.countries.view",
@@ -847,6 +847,12 @@ class AuthorizationService:
             if entity_type != "ns_branch" and branch is not None and getattr(branch, "id", None):
                 chain.append(("ns_branch", int(branch.id)))
             country = EntityService.get_country_from_entity(entity_type, entity)
+            if country is not None and getattr(country, "id", None):
+                chain.append(("country", int(country.id)))
+        elif entity_type == "initiative":
+            # Delegation and entity reads follow the country. Access to the reports of an initiative does not:
+            # assignment access needs a permission on the initiative itself.
+            country = getattr(entity, "country", None)
             if country is not None and getattr(country, "id", None):
                 chain.append(("country", int(country.id)))
         elif entity_type == "department":

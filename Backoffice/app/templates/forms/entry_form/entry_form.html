@@ -113,6 +113,7 @@
                                         ('NS Branch' if assignment_status.entity_type == 'ns_branch' else
                                          'NS Sub-branch' if assignment_status.entity_type == 'ns_subbranch' else
                                          'NS Local Unit' if assignment_status.entity_type == 'ns_localunit' else
+                                         'Initiative' if assignment_status.entity_type == 'initiative' else
                                          'Division' if assignment_status.entity_type == 'division' else
                                          'Department' if assignment_status.entity_type == 'department' else
                                          assignment_status.entity_type),

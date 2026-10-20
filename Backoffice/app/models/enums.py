@@ -472,6 +472,7 @@ class EntityType(str, enum.Enum):
     department = 'department'
     regional_office = 'regional_office'
     cluster_office = 'cluster_office'
+    initiative = 'initiative'
 
 
 class NotificationType(enum.Enum):

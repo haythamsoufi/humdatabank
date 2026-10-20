@@ -992,7 +992,7 @@ def batch_countries_for_aes_list(aes_list):
         return {}
 
     from app.models.core import Country
-    from app.models.organization import NSBranch, NSSubBranch, NSLocalUnit
+    from app.models.organization import NationalSociety, NSBranch, NSSubBranch, NSLocalUnit
     from sqlalchemy.orm import joinedload
 
     result = {}
@@ -1045,6 +1045,20 @@ def batch_countries_for_aes_list(aes_list):
             parent_country = local_unit.branch.country if local_unit.branch else None
             if parent_country:
                 result[('ns_localunit', local_unit.id)] = parent_country
+
+    initiative_ids = {
+        aes.entity_id for aes in aes_list
+        if aes.entity_type == 'initiative' and aes.entity_id
+    }
+    if initiative_ids:
+        from app.models.initiatives import Initiative
+        for initiative in (
+            Initiative.query.options(joinedload(Initiative.national_society).joinedload(NationalSociety.country))
+            .filter(Initiative.id.in_(initiative_ids))
+            .all()
+        ):
+            if initiative.country:
+                result[('initiative', initiative.id)] = initiative.country
 
     return result
 

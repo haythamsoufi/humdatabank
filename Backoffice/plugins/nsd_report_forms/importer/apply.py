@@ -90,16 +90,23 @@ class Lookups:
 
     @staticmethod
     def _ns_index():
-        """(normalised name -> NS ids, ISO3 -> NS ids) over the active National Societies."""
-        by_name, by_country = defaultdict(set), defaultdict(set)
-        rows = (db.session.query(NationalSociety, Country.iso3).join(Country, Country.id == NationalSociety.country_id)
-                .filter(NationalSociety.is_active.is_(True)).all())
+        """(normalised name -> NS ids, ISO3 -> NS ids). Active National Societies win; inactive ones are used only
+        where no active one matches, so projects of an inactive NS are still imported."""
+        rows = (db.session.query(NationalSociety, Country.iso3)
+                .join(Country, Country.id == NationalSociety.country_id).all())
+        active_name, active_country = defaultdict(set), defaultdict(set)
+        spare_name, spare_country = defaultdict(set), defaultdict(set)
         for ns, iso3 in rows:
+            by_name, by_country = (active_name, active_country) if ns.is_active else (spare_name, spare_country)
             for n in [ns.name] + [v for v in (ns.name_translations or {}).values() if isinstance(v, str)]:
                 by_name[_norm_name(n)].add(ns.id)
             if iso3:
                 by_country[iso3.upper()].add(ns.id)
-        return by_name, by_country
+        for key, ids in spare_name.items():
+            active_name.setdefault(key, ids)
+        for iso3, ids in spare_country.items():
+            active_country.setdefault(iso3, ids)
+        return active_name, active_country
 
     def match_ns(self, name: str, iso3: str = '') -> Optional[int]:
         """The National Society by name; failing that, the only one of the project's country (when its ISO3 is given)."""

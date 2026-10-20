@@ -999,6 +999,10 @@ def get_form_items_for_section(section_obj: FormSection, assignment_entity_statu
     )
 
     for form_item in form_items:
+        # Swiss-franc companions are stored on their own item and drawn as a
+        # read-only line under the amount the focal point edits.
+        if (form_item.config or {}).get("fdrs_chf_companion"):
+            continue
         # Set up the form item using our unified processor
         processed_item = FormItemProcessor.setup_form_item_for_template(form_item, assignment_entity_status)
         current_section_fields.append(processed_item)

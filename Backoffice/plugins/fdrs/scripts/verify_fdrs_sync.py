@@ -50,6 +50,7 @@ from fdrs_sync_verify import (  # noqa: E402
     SUMMARY_COLUMNS,
     DatabankValue,
     apply_mapping_skips,
+    apply_network_matrix_checks,
     attach_classification,
     attach_databank_values,
     counts_by_status,
@@ -379,6 +380,12 @@ def execute_verification(
         by_iso_year_item=by_iso_year_item,
         country_names=country_names,
         kpi_names=kpi_names,
+    )
+    from import_fdrs_form_data import _load_don_code_to_matrix_row_label
+
+    apply_network_matrix_checks(
+        points,
+        _load_don_code_to_matrix_row_label(base_url=base_url, api_key=resolved_key),
     )
     attach_classification(points)
     _raise_if_cancelled()

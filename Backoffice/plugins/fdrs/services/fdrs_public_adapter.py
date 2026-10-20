@@ -331,10 +331,28 @@ def matrix_cells(disagg: Any) -> dict[str, float]:
     if not payload:
         return out
     for key, raw in payload.items():
+        lowered = str(key).strip().lower()
+        if lowered.startswith("_chf|"):
+            continue
         number = _number(raw)
         if number is not None:
-            out[str(key).strip().lower()] = number
+            out[lowered] = number
     return out
+
+
+def income_matrix_chf_amount(disagg: Any, label: str, column: str) -> Any:
+    """Swiss-franc amount for one income-source row.
+
+    Prefers the companion stored beside the cell. Older rows keep that amount in
+    the Funding cell itself.
+    """
+    payload = _payload(disagg) or {}
+    lowered = {str(key).strip().lower(): raw for key, raw in payload.items()}
+    base = f"{label}_{column}".strip().lower()
+    raw = lowered.get(f"_chf|{base}")
+    if raw is None:
+        raw = lowered.get(base)
+    return json_number(_number(raw))
 
 
 def _clean_text(value: Any) -> Optional[str]:
@@ -363,8 +381,7 @@ def observation_for(spec: SeriesSpec, row: Any, *, name_to_don: Mapping[str, str
     elif spec.kind == KIND_AGE:
         value = json_number(age_value(row.published_disagg_data, spec.sex, spec.age))
     elif spec.kind == KIND_INCOME:
-        key = f"{spec.income_row}_{INCOME_MATRIX_COLUMN}".lower()
-        value = json_number(matrix_cells(row.published_disagg_data).get(key))
+        value = income_matrix_chf_amount(row.published_disagg_data, spec.income_row or "", INCOME_MATRIX_COLUMN)
     elif spec.kind == KIND_QUESTION:
         value = _clean_text(row.published_value)
     elif spec.kind == KIND_NETWORK:
@@ -779,12 +796,13 @@ def _codes_for_cell(row: Any, *, name_to_don: Mapping[str, str]) -> list[tuple[s
         return found
 
     if item_id == INCOME_MATRIX_ITEM_ID:
-        cells = matrix_cells(row.published_disagg_data)
-        return [
-            (code, json_number(cells[f"{label}_{INCOME_MATRIX_COLUMN}".lower()]))
-            for code, label in INCOME_KPI_TO_ROW.items()
-            if f"{label}_{INCOME_MATRIX_COLUMN}".lower() in cells
-        ]
+        found_income: list[tuple[str, Any]] = []
+        for code, label in INCOME_KPI_TO_ROW.items():
+            amount = income_matrix_chf_amount(row.published_disagg_data, label, INCOME_MATRIX_COLUMN)
+            if amount is None:
+                continue
+            found_income.append((code, amount))
+        return found_income
 
     for code, question_item in QUESTION_KPI_TO_ITEM.items():
         if question_item == item_id:

@@ -162,6 +162,16 @@ class FdrsPlugin(FirstPartyPluginMetadata, BasePlugin):
     def is_admin_feature(self) -> bool:
         return True
 
+    def get_entry_form_assets(self, template_id: int | None) -> list[dict[str, str]]:
+        if template_id != 21:
+            return []
+        from plugins.fdrs.currency_routes import fdrs_static_url
+
+        return [
+            {"kind": "stylesheet", "url": fdrs_static_url("css/fdrs-currency.css")},
+            {"kind": "script", "url": fdrs_static_url("js/fdrs-currency.js")},
+        ]
+
     def register_validation_packs(self) -> None:
         from plugins.fdrs.validation.register import register_fdrs_validation_pack
 

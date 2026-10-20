@@ -1,0 +1,55 @@
+.fdrs-chf-stripe {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    margin: 0.75rem -0.75rem -0.75rem;
+    padding: 0.45rem 0.75rem;
+    background: #f3f4f6;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border-bottom-left-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+}
+
+@media (min-width: 640px) {
+    .fdrs-chf-stripe {
+        margin: 1rem -1rem -1rem;
+        padding: 0.5rem 1rem;
+    }
+}
+
+.fdrs-chf-stripe[hidden] {
+    display: none;
+}
+
+.fdrs-chf-stripe strong {
+    color: #374151;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.fdrs-chf-col {
+    min-width: 7rem;
+    color: #4b5563;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: center;
+    background: #f9fafb;
+}
+
+th.fdrs-chf-col {
+    background: #f3f4f6;
+    text-align: center;
+    font-weight: 600;
+    color: #4b5563;
+}
+
+.fdrs-chf-col.is-total {
+    font-weight: 600;
+    color: #374151;
+    background: #f3f4f6;
+}

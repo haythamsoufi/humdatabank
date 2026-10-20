@@ -546,16 +546,21 @@ def test_data_availability_from_group_rows_maps_is_data_not_collected_to_not_app
     assert not_applic is True
 
 
-def test_network_amount_shares_base_kpi_with_its_slot():
-    """Given-support amounts are one token plus _amount, so they must not become a second base KPI."""
+def test_network_amount_keeps_its_own_base_kpi():
+    """Partner NS codes and amounts are different fields, including received-support slots."""
+    _, _, _, _, given_code = _classify_fdrs_combined_row({
+        "KPI_code": "supported1",
+        "Value": "DFR001",
+        "year": 2024,
+    })
     _, _, _, _, given_amount = _classify_fdrs_combined_row({
         "KPI_code": "supported1_amount",
         "Value": "100",
         "year": 2024,
     })
-    _, _, _, _, given_code = _classify_fdrs_combined_row({
-        "KPI_code": "supported1",
-        "Value": "DFR001",
+    _, _, _, _, received_code = _classify_fdrs_combined_row({
+        "KPI_code": "received_support1",
+        "Value": "DNO001",
         "year": 2024,
     })
     _, _, _, _, received_amount = _classify_fdrs_combined_row({
@@ -563,8 +568,10 @@ def test_network_amount_shares_base_kpi_with_its_slot():
         "Value": "50",
         "year": 2024,
     })
-    assert given_amount == given_code == "supported1"
-    assert received_amount == "received_support1"
+    assert given_code == "supported1"
+    assert given_amount == "supported1_amount"
+    assert received_code == "received_support1"
+    assert received_amount == "received_support1_amount"
 
 
 def test_classify_fdrs_combined_row_keeps_is_data_not_collected_with_empty_value():

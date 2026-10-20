@@ -1860,6 +1860,37 @@ class FormDataService(
 
             data_entry = DataModel.query.filter_by(**query_filter).first()
 
+            if final_disagg_data:
+                from plugins.fdrs.services.fdrs_currency import (
+                    currency_code_from_items,
+                    end_date_from_items,
+                    is_fdrs_income_matrix,
+                    merge_income_matrix_chf,
+                    normalize_rate_date,
+                    rate_for_date,
+                    reporting_end_item,
+                )
+
+                if is_fdrs_income_matrix(matrix):
+                    version_items = FormItem.query.filter_by(version_id=matrix.version_id, archived=False).all()
+                    currency_code = currency_code_from_items(version_items, request.form)
+                    end_date = end_date_from_items(version_items, request.form)
+                    if not end_date:
+                        end_item = reporting_end_item(version_items)
+                        if end_item is not None:
+                            saved_end = FormData.query.filter_by(
+                                **cls._get_data_query_filter(assignment_entity_status, end_item.id)
+                            ).first()
+                            if saved_end is not None:
+                                end_date = normalize_rate_date(saved_end.value) or ""
+                    existing_disagg = data_entry.disagg_data if data_entry is not None else None
+                    final_disagg_data = merge_income_matrix_chf(
+                        final_disagg_data,
+                        existing_disagg if isinstance(existing_disagg, dict) else None,
+                        currency_code,
+                        rate_for_date(end_date, currency_code),
+                    )
+
             if data_entry:
                 # Track old value for change detection - handle matrix data stored in disagg_data
                 old_data_not_available = data_entry.data_not_available or False

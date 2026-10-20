@@ -73,6 +73,21 @@ def test_build_income_sources_matrix_rows_aggregates_cells():
     assert rows[0]["published_disagg_data"] == ""
 
 
+def test_income_matrix_splits_local_and_chf_when_currency_is_not_chf():
+    fdrs_data = [
+        {"ISO3": "AFG", "year": "2024", "BaseKPI": "KPI_CUR_Code", "KPI_code": "KPI_CUR_Code", "Value": "AFN"},
+        {"ISO3": "AFG", "year": "2024", "BaseKPI": "h_gov", "KPI_code": "h_gov", "Value": "1000"},
+        {"ISO3": "AFG", "year": "2024", "BaseKPI": "h_gov_CHF", "KPI_code": "h_gov_CHF", "Value": "25"},
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "AFG", "assignment_entity_status_id": 42},
+    ]
+    rows = build_income_sources_matrix_rows(fdrs_data, assignment_rows)
+    disagg = json.loads(rows[0]["disagg_data"])
+    assert disagg["Home Government_Funding"] == 1000
+    assert disagg["_chf|Home Government_Funding"] == 25
+
+
 def test_income_matrix_published_disagg_keeps_only_state_500():
     fdrs_data = [
         {"ISO3": "SYR", "year": "2024", "BaseKPI": "si_CHF", "KPI_code": "si_CHF", "Value": "80", "State": 500},
@@ -86,7 +101,11 @@ def test_income_matrix_published_disagg_keeps_only_state_500():
     published = json.loads(rows[0]["published_disagg_data"])
     assert disagg["Service income_Funding"] == 80
     assert disagg["Home Government_Funding"] == 20
-    assert published == {"Service income_Funding": 80}
+    assert disagg["_chf|Service income_Funding"] == 80
+    assert disagg["_chf|Home Government_Funding"] == 20
+    assert published["Service income_Funding"] == 80
+    assert published["_chf|Service income_Funding"] == 80
+    assert "Home Government_Funding" not in published
     assert rows[0]["published_value"] == ""
 
 

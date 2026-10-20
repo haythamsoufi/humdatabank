@@ -21,6 +21,7 @@ from fdrs_sync_verify import (  # noqa: E402
     STATUS_SKIPPED,
     DatabankValue,
     FdrsDataPoint,
+    apply_network_matrix_checks,
     apply_mapping_skips,
     attach_classification,
     attach_databank_values,
@@ -46,6 +47,8 @@ def test_kpi_kind():
     assert kpi_kind("KPI_PeopleVol") == "indicator"
     assert kpi_kind("KPI_pr_sex") == "question"
     assert kpi_kind("h_gov_CHF") == "income_matrix"
+    assert kpi_kind("h_gov") == "income_matrix"
+    assert kpi_kind("KPI_incomeFromNSsLC") == "income_matrix"
     assert kpi_kind("supported3") == "network_support"
     assert kpi_kind("supported3_amount") == "network_support"
     assert kpi_kind("received_support1") == "network_support"
@@ -125,7 +128,41 @@ def test_network_code_and_amount_stay_separate_points():
     assert by_kpi["supported1_amount"].fdrs_value == "1000"
     assert by_kpi["received_support1"].fdrs_value == "DNO001"
     assert by_kpi["received_support1_amount"].fdrs_value == "50"
-    assert all(p.skip_reason == "network_support_slot" for p in points)
+    assert by_kpi["received_support1"].item_id == 929
+    assert by_kpi["received_support1_amount"].item_id == 929
+    assert by_kpi["supported1"].item_id == 919
+    assert by_kpi["supported1_amount"].item_id == 919
+    assert all(p.skip_reason is None for p in points)
+
+
+def test_received_support_matches_item_929_matrix_cells():
+    rows = build_fdrs_snapshot_rows([
+        {
+            "ISO3": "GBR",
+            "DonCode": "DGBR001",
+            "year": 2024,
+            "KPI_code": code,
+            "Value": value,
+            "ImputedValue": None,
+            "State": 500,
+        }
+        for code, value in (
+            ("received_support1", "DNO001"),
+            ("received_support1_amount", "50000"),
+        )
+    ])
+    points = group_snapshot_to_points(rows)
+    disagg = {"Norwegian Red Cross_Funding Received": 50000}
+    for point in points:
+        point.databank = DatabankValue(disagg_data=disagg)
+    apply_network_matrix_checks(points, {"DNO001": "Norwegian Red Cross"})
+    attach_classification(points)
+    by_kpi = {p.base_kpi: p for p in points}
+    assert by_kpi["received_support1"].status == STATUS_MATCHED
+    assert by_kpi["received_support1"].network_db_value == "Norwegian Red Cross"
+    assert by_kpi["received_support1_amount"].status == STATUS_MATCHED
+    assert by_kpi["received_support1_amount"].network_db_value == "50000"
+    assert by_kpi["received_support1_amount"].item_id == 929
 
 
 def test_sex_age_rows_stay_one_point_per_base_kpi():
@@ -169,9 +206,11 @@ def test_workflow_and_network_slots_are_intentional_skips():
     )
     by_kpi = {p.base_kpi: p for p in points}
     assert by_kpi["KPI_NSGS"].skip_reason == "assignment_workflow"
-    assert by_kpi["supported1"].skip_reason == "network_support_slot"
+    assert by_kpi["supported1"].item_id == 919
+    assert by_kpi["supported1"].skip_reason is None
     attach_classification(points)
-    assert all(p.status == STATUS_SKIPPED for p in points)
+    assert by_kpi["KPI_NSGS"].status == STATUS_SKIPPED
+    assert by_kpi["supported1"].status == STATUS_MISSING
 
 
 def test_filtered_unpublished_row_is_skipped():

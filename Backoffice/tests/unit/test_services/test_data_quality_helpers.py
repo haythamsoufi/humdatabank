@@ -365,6 +365,13 @@ class TestSumMatrixDisaggValues:
         data = {"values": {"row1": None, "row2": 8}}
         assert sum_matrix_disagg_values(data) == pytest.approx(8.0)
 
+    def test_swiss_franc_companion_keys_are_not_added_to_the_total(self):
+        data = {
+            "Home Government_Funding": 1000,
+            "_chf|Home Government_Funding": 25,
+        }
+        assert sum_matrix_disagg_values(data) == pytest.approx(1000.0)
+
 
 # ---------------------------------------------------------------------------
 # _matrix_row_has_value

@@ -290,6 +290,8 @@ class TemplatePreparationService:
         try:
             items_by_section = {sid: [] for sid in section_ids}
             for item in _raw_items:
+                if (item.config or {}).get("fdrs_chf_companion"):
+                    continue
                 processed = FormItemProcessor.setup_form_item_for_template(item, assignment_entity_status)
                 items_by_section.setdefault(item.section_id, []).append(processed)
         except Exception as e:

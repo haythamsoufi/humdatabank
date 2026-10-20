@@ -1018,6 +1018,27 @@ def build_ready_to_import_from_new_pipeline(
             f"{iso3},{yr},{base}"
             for (iso3, yr, base) in sorted(main_value_empty_or_zero_set)
         ][: _EXCLUSION_LIST_CAP]
+
+    from plugins.fdrs.services.fdrs_currency import CURRENCY_AMOUNT_PAIRS, mirror_chf_currency_rows
+
+    pairs: List[Tuple[int, int]] = []
+    for local_code, chf_code in CURRENCY_AMOUNT_PAIRS:
+        local_bank = base_to_indicator_id.get(local_code)
+        chf_bank = base_to_indicator_id.get(chf_code)
+        if local_bank is None or chf_bank is None:
+            continue
+        local_item = bank_to_item_id.get(local_bank)
+        chf_item = bank_to_item_id.get(chf_bank)
+        if local_item and chf_item:
+            pairs.append((int(local_item), int(chf_item)))
+    if pairs:
+        currency_item = str(FDRS_QUESTION_KPI_TO_ITEM["KPI_CUR_Code"])
+        currency_by_assignment = {
+            str(row.get(COL_ASSIGNMENT) or ""): str(row.get(COL_VALUE) or "")
+            for row in out
+            if str(row.get(COL_ITEM) or "") == currency_item
+        }
+        out = mirror_chf_currency_rows(out, pairs, currency_by_assignment)
     return out
 
 
@@ -1263,24 +1284,43 @@ def build_income_sources_matrix_rows(
 ) -> List[Dict[str, str]]:
     """
     Aggregate FDRS income-source KPIs into one matrix FormData row per (iso3, year) for item 943.
-    disagg_data uses keys ``{row_label}_{column}`` (e.g. Home Government_Funding).
+
+    ``{row}_{column}`` is the amount in the reporting currency. ``_chf|{row}_{column}``
+    is the Swiss-franc figure. When the reporting currency is CHF they match.
     """
     from collections import defaultdict
+
+    from plugins.fdrs.services.fdrs_currency import (
+        chf_matrix_key,
+        income_source_slot,
+        resolve_reported_amounts,
+    )
 
     assignment_by_key: Dict[Tuple[str, str], int] = {
         (r["period_name"], r["iso3"]): int(r["assignment_entity_status_id"]) for r in assignment_rows
     }
-    cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
-    published_cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
+    currency_by_iso_year: Dict[Tuple[str, str], str] = {}
+    # (iso, year, aes, cell) -> local/chf amounts, live and published
+    slots: Dict[Tuple[str, str, int, str], Dict[str, Any]] = defaultdict(
+        lambda: {"local": None, "chf": None, "local_pub": None, "chf_pub": None}
+    )
 
     for r in fdrs_data:
         base_kpi = (r.get("BaseKPI") or "").strip()
         kpi_code = (r.get("KPI_code") or "").strip()
-        row_label = FDRS_INCOME_KPI_TO_MATRIX_ROW.get(base_kpi) or FDRS_INCOME_KPI_TO_MATRIX_ROW.get(kpi_code)
-        if not row_label:
-            continue
         iso3 = (r.get("ISO3") or "").strip()
         year = (r.get("year") or "").strip()
+        if base_kpi == "KPI_CUR_Code" or kpi_code == "KPI_CUR_Code":
+            raw_currency = r.get("Value")
+            if raw_currency is not None and str(raw_currency).strip():
+                currency_by_iso_year[(iso3, year)] = str(raw_currency).strip()
+            continue
+        slot_info = income_source_slot(base_kpi, FDRS_INCOME_KPI_TO_MATRIX_ROW) or income_source_slot(
+            kpi_code, FDRS_INCOME_KPI_TO_MATRIX_ROW
+        )
+        if not slot_info:
+            continue
+        row_label, kind = slot_info
         aes_id = assignment_by_key.get((year, iso3))
         if aes_id is None:
             continue
@@ -1292,12 +1332,29 @@ def build_income_sources_matrix_rows(
         except (ValueError, TypeError):
             continue
         cell_key = f"{row_label}_{matrix_column}"
-        group_key = (iso3, year, aes_id)
-        cells_by_key[group_key][cell_key] = num
+        slot = slots[(iso3, year, aes_id, cell_key)]
+        amount_key = "local" if kind == "local" else "chf"
+        slot[amount_key] = num
         if _row_is_fdrs_published(r):
-            published_cells_by_key[group_key][cell_key] = num
+            slot[f"{amount_key}_pub"] = num
         else:
-            published_cells_by_key[group_key].pop(cell_key, None)
+            slot[f"{amount_key}_pub"] = None
+
+    cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
+    published_cells_by_key: Dict[Tuple[str, str, int], Dict[str, Any]] = defaultdict(dict)
+    for (iso3, year, aes_id, cell_key), slot in slots.items():
+        currency = currency_by_iso_year.get((iso3, year))
+        live_local, live_chf = resolve_reported_amounts(slot["local"], slot["chf"], currency)
+        pub_local, pub_chf = resolve_reported_amounts(slot["local_pub"], slot["chf_pub"], currency)
+        group_key = (iso3, year, aes_id)
+        if live_local is not None:
+            cells_by_key[group_key][cell_key] = live_local
+        if live_chf is not None:
+            cells_by_key[group_key][chf_matrix_key(cell_key)] = live_chf
+        if pub_local is not None:
+            published_cells_by_key[group_key][cell_key] = pub_local
+        if pub_chf is not None:
+            published_cells_by_key[group_key][chf_matrix_key(cell_key)] = pub_chf
 
     sub_at = submitted_at_default.strftime("%d/%m/%Y  %H:%M:%S") if submitted_at_default else ""
     out: List[Dict[str, str]] = []

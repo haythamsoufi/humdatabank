@@ -22,7 +22,11 @@ from fdrs_sync_constants import (
     FDRS_INCOME_SOURCES_MATRIX_COLUMN,
     FDRS_INCOME_SOURCES_MATRIX_ITEM_ID,
     FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX,
+    FDRS_NETWORK_SUPPORT_GIVEN_COLUMN,
+    FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID,
     FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX,
+    FDRS_NETWORK_SUPPORT_RECEIVED_COLUMN,
+    FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID,
     FDRS_QUESTION_KPI_TO_ITEM,
     FDRS_SECTION_WORKFLOW_SPECS,
     fdrs_kpi_has_data_availability_suffix,
@@ -114,6 +118,9 @@ class FdrsDataPoint:
     item_id: Optional[int] = None
     aes_id: Optional[int] = None
     matrix_cell: Optional[str] = None
+    network_db_value: Any = None
+    network_status: str = ""
+    network_detail: str = ""
     kpi_name: str = ""
     country_name: str = ""
     databank: Optional[DatabankValue] = None
@@ -167,7 +174,7 @@ def kpi_kind(base_kpi: str) -> str:
         return KIND_OTHER
     if k in FDRS_QUESTION_KPI_TO_ITEM:
         return KIND_QUESTION
-    if k in FDRS_INCOME_KPI_TO_MATRIX_ROW:
+    if k in FDRS_INCOME_KPI_TO_MATRIX_ROW or f"{k}_CHF" in FDRS_INCOME_KPI_TO_MATRIX_ROW:
         return KIND_INCOME
     if _NETWORK_SLOT_RE.match(k):
         return KIND_NETWORK
@@ -208,6 +215,149 @@ def _is_variant_kpi(kpi_code: str, base_kpi: str) -> bool:
     return True
 
 
+def _network_matrix_target(base_kpi: str) -> Optional[Tuple[int, str, str]]:
+    """Return (item_id, amount column, code prefix) for a network-support slot KPI."""
+    k = (base_kpi or "").strip()
+    if not _NETWORK_SLOT_RE.match(k):
+        return None
+    lower = k.lower()
+    if lower.startswith(FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX):
+        return (
+            FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID,
+            FDRS_NETWORK_SUPPORT_RECEIVED_COLUMN,
+            FDRS_NETWORK_SUPPORT_RECEIVED_CODE_PREFIX,
+        )
+    if lower.startswith(FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX):
+        return (
+            FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID,
+            FDRS_NETWORK_SUPPORT_GIVEN_COLUMN,
+            FDRS_NETWORK_SUPPORT_GIVEN_CODE_PREFIX,
+        )
+    return None
+
+
+def _network_slot_index(base_kpi: str, prefix: str) -> Optional[int]:
+    rest = (base_kpi or "")[len(prefix) :]
+    if rest.lower().endswith("_amount"):
+        rest = rest[: -len("_amount")]
+    return int(rest) if rest.isdigit() else None
+
+
+def _disagg_payload(point: FdrsDataPoint) -> Optional[Dict[str, Any]]:
+    db = point.databank
+    if db is None:
+        return None
+    payload = db.disagg_data
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def apply_network_matrix_checks(
+    points: Sequence[FdrsDataPoint],
+    don_to_label: Optional[Dict[str, str]] = None,
+) -> None:
+    """Compare received/given support slots to matrix items 929 and 919.
+
+    ``received_supportN`` is the partner NS codes and ``received_supportN_amount``
+    is the matching amounts. Both are stored on item 929 as ``{NS name}_Funding Received``.
+    Support given uses item 919 the same way. A cell may be the sum of several slots.
+    """
+    from import_fdrs_form_data import _parse_don_code_amount_pairs
+
+    labels = don_to_label or {}
+    grouped: Dict[Tuple[str, str, str], Dict[int, Dict[str, FdrsDataPoint]]] = defaultdict(dict)
+    for point in points:
+        if point.kind != KIND_NETWORK or point.skip_reason:
+            continue
+        target = _network_matrix_target(point.base_kpi)
+        if target is None or not point.iso3:
+            continue
+        _item_id, _column, prefix = target
+        slot = _network_slot_index(point.base_kpi, prefix)
+        if slot is None:
+            continue
+        role = "amount" if point.base_kpi.lower().endswith("_amount") else "code"
+        grouped[(point.iso3, point.year, prefix)].setdefault(slot, {})[role] = point
+
+    for (iso3, year, prefix), slots in grouped.items():
+        sample = next(iter(next(iter(slots.values())).values()))
+        target = _network_matrix_target(sample.base_kpi)
+        if target is None:
+            continue
+        _item_id, column, _prefix = target
+        sums: Dict[str, int] = defaultdict(int)
+        parsed_slots: Dict[int, List[Tuple[str, int]]] = {}
+        for slot, roles in slots.items():
+            code_point = roles.get("code")
+            amount_point = roles.get("amount")
+            pairs = _parse_don_code_amount_pairs(
+                code_point.fdrs_value if code_point is not None else "",
+                amount_point.fdrs_value if amount_point is not None else "",
+            )
+            parsed_slots[slot] = pairs
+            for don, amount in pairs:
+                sums[don] += amount
+
+        payload = None
+        for roles in slots.values():
+            for point in roles.values():
+                payload = _disagg_payload(point)
+                if payload is not None:
+                    break
+            if payload is not None:
+                break
+
+        for slot, roles in slots.items():
+            pairs = parsed_slots.get(slot) or []
+            names: List[str] = []
+            found_amounts: List[str] = []
+            missing: List[str] = []
+            differed: List[str] = []
+            for don, _amount in pairs:
+                label = labels.get(don, don)
+                key = f"{label}_{column}"
+                names.append(label)
+                cell = None if payload is None else payload.get(key)
+                if cell is None:
+                    missing.append(don)
+                    found_amounts.append("")
+                    continue
+                found_amounts.append(str(cell).strip())
+                if not values_equal(cell, sums[don]):
+                    differed.append(don)
+            code_point = roles.get("code")
+            amount_point = roles.get("amount")
+            if code_point is not None and not _blank(code_point.fdrs_value):
+                code_point.network_db_value = ", ".join(names) if names else None
+                if payload is None:
+                    code_point.network_status = STATUS_MISSING
+                    code_point.network_detail = "value_not_in_databank"
+                elif missing:
+                    code_point.network_status = STATUS_MISSING
+                    code_point.network_detail = "matrix_row_missing"
+                else:
+                    code_point.network_status = STATUS_MATCHED
+                    code_point.network_detail = "matrix_row"
+            if amount_point is not None and not _blank(amount_point.fdrs_value):
+                amount_point.network_db_value = ",".join(found_amounts) if found_amounts else None
+                if payload is None:
+                    amount_point.network_status = STATUS_MISSING
+                    amount_point.network_detail = "value_not_in_databank"
+                elif missing:
+                    amount_point.network_status = STATUS_MISSING
+                    amount_point.network_detail = "matrix_amount_missing"
+                elif differed:
+                    amount_point.network_status = STATUS_MISMATCH
+                    amount_point.network_detail = "matrix_amount_differs"
+                else:
+                    amount_point.network_status = STATUS_MATCHED
+                    amount_point.network_detail = "matrix_amount"
+
+
 def build_point_from_group(rows: Sequence[Dict[str, Any]]) -> FdrsDataPoint:
     """Collapse raw FDRS snapshot rows that share (country, year, BaseKPI)."""
     from import_fdrs_form_data import (
@@ -244,12 +394,9 @@ def build_point_from_group(rows: Sequence[Dict[str, Any]]) -> FdrsDataPoint:
         point.fdrs_value_status = (first.get("ValueStatus") or "")
         return point
     if kind == KIND_NETWORK:
-        point.skip_reason = "network_support_slot"
-        point.kpi_code_used = (first.get("KPI_code") or base_kpi).strip()
-        point.fdrs_value = first.get("Value")
-        point.fdrs_state = first.get("State")
-        point.fdrs_value_status = (first.get("ValueStatus") or "")
-        return point
+        target = _network_matrix_target(base_kpi)
+        if target is not None:
+            point.item_id = target[0]
 
     if not iso3:
         point.skip_reason = "no_iso3_mapping"
@@ -300,7 +447,9 @@ def build_point_from_group(rows: Sequence[Dict[str, Any]]) -> FdrsDataPoint:
     point.fdrs_state = picked.get("State")
     point.fdrs_value_status = (picked.get("ValueStatus") or "")
     if kind == KIND_INCOME:
-        row_label = FDRS_INCOME_KPI_TO_MATRIX_ROW.get(base_kpi)
+        row_label = FDRS_INCOME_KPI_TO_MATRIX_ROW.get(base_kpi) or FDRS_INCOME_KPI_TO_MATRIX_ROW.get(
+            f"{base_kpi}_CHF"
+        )
         if row_label:
             point.matrix_cell = f"{row_label}_{FDRS_INCOME_SOURCES_MATRIX_COLUMN}"
             point.item_id = FDRS_INCOME_SOURCES_MATRIX_ITEM_ID
@@ -346,6 +495,10 @@ def apply_mapping_skips(
             point.item_id = FDRS_QUESTION_KPI_TO_ITEM.get(point.base_kpi)
         elif point.kind == KIND_INCOME:
             point.item_id = FDRS_INCOME_SOURCES_MATRIX_ITEM_ID
+        elif point.kind == KIND_NETWORK and point.item_id is None:
+            target = _network_matrix_target(point.base_kpi)
+            if target is not None:
+                point.item_id = target[0]
         elif point.item_id is None:
             item_id = base_to_item_id.get(point.base_kpi)
             if item_id is not None:
@@ -356,7 +509,7 @@ def apply_mapping_skips(
 
         if point.skip_reason:
             continue
-        if point.kind in (KIND_NETWORK, KIND_WORKFLOW):
+        if point.kind == KIND_WORKFLOW:
             continue
         if point.item_id is None:
             if point.base_kpi in bank_codes:
@@ -371,6 +524,8 @@ def apply_mapping_skips(
 def _databank_comparable(point: FdrsDataPoint) -> Tuple[Any, Any]:
     """Return (main_value, imputed_value) from the databank row for this point."""
     db = point.databank
+    if point.network_db_value is not None:
+        return point.network_db_value, None
     if db is None:
         return None, None
     if point.matrix_cell:
@@ -382,6 +537,10 @@ def _databank_comparable(point: FdrsDataPoint) -> Tuple[Any, Any]:
                 payload = {}
         if not isinstance(payload, dict):
             payload = {}
+        if point.base_kpi in FDRS_INCOME_KPI_TO_MATRIX_ROW:
+            chf_value = payload.get(f"_chf|{point.matrix_cell}")
+            if chf_value is not None and not _blank(chf_value):
+                return chf_value, db.imputed_value
         return payload.get(point.matrix_cell), db.imputed_value
     if db.data_not_available or db.not_applicable:
         return None, None
@@ -399,6 +558,8 @@ def classify_point(point: FdrsDataPoint) -> Tuple[str, str]:
     missing: we would import it, but databank has no comparable value.
     mismatch: both sides have a value and they differ.
     """
+    if point.network_status:
+        return point.network_status, point.network_detail or "matrix"
     if point.skip_reason:
         return STATUS_SKIPPED, point.skip_reason
 

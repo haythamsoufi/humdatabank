@@ -257,6 +257,8 @@ def sum_matrix_disagg_values(disagg_data: dict | None) -> float:
     for key, val in payload.items():
         if key in ("mode", "values", "direct", "indirect"):
             continue
+        if isinstance(key, str) and key.startswith("_"):
+            continue
         if isinstance(val, dict):
             total += sum_matrix_disagg_values(val)
         else:

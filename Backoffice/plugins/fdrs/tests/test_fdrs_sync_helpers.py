@@ -20,9 +20,13 @@ from fdrs_assignment_status_sync import (  # noqa: E402
 )
 from fdrs_documents_sync import (  # noqa: E402
     build_document_import_plan,
+    choose_fdrs_slot_document,
     encode_fdrs_document_url,
     fetch_fdrs_document_bytes,
+    fdrs_pending_slot_siblings,
     fdrs_url_without_duplicate_suffix,
+    public_document_sync_summary,
+    select_fdrs_document_for_upsert,
     _resolve_download_outcome,
     _should_attempt_download,
 )
@@ -30,6 +34,7 @@ from fdrs_sync_constants import (  # noqa: E402
     FDRS_INCOME_SOURCES_MATRIX_ITEM_ID,
     FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID,
     FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID,
+    fdrs_approval_is_importable,
     fdrs_document_is_public_visibility,
     fdrs_document_status_from_approval,
 )
@@ -148,6 +153,113 @@ def test_fdrs_document_status_from_approval_maps_validated_and_pending():
     assert fdrs_document_status_from_approval("Rejected (Public)") == "rejected"
     assert fdrs_document_status_from_approval("Rejected (Private)") == "rejected"
     assert fdrs_document_status_from_approval(None) == "pending"
+
+
+def test_fdrs_document_status_uses_public_code_when_label_is_missing():
+    assert fdrs_document_status_from_approval(None, public_code=1) == "approved"
+    assert fdrs_document_status_from_approval(None, public_code=0) == "approved"
+    assert fdrs_document_status_from_approval("", public_code="3") == "rejected"
+    assert fdrs_document_status_from_approval(None, public_code=2) == "pending"
+    assert fdrs_document_status_from_approval(None, public_code=4) == "pending"
+    assert fdrs_document_status_from_approval(1) == "approved"
+    assert fdrs_document_status_from_approval("Rejected (Public)", public_code=1) == "rejected"
+    assert fdrs_approval_is_importable(None, 1) is True
+    assert fdrs_approval_is_importable("Nope", None) is False
+    assert fdrs_approval_is_importable("Nope", 1) is True
+
+
+class _Doc:
+    def __init__(self, *, key, filename="a.pdf", status="pending", uploaded_at="2024-01-01", row_id=1):
+        self.fdrs_import_key = key
+        self.filename = filename
+        self.status = status
+        self.uploaded_at = uploaded_at
+        self.id = row_id
+
+
+def test_select_fdrs_document_reuses_slot_row_when_filename_changes():
+    old = _Doc(key="old", filename="rejected.pdf", status="pending", row_id=2)
+    chosen, adopted = select_fdrs_document_for_upsert(None, [old], filename="validated.pdf")
+    assert chosen is old
+    assert adopted is True
+    keyed = _Doc(key="same", filename="validated.pdf", status="approved", row_id=9)
+    chosen, adopted = select_fdrs_document_for_upsert(keyed, [old, keyed], filename="validated.pdf")
+    assert chosen is keyed
+    assert adopted is False
+
+
+def test_pending_siblings_follow_approved_slot_status():
+    canonical = _Doc(key="new", filename="validated.pdf", status="pending", row_id=2)
+    leftover = _Doc(key="old", filename="old.pdf", status="pending", row_id=1)
+    user_upload = _Doc(key=None, filename="manual.pdf", status="pending", row_id=3)
+    already = _Doc(key="other", filename="kept.pdf", status="rejected", row_id=4)
+    pending = fdrs_pending_slot_siblings(canonical, [canonical, leftover, user_upload, already], "approved")
+    assert pending == [leftover]
+    assert fdrs_pending_slot_siblings(canonical, [leftover], "pending") == []
+    named = choose_fdrs_slot_document([leftover, canonical], filename="validated.pdf")
+    assert named is canonical
+
+
+def test_build_document_import_plan_maps_public_code_without_approval_label():
+    documents = [
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "Annual Report_USA_2024_en.pdf",
+            "url": "https://data-api.ifrc.org/documents/US/Annual Report_USA_2024_en.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ModifiedAt": "2025-01-01T00:00:00",
+        },
+        {
+            "don_code": "DGA001",
+            "iso3": "GAB",
+            "document_type": "Our Audited Financial Statements",
+            "document_typeId": 2,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "audited.pdf",
+            "url": "https://example.org/b.pdf",
+            "LangCode": "fr",
+            "Public": 3,
+            "ModifiedAt": "2025-01-01T00:00:00",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+        {"period_name": "2024", "iso3": "GAB", "assignment_entity_status_id": 77},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    by_iso = {row["iso3"]: row for row in plan}
+    assert summary["planned"] == 2
+    assert summary["skipped_approval"] == 0
+    assert by_iso["USA"]["status"] == "approved"
+    assert by_iso["GAB"]["status"] == "rejected"
+    assert summary["status_approved"] == 1
+    assert summary["status_rejected"] == 1
+
+
+def test_public_document_sync_summary_reads_job_stats():
+    summary = public_document_sync_summary(
+        {
+            "documents_inserted": 2,
+            "documents_updated": 5,
+            "documents_errors": 1,
+            "documents_status_approved": 4,
+            "documents_status_pending": 2,
+            "documents_status_rejected": 1,
+            "documents_status_changed": 3,
+            "documents_sync_error": None,
+        }
+    )
+    assert summary["inserted"] == 2
+    assert summary["status_approved"] == 4
+    assert summary["status_changed"] == 3
+    assert summary["sync_error"] is None
 
 
 def test_build_document_import_plan_maps_under_validation_to_pending():

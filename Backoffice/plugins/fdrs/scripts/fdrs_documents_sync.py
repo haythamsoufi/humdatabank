@@ -27,14 +27,15 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from werkzeug.datastructures import FileStorage
 
 from fdrs_sync_constants import (
-    FDRS_DOCUMENT_APPROVAL_OK,
-    FDRS_DOCUMENT_PUBLIC_OK,
     FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL,
     FDRS_DOCUMENT_TYPE_TO_ITEM,
     FdrsSyncCancelled,
+    fdrs_approval_is_importable,
+    fdrs_clean_approval_text,
     fdrs_document_approval_rank,
     fdrs_document_is_public_visibility,
     fdrs_document_status_from_approval,
+    fdrs_public_code,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,8 @@ def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
     status_rejected = doc_stats.get("status_rejected", 0)
     return (
         f"FDRS documents complete: {inserted} inserted, {updated} updated; "
-        f"status approved={status_approved} pending={status_pending} rejected={status_rejected}; "
+        f"status approved={status_approved} pending={status_pending} rejected={status_rejected} "
+        f"changed={doc_stats.get('status_changed', 0)}; "
         f"files saved: {downloaded}, awaiting IFRC file download: {pending}, "
         f"unreachable URLs: {url_unreachable}, download errors: {download_errors}"
     )
@@ -368,16 +370,26 @@ def fetch_fdrs_documents_api(
     return flat
 
 
+def _doc_approval_raw(doc: Dict[str, Any]) -> Any:
+    for key in ("ApprovalStatus", "approvalStatus", "approval_status"):
+        if doc.get(key) not in (None, ""):
+            return doc.get(key)
+    return None
+
+
+def _doc_public_raw(doc: Dict[str, Any]) -> Any:
+    if doc.get("Public") not in (None, ""):
+        return doc.get("Public")
+    return doc.get("public")
+
+
 def _doc_score(doc: Dict[str, Any]) -> Tuple[int, str]:
     """Higher is better for dedupe within (iso3, year, document_type)."""
-    approval = (doc.get("ApprovalStatus") or "").strip()
-    public = doc.get("Public")
-    try:
-        public_i = int(public) if public is not None else -1
-    except (TypeError, ValueError):
-        public_i = -1
-    approval_rank = fdrs_document_approval_rank(approval)
-    public_rank = 2 if public_i == 1 else 1 if public_i in FDRS_DOCUMENT_PUBLIC_OK else 0
+    approval_raw = _doc_approval_raw(doc)
+    public_raw = _doc_public_raw(doc)
+    public_i = fdrs_public_code(public_raw)
+    approval_rank = fdrs_document_approval_rank(approval_raw, public_code=public_raw)
+    public_rank = 2 if public_i == 1 else 1 if public_i in (0, 2, 3, 4) else 0
     lang_rank = 1 if (doc.get("LangCode") or "").strip().lower() == "en" else 0
     modified = (doc.get("ModifiedAt") or "")[:19]
     return (approval_rank, public_rank, lang_rank, modified)
@@ -433,15 +445,9 @@ def build_document_import_plan(
         if doc_type not in FDRS_DOCUMENT_TYPE_TO_ITEM:
             summary["skipped_unmapped_type"] += 1
             continue
-        approval = (doc.get("ApprovalStatus") or "").strip()
-        if approval and approval not in FDRS_DOCUMENT_APPROVAL_OK:
-            summary["skipped_approval"] += 1
-            continue
-        try:
-            public_i = int(doc.get("Public")) if doc.get("Public") is not None else None
-        except (TypeError, ValueError):
-            public_i = None
-        if public_i is not None and public_i not in FDRS_DOCUMENT_PUBLIC_OK:
+        approval_raw = _doc_approval_raw(doc)
+        public_raw = _doc_public_raw(doc)
+        if not fdrs_approval_is_importable(approval_raw, public_raw):
             summary["skipped_approval"] += 1
             continue
 
@@ -474,12 +480,17 @@ def build_document_import_plan(
         form_item_id = FDRS_DOCUMENT_TYPE_TO_ITEM[doc_type]
         period = (doc.get("YearText") or year_str).strip()
         lang = (doc.get("LangCode") or "en").strip().lower() or "en"
-        approval_status = (doc.get("ApprovalStatus") or "").strip()
+        approval_raw = _doc_approval_raw(doc)
+        public_raw = _doc_public_raw(doc)
+        approval_status = fdrs_clean_approval_text(approval_raw)
         is_public = fdrs_document_is_public_visibility(
-            approval_status,
-            public_code=doc.get("Public"),
+            approval_raw,
+            public_code=public_raw,
         )
-        doc_status = fdrs_document_status_from_approval(approval_status)
+        doc_status = fdrs_document_status_from_approval(
+            approval_raw,
+            public_code=public_raw,
+        )
         plan.append(
             {
                 "fdrs_import_key": import_key,
@@ -496,6 +507,7 @@ def build_document_import_plan(
                 "year": year_str,
                 "fdrs_document_type": doc_type,
                 "approval_status": approval_status,
+                "public_code": fdrs_public_code(public_raw),
                 "status": doc_status,
                 "modified_at": doc.get("ModifiedAt"),
             }
@@ -541,6 +553,88 @@ def _document_progress_percent(
     return progress_start_pct + (span * (index / total))
 
 
+def stored_document_status(value: Any) -> str:
+    """Canonical pending/approved/rejected text for a stored status value."""
+    if value is None:
+        return "pending"
+    if hasattr(value, "value"):
+        value = value.value
+    text = str(value).strip().casefold()
+    if text in ("approved", "rejected", "pending"):
+        return text
+    return "pending"
+
+
+def choose_fdrs_slot_document(slot_rows: List[Any], *, filename: Optional[str] = None) -> Optional[Any]:
+    """FDRS row to reuse when the import key is new but the assignment field already has one.
+
+    A renamed file must update the existing row. Leaving the old row pending hides
+    a newer approved document, because any pending sibling wins in compliance.
+    """
+    rows = [row for row in slot_rows or [] if getattr(row, "fdrs_import_key", None)]
+    if not rows:
+        return None
+    name = (filename or "").strip()
+    if name:
+        named = [row for row in rows if (getattr(row, "filename", None) or "") == name]
+        if named:
+            rows = named
+
+    def _recency(row: Any) -> Tuple[str, int]:
+        uploaded = getattr(row, "uploaded_at", None)
+        stamp = uploaded.isoformat() if hasattr(uploaded, "isoformat") else str(uploaded or "")
+        try:
+            row_id = int(getattr(row, "id", 0) or 0)
+        except (TypeError, ValueError):
+            row_id = 0
+        return (stamp, row_id)
+
+    return max(rows, key=_recency)
+
+
+def select_fdrs_document_for_upsert(
+    keyed_row: Optional[Any],
+    slot_rows: List[Any],
+    *,
+    filename: Optional[str] = None,
+) -> Tuple[Optional[Any], bool]:
+    """Return ``(row, adopted)``. ``adopted`` means the import key will move onto a slot row."""
+    if keyed_row is not None:
+        return keyed_row, False
+    chosen = choose_fdrs_slot_document(slot_rows, filename=filename)
+    return chosen, chosen is not None
+
+
+def fdrs_pending_slot_siblings(canonical: Any, slot_rows: List[Any], canonical_status: str) -> List[Any]:
+    """Other FDRS rows on this field that are still pending while the slot is approved or rejected."""
+    if canonical_status not in ("approved", "rejected"):
+        return []
+    pending: List[Any] = []
+    for row in slot_rows or []:
+        if row is canonical:
+            continue
+        if not getattr(row, "fdrs_import_key", None):
+            continue
+        if stored_document_status(getattr(row, "status", None)) == "pending":
+            pending.append(row)
+    return pending
+
+
+def public_document_sync_summary(stats: Dict[str, Any]) -> Dict[str, Any]:
+    """Flat document counts for the sync summary and the last-check banner."""
+    error = stats.get("documents_sync_error")
+    return {
+        "inserted": int(stats.get("documents_inserted") or 0),
+        "updated": int(stats.get("documents_updated") or 0),
+        "errors": int(stats.get("documents_errors") or 0),
+        "status_approved": int(stats.get("documents_status_approved") or 0),
+        "status_pending": int(stats.get("documents_status_pending") or 0),
+        "status_rejected": int(stats.get("documents_status_rejected") or 0),
+        "status_changed": int(stats.get("documents_status_changed") or 0),
+        "sync_error": (str(error)[:300] if error else None),
+    }
+
+
 def upsert_fdrs_document_metadata(
     plan_rows: List[Dict[str, Any]],
     *,
@@ -550,14 +644,17 @@ def upsert_fdrs_document_metadata(
     download_timeout: int = _DEFAULT_DOWNLOAD_TIMEOUT,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
     progress_start_pct: float = 82.0,
     progress_end_pct: float = 94.0,
 ) -> Dict[str, int]:
     """Insert or update SubmittedDocument rows; download file bytes when the FDRS URL responds 200/206."""
+    from collections import defaultdict
+
     from app.extensions import db
     from app.models.assignments import AssignmentEntityStatus
     from app.models.documents import SubmittedDocument
-    from app.models.enums import DocumentStatusValue
+    from app.models.enums import DocumentStatus
 
     stats = {
         "loaded": len(plan_rows),
@@ -572,6 +669,7 @@ def upsert_fdrs_document_metadata(
         "status_approved": 0,
         "status_pending": 0,
         "status_rejected": 0,
+        "status_changed": 0,
     }
     if not plan_rows:
         return stats
@@ -628,6 +726,40 @@ def upsert_fdrs_document_metadata(
         for aes in AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all():
             aes_by_id[aes.id] = aes
 
+    item_ids = {
+        int(r["form_item_id"])
+        for r in plan_rows
+        if r.get("form_item_id") is not None
+    }
+    slots: Dict[Tuple[int, int], List[SubmittedDocument]] = defaultdict(list)
+    if aes_ids and item_ids:
+        for doc in SubmittedDocument.query.filter(
+            SubmittedDocument.assignment_entity_status_id.in_(aes_ids),
+            SubmittedDocument.form_item_id.in_(item_ids),
+            SubmittedDocument.fdrs_import_key.isnot(None),
+        ).all():
+            slots[(int(doc.assignment_entity_status_id), int(doc.form_item_id))].append(doc)
+
+    def _record_status(old_status: Optional[str], new_status: str, source: Dict[str, Any]) -> None:
+        if dry_run or change_recorder is None or old_status == new_status:
+            return
+        try:
+            change_recorder(
+                {
+                    "op": "document_status",
+                    "aes_id": source.get("assignment_entity_status_id"),
+                    "item_id": source.get("form_item_id"),
+                    "iso3": source.get("iso3"),
+                    "year": source.get("year"),
+                    "label": source.get("filename"),
+                    "kpi": source.get("document_type"),
+                    "old_value": old_status,
+                    "new_value": new_status,
+                }
+            )
+        except Exception as exc:
+            logger.debug("FDRS document status change log failed: %s", exc)
+
     for i, row in enumerate(plan_rows, start=1):
         _check_cancel(cancel_check)
         import_key = row.get("fdrs_import_key")
@@ -635,21 +767,28 @@ def upsert_fdrs_document_metadata(
             stats["skipped"] += 1
             continue
         try:
-            existing = existing_by_key.get(import_key)
+            slot_key = (
+                int(row["assignment_entity_status_id"]),
+                int(row["form_item_id"]),
+            )
+            slot_rows = slots.get(slot_key, [])
+            existing, adopted = select_fdrs_document_for_upsert(
+                existing_by_key.get(import_key),
+                slot_rows,
+                filename=row.get("filename"),
+            )
+            previous_status = stored_document_status(existing.status) if existing is not None else None
             modified_at = _parse_fdrs_modified_at(row.get("modified_at"))
             from app.utils.datetime_helpers import utcnow
 
             uploaded_at = modified_at or utcnow()
-            doc_status = DocumentStatusValue.normalize(
+            doc_status = DocumentStatus.normalize(
                 row.get("status")
-                or fdrs_document_status_from_approval(row.get("approval_status"))
+                or fdrs_document_status_from_approval(
+                    row.get("approval_status"),
+                    public_code=row.get("public_code"),
+                )
             )
-            if doc_status == DocumentStatusValue.approved:
-                stats["status_approved"] += 1
-            elif doc_status == DocumentStatusValue.rejected:
-                stats["status_rejected"] += 1
-            else:
-                stats["status_pending"] += 1
 
             storage_path = existing.storage_path if existing else None
             file_pending = True
@@ -734,16 +873,39 @@ def upsert_fdrs_document_metadata(
             if source_url_http_status is not None and not fdrs_url_is_downloadable(source_url_http_status):
                 stats["url_unreachable"] += 1
 
+            siblings = fdrs_pending_slot_siblings(existing, slot_rows, doc_status)
+
+            def _count_document_status() -> None:
+                if doc_status == DocumentStatus.APPROVED:
+                    stats["status_approved"] += 1
+                elif doc_status == DocumentStatus.REJECTED:
+                    stats["status_rejected"] += 1
+                else:
+                    stats["status_pending"] += 1
+                if existing is not None and previous_status != doc_status:
+                    stats["status_changed"] += 1
+                stats["status_changed"] += len(siblings)
+
             if dry_run:
                 if existing:
                     stats["updated"] += 1
                 else:
                     stats["inserted"] += 1
+                _count_document_status()
                 continue
+
+            if adopted and existing is not None:
+                old_key = existing.fdrs_import_key
+                if old_key and old_key != import_key:
+                    existing_by_key.pop(old_key, None)
+                existing.fdrs_import_key = import_key
+                existing_by_key[import_key] = existing
 
             if existing:
                 # Field updates flush via ORM; linked AIDocument privacy/metadata/searchable
                 # sync automatically (SubmittedDocument before_flush hook in app.models.documents).
+                # Status is the string value ('approved' / 'pending' / 'rejected'), same as the
+                # document review routes, so a later sync replaces a stale pending row.
                 existing.filename = row["filename"]
                 existing.source_url = row.get("source_url")
                 existing.thumbnail_source_url = row.get("thumbnail_url")
@@ -759,6 +921,7 @@ def upsert_fdrs_document_metadata(
                     existing.uploaded_at = modified_at
                 db.session.add(existing)
                 stats["updated"] += 1
+                _record_status(previous_status, doc_status, row)
             else:
                 entry = SubmittedDocument(
                     assignment_entity_status_id=int(row["assignment_entity_status_id"]),
@@ -780,7 +943,22 @@ def upsert_fdrs_document_metadata(
                 )
                 db.session.add(entry)
                 existing_by_key[import_key] = entry
+                slots.setdefault(slot_key, []).append(entry)
                 stats["inserted"] += 1
+
+            for sibling in siblings:
+                old_status = stored_document_status(sibling.status)
+                sibling.status = doc_status
+                db.session.add(sibling)
+                _record_status(
+                    old_status,
+                    doc_status,
+                    {
+                        **row,
+                        "filename": getattr(sibling, "filename", None) or row.get("filename"),
+                    },
+                )
+            _count_document_status()
 
             if batch_size and i % batch_size == 0:
                 db.session.commit()
@@ -796,7 +974,7 @@ def upsert_fdrs_document_metadata(
             stats["errors"] += 1
             logger.error("FDRS document row error: %s", e)
 
-    if not dry_run and (stats["inserted"] + stats["updated"]) > 0:
+    if not dry_run and (stats["inserted"] + stats["updated"] + stats["status_changed"]) > 0:
         db.session.commit()
     return stats
 
@@ -812,6 +990,7 @@ def run_fdrs_documents_sync(
     batch_size: int = 500,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
     progress_start_pct: float = 82.0,
     progress_end_pct: float = 94.0,
 ) -> Dict[str, Any]:
@@ -852,6 +1031,7 @@ def run_fdrs_documents_sync(
         batch_size=batch_size,
         progress_cb=progress_cb,
         cancel_check=cancel_check,
+        change_recorder=change_recorder,
         progress_start_pct=progress_start_pct,
         progress_end_pct=progress_end_pct,
     )

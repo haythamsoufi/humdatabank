@@ -124,6 +124,13 @@ def persist_verify_latest(
     }
     if extra:
         meta.update(extra)
+    # A check-only run replaces this sidecar. Keep the document line from the
+    # last data sync unless this write sets ``documents`` itself (including null
+    # when that sync skipped documents).
+    if "documents" not in meta:
+        previous = load_verify_latest_meta(template_id) or {}
+        if previous.get("documents"):
+            meta["documents"] = previous["documents"]
     return persist_xlsx_and_meta(
         xlsx_rel=verify_xlsx_rel(template_id),
         meta_rel=verify_meta_rel(template_id),

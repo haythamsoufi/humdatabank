@@ -141,6 +141,58 @@ FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3, 4})
 FDRS_DOCUMENT_DOWNLOAD_PUBLIC_CODES = frozenset({1, 2, 3})
 
 
+# Public integer → SubmittedDocument.status. Used when ApprovalStatus text is missing.
+FDRS_PUBLIC_CODE_STATUS = {
+    0: "approved",  # Validated (Private)
+    1: "approved",  # Validated (Public)
+    2: "pending",  # Under Validation (Public)
+    3: "rejected",  # Rejected (Public)
+    4: "pending",  # Under Validation (Private)
+}
+
+
+def fdrs_clean_approval_text(raw: Any) -> str:
+    """ApprovalStatus label. Numeric codes are not labels; those live on ``Public``."""
+    if raw is None or isinstance(raw, bool):
+        return ""
+    if isinstance(raw, (int, float)):
+        return ""
+    return " ".join(str(raw).split())
+
+
+def fdrs_public_code(raw: Any) -> int | None:
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, str) and not raw.strip():
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _status_from_approval_text(text: str) -> str | None:
+    key = (text or "").casefold()
+    if not key:
+        return None
+    if key in ("validated (public)", "validated (private)", "validated", "approved"):
+        return "approved"
+    if key.startswith("validat") or key.startswith("approv"):
+        return "approved"
+    if "under validation" in key or key == "pending":
+        return "pending"
+    if key.startswith("reject"):
+        return "rejected"
+    return None
+
+
+def _approval_code(approval_status: Any, public_code: Any) -> int | None:
+    code = fdrs_public_code(public_code)
+    if code is None and isinstance(approval_status, (int, float)) and not isinstance(approval_status, bool):
+        return int(approval_status)
+    return code
+
+
 def fdrs_document_is_public_visibility(
     approval_status: str | None = None,
     *,
@@ -152,15 +204,12 @@ def fdrs_document_is_public_visibility(
     Private (Validated Private, Public code 0) → metadata only, no file fetch.
     Public codes 1–3 or ApprovalStatus ending in ``(Public)`` → fetch allowed.
     """
-    approval = (approval_status or "").strip()
+    approval = fdrs_clean_approval_text(approval_status)
     if approval.endswith("(Private)"):
         return False
     if approval.endswith("(Public)"):
         return True
-    try:
-        code = int(public_code) if public_code is not None else None
-    except (TypeError, ValueError):
-        code = None
+    code = _approval_code(approval_status, public_code)
     if code is not None:
         if code == 0:
             return False
@@ -169,9 +218,9 @@ def fdrs_document_is_public_visibility(
     return False
 
 
-def fdrs_document_approval_rank(approval_status: str | None) -> int:
+def fdrs_document_approval_rank(approval_status: str | None = None, *, public_code: Any = None) -> int:
     """Higher rank wins dedupe within (iso3, year, document_type)."""
-    approval = (approval_status or "").strip()
+    approval = fdrs_clean_approval_text(approval_status)
     if approval == "Validated (Public)":
         return 4
     if approval == "Validated (Private)":
@@ -180,19 +229,49 @@ def fdrs_document_approval_rank(approval_status: str | None) -> int:
         return 2
     if approval.lower().startswith("reject"):
         return 1
-    return 0
+    mapped = _status_from_approval_text(approval)
+    if mapped == "approved" and approval.casefold().endswith("(private)"):
+        return 3
+    if mapped == "approved":
+        return 4
+    if mapped == "pending":
+        return 2
+    if mapped == "rejected":
+        return 1
+    code = _approval_code(approval_status, public_code)
+    return {1: 4, 0: 3, 2: 2, 4: 2, 3: 1}.get(code if code is not None else -1, 0)
 
 
-def fdrs_document_status_from_approval(approval_status: str | None) -> str:
-    """Map FDRS ``ApprovalStatus`` to ``SubmittedDocument.status``."""
-    approval = (approval_status or "").strip()
-    if approval in ("Validated (Public)", "Validated (Private)"):
-        return "approved"
-    if approval in ("Under Validation (Public)", "Under Validation (Private)"):
-        return "pending"
-    if approval in ("Rejected (Public)", "Rejected (Private)") or approval.lower().startswith("reject"):
-        return "rejected"
+def fdrs_document_status_from_approval(
+    approval_status: str | None = None,
+    *,
+    public_code: Any = None,
+) -> str:
+    """Map FDRS ``ApprovalStatus`` / ``Public`` to ``SubmittedDocument.status``.
+
+    The label wins when it is recognized. Otherwise the ``Public`` code is used
+    (0/1 approved, 2/4 pending, 3 rejected). Missing both stays pending.
+    """
+    mapped = _status_from_approval_text(fdrs_clean_approval_text(approval_status))
+    if mapped is not None:
+        return mapped
+    code = _approval_code(approval_status, public_code)
+    if code in FDRS_PUBLIC_CODE_STATUS:
+        return FDRS_PUBLIC_CODE_STATUS[code]
     return "pending"
+
+
+def fdrs_approval_is_importable(approval_status: Any = None, public_code: Any = None) -> bool:
+    """False only when a status was sent and neither the label nor the Public code is known."""
+    text = fdrs_clean_approval_text(approval_status)
+    if _status_from_approval_text(text) is not None:
+        return True
+    code = _approval_code(approval_status, public_code)
+    if code in FDRS_DOCUMENT_PUBLIC_OK:
+        return True
+    if not text and code is None:
+        return True
+    return False
 
 
 # Network Support matrices (template 21)

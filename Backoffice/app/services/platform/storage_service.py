@@ -228,6 +228,9 @@ UPLOAD_RESPONSE_CSP = "default-src 'none'; sandbox"
 # Trusted logos are drawn in <img>. Sandbox on the SVG response stops the browser
 # painting them. Scripts stay blocked if someone opens the logo URL directly.
 INLINE_SVG_CSP = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'"
+# Chrome's PDF viewer refuses ``sandbox``. Leaving the header unset lets the page
+# CSP (``object-src 'none'``) land on the file and block the viewer too.
+INLINE_PDF_CSP = "default-src 'none'; object-src 'self'; frame-ancestors 'none'; base-uri 'none'"
 
 
 def is_active_content(mimetype: Optional[str], filename: Optional[str] = None) -> bool:
@@ -242,8 +245,8 @@ def harden_upload_response(response, *, mimetype: Optional[str], as_attachment: 
     """Apply the standard defensive headers to a response that serves user-supplied bytes.
 
     ``nosniff`` stops content-type guessing; the ``default-src 'none'; sandbox`` policy
-    neutralises scripts if a file is opened directly. Inline PDFs are exempt from the
-    sandbox policy because Chrome refuses to render them under it. Inline SVGs use a
+    neutralises scripts if a file is opened directly. Inline PDFs use a viewer policy
+    without ``sandbox`` because Chrome refuses to render them under it. Inline SVGs use a
     script-blocking policy without ``sandbox``, which would hide the image.
     """
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -251,8 +254,10 @@ def harden_upload_response(response, *, mimetype: Optional[str], as_attachment: 
         response.headers["Content-Security-Policy"] = INLINE_SVG_CSP
         return response
     inline_pdf = (not as_attachment) and (mimetype or "").split(";", 1)[0].strip().lower() == "application/pdf"
-    if not inline_pdf:
-        response.headers["Content-Security-Policy"] = UPLOAD_RESPONSE_CSP
+    if inline_pdf:
+        response.headers["Content-Security-Policy"] = INLINE_PDF_CSP
+        return response
+    response.headers["Content-Security-Policy"] = UPLOAD_RESPONSE_CSP
     return response
 
 

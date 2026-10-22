@@ -235,6 +235,26 @@ def _language_display_name(language_code: str | None) -> str:
     return language_display_name(language_code)
 
 
+def _document_review_status(status) -> str:
+    """Canonical ``pending`` / ``approved`` / ``rejected`` text for the documents grid.
+
+    On Python 3.11+, ``str(DocumentStatusValue.approved)`` is
+    ``DocumentStatusValue.approved``. The grid compares that to ``approved`` and
+    otherwise shows the pending Approve/Decline actions, and the status filter
+    lists the class-qualified name.
+    """
+    if status is None:
+        return ""
+    raw = getattr(status, "value", status)
+    text = str(raw).strip()
+    prefix = "documentstatusvalue."
+    if text.casefold().startswith(prefix):
+        text = text[len(prefix):].strip()
+    if not text:
+        return ""
+    return DocumentStatus.normalize(text)
+
+
 def _serialize_document_grid_row(
     doc_row: tuple,
     *,
@@ -259,8 +279,10 @@ def _serialize_document_grid_row(
         current_user, "assignment.documents.upload"
     )
 
-    doc_review_status = (str(status if status is not None else doc.status or "")).strip().lower()
-    is_approved_doc = doc_review_status == "approved"
+    doc_review_status = _document_review_status(
+        status if status is not None else getattr(doc, "status", None)
+    )
+    is_approved_doc = doc_review_status == DocumentStatus.APPROVED
     is_owner = (
         current_user.is_authenticated
         and doc.uploaded_by_user_id == current_user.id
@@ -329,7 +351,7 @@ def _serialize_document_grid_row(
         "uploaded_by_active": uploaded_by_active,
         "uploaded_by_profile_color": uploaded_by_profile_color,
         "uploaded_at": uploaded_at.isoformat() if uploaded_at else None,
-        "status": str(status) if status is not None else "",
+        "status": doc_review_status,
         "can_edit": can_edit_doc,
         "can_delete": can_delete_doc,
         "delete_url": delete_url,

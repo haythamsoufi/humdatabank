@@ -464,6 +464,7 @@ def _compute_tracker_data(template_id: int, period_name: str) -> dict[str, Any]:
                 "fds_member_name": fds_member_user_display_name(fds_user) or None,
                 "period_name": resolved_period_by_country.get(country.id),
                 "assignment_id": aes.assigned_form_id,
+                "aes_id": aes.id,
                 "status": status,
                 "status_label": status_display_label(status),
                 "submitted_at": aes.submitted_at.isoformat() if aes.submitted_at else None,

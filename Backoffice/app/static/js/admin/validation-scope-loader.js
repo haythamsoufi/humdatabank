@@ -144,7 +144,7 @@
         var hidden = document.getElementById('vd-template');
         if (templateId && hidden) hidden.value = templateId;
         var code = opt.getAttribute('data-round');
-        document.querySelectorAll('#vd-period, #vd-tracker-period').forEach(function (other) {
+        document.querySelectorAll('#vd-period, #vd-tracker-period, #vd-em-period').forEach(function (other) {
             if (other === selectEl) return;
             Array.prototype.forEach.call(other.options, function (option) {
                 if (option.getAttribute('data-round') === code) other.value = option.value;

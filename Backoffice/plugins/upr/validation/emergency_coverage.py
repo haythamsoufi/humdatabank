@@ -14,6 +14,7 @@ block submission.
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -21,6 +22,8 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 _COVERAGE_BATCH: ContextVar = ContextVar("upr_coverage_batch", default=None)
+_PERIOD_YEAR_RE = re.compile(r"\b(20\d{2})\b")
+_PERIOD_FORMULA_RE = re.compile(r"\[\[(assignment_period)\]([+\-]\d+)\]")
 
 RULE_MISSING = "emergency_missing"
 RULE_NOT_APPLICABLE = "emergency_not_applicable"
@@ -127,16 +130,36 @@ def coverage_messages(field: FieldEmergencyCoverage) -> list[dict[str, str]]:
     return messages
 
 
-def tracker_status(fields: list[FieldEmergencyCoverage] | None) -> dict[str, str]:
+def _status_groups(fields: list[FieldEmergencyCoverage]) -> list[dict]:
+    """Appeal lists for the tracker disclosure, kept separate per matrix."""
+    specs = (
+        ("missing", "Not added"),
+        ("not_applicable", "Not applicable"),
+        ("no_longer_applicable", "No longer applicable"),
+    )
+    groups = []
+    for attr, heading in specs:
+        sections = []
+        for field in fields:
+            items = [op.label for op in getattr(field.coverage, attr) if op.label]
+            if items:
+                sections.append({"name": field.section_name, "items": items})
+        if sections:
+            groups.append({"heading": heading, "sections": sections})
+    return groups
+
+
+def tracker_status(fields: list[FieldEmergencyCoverage] | None) -> dict:
     """One tracker cell for every emergency repeat section on the assignment."""
     if fields is None:
         return {
             "state": "unknown",
             "label": "—",
             "detail": "The emergency list is not available yet.",
+            "groups": [],
         }
     if not fields:
-        return {"state": "not_used", "label": "—", "detail": ""}
+        return {"state": "not_used", "label": "—", "detail": "", "groups": []}
 
     missing: list[str] = []
     not_applicable: list[str] = []
@@ -151,6 +174,7 @@ def tracker_status(fields: list[FieldEmergencyCoverage] | None) -> dict[str, str
             "state": "ok",
             "label": "Complete",
             "detail": "Every applicable emergency has been added.",
+            "groups": [],
         }
 
     parts: list[str] = []
@@ -178,7 +202,12 @@ def tracker_status(fields: list[FieldEmergencyCoverage] | None) -> dict[str, str
         state = "not_applicable"
     else:
         state = "no_longer_applicable"
-    return {"state": state, "label": " · ".join(parts), "detail": ". ".join(details) + "."}
+    return {
+        "state": state,
+        "label": " · ".join(parts),
+        "detail": ". ".join(details) + ".",
+        "groups": _status_groups(fields),
+    }
 
 
 def checks_from_fields(fields: list[FieldEmergencyCoverage] | None) -> list[dict[str, str]]:
@@ -637,6 +666,27 @@ def _selected_emergencies(aes_id: int, item) -> list[EmergencyRef]:
     return selected
 
 
+def _fill_assignment_period(text: str, period: str | None) -> str:
+    """Replace [assignment_period] tokens using the assignment round, without a request."""
+    raw = str(text or "")
+    if "[" not in raw:
+        return raw
+    period_text = str(period or "").strip()
+    if not period_text:
+        return raw
+    year_match = _PERIOD_YEAR_RE.search(period_text)
+    year = int(year_match.group(1)) if year_match else None
+
+    def formula(match: re.Match) -> str:
+        if year is None:
+            return match.group(0)
+        offset = int(match.group(2))
+        return str(year + offset)
+
+    filled = _PERIOD_FORMULA_RE.sub(formula, raw)
+    return filled.replace("[assignment_period]", period_text)
+
+
 def _plain_section_name(item_label: str, section_name: str) -> str:
     raw = str(item_label or "").strip()
     if raw in {"", "-", "—"}:
@@ -704,12 +754,17 @@ class _CoverageBatch:
         version_id = getattr(template, "published_version_id", None) if template is not None else None
         if not isinstance(template_id, int):
             return []
+        period = self._period(aes)
+
+        def names(item_label, section_name):
+            return _fill_assignment_period(_plain_section_name(item_label, section_name), period)
+
         sources = []
         for item, section_name, plugin_config in self.repeat_defs.get(template_id, []):
             if version_id and item.version_id not in (version_id, None):
                 continue
             sources.append((
-                section_name,
+                _fill_assignment_period(section_name, period),
                 plugin_config,
                 self.repeat_selected.get((aes.id, item.id), []),
             ))
@@ -721,7 +776,7 @@ class _CoverageBatch:
             aes,
             items=self.matrix_items.get(template_id, []),
             cells_for_item=cells_for_item,
-            name_fn=_plain_section_name,
+            name_fn=names,
             template_id=template_id,
             version_id=version_id,
         ))

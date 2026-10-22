@@ -87,6 +87,11 @@
                     class="settings-tab {{ admin_underline_tab_btn_classes(false) }} hidden">
                 <i class="fas fa-users mr-1.5" aria-hidden="true"></i>{{ _('NS capacity') }}
             </button>
+            <button type="button" role="tab" id="tab-vd-emergencies" data-tab="emergencies"
+                    aria-selected="false"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(false) }} hidden">
+                <i class="fas fa-house-damage mr-1.5" aria-hidden="true"></i>{{ _('Emergencies') }}
+            </button>
         {% endcall %}
 
         {# ——— Tracker (default) ——— #}
@@ -292,6 +297,61 @@
             </div>
             <p id="vd-cap-empty" class="vd-table-empty">{{ _('Open this tab to compare planning and country reporting.') }}</p>
         </div>
+
+        {# ——— UPR emergencies: applicable list for the round, marked covered or not ——— #}
+        <div id="panel-emergencies" class="vd-panel hidden p-6">
+            <p class="vd-cap-intro">
+                {{ _('Every emergency that applies to a country in this round. Covered means it was added on each list that includes it. Not covered means at least one of those lists is still missing it.') }}
+            </p>
+            <div class="vd-cap-stats" aria-live="polite">
+                <div class="vd-cap-stat">
+                    <span id="vd-em-applicable" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Applicable') }}</span>
+                </div>
+                <div class="vd-cap-stat">
+                    <span id="vd-em-covered" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Covered') }}</span>
+                </div>
+                <div class="vd-cap-stat is-attention">
+                    <span id="vd-em-missing" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Not covered') }}</span>
+                </div>
+                <div class="vd-cap-stat">
+                    <span id="vd-em-countries" class="vd-cap-stat-value">—</span>
+                    <span class="vd-cap-stat-label">{{ _('Countries') }}</span>
+                </div>
+            </div>
+            <div class="vd-toolbar mb-4">
+                <div class="vd-toolbar-row">
+                    <div class="vd-field vd-field-period">
+                        <label for="vd-em-period" class="vd-field-label">{{ _('Round') }}</label>
+                        <select id="vd-em-period" class="vd-select" disabled>
+                            <option value="">{{ _('Loading periods…') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-field">
+                        <label for="vd-em-status" class="vd-field-label">{{ _('Coverage') }}</label>
+                        <select id="vd-em-status" class="vd-select">
+                            <option value="applicable">{{ _('Applicable') }}</option>
+                            <option value="missing">{{ _('Not covered') }}</option>
+                            <option value="covered">{{ _('Covered') }}</option>
+                            <option value="all">{{ _('All, including ones outside the list') }}</option>
+                        </select>
+                    </div>
+                    <div class="vd-field vd-field-country">
+                        <label for="vd-em-search" class="vd-field-label">{{ _('Country or emergency') }}</label>
+                        <input type="search" id="vd-em-search" class="vd-select" placeholder="{{ _('Search')|forceescape }}">
+                    </div>
+                </div>
+            </div>
+            <div class="vd-table-scroll vd-table-scroll-tall">
+                <table class="vd-table" id="vd-em-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <p id="vd-em-empty" class="vd-table-empty">{{ _('Choose a round to see its emergencies.') }}</p>
+        </div>
     </div>
 </div>
 
@@ -302,6 +362,7 @@
     'previewUrl': url_for('admin.validation_dashboard_preview_api'),
     'runChecksUrl': url_for('admin.validation_dashboard_run_checks'),
     'trackerUrl': url_for('admin.validation_dashboard_tracker_api'),
+    'emergenciesUrl': url_for('admin.validation_dashboard_emergencies_api'),
     'capacityUrl': url_for('admin.validation_dashboard_capacity_api'),
     'mapboxAccessToken': mapbox_access_token,
     'mapboxStyleId': mapbox_style_id,
@@ -332,6 +393,9 @@
         'sortAscending': _('Ascending'),
         'sortDescending': _('Descending'),
         'clearFilter': _('Clear filter'),
+        'showNoticeDetails': _('Show details'),
+        'hideNoticeDetails': _('Hide details'),
+        'partOf': _('part of'),
         'completionAtLeast80': _('At least 80'),
         'completionAtLeast50': _('At least 50'),
         'completionAtLeast25': _('At least 25'),
@@ -402,6 +466,18 @@
         'staff': _('Staff'),
         'branches': _('Branches'),
         'localUnits': _('Local units'),
+        'emergenciesEmpty': _('No emergencies apply to this round.'),
+        'emergenciesEmptyFilter': _('No emergencies match this filter.'),
+        'emergenciesLoadFailed': _('Failed to load emergencies'),
+        'emergenciesUnavailable': _('The emergency list is not available yet.'),
+        'emergencyCovered': _('Covered'),
+        'emergencyMissing': _('Not covered'),
+        'emergencyNotApplicable': _('Not applicable'),
+        'emergencyNoLonger': _('No longer applicable'),
+        'emergencyCountry': _('Country'),
+        'emergencyName': _('Emergency'),
+        'emergencyCode': _('Code'),
+        'emergencyStatus': _('Coverage'),
     }
 } %}
 {{ ag_grid_page_config('validationDashboardConfig', 'VD_GRID_TRANSLATIONS', vd_grid_bootstrap) }}
@@ -418,4 +494,5 @@
 <script src="{{ static_url('js/admin/validation-dashboard-tracker.js') }}"></script>
 <script src="{{ static_url('js/admin/validation-dashboard.js') }}"></script>
 <script src="{{ static_url('js/admin/validation-dashboard-capacity.js') }}"></script>
+<script src="{{ static_url('js/admin/validation-dashboard-emergencies.js') }}"></script>
 {% endblock %}

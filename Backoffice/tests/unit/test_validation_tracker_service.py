@@ -139,6 +139,7 @@ def test_build_tracker_data_shapes(
     assert len(payload["rows"]) == 1
     row = payload["rows"][0]
     assert row["country_name"] == "Testland"
+    assert row["aes_id"] == 99
     assert row["status"] == "in_progress"
     assert set(row["sections"].keys()) == {s["key"] for s in _SHAPE_TRACKER.sections}
     assert row["completion_rate"] == 0.0

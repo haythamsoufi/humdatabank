@@ -71,13 +71,15 @@ def map_subtype_to_appeal_type(subtype: Optional[str]) -> str:
 
 _PART_OF_LABEL_RE = re.compile(r"^(.*?)\s+\(part of ([A-Za-z0-9]+)\)\s*$", re.IGNORECASE)
 _CODE_FIRST_LABEL_RE = re.compile(r"^([A-Z][A-Z0-9]{4,})\s+(.+)$")
+_CODE_ONLY_LABEL_RE = re.compile(r"^([A-Z][A-Z0-9]{4,})$")
 _NAME_FIRST_LABEL_RE = re.compile(r"^(.+?)\s+\(([A-Z][A-Z0-9]{4,})\)\s*$")
 
 
 def parse_operation_label(value: Optional[str]) -> Dict[str, str]:
-    """Read a dropdown label back into name and appeal code.
+    """Read a saved emergency label back into name and appeal code.
 
-    Accepts ``CODE Name (part of PARENT)`` and the older ``Name (CODE)`` form.
+    Accepts ``CODE Name (part of PARENT)``, the older ``Name (CODE)`` form,
+    and a bare appeal code. Matrix rows store that code as the lookup id.
     """
     text = (value or "").strip()
     if not text:
@@ -94,6 +96,9 @@ def parse_operation_label(value: Optional[str]) -> Dict[str, str]:
     name_first = _NAME_FIRST_LABEL_RE.match(body)
     if name_first:
         return {"name": name_first.group(1).strip(), "code": name_first.group(2).strip(), "part_of": parent}
+    code_only = _CODE_ONLY_LABEL_RE.match(body)
+    if code_only:
+        return {"name": "", "code": code_only.group(1).strip(), "part_of": parent}
     return {"name": text, "code": "", "part_of": parent}
 
 

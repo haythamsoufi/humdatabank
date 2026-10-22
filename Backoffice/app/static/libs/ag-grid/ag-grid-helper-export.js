@@ -13,33 +13,42 @@
 
         /**
          * Build custom context menu items for right-click on a cell.
-         * Returns: Copy cell, Export table to Excel.
+         * Returns: Copy cell, Copy column, Copy table, Export table to Excel.
          * @param {Object} params - AG Grid context menu params (node, column, value, api, etc.)
          * @returns {Array} Array of context menu item descriptors
          */
         AgGridHelper.prototype.buildContextMenuItems = function(params) {
             const self = this;
             const items = [];
+            const api = (params && params.api) || self.gridApi;
+            const colId = self.getContextColumnId(params && params.column);
     
             items.push({
                 name: self.getTranslation('copyCell', 'Copy cell'),
                 action: function() {
                     const value = params.value;
                     const text = value == null ? '' : String(value);
-                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                        navigator.clipboard.writeText(text).catch(function() {
-                            AgGridHelper.fallbackCopyToClipboard(text);
-                        });
-                    } else {
-                        AgGridHelper.fallbackCopyToClipboard(text);
-                    }
+                    self.copyTextToClipboard(text);
+                }
+            });
+
+            items.push({
+                name: self.getTranslation('copyColumn', 'Copy column'),
+                action: function() {
+                    self.copyColumnToClipboard(api, colId);
+                }
+            });
+
+            items.push({
+                name: self.getTranslation('copyTable', 'Copy table'),
+                action: function() {
+                    self.copyTableToClipboard(api);
                 }
             });
     
             items.push({
                 name: self.getTranslation('exportTableToExcel', 'Export table to Excel'),
                 action: function() {
-                    const api = params.api || self.gridApi;
                     if (api) {
                         var exportName = (self.config && self.config.templateId)
                             ? (String(self.config.templateId).replace(/[^a-z0-9_-]+/gi, '_') + '.csv')
@@ -53,7 +62,7 @@
         };
     
         /**
-         * Setup custom right-click context menu (Copy URL on endpoint links, Copy cell, Export table to Excel).
+         * Setup custom right-click context menu (Copy URL on endpoint links, Copy cell, Copy column, Copy table, Export table to Excel).
          * Uses DOM listener so it works in AG Grid Community edition (context menu is Enterprise-only).
          */
         AgGridHelper.prototype.setupContextMenuFallback = function() {
@@ -162,26 +171,20 @@
                     const copyUrlLabel = (self.config.contextMenuLabels && self.config.contextMenuLabels.copyUrl)
                         || self.getTranslation('copyUrl', 'Copy URL');
                     addItem(copyUrlLabel, function() {
-                        const url = endpointLink.href;
-                        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                            navigator.clipboard.writeText(url).catch(function() {
-                                AgGridHelper.fallbackCopyToClipboard(url);
-                            });
-                        } else {
-                            AgGridHelper.fallbackCopyToClipboard(url);
-                        }
+                        self.copyTextToClipboard(endpointLink.href);
                     });
                 }
     
                 addItem(self.getTranslation('copyCell', 'Copy cell'), function() {
-                    const text = cellValue;
-                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                        navigator.clipboard.writeText(text).catch(function() {
-                            AgGridHelper.fallbackCopyToClipboard(text);
-                        });
-                    } else {
-                        AgGridHelper.fallbackCopyToClipboard(text);
-                    }
+                    self.copyTextToClipboard(cellValue);
+                });
+
+                addItem(self.getTranslation('copyColumn', 'Copy column'), function() {
+                    self.copyColumnToClipboard(api, colId);
+                });
+
+                addItem(self.getTranslation('copyTable', 'Copy table'), function() {
+                    self.copyTableToClipboard(api);
                 });
     
                 addItem(self.getTranslation('exportTableToExcel', 'Export table to Excel'), function() {
@@ -278,6 +281,342 @@
             }
             return '';
         };
+
+        /**
+         * Column id from an AG Grid column, a colDef, or a context-menu column param.
+         * @param {Object|string|null} column
+         * @returns {string}
+         */
+        AgGridHelper.prototype.getContextColumnId = function(column) {
+            if (!column) {
+                return '';
+            }
+            if (typeof column === 'string') {
+                return column;
+            }
+            if (typeof column.getColId === 'function') {
+                return column.getColId() || '';
+            }
+            if (column.colId) {
+                return column.colId;
+            }
+            var def = (typeof column.getColDef === 'function') ? column.getColDef() : (column.colDef || column);
+            return (def && (def.colId || def.field)) || '';
+        };
+
+        /**
+         * Write text to the clipboard, with a textarea fallback.
+         * @param {string} text
+         */
+        AgGridHelper.prototype.copyTextToClipboard = function(text) {
+            text = text == null ? '' : String(text);
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(text).catch(function() {
+                    AgGridHelper.fallbackCopyToClipboard(text);
+                });
+            } else {
+                AgGridHelper.fallbackCopyToClipboard(text);
+            }
+        };
+
+        /**
+         * Plain string for a cell value (no CSV/TSV quoting).
+         * @param {*} value
+         * @returns {string}
+         */
+        AgGridHelper.prototype.stringifyExportValue = function(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            if (typeof value === 'boolean') {
+                return value ? 'true' : 'false';
+            }
+            if (Array.isArray(value)) {
+                return value.join('; ');
+            }
+            if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value);
+                } catch (e) {
+                    return String(value);
+                }
+            }
+            return String(value);
+        };
+
+        /**
+         * Quote a cell for tab-separated clipboard text (Excel / Sheets paste).
+         * @param {*} value
+         * @returns {string}
+         */
+        AgGridHelper.prototype.formatClipboardCell = function(value) {
+            var str = this.stringifyExportValue(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            if (/[\t\n"]/.test(str)) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        };
+
+        /**
+         * Clipboard text for one cell.
+         * Custom processCellForClipboard results win (same as Copy cell).
+         * Otherwise the export value is used so valueGetters are included.
+         * @param {Object} col
+         * @param {Object} node
+         * @returns {string}
+         */
+        AgGridHelper.prototype.getClipboardCellText = function(col, node) {
+            if (!col || !node) {
+                return '';
+            }
+            var data = node.data || {};
+            var column = col.column || null;
+            var colId = this.getContextColumnId(column) || col.field || '';
+            var raw;
+            if (colId && Object.prototype.hasOwnProperty.call(data, colId)) {
+                raw = data[colId];
+            } else if (col.field && Object.prototype.hasOwnProperty.call(data, col.field)) {
+                raw = data[col.field];
+            }
+
+            if (this._gridOptions && typeof this._gridOptions.processCellForClipboard === 'function') {
+                try {
+                    var processed = this._gridOptions.processCellForClipboard({
+                        value: raw,
+                        node: node,
+                        data: data,
+                        column: column,
+                        api: this.gridApi,
+                        columnApi: this.columnApi,
+                        context: this._gridOptions.context,
+                        type: 'clipboard'
+                    });
+                    var rawEmpty = raw == null || raw === '';
+                    var processedEmpty = processed == null || processed === '';
+                    if (!(rawEmpty && processedEmpty) && processed !== raw) {
+                        return this.stringifyExportValue(processed);
+                    }
+                } catch (e) {
+                    // Fall through to the export value.
+                }
+            }
+            return this.stringifyExportValue(this.getExportCellValue(col, node));
+        };
+
+        /**
+         * Visible columns used by table export and clipboard copy.
+         * @param {Object} api
+         * @param {{includeHiddenExportAlways?: boolean, skipActions?: boolean}} [options]
+         * @returns {Array}
+         */
+        AgGridHelper.prototype.getVisibleExportColumns = function(api, options) {
+            options = options || {};
+            var includeHiddenExportAlways = options.includeHiddenExportAlways !== false;
+            var skipActions = options.skipActions === true;
+            var visibleCols = [];
+
+            if (api && typeof api.getColumns === 'function') {
+                var cols = api.getColumns();
+                if (cols && cols.length) {
+                    visibleCols = cols
+                        .filter(function(col) {
+                            var def = col.getColDef ? col.getColDef() : (col.colDef || {});
+                            var field = def.field || (col.getColId ? col.getColId() : col.colId);
+                            var visible = col.getVisible ? col.getVisible() : (col.visible !== false);
+                            if (!field || field === 'ag-Grid-SelectionColumn' || field === 'ag-Grid-AutoColumn') {
+                                return false;
+                            }
+                            if (skipActions && AgGridHelper.isActionsColumn(def)) {
+                                return false;
+                            }
+                            var exportProps = AgGridHelper.getColDefExportProps(def);
+                            return visible || (includeHiddenExportAlways && exportProps.exportAlways);
+                        })
+                        .map(function(col) {
+                            var def = col.getColDef ? col.getColDef() : (col.colDef || {});
+                            var exportProps = AgGridHelper.getColDefExportProps(def);
+                            return {
+                                field: def.field || (col.getColId ? col.getColId() : col.colId),
+                                headerName: def.headerName || def.field || (col.getColId ? col.getColId() : col.colId),
+                                valueGetter: def.valueGetter,
+                                exportValueGetter: exportProps.exportValueGetter,
+                                colDef: def,
+                                column: col
+                            };
+                        });
+                }
+            }
+
+            if (!visibleCols.length) {
+                var columnDefs = (this.config && this.config.columnDefs) || [];
+                visibleCols = columnDefs
+                    .filter(function(col) {
+                        var exportProps = AgGridHelper.getColDefExportProps(col);
+                        if (!col.field || (skipActions && AgGridHelper.isActionsColumn(col))) {
+                            return false;
+                        }
+                        return col.hide !== true || (includeHiddenExportAlways && exportProps.exportAlways);
+                    })
+                    .map(function(col) {
+                        var exportProps = AgGridHelper.getColDefExportProps(col);
+                        return {
+                            field: col.field,
+                            headerName: col.headerName || col.field,
+                            valueGetter: col.valueGetter,
+                            exportValueGetter: exportProps.exportValueGetter,
+                            colDef: col,
+                            column: null
+                        };
+                    });
+            }
+            return visibleCols;
+        };
+
+        /**
+         * Walk rows in filter/sort order (same set as Export table to Excel).
+         * @param {Object} api
+         * @param {Function} callback
+         */
+        AgGridHelper.prototype.forEachExportRow = function(api, callback) {
+            if (!api || typeof callback !== 'function') {
+                return;
+            }
+            if (typeof api.forEachNodeAfterFilterAndSort === 'function') {
+                api.forEachNodeAfterFilterAndSort(function(node) {
+                    if (node && node.data) {
+                        callback(node);
+                    }
+                });
+                return;
+            }
+            if (typeof api.forEachNode === 'function') {
+                api.forEachNode(function(node) {
+                    if (node && node.data && (node.displayed === true || node.displayed === undefined)) {
+                        callback(node);
+                    }
+                });
+            }
+        };
+
+        /**
+         * Find one export column by col id, including columns omitted from a full-table copy.
+         * @param {Object} api
+         * @param {string} colId
+         * @returns {Object|null}
+         */
+        AgGridHelper.prototype.getExportColumnById = function(api, colId) {
+            if (!colId) {
+                return null;
+            }
+            var cols = this.getVisibleExportColumns(api, {
+                includeHiddenExportAlways: true,
+                skipActions: false
+            });
+            var i;
+            for (i = 0; i < cols.length; i++) {
+                var id = this.getContextColumnId(cols[i].column) || cols[i].field;
+                if (id === colId || cols[i].field === colId) {
+                    return cols[i];
+                }
+            }
+
+            var column = null;
+            if (api && typeof api.getColumn === 'function') {
+                column = api.getColumn(colId);
+            }
+            if (!column && this.columnApi && typeof this.columnApi.getColumn === 'function') {
+                column = this.columnApi.getColumn(colId);
+            }
+            if (!column) {
+                var columnDefs = (this.config && this.config.columnDefs) || [];
+                for (i = 0; i < columnDefs.length; i++) {
+                    var def = columnDefs[i];
+                    if (def && (def.colId === colId || def.field === colId)) {
+                        var fallbackProps = AgGridHelper.getColDefExportProps(def);
+                        return {
+                            field: def.field || colId,
+                            headerName: def.headerName || def.field || colId,
+                            valueGetter: def.valueGetter,
+                            exportValueGetter: fallbackProps.exportValueGetter,
+                            colDef: def,
+                            column: null
+                        };
+                    }
+                }
+                return null;
+            }
+
+            var colDef = column.getColDef ? column.getColDef() : {};
+            var exportProps = AgGridHelper.getColDefExportProps(colDef);
+            return {
+                field: colDef.field || colId,
+                headerName: colDef.headerName || colDef.field || colId,
+                valueGetter: colDef.valueGetter,
+                exportValueGetter: exportProps.exportValueGetter,
+                colDef: colDef,
+                column: column
+            };
+        };
+
+        /**
+         * Tab-separated table, or one column as newline-separated values.
+         * Copy table includes a header row. Copy column does not.
+         * @param {Object} api
+         * @param {{colId?: string, includeHeader?: boolean}} [options]
+         * @returns {string}
+         */
+        AgGridHelper.prototype.buildClipboardText = function(api, options) {
+            options = options || {};
+            var self = this;
+            var cols;
+            if (options.colId) {
+                var one = this.getExportColumnById(api, options.colId);
+                cols = one ? [one] : [];
+            } else {
+                cols = this.getVisibleExportColumns(api, {
+                    includeHiddenExportAlways: false,
+                    skipActions: true
+                });
+            }
+            if (!cols.length) {
+                return '';
+            }
+
+            var lines = [];
+            if (options.includeHeader) {
+                lines.push(cols.map(function(col) {
+                    return self.formatClipboardCell(col.headerName || col.field || '');
+                }).join('\t'));
+            }
+            this.forEachExportRow(api, function(node) {
+                lines.push(cols.map(function(col) {
+                    return self.formatClipboardCell(self.getClipboardCellText(col, node));
+                }).join('\t'));
+            });
+            return lines.join('\r\n');
+        };
+
+        /**
+         * Copy the visible table (headers + filtered/sorted rows) to the clipboard.
+         * @param {Object} [api]
+         */
+        AgGridHelper.prototype.copyTableToClipboard = function(api) {
+            api = api || this.gridApi;
+            this.copyTextToClipboard(this.buildClipboardText(api, { includeHeader: true }));
+        };
+
+        /**
+         * Copy every filtered/sorted value in one column to the clipboard.
+         * @param {Object} [api]
+         * @param {string} colId
+         */
+        AgGridHelper.prototype.copyColumnToClipboard = function(api, colId) {
+            api = api || this.gridApi;
+            this.copyTextToClipboard(this.buildClipboardText(api, {
+                colId: colId,
+                includeHeader: false
+            }));
+        };
     
         /**
          * Escape a value for CSV and quote when needed.
@@ -285,21 +624,7 @@
          * @returns {string}
          */
         AgGridHelper.prototype.formatCsvCell = function(value) {
-            if (value === null || value === undefined) {
-                return '';
-            }
-            if (typeof value === 'boolean') {
-                value = value ? 'true' : 'false';
-            } else if (Array.isArray(value)) {
-                value = value.join('; ');
-            } else if (typeof value === 'object') {
-                try {
-                    value = JSON.stringify(value);
-                } catch (e) {
-                    value = String(value);
-                }
-            }
-            var str = String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/"/g, '""');
+            var str = this.stringifyExportValue(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/"/g, '""');
             return str.includes(',') || str.includes('\n') || str.includes('"') ? '"' + str + '"' : str;
         };
     
@@ -357,77 +682,15 @@
             }
     
             var self = this;
-            var visibleCols = [];
-            if (typeof api.getColumns === 'function') {
-                var cols = api.getColumns();
-                if (cols && cols.length) {
-                    visibleCols = cols
-                        .filter(function(col) {
-                            var def = col.getColDef ? col.getColDef() : (col.colDef || {});
-                            var field = def.field || (col.getColId ? col.getColId() : col.colId);
-                            var visible = col.getVisible ? col.getVisible() : (col.visible !== false);
-                            // Skip selection / auto-group utility columns
-                            if (!field || field === 'ag-Grid-SelectionColumn' || field === 'ag-Grid-AutoColumn') {
-                                return false;
-                            }
-                            var exportProps = AgGridHelper.getColDefExportProps(def);
-                            // Include visible columns, plus any marked exportAlways (even if hidden)
-                            return visible || exportProps.exportAlways;
-                        })
-                        .map(function(col) {
-                            var def = col.getColDef ? col.getColDef() : (col.colDef || {});
-                            var exportProps = AgGridHelper.getColDefExportProps(def);
-                            return {
-                                field: def.field || (col.getColId ? col.getColId() : col.colId),
-                                headerName: def.headerName || def.field || (col.getColId ? col.getColId() : col.colId),
-                                valueGetter: def.valueGetter,
-                                exportValueGetter: exportProps.exportValueGetter,
-                                colDef: def,
-                                column: col
-                            };
-                        });
-                }
-            }
-            if (!visibleCols.length) {
-                var columnDefs = this.config.columnDefs || [];
-                visibleCols = columnDefs
-                    .filter(function(col) {
-                        var exportProps = AgGridHelper.getColDefExportProps(col);
-                        return col.field && (col.hide !== true || exportProps.exportAlways);
-                    })
-                    .map(function(col) {
-                        var exportProps = AgGridHelper.getColDefExportProps(col);
-                        return {
-                            field: col.field,
-                            headerName: col.headerName || col.field,
-                            valueGetter: col.valueGetter,
-                            exportValueGetter: exportProps.exportValueGetter,
-                            colDef: col,
-                            column: null
-                        };
-                    });
-            }
+            var visibleCols = this.getVisibleExportColumns(api);
             var headers = visibleCols.map(function(col) { return col.headerName || col.field; });
     
             const rowData = [];
-            function pushExportRow(node) {
-                if (!node || !node.data) {
-                    return;
-                }
+            this.forEachExportRow(api, function(node) {
                 rowData.push(visibleCols.map(function(col) {
                     return self.formatCsvCell(self.getExportCellValue(col, node));
                 }));
-            }
-    
-            if (typeof api.forEachNodeAfterFilterAndSort === 'function') {
-                api.forEachNodeAfterFilterAndSort(pushExportRow);
-            } else if (typeof api.forEachNode === 'function') {
-                api.forEachNode(function(node) {
-                    if (node && (node.displayed === true || node.displayed === undefined)) {
-                        pushExportRow(node);
-                    }
-                });
-            }
+            });
     
             const csv = [headers.join(','), ...rowData.map(function(row) { return row.join(','); })].join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

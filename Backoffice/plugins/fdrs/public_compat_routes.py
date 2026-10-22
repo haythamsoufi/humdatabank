@@ -7,6 +7,9 @@ Design, parameter tables and cutover: ``docs/FDRS-PUBLIC-FRONTEND-ADAPTER.md``.
 
 Auth: an API key holding ``content:read`` with ``allow_query_api_key`` enabled, sent as
 ``?apiKey=`` (also accepted: ``api_key``, ``Authorization: Bearer``, ``X-API-Key``).
+``/csv/export`` and ``/csv/exportns`` are the exception: a browser follows those
+links, so they do not require a key. The Angular client only puts the key on a
+CSV href when its parameter name is ``api_key``; keep the name ``apiKey``.
 Reads the published snapshot only (``plugins/fdrs/services/fdrs_public_adapter.py``).
 
 Content that Backoffice does not store (translations, embeds, offices, the
@@ -197,7 +200,7 @@ API_ENDPOINTS = [
         "methods": ["GET"],
         "auth": "api_key",
         "rate_limited": True,
-        "description": "Volunteer totals per zone S1-S5 plus a world row (empty ZoneCode) for a year.",
+        "description": "Volunteer headline per zone S1-S5 plus a world row (empty ZoneCode): 3-year rolling mean of reported volunteers.",
         "consumers": "data.ifrc.org",
     },
     {
@@ -271,18 +274,18 @@ API_ENDPOINTS = [
         "group": "FDRS public frontend",
         "path": "/csv/export",
         "methods": ["GET"],
-        "auth": "api_key",
+        "auth": "public",
         "rate_limited": True,
-        "description": "Published public FDRS figures as CSV. excel=1 returns the same rows as an .xlsx workbook.",
+        "description": "Published public FDRS figures as CSV. No API key: the link is a browser download. excel=1 returns the same rows as an .xlsx workbook.",
         "consumers": "data.ifrc.org",
     },
     {
         "group": "FDRS public frontend",
         "path": "/csv/exportns",
         "methods": ["GET"],
-        "auth": "api_key",
+        "auth": "public",
         "rate_limited": True,
-        "description": "Published public FDRS figures for one society (doncode). excel=1 returns an .xlsx workbook.",
+        "description": "Published public FDRS figures for one society (doncode). No API key. excel=1 returns an .xlsx workbook.",
         "consumers": "data.ifrc.org",
     },
 ]
@@ -545,7 +548,6 @@ def _export_file(don_code: str | None):
 
 
 @bp.route("/csv/export", methods=["GET"])
-@require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_csv_export():
     try:
         return _export_file(None)
@@ -553,8 +555,10 @@ def fdrs_public_compat_csv_export():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+fdrs_public_compat_csv_export._ep_auth = "public"
+
+
 @bp.route("/csv/exportns", methods=["GET"])
-@require_api_key(capability=CONTENT_READ)
 def fdrs_public_compat_csv_export_ns():
     try:
         don_code = (request.args.get("doncode") or "").strip().upper()
@@ -565,6 +569,10 @@ def fdrs_public_compat_csv_export_ns():
         return _export_file(don_code)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+fdrs_public_compat_csv_export_ns._ep_auth = "public"
+
 # The mailing-list POST carries no cookie and is authenticated by the API key
 # (``require_api_key``), so a CSRF token adds nothing; the browser cannot send one cross-origin.
 _register_passthrough("/api/documentSubscribe", ["POST"], exempt_csrf=True)

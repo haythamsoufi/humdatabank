@@ -42,7 +42,7 @@ The production bundle initialises its FDRS client once:
 fdrsHttpService.initialize("https://data-api.ifrc.org/api/", "<apiKey>")
 ```
 
-Every call is `base + relativePath`, and every call adds `apiKey` as a query parameter. CSV links are absolute on the same host (`/csv/export`, `/csv/export?excel=1`, `/csv/exportns?doncode=`). GO appeals, Mapbox, YouTube, and Tableau stay on their own hosts.
+Every `/api` call is `base + relativePath` and adds `apiKey` as a query parameter. CSV links are absolute on the same host and do **not** include the key: `/csv/export`, `/csv/export?excel=1`, `/csv/exportns?doncode=`. The client's `getCsvExportUrl` appends the key only when the configured parameter name is `api_key`. Keep that name as `apiKey` (Backoffice accepts it). GO appeals, Mapbox, YouTube, and Tableau stay on their own hosts.
 
 ## Recommendation
 
@@ -73,7 +73,7 @@ PostgreSQL   form_data.published_*  +  indicator_bank.fdrs_kpi_code
              + a small FDRS society reference (DON code, zone, coordinates)
 ```
 
-Auth stays the query parameter the client already sends. Backoffice accepts `apiKey`, `apikey` and `api_key` in the query string, plus `Authorization: Bearer` and `X-API-Key` for other callers. The key must hold `content:read`, and the query-string form works only for keys with `allow_query_api_key`. Do not switch this client to `X-API-Key` or `Authorization: Bearer`; that would be a frontend change. A missing or unknown key returns `401`.
+Auth stays the query parameter the client already sends. Backoffice accepts `apiKey`, `apikey` and `api_key` in the query string, plus `Authorization: Bearer` and `X-API-Key` for other callers. The key must hold `content:read`, and the query-string form works only for keys with `allow_query_api_key`. Do not switch this client to `X-API-Key` or `Authorization: Bearer`; that would be a frontend change. A missing or unknown key returns `401`. `/csv/export` and `/csv/exportns` are browser downloads of the same public snapshot and do not require a key. A key on those URLs is ignored.
 
 The adapter reads only the published snapshot (`published_value`, `published_numeric_value`, `published_disagg_data`, `published_source`, `published_at`). A cell that has an unpublished edit still returns the last published figure. `showunpublished=true` is accepted and ignored.
 
@@ -91,7 +91,7 @@ Confirmed against the live bundle and `fdrs_api_endpoints.xlsx`.
 | GET | `/api/data` | KPI series, comparisons, age/sex, leadership, income sources, network support |
 | GET | `/api/dataimputed` | Imputed income/expenditure and people-reached charts |
 | GET | `/api/KpiImputedValue` | Imputed map layer |
-| GET | `/api/globalvalidationdata` | Volunteer total; zone filter is applied in the browser |
+| GET | `/api/globalvalidationdata` | Volunteer headline (3-year rolling mean); zone filter is applied in the browser |
 | GET | `/api/kpivalue` | One KPI per society. The public site no longer calls this for digital maturity |
 | GET | `/api/documents` | Everyone Counts, analysis, videos, society documents |
 | GET | `/api/embeddedcontent` | Dashboard embeds |
@@ -116,7 +116,7 @@ These stay outside the adapter:
 
 | Parameter | Values the client sends |
 |---|---|
-| `apiKey` | On every FDRS call |
+| `apiKey` | On every `/api` call. Not on `/csv/export` or `/csv/exportns` |
 | `indicator` | Comma-separated KPI codes (see below) |
 | `year` | Calendar year |
 | `KPI_Don_Code` | One DON code, or several comma-separated |
@@ -218,7 +218,7 @@ The age/sex mapper does `response.data.filter(series => expectedIds.includes(ser
 
 `GET /api/kpivalue` rows are filtered in the browser with `row.doncode`. Include `doncode` and `value`.
 
-`GET /api/documents` is read as `response[0].documents`.
+`GET /api/documents` is read as `response[0].documents`. The Everyone Counts page builds its year dropdown from `year` (`year.toString()`, so a null year leaves the list empty) and its language dropdown from `language` (the name, such as `English`) plus `LangCode`. `Description` is the card text. When a publication has no date, `year` is taken from the file name or title.
 
 `GET /api/embeddedcontent` rows include `Id`, `TitleEn` / `TitleEs` / `TitleFr` / `TitleAr`, the matching `Text*` fields, and `EmbedCode`.
 
@@ -257,7 +257,7 @@ When a code is unknown, private, or has no published value for the filters, its 
 
 `/api/lastpublishedyear` is the greatest year that has any published public FDRS value.
 
-`/api/globalvalidationdata` sums published `KPI_PeopleVol` for that year, reported and imputed: one row per `S1`–`S5` (0 when a zone has no data), plus a world row with an empty `ZoneCode`. Whether the legacy figure includes imputed volunteers is an assumption; compare one year against the live API before cutover.
+`/api/globalvalidationdata` is the number the site shows when the selected indicator is `KPI_PeopleVol_Tot`. Other indicators sum `/api/data` in the browser; volunteers do not. The figure is a three-year rolling mean of **reported** `KPI_PeopleVol`, not that year's total and not the imputed value. For year Y, each society contributes the mean of Y−2, Y−1 and Y. A missing year uses the latest earlier reported value above zero. A society with nothing to carry into Y−2 is left out. Those means are summed into one row per `S1`–`S5` (0 when a zone has no data) plus a world row with an empty `ZoneCode`.
 
 ## Society reference the adapter needs
 

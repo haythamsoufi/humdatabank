@@ -13,6 +13,8 @@ Legacy semantics this module reproduces:
 - ``X_IP`` is reported **plus** imputed values; plain ``X`` is reported only.
 - ``KpiImputedValue`` returns every society with a value and flags imputed rows
   with ``source = "I"``.
+- ``globalvalidationdata`` is the volunteer headline: a 3-year rolling mean of
+  reported values, not the single-year total.
 - Sex and age series (``X_M``, ``X_F``, ``X_M_age_6_12`` ...) come from the
   disaggregation of the base indicator.
 """
@@ -664,10 +666,31 @@ def build_kpi_values(kpi_codes: list[str], *, year: int) -> list[dict[str, Any]]
     return [out[key] for key in sorted(out)]
 
 
+def three_year_rolling_mean(values_by_year: Mapping[int, float], end_year: int) -> Optional[float]:
+    """Mean of ``end_year-2`` .. ``end_year``.
+
+    A missing year uses the latest earlier value above zero. The society is left
+    out when nothing positive was reported at or before the first year of the
+    window. This is the figure the public site shows for volunteers.
+    """
+    filled: list[float] = []
+    for year in (end_year - 2, end_year - 1, end_year):
+        candidates = [reported_year for reported_year, value in values_by_year.items() if reported_year <= year and value > 0]
+        if not candidates:
+            return None
+        filled.append(float(values_by_year[max(candidates)]))
+    return sum(filled) / 3.0
+
+
 def build_global_validation(year: int) -> list[dict[str, Any]]:
-    """The ``/api/globalvalidationdata`` list: volunteers per zone plus a world row."""
-    spec = SeriesSpec(VOLUNTEER_BANK_CODE, KIND_TOTAL, candidates=(VOLUNTEER_BANK_CODE,), reported_only=False)
-    by_don = compute_series([spec], year=year).get(spec.code, {})
+    """Volunteer headline per zone, plus a world row with an empty ``ZoneCode``.
+
+    Each society contributes :func:`three_year_rolling_mean` of reported
+    ``KPI_PeopleVol``. Imputed cells are not included. The single-year total
+    stays on ``/api/data``.
+    """
+    spec = SeriesSpec(VOLUNTEER_BANK_CODE, KIND_TOTAL, candidates=(VOLUNTEER_BANK_CODE,), reported_only=True)
+    by_don = compute_series([spec], year=None).get(spec.code, {})
     zone_by_don = {
         don: zone
         for don, zone in db.session.query(NationalSociety.fdrs_don_code, NationalSociety.fdrs_zone_code)
@@ -677,14 +700,21 @@ def build_global_validation(year: int) -> list[dict[str, Any]]:
     totals = {zone: 0.0 for zone in FDRS_ZONES}
     world = 0.0
     for don, years in by_don.items():
-        observation = years.get(year)
-        if observation is None:
+        numeric: dict[int, float] = {}
+        for reported_year, observation in years.items():
+            try:
+                value = float(observation.value)
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                numeric[reported_year] = value
+        mean = three_year_rolling_mean(numeric, year)
+        if mean is None:
             continue
-        value = float(observation.value)
-        world += value
+        world += mean
         zone = zone_by_don.get(don)
         if zone in totals:
-            totals[zone] += value
+            totals[zone] += mean
     rows = [{"ZoneCode": zone, "IntValue": int(round(total))} for zone, total in totals.items()]
     rows.append({"ZoneCode": "", "IntValue": int(round(world))})
     return rows

@@ -324,11 +324,12 @@ class TestBuildImportPlan:
         assert item["status"] == "blocked"
         assert any(i["code"] == "no_matching_entities" for i in item["issues"])
 
-    def test_existing_progress_warns_about_overwrite(self):
-        form = _af(1, 24, "2026", iso3s={"JOR", "SYR"}, counts={"pending": 0, "submitted": 2})
+    def test_existing_progress_is_noted_without_a_warning(self):
+        form = _af(1, 24, "2026", iso3s={"JOR", "SYR"}, counts={"pending": 0, "approved": 2})
         item = _item(self._plan(af_index=[form]), "24:P26")
-        assert item["status"] == "warning"
+        assert item["status"] == "ok"
         issue = next(i for i in item["issues"] if i["code"] == "existing_progress")
+        assert issue["level"] == "info"
         assert "will replace those saved values" in issue["message"]
 
     def test_round_without_workbook_rows_is_empty_not_selectable(self):

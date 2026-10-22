@@ -559,10 +559,12 @@ def _short_ea_title(label: str) -> str:
 
 
 def _warning_section(key: str, label: str) -> str:
-    if key.startswith("ea_matched|"):
-        return "matched"
+    if key.startswith(("ea_matched|", "ea_code_not_found|", "reach_ea_fallback|")):
+        return "emergency_appeals"
+    lowered = label.lower()
+    if lowered.startswith("emergency appeal") or lowered.startswith("emergency code"):
+        return "emergency_appeals"
     review_prefixes = (
-        "ea_code_not_found|",
         "missing_reporting_item|",
         "unknown_sp_breakdown|",
         "missing_indicator_bank|",
@@ -571,7 +573,6 @@ def _warning_section(key: str, label: str) -> str:
     )
     if key.startswith(review_prefixes) or key in {"no_host_ns", "no_country_id", "funding_missing_year"}:
         return "review"
-    lowered = label.lower()
     if "not found" in lowered or "please review" in lowered or "outside the valid" in lowered:
         return "review"
     return "other"
@@ -681,18 +682,22 @@ def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
             group.details.add(parts.detail)
 
     summarized: List[str] = []
-    section_items: Dict[str, List[Dict[str, Any]]] = {"review": [], "matched": [], "other": []}
+    section_items: Dict[str, List[Dict[str, Any]]] = {
+        "review": [],
+        "emergency_appeals": [],
+        "other": [],
+    }
     for key in order:
         rendered = _compose_warning_group(key, groups[key])
         summarized.append(rendered["log"])
         section_items[rendered["section"]].append(rendered["item"])
     warning_groups = []
-    for section in ("review", "matched", "other"):
+    for section in ("review", "emergency_appeals", "other"):
         items = section_items[section]
         if not items:
             continue
         group: Dict[str, Any] = {"id": section, "items": items}
-        if section == "review" and any(
+        if section == "emergency_appeals" and any(
             "not listed in GO" in item["text"] or "not found in GO" in item["text"] for item in items
         ):
             group["note"] = "unlisted_imported"

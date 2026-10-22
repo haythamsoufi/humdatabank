@@ -210,9 +210,9 @@ class TestSummarizeWarnings:
         assert "Croatia (HRV)" in line
         assert "Possible GO matches: MDRRU028, MDRRU027" in line
         assert "for this country" not in line
-        review = result["warning_groups"][0]
-        assert review["id"] == "review"
-        assert review["items"][0]["lines"][0].startswith("Bulgaria (BGR)")
+        appeals = result["warning_groups"][0]
+        assert appeals["id"] == "emergency_appeals"
+        assert appeals["items"][0]["lines"][0].startswith("Bulgaria (BGR)")
 
     def test_keeps_one_unlisted_assignment_in_full(self):
         place = "Chad (TCD) — Reporting - Country 2025 (assignment 42)"
@@ -244,19 +244,36 @@ class TestSummarizeWarnings:
         assert "Moldova, Republic of (MDA) → MDRMD007 Ukraine Crisis - Moldova ×2" in grouped
         assert "Poland (POL) → MDRPL002 Ukraine Crisis - Poland" in grouped
         assert "(part of MGR65002)" not in grouped
-        assert result["warning_groups"][0]["id"] == "matched"
+        assert result["warning_groups"][0]["id"] == "emergency_appeals"
         same_group = result["warnings"][1]
         assert "MDR66001" in same_group
         assert "Romania (ROU)" in same_group
         assert "MDRRO005 Ukraine Crisis - Romania" in same_group
         assert "assignment 3496" not in same_group
 
+    def test_unlisted_and_matched_appeals_share_one_category(self):
+        result = summarize_warnings([
+            "Emergency appeal MGR60001 for Angola (AGO) — Reporting - Country 2024 (assignment 1) was matched to MDRAO007 Angola - Hunger Crisis (part of MGR60001) (the country appeal under that group).",
+            {
+                "message": (
+                    "Emergency appeal MDRTD999 is not listed for this country in GO. "
+                    "The Excel name and code were imported — please review it on the form."
+                ),
+                "code": "MDRTD999",
+                "iso3": "TCD",
+            },
+        ])
+        assert [group["id"] for group in result["warning_groups"]] == ["emergency_appeals"]
+        group = result["warning_groups"][0]
+        assert len(group["items"]) == 2
+        assert group["note"] == "unlisted_imported"
+
     def test_review_warnings_are_listed_before_matches(self):
         result = summarize_warnings([
             "Emergency appeal MGR60001 for Angola (AGO) — Reporting - Country 2024 (assignment 1) was matched to MDRAO007 Angola - Hunger Crisis (part of MGR60001) (the country appeal under that group).",
             "National Society not found: 'Hong Kong Red Cross'",
         ])
-        assert [group["id"] for group in result["warning_groups"]] == ["review", "matched"]
+        assert [group["id"] for group in result["warning_groups"]] == ["review", "emergency_appeals"]
 
     def test_keeps_distinct_percentage_indicators_separate(self):
         warnings = [

@@ -26,6 +26,7 @@ from import_upr_excel_data import (  # noqa: E402
     is_planning_funding_requirement_row,
     is_pns_data_source,
     parse_pns_reported_yes,
+    pns_aes_with_pns_data,
     plan_non_reported_pns_aes_by_template,
     pns_clear_periods_for_template,
     plan_pns_assignment_status_updates,
@@ -86,6 +87,69 @@ class TestBuildPnsReportedYesSets:
         rows = [_funding_row(**{"PNS reported": "No"})]
         t22_yes, _ = _build_pns_reported_yes_sets(rows, ctx, [22])
         assert t22_yes == set()
+
+
+class TestPnsAssignmentApprovalUsesPnsData:
+    def _ctx(self):
+        ctx = UprImportContext(template_ids=[22, 23])
+        ctx.ns_home_country_iso3 = {"british red cross": "GBR"}
+        ctx.assignment_by_template = {
+            22: {("2026", "GBR"): 3221},
+            23: {("2025", "GBR"): 4001},
+        }
+        return ctx
+
+    def test_approves_when_pns_data_has_a_value_even_if_pns_reported_is_no(self):
+        ctx = self._ctx()
+        found = pns_aes_with_pns_data(
+            [_funding_row(Source="PNS Data", **{"PNS reported": "No"})],
+            ctx,
+            [22],
+            rounds={"P26"},
+        )
+        assert found[22] == {3221}
+
+    def test_does_not_approve_country_data_even_when_pns_reported_is_yes(self):
+        ctx = self._ctx()
+        found = pns_aes_with_pns_data(
+            [_funding_row(Source="Country Data", **{"PNS reported": "Yes"})],
+            ctx,
+            [22],
+            rounds={"P26"},
+        )
+        assert found[22] == set()
+
+    def test_blank_pns_data_row_does_not_approve(self):
+        ctx = self._ctx()
+        found = pns_aes_with_pns_data(
+            [_funding_row(Source="PNS Data", **{"PNS Value": None, "ValueNum": None})],
+            ctx,
+            [22],
+            rounds={"P26"},
+        )
+        assert found[22] == set()
+
+    def test_transform_marks_pns_data_for_approval_without_writing_unreported_cells(self):
+        ctx = self._ctx()
+        ctx.country_id_by_iso3 = {"BFA": 34}
+        ctx.template_ids = [22]
+        rows = [_funding_row(Source="PNS Data", **{"PNS reported": "No"})]
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[22], rounds={"P26"})
+        assert ctx.pns_t22_reported_aes == {3221}
+        assert not any(r.get("item_id") == str(ITEM_FUNDING_REQUIREMENTS_T22) for r in import_rows)
+        assert reported_pns_aes_in_scope(ctx, [22], rounds={"P26"}) == {3221}
+        plan = plan_pns_assignment_status_updates(ctx, [22], rounds={"P26"})
+        assert plan == []
+
+    def test_reporting_uses_pns_data_source(self):
+        ctx = self._ctx()
+        found = pns_aes_with_pns_data(
+            [_ar25_pns_funding_row(**{"PNS reported": "No"})],
+            ctx,
+            [23],
+            rounds={"AR25"},
+        )
+        assert found[23] == {4001}
 
 
 class TestTransformT22PnsReportedGate:

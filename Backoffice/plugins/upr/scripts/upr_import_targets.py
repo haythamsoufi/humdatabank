@@ -618,7 +618,7 @@ def build_import_plan(
                     parts = ", ".join(f"{n} {st}" for st, n in sorted(counts.items()) if st != "pending")
                     issues.append(
                         _issue(
-                            ISSUE_WARNING,
+                            ISSUE_INFO,
                             "existing_progress",
                             f"{touched} of {af['aes_total']} assignments already have "
                             f"saved data ({parts}). The import will replace those saved values "
@@ -634,7 +634,7 @@ def build_import_plan(
                             level,
                             "pns_clear",
                             f"{clear['aes_to_clear']} PNS assignments have no "
-                            "PNS-reported rows in the workbook; their imported funding/staff data is "
+                            "PNS Data values in the workbook; their imported funding/staff data is "
                             f"cleared and status reset to pending ({clear.get('aes_with_data', 0)} currently hold data).",
                         )
                     )
@@ -700,8 +700,7 @@ def _compute_pns_clear(
         if tid not in (22, 23) or not item.get("assigned_form_id") or not item["workbook_rows"]:
             continue
         rnd = item["round"]
-        t22_yes, t23_yes = imp._build_pns_reported_yes_sets(rows, ctx, [tid], rounds={rnd})
-        reported_aes = {int(a) for a, _ in (t22_yes if tid == 22 else t23_yes)}
+        reported_aes = imp.pns_aes_with_pns_data(rows, ctx, [tid], rounds={rnd}).get(tid, set())
         aes_ids = imp.target_aes_ids(ctx, [tid], {rnd})
         to_clear = aes_ids - reported_aes
         item_ids = imp.upr_pns_import_item_ids(ctx, tid)

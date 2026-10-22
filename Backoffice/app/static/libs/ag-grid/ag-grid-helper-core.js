@@ -751,7 +751,7 @@
                 // Emit selection-changed events so templates can show bulk-action UI
                 this.setupSelectionChangedDispatcher();
     
-                // Custom right-click context menu (Copy cell, Export table to Excel) – works in Community edition
+                // Custom right-click context menu (Copy cell, Copy column, Copy table, Export table to Excel) – works in Community edition
                 this.setupContextMenuFallback();
     
                 // Mobile: unpin columns so wide cells are not trapped in narrow pinned panes.

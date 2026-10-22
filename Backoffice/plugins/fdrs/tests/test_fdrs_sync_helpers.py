@@ -21,6 +21,7 @@ from fdrs_assignment_status_sync import (  # noqa: E402
 from fdrs_documents_sync import (  # noqa: E402
     build_document_import_plan,
     choose_fdrs_slot_document,
+    clean_fdrs_document_period,
     encode_fdrs_document_url,
     fetch_fdrs_document_bytes,
     fdrs_pending_slot_siblings,
@@ -449,6 +450,40 @@ def test_build_document_import_plan_maps_multi_year_annual_report_to_end_year():
     assert summary["planned"] == 1
     assert plan[0]["form_item_id"] == 923
     assert plan[0]["assignment_entity_status_id"] == 386
+    assert plan[0]["year"] == "2024"
+    assert plan[0]["period"] == "2021-2024"
+
+
+def test_same_year_period_range_is_stored_as_the_year():
+    assert clean_fdrs_document_period("2024-2024") == "2024"
+    assert clean_fdrs_document_period(" 2024 - 2024 ") == "2024"
+    assert clean_fdrs_document_period("2024–2024") == "2024"
+    assert clean_fdrs_document_period("2024") == "2024"
+    assert clean_fdrs_document_period("2021-2024") == "2021-2024"
+    assert clean_fdrs_document_period("2024-2025") == "2024-2025"
+
+    documents = [
+        {
+            "don_code": "DAF001",
+            "iso3": "AFG",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024-2024",
+            "name": "Annual Report_Afghanistan_2024-2024_en.pdf",
+            "url": "https://data-api.ifrc.org/documents/AF/report.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        }
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "AFG", "assignment_entity_status_id": 88},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 1
+    assert plan[0]["period"] == "2024"
     assert plan[0]["year"] == "2024"
 
 

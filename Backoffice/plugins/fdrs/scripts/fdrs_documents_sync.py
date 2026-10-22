@@ -73,6 +73,8 @@ _FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
 _DEFAULT_DOWNLOAD_TIMEOUT = 120
 _PROGRESS_REPORT_EVERY = 10
 _YEAR_IN_TEXT_RE = re.compile(r"\b(20\d{2})\b")
+# FDRS writes the chosen start and end years into YearText. ``2024-2024`` is one year.
+_SAME_YEAR_PERIOD_RE = re.compile(r"^(20\d{2})\s*[-–—]\s*(20\d{2})$")
 # IFRC duplicate-filename suffix immediately before the extension (_1.pdf, _12.docx).
 # Does not match year (_2016) or placeholder (_0).
 _DUP_FILENAME_SUFFIX_RE = re.compile(r"_([1-9]\d?)(\.[A-Za-z0-9]+)$")
@@ -285,6 +287,20 @@ def resolve_fdrs_source_url_http_status(
     return None
 
 
+def clean_fdrs_document_period(raw: Any) -> str:
+    """Collapse a same-year FDRS range to that year.
+
+    A document period selected with the same start and end year arrives as
+    ``2024-2024``. That is the reporting year 2024. A real span such as
+    ``2021-2024`` is kept.
+    """
+    text = " ".join(str(raw or "").split())
+    match = _SAME_YEAR_PERIOD_RE.match(text)
+    if match and match.group(1) == match.group(2):
+        return match.group(1)
+    return text
+
+
 def _parse_year_text_bounds(year_text: Any) -> Tuple[Optional[int], Optional[int]]:
     """Return inclusive (start, end) calendar years parsed from FDRS YearText."""
     if year_text is None:
@@ -478,7 +494,7 @@ def build_document_import_plan(
         seen_keys.add(import_key)
         aes_id = assignment_by_key[(year_str, iso3)]
         form_item_id = FDRS_DOCUMENT_TYPE_TO_ITEM[doc_type]
-        period = (doc.get("YearText") or year_str).strip()
+        period = clean_fdrs_document_period(doc.get("YearText") or year_str)
         lang = (doc.get("LangCode") or "en").strip().lower() or "en"
         approval_raw = _doc_approval_raw(doc)
         public_raw = _doc_public_raw(doc)

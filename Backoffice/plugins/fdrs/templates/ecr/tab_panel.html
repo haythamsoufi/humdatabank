@@ -152,8 +152,12 @@
             <div class="max-w-4xl">
                 <h3 class="text-lg font-semibold text-gray-900">{{ _('Everyone Counts') }}</h3>
                 <p class="text-sm text-gray-600 mt-1">
-                    {{ _('Every figure and table from Everyone Counts 2026, calculated from current FDRS assignments. Closed years use the published value. A figure that needs a source outside the databank is still listed, with that source named.') }}
+                    {{ _('Every figure and table from Everyone Counts 2026, read from a saved calculation. Closed years use the published value. A figure that needs a source outside the databank is still listed, with that source named.') }}
                 </p>
+                <div class="flex flex-wrap items-start gap-3 mt-3">
+                    <p id="ecr-saved" class="text-xs text-gray-500"></p>
+                    <button type="button" id="ecr-refresh-analysis" class="ecr-refresh">{{ _('Calculate figures') }}</button>
+                </div>
             </div>
         </div>
     </div>
@@ -162,7 +166,12 @@
         <div class="text-center py-12">
             <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
             <p class="text-lg text-gray-600">{{ _('Calculating Everyone Counts indicators...') }}</p>
+            <p class="text-sm text-gray-500 mt-1">{{ _('This can take a few minutes. The page updates when the calculation is saved.') }}</p>
         </div>
+    </div>
+
+    <div id="ecr-empty" class="bg-white p-6 shadow-md border border-gray-200 mb-6 hidden">
+        <p class="text-sm text-gray-600">{{ _('Everyone Counts has not been calculated yet. Calculate figures to build a saved copy from current FDRS assignments. Opening this tab reads that copy.') }}</p>
     </div>
 
     <div id="ecr-error" class="bg-white p-6 shadow-md border border-red-200 mb-6 hidden">
@@ -195,6 +204,8 @@
 (function () {
     var loaded = false;
     var loading = false;
+    var pollTimer = null;
+    var shownBuiltAt = null;
     var chapterId = null;
     var currentOutputId = null;
     var latestData = null;
@@ -223,7 +234,14 @@
         notSaved: {{ _('Not saved')|tojson }},
         refresh: {{ _('Refresh')|tojson }},
         refreshing: {{ _('Refreshing…')|tojson }},
-        refreshFailed: {{ _('The snapshot could not be refreshed. The saved file is unchanged.')|tojson }}
+        refreshFailed: {{ _('The snapshot could not be refreshed. The saved file is unchanged.')|tojson }},
+        calculateFigures: {{ _('Calculate figures')|tojson }},
+        refreshFigures: {{ _('Refresh figures')|tojson }},
+        calculating: {{ _('Calculating…')|tojson }},
+        savedLead: {{ _('Opening this tab reads the saved calculation. Refresh figures to rebuild it from current assignments and the saved external files.')|tojson }},
+        notCalculated: {{ _('Not calculated yet.')|tojson }},
+        recalculating: {{ _('Calculating a new copy.')|tojson }},
+        sourceSaved: {{ _('File saved. Refresh figures to include it in the charts.')|tojson }}
     };
 
     function byId(id) { return document.getElementById(id); }
@@ -275,9 +293,47 @@
 
     function showError(message) {
         byId('ecr-loading').classList.add('hidden');
+        byId('ecr-empty').classList.add('hidden');
         byId('ecr-content').classList.add('hidden');
         byId('ecr-error').classList.remove('hidden');
         byId('ecr-error-text').textContent = message || labels.loadFailed;
+    }
+
+    function formatWhen(iso) {
+        if (!iso) return '';
+        var date = new Date(iso);
+        if (isNaN(date.getTime())) return String(iso);
+        try {
+            return date.toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC';
+        } catch (err) {
+            return date.toISOString();
+        }
+    }
+
+    function renderSaved(saved) {
+        var line = byId('ecr-saved');
+        var button = byId('ecr-refresh-analysis');
+        if (!line || !button) return;
+        saved = saved || {};
+        if (saved.busy) {
+            line.textContent = saved.built_at
+                ? labels.recalculating + ' ' + labels.savedOn + ' ' + formatWhen(saved.built_at) + '.'
+                : labels.calculating;
+            button.disabled = true;
+            button.textContent = labels.calculating;
+            return;
+        }
+        button.disabled = false;
+        if (saved.built_at) {
+            line.textContent = labels.savedOn + ' ' + formatWhen(saved.built_at) + '. ' + labels.savedLead;
+            button.textContent = labels.refreshFigures;
+        } else {
+            line.textContent = labels.notCalculated;
+            button.textContent = labels.calculateFigures;
+        }
+        if (saved.error) {
+            line.textContent = saved.error + ' ' + line.textContent;
+        }
     }
 
     function card(label, value, detail, provisional) {
@@ -385,8 +441,12 @@
                 });
                 return;
             }
-            loaded = false;
-            loadAnalysis(false, true);
+            applySourceStatus(sourceId, source);
+            sourceRowNote(sourceId, labels.sourceSaved);
+            buttons.forEach(function (item) {
+                item.disabled = false;
+                item.textContent = labels.refresh;
+            });
         }).catch(function () {
             sourceRowError(sourceId, labels.refreshFailed);
             buttons.forEach(function (item) {
@@ -406,6 +466,34 @@
         }
         var copy = row.firstChild;
         if (copy) copy.appendChild(el('p', 'text-xs ecr-warning mt-1', message));
+    }
+
+    function sourceRowNote(sourceId, message) {
+        var row = byId('ecr-sources') && byId('ecr-sources').querySelector('[data-source-id="' + sourceId + '"]');
+        if (!row || !row.firstChild) return;
+        var note = row.querySelector('[data-source-note]');
+        if (!note) {
+            note = el('p', 'text-xs text-gray-500 mt-1', message);
+            note.setAttribute('data-source-note', '1');
+            row.firstChild.appendChild(note);
+            return;
+        }
+        note.textContent = message;
+    }
+
+    function applySourceStatus(sourceId, source) {
+        var row = byId('ecr-sources') && byId('ecr-sources').querySelector('[data-source-id="' + sourceId + '"]');
+        if (!row || !source) return;
+        var status = row.querySelector('.ecr-source-status');
+        if (!status) return;
+        status.classList.toggle('ecr-source-missing', !source.available);
+        if (source.available) {
+            var when = source.fetched_at ? labels.savedOn + ' ' + source.fetched_at : labels.savedOn;
+            var count = source.count != null ? Number(source.count).toLocaleString('en-GB') : '';
+            status.textContent = when + (count ? ' · ' + count + ' ' + (source.count_label || '') : '');
+        } else {
+            status.textContent = labels.notSaved;
+        }
     }
 
     function renderSubtabs(chapters) {
@@ -1006,6 +1094,8 @@
             return;
         }
         byId('ecr-error').classList.add('hidden');
+        byId('ecr-empty').classList.add('hidden');
+        byId('ecr-loading').classList.add('hidden');
         byId('ecr-content').classList.remove('hidden');
         var warning = byId('ecr-warning');
         if (data.warning) {
@@ -1023,14 +1113,39 @@
         renderNotes(data.notes);
     }
 
-    function loadAnalysis(refresh, quiet) {
-        if (loading) return;
-        if (loaded && !refresh) return;
+    function stopPoll() {
+        if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function schedulePoll() {
+        stopPoll();
+        pollTimer = setTimeout(function () { loadAnalysis(true); }, 4000);
+    }
+
+    function showEmpty() {
+        byId('ecr-loading').classList.add('hidden');
+        byId('ecr-error').classList.add('hidden');
+        if (!loaded) byId('ecr-empty').classList.remove('hidden');
+    }
+
+    function analysisFrom(payload) {
+        if (payload && payload.chapters) return payload;
+        if (payload && payload.data && payload.data.chapters) return payload.data;
+        return null;
+    }
+
+    function loadAnalysis(force) {
+        if (loading) {
+            if (force) schedulePoll();
+            return;
+        }
+        if (loaded && !force) return;
         loading = true;
         byId('ecr-error').classList.add('hidden');
-        if (!loaded && !quiet) byId('ecr-loading').classList.remove('hidden');
-        var url = '/admin/data-exploration/everyone-counts' + (refresh ? '?refresh=1' : '');
-        fetch(url, {
+        fetch('/admin/data-exploration/everyone-counts', {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json' }
         }).then(function (response) {
@@ -1038,11 +1153,29 @@
             return response.json();
         }).then(function (payload) {
             loading = false;
-            loaded = true;
-            byId('ecr-loading').classList.add('hidden');
-            applyPayload(payload.data || payload);
+            var saved = payload.saved || {};
+            renderSaved(saved);
+            var data = analysisFrom(payload);
+            if (data) {
+                var stamp = saved.built_at || '';
+                if (!loaded || stamp !== shownBuiltAt) {
+                    shownBuiltAt = stamp;
+                    loaded = true;
+                    applyPayload(data);
+                }
+            } else if (saved.busy && !loaded) {
+                byId('ecr-empty').classList.add('hidden');
+                byId('ecr-loading').classList.remove('hidden');
+            } else if (!loaded && saved.status === 'failed') {
+                showError(saved.error || labels.loadFailed);
+            } else if (!loaded) {
+                showEmpty();
+            }
+            if (saved.busy) schedulePoll();
+            else stopPoll();
         }).catch(function () {
             loading = false;
+            stopPoll();
             byId('ecr-loading').classList.add('hidden');
             var sourceButtons = byId('ecr-sources') && byId('ecr-sources').querySelectorAll('button');
             if (sourceButtons) {
@@ -1055,8 +1188,40 @@
         });
     }
 
+    function refreshAnalysis() {
+        var button = byId('ecr-refresh-analysis');
+        if (!button || button.disabled) return;
+        button.disabled = true;
+        button.textContent = labels.calculating;
+        fetch('/admin/data-exploration/everyone-counts/refresh', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (response) {
+            return response.json().then(function (payload) {
+                if (!response.ok) throw new Error(labels.refreshFailed);
+                return payload;
+            });
+        }).then(function (payload) {
+            var saved = payload.saved || { busy: true, status: 'building' };
+            renderSaved(saved);
+            if (!loaded) {
+                byId('ecr-error').classList.add('hidden');
+                byId('ecr-empty').classList.add('hidden');
+                byId('ecr-loading').classList.remove('hidden');
+            }
+            if (saved.busy !== false) schedulePoll();
+        }).catch(function () {
+            button.disabled = false;
+            button.textContent = loaded ? labels.refreshFigures : labels.calculateFigures;
+            if (!loaded) showError(labels.refreshFailed);
+        });
+    }
+
     function boot() {
         if (!byId('panel-everyone-counts')) return;
+        var refreshButton = byId('ecr-refresh-analysis');
+        if (refreshButton) refreshButton.addEventListener('click', refreshAnalysis);
         var tab = byId('tab-everyone-counts');
         if (tab) {
             tab.addEventListener('click', function () {

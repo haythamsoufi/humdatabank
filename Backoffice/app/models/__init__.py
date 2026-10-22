@@ -129,6 +129,8 @@ from .plugin_data import (
     PluginData,
 )
 
+from plugins.fdrs.models import EveryoneCountsSnapshot
+
 from .translation_quality import (
     TranslationString,
     TranslationEntityProvenance,
@@ -331,6 +333,7 @@ __all__ = [
 
     # Plugin data
     'PluginData',
+    'EveryoneCountsSnapshot',
 
     # Translation quality
     'TranslationString',

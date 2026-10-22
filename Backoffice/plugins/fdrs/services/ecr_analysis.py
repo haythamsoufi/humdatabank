@@ -4,7 +4,9 @@ The figures in Everyone Counts 2026 are drawn from a National Society–year
 panel of FDRS indicators (see the private analysis repository
 ``stevepowell99/ECR2026-data-and-code``, ``scripts/02_ns_year_panel.R`` and
 ``chapters/annex a methodology/fdrs-methods.md``). This module builds that
-panel from template 21 assignments instead of a frozen extract.
+panel from template 21 assignments instead of a frozen extract. The explorer
+tab does not call it on each open: it reads the saved calculation in
+``ecr_snapshot`` and runs this module only when someone refreshes.
 
 Closed years use the published snapshot. A late submission — a reported value
 that differs from a snapshot still marked imputed — replaces that placeholder.
@@ -124,6 +126,7 @@ NOTES = (
     "World Giving Index, IFRC GO, OCAC, ILO wages, World Bank median age, the Aid Worker Security Database, and the security-unit death counts are read from saved snapshots. Each chart states the snapshot date. Refresh a file from External sources on this page; until then the page keeps the saved copy.",
     "The printed reach models (Figures 3.8 to 3.10 and Table A.1) are multilevel models. This view shows the unadjusted comparison for Figures 3.8 and 3.9 and does not re-estimate the model.",
     "President and Secretary General sex come from the FDRS questions, not from the indicator bank. Motiro survey rows and the named deaths register are not imported.",
+    "This page shows a saved calculation. Refresh figures to rebuild it from current FDRS assignments and the saved external files. Opening the tab does not recalculate.",
 )
 
 
@@ -872,7 +875,11 @@ def load_everyone_counts(
     *,
     refresh_external: bool = False,
 ) -> dict[str, Any]:
-    """Read FDRS assignment cells and return the Everyone Counts summary."""
+    """Read FDRS assignment cells and return the Everyone Counts summary.
+
+    The data-explorer page stores the result and serves that copy. Call this
+    from the snapshot rebuild, not from the request that paints the tab.
+    """
     from app.models import AssignedForm, AssignmentEntityStatus, Country, FormData, FormItem, IndicatorBank
     from app.services.data_quality.helpers import parse_period_year
     from app.utils.country_utils import exclude_sandbox_countries

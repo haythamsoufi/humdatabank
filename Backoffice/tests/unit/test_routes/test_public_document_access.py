@@ -302,6 +302,68 @@ class TestPublicImageResponseHeaders:
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["Content-Security-Policy"] == "default-src 'none'; sandbox"
 
+    def test_public_pdf_is_served_inline(self, client, db_session, upload_root):
+        doc = _make_document(
+            db_session,
+            filename="annual-report.pdf",
+            storage_path="public/annual-report.pdf",
+            public_submission=False,
+        )
+        _write_upload(upload_root, "public/annual-report.pdf", PDF_BYTES)
+        resp = client.get(f"/documents/display/{doc.public_id}")
+        assert resp.status_code == 200
+        assert resp.data == PDF_BYTES
+        assert resp.headers["Content-Type"].startswith("application/pdf")
+        assert resp.headers["Content-Disposition"].startswith("inline")
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+
+    def test_private_pdf_display_is_404(self, client, db_session, upload_root):
+        doc = _make_document(
+            db_session,
+            filename="secret.pdf",
+            storage_path="public/secret.pdf",
+            public_submission=False,
+            is_public=False,
+        )
+        _write_upload(upload_root, "public/secret.pdf", PDF_BYTES)
+        assert client.get(f"/documents/display/{doc.public_id}").status_code == 404
+
+    def test_missing_fdrs_file_is_fetched_for_display(self, client, db_session, upload_root, monkeypatch):
+        doc = _make_document(
+            db_session,
+            filename="annual-report.pdf",
+            storage_path="public/pending.pdf",
+            public_submission=False,
+            file_pending=True,
+            source_url="https://data-api.ifrc.org/documents/AF/report.pdf",
+            fdrs_import_key="abc",
+        )
+
+        def _fetch(document):
+            _write_upload(upload_root, "public/pending.pdf", PDF_BYTES)
+            document.file_pending = False
+            return True, None
+
+        import plugins.fdrs.services.fdrs_document_fetch_service as fetch
+
+        monkeypatch.setattr(fetch, "try_materialize_public_fdrs_document", _fetch)
+        resp = client.get(f"/documents/display/{doc.public_id}")
+        assert resp.status_code == 200
+        assert resp.data == PDF_BYTES
+
+    def test_html_display_is_downloaded_not_rendered(self, client, db_session, upload_root):
+        doc = _make_document(
+            db_session,
+            filename="page.html",
+            storage_path="public/page.html",
+            public_submission=False,
+        )
+        _write_upload(upload_root, "public/page.html", b"<script>alert(1)</script>")
+        resp = client.get(f"/documents/display/{doc.public_id}")
+        assert resp.status_code == 200
+        assert resp.headers["Content-Disposition"].startswith("attachment")
+        assert resp.headers["Content-Security-Policy"] == "default-src 'none'; sandbox"
+
 
 def _template_with_image(db_session, *, storage_path="1/v1/items/1/en/a.png"):
     from tests.factories import create_test_item, create_test_section, create_test_template
@@ -458,7 +520,9 @@ class TestStorageStreamResponse:
             resp = storage.stream_response(storage.RESOURCES, "doc.pdf", filename="doc.pdf", as_attachment=False)
         assert resp.headers["Content-Disposition"].startswith("inline")
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
-        assert "Content-Security-Policy" not in resp.headers
+        csp = resp.headers["Content-Security-Policy"]
+        assert "sandbox" not in csp
+        assert "object-src 'self'" in csp
 
     @pytest.mark.parametrize(
         "filename,mimetype",

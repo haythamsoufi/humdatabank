@@ -26,6 +26,10 @@ def test_operation_label_puts_code_first_and_names_the_parent():
     legacy = parse_operation_label("Uganda - Population Movement (MDRUG051)")
     assert legacy["code"] == "MDRUG051"
     assert legacy["name"] == "Uganda - Population Movement"
+    bare = parse_operation_label("MDRAF018")
+    assert bare["code"] == "MDRAF018"
+    assert bare["name"] == ""
+    assert parse_operation_label("MDRS1001")["code"] == "MDRS1001"
 
 
 def test_emergency_and_minor_emergency_map_to_go_type_names():

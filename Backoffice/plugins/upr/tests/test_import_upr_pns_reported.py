@@ -32,6 +32,7 @@ from import_upr_excel_data import (  # noqa: E402
     plan_pns_assignment_status_updates,
     reported_pns_aes_in_scope,
     t23_matrix_has_funding_columns,
+    t23_pns_funding_matrix_column,
     transform_to_import_rows,
     upr_pns_import_item_ids,
 )
@@ -501,14 +502,14 @@ def _ar25_pns_funding_row(**overrides):
         "Section": "Funding",
         "Entity": "PNS",
         "NS": "British Red Cross",
-        "Area": "Total",
+        "Area": "",
         "Year": 2025,
         "Indicator": "Funding",
         "indicatorId": 733,
         "ValueNum": 100000,
         "Source": "PNS Data",
         "PNS reported": "",
-        "Attribute": "Funding Source",
+        "Attribute": "Total",
     }
     base.update(overrides)
     return base
@@ -568,6 +569,49 @@ class TestT23ReportingPnsDataSource:
         assert len(item_rows) == 1
         cells = json.loads(item_rows[0]["disagg_data"])
         assert cells["77_Total Funding"] == 100000
+
+    def test_sp_breakdown_expenditure_does_not_replace_the_total(self):
+        ctx = self._ctx()
+        rows = [
+            _ar25_pns_funding_row(Indicator="Expenditure", indicatorId=734, ValueNum=53794),
+            _ar25_pns_funding_row(Indicator="Funding", indicatorId=733, ValueNum=107588),
+            _ar25_pns_funding_row(Indicator="Transferred", indicatorId="00005", ValueNum=107588),
+            _ar25_pns_funding_row(
+                Indicator="Expenditure", indicatorId=734, ValueNum=281233,
+                Attribute="SP Breakdown", Area="SP2",
+            ),
+            _ar25_pns_funding_row(
+                Indicator="Expenditure", indicatorId=734, ValueNum=107588,
+                Attribute="SP Breakdown", Area="SP3",
+            ),
+        ]
+        import_rows = transform_to_import_rows(
+            rows, ctx, template_ids=[23], rounds={"AR25"}
+        )
+        item_rows = [r for r in import_rows if r["item_id"] == "1433"]
+        assert len(item_rows) == 1
+        cells = json.loads(item_rows[0]["disagg_data"])
+        assert cells["77_Total Funding"] == 107588
+        assert cells["77_Total Expenditure"] == 53794
+        assert cells["77_Total Transferred to HNS"] == 107588
+        assert cells["77_SP2"] == 281233
+        assert cells["77_SP3"] == 107588
+
+    def test_unknown_sp_breakdown_area_is_not_written_to_total_expenditure(self):
+        ctx = self._ctx()
+        transform_to_import_rows(
+            [_ar25_pns_funding_row(
+                Indicator="Expenditure", indicatorId=734, ValueNum=107588,
+                Attribute="SP Breakdown", Area="EA1",
+            )],
+            ctx,
+            template_ids=[23],
+            rounds={"AR25"},
+        )
+        assert any("Unknown SP/EF area" in w for w in ctx.warnings)
+        assert t23_pns_funding_matrix_column(
+            {"Attribute": "SP Breakdown", "indicatorId": 734, "Area": "EA1"}
+        ) is None
 
     def test_skips_country_data_source(self):
         ctx = self._ctx()

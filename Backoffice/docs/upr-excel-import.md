@@ -404,6 +404,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 - NS name → home country ISO3 → template 23 AES (`period_name` `2025` / `2025 Annual` / `AR25` all match AR25)
 - Row key: `iso3_to_hns_id[host_ISO3]` (the host country's primary NS)
 - Columns: `Total Funding` (iid 733), `Total Expenditure` (iid 734), `Total Transferred to HNS` (iid 5, from `00005`)
+- `Attribute = Total` writes those three columns. `Attribute = SP Breakdown` with indicator 734 writes `Area` (`SP1`–`SP5`, `EFs`) to the expenditure-breakdown column of the same name. Breakdown rows share indicator 734 with the total and must not overwrite `Total Expenditure`.
 - Upsert only writes published item ids. If the matrix cannot be resolved, T23 rows are skipped.
 - `Funding Requirement` (iid 2, `00002`) is pre-filled from planning (variable/readonly) — skipped
 

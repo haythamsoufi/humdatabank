@@ -490,6 +490,28 @@ def is_skipped_legacy_funding_area(area: Any) -> bool:
     return str(area or "").strip() in SKIPPED_LEGACY_FUNDING_AREAS
 
 
+def t23_pns_funding_matrix_column(row: Dict[str, Any]) -> Optional[str]:
+    """Template 23 funding-matrix column for one PNS Data row.
+
+    ``Attribute = Total`` maps indicator 733 / 734 / 5 to Total Funding,
+    Total Expenditure, and Total Transferred to HNS.
+
+    ``Attribute = SP Breakdown`` maps Expenditure (734) to the Area column
+    (``SP1``–``SP5``, ``EFs``). Those rows use the same indicator id as the
+    expenditure total, so they stay on the breakdown column and leave
+    Total Expenditure unchanged.
+    """
+    attr = str(row.get("Attribute") or "").strip().lower()
+    indicator_id = normalize_indicator_id(row.get("indicatorId"))
+    if attr == "total":
+        return T23_PNS_FUNDING_COLUMNS.get(indicator_id)
+    if attr == "sp breakdown" and indicator_id == REPORTING_EXPENDITURE_BANK_ID:
+        area = str(row.get("Area") or "").strip()
+        if area in T22_BREAKDOWN_AREAS:
+            return area
+    return None
+
+
 def is_planning_confirmed_funding_row(row: Dict[str, Any]) -> bool:
     """True for UPR Master ``Confirmed Funding`` rows (no indicator bank id).
 
@@ -4888,6 +4910,8 @@ def transform_to_import_rows(
             # ── T23: PNS self-report Funding / Expenditure / Transferred ──
             # Reporting is PNS-only: Source=PNS Data, amount is ValueNum (not Country/PNS Value).
             # AES is keyed by PNS home country ISO3; row is the host country's NS id.
+            # Attribute=Total → the three total columns. Attribute=SP Breakdown and
+            # indicator 734 → that Area's expenditure column (SP1–SP5, EFs).
             if 23 in tids and rnd.startswith("AR") and ent_upper == "PNS" and is_pns_data_source(row):
                 if not ctx.pns_funding_item_id:
                     skip_msg = (
@@ -4896,7 +4920,18 @@ def transform_to_import_rows(
                     if skip_msg not in ctx.warnings:
                         ctx.warnings.append(skip_msg)
                 else:
-                    col_name = T23_PNS_FUNDING_COLUMNS.get(indicator_id)
+                    col_name = t23_pns_funding_matrix_column(row)
+                    if (
+                        not col_name
+                        and attr_lower == "sp breakdown"
+                        and indicator_id == REPORTING_EXPENDITURE_BANK_ID
+                    ):
+                        unknown_area = str(row.get("Area") or "").strip()
+                        if unknown_area:
+                            ctx.warnings.append(
+                                f"Unknown SP/EF area for template 23 expenditure breakdown: "
+                                f"{unknown_area!r} ({iso3} {rnd})"
+                            )
                     if col_name and ns_name and ns_name.lower() not in ("country", ""):
                         pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
                         if not pns_iso3:
